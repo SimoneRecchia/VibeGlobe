@@ -24,7 +24,7 @@ The visual suite (`e2e/visual.spec.ts`) renders canonical views on WebGPU and on
 Baselines change only in a commit that says why, and only from the pinned environment:
 
 1. Make the intended visual change and commit it, with the reason, on your branch.
-2. Run the **Visual baselines** workflow (Actions → Visual baselines → Run workflow) on that branch. It records every baseline with `--update-snapshots=all` and commits the result to the branch.
+2. Start the **Visual baselines** workflow on that branch: run it from Actions → Visual baselines, or push a commit that rewrites `e2e/__baselines__/request.md` with the reason. It records every baseline with `--update-snapshots=all` and commits the result to the branch.
 3. Review the new images in the pull request before merging.
 
 Never update baselines from a local machine: another GPU, driver or Chromium build gives different pixels.

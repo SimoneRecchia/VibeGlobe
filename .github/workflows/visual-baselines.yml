@@ -2,9 +2,13 @@ name: Visual baselines
 
 # Records the visual-test baselines in the pinned environment (ADR 0012): Playwright's own Chromium on a GitHub-hosted
 # runner, the same setup as the CI end-to-end job. Run it manually on a branch after an intended visual change; it
-# commits the new baselines to that branch. Procedure: docs/guides/visual-tests.md.
+# commits the new baselines to that branch. A push that changes e2e/__baselines__/request.md (the reason for new
+# baselines) also starts it, so it works on branches before the workflow reaches the default branch. Procedure:
+# docs/guides/visual-tests.md.
 on:
   workflow_dispatch:
+  push:
+    paths: ['e2e/__baselines__/request.md']
 
 permissions:
   contents: write

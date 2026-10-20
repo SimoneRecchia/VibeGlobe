@@ -10,5 +10,12 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
   "include": ["src"],
-  "references": [{ "path": "../../packages/core" }]
+  "references": [
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/ui"
+    }
+  ]
 }

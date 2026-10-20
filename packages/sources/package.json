@@ -1,0 +1,17 @@
+{
+  "name": "@vibeglobe/sources",
+  "version": "0.0.0",
+  "description": "VibeGlobeEngine sources: source adapters for imagery, terrain, vector and 3D data, with provider profiles.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -20,7 +20,8 @@ const { features } = list;
 const invalid = features.filter((f) => f.status !== 'passing' && f.status !== 'failing');
 const duplicateIds = features.map((f) => f.id).filter((id, index, ids) => ids.indexOf(id) !== index);
 if (invalid.length > 0 || duplicateIds.length > 0) {
-  if (invalid.length > 0) console.error(`Invalid status (expected "passing" or "failing"): ${invalid.map((f) => f.id).join(', ')}`);
+  if (invalid.length > 0)
+    console.error(`Invalid status (expected "passing" or "failing"): ${invalid.map((f) => f.id).join(', ')}`);
   if (duplicateIds.length > 0) console.error(`Duplicate ids: ${duplicateIds.join(', ')}`);
   process.exit(1);
 }

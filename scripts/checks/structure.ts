@@ -1,0 +1,52 @@
+import type { WorkspacePackage } from '../workspace.ts';
+
+/** Library packages required by PLAN.md "Architecture guidance", published as `@vibeglobe/<dir>`. */
+export const LIBRARY_PACKAGES = [
+  'core',
+  'renderer',
+  'sources',
+  'layers',
+  'controls',
+  'offline',
+  'ui',
+  'vue',
+  'web-component',
+  'tools',
+];
+const REQUIRED_APPS = ['playground'];
+
+/**
+ * Every package follows one layout: package.json, src/, a CLAUDE.md, ESM, a lowercase name, tests next to code; library
+ * packages also have a `src/index.ts` entry and are side-effect free.
+ */
+export function findStructureViolations(packages: WorkspacePackage[]): string[] {
+  const violations: string[] = [];
+  const dirs = new Set(packages.map((pkg) => pkg.dir));
+  for (const name of LIBRARY_PACKAGES)
+    if (!dirs.has(`packages/${name}`)) violations.push(`packages/${name}: missing package`);
+  for (const name of REQUIRED_APPS) if (!dirs.has(`apps/${name}`)) violations.push(`apps/${name}: missing app`);
+
+  for (const pkg of packages) {
+    const has = (file: string): boolean => pkg.files.includes(`${pkg.dir}/${file}`);
+    const isLibrary = pkg.dir.startsWith('packages/');
+    const folder = pkg.dir.split('/')[1] ?? '';
+    const expectedName = `@vibeglobe/${folder}`;
+    if (!has('package.json')) violations.push(`${pkg.dir}: missing package.json`);
+    if (!has('CLAUDE.md')) violations.push(`${pkg.dir}: missing CLAUDE.md`);
+    if (!pkg.files.some((file) => file.startsWith(`${pkg.dir}/src/`))) violations.push(`${pkg.dir}: missing src/`);
+    if (folder !== folder.toLowerCase()) violations.push(`${pkg.dir}: package folder names must be lowercase`);
+    else if (pkg.manifest.name !== expectedName) violations.push(`${pkg.dir}: package name must be "${expectedName}"`);
+    if (pkg.manifest.type !== 'module') violations.push(`${pkg.dir}: package.json must declare "type": "module"`);
+    if (isLibrary && !has('src/index.ts')) violations.push(`${pkg.dir}: missing src/index.ts entry point`);
+    if (isLibrary && pkg.manifest.sideEffects !== false)
+      violations.push(`${pkg.dir}: package.json must declare "sideEffects": false`);
+    for (const file of pkg.files) {
+      if (/\/(test|tests|__tests__)\//.test(file))
+        violations.push(`${file}: tests live next to the code they test, not in a test folder`);
+      if (/\.(test|spec)\.ts$/.test(file) && !file.startsWith(`${pkg.dir}/src/`)) {
+        violations.push(`${file}: tests live next to the code they test, inside src/`);
+      }
+    }
+  }
+  return violations;
+}

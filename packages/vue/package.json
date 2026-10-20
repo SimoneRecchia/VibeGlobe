@@ -1,0 +1,17 @@
+{
+  "name": "@vibeglobe/vue",
+  "version": "0.0.0",
+  "description": "VibeGlobeEngine vue: vue 3 adapter: components and composables, SSR-safe.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

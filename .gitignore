@@ -6,3 +6,5 @@ test-results/
 playwright-report/
 .playground.log
 .playground.pid
+benchmark-results/
+docs-site/

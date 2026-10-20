@@ -20,9 +20,9 @@ const globe = createGlobe({
   network: { mode: 'hybrid' },
 });
 
-await globe.ready;               // first complete frame from the pinned base
+await globe.ready; // first complete frame from the pinned base
 await globe.flyTo({ longitudeDeg: 139.69, latitudeDeg: 35.68, zoom: 15 });
-globe.destroy();                 // frees GPU memory, RAM, workers, listeners
+globe.destroy(); // frees GPU memory, RAM, workers, listeners
 ```
 
 ```ts
@@ -32,13 +32,13 @@ interface GlobeOptions {
   controls?: ControlsFactory;
   imagery?: ImageryLayerInput[];
   terrain?: TerrainSource;
-  view?: ViewInit;                       // initial camera
-  viewMode?: ViewMode;                   // default 'auto'
+  view?: ViewInit; // initial camera
+  viewMode?: ViewMode; // default 'auto'
   constraints?: CameraConstraints;
   network?: NetworkOptions;
-  loading?: Partial<LoadingSwitches>;    // global switches, all true by default
+  loading?: Partial<LoadingSwitches>; // global switches, all true by default
   quality?: QualityPreset | 'auto';
-  resolutionScale?: number;              // multiplies devicePixelRatio
+  resolutionScale?: number; // multiplies devicePixelRatio
   memory?: { gpuBudgetBytes?: number; ramBudgetBytes?: number };
   assets?: { workerUrl?: string; wasmBaseUrl?: string };
   logger?: LoggerOptions;
@@ -47,8 +47,8 @@ interface GlobeOptions {
 interface Globe {
   readonly ready: Promise<void>;
   readonly backend: 'webgpu' | 'webgl2';
-  readonly camera: CameraState;          // applied values, read-only snapshot
-  readonly view: ViewController;         // modes, chosen tilt/heading
+  readonly camera: CameraState; // applied values, read-only snapshot
+  readonly view: ViewController; // modes, chosen tilt/heading
   readonly layers: LayerStack;
   readonly network: NetworkController;
   readonly debug: DebugController;
@@ -60,12 +60,12 @@ interface Globe {
   fitBounds(bounds: GeoBounds, options?: { paddingPx?: Padding }): CameraAnimation;
 
   pick(screenPoint: ScreenPoint): Promise<PickResult | undefined>;
-  getElevation(position: GeoPosition): number | undefined;         // best available, synchronous
-  getElevationPrecise(position: GeoPosition): Promise<number>;     // loads the finest level
+  getElevation(position: GeoPosition): number | undefined; // best available, synchronous
+  getElevationPrecise(position: GeoPosition): Promise<number>; // loads the finest level
   screenToGeo(screenPoint: ScreenPoint): GeoPosition | undefined;
   geoToScreen(position: GeoPosition): ScreenPoint | undefined;
 
-  getViewState(): ViewState;             // serializable (URL or JSON)
+  getViewState(): ViewState; // serializable (URL or JSON)
   setViewState(state: ViewState): void;
   screenshot(options?: { widthPx?: number; heightPx?: number }): Promise<Blob>;
 
@@ -88,21 +88,21 @@ type ViewMode = 'auto' | '2d' | 'manual';
 interface CameraState {
   longitudeDeg: number;
   latitudeDeg: number;
-  zoom: number;                 // continuous, fractional
-  altitudeMeters: number;       // above the ellipsoid
-  headingDeg: number;           // applied
-  tiltDeg: number;              // applied
-  morph: number;                // 0 = globe, 1 = flat
+  zoom: number; // continuous, fractional
+  altitudeMeters: number; // above the ellipsoid
+  headingDeg: number; // applied
+  tiltDeg: number; // applied
+  morph: number; // 0 = globe, 1 = flat
   reliefScale: number;
 }
 
 interface ViewController {
   readonly mode: ViewMode;
-  readonly chosenTiltDeg: number | undefined;    // undefined in 'auto'
+  readonly chosenTiltDeg: number | undefined; // undefined in 'auto'
   readonly chosenHeadingDeg: number;
-  setAuto(): void;                // zoom-driven curves
-  set2D(): void;                  // tilt locked to 0°, morph still active
-  set3D(tiltDeg?: number): void;  // manual mode with a default tilt
+  setAuto(): void; // zoom-driven curves
+  set2D(): void; // tilt locked to 0°, morph still active
+  set3D(tiltDeg?: number): void; // manual mode with a default tilt
   setHeading(headingDeg: number): void;
   resetNorth(): void;
 }
@@ -112,7 +112,7 @@ interface CameraConstraints {
   maxZoom?: number;
   maxTiltDeg?: number;
   bounds?: GeoBounds;
-  terrainCollision?: boolean;     // default true
+  terrainCollision?: boolean; // default true
 }
 ```
 
@@ -121,11 +121,15 @@ Internally the camera holds `chosen` and `applied` orientation; constraints writ
 ## Tiles
 
 ```ts
-type TileKey = number;                 // packed quadtree index, exact up to level 25
-interface TileCoord { level: number; x: number; y: number }
+type TileKey = number; // packed quadtree index, exact up to level 25
+interface TileCoord {
+  level: number;
+  x: number;
+  y: number;
+}
 
 interface TilingScheme {
-  readonly crs: string;                // e.g. 'EPSG:3857', 'EPSG:4326', 'EPSG:32632'
+  readonly crs: string; // e.g. 'EPSG:3857', 'EPSG:4326', 'EPSG:32632'
   readonly rootTilesX: number;
   readonly rootTilesY: number;
   tileExtent(coord: TileCoord, out: GeoRectangle): GeoRectangle;
@@ -133,8 +137,7 @@ interface TilingScheme {
 }
 
 type TileState =
-  | 'unloaded' | 'queued' | 'loading' | 'decoding' | 'decoded'
-  | 'uploading' | 'ready' | 'failed' | 'noData';
+  'unloaded' | 'queued' | 'loading' | 'decoding' | 'decoded' | 'uploading' | 'ready' | 'failed' | 'noData';
 ```
 
 ## Sources and provider profiles
@@ -144,11 +147,11 @@ interface SourceMetadata {
   id: string;
   kind: 'imagery' | 'terrain' | 'vector' | '3d';
   tilingScheme: TilingScheme;
-  coverage?: GeoBounds | GeoBounds[];  // tiles outside are never requested
+  coverage?: GeoBounds | GeoBounds[]; // tiles outside are never requested
   minLevel: number;
   maxLevel: number;
   tileSizePx?: 256 | 512 | number;
-  pixelRatio?: 1 | 2;                  // @2x tiles
+  pixelRatio?: 1 | 2; // @2x tiles
   attribution: Attribution;
   profile: ProviderProfile;
   auth?: { headers?: Record<string, string>; token?: () => Promise<string> };
@@ -164,16 +167,20 @@ interface TileSource<TDecoded> {
 }
 
 interface ProviderProfile {
-  id: string;                                    // 'google', 'osm-public', 'osm-selfhosted', 'custom', …
-  forbids: ReadonlySet<keyof LoadingSwitches>;   // a profile can only switch features off
+  id: string; // 'google', 'osm-public', 'osm-selfhosted', 'custom', …
+  forbids: ReadonlySet<keyof LoadingSwitches>; // a profile can only switch features off
   respectCacheHeaders: boolean;
   maxConcurrentRequests?: number;
-  requiredAttribution: Attribution;              // text and/or logo, never covered
-  sessionRenewalSeconds?: number;                // e.g. Google 3D sessions
-  termsAdr: string;                              // ADR recording the terms reading
+  requiredAttribution: Attribution; // text and/or logo, never covered
+  sessionRenewalSeconds?: number; // e.g. Google 3D sessions
+  termsAdr: string; // ADR recording the terms reading
 }
 
-interface Attribution { text: string; url?: string; logo?: { src: string; alt: string } }
+interface Attribution {
+  text: string;
+  url?: string;
+  logo?: { src: string; alt: string };
+}
 ```
 
 Layer composition: `ImageryLayerInput` is either a source or `{ sources: TileSource[] /* priority chain */, opacity, visible, blend, harmonize }`; the chain falls back by coverage and availability.
@@ -186,12 +193,12 @@ type NetworkMode = 'online' | 'offline' | 'hybrid';
 interface LoadingSwitches {
   persistentCache: boolean;
   memoryReuse: boolean;
-  prefetch: boolean;           // also flight preloading
+  prefetch: boolean; // also flight preloading
   offlinePackaging: boolean;
 }
 
 interface NetworkController {
-  mode: NetworkMode;                                  // settable at runtime
+  mode: NetworkMode; // settable at runtime
   setSwitches(switches: Partial<LoadingSwitches>, scope?: { layerId?: string; sourceId?: string }): void;
   readonly connectivity: 'online' | 'offline' | 'degraded';
   readonly bandwidthBytesPerSecond: number | undefined;
@@ -219,7 +226,10 @@ interface OfflinePackageManifest {
 interface PackageManager {
   list(): Promise<InstalledPackage[]>;
   estimate(request: PackageRequest): Promise<{ tiles: number; bytes: number }>;
-  install(from: URL | File | PackageRequest, options?: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstalledPackage>;
+  install(
+    from: URL | File | PackageRequest,
+    options?: { signal?: AbortSignal; onProgress?: (p: Progress) => void },
+  ): Promise<InstalledPackage>;
   update(id: string): Promise<InstalledPackage>;
   remove(id: string): Promise<void>;
   storageUsage(): Promise<{ bytes: number; quotaBytes: number | undefined; persisted: boolean }>;
@@ -230,12 +240,14 @@ interface PackageManager {
 ## Data layers (`@vibeglobe/layers`)
 
 ```ts
-const sensors = globe.layers.add(pointLayer({
-  data: featureCollection,                 // or an async iterable stream
-  placement: 'clamp-to-ground',            // | 'drape' | { absoluteAltitudeMeters: number }
-  style: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2, 15, 8], 'circle-color': ['get', 'color'] },
-  cluster: { radiusPx: 60 },
-}));
+const sensors = globe.layers.add(
+  pointLayer({
+    data: featureCollection, // or an async iterable stream
+    placement: 'clamp-to-ground', // | 'drape' | { absoluteAltitudeMeters: number }
+    style: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2, 15, 8], 'circle-color': ['get', 'color'] },
+    cluster: { radiusPx: 60 },
+  }),
+);
 
 sensors.updateFeature('s-42', { position: [9.2, 45.5], properties: { color: '#f00' } });
 sensors.setFeatureVisible('s-42', false);
@@ -253,27 +265,27 @@ interface GlobeEvents {
   'camera-change': CameraState;
   'move-end': CameraState;
   'view-mode-change': { mode: ViewMode };
-  'idle': void;                                      // nothing moving, every visible tile ready
+  idle: void; // nothing moving, every visible tile ready
   'tile-load': { sourceId: string; coord: TileCoord };
   'tile-error': { sourceId: string; coord: TileCoord; reason: TileErrorReason };
   'connectivity-change': { connectivity: 'online' | 'offline' | 'degraded' };
   'device-lost': { reason: string };
   'device-restored': void;
-  'error': EngineError;
+  error: EngineError;
 }
 ```
 
 ## Plug-in interfaces defined by core
 
-| Interface | Implemented by |
-| --- | --- |
-| `RendererBackend` (+ `RendererFactory`) | `@vibeglobe/renderer` |
-| `TileSource`, `DecoderRef`, `TilingScheme` | `@vibeglobe/sources`, applications |
-| `CacheStore` | `@vibeglobe/offline` |
-| `NetworkPolicy` (resolves mode, switches and profiles) | core default; replaceable |
-| `Controls` (+ `ControlsFactory`) | `@vibeglobe/controls` |
-| `Geocoder` | applications (no default provider) |
-| `Layer` | `@vibeglobe/layers`, applications |
+| Interface                                              | Implemented by                     |
+| ------------------------------------------------------ | ---------------------------------- |
+| `RendererBackend` (+ `RendererFactory`)                | `@vibeglobe/renderer`              |
+| `TileSource`, `DecoderRef`, `TilingScheme`             | `@vibeglobe/sources`, applications |
+| `CacheStore`                                           | `@vibeglobe/offline`               |
+| `NetworkPolicy` (resolves mode, switches and profiles) | core default; replaceable          |
+| `Controls` (+ `ControlsFactory`)                       | `@vibeglobe/controls`              |
+| `Geocoder`                                             | applications (no default provider) |
+| `Layer`                                                | `@vibeglobe/layers`, applications  |
 
 ## Framework adapters
 

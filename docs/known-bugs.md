@@ -1,0 +1,10 @@
+# Known bugs
+
+Every bug found is listed here until it is fixed, and stays listed afterwards as a record. Rules (`PLAN.md`, Correctness):
+
+- A fix starts with a failing regression test that reproduces the bug; the test is named below.
+- No known bug may remain open at the end of a milestone, and a release ships with none open.
+
+| Id     | Symptom                                                                                                                                                                                                                                                                                                                                        | Reproduction                                                                                         | Status     | Regression test                                                                                     |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
+| KB-001 | The `local/no-commented-out-code` lint rule never reported anything, so commented-out code passed `npm run lint`. Root cause: it called `tseslint.parser.parse`, which does not exist (the parser exposes `parseForESLint`), and its `catch` treated the resulting `TypeError` as "not code". Found in M1 before the rule was first committed. | Put `// const old = legacy();` above any statement in a `.ts` file and run `npm run lint`: no error. | Fixed (M1) | `scripts/eslint/no-commented-out-code.test.ts` ("flags …" cases and the `invalid` RuleTester cases) |

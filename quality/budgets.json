@@ -1,0 +1,51 @@
+{
+  "bundleExternal": ["three"],
+  "features": {
+    "frame-loop": {
+      "scenario": "frame-loop",
+      "frameTimeP95Ms": 18,
+      "cpuFrameP95Ms": 2
+    },
+    "debug-overlay": {
+      "scenario": "debug-overlay",
+      "frameTimeP95Ms": 18,
+      "cpuFrameP95Ms": 2
+    }
+  },
+  "packages": {
+    "core": {
+      "bundleGzipKB": 60,
+      "memoryScenario": "frame-loop",
+      "jsHeapMB": 32
+    },
+    "renderer": {
+      "bundleGzipKB": 40
+    },
+    "sources": {
+      "bundleGzipKB": 40
+    },
+    "layers": {
+      "bundleGzipKB": 40
+    },
+    "controls": {
+      "bundleGzipKB": 15
+    },
+    "offline": {
+      "bundleGzipKB": 25
+    },
+    "ui": {
+      "bundleGzipKB": 25,
+      "memoryScenario": "debug-overlay",
+      "jsHeapMB": 32
+    },
+    "vue": {
+      "bundleGzipKB": 5
+    },
+    "web-component": {
+      "bundleGzipKB": 5
+    },
+    "tools": {
+      "bundleGzipKB": 100
+    }
+  }
+}

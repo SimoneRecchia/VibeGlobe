@@ -9,5 +9,13 @@
     "types": ["node"],
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tools.tsbuildinfo"
   },
-  "include": ["scripts", "e2e", "vitest.config.ts", "playwright.config.ts", "apps/*/vite.config.ts"]
+  "include": [
+    "scripts",
+    "benchmarks",
+    "e2e",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "apps/*/vite.config.ts",
+    "eslint.config.ts"
+  ]
 }

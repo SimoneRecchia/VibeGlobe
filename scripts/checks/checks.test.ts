@@ -15,6 +15,7 @@ function pkg(
   return {
     dir,
     manifest: { name: `@vibeglobe/${folder}`, type: 'module', sideEffects: false },
+    tsconfig: { compilerOptions: { outDir: 'dist', tsBuildInfoFile: 'dist/tsconfig.tsbuildinfo' } },
     files,
     sources: Object.entries(sources).map(([path, content]) => ({ path, content })),
     ...overrides,
@@ -65,6 +66,18 @@ describe('findStructureViolations', () => {
       'packages/ui: missing CLAUDE.md',
       'packages/ui/test/ui.test.ts: tests live next to the code they test, not in a test folder',
       'packages/ui/test/ui.test.ts: tests live next to the code they test, inside src/',
+    ]);
+  });
+
+  it('reports build info kept outside the output folder (KB-002)', () => {
+    const workspace = validWorkspace();
+    find(workspace, 'packages/vue').tsconfig = { compilerOptions: { outDir: 'dist' } };
+    find(workspace, 'packages/ui').tsconfig = {
+      compilerOptions: { outDir: 'dist', tsBuildInfoFile: 'tsconfig.tsbuildinfo' },
+    };
+    expect(findStructureViolations(workspace)).toEqual([
+      'packages/ui: tsconfig.json must set "tsBuildInfoFile" inside its "outDir"',
+      'packages/vue: tsconfig.json must set "tsBuildInfoFile" inside its "outDir"',
     ]);
   });
 

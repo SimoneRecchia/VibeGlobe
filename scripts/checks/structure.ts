@@ -40,6 +40,11 @@ export function findStructureViolations(packages: WorkspacePackage[]): string[] 
     if (isLibrary && !has('src/index.ts')) violations.push(`${pkg.dir}: missing src/index.ts entry point`);
     if (isLibrary && pkg.manifest.sideEffects !== false)
       violations.push(`${pkg.dir}: package.json must declare "sideEffects": false`);
+    // The build info must live inside the output folder: deleting dist/ then forces tsc -b to rebuild (KB-002).
+    const options = pkg.tsconfig?.compilerOptions;
+    if (isLibrary && !(options?.outDir && options.tsBuildInfoFile?.startsWith(`${options.outDir}/`))) {
+      violations.push(`${pkg.dir}: tsconfig.json must set "tsBuildInfoFile" inside its "outDir"`);
+    }
     for (const file of pkg.files) {
       if (/\/(test|tests|__tests__)\//.test(file))
         violations.push(`${file}: tests live next to the code they test, not in a test folder`);

@@ -12,6 +12,10 @@ export interface PackageManifest {
   devDependencies?: Record<string, string>;
 }
 
+export interface TsConfig {
+  compilerOptions?: { outDir?: string; tsBuildInfoFile?: string };
+}
+
 export interface SourceFile {
   /** Path relative to the repository root, with forward slashes. */
   path: string;
@@ -22,6 +26,8 @@ export interface WorkspacePackage {
   /** Directory relative to the repository root, for example `packages/core`. */
   dir: string;
   manifest: PackageManifest;
+  /** The package's build `tsconfig.json`, when it has one. */
+  tsconfig?: TsConfig;
   /** Every file under the package directory except build output and dependencies, relative to the root. */
   files: string[];
   /** TypeScript and Vue sources under `src/`. */
@@ -54,11 +60,15 @@ export function readWorkspace(rootDir: string = ROOT_DIR): WorkspacePackage[] {
       const manifest = existsSync(manifestPath)
         ? (JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageManifest)
         : {};
+      const tsconfigPath = join(dir, 'tsconfig.json');
+      const tsconfig = existsSync(tsconfigPath)
+        ? (JSON.parse(readFileSync(tsconfigPath, 'utf8')) as TsConfig)
+        : undefined;
       const files = listFiles(dir).map((file) => relative(rootDir, file).split('\\').join('/'));
       const sources = files
         .filter((file) => /\/src\/.*\.(ts|vue)$/.test(file))
         .map((path) => ({ path, content: readFileSync(join(rootDir, path), 'utf8') }));
-      packages.push({ dir: `${group}/${name}`, manifest, files, sources });
+      packages.push({ dir: `${group}/${name}`, manifest, files, sources, ...(tsconfig ? { tsconfig } : {}) });
     }
   }
   return packages;

@@ -25,6 +25,7 @@ describe('zoom', () => {
     const lat = (60 * Math.PI) / 180;
     expect(groundZoomFromMercatorZoom(10, lat)).toBeCloseTo(11, 12);
     expect(mercatorZoomFromGroundZoom(11, lat)).toBeCloseTo(10, 12);
-    expect(Number.isFinite(groundZoomFromMercatorZoom(3, Math.PI / 2))).toBe(true);
+    // At and beyond the Web Mercator limit the limit's scale factor applies (cosh π ≈ 11.59, so +3.53 levels).
+    expect(groundZoomFromMercatorZoom(3, Math.PI / 2)).toBeCloseTo(3 + Math.log2(Math.cosh(Math.PI)), 9);
   });
 });

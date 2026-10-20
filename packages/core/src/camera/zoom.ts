@@ -1,4 +1,5 @@
 import { WGS84 } from '../geodesy/wgs84.js';
+import { clampWebMercatorLatitudeRad } from '../projections/web-mercator.js';
 
 /** Default vertical field of view, in radians (about 36.87°, a natural perspective that keeps the horizon calm). */
 export const DEFAULT_FOV_Y_RAD = 0.6435011087932844;
@@ -25,12 +26,15 @@ export function groundZoomForRange(rangeMeters: number, viewportHeightPx: number
   return Math.log2(EQUATOR_METERS / (TILE_SIZE_PX * metersPerPixel));
 }
 
-/** Web Mercator zoom (the public `zoom`) from ground zoom at a latitude: zoom = z_g − log2 k(φ), k = 1 / cos φ. */
+/**
+ * Web Mercator zoom (the public `zoom`) from ground zoom at a latitude: zoom = z_g − log2 k(φ), k = 1 / cos φ. Beyond
+ * the Web Mercator limit (about ±85.05°) the scale factor of the limit applies, so zoom stays finite at the poles.
+ */
 export function mercatorZoomFromGroundZoom(groundZoom: number, latitudeRad: number): number {
-  return groundZoom + Math.log2(Math.max(Math.cos(latitudeRad), 1e-12));
+  return groundZoom + Math.log2(Math.cos(clampWebMercatorLatitudeRad(latitudeRad)));
 }
 
 /** Ground zoom from Web Mercator zoom at a latitude; inverse of {@link mercatorZoomFromGroundZoom}. */
 export function groundZoomFromMercatorZoom(zoom: number, latitudeRad: number): number {
-  return zoom - Math.log2(Math.max(Math.cos(latitudeRad), 1e-12));
+  return zoom - Math.log2(Math.cos(clampWebMercatorLatitudeRad(latitudeRad)));
 }

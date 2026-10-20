@@ -56,6 +56,7 @@ class GlobeEngine implements Globe {
   private imageryLoaded = false;
   private destroyed = false;
   private resolveReady: (() => void) | undefined;
+  private resolutionScale: number;
   private readonly frameView = {
     view: this.cam.view,
     projection: this.cam.projection,
@@ -66,6 +67,7 @@ class GlobeEngine implements Globe {
   };
 
   constructor(private readonly options: GlobeOptions) {
+    this.resolutionScale = options.resolutionScale ?? 1;
     this.navigation = {
       grab: (point) => this.screenToGeo(point),
       dragTo: (anchor, point) => this.dragTo(anchor, point),
@@ -142,7 +144,7 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     if (!renderer) return;
     const { widthPx, heightPx } = renderer.host.containerSize();
-    const pixelRatio = renderer.host.pixelRatio() * (this.options.resolutionScale ?? 1);
+    const pixelRatio = renderer.host.pixelRatio() * this.resolutionScale;
     this.cam.widthPx = Math.max(1, widthPx);
     this.cam.heightPx = Math.max(1, heightPx);
     this.frameView.widthPx = this.cam.widthPx;
@@ -186,9 +188,23 @@ class GlobeEngine implements Globe {
     else this.emitter.emit('idle', { frameNumber: this.frames });
   }
 
+  setResolutionScale(scale: number): void {
+    this.assertAlive();
+    if (typeof scale !== 'number' || !(scale >= 0.1 && scale <= 4)) {
+      throw new GlobeError(
+        'invalid-option',
+        `resolutionScale must be a number between 0.1 and 4, got ${String(scale)}`,
+      );
+    }
+    this.resolutionScale = scale;
+    this.syncSize();
+    this.requestRender();
+  }
+
   jumpTo(target: ViewInit): void {
     this.assertAlive();
-    applyView(this.cam, validateView(target, currentView(this.cam)));
+    const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
+    applyView(this.cam, validateView(target, currentView(this.cam)), keepRange);
     this.cam.update();
     this.requestRender();
   }

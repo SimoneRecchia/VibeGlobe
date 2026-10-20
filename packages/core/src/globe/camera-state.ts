@@ -36,14 +36,18 @@ export function readCameraState(camera: Camera): CameraState {
   };
 }
 
-/** Applies a validated view to the camera pose. */
-export function applyView(camera: Camera, view: ValidView): void {
+/**
+ * Applies a validated view to the camera pose. With `keepRange` the ground scale is kept and `view.zoom` is ignored, so
+ * moving the target never changes the scale (ADR 0009: pans keep range).
+ */
+export function applyView(camera: Camera, view: ValidView, keepRange = false): void {
   const { pose } = camera;
   pose.targetLongitudeRad = wrapDegrees(view.longitudeDeg) * RAD;
   pose.targetLatitudeRad = view.latitudeDeg * RAD;
   pose.targetHeightMeters = 0;
   pose.headingRad = wrapDegrees(view.headingDeg) * RAD;
   pose.tiltRad = view.tiltDeg * RAD;
+  if (keepRange) return;
   const groundZoom = groundZoomFromMercatorZoom(view.zoom, pose.targetLatitudeRad);
   pose.rangeMeters = clampRange(camera, rangeForGroundZoom(groundZoom, camera.heightPx, camera.fovYRad));
 }
@@ -51,7 +55,8 @@ export function applyView(camera: Camera, view: ValidView): void {
 /** Clamps a range so the eye stays at least {@link MIN_EYE_HEIGHT_METERS} above the ellipsoid. */
 export function clampRange(camera: Camera, rangeMeters: number): number {
   const cosTilt = Math.max(Math.cos(camera.pose.tiltRad), 0.05);
-  const minimum = (MIN_EYE_HEIGHT_METERS - Math.min(camera.pose.targetHeightMeters, 0)) / cosTilt;
+  // A micrometer of margin keeps float rounding from ever reporting the eye below the minimum.
+  const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - Math.min(camera.pose.targetHeightMeters, 0)) / cosTilt;
   return Math.min(MAX_RANGE_METERS, Math.max(minimum, rangeMeters));
 }
 

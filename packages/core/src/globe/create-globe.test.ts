@@ -31,6 +31,16 @@ describe('createGlobe', () => {
     expect(globe.screenToGeo({ xPx: 0, yPx: 0 })).toBeDefined();
   });
 
+  it('keeps the ground scale when a jump changes only the position, even to a pole', async () => {
+    const { globe } = await started({ view: { longitudeDeg: 0, latitudeDeg: 0, zoom: 1 } });
+    const range = globe.camera.rangeMeters;
+    globe.jumpTo({ latitudeDeg: 90 });
+    expect(globe.camera.rangeMeters).toBeCloseTo(range, 3);
+    globe.jumpTo({ latitudeDeg: 89.9, zoom: 1 });
+    expect(Number.isFinite(globe.camera.rangeMeters)).toBe(true);
+    expect(globe.camera.rangeMeters).toBeGreaterThan(range / 20);
+  });
+
   it('renders only on demand and stops when nothing changes (F062)', async () => {
     const { globe, renderer } = await started();
     expect(renderer.flush()).toBe(0);

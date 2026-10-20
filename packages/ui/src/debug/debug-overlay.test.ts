@@ -24,4 +24,17 @@ describe('createDebugOverlay', () => {
     overlay.destroy();
     expect(container.children).toHaveLength(0);
   });
+
+  it('shows info rows keyed by metric and replaces them on the next call', () => {
+    const container = document.createElement('div');
+    const overlay = createDebugOverlay(container);
+    overlay.setInfo([
+      ['backend', 'backend webgpu'],
+      ['max-texture-size', 'max texture 8192'],
+    ]);
+    expect(container.querySelector('[data-metric="backend"]')?.textContent).toBe('backend webgpu');
+    overlay.setInfo([['backend', 'backend webgl2']]);
+    expect(container.querySelectorAll('[data-metric]').length).toBe(3);
+    expect(container.querySelector('[data-metric="backend"]')?.textContent).toBe('backend webgl2');
+  });
 });

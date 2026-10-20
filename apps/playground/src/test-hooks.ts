@@ -11,6 +11,8 @@ interface RecordedEvent {
 interface PlaygroundTestHooks {
   /** The engine instance, through its public API only. */
   readonly globe: Globe;
+  /** Every engine instance on the page (two in the two-globes scenario). */
+  readonly globes: readonly Globe[];
   /** Engine events since the page loaded, oldest first (frame events excluded; see `frameNumber`). */
   readonly events: RecordedEvent[];
   cpuFrameTimesMs(): number[];
@@ -33,11 +35,14 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
 ];
 
 /** Exposes the engine and a frame loop's samples to tests and benchmarks. */
-export function exposeTestHooks(globe: Globe, loop: FrameLoop | undefined): void {
+export function exposeTestHooks(globes: readonly Globe[], loop: FrameLoop | undefined): void {
+  const globe = globes[0];
+  if (!globe) return;
   const events: RecordedEvent[] = [];
   for (const type of RECORDED) globe.on(type, (payload) => events.push({ type, payload }));
   window.vibeglobePlayground = {
     globe,
+    globes,
     events,
     cpuFrameTimesMs: () => loop?.cpuFrameTimesMs() ?? [],
     resetCpuSamples: () => loop?.resetCpuSamples(),

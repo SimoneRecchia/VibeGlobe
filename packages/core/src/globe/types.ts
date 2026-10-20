@@ -195,6 +195,8 @@ export interface Globe {
   geoToScreen(position: GeoPosition): ScreenPoint | undefined;
   /** Subscribes to an event; returns an unsubscribe function. */
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void;
+  /** Changes the resolution scale (a multiplier of the device pixel ratio, 0.1–4) and redraws. */
+  setResolutionScale(scale: number): void;
   /** Requests a frame, for example after an external change. */
   requestRender(): void;
   /** GPU resource counters. */

@@ -639,7 +639,7 @@
         "In the playground, read the camera position in the globe phase and confirm it is WGS84 degrees and meters",
         "Run the API unit tests that pass positions in and out and confirm no projected coordinates leak through the public API"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F044",
@@ -701,7 +701,7 @@
         "In the playground, move the pointer over known features of the pinned imagery and confirm the reported coordinates within one pixel's ground size",
         "Move the pointer over empty space beside the globe and confirm no position is reported and no error occurs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F049",
@@ -763,7 +763,7 @@
         "Confirm the engine reports webgpu as the active backend in its API and the debug overlay",
         "Capture a screenshot and confirm the globe is rendered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F054",
@@ -776,7 +776,7 @@
         "Confirm the active backend is webgl2 and the globe renders",
         "Open http://localhost:5173/?backend=webgl2 and confirm the backend can also be forced"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F055",
@@ -788,7 +788,7 @@
         "Confirm the engine emits a typed unsupported-device error with a human-readable message",
         "Confirm the page does not crash and no unhandled exception is logged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F056",
@@ -800,7 +800,7 @@
         "Confirm the overlay shows the active backend, key GPU limits (maximum texture size, maximum anisotropy, compressed texture formats) and memory hints",
         "Read the same values through the public capabilities API in a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F057",
@@ -839,7 +839,7 @@
         "Rotate the globe through all longitudes and over both poles (the pinned base is geographic imagery that covers the poles) and confirm no black or empty pixels appear",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F060",
@@ -851,7 +851,7 @@
         "Confirm after each move that the point under the cursor is the grabbed point, within one pixel",
         "Confirm dragging near the globe edge and over a pole causes no jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F061",
@@ -864,7 +864,7 @@
         "Continue until the camera is about 1 m above the ground and confirm the camera never goes below the ellipsoid surface",
         "Zoom back out to orbit and confirm the globe is complete"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F062",

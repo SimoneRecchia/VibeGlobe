@@ -22,3 +22,6 @@ export const WGS84: Ellipsoid = {
   flattening: WGS84_FLATTENING,
   firstEccentricitySquared: WGS84_FLATTENING * (2 - WGS84_FLATTENING),
 };
+
+/** Deliberate type error to show that CI rejects it; reverted by the next commit. */
+export const ciTypeErrorDemo: number = "not a number";

@@ -66,6 +66,12 @@ const REFERENCES = [
 ];
 
 const ecef = new Float64Array(3);
+
+/** The ECEF output as a tuple, so assertions need no index checks. */
+function xyz(): [number, number, number] {
+  const [x = NaN, y = NaN, z = NaN] = ecef;
+  return [x, y, z];
+}
 const geodetic: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
 
 /** Wraps an angle difference to [-π, π). */
@@ -83,14 +89,16 @@ describe('geodeticToEcef', () => {
   it('matches the EPSG Guidance Note 7-2 example within 1 mm', () => {
     const { longitudeDeg, latitudeDeg, heightMeters, x, y, z } = EPSG_EXAMPLE;
     geodeticToEcef(longitudeDeg * DEG, latitudeDeg * DEG, heightMeters, ecef);
-    expect(Math.abs(ecef[0]! - x)).toBeLessThan(MM);
-    expect(Math.abs(ecef[1]! - y)).toBeLessThan(MM);
-    expect(Math.abs(ecef[2]! - z)).toBeLessThan(MM);
+    const [ex, ey, ez] = xyz();
+    expect(Math.abs(ex - x)).toBeLessThan(MM);
+    expect(Math.abs(ey - y)).toBeLessThan(MM);
+    expect(Math.abs(ez - z)).toBeLessThan(MM);
   });
 
   it.each(REFERENCES)('matches the reference at $longitudeDeg, $latitudeDeg, $heightMeters m', (ref) => {
     geodeticToEcef(ref.longitudeDeg * DEG, ref.latitudeDeg * DEG, ref.heightMeters, ecef);
-    expect(Math.hypot(ecef[0]! - ref.x, ecef[1]! - ref.y, ecef[2]! - ref.z)).toBeLessThan(MM);
+    const [ex, ey, ez] = xyz();
+    expect(Math.hypot(ex - ref.x, ey - ref.y, ez - ref.z)).toBeLessThan(MM);
   });
 
   it('writes at an offset', () => {
@@ -129,10 +137,11 @@ describe('geodetic ⇄ ECEF round trip', () => {
 
   test.prop([longitude, latitude, height])('stays within 1 mm everywhere, including the poles', (lon, lat, h) => {
     geodeticToEcef(lon, lat, h, ecef);
-    const [x, y, z] = [ecef[0]!, ecef[1]!, ecef[2]!];
+    const [x, y, z] = xyz();
     ecefToGeodetic(x, y, z, geodetic);
     geodeticToEcef(geodetic.longitudeRad, geodetic.latitudeRad, geodetic.heightMeters, ecef);
-    expect(Math.hypot(ecef[0]! - x, ecef[1]! - y, ecef[2]! - z)).toBeLessThan(MM);
+    const [rx, ry, rz] = xyz();
+    expect(Math.hypot(rx - x, ry - y, rz - z)).toBeLessThan(MM);
     expect(Math.abs(geodetic.heightMeters - h)).toBeLessThan(MM);
     expect(Math.abs(geodetic.latitudeRad - lat) * 6378137).toBeLessThan(MM);
   });

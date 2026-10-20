@@ -1,0 +1,45 @@
+import { ESLint } from 'eslint';
+import { describe, expect, it } from 'vitest';
+
+// Focused, skipped and conditionally skipped tests must fail the lint in every test runner (KB-005).
+const eslint = new ESLint({ cwd: new URL('../..', import.meta.url).pathname });
+
+async function ruleIds(code: string, filePath: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath });
+  return (result?.messages ?? []).map((message) => message.ruleId ?? message.message);
+}
+
+describe('lint rules that keep tests from being skipped or focused (KB-005)', () => {
+  it.each([
+    ["test.only('a', async () => {});", 'test.only'],
+    ["test.describe.only('suite', () => {});", 'test.describe.only'],
+    ["test.skip('a', async () => {});", 'test.skip'],
+    ["test.fixme('a', async () => {});", 'test.fixme'],
+    ["test('a', async () => {\n  test.skip();\n});", 'an in-body test.skip()'],
+  ])('rejects %j in Playwright specs (%s)', async (body) => {
+    const code = `import { test } from '@playwright/test';\n${body}\n`;
+    expect(await ruleIds(code, 'e2e/zz-lint-probe.spec.ts')).not.toEqual([]);
+  });
+
+  it.each([
+    "it.skipIf(process.env['CI'])('a', () => {});",
+    "it.runIf(process.env['CI'])('a', () => {});",
+    "describe.skipIf(true)('suite', () => {});",
+    "test.runIf(false)('a', () => {});",
+  ])('rejects %j in Vitest tests', async (body) => {
+    const code = `import { describe, it, test } from 'vitest';\n${body}\n`;
+    expect(await ruleIds(code, 'packages/core/src/zz-lint-probe.test.ts')).not.toEqual([]);
+  });
+
+  it('accepts ordinary tests', async () => {
+    expect(
+      await ruleIds(
+        "import { test } from '@playwright/test';\ntest('a', async () => {});\n",
+        'e2e/zz-lint-probe.spec.ts',
+      ),
+    ).toEqual([]);
+    expect(
+      await ruleIds("import { it } from 'vitest';\nit('a', () => {});\n", 'packages/core/src/zz-lint-probe.test.ts'),
+    ).toEqual([]);
+  });
+});

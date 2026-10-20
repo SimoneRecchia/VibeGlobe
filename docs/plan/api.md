@@ -122,8 +122,9 @@ Internally the camera holds `chosen` and `applied` orientation; constraints writ
 ## Tiles
 
 ```ts
-type TileKey = number; // packed quadtree index, exact up to level 25
+type TileKey = number; // packed root + quadtree index, exact up to level 25
 interface TileCoord {
+  root: 0 | 1 | 2; // 0 Web Mercator, 1 north polar cap, 2 south polar cap (ADR 0006, ADR 0013)
   level: number;
   x: number;
   y: number;
@@ -271,8 +272,9 @@ interface GlobeEvents {
   'tile-error': { sourceId: string; coord: TileCoord; reason: TileErrorReason };
   'connectivity-change': { connectivity: 'online' | 'offline' | 'degraded' };
   'device-lost': { reason: string };
-  'device-restored': void;
-  error: EngineError;
+  'device-restored': void; // renderer recreated after a loss (ADR 0010, ADR 0013)
+  'backend-fallback': { from: 'webgpu'; to: 'webgl2'; reason: string }; // WebGPU startup self-test failed
+  error: EngineError; // code 'renderer-failed' after three failed recoveries in 60 s
 }
 ```
 

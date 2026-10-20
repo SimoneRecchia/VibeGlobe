@@ -1,6 +1,6 @@
 # 0005. Depth strategy: one reversed-Z float encoding, with a fragment-depth path for WebGL2 without clip control
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0013)
 - Date: 2026-10-20
 - Milestone: M2
 

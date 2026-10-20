@@ -8,6 +8,9 @@ const chromiumPath = process.env['VGE_CHROMIUM_PATH'];
 export default defineConfig({
   testDir: 'e2e',
   forbidOnly: Boolean(process.env['CI']),
+  // ADR 0012: on CI a failure is retried once to record a trace, but a test that passes only on retry fails the run.
+  retries: process.env['CI'] ? 1 : 0,
+  failOnFlakyTests: Boolean(process.env['CI']),
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${port}`,

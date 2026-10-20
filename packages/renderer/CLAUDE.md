@@ -4,8 +4,8 @@
 
 ## Rules
 
-- The rendering library (ADR 0010) is imported only here, pinned to an exact version. Globe logic (tiles, levels of detail, precision, camera) stays in core.
-- Every feature must render the same on WebGPU and on forced WebGL2 (`?backend=webgl2` in the playground).
+- three.js (ADR 0010) is imported only here, from `three/webgpu` and `three/tsl`, pinned to exactly `three@0.186.1`. Globe logic (tiles, levels of detail, precision, camera) stays in core.
+- Every feature must render the same on WebGPU and on forced WebGL2 (the playground's `?backend=` switch arrives with this package's first code in M2).
 
 ## Commands
 

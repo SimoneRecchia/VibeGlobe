@@ -1,6 +1,6 @@
 # 0010. Renderer base: three.js WebGPURenderer pinned to 0.186.1
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0013)
 - Date: 2026-10-20
 - Milestone: M2
 

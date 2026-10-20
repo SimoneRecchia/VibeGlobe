@@ -4,5 +4,6 @@ Tests protect the work (`PLAN.md`, Working method): a test is never removed or w
 
 Each entry names the test file and test title (or the gate file and key path), the change and the reason.
 
-| Date | Test or gate | Change | Reason |
-| ---- | ------------ | ------ | ------ |
+| Date       | Test or gate                            | Change                        | Reason                                                                                                                                                               |
+| ---------- | --------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-20 | benchmarks/budgets.test.ts "percentile" | Suite renamed to "statistics" | The suite now covers the ADR 0012 statistics (median, distributions, per-run summaries); its case "uses the nearest-rank method" is kept and extended with `median`. |

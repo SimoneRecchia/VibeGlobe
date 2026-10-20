@@ -1,12 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { findBudgetViolations, percentile, summarize, type Budgets } from './budgets.ts';
+import {
+  distribution,
+  findBudgetViolations,
+  median,
+  percentile,
+  summarizeRun,
+  summarizeScenario,
+  type Budgets,
+} from './budgets.ts';
 
-describe('percentile', () => {
+describe('statistics', () => {
   it('uses the nearest-rank method', () => {
     const samples = Array.from({ length: 100 }, (_, index) => index + 1);
     expect(percentile(samples, 0.95)).toBe(95);
     expect(percentile([5, 1, 3], 0.5)).toBe(3);
     expect(percentile([], 0.95)).toBe(0);
+    expect(median([4, 1, 9, 7, 3])).toBe(4);
+  });
+
+  it('summarizes a run with p50, p95, p99, max and the frames over 16.7 and 33.3 ms', () => {
+    const frames = [...Array.from({ length: 97 }, () => 16.6), 17, 20, 40];
+    const run = summarizeRun(frames, [0.5, 1, 2], 3 * 1024 * 1024);
+    expect(run.frameTimeMs).toEqual({ ...distribution(frames), over16_7: 3, over33_3: 1 });
+    expect(run.frameTimeMs.p99).toBe(20);
+    expect(run.frameTimeMs.max).toBe(40);
+    expect(run.cpuFrameMs.max).toBe(2);
+    expect(run.jsHeapMB).toBe(3);
+    expect(run.gpuFrameMs).toBeNull();
+  });
+
+  it('checks budgets against the median of the per-run p95 values', () => {
+    const runs = [16.7, 16.8, 30, 16.6, 16.7].map((p95) => summarizeRun([p95], [1], 1024 * 1024));
+    expect(summarizeScenario(runs).frameTimeP95Ms).toBe(16.7);
   });
 });
 
@@ -17,14 +42,16 @@ describe('findBudgetViolations', () => {
   };
 
   it('accepts results within budget', () => {
-    expect(findBudgetViolations(budgets, { s: summarize([16, 17, 16.5], [0.5, 1], 5 * 1024 * 1024) })).toEqual([]);
+    const summary = summarizeScenario([summarizeRun([16, 17, 16.5], [0.5, 1], 5 * 1024 * 1024)]);
+    expect(findBudgetViolations(budgets, { s: summary })).toEqual([]);
   });
 
   it('reports every broken budget and missing scenarios', () => {
-    expect(findBudgetViolations(budgets, { s: summarize([16, 40], [3], 20 * 1024 * 1024) })).toEqual([
-      'loop: frame p95 40.00 ms > 18 ms',
-      'loop: cpu p95 3.000 ms > 2 ms',
-      'core: JS heap 20.0 MB > 10 MB',
+    const summary = summarizeScenario([summarizeRun([16, 40], [3], 20 * 1024 * 1024)]);
+    expect(findBudgetViolations(budgets, { s: summary })).toEqual([
+      'loop: median frame p95 40.00 ms > 18 ms',
+      'loop: median cpu p95 3.000 ms > 2 ms',
+      'core: median JS heap 20.0 MB > 10 MB',
     ]);
     expect(findBudgetViolations(budgets, {})).toEqual([
       'loop: scenario "s" did not run',

@@ -1,6 +1,6 @@
 # NNNN. Title
 
-- Status: Proposed | Accepted | Superseded by NNNN | Deprecated
+- Status: Proposed | Accepted | Accepted (partly superseded by NNNN) | Superseded by NNNN | Deprecated
 - Date: YYYY-MM-DD
 - Milestone: Mn
 
@@ -10,7 +10,7 @@ The problem, the forces at play, and the requirements from `PLAN.md` that apply.
 
 ## Options considered
 
-1. **Option A:** how it works; pros; cons; evidence (measurements, issue-tracker findings).
+1. **Option A:** how it works; pros; cons; evidence (issue-tracker findings; for performance, profiling measurements before and after, with benchmark, device and commit).
 2. **Option B:** …
 
 ## Decision

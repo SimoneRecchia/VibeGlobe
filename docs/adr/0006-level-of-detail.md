@@ -1,6 +1,6 @@
 # 0006. Terrain and imagery level of detail
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0013)
 - Date: 2026-10-20
 - Milestone: M3 (selection, fallback, imagery transitions, poles and antimeridian), M4 (terrain geometry, geomorphing, skirts)
 

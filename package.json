@@ -44,6 +44,7 @@
     "@vitest/eslint-plugin": "1.6.27",
     "eslint": "10.13.0",
     "eslint-plugin-jsdoc": "63.3.3",
+    "eslint-plugin-playwright": "2.12.1",
     "happy-dom": "21.0.3",
     "knip": "6.42.1",
     "prettier": "3.9.10",

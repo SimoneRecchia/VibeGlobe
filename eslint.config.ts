@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import vitest from '@vitest/eslint-plugin';
 import { defineConfig } from 'eslint/config';
 import jsdoc from 'eslint-plugin-jsdoc';
+import playwright from 'eslint-plugin-playwright';
 import tseslint from 'typescript-eslint';
 import { noCommentedOutCode } from './scripts/eslint/no-commented-out-code.ts';
 
@@ -58,6 +59,28 @@ export default defineConfig(
     // Tests are never focused or skipped (PLAN.md: never remove or weaken a test).
     files: ['**/*.test.ts', '**/*.spec.ts'],
     plugins: { vitest },
-    rules: { 'vitest/no-focused-tests': 'error', 'vitest/no-disabled-tests': 'error' },
+    rules: {
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-disabled-tests': 'error',
+      'no-restricted-properties': [
+        'error',
+        ...['it', 'test', 'describe'].flatMap((object) =>
+          ['skipIf', 'runIf'].map((property) => ({
+            object,
+            property,
+            message: 'Tests are never skipped conditionally.',
+          })),
+        ),
+      ],
+    },
+  },
+  {
+    // Playwright specs: the Vitest rules do not see tests imported from @playwright/test (KB-005).
+    files: ['e2e/**/*.spec.ts'],
+    plugins: { playwright },
+    rules: {
+      'playwright/no-focused-test': 'error',
+      'playwright/no-skipped-test': ['error', { allowConditional: false, disallowFixme: true }],
+    },
   },
 );

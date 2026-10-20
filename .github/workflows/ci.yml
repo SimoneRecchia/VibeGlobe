@@ -108,3 +108,23 @@ jobs:
           path: |
             playwright-report/
             test-results/
+
+  benchmarks:
+    name: Benchmarks (recorded, not gated)
+    runs-on: ubuntu-latest
+    env:
+      VGE_DEVICE: ci-swiftshader
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Timings on SwiftShader are not meaningful (ADR 0012): record them as a trend, gate only deterministic counters.
+      - run: npm run bench -- --report-only
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: benchmarks/results/ci-swiftshader/

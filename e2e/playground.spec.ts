@@ -50,3 +50,15 @@ test('debug overlay is absent and its code not loaded without ?debug=1', async (
   await expect(page.locator('.vge-debug-overlay')).toHaveCount(0);
   expect(requested.filter((url) => url.includes('debug-overlay') || url.includes('/packages/ui/'))).toEqual([]);
 });
+
+test('the frame loop keeps bounded CPU samples and piles up no performance entries (KB-006)', async ({ page }) => {
+  await page.goto('/?scenario=frame-loop');
+
+  const samples = (): Promise<number> =>
+    page.evaluate(
+      () =>
+        (window as { vgePlayground?: { cpuFrameTimesMs(): number[] } }).vgePlayground?.cpuFrameTimesMs().length ?? 0,
+    );
+  await expect.poll(samples, { timeout: 5000 }).toBeGreaterThan(30);
+  expect(await page.evaluate(() => performance.getEntriesByType('measure').length)).toBe(0);
+});

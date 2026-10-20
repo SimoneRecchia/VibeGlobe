@@ -1,6 +1,6 @@
 # 0008. Globe-to-flat morph
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0013)
 - Date: 2026-10-20
 - Milestone: M5
 

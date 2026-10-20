@@ -1,5 +1,6 @@
 import { WGS84 } from '@vibeglobe/core';
 import { startFrameLoop } from './frame-loop.js';
+import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
 
@@ -15,11 +16,12 @@ if (app && params.has('debug')) {
   const { createDebugOverlay } = await import('@vibeglobe/ui');
   const overlay = createDebugOverlay(app);
   let lastRefreshMs = -Infinity;
-  startFrameLoop((stats, timestampMs) => {
+  const loop = startFrameLoop((stats, timestampMs) => {
     if (timestampMs - lastRefreshMs < OVERLAY_REFRESH_MS) return;
     lastRefreshMs = timestampMs;
     overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
   });
+  exposeTestHooks(loop);
 } else if (params.get('scenario') === 'frame-loop') {
-  startFrameLoop(() => undefined);
+  exposeTestHooks(startFrameLoop(() => undefined));
 }

@@ -17,7 +17,7 @@ Research first: precision, depth, terrain and imagery levels of detail, tile sch
 5. CI: type check, lint, unit tests, end-to-end smoke, API docs build, license audit (fails on copyleft) with generated third-party notices.
 6. Benchmark harness with budgets (frame CPU/GPU, memory, bundle size per package) that fails on breach.
 7. Documentation site scaffold; ADR and progress-log conventions (already started in session 1).
-8. Playground shell with backend selection, scenario runner hook and debug overlay skeleton.
+8. Playground shell with a scenario hook and the debug overlay skeleton (backend selection arrives with the renderer in M2).
 
 ## M2 Globe core
 
@@ -28,11 +28,12 @@ Prerequisites: precision, depth, GPU and camera surveys; ADRs for precision, dep
 1. float64 math library (pooled vectors, matrices, quaternions) and WGS84 geodesy (geodetic ↔ ECEF ↔ ENU, ellipsoid normals, ray–ellipsoid intersection) with property-based tests.
 2. Camera model (position, heading, tilt, field of view, zoom ↔ altitude), screen ↔ globe projection.
 3. `RendererBackend` interface; three.js implementation at a pinned version with WebGPU and WebGL2 fallback, forced-backend option, capability detection, clear error without WebGL2.
-4. Precision (RTC tiles, relative-to-eye split) and depth (reversed-Z / logarithmic fallback, fitted planes).
+4. Precision (camera-relative rendering with float64 origins and split per-draw offsets, ADR 0004) and depth (reversed-Z float depth with an infinite far plane; fragment-written depth on WebGL2 without clip control, ADR 0005 and ADR 0013).
 5. Globe mesh with pinned low-resolution imagery (bundled, permissively licensed).
 6. Basic drag (rotate the globe under the cursor) and zoom.
 7. Render on demand, background throttling, zero-allocation frame loop, resize and pixel-density handling, device/context loss recovery, `destroy()` and multiple instances.
-8. Visual regression harness of canonical views on both backends; CI WebGL2 through software rendering; documented local WebGPU procedure; OffscreenCanvas evaluation ADR.
+8. Visual regression harness of canonical views on both backends; CI runs WebGL2 and WebGPU through SwiftShader (ADR 0012); documented local procedure for real GPUs; OffscreenCanvas evaluation ADR.
+9. The ADR 0012 probes on Playwright's pinned Chromium in CI, start-up measurement (navigation to `ready`) and steady-state allocation sampling in the benchmark harness (ADR 0013).
 
 ## M3 Imagery streaming
 
@@ -57,8 +58,8 @@ Done when: no cracks, correct relief, and the camera never enters the terrain.
 Prerequisite: terrain level-of-detail survey (part of the M1 level-of-detail survey).
 
 1. Terrain adapters: quantized-mesh, Terrarium, Terrain-RGB (decoders in workers, fuzzed).
-2. Mesh generation in workers (grid or RTIN-style simplification for heightmaps), bounding volumes with height ranges.
-3. Skirts (or stitching), geomorphing, independent terrain and imagery levels (imagery draped across terrain tiles).
+2. Height grids from every terrain source and per-tile meshes (globe and plane offsets) built in workers, with shared index buffers per grid size; RTIN-style simplification only as a measured fallback (ADR 0006, ADR 0013). Bounding volumes with height ranges.
+3. Skirts, time-based geomorphing, independent terrain and imagery levels within one surface quadtree (ADR 0006).
 4. Elevation queries: synchronous best-available, asynchronous most-precise.
 5. Terrain collision for the camera.
 

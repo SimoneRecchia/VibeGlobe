@@ -192,7 +192,7 @@
         "Verify it summarizes how those projects test rendering across backends",
         "Verify it states whether three.js is adopted as the rendering base (and which pinned version) or why another option is better, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F014",

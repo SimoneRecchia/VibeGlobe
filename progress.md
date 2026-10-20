@@ -2,12 +2,34 @@
 
 ## Current state
 
-- Milestone in progress: **M1 Research and foundation** (nothing passing yet).
-- Feature list: 541 entries, all failing (`npm run status`).
-- Working skeleton: npm workspaces, `@vibeglobe/core` (WGS84 constants + tests), `apps/playground` (Vite), Vitest, Playwright smoke test, `init.sh`, `npm run status`.
-- Next: `F001` and the rest of M1 in file order. Session 1 already wrote the technical plan (F001) and the session-state files (F002); the next session should verify them against their steps, mark them passing if they hold, then continue with the M1 research surveys (good candidates for parallel subagents, one area each).
+- Milestone in progress: **M1 Research and foundation**: 38 of 41 entries pass (`npm run status`).
+- Still failing in M1 and why:
+  - `F002` (session state): passes once this progress entry and a clean tree are committed at the end of the M1 session.
+  - `F027` (CI) and `F041` (M1 acceptance): both require "the latest CI run on the main branch is green". CI is green on `claude/happy-galileo-b07j98` (runs 1, 2, 4+), but this branch has not been merged into `main`; merging needs the owner's approval.
+- Next after M1: M2 Globe core, starting with `F042` (WGS84 conversions) in file order.
 
 ## Session log (newest first)
+
+### Session 2 — 2026-10-20 (milestone 1)
+
+Done:
+
+- Research surveys for every M1 core area in `docs/research/` (precision, depth, levels of detail, scheduling and caching, globe-to-flat, camera control, GPU and renderer, workers, testing and benchmarks), written by parallel subagents from the projects' code at pinned commits, with linked issue-tracker failure modes, and the decisions in ADRs 0004–0012. `docs/plan/architecture.md` and `quality.md` now follow those ADRs.
+- Monorepo with every package of the architecture (same layout, a `CLAUDE.md` each), Prettier, ESLint (no `any`, TSDoc on public APIs, length limits, no focused/skipped tests, a local no-commented-out-code rule), knip, repository checks (`npm run check`: layout, dependency rules, hot-path headers, build info inside `dist/`), feature-list integrity and test guards, SSR import test, coverage minima, bundle-size budgets, tree-shaking check, consumer check, license audit and generated notices, benchmark harness, TypeDoc site, Claude Code PostToolUse hook, GitHub Actions CI. `npm run verify` runs every non-browser check.
+- `FrameStats` (core) and a lazily loaded debug overlay (ui) driven by a playground frame loop; e2e tests for the playground and the docs site.
+- Bugs found and fixed regression-first: KB-001 (the commented-out-code rule never reported), KB-002 (a deleted `dist/` was not rebuilt).
+
+Verified: every check was broken on purpose in a local scratch branch and failed as required (results in the commit history of this session); CI run 3 failed on a deliberate type error and passed again after the revert; `./init.sh` from a fresh clone exits 0; every command listed in the `CLAUDE.md` files works; a jscpd scan found no code shared between this repository and CesiumJS, MapLibre GL JS, deck.gl, iTowns, OpenGlobus, 3DTilesRendererJS, three.js and OpenLayers (1,844 duplicates found inside those projects, none across).
+
+Features now passing: F001, F003–F026, F028–F040.
+
+Decisions to note: three.js is the rendering base, pinned to exactly `three@0.186.1` (ADR 0010; r187 required before M4). The initial-JavaScript budget needs the owner's review in M2 (open question 12).
+
+Notes for the next session:
+
+- The owner questions in `docs/open-questions.md` (8–11) came out of the surveys; the defaults used meanwhile are listed there.
+- ADR 0011 adds a `@vibeglobe/worker` package in M3; add it to `LIBRARY_PACKAGES` in `scripts/checks/structure.ts` then.
+- ADR 0012 lists engine test hooks (frame read-back, injectable clock, ready/idle events) to build in M2–M3.
 
 ### Session 1 — 2026-10-20
 

@@ -651,7 +651,7 @@
         "Confirm the axes are orthonormal and point east, north and up against reference values",
         "Run property-based tests for round trips and continuity at the poles and across the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F045",
@@ -664,7 +664,7 @@
         "Confirm longitudes either side of ±180° map to adjacent projected positions with correct wrapping",
         "Confirm latitudes beyond the Web Mercator limit are clamped without NaN or infinity"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F046",

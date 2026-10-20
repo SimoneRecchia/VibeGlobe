@@ -21,5 +21,5 @@ Conventions:
 | [0009](0009-camera-and-input.md)              | Camera and input                                                                                          | Accepted                             |
 | [0010](0010-renderer-base.md)                 | Renderer base: three.js WebGPURenderer pinned to 0.186.1                                                  | Accepted (partly superseded by 0013) |
 | [0011](0011-workers.md)                       | Worker architecture                                                                                       | Accepted                             |
-| [0012](0012-test-tooling.md)                  | Test tooling, image tolerances and benchmark method                                                       | Accepted                             |
+| [0012](0012-test-tooling.md)                  | Test tooling, image tolerances and benchmark method                                                       | Accepted (partly superseded by 0013) |
 | [0013](0013-reconcile-m1-decisions.md)        | Reconcile the M1 decisions                                                                                | Accepted                             |

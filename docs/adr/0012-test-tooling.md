@@ -1,6 +1,6 @@
 # 0012. Test tooling, image tolerances and benchmark method
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0013)
 - Date: 2026-10-20
 - Milestone: M1–M3 (benchmark harness in M1; visual regression, renderer GPU tests and property-based tests in M2; scenario capture and fuzzing in M3)
 

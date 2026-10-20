@@ -62,21 +62,18 @@ export default defineConfig(
     rules: {
       'vitest/no-focused-tests': 'error',
       'vitest/no-disabled-tests': 'error',
-      'no-restricted-properties': [
+      'no-restricted-syntax': [
         'error',
-        ...['it', 'test', 'describe'].flatMap((object) =>
-          ['skipIf', 'runIf'].map((property) => ({
-            object,
-            property,
-            message: 'Tests are never skipped conditionally.',
-          })),
-        ),
+        {
+          selector: 'MemberExpression[property.name=/^(skipIf|runIf)$/]',
+          message: 'Tests are never skipped conditionally.',
+        },
       ],
     },
   },
   {
     // Playwright specs: the Vitest rules do not see tests imported from @playwright/test (KB-005).
-    files: ['e2e/**/*.spec.ts'],
+    files: ['e2e/**/*.{spec,test}.ts'],
     plugins: { playwright },
     rules: {
       'playwright/no-focused-test': 'error',

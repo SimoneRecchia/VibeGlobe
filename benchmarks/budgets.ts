@@ -14,12 +14,20 @@ export interface Distribution {
 
 export interface RunResult {
   frames: number;
+  /** `over16_7`: frames that missed a 60 Hz refresh; `over33_3`: frames that lasted two refreshes or more. */
   frameTimeMs: Distribution & { over16_7: number; over33_3: number };
   cpuFrameMs: Distribution;
   jsHeapMB: number;
-  /** GPU time, uploads, tiles and requests: `null` until the engine reports them (M2–M3). */
+  /** Not measurable before the engine exists; recorded as `null` until M2–M3 (ADR 0013). */
   gpuFrameMs: Distribution | null;
+  gpuMemoryMB: number | null;
+  startupMs: number | null;
+  steadyStateAllocations: number | null;
 }
+
+// rAF intervals carry vsync and timestamp-coarsening jitter of a few tenths of a millisecond (ADR 0013), so a frame
+// counts as late only beyond that jitter: an on-time 16.8 ms interval is not late, a 33.2999 ms one is two refreshes.
+const TIMER_JITTER_MS = 0.5;
 
 export interface ScenarioSummary {
   runs: RunResult[];
@@ -58,12 +66,15 @@ export function summarizeRun(
     frames: frameTimesMs.length,
     frameTimeMs: {
       ...distribution(frameTimesMs),
-      over16_7: frameTimesMs.filter((time) => time > 16.7).length,
-      over33_3: frameTimesMs.filter((time) => time > 33.3).length,
+      over16_7: frameTimesMs.filter((time) => time > 16.7 + TIMER_JITTER_MS).length,
+      over33_3: frameTimesMs.filter((time) => time >= 33.3 - TIMER_JITTER_MS).length,
     },
     cpuFrameMs: distribution(cpuFrameMs),
     jsHeapMB: jsHeapBytes / (1024 * 1024),
     gpuFrameMs: null,
+    gpuMemoryMB: null,
+    startupMs: null,
+    steadyStateAllocations: null,
   };
 }
 

@@ -5,7 +5,7 @@
 - Milestone in progress: **M1 Research and foundation**: 38 of 41 entries pass (`npm run status`).
 - Still failing in M1 and why:
   - `F002` (session state): passes once this progress entry and a clean tree are committed at the end of the M1 session.
-  - `F027` (CI) and `F041` (M1 acceptance): both require "the latest CI run on the main branch is green". CI is green on `claude/happy-galileo-b07j98` (runs 1, 2, 4+), but this branch has not been merged into `main`; merging needs the owner's approval.
+  - `F027` (CI) and `F041` (M1 acceptance): both require "the latest CI run on the main branch is green". CI on `claude/happy-galileo-b07j98` has been green since run 8 (runs 3, 4 and 7 failed: a deliberate type error, a formatting slip and KB-003), but this branch has not been merged into `main`; merging needs the owner's approval.
 - Next after M1: M2 Globe core, starting with `F042` (WGS84 conversions) in file order.
 
 ## Session log (newest first)

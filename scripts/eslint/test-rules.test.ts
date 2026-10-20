@@ -21,7 +21,14 @@ describe('lint rules that keep tests from being skipped or focused (KB-005)', ()
     expect(await ruleIds(code, 'e2e/zz-lint-probe.spec.ts')).not.toEqual([]);
   });
 
+  it('rejects skipped Playwright tests in e2e/*.test.ts files too', async () => {
+    const code = "import { test } from '@playwright/test';\ntest.skip('a', async () => {});\n";
+    expect(await ruleIds(code, 'e2e/zz-lint-probe.test.ts')).not.toEqual([]);
+  });
+
   it.each([
+    "it.concurrent.skipIf(true)('a', () => {});",
+    "it.sequential.runIf(false)('a', () => {});",
     "it.skipIf(process.env['CI'])('a', () => {});",
     "it.runIf(process.env['CI'])('a', () => {});",
     "describe.skipIf(true)('suite', () => {});",

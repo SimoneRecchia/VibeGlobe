@@ -32,6 +32,6 @@ For each conflict, the options were the positions of the ADRs involved:
 
 ## Consequences
 
-- ADR 0005, 0006, 0008 and 0010 keep their status but are marked as partly superseded by this ADR; `docs/plan/` follows this ADR.
+- ADR 0005, 0006, 0008, 0010 and 0012 keep their status but are marked as partly superseded by this ADR (0012 for the timing of its probes); `docs/plan/` follows this ADR.
 - M2 has three extra tasks: the ADR 0012 probes, start-up measurement and allocation sampling.
 - Per-tile vertex buffers cost more memory than a shared grid; ADR 0007's GPU budget accounts for them, and M4 measures the cost against the budget.

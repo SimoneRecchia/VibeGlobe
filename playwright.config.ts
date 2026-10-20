@@ -21,6 +21,8 @@ const SOFTWARE_GPU_ARGS = [
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.spec.ts',
+  // Visual baselines (ADR 0012): one per view and backend, recorded only in the pinned CI environment.
+  snapshotPathTemplate: '{testDir}/__baselines__/{arg}{ext}',
   forbidOnly: Boolean(process.env['CI']),
   // ADR 0012: on CI a failure is retried once to record a trace, but a test that passes only on retry fails the run.
   retries: process.env['CI'] ? 1 : 0,

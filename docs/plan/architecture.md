@@ -32,7 +32,7 @@ Dependency rules (checked in CI from M1):
 
 ## 2. Runtime model
 
-`createGlobe(options)` builds one engine instance bound to a container element. Several instances can live on one page; they share nothing but the worker pool and the persistent cache store, both reference-counted.
+`createGlobe(options)` builds one engine instance bound to a container element. Several instances can live on one page; they share nothing but the worker pool (ADR 0011), the network pool (ADR 0007) and the persistent cache store, all reference-counted.
 
 The frame loop runs on `requestAnimationFrame` only while something changes (render on demand). Each frame:
 
@@ -40,7 +40,7 @@ The frame loop runs on `requestAnimationFrame` only while something changes (ren
 2. **Input:** controls apply pending gestures to camera targets; inertia decays by elapsed time.
 3. **Animation:** active `flyTo`/`easeTo`/tour advance by elapsed time; any user input cancels them, starting from the applied camera so nothing jumps.
 4. **View resolution:** zoom drives the morph factor, tilt curve and relief scale (Auto mode) or the user's chosen values (2D locked, manual); constraints and terrain collision produce the applied values without touching the chosen ones.
-5. **Camera:** float64 view and projection matrices, eye position split into high/low float32 parts, frustum planes, horizon-culling occluder.
+5. **Camera:** float64 camera state; a rotation-only view matrix and a reversed-Z projection with an infinite far plane (ADR 0004, ADR 0005), per-draw eye-relative offsets, frustum planes, horizon-culling occluder.
 6. **Selection:** terrain and imagery layers each traverse their quadtree by screen-space error with frustum and horizon culling, producing a render set with ancestor fallback and a list of wanted tiles with priorities.
 7. **Loading:** the scheduler dispatches wanted tiles through policy, cache hierarchy, network and workers; stale requests are cancelled.
 8. **Residency:** decoded tiles enter the upload queue, drained within the per-frame time and byte budget; LRU eviction keeps GPU and RAM within budget, never evicting the pinned base or anything on screen.
@@ -62,23 +62,23 @@ The hot path (steps 1–11) allocates nothing in steady state: math types are pr
 | Flat map space (Web Mercator meters, float64)                                                                         | The flat phase; the morph target                            |
 | Tile-local (float32, relative to tile center)                                                                         | Vertex buffers                                              |
 
-**Proposed precision strategy (confirm in the precision survey, ADR in M2):** all CPU math in float64. Tile vertices are stored relative to the tile center (RTC) in float32; per tile the CPU computes the model-view matrix in float64 relative to the eye and casts it to float32 only at the end, so the GPU never sees large magnitudes. Long primitives that cannot be split by tile (data-layer lines, large polygons) use relative-to-eye rendering with positions split into high and low float32 parts. Morph vertices carry both the globe and the flat position relative to the same center. Acceptance: no vertex jitter at 1 m altitude anywhere on Earth on both backends (scenario test with sub-millimeter camera moves, screen-space variance below 0.5 px).
+**Decided (ADR 0004, [survey](../research/precision.md)):** all CPU math in float64, rounded to float32 only at upload. The eye is the world origin every frame and the uploaded view matrix is rotation-only. Every piece of GPU geometry (tile, data-layer cell, model, 3D Tiles content) has a float64 origin and small float32 offsets from it; each frame the CPU computes origin − eye per drawn chunk and uploads it as two float32 parts, which shaders add before the rotation. Long primitives are split into spatial chunks (no per-vertex high/low positions), with a chunk radius of at most 1000 × its distance from the eye. Positions never use GPU trigonometry. Morph vertices carry globe and flat offsets, blended eye-relative, with dedicated pipelines for the pure globe (m = 0) and pure flat (m = 1) cases. Acceptance: no vertex jitter at 1 m altitude anywhere on Earth on both backends (sub-millimeter camera moves, screen-space variance below 0.1 px).
 
 ## 4. Depth
 
-**Proposed (confirm in the depth survey, ADR in M2):** reversed-Z with a 32-bit float depth buffer where available (native on WebGPU; on WebGL2 through clip-control extensions where exposed), tight near/far planes fitted each frame from camera height, terrain bounds and horizon distance, and a logarithmic-depth fallback where reversed-Z is unavailable. Multi-frustum rendering is the escape hatch if measurements show either approach failing. Acceptance: no z-fighting between near terrain, data layers and far geometry from orbit to 1 m altitude on both backends.
+**Decided (ADR 0005, [survey](../research/depth.md)):** one encoding everywhere: reversed depth `z = near / d` with an infinite far plane in a 32-bit float attachment, cleared to 0 and tested greater-equal. WebGPU uses `depth32float` natively; WebGL2 uses `EXT_clip_control` where exposed (Chrome, Edge, Safari) and otherwise writes the same value from the fragment shader (Firefox), at a GPU cost measured in M2. The near plane is `min(0.1 m, 0.5 × camera clearance)`, floored at 1 mm; no depth bias or polygon offset. Multi-frustum rendering and logarithmic depth are not used. Acceptance: no z-fighting between near terrain, data layers and far geometry from orbit to 1 m altitude on both backends.
 
 ## 5. Globe, flat map and oblique view
 
 One continuous camera; the shape morphs, nothing switches.
 
-- **Morph:** vertices hold globe (ECEF, RTC) and flat (Web Mercator, RTC) positions; the vertex shader mixes them by the morph factor `m(zoom)` (eased, no thresholds). Normals and the camera up vector follow the same mix.
-- **Anchor:** while `m` changes, the camera is re-solved each frame so the geographic point under the cursor (or the screen center) maps to the same screen pixel: the anchor is unprojected before the morph step and the camera translated in morph space after it.
-- **Curves:** tilt and relief scale are eased functions of zoom with slight overlap (tilt starts as flattening ends). Values are tuning constants in one module, covered by continuity tests (no derivative jumps).
-- **Relief on the flat plane:** heights are scaled by the Mercator scale factor at the anchor latitude so relief stays consistent with the plane; measurements always use the ellipsoid.
+- **Morph (ADR 0008):** the camera sits in the east-north-up frame of its target point (the anchor) and its pose does not depend on the morph factor. Vertices hold globe (WGS84) and plane (Web Mercator scaled to match the ground at the anchor) offsets, precomputed in float64 by workers; the vertex shader blends them linearly by `m` (eased, no thresholds). One morph function serves the GPU and the CPU paths (picking, labels, culling).
+- **Anchor:** the screen-center point stays fixed by construction; the point under the cursor stays fixed through a small float64 solve for the camera target each frame (at most 3 iterations), shared with pan and zoom-at-cursor (ADR 0009).
+- **Curves:** morph, tilt and relief are eased functions of ground zoom (independent of latitude), following the phase table of `PLAN.md` (see open question 9). Values are tuning constants in one module, covered by continuity tests (no derivative jumps).
+- **Relief on the flat plane:** heights are scaled per vertex by the Mercator scale factor, exact at the anchor, so relief stays consistent with the plane; measurements always use the ellipsoid.
 - **View modes:** `auto`, `2d` (tilt locked to 0°, morph still active), `manual` (user-chosen tilt persists at every zoom). The 3D button sets `manual` with a default tilt. Heading is always user-chosen; the compass resets north.
-- **Chosen vs applied:** the camera stores `chosen` and `applied` tilt and heading. Constraints (terrain collision, sky-filling tilt at high altitude, max tilt) clamp only `applied`; each frame `applied` relaxes back toward `chosen` once the constraint allows.
-- **Poles and antimeridian:** Web Mercator imagery stops near ±85.05°; polar caps are filled from geographic-scheme imagery (the global fallback covers the poles) on the globe and clipped on the flat map. Longitude wraps continuously: the flat map repeats horizontally and tile keys wrap.
+- **Chosen vs applied:** the camera stores `chosen` and `applied` tilt, heading and range (ADR 0009). Constraints (terrain collision, sky-filling tilt at high altitude, max tilt, zoom limits, bounds) clamp only `applied`; each frame `applied` relaxes back toward `chosen` once the constraint allows.
+- **Poles and antimeridian:** Web Mercator imagery stops near ±85.05°; polar caps are geographic tiles textured from the global fallback, kept on the flat map as a strip beyond ±85°. Each tile is placed at the longitude copy nearest the anchor, so the antimeridian never shows a seam and no world copies are drawn.
 
 ## 6. Tiling and level of detail
 
@@ -89,7 +89,7 @@ One continuous camera; the shape morphs, nothing switches.
 - **No popping:** a tile that becomes ready fades in over a short, time-based interval while its ancestor stays underneath; terrain geomorphs vertex heights between levels.
 - **No seams:** imagery uses edge-clamped sampling of the tile's own texture with mip levels built per tile (or gutters when tiles are atlased); terrain hides level cracks with skirts (proposed; stitching if the survey shows skirts fail under steep tilt).
 - **Culling:** frustum culling against bounding volumes in float64, horizon culling with an ellipsoid occluder (and terrain max heights).
-- **Tile states:** `unloaded → queued → loading → decoding → decoded → uploading → ready`, plus `failed` (retry with backoff) and `noData` (terminal: stay on the parent, never retry).
+- **Tile states:** `unloaded → queued → loading → decoding → decoded → uploading → ready`, plus `failed` (retried with randomized exponential backoff, at most 4 times, and only while the tile is still wanted) and `noData` (404, 410, 204 or out of coverage: terminal, stay on the parent, never retry). Details in ADR 0007.
 
 ## 7. Loading pipeline
 
@@ -101,7 +101,7 @@ selection ─▶ wanted tiles (priority) ─▶ policy ─▶ cache hierarchy �
 
 - **Priority:** visible before prefetch, coarse before fine, screen center first (distance from center in screen space), destination of a flight before the path.
 - **Scheduler:** binary-heap queue; concurrency limits per host and per provider profile; `AbortController` cancellation of requests no longer wanted (essential during flights); retries with exponential backoff and jitter; timeouts; request coalescing so the same tile is never fetched twice concurrently, and the cache hierarchy ensures it is never downloaded twice.
-- **Workers:** decoding (images via `createImageBitmap`, terrain meshes, vector tiles, labels, clustering) runs in a worker pool; buffers move as transferables.
+- **Workers (ADR 0011):** decoding (images via `createImageBitmap`, terrain meshes, vector tiles, labels, clustering) runs in one page-wide pool of module workers from a single prebuilt worker program (`@vibeglobe/worker`, added in M3); the main-thread scheduler fetches and transfers buffers, workers return `ImageBitmap`s or flat typed arrays.
 - **Upload budget:** GPU uploads are drained within a per-frame time and byte budget, so no frame stutters when many tiles arrive together.
 - **Compression:** KTX2/Basis transcoding in workers where the source provides it, chosen per device capability.
 - **Motion-aware detail:** while the camera moves fast, `maxSse` rises and prefetch shrinks; detail refines when motion slows or stops.
@@ -122,7 +122,7 @@ selection ─▶ wanted tiles (priority) ─▶ policy ─▶ cache hierarchy �
 - **Interface:** `RendererBackend` is defined in core; the engine hands it a frame description (camera matrices, ordered batches of tile meshes with their imagery, layer batches, overlays) and resource commands (create, upload, release). Everything above that line is engine logic.
 - **Implementation (proposed, confirm in the GPU survey, ADR in M2):** three.js `WebGPURenderer` at a pinned version, which selects WebGPU and falls back to WebGL2 automatically (forceable for tests); shaders in TSL compile to WGSL and GLSL. Automatic matrix updates and three.js frustum culling are disabled (the engine culls and computes matrices); texture uploads are explicit so the upload budget holds. Devices without WebGL2 get a clear error event and message.
 - **Draw efficiency:** tiles share geometry where possible (heightmap terrain from a shared grid + height texture; quantized-mesh terrain per tile), imagery per terrain tile composed in one draw with texture arrays where supported; state-sorted batches; instancing for markers.
-- **Loss recovery:** WebGPU `device.lost` and WebGL `webglcontextlost/restored` rebuild GPU resources from CPU-side caches without reloading the page; the view stays on the last good frame meanwhile.
+- **Loss recovery:** WebGPU `device.lost` and WebGL `webglcontextlost/restored` rebuild GPU resources from the encoded tile bytes kept in the RAM cache, decoded again in workers with the pinned base first (ADR 0007), without reloading the page; the view stays on the last good frame meanwhile.
 - **OffscreenCanvas:** rendering from a worker is evaluated in M2 with measurements; adopted only if it improves frame-time stability without breaking input latency or browser coverage.
 - **Hot paths:** replaced with lower-level code only when profiling proves a bottleneck; a fully custom backend is acceptable if measurements justify it (ADR required).
 
@@ -138,8 +138,8 @@ selection ─▶ wanted tiles (priority) ─▶ policy ─▶ cache hierarchy �
 
 ## 11. Controls and animation
 
-- Pointer Events unify mouse, pen and touch; gesture recognizers produce semantic intents (pan, zoom at point, rotate, tilt) consumed by navigation logic in core terms.
-- Inertia from velocity sampled over the last ~100 ms, decayed by elapsed time (frame-rate independent).
+- Pointer Events unify mouse, pen and touch. Input is recorded as events arrive and applied once per frame; gesture recognizers produce semantic intents (pan, zoom at point, rotate, tilt), and a gesture re-bases with zero movement when a finger is added or lifted (ADR 0009).
+- Inertia from the velocity over the 80 ms ending at release (a drag that paused does not glide), evaluated in closed form from elapsed time, so it follows the same path at any refresh rate.
 - `flyTo` follows a smooth zoom-out/zoom-in path (van Wijk and Nuij); `easeTo` for short moves; `jumpTo` teleports; tours queue waypoints. All return cancellable promises and emit events, and keep the user's tilt and heading unless the call sets them.
 - Reduced motion: flights become quick fades; inertia shortens.
 - Keyboard: the container is focusable; arrows pan, Shift+arrows rotate/tilt, +/- zoom.
@@ -152,7 +152,7 @@ selection ─▶ wanted tiles (priority) ─▶ policy ─▶ cache hierarchy �
 
 ## 13. Threading, assets and CSP
 
-- One shared worker pool (size from `hardwareConcurrency`, capped) with task types for each decoder.
+- One page-wide pool of stateless module workers (ADR 0011): it starts with one worker and grows on backlog up to `clamp(hardwareConcurrency − 2, 1, 4)`; a startup handshake checks the build id, and a main-thread executor takes over if workers cannot start. Worker and WebAssembly URLs are same-origin.
 - Workers, WebAssembly and other assets are separate files resolvable by bundlers (`new URL(..., import.meta.url)`) and overridable by configurable base URLs. No `eval`, no `new Function`, no blob-URL code, so the engine runs under a strict Content Security Policy.
 
 ## 14. Errors and validation

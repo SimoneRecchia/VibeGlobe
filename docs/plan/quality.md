@@ -39,7 +39,7 @@ Owner hardware availability is tracked in [open questions](../open-questions.md)
 | Popping                        | Frame differencing in windows where the camera is static: per-pixel change above a threshold that is not explained by a running cross-fade |
 | Flicker and z-fighting shimmer | Frame differencing under sub-pixel camera moves: oscillating pixels across consecutive frames                                              |
 | Seams and cracks               | Edge-line detection along projected tile boundaries; background pixels inside terrain coverage                                             |
-| Vertex jitter                  | Sub-millimeter camera moves at 1 m altitude: screen-space variance of tracked points ≤ 0.5 px                                              |
+| Vertex jitter                  | Sub-millimeter camera moves at 1 m altitude: screen-space variance of tracked points ≤ 0.1 px (ADR 0004)                                              |
 | Backend consistency            | Same canonical views on WebGPU and WebGL2 within the visual-test tolerance                                                                 |
 
 ## Testing strategy and tooling

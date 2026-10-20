@@ -25,6 +25,8 @@ export type {
   BackendName,
   CameraState,
   Controls,
+  DebugMeshData,
+  DebugShape,
   ControlsFactory,
   FrameView,
   GeoPosition,
@@ -36,11 +38,13 @@ export type {
   RendererCapabilities,
   RendererEvents,
   RendererFactory,
+  RendererStats,
   RenderHost,
   ResourceCounts,
   ScreenPoint,
   ViewInit,
 } from './globe/types.js';
+export { buildTileMesh } from './surface/surface-mesh.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
 export {
   enuFrame,

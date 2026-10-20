@@ -33,14 +33,15 @@ export function setEyeOffset(offset: EyeOffset, origin: Float64Array, eye: Float
 
 const zero = new Vector3();
 
+/** The eye-relative offset part an object carries, or zero for objects without one. */
+export function offsetPart(part: 'high' | 'low', object: unknown): Vector3 {
+  return (object ? offsets.get(object as Object3D)?.[part] : undefined) ?? zero;
+}
+
 /** The textured surface material shared by every tile: one shader, per-object offsets. */
 export function createSurfaceMaterial(baseImagery: Texture): MeshBasicNodeMaterial {
-  const high = uniform(new Vector3()).onObjectUpdate(
-    ({ object }) => (object ? offsets.get(object)?.high : undefined) ?? zero,
-  );
-  const low = uniform(new Vector3()).onObjectUpdate(
-    ({ object }) => (object ? offsets.get(object)?.low : undefined) ?? zero,
-  );
+  const high = uniform(new Vector3()).onObjectUpdate(({ object }) => offsetPart('high', object));
+  const low = uniform(new Vector3()).onObjectUpdate(({ object }) => offsetPart('low', object));
   const material = new MeshBasicNodeMaterial();
   material.positionNode = positionLocal.add(low).add(high);
   material.colorNode = texture(baseImagery, uv());

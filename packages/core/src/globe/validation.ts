@@ -1,7 +1,8 @@
 import { GlobeError } from './errors.js';
 import type { GlobeOptions, ViewInit } from './types.js';
 
-const MAX_ZOOM = 24;
+// Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
+const MAX_ZOOM = 28;
 
 function finite(value: unknown, name: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {

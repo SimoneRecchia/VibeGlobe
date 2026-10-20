@@ -41,6 +41,8 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     setBaseImagery: () => Promise.resolve(),
     render: (_view: FrameView, _keys: readonly number[], count: number) => void renderer.draws.push(count),
     resize: () => undefined,
+    setDebugMeshes: () => undefined,
+    stats: () => ({ drawCalls: renderer.draws.length, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
     resourceCounts: () => ({
       meshes: renderer.destroyed ? 0 : renderer.meshes.size,
       textures: renderer.destroyed ? 0 : 1,

@@ -8,8 +8,11 @@ import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selecti
 import { applyView, clampRange, currentView, readCameraState, wrapDegrees } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
+import { buildDebugMesh } from './debug-mesh.js';
 import type {
   BackendName,
+  DebugShape,
+  RendererStats,
   CameraState,
   Controls,
   GeoPosition,
@@ -274,6 +277,17 @@ class GlobeEngine implements Globe {
 
   resourceCounts(): ResourceCounts {
     return this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0 };
+  }
+
+  rendererStats(): RendererStats {
+    return this.renderer?.stats() ?? { drawCalls: 0, triangles: 0, textureUploads: 0, matrixUpdates: 0 };
+  }
+
+  setDebugShapes(shapes: readonly DebugShape[]): void {
+    this.assertAlive();
+    const meshes = shapes.map((shape) => buildDebugMesh(shape));
+    this.renderer?.setDebugMeshes(meshes);
+    this.requestRender();
   }
 
   simulateDeviceLoss(): void {

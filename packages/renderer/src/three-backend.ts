@@ -1,16 +1,16 @@
 import {
   GlobeError,
+  type DebugMeshData,
   type FrameView,
   type RendererBackend,
   type RendererCapabilities,
   type RendererEvents,
+  type RendererStats,
   type RenderHost,
   type ResourceCounts,
   type TileMeshData,
 } from '@vibeglobe/core';
 import {
-  BufferAttribute,
-  BufferGeometry,
   Camera,
   LinearMipmapLinearFilter,
   Mesh,
@@ -22,8 +22,16 @@ import {
   type MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
+import { createDebugEntry, eyeOffsetUniforms, type DebugEntry } from './debug-meshes.js';
+import { createTileMesh } from './tile-mesh.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import { attachEyeOffset, createSurfaceMaterial, setEyeOffset, type EyeOffset } from './surface-material.js';
+import {
+  attachEyeOffset,
+  createSurfaceMaterial,
+  offsetPart,
+  setEyeOffset,
+  type EyeOffset,
+} from './surface-material.js';
 
 /** A camera whose matrices the engine writes every frame; three.js must not recompute them. */
 class EngineCamera extends Camera {
@@ -52,6 +60,12 @@ export class ThreeBackend implements RendererBackend {
   private readonly scene = new Scene();
   private readonly camera = new EngineCamera();
   private readonly tiles = new Map<number, TileEntry>();
+  private debugEntries: DebugEntry[] = [];
+  private readonly debugUniforms = eyeOffsetUniforms(offsetPart);
+  private textureUploads = 0;
+  private matrixUpdates = 0;
+  private lastDrawCalls = 0;
+  private lastTriangles = 0;
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
   private imagery: HTMLImageElement | undefined;
@@ -117,6 +131,14 @@ export class ThreeBackend implements RendererBackend {
     ) {
       this.events.backendFallback('WebGPU initialization failed; using WebGL2');
     }
+    const backend = renderer.backend as { updateTexture?: (...args: unknown[]) => unknown };
+    const updateTexture = backend.updateTexture?.bind(backend);
+    if (updateTexture) {
+      backend.updateTexture = (...args: unknown[]) => {
+        this.textureUploads++;
+        return updateTexture(...args);
+      };
+    }
     if (this.canvas !== undefined && this.canvas !== canvas) this.canvas.replaceWith(canvas);
     else if (!canvas.isConnected) this.container.appendChild(canvas);
     this.canvas = canvas;
@@ -147,17 +169,45 @@ export class ThreeBackend implements RendererBackend {
   }
 
   private entryFor(data: TileMeshData): TileEntry {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
-    geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
-    geometry.setIndex(new BufferAttribute(data.indices, 1));
-    const mesh = new Mesh(geometry, this.material);
-    mesh.matrixAutoUpdate = false;
-    mesh.matrixWorldAutoUpdate = false;
-    mesh.frustumCulled = false;
-    mesh.visible = false;
+    const mesh = createTileMesh(data, this.material);
+    this.countMatrixUpdates(mesh);
     this.scene.add(mesh);
     return { data, mesh, offset: attachEyeOffset(mesh) };
+  }
+
+  /** Counts any automatic matrix update three.js performs on a tile mesh; the engine expects none (F052). */
+  private countMatrixUpdates(mesh: Mesh): void {
+    const updateMatrix = mesh.updateMatrix.bind(mesh);
+    const updateMatrixWorld = mesh.updateMatrixWorld.bind(mesh);
+    mesh.updateMatrix = () => {
+      this.matrixUpdates++;
+      updateMatrix();
+    };
+    mesh.updateMatrixWorld = (force?: boolean) => {
+      this.matrixUpdates++;
+      updateMatrixWorld(force);
+    };
+  }
+
+  /** Replaces the debug quads drawn with the surface's precision path. */
+  setDebugMeshes(meshes: readonly DebugMeshData[]): void {
+    for (const entry of this.debugEntries) {
+      this.scene.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      (entry.mesh.material as MeshBasicNodeMaterial).dispose();
+    }
+    this.debugEntries = meshes.map((data) => createDebugEntry(data, this.debugUniforms));
+    for (const entry of this.debugEntries) this.scene.add(entry.mesh);
+  }
+
+  /** Cumulative counters (F052). */
+  stats(): RendererStats {
+    return {
+      drawCalls: this.lastDrawCalls,
+      triangles: this.lastTriangles,
+      textureUploads: this.textureUploads,
+      matrixUpdates: this.matrixUpdates,
+    };
   }
 
   /** Releases a surface tile mesh. */
@@ -209,11 +259,15 @@ export class ThreeBackend implements RendererBackend {
       entry.mesh.visible = true;
       setEyeOffset(entry.offset, entry.data.originEcef, view.eyeEcef);
     }
+    for (const entry of this.debugEntries) setEyeOffset(entry.offset, entry.data.originEcef, view.eyeEcef);
     this.camera.matrixWorldInverse.fromArray(view.view);
     this.camera.matrixWorld.copy(this.camera.matrixWorldInverse).invert();
     this.camera.projectionMatrix.fromArray(view.projection);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
     this.renderer.render(this.scene, this.camera);
+    const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };
+    this.lastDrawCalls = info.drawCalls ?? info.calls ?? 0;
+    this.lastTriangles = info.triangles;
   }
 
   /** Sets the drawing-buffer size: CSS size times pixel ratio. */
@@ -255,6 +309,7 @@ export class ThreeBackend implements RendererBackend {
       for (const entry of this.tiles.values()) entry.mesh.geometry.dispose();
       await this.initRenderer();
       this.createImageryResources();
+      this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
       this.recovering = false;
       this.events.deviceRestored();
     } catch (error) {
@@ -269,6 +324,7 @@ export class ThreeBackend implements RendererBackend {
     if (this.destroyed) return;
     this.destroyed = true;
     for (const key of [...this.tiles.keys()]) this.removeMesh(key);
+    this.setDebugMeshes([]);
     this.material?.dispose();
     this.imageryTexture?.dispose();
     this.renderer.dispose();

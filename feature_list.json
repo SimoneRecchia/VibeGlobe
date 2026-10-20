@@ -751,7 +751,7 @@
         "Instrument the renderer in the playground and confirm per-frame matrix updates are not performed for unchanged tiles",
         "Confirm textures upload only when the engine's upload scheduler releases them, by counting uploads per frame in a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F053",
@@ -813,7 +813,7 @@
         "Confirm the residual screen-space motion not explained by camera movement stays below 0.1 px",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F058",
@@ -826,7 +826,7 @@
         "Confirm surfaces at a few centimeters of separation resolve in the correct order across the depth range",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F059",

@@ -2,6 +2,7 @@ import { createControls } from '@vibeglobe/controls';
 import { createGlobe, WGS84, type Globe, type ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
 import { startFrameLoop, type FrameLoop } from './frame-loop.js';
+import { runScenario } from './scenarios.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
@@ -97,6 +98,7 @@ if (app && canvas) {
   const globe = startGlobe(app, canvas, viewFromUrl());
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, canvas);
+  runScenario(globe, scenario);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;
   };

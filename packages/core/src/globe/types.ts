@@ -52,6 +52,36 @@ export interface ResourceCounts {
   readonly gpuBytes: number;
 }
 
+/** Cumulative renderer counters for diagnostics and tests (F052). */
+export interface RendererStats {
+  /** Draw calls in the last frame. */
+  readonly drawCalls: number;
+  /** Triangles in the last frame. */
+  readonly triangles: number;
+  /** Texture uploads since the renderer started. */
+  readonly textureUploads: number;
+  /** Automatic object matrix updates since the renderer started (tiles must cause none). */
+  readonly matrixUpdates: number;
+}
+
+/** A flat test quad drawn with the surface's precision path, for scenario tests of jitter and depth (F057, F058). */
+export interface DebugShape {
+  /** The four corners, in order around the quad. */
+  readonly corners: readonly [GeoPosition, GeoPosition, GeoPosition, GeoPosition];
+  /** Color, each channel 0–1. */
+  readonly colorRgb: readonly [number, number, number];
+  /** When set, a smooth checker-like pattern fixed to the ground with cells of this size (a sum of sines). */
+  readonly checkerMeters?: number;
+}
+
+/** A debug quad ready for the renderer: float32 offsets from a float64 origin. */
+export interface DebugMeshData {
+  readonly originEcef: Float64Array;
+  readonly positions: Float32Array;
+  readonly colorRgb: readonly [number, number, number];
+  readonly checkerMeters: number;
+}
+
 /** Browser services the engine needs, supplied by the renderer plug-in because core has no DOM (architecture §1). */
 export interface RenderHost {
   /** Schedules `callback` for the next display frame; returns an id for {@link RenderHost.cancelFrame}. */
@@ -88,6 +118,10 @@ export interface RendererBackend {
   removeMesh(key: number): void;
   /** Loads the pinned base imagery (an equirectangular world image); resolves when it is on the GPU. */
   setBaseImagery(url: string): Promise<void>;
+  /** Replaces the debug quads. */
+  setDebugMeshes(meshes: readonly DebugMeshData[]): void;
+  /** Cumulative counters. */
+  stats(): RendererStats;
   /** Draws the listed surface tiles. */
   render(view: FrameView, keys: readonly number[], count: number): void;
   resize(widthPx: number, heightPx: number, pixelRatio: number): void;
@@ -201,6 +235,10 @@ export interface Globe {
   requestRender(): void;
   /** GPU resource counters. */
   resourceCounts(): ResourceCounts;
+  /** Renderer counters: draw calls, triangles, texture uploads and automatic matrix updates. */
+  rendererStats(): RendererStats;
+  /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
+  setDebugShapes(shapes: readonly DebugShape[]): void;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */
   simulateDeviceLoss(): void;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */

@@ -1,0 +1,77 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/core/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/core/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/renderer"
+    },
+    {
+      "path": "./packages/renderer/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/sources"
+    },
+    {
+      "path": "./packages/sources/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/layers"
+    },
+    {
+      "path": "./packages/layers/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/controls"
+    },
+    {
+      "path": "./packages/controls/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/offline"
+    },
+    {
+      "path": "./packages/offline/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./packages/ui/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/vue"
+    },
+    {
+      "path": "./packages/vue/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/web-component"
+    },
+    {
+      "path": "./packages/web-component/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/tools"
+    },
+    {
+      "path": "./packages/tools/tsconfig.test.json"
+    },
+    {
+      "path": "./apps/playground"
+    },
+    {
+      "path": "./tsconfig.tools.json"
+    }
+  ]
+}

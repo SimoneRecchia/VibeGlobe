@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.playground.log
+.playground.pid
+docs-site/
+benchmarks/results/local/
+benchmarks/results/ci-*/

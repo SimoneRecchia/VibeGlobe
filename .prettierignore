@@ -1,0 +1,11 @@
+# The owner's brief and the frozen feature list keep their exact formatting.
+PLAN.md
+feature_list.json
+package-lock.json
+THIRD_PARTY_NOTICES.md
+dist/
+coverage/
+docs-site/
+test-results/
+playwright-report/
+benchmark-results/

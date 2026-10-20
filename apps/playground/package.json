@@ -1,0 +1,16 @@
+{
+  "name": "@vibeglobe/playground",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Demo app that exercises every engine feature; also the bed for visual and scenario tests.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vibeglobe/core": "*",
+    "@vibeglobe/ui": "*"
+  }
+}

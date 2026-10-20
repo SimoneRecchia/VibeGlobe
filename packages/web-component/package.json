@@ -1,0 +1,18 @@
+{
+  "name": "@vibeglobe/web-component",
+  "version": "0.0.0",
+  "description": "VibeGlobeEngine web-component: framework-neutral <vibe-globe> custom element.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ]
+}

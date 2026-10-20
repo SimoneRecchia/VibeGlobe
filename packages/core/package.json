@@ -1,0 +1,18 @@
+{
+  "name": "@vibeglobe/core",
+  "version": "0.0.0",
+  "description": "VibeGlobeEngine core: math, geodesy, camera, tiling, scheduling, cache and events.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ]
+}

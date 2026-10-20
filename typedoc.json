@@ -1,0 +1,11 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "VibeGlobeEngine",
+  "entryPoints": ["packages/*/src/index.ts"],
+  "tsconfig": "tsconfig.docs.json",
+  "out": "docs-site",
+  "readme": "README.md",
+  "projectDocuments": ["docs/guides/*.md"],
+  "excludePrivate": true,
+  "treatWarningsAsErrors": true
+}

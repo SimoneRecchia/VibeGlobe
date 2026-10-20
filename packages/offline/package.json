@@ -1,0 +1,18 @@
+{
+  "name": "@vibeglobe/offline",
+  "version": "0.0.0",
+  "description": "VibeGlobeEngine offline: persistent cache, network modes, offline packages, connectivity and bandwidth logic.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ]
+}

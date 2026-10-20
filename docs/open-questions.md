@@ -13,6 +13,13 @@ Items only the owner can provide or decide. Each lists the stub or default used 
 | 16  | **`GOOGLE_MAPS_API_KEY`**: the restricted key, as a CI secret and for local live runs.                                                                                                                                                        | M7, M13                                     | Fixture conformance suites; the live command reports that it did not run                                                |
 | 17  | **npm publishing token** for the `vibeglobe` organization, stored as a CI secret, and approval of each release.                                                                                                                               | M15                                         | Release workflow tested as a dry run                                                                                    |
 
+## Pending owner steps
+
+Feature-list entries whose every other step passes and whose remaining step needs the owner (ADR 0017). `npm run check:features` keeps this table and the `pending` statuses in `feature_list.json` in sync.
+
+| Entry | Owner-only step | Prepared |
+| ----- | --------------- | -------- |
+
 ## Resolved
 
 All answered on 2026-10-20 and recorded in [ADR 0015](adr/0015-owner-decisions-2026-10-20.md). Principle: the project runs no servers; every consumer hosts tiles, offline packages and engine assets in their own backend and frontend, with the tools and documentation in the repository.

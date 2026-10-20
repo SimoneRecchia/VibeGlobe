@@ -78,3 +78,26 @@ export function findSupersessionViolations(current: FeatureList, record: string)
   }
   return violations;
 }
+
+const PENDING_HEADING = '## Pending owner steps';
+
+/**
+ * Lists pending entries that docs/open-questions.md does not justify (ADR 0017): every pending entry has a row in the
+ * "Pending owner steps" section naming the owner-only step, and every row there names a pending entry.
+ */
+export function findPendingViolations(current: FeatureList, openQuestions: string): string[] {
+  const start = openQuestions.indexOf(PENDING_HEADING);
+  const section = start === -1 ? '' : (openQuestions.slice(start).split(/\n## /)[0] ?? '');
+  const listed = new Set([...section.matchAll(/^\|\s*(F\d+)\s*\|/gm)].map((match) => match[1] as string));
+  const violations: string[] = [];
+  const where = 'under "Pending owner steps" in docs/open-questions.md';
+  for (const feature of current.features) {
+    if (feature.status === 'pending' && !listed.has(feature.id))
+      violations.push(`${feature.id}: pending but not listed ${where}`);
+  }
+  for (const id of listed) {
+    const status = current.features.find((feature) => feature.id === id)?.status;
+    if (status !== 'pending') violations.push(`${id}: listed ${where} but its status is "${status ?? 'missing'}"`);
+  }
+  return violations;
+}

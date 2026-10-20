@@ -1,8 +1,12 @@
 // The feature list schema (ADR 0003) and its loader, shared by the status and integrity scripts.
 import { readFileSync } from 'node:fs';
 
-/** `superseded`: an owner decision made the entry impossible; docs/feature-changes.md names its replacement (ADR 0016). */
-export const FEATURE_STATUSES = ['passing', 'failing', 'superseded'] as const;
+/**
+ * `superseded`: an owner decision made the entry impossible; docs/feature-changes.md names its replacement (ADR 0016).
+ * `pending`: every step reachable without the owner passes and the rest needs an owner-only step, listed in
+ * docs/open-questions.md (ADR 0017).
+ */
+export const FEATURE_STATUSES = ['passing', 'failing', 'superseded', 'pending'] as const;
 type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 
 export interface Feature {

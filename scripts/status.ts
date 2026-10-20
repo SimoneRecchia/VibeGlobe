@@ -16,26 +16,30 @@ if (invalid.length > 0 || duplicateIds.length > 0) {
 
 const active = features.filter((f) => f.status !== 'superseded');
 const passing = active.filter((f) => f.status === 'passing').length;
-const failing = active.length - passing;
+const pending = active.filter((f) => f.status === 'pending').length;
+const failing = active.length - passing - pending;
 const superseded = features.length - active.length;
 const percent = active.length === 0 ? 0 : (100 * passing) / active.length;
 
 console.log(`Passing:    ${passing}`);
 console.log(`Failing:    ${failing}`);
+console.log(`Pending:    ${pending} (waiting only for owner-only steps, docs/open-questions.md)`);
 console.log(`Superseded: ${superseded} (replaced by owner decisions, docs/feature-changes.md)`);
 console.log(`Total:      ${features.length} (${percent.toFixed(1)}% of the ${active.length} active entries passing)`);
 
-console.log('\nBy milestone (passing/active, superseded):');
+console.log('\nBy milestone (passing/active, pending, superseded):');
 for (const [milestone, name] of Object.entries(list.milestones)) {
   const inMilestone = features.filter((f) => f.milestone === Number(milestone));
   const activeInMilestone = inMilestone.filter((f) => f.status !== 'superseded');
   const done = activeInMilestone.filter((f) => f.status === 'passing').length;
+  const pendingInMilestone = activeInMilestone.filter((f) => f.status === 'pending').length;
+  const pendingNote = pendingInMilestone > 0 ? `  (${pendingInMilestone} pending)` : '';
   const supersededNote =
     inMilestone.length > activeInMilestone.length
       ? `  (${inMilestone.length - activeInMilestone.length} superseded)`
       : '';
   console.log(
-    `  M${milestone.padEnd(2)}  ${`${done}/${activeInMilestone.length}`.padStart(7)}  ${name}${supersededNote}`,
+    `  M${milestone.padEnd(2)}  ${`${done}/${activeInMilestone.length}`.padStart(7)}  ${name}${pendingNote}${supersededNote}`,
   );
 }
 

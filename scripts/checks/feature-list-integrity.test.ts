@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Feature, FeatureList } from '../feature-list.ts';
-import { findFeatureListViolations, findSupersessionViolations } from './feature-list-integrity.ts';
+import {
+  findFeatureListViolations,
+  findPendingViolations,
+  findSupersessionViolations,
+} from './feature-list-integrity.ts';
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
   return {
@@ -115,5 +119,31 @@ describe('findSupersessionViolations', () => {
     expect(findSupersessionViolations(current, '| F001 | none | 2026-10-20 | Dropped |')).toEqual([
       'F001: no replacement recorded in docs/feature-changes.md',
     ]);
+  });
+});
+
+describe('findPendingViolations', () => {
+  const questions = [
+    '## Pending owner steps',
+    '',
+    '| Entry | Owner-only step | Prepared |',
+    '| ----- | --------------- | -------- |',
+    '| F001  | Run the procedure on the reference desktop | Procedure written |',
+  ].join('\n');
+
+  it('accepts pending entries listed with their owner-only step', () => {
+    expect(findPendingViolations(list(feature('F001', { status: 'pending' }), feature('F002')), questions)).toEqual([]);
+  });
+
+  it('rejects unlisted pending entries and listed entries that are not pending', () => {
+    expect(findPendingViolations(list(feature('F001'), feature('F002', { status: 'pending' })), questions)).toEqual([
+      'F002: pending but not listed under "Pending owner steps" in docs/open-questions.md',
+      'F001: listed under "Pending owner steps" in docs/open-questions.md but its status is "failing"',
+    ]);
+  });
+
+  it('ignores entry ids outside the pending section', () => {
+    const text = '| F009 | some other table |\n' + questions;
+    expect(findPendingViolations(list(feature('F001', { status: 'pending' })), text)).toEqual([]);
   });
 });

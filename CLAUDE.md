@@ -27,7 +27,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 
 ## Rules that differ from defaults
 
-- `feature_list.json`: only the `status` field ever changes. Never delete, reorder or reword entries (ADR 0003; `npm run check:features`). An entry an owner decision made impossible becomes `superseded`, recorded with its replacements in `docs/feature-changes.md` (ADR 0016).
+- `feature_list.json`: only the `status` field ever changes. Never delete, reorder or reword entries (ADR 0003; `npm run check:features`). An entry an owner decision made impossible becomes `superseded`, recorded with its replacements in `docs/feature-changes.md` (ADR 0016). An entry whose only remaining steps need the owner (devices, real keys, money, publishing, making the repository public, legal sign-off) becomes `pending`, listed in `docs/open-questions.md` (ADR 0017).
 - Never remove, skip or weaken a test, and never loosen `quality/*.json`. A genuinely wrong test or gate is fixed with the reason logged in `docs/test-changes.md` (`npm run check:tests`).
 - Bugs: list them in `docs/known-bugs.md`; every fix starts with a failing regression test; no known bug may stay open at the end of a milestone.
 - English everywhere (code, comments, docs, commit messages). TypeScript strict, ESM, no `any`, TSDoc on public APIs, units in names (`Meters`, `Deg`, `Rad`, `Px`, `Ms`).

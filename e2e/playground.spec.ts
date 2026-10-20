@@ -14,7 +14,7 @@ test('playground loads without errors', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page).toHaveTitle('VibeGlobeEngine playground');
+  await expect(page).toHaveTitle('VibeGlobe playground');
   await expect(page.locator('#app')).toBeVisible();
   await expect(page.locator('#app canvas#globe')).toBeVisible();
   await expect(page.locator('#status')).toContainText('WGS84, a = 6378137 m');
@@ -26,8 +26,8 @@ test('debug overlay shows live frame time and frame rate with ?debug=1', async (
 
   await page.goto('/?debug=1');
 
-  const frameTime = page.locator('.vge-debug-overlay [data-metric="frame-time"]');
-  const frameRate = page.locator('.vge-debug-overlay [data-metric="frame-rate"]');
+  const frameTime = page.locator('.vibeglobe-debug-overlay [data-metric="frame-time"]');
+  const frameRate = page.locator('.vibeglobe-debug-overlay [data-metric="frame-rate"]');
   await expect(frameTime).toHaveText(/frame \d+\.\d ms/);
   await expect(frameRate).toHaveText(/rate {2}\d+\.\d fps/);
   // A long frame must show up in the live values: block the main thread once and wait for the overlay to change.
@@ -47,7 +47,7 @@ test('debug overlay is absent and its code not loaded without ?debug=1', async (
   await page.goto('/');
   await expect(page.locator('#status')).toContainText('WGS84');
 
-  await expect(page.locator('.vge-debug-overlay')).toHaveCount(0);
+  await expect(page.locator('.vibeglobe-debug-overlay')).toHaveCount(0);
   expect(requested.filter((url) => url.includes('debug-overlay') || url.includes('/packages/ui/'))).toEqual([]);
 });
 
@@ -57,7 +57,8 @@ test('the frame loop keeps bounded CPU samples and piles up no performance entri
   const samples = (): Promise<number> =>
     page.evaluate(
       () =>
-        (window as { vgePlayground?: { cpuFrameTimesMs(): number[] } }).vgePlayground?.cpuFrameTimesMs().length ?? 0,
+        (window as { vibeglobePlayground?: { cpuFrameTimesMs(): number[] } }).vibeglobePlayground?.cpuFrameTimesMs()
+          .length ?? 0,
     );
   await expect.poll(samples, { timeout: 5000 }).toBeGreaterThan(30);
   expect(await page.evaluate(() => performance.getEntriesByType('measure').length)).toBe(0);

@@ -9,8 +9,8 @@ URL="http://localhost:${PORT}"
 export PLAYGROUND_PORT="$PORT"
 
 # Cloud containers ship a preinstalled Chromium for Playwright.
-if [[ -z "${VGE_CHROMIUM_PATH:-}" && -x /opt/pw-browsers/chromium ]]; then
-  export VGE_CHROMIUM_PATH=/opt/pw-browsers/chromium
+if [[ -z "${VIBEGLOBE_CHROMIUM_PATH:-}" && -x /opt/pw-browsers/chromium ]]; then
+  export VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium
 fi
 
 echo "==> Installing dependencies"

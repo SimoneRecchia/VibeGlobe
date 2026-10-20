@@ -1,6 +1,6 @@
 # 0011. Worker architecture
 
-- Status: Accepted
+- Status: Accepted (open points settled by 0015)
 - Date: 2026-10-20
 - Milestone: M3 (worker pool, decoding, CSP-safe loading); M2 for the rendering-thread evaluation
 
@@ -145,3 +145,7 @@ Options **1c, 2d, 3b, 4b and 5a**, with the M2 measurement able to switch to 5b.
     - decoded-but-discarded tiles below 5% during flights;
     - flat worker count and worker heap in soak tests.
   - A measurement that misses one of these budgets reopens this decision through a new ADR.
+
+## Update 2026-10-20
+
+The owner confirmed same-origin only ([ADR 0015](0015-owner-decisions-2026-10-20.md), decision 11): consumers serve engine assets from their own origin, offline LAN installs included. `assets.workerUrl` and `assets.wasmBaseUrl` stay configurable; no CDN support is planned (follow-up list).

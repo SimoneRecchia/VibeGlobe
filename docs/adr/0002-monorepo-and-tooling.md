@@ -1,6 +1,6 @@
 # 0002. Monorepo and tooling
 
-- Status: Accepted
+- Status: Accepted (amended by 0015)
 - Date: 2026-10-20
 - Milestone: M1
 
@@ -25,10 +25,14 @@
 - Tooling scripts are TypeScript run directly by Node (`engines.node >= 22.18.0`).
 - Exact versions for every dependency (`save-exact`), with `package-lock.json` committed; `engine-strict` on.
 - Package scope `@vibeglobe/` (registry scope tracked in `docs/open-questions.md`).
-- `VGE_CHROMIUM_PATH` lets Playwright use a preinstalled Chromium (cloud containers ship one under `/opt/pw-browsers`); verified that Playwright 1.64 drives that build for the smoke test.
+- `VIBEGLOBE_CHROMIUM_PATH` lets Playwright use a preinstalled Chromium (cloud containers ship one under `/opt/pw-browsers`); verified that Playwright 1.64 drives that build for the smoke test.
 
 ## Consequences
 
 - No phantom-dependency protection from pnpm: every package must declare what it imports (to be enforced by the M1 dependency-rule check).
 - `tsc -b` must be revisited if worker or shader assets need bundling.
 - Upgrading TypeScript to 7.x is a tracked follow-up once the linting and documentation tools support it.
+
+## Update 2026-10-20
+
+The owner settled the registry: the `@vibeglobe/` scope is published on the public npm registry under the owner's `vibeglobe` organization, and the project is now named VibeGlobe (root package `vibeglobe`, environment variables `VIBEGLOBE_*`). Every `package.json` declares `PolyForm-Noncommercial-1.0.0`, checked by `npm run check` ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 1 and 7).

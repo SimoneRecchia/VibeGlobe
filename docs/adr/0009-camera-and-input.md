@@ -1,6 +1,6 @@
 # 0009. Camera and input
 
-- Status: Accepted
+- Status: Accepted (open points settled by 0015)
 - Date: 2026-10-20
 - Milestone: M2, M5, M6 (terrain collision in M4)
 
@@ -140,3 +140,7 @@ Option 3. Package placement follows architecture.md §1.
     - **Flights:** `flyTo` endpoints are exact, the path is continuous, and Milan→Tokyo reaches the globe phase.
     - **Touch:** recognizer timelines cover tilt vs pinch vs twist and finger add/remove.
     - **Performance:** controls cost ≤ 0.2 ms CPU per frame with zero allocations, a CPU pick ≤ 0.1 ms, and input-to-frame latency measured on WebGPU and WebGL2.
+
+## Update 2026-10-20
+
+The owner confirmed the defaults ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 8 and 10): constant ground scale while panning in the flat 2D phase, and free rotation near the poles with no jump and never an automatic north-up. No change to this ADR's decisions.

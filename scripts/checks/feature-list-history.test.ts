@@ -23,7 +23,7 @@ describe('featureListViolationsSince (KB-003)', () => {
     execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'vge-feature-list-'));
+    dir = mkdtempSync(join(tmpdir(), 'vibeglobe-feature-list-'));
     git('init', '-q');
     git('config', 'user.email', 'test@example.com');
     git('config', 'user.name', 'Test');

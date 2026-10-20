@@ -2,7 +2,7 @@
 
 ## Current state
 
-- **M1 Research and foundation is complete**: 41 of 41 entries pass (`npm run status`). It was merged into `main` through SimoneRecchia/VibeGlobeEngine#1 (merge commit `470b458`, with the owner's approval), and CI run 20 on `main` is green.
+- **M1 Research and foundation is complete**: 41 of 41 entries pass (`npm run status`). It was merged into `main` through SimoneRecchia/VibeGlobe#1 (merge commit `470b458`, with the owner's approval), and CI run 20 on `main` is green.
 - Next: M2 Globe core, starting with `F042` (WGS84 conversions) in file order. Read ADRs 0004, 0005, 0009, 0010, 0013 and 0014 first; M2 also owns the ADR 0012 probes, start-up measurement and allocation sampling (ADR 0013).
 - Owner questions open: `docs/open-questions.md` 1–12 (registry scope, reference devices, hosting, Sentinel-2 egress, Google key, CI capacity, license, 2D panning, tilt timing, heading near the poles, worker hosting, initial-JavaScript budget).
 
@@ -20,7 +20,7 @@ Done:
 
 Verified: every check was broken on purpose in a local scratch branch and failed as required (results in the commit history of this session); CI run 3 failed on a deliberate type error; the revert's own run failed on `format:check` (a table in `docs/plan/quality.md` committed unformatted in the same push), and CI was green again from the next push; `./init.sh` from a fresh clone exits 0; every command listed in the `CLAUDE.md` files works; a jscpd scan found no code shared between this repository and CesiumJS, MapLibre GL JS, deck.gl, iTowns, OpenGlobus, 3DTilesRendererJS, three.js and OpenLayers (1,844 duplicates found inside those projects, none across).
 
-Features now passing: all of M1, F001–F041. F002, F027 and F041 were marked last: after the merge into `main` (SimoneRecchia/VibeGlobeEngine#1), green CI run 20 on `main`, `./init.sh` from a fresh clone of the merged tree, and a final fresh-context review reporting no gaps.
+Features now passing: all of M1, F001–F041. F002, F027 and F041 were marked last: after the merge into `main` (SimoneRecchia/VibeGlobe#1), green CI run 20 on `main`, `./init.sh` from a fresh clone of the merged tree, and a final fresh-context review reporting no gaps.
 
 Decisions to note: three.js is the rendering base, pinned to exactly `three@0.186.1` (ADR 0010; r187 required before M4). The initial-JavaScript budget needs the owner's review in M2 (open question 12).
 
@@ -40,7 +40,7 @@ Done:
   - Fidelity review fixed entries that required capabilities from later milestones (moved, or limited to what exists then), contradictions (three.js no longer mandatory; OpenStreetMap profile limits only what its terms forbid; phones best effort; owner approval before publishing) and unprovable steps (numeric thresholds).
   - Removed as duplicates or overreach: a second custom-elevation-encoding entry, a second tree-shaking entry, the in-browser package builder, the optional fresher Sentinel-2 mosaic and OpenStreetMap raster tiles (the last three moved to `docs/follow-ups.md`).
 - Created `init.sh`, `npm run status` (`scripts/status.ts`), `CLAUDE.md`, `README.md`, ADRs 0001–0003, the research-survey index, `docs/open-questions.md` and `docs/follow-ups.md`.
-- Minimal monorepo so `init.sh` works end to end: TypeScript 6.0.3 project references, Vite 8, Vitest 5, Playwright 1.64 (drives the container's preinstalled Chromium through `VGE_CHROMIUM_PATH`).
+- Minimal monorepo so `init.sh` works end to end: TypeScript 6.0.3 project references, Vite 8, Vitest 5, Playwright 1.64 (drives the container's preinstalled Chromium through `VIBEGLOBE_CHROMIUM_PATH`).
 
 Verified: `./init.sh` from scratch (install, build, playground up, 2 unit tests and 1 e2e smoke test green, status printed); re-run reuses the running playground; `kill $(cat .playground.pid)` stops it; `npm run status` rejects invalid statuses and duplicate ids.
 

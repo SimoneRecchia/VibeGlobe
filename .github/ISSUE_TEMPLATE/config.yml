@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/SimoneRecchia/VibeGlobe/blob/main/SECURITY.md
+    about: Never report vulnerabilities in public issues; follow the security policy.

@@ -1,4 +1,4 @@
-# VibeGlobeEngine technical plan
+# VibeGlobe technical plan
 
 This is the implementing agent's detailed technical plan, derived from the owner's master brief in [`PLAN.md`](../../PLAN.md). `PLAN.md` states what must be built and the fixed constraints; these documents state how.
 
@@ -13,6 +13,7 @@ Related state:
 
 - [`feature_list.json`](../../feature_list.json): every requirement as an end-to-end behavior with proof steps and a status. `npm run status` summarizes it.
 - [`progress.md`](../../progress.md): session log and next steps.
+- [`docs/feature-changes.md`](../feature-changes.md): feature-list entries superseded by owner decisions, with their replacements (ADR 0016).
 - [`docs/adr/`](../adr/): Architecture Decision Records.
 - [`docs/research/`](../research/): the mandatory research survey, one file per problem area.
 - [`docs/open-questions.md`](../open-questions.md): items only the owner can provide.

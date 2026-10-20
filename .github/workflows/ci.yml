@@ -1,29 +1,26 @@
 name: CI
 
+# Saves minutes (ADR 0015): every push, and pull requests from forks, run one job with every fast check; pushes to
+# main, the nightly schedule and manual runs add the browser jobs (end-to-end tests and recorded benchmarks).
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 jobs:
-  typecheck:
-    name: Type check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run typecheck
-
-  lint:
-    name: Lint, format and repository checks
+  fast:
+    name: Fast checks
+    # A pull request from this repository is already checked by the push of its head commit.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -31,10 +28,16 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run check
-      - run: npm run deadcode
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Repository checks
+        run: npm run check
+      - name: Dead code
+        run: npm run deadcode
       - name: Feature list and test guards against the previous state
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
@@ -43,53 +46,26 @@ jobs:
           fi
           npm run check:features -- --base "$base"
           npm run check:tests -- --base "$base"
-
-  test:
-    name: Unit tests with coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run coverage
-
-  docs:
-    name: API documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run docs
-
-  licenses:
-    name: License audit and notices
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run licenses
-      - run: npm run notices -- --check
-
-  bundle:
-    name: Bundle size and tree shaking
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run build
-      - run: npm run check:consumer
-      - run: npm run size
-      - run: npm run treeshake
+      - name: Unit tests with coverage
+        run: npm run coverage
+      - name: License audit
+        run: npm run licenses
+      - name: Third-party notices up to date
+        run: npm run notices -- --check
+      - name: API documentation
+        run: npm run docs
+      - name: Build
+        run: npm run build
+      - name: Consumer check
+        run: npm run check:consumer
+      - name: Bundle size
+        run: npm run size
+      - name: Tree shaking
+        run: npm run treeshake
 
   e2e:
     name: End-to-end tests (Chromium)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
       CI: true
@@ -111,9 +87,10 @@ jobs:
 
   benchmarks:
     name: Benchmarks (recorded, not gated)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
-      VGE_DEVICE: ci-swiftshader
+      VIBEGLOBE_DEVICE: ci-swiftshader
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

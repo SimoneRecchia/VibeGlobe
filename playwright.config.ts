@@ -2,8 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
-// Cloud containers ship a preinstalled Chromium; init.sh points VGE_CHROMIUM_PATH at it.
-const chromiumPath = process.env['VGE_CHROMIUM_PATH'];
+// Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
+const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 
 export default defineConfig({
   testDir: 'e2e',

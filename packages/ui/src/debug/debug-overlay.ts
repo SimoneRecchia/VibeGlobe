@@ -19,7 +19,7 @@ function format(value: number | undefined, unit: string): string {
 /** Adds the debug overlay to `container`, which should be the positioned element that holds the map. */
 export function createDebugOverlay(container: HTMLElement): DebugOverlay {
   const panel = document.createElement('div');
-  panel.className = 'vge-debug-overlay';
+  panel.className = 'vibeglobe-debug-overlay';
   panel.setAttribute('role', 'status');
   panel.setAttribute('aria-label', 'Engine diagnostics');
   panel.style.cssText =

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Feature, FeatureList } from '../feature-list.ts';
-import { findFeatureListViolations } from './feature-list-integrity.ts';
+import { findFeatureListViolations, findSupersessionViolations } from './feature-list-integrity.ts';
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
   return {
@@ -32,6 +32,11 @@ describe('findFeatureListViolations', () => {
       feature('F004'),
       feature('F003', { milestone: 2 }),
     );
+    expect(findFeatureListViolations(base, current)).toEqual([]);
+  });
+
+  it('accepts a superseded status, which changes nothing else (ADR 0016)', () => {
+    const current = list(feature('F001', { status: 'superseded' }), feature('F002'), feature('F003', { milestone: 2 }));
     expect(findFeatureListViolations(base, current)).toEqual([]);
   });
 
@@ -74,6 +79,41 @@ describe('findFeatureListViolations', () => {
       'F002: duplicate id',
       'F003: unknown field "priority"',
       'milestone 2: renamed or removed',
+    ]);
+  });
+});
+
+describe('findSupersessionViolations', () => {
+  const record = [
+    '| Entry | Replaced by | Owner decision | Why it can no longer pass |',
+    '| ----- | ----------- | -------------- | ------------------------- |',
+    '| F001  | F003, F004  | 2026-10-20     | Renamed                   |',
+  ].join('\n');
+
+  it('accepts superseded entries recorded with existing, active replacements', () => {
+    const current = list(feature('F001', { status: 'superseded' }), feature('F002'), feature('F003'), feature('F004'));
+    expect(findSupersessionViolations(current, record)).toEqual([]);
+  });
+
+  it('rejects an unrecorded supersession and a record that does not match the list', () => {
+    const current = list(
+      feature('F001'),
+      feature('F002', { status: 'superseded' }),
+      feature('F003', { status: 'superseded' }),
+    );
+    expect(findSupersessionViolations(current, record)).toEqual([
+      'F002: superseded but not recorded in docs/feature-changes.md',
+      'F003: superseded but not recorded in docs/feature-changes.md',
+      'F001: recorded in docs/feature-changes.md but its status is "failing"',
+      'F001: replacement F003 is itself superseded',
+      'F001: replacement F004 does not exist',
+    ]);
+  });
+
+  it('rejects a recorded entry without a replacement', () => {
+    const current = list(feature('F001', { status: 'superseded' }));
+    expect(findSupersessionViolations(current, '| F001 | none | 2026-10-20 | Dropped |')).toEqual([
+      'F001: no replacement recorded in docs/feature-changes.md',
     ]);
   });
 });

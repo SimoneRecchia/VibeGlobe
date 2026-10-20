@@ -4,7 +4,7 @@ title: Development
 
 # Development
 
-How to build, test and change VibeGlobeEngine. The rules behind this workflow are in `CLAUDE.md` and `PLAN.md`.
+How to build, test and change VibeGlobe. The rules behind this workflow are in `CLAUDE.md` and `PLAN.md`.
 
 ## Requirements
 

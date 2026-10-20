@@ -1,0 +1,44 @@
+name: Bug report
+description: Something renders wrong, stutters, crashes or behaves differently from the documentation.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. Screenshots or a recording help for visual glitches.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest setup that shows the problem (playground URL, configuration, source, camera position).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: VibeGlobe version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Graphics backend
+      options: [WebGPU, WebGL2, Both, Unknown]
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser and version, operating system, device and GPU, pixel ratio, framework (Vue, Nuxt, Web Component, plain).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output and debug overlay
+      description: Errors and warnings from the console, and the debug overlay (`?debug=1`) if relevant.
+      render: text

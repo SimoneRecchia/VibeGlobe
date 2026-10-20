@@ -17,7 +17,7 @@ describe('looksLikeCode', () => {
 
   it.each([
     'Runs Vite directly (not through npm) so the recorded pid is the server itself.',
-    'Cloud containers ship a preinstalled Chromium; init.sh points VGE_CHROMIUM_PATH at it.',
+    'Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.',
     'Hot path: frame loop',
     'width',
     'eslint-disable-next-line no-console',

@@ -1,6 +1,6 @@
 # 0003. Session state for a multi-session build
 
-- Status: Accepted
+- Status: Accepted (amended by 0016)
 - Date: 2026-10-20
 - Milestone: M1
 
@@ -24,3 +24,7 @@ The build spans many sessions and context windows. `PLAN.md` (Working method) re
 ## Consequences
 
 Progress is measurable at any time (`npm run status`), and a fresh session can resume from the repository alone. Appending instead of editing keeps history honest at the cost of occasional near-duplicate entries.
+
+## Update 2026-10-20
+
+An owner decision can make an entry impossible to pass. Such an entry gets the status `superseded`, recorded with its replacements in `docs/feature-changes.md` and checked by `npm run check:features` ([ADR 0016](0016-superseded-feature-entries.md)). Everything else here stands.

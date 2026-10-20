@@ -15,6 +15,14 @@ export const LIBRARY_PACKAGES = [
 ];
 const REQUIRED_APPS = ['playground'];
 
+/** SPDX identifier that every package.json declares, the root included (ADR 0015). */
+export const PROJECT_LICENSE = 'PolyForm-Noncommercial-1.0.0';
+
+/** Reports a manifest at `dir` whose license is not the project license. */
+export function findLicenseViolation(dir: string, license: string | undefined): string[] {
+  return license === PROJECT_LICENSE ? [] : [`${dir}: package.json must declare "license": "${PROJECT_LICENSE}"`];
+}
+
 /**
  * Every package follows one layout: package.json, src/, a CLAUDE.md, ESM, a lowercase name, tests next to code; library
  * packages also have a `src/index.ts` entry and are side-effect free.
@@ -36,6 +44,7 @@ export function findStructureViolations(packages: WorkspacePackage[]): string[] 
     if (!pkg.files.some((file) => file.startsWith(`${pkg.dir}/src/`))) violations.push(`${pkg.dir}: missing src/`);
     if (folder !== folder.toLowerCase()) violations.push(`${pkg.dir}: package folder names must be lowercase`);
     else if (pkg.manifest.name !== expectedName) violations.push(`${pkg.dir}: package name must be "${expectedName}"`);
+    violations.push(...findLicenseViolation(pkg.dir, pkg.manifest.license));
     if (pkg.manifest.type !== 'module') violations.push(`${pkg.dir}: package.json must declare "type": "module"`);
     if (isLibrary && !has('src/index.ts')) violations.push(`${pkg.dir}: missing src/index.ts entry point`);
     if (isLibrary && pkg.manifest.sideEffects !== false)

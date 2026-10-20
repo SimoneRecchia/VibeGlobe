@@ -1,14 +1,15 @@
 // Repository checks that must always hold: package layout, dependency rules and hot-path documentation.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { findDependencyViolations } from './checks/dependencies.ts';
 import { findHotPathViolations } from './checks/hot-paths.ts';
-import { findStructureViolations } from './checks/structure.ts';
+import { findLicenseViolation, findStructureViolations } from './checks/structure.ts';
 import { ROOT_DIR, readWorkspace } from './workspace.ts';
 
 const packages = readWorkspace();
+const rootManifest = JSON.parse(readFileSync(join(ROOT_DIR, 'package.json'), 'utf8')) as { license?: string };
 const results: [string, string[]][] = [
-  ['structure', findStructureViolations(packages)],
+  ['structure', [...findLicenseViolation('.', rootManifest.license), ...findStructureViolations(packages)]],
   ['dependency rules', findDependencyViolations(packages)],
   [
     'hot paths',

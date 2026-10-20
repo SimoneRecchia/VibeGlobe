@@ -4,6 +4,7 @@ import { join, relative } from 'node:path';
 
 interface PackageManifest {
   name?: string;
+  license?: string;
   private?: boolean;
   type?: string;
   sideEffects?: boolean | string[];

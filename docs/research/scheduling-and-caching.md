@@ -153,7 +153,7 @@ Everyone unit-tests the scheduler with fake transports; nobody runs automated sc
 
 **WebGPU and WebGL2.** Upload cost differs by backend and must be budgeted per backend: on WebGL2, `texImage2D` from an `ImageBitmap` runs synchronously on the calling thread and may convert or flip pixels; on WebGPU, `copyExternalImageToTexture` is queued to the GPU process and returns sooner. Mipmap generation is a driver call on WebGL2 but needs render or compute passes on WebGPU (three.js provides them). Releasing memory is deterministic on WebGPU (`texture.destroy()`) and deferred by the driver on WebGL2, so the engine keeps its own byte accounting on both. Only WebGPU reports allocation failure (`out-of-memory` error scopes); on WebGL2 the only signal is context loss, so budgets must be conservative there.
 
-## Chosen approach for VibeGlobeEngine
+## Chosen approach for VibeGlobe
 
 Full specification and defaults in [ADR 0007](../adr/0007-scheduling-and-caching.md). In short:
 

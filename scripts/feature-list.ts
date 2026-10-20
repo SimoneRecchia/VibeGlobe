@@ -1,7 +1,9 @@
 // The feature list schema (ADR 0003) and its loader, shared by the status and integrity scripts.
 import { readFileSync } from 'node:fs';
 
-type FeatureStatus = 'passing' | 'failing';
+/** `superseded`: an owner decision made the entry impossible; docs/feature-changes.md names its replacement (ADR 0016). */
+export const FEATURE_STATUSES = ['passing', 'failing', 'superseded'] as const;
+type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 
 export interface Feature {
   id: string;

@@ -1,6 +1,6 @@
 # 0010. Renderer base: three.js WebGPURenderer pinned to 0.186.1
 
-- Status: Accepted (partly superseded by 0013)
+- Status: Accepted (partly superseded by 0013 and 0015)
 - Date: 2026-10-20
 - Milestone: M2
 
@@ -257,3 +257,7 @@ This ADR confirms the proposal, with five changes:
 | Chaos suite   | Injected `GPUDevice.destroy()` and `WEBGL_lose_context`; recovery without reloading the page |
 | Leak suite    | Heap, `info.memory` and GL object counts flat over 100 mount/unmount cycles                  |
 | Debug overlay | Zero pipeline compiles after warm-up                                                         |
+
+## Update 2026-10-20
+
+Point 5 is settled by the owner ([ADR 0015](0015-owner-decisions-2026-10-20.md), decision 12): no separate lightweight first-frame path. M2 measures three.js after tree-shaking, time to first frame (at most 1 s from a LAN server) is the binding target, the initial-JavaScript byte budget is set from the measurement with a CI size check that blocks regressions (F546), and host apps can load the engine through a dynamic import (F547). The 300 KB proposal is withdrawn.

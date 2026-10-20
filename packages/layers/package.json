@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/layers",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine layers: data layers: primitives, labels, styling, picking and draping.",
+  "description": "VibeGlobe layers: data layers: primitives, labels, styling, picking and draping.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

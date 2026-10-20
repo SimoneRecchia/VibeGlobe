@@ -1,6 +1,6 @@
 // Scenario benchmarks with the method of ADR 0012: per scenario one discarded warm-up run, then 5 runs in fresh pages,
 // each discarding its first 2 s; budgets in quality/budgets.json are checked against the median of the per-run p95.
-// Results go to benchmarks/results/<device>/ (device from VGE_DEVICE, default "local").
+// Results go to benchmarks/results/<device>/ (device from VIBEGLOBE_DEVICE, default "local").
 // Options: --budgets <path> uses another budget file; --report-only records without failing (CI on SwiftShader, where
 // timings are not meaningful and only deterministic counters are gated).
 import { execFileSync } from 'node:child_process';
@@ -34,10 +34,10 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
   const page = await browser.newPage();
   try {
     await page.goto(url);
-    await page.waitForFunction(() => 'vgePlayground' in window);
+    await page.waitForFunction(() => 'vibeglobePlayground' in window);
     await page.waitForTimeout(DISCARD_MS);
     const sample = await page.evaluate(async (durationMs) => {
-      const hooks = (window as unknown as { vgePlayground: PlaygroundHooks }).vgePlayground;
+      const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
       hooks.resetCpuSamples();
       const timestamps: number[] = [];
       await new Promise<void>((done) => {
@@ -75,7 +75,7 @@ async function describeDevice(browser: Browser, url: string): Promise<Record<str
       };
     });
     return {
-      name: process.env['VGE_DEVICE'] ?? 'local',
+      name: process.env['VIBEGLOBE_DEVICE'] ?? 'local',
       os: `${process.platform} ${release()}`,
       browser: `chromium ${browser.version()}`,
       ...display,
@@ -97,7 +97,7 @@ const scenarios = new Set([
 
 const server = await preview({ root: join(ROOT_DIR, 'apps/playground'), logLevel: 'silent', preview: { port: 4173 } });
 const baseUrl = server.resolvedUrls?.local[0] ?? 'http://localhost:4173/';
-const executablePath = process.env['VGE_CHROMIUM_PATH'];
+const executablePath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
 const summaries: Record<string, ScenarioSummary> = {};
 let device: Record<string, unknown> | undefined;

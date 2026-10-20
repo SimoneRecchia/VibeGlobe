@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/renderer",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine renderer: renderer backend: WebGPU with automatic WebGL2 fallback, shaders, GPU resource management.",
+  "description": "VibeGlobe renderer: renderer backend: WebGPU with automatic WebGL2 fallback, shaders, GPU resource management.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

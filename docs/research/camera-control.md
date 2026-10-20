@@ -238,7 +238,7 @@ Where the backend matters (WebGPU vs WebGL2):
 - **Latency:** input-to-photon latency can differ between backends and browsers (presentation queueing), so it is measured per backend.
 - **OffscreenCanvas:** if rendering moves to a worker (M2 evaluation), only the main thread receives input. A per-frame snapshot of coalesced input keeps the recognizers independent of where the frame is computed.
 
-## 8. Chosen approach for VibeGlobeEngine
+## 8. Chosen approach for VibeGlobe
 
 Full decision, options and consequences: [ADR 0009](../adr/0009-camera-and-input.md). Each choice and the reason for it:
 
@@ -279,6 +279,8 @@ Full decision, options and consequences: [ADR 0009](../adr/0009-camera-and-input
   - **Latency:** input-to-frame latency on both backends.
 
 ## 9. Open questions
+
+Update 2026-10-20: the owner settled questions 3 and 5: free rotation near the poles with no jump and never an automatic north-up, and constant ground scale while panning ([ADR 0015](../adr/0015-owner-decisions-2026-10-20.md)).
 
 1. **Safari:** does current Safari still need `gesturestart`/`gesturechange` for trackpad pinch, or does it now send ctrl-wheel? To verify on a device in M6.
 2. **Multi-touch automation:** Playwright has no multi-touch API. Chromium can use CDP `Input.dispatchTouchEvent`; WebKit multi-touch needs real tablets. The procedure is to be documented in M6.

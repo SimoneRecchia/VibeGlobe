@@ -1,6 +1,6 @@
 /**
  * @packageDocumentation
- * Framework-agnostic core of VibeGlobeEngine: math, WGS84 geodesy, camera, tiling, scheduling, cache and events.
+ * Framework-agnostic core of VibeGlobe: math, WGS84 geodesy, camera, tiling, scheduling, cache and events.
  * @module @vibeglobe/core
  */
 export { FrameStats } from './diagnostics/frame-stats.js';

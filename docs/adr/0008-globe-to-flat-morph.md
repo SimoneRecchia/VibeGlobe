@@ -1,6 +1,6 @@
 # 0008. Globe-to-flat morph
 
-- Status: Accepted (partly superseded by 0013)
+- Status: Accepted (partly superseded by 0013; open points settled by 0015)
 - Date: 2026-10-20
 - Milestone: M5
 
@@ -164,3 +164,7 @@ Verification in M5:
 - **Poles and antimeridian:** zero sentinel pixels at 80°N and 80°S during the sweep (F160), and in the 2D pan across 180° (F159).
 - **Curves:** curve properties and phase ranges (F149, F150).
 - **Cost:** added GPU time ≤ 0.3 ms per frame on the reference desktop and tablet. Otherwise add shader variants for m = 0 and m = 1. Record the measurements in this ADR's follow-up.
+
+## Update 2026-10-20
+
+The owner confirmed both follow-up points ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 8 and 9): pans keep ground scale constant in the flat 2D phase, accepting the small Mercator-zoom drift; and the phase table holds, with a 0° 2D band at region and city scale and tilt rising only at neighborhood scale, each curve easing in and out at its ends. `PLAN.md` now says so, and F548 replaces F149.

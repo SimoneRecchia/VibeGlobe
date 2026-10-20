@@ -469,7 +469,7 @@ The minified sizes below are measured gzip sizes.
   - **Engine restore from CPU copies** (Babylon.js, PlayCanvas): convenient but doubles memory.
   - **Re-decode from the RAM tier** (ADR 0007): no duplicated decoded memory. This is our case, because tiles are always re-fetchable.
 
-## Chosen approach for VibeGlobeEngine
+## Chosen approach for VibeGlobe
 
 Adopt **three.js `WebGPURenderer` pinned to exactly `0.186.1`** (MIT, tag r186), behind the engine's `RendererBackend`, as [ADR 0010](../adr/0010-renderer-base.md) details.
 
@@ -499,6 +499,8 @@ Adopt **three.js `WebGPURenderer` pinned to exactly `0.186.1`** (MIT, tag r186),
 | M3        | Instanced texture-array path: GPU copies into layers (`copyTextureToTexture` per mip level)                                                          | Run only if the M2 switch triggers                                                                                     |
 
 ## Open questions
+
+Update 2026-10-20: the owner settled the bundle budget: no separate lightweight first-frame path; the byte budget is set from the M2 measurement with a blocking CI size check, time to first frame is binding, and the engine can be loaded through a dynamic import ([ADR 0015](../adr/0015-owner-decisions-2026-10-20.md)).
 
 - **Bundle budget:** three.js alone is about 258 KB gzip. That leaves about 40 KB of the proposed 300 KB initial-JavaScript budget (`docs/plan/quality.md`). The budget needs owner review in M2.
 - **Shared `GPUDevice`:** should several engine instances share one device? r186 accepts a `device` parameter. Sharing saves memory but couples one instance's loss to all of them.

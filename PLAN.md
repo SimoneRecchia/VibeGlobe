@@ -1,12 +1,12 @@
-# VibeGlobeEngine — Master Plan
+# VibeGlobe — Master Plan
 
 Oct 20, 2026 · @Simone
 
-VibeGlobeEngine must be the most optimized, glitch-free web globe engine we can build: designed after studying every major open-source engine, tested on every supported system, and compatible with any map source.
+VibeGlobe must be the most optimized, glitch-free web globe engine we can build: designed after studying every major open-source engine, tested on every supported system, and compatible with any map source.
 
 ## How to use this document
 
-This is the master brief for VibeGlobeEngine: the implementing agent turns it into its own detailed technical plan, then builds everything in it, end to end.
+This is the master brief for VibeGlobe: the implementing agent turns it into its own detailed technical plan, then builds everything in it, end to end.
 
 1. Read the whole document before writing any code. Then write your own detailed implementation plan in the repository (for example under `docs/plan/`): architecture, modules, data structures, public APIs and a task breakdown.
 2. The scope is everything in this document. Do not stop after a minimum viable product: complete every milestone until the Definition of done is met.
@@ -48,7 +48,7 @@ Rules that hold throughout:
 
 ## Vision and goals
 
-VibeGlobeEngine is a generic, modular web engine that renders an interactive 3D globe and map with the feel of Google Earth, Google Maps and Apple Maps, and it must be extremely optimized: visual quality and fluidity come before everything else.
+VibeGlobe is a generic, modular web engine that renders an interactive 3D globe and map with the feel of Google Earth, Google Maps and Apple Maps, and it must be extremely optimized: visual quality and fluidity come before everything else.
 
 - **What it is:** a TypeScript library for the browser. One continuous camera shows a 3D globe when zoomed out, a flat 2D map at mid zoom and an oblique 3D view up close.
 - **Who uses it:** any web application. The first consumer is Vireox Cube, a commercial web platform (Vue/Nuxt, TypeScript) with a GIS module. The engine lives in its own repository and Cube consumes it later as a library. Nothing in the engine may depend on Cube.
@@ -71,8 +71,8 @@ These decisions are final; the agent must not change them without the owner's ap
 
 | Area | Decision |
 | --- | --- |
-| Name | VibeGlobeEngine (repository and product name). Package names are lowercase; exact naming is the agent's choice. |
-| Repository | Private GitHub repository, fully separate from Vireox Cube. |
+| Name | VibeGlobe (repository and product name). Packages are published on the public npm registry under the npm organization @vibeglobe, for example @vibeglobe/core and @vibeglobe/vue. |
+| Repository | GitHub repository under the owner's personal account (simonerecchia/VibeGlobe), fully separate from Vireox Cube. VibeGlobe is a public, source-available project; the repository may stay private until the first release. License: PolyForm Noncommercial 1.0.0, so anyone may use, change and share it free of charge for noncommercial purposes, while any commercial use, resale included, needs a separate commercial license from the owner. External contributions require a contributor license agreement, so they can be offered under both licenses. |
 | Language | TypeScript in strict mode, ES modules. Code, comments, documentation and commit messages in English. |
 | Platforms | Every major operating system (Windows, macOS, Linux, ChromeOS, iPadOS, Android) in current browsers: Chrome, Edge, Firefox and Safari, current and previous major versions. Any GPU vendor. Desktop is the primary target; tablets with touch must be fully supported; phones are best effort. |
 | Graphics | WebGPU as the primary backend, with an automatic WebGL2 fallback. Devices without WebGL2 are out of scope. |
@@ -81,7 +81,7 @@ These decisions are final; the agent must not change them without the owner's ap
 | Network mode | Configurable: online only, offline only, or hybrid (both). Default: hybrid. |
 | Cache | Every loading feature (persistent cache, memory reuse, prefetch and flight preloading, offline packaging) is enabled by default and can be disabled globally or per source. Built-in provider profiles for Google Maps Platform and OpenStreetMap switch off automatically what each provider's terms forbid. |
 | Third-party code | Permissive licenses only (MIT, BSD, Apache-2.0, ISC; fonts under OFL). No GPL, LGPL, AGPL or other copyleft in anything shipped. No code copied from other engines: ideas are studied, implementations are original. |
-| Default data | Only free sources licensed for commercial redistribution, self-hosted (see Default datasets). No default dependency on Google, Apple, Mapbox, MapTiler, Cesium ion or other paid or restricted services; they may exist only as optional adapters that respect their terms. |
+| Default data | Only free sources licensed for commercial redistribution. The project runs no servers: every consumer hosts tiles, offline packages and engine assets in their own backend and frontend, using the tools and documentation in the repository (see Default datasets). No default dependency on Google, Apple, Mapbox, MapTiler, Cesium ion or other paid or restricted services; they may exist only as optional adapters that respect their terms. |
 | Geodesy | WGS84 ellipsoid for every position, measurement and computation, whatever the display projection. |
 | Offline | Both offline modes are required: a local-network server with no internet, and a user device with no network. |
 
@@ -163,7 +163,7 @@ Zoom-driven behavior in Auto mode (scales and angles are starting values to tune
 
 Transition rules:
 
-- Every transition is a smooth, continuous function of zoom (easing curves), never a threshold. Curves may overlap slightly: tilt starts as the map finishes flattening.
+- Every transition is a smooth, continuous function of zoom (easing curves), never a threshold. Each curve eases in and out at its ends, so nothing starts or stops abruptly; the 0° 2D band in the table stays, and tilt rises only at neighborhood scale.
 - The globe-to-flat morph interpolates positions between the ellipsoid and the plane on the GPU, as MapLibre does between its globe and Mercator projections.
 - The geographic point under the cursor (or the screen center) must stay fixed during the morph; otherwise the map slides away while flattening.
 - On the flat plane, terrain heights are scaled consistently with the projection's scale factor. Measurements always stay on the ellipsoid.
@@ -399,7 +399,7 @@ Public API: typed configuration, events, promises for animations, tree-shakeable
 
 ## Default datasets and data pipeline
 
-Default data is free, commercially usable and self-hosted; a pipeline turns raw downloads into tiles and offline packages. Licenses below were checked during planning: the agent must re-verify them before shipping (links in References).
+Default data is free, commercially usable and hosted by each consumer on their own infrastructure; a pipeline turns raw downloads into tiles and offline packages. Licenses below were checked during planning: the agent must re-verify them before shipping (links in References).
 
 | Layer | Dataset | Notes |
 | --- | --- | --- |
@@ -480,7 +480,7 @@ Work proceeds through these 15 milestones; each closes only when its acceptance 
    - Done when: each adapter passes its conformance suite and a mixed stack switches sources without visible seams.
 8. **Offline and adaptive loading:** persistent cache, the loading-feature switches, the three network modes, both offline modes, package builder, package management API, connectivity and bandwidth adaptation, flight preloading, motion-aware detail.
    - Done when: the network scenarios pass (offline, slow, flaky, connection dropping and returning), and every combination of network mode and loading-feature switch behaves as specified.
-9. **Data pipeline and default datasets:** tools for the DEM, Sentinel-2 2016, OpenStreetMap and the global fallback; world low-detail and Italy high-detail builds; license and attribution files.
+9. **Data pipeline and default datasets:** tools for the DEM, Sentinel-2 2016, OpenStreetMap and the global fallback; ready-to-run configurations for world low-detail and Italy high-detail builds, verified on small sample areas; license and attribution files.
    - Done when: the default datasets rebuild reproducibly from configuration.
 10. **Data layers:** primitives, draping and ground clamping, clustering, labels with collision, styling, picking and events, live updates, glTF models.
     - Done when: 100,000 points with clustering stay at the target frame rate, and draped shapes follow terrain at every level.
@@ -492,18 +492,18 @@ Work proceeds through these 15 milestones; each closes only when its acceptance 
     - Done when: a city view with roads, labels and buildings meets the performance targets.
 14. **Framework adapters:** the Vue adapter (components and composables, SSR-safe), the Web Component wrapper, a Nuxt example app, an integration guide for consumers such as Cube.
     - Done when: the Nuxt example builds with SSR and runs every feature on the client, and the Web Component works in a plain HTML page.
-15. **Hardening and release:** performance pass on the reference devices, the full hardware and OS matrix, soak and chaos tests, cross-browser fixes, complete documentation, API review, version 1.0.0 published to a private package registry.
+15. **Hardening and release:** performance pass on the reference devices, the full hardware and OS matrix, soak and chaos tests, cross-browser fixes, complete documentation, API review, version 1.0.0 published to npm under @vibeglobe.
     - Done when: every item in Definition of done is ticked.
 
 ## Documentation and distribution
 
 The library ships with documentation good enough that a new project can integrate it without reading the source.
 
-- **Documentation:** README; getting started; architecture overview; API reference generated from the types; guides for sources and custom adapters, offline packages, performance tuning, data layers and Vue/Nuxt integration; ADRs; changelog; third-party notices; data licenses and attributions.
+- **Documentation:** README; licensing section with the commercial-license contact; contributing guide with the contributor license agreement; security policy; code of conduct; issue templates; getting started; architecture overview; API reference generated from the types; guides for sources and custom adapters, offline packages, performance tuning, data layers and Vue/Nuxt integration; ADRs; changelog; third-party notices; data licenses and attributions.
 - **Examples:** the playground covers every feature, plus a minimal example per feature.
-- **Distribution:** a private package registry for now (for example GitHub Packages); semantic versioning; ESM builds with type declarations; tree-shakeable packages; workers, WebAssembly and shader assets resolvable by common bundlers (Vite, Nuxt) or from configurable URLs.
+- **Distribution:** the public npm registry under the @vibeglobe organization; semantic versioning; ESM builds with type declarations; tree-shakeable packages; workers, WebAssembly and shader assets resolvable by common bundlers (Vite, Nuxt) or from configurable URLs.
 - **Release automation:** changelog generation, version tags, publishing from CI.
-- **Consumption by Cube:** Cube installs the packages from the private registry like any other dependency; nothing in the engine refers to Cube.
+- **Consumption by Cube:** Cube installs the packages from npm like any other dependency, under a commercial license granted by the owner; nothing in the engine refers to Cube.
 
 ## Definition of done
 
@@ -520,7 +520,7 @@ The project is complete only when every item below is true.
 - [ ] The default datasets rebuild reproducibly with correct licenses and attribution.
 - [ ] The Vue adapter works in a Nuxt app with SSR, and the Web Component works in plain HTML.
 - [ ] Documentation and examples are complete, CLAUDE.md is current, and the license audit is clean.
-- [ ] Version 1.0.0 is published to the private registry.
+- [ ] Version 1.0.0 is published to npm under @vibeglobe.
 
 ## Decision log from the planning discussion
 
@@ -540,11 +540,14 @@ These choices were made with the owner before implementation; the reasons are ke
 | Every loading feature enabled by default, each one switchable | The owner wants everything on by default, with the option to switch features off globally or per source |
 | Provider profiles for Google and OpenStreetMap | The engine must work with both; each profile switches off only what that provider's terms forbid |
 | Map-agnostic adapters and a Web Component wrapper | The engine must work with any map and from any framework or system |
-| Only free, commercially redistributable data by default | The engine and Cube are sold commercially; paid tiers (Google, Mapbox, MapTiler, Cesium ion) are optional adapters, not defaults |
+| No hosted infrastructure | Every consumer hosts tiles, packages and engine assets in their own backend and frontend |
+| Public, source-available project under PolyForm Noncommercial 1.0.0 | The owner's choice: anyone may use VibeGlobe for free, nobody may sell it or use it commercially without the owner's commercial license |
+| Repository under the owner's name, packages as @vibeglobe on npm | npm scopes are independent of GitHub, so the project keeps its own name while the repository stays under the owner's account |
+| Only free, commercially redistributable data and dependencies by default | Commercial licensees, Cube first, must be able to ship everything; paid tiers (Google, Mapbox, MapTiler, Cesium ion) are optional adapters, not defaults |
 | Apple MapKit rejected | Its terms forbid using Apple map data outside Apple's own MapKit and storing it, and add commercial restrictions on non-Apple hardware |
 | Both offline modes | Cube runs at customer sites without internet and on devices without network |
 | Desktop first, tablets supported | The owner's priority |
-| Private repository, English throughout | The owner's choice; the license will be decided before any public release |
+| English throughout | Standard for a public library |
 
 ## References
 

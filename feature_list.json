@@ -560,7 +560,7 @@
         "Confirm the repository has no git submodule referring to Cube and the dependency-rule check finds no package depending on or referring to Cube",
         "Run ./init.sh from a fresh clone and confirm it passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F543",
@@ -573,7 +573,7 @@
         "Open the README licensing section and confirm it states that noncommercial use is free, that any commercial use including resale needs a commercial license from the owner, and how to request one",
         "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0015 explains why each allowlisted license permits distribution inside a PolyForm Noncommercial project"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F544",
@@ -587,7 +587,7 @@
         "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature, question and commercial-license templates, a security link instead of blank issues, and the CLA acceptance line",
         "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F545",

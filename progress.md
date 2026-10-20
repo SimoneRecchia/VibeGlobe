@@ -2,11 +2,32 @@
 
 ## Current state
 
-- **M1 Research and foundation is complete**: 41 of 41 entries pass (`npm run status`). It was merged into `main` through SimoneRecchia/VibeGlobe#1 (merge commit `470b458`, with the owner's approval), and CI run 20 on `main` is green.
-- Next: M2 Globe core, starting with `F042` (WGS84 conversions) in file order. Read ADRs 0004, 0005, 0009, 0010, 0013 and 0014 first; M2 also owns the ADR 0012 probes, start-up measurement and allocation sampling (ADR 0013).
-- Owner questions open: `docs/open-questions.md` 1–12 (registry scope, reference devices, hosting, Sentinel-2 egress, Google key, CI capacity, license, 2D panning, tilt timing, heading near the poles, worker hosting, initial-JavaScript budget).
+- **The owner's decisions of 2026-10-20 are applied** (ADR 0015): the project is VibeGlobe (repository `SimoneRecchia/VibeGlobe`, packages on public npm under `@vibeglobe`), licensed under PolyForm Noncommercial 1.0.0, with CI split into a fast job on every push and the full suite on `main` and nightly. `PLAN.md` is the owner's new version.
+- **M1 is 43 of 44 active entries** (F038 superseded). M1 was complete and merged into `main` (SimoneRecchia/VibeGlobe#1 and SimoneRecchia/VibeGlobe#2, CI run 23 green); the decisions added F542–F545, and F542–F544 pass.
+- Next: **F545** (CI cadence). It needs this branch merged into `main` through a pull request from the same repository (confirm only the fast job runs there and no duplicate run starts), a green full run on `main`, and a green nightly run. Then M2 Globe core from F042: read ADRs 0004, 0005, 0009, 0010, 0013, 0014 and 0015 first; M2 also owns F546 and F547 (initial-JavaScript budget from the measured three.js size, lazy loading).
+- Owner questions open: `docs/open-questions.md` 2 (device details: the answer arrived without values), 13–17 (CLA legal review, contact address, repository settings, Google key, npm token).
 
 ## Session log (newest first)
+
+### Session 3 — 2026-10-20 (owner decisions)
+
+Done:
+
+- Replaced `PLAN.md` with the owner's new version. Its diff against the old one contains only the owner's changes, and git history shows the old one was only ever changed by the owner's upload, so no agent clarification needed carrying over.
+- Recorded the answers to open questions 1–12 in ADR 0015 and dated notes in ADRs 0002, 0003, 0008, 0009, 0010, 0011 and 0012; updated `docs/plan/`, four surveys, `CLAUDE.md`, the open-questions and follow-up lists.
+- Renamed VibeGlobeEngine to VibeGlobe and `VGE_` to `VIBEGLOBE_` everywhere except git history (the repository had already been renamed on GitHub; the remote now points to it).
+- License: `LICENSE.md` (official PolyForm Noncommercial 1.0.0 text, verified byte for byte, with the owner's required notice), the SPDX identifier in every `package.json` enforced by `npm run check` (regression test first), README licensing section, `CLA.md` (pending legal review), `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue and pull request templates. No third-party package ships yet; ADR 0015 explains why every allowlisted license fits.
+- CI: one fast job with every non-browser check on every push and fork pull request; end-to-end and benchmarks on `main`, nightly and manual runs; no duplicate push and pull-request runs.
+- Feature list: new status `superseded` (ADR 0016) for F038, F149, F342, F347, F489, F521, F534, F536 and F539, recorded in `docs/feature-changes.md` and checked by `npm run check:features`; new entries F542–F561 at their priority positions.
+
+Verified: `npm run verify`; `npm test` (117 tests); `npm run test:e2e` (5 tests); `./init.sh` from a fresh clone; the license check fails when a package loses its license field; `check:features` fails on an unrecorded supersession; the license text matches the PolyForm Project's 1.0.0 release.
+
+Features now passing: F542, F543, F544. Superseded: the nine entries above.
+
+Notes for the next session:
+
+- F545 cannot pass before a merge into `main` and a nightly run (see Current state).
+- Live Google tests will be a separate `npm run test:live` command, never skipped tests inside a suite (ADR 0015, decision 5).
 
 ### Session 2 — 2026-10-20 (milestone 1)
 

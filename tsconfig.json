@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/core/tsconfig.test.json" },
+    { "path": "./apps/playground" },
+    { "path": "./tsconfig.tools.json" }
+  ]
+}

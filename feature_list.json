@@ -29,7 +29,7 @@
         "Verify it contains a task breakdown for each of the 15 milestones, mapped to that milestone's acceptance criteria",
         "Verify it defines the reference desktop and tablet devices and the per-frame CPU/GPU, memory and bundle-size budgets derived from Performance and quality targets"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F002",
@@ -56,7 +56,7 @@
         "In a scratch branch, delete one entry and confirm the check fails",
         "In a scratch branch, change only one entry's status and confirm the check passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F004",
@@ -69,7 +69,7 @@
         "Confirm the ADR conventions require performance-related ADRs to record the profiling measurements taken before and after the change",
         "Confirm CLAUDE.md points to the ADR conventions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F005",
@@ -81,7 +81,7 @@
         "Confirm CLAUDE.md states the regression-first rule and the rule that no known bug may remain open at the end of a milestone",
         "For a fixed bug in git history (or, if none exists yet, a bug planted in a scratch branch), run its regression test against the code before the fix and confirm it fails; with the fix confirm it passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F006",
@@ -93,7 +93,7 @@
         "Confirm the rules state that only open-source projects are studied, that Mapbox GL JS from version 2 and Unreal Engine are excluded, and that no code is copied",
         "Confirm the index lists, per area, the projects from the Research survey table to study"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F007",
@@ -108,7 +108,7 @@
         "Verify it compares the approaches with their trade-offs and known failure modes, and states the chosen approach and why, linking the ADR",
         "Run a code-similarity scan of the repository against the studied projects' sources and confirm no copied code appears"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F008",
@@ -122,7 +122,7 @@
         "Verify it summarizes how those projects test depth correctness",
         "Verify it compares the approaches on both WebGPU and WebGL2, with trade-offs and known failure modes, and states the chosen approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F009",
@@ -136,7 +136,7 @@
         "Verify it summarizes how those projects test and benchmark tile selection",
         "Verify it states the chosen selection, fallback and transition approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F010",
@@ -150,7 +150,7 @@
         "Verify it summarizes how those projects test and benchmark loading",
         "Verify it states the chosen scheduler and cache design and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F011",
@@ -164,7 +164,7 @@
         "Verify it summarizes how those projects test transitions",
         "Verify it states the chosen morph, anchor-point and terrain-scaling approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F012",
@@ -178,7 +178,7 @@
         "Verify it summarizes how those projects test camera behavior",
         "Verify it states the chosen camera and input design and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F013",
@@ -206,7 +206,7 @@
         "Verify it summarizes how those projects test and benchmark worker code",
         "Verify it states the chosen worker architecture and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F015",
@@ -219,7 +219,7 @@
         "Verify it lists flaky-test and cross-platform tolerance issues from their issue trackers, with links",
         "Verify it states the chosen test tooling, image tolerances and benchmark method and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F016",
@@ -232,7 +232,7 @@
         "Rename a package folder in a scratch branch to break the layout and confirm the check fails",
         "Run npm run build and confirm every package builds"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F017",
@@ -246,7 +246,7 @@
         "Import the built packages from a Node ESM script and from a minimal Vite app and confirm both resolve",
         "Compile a consumer file against the built declarations in strict mode and confirm zero type errors"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F018",
@@ -259,7 +259,7 @@
         "Run npm run typecheck and confirm it exits with code 0",
         "Introduce an implicit any in a scratch file and confirm the type check fails"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F019",
@@ -271,7 +271,7 @@
         "Misformat a source file in a scratch branch and confirm the format check fails",
         "Run the format command and confirm the file is fixed and the check passes again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F020",
@@ -284,7 +284,7 @@
         "Export a public function without a TSDoc comment from a package entry point and confirm the lint fails",
         "Confirm the lint runs in CI"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F021",
@@ -297,7 +297,7 @@
         "Add an unused dependency to a package.json and confirm the check fails",
         "Add a block of commented-out code and confirm the check fails"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F022",
@@ -309,7 +309,7 @@
         "Run the hot-path check and confirm every marked module names its reason and an existing benchmark",
         "Mark a module as hot path without a benchmark reference in a scratch branch and confirm the check fails"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F023",
@@ -322,7 +322,7 @@
         "Edit a file with formatting problems and confirm the hook formats it",
         "Confirm CI runs the same checks"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F024",
@@ -336,7 +336,7 @@
         "Run every command listed in the CLAUDE.md files and confirm each one works",
         "Confirm the commit messages in git history are in English"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F025",
@@ -348,7 +348,7 @@
         "Confirm test files sit next to the modules they test",
         "Add a failing assertion in a scratch branch and confirm npm test exits with a non-zero code"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F026",
@@ -361,7 +361,7 @@
         "Remove tests in a scratch branch so coverage drops below the threshold and confirm the command fails",
         "Confirm CI runs the coverage check"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F027",
@@ -388,7 +388,7 @@
         "Add an LGPL or AGPL dependency in a scratch branch and confirm the audit fails",
         "Confirm CI runs the audit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F029",
@@ -401,7 +401,7 @@
         "Run the generator twice and confirm the output is identical",
         "Add a dependency in a scratch branch without regenerating and confirm CI reports the file as stale"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F030",
@@ -414,7 +414,7 @@
         "Confirm the API reference pages are generated from the TypeScript types of every package",
         "Confirm CI builds the documentation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F031",
@@ -427,7 +427,7 @@
         "Confirm no console errors or unhandled promise rejections are logged",
         "Run npm run test:e2e and confirm the playground smoke test passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F032",
@@ -440,7 +440,7 @@
         "Open the playground without ?debug=1 and confirm no overlay is shown and no overlay code is loaded",
         "Cover it with a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F033",
@@ -454,7 +454,7 @@
         "Set an unachievable budget in a scratch branch and confirm the benchmark command fails",
         "Confirm results are written as machine-readable files that can be compared over time"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F034",
@@ -467,7 +467,7 @@
         "Add a large dependency to a package in a scratch branch and confirm the check fails",
         "Load the playground and confirm optional modules (for example the debug overlay) are fetched only when used"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F035",
@@ -481,7 +481,7 @@
         "Add a top-level document access to a module in a scratch branch and confirm the test fails",
         "Confirm CI runs the test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F036",
@@ -494,7 +494,7 @@
         "Add a vue import to the core package in a scratch branch and confirm the check fails",
         "Confirm CI runs the check"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F037",
@@ -507,7 +507,7 @@
         "Inspect the bundle and confirm unrelated modules (renderer, sources, layers) are absent",
         "Run this check in CI"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F038",
@@ -520,7 +520,7 @@
         "Run the dependency-rule check and confirm no package depends on or refers to Cube",
         "Search the source tree and confirm it contains no Cube code (PLAN.md and docs may name Cube as the first consumer)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F039",
@@ -534,7 +534,7 @@
         "Lower the coverage threshold or loosen a budget in a scratch branch and confirm the guard fails",
         "Confirm CI runs the guard"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F040",
@@ -546,7 +546,7 @@
         "Add an over-long function and an over-long module in a scratch branch and confirm the lint fails",
         "Confirm *.hot.ts modules are exempt from these two rules"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F041",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findLoosenedGates, findRemovedTests, testTitles } from './test-guard.ts';
+import { findAddedExclusions, findLoosenedGates, findRemovedTests, testTitles } from './test-guard.ts';
 
 describe('testTitles', () => {
   it('finds suites, cases, .each templates and escaped quotes', () => {
@@ -16,7 +16,7 @@ describe('testTitles', () => {
 });
 
 describe('testTitles with chained modifiers and templates', () => {
-  it('finds concurrent, sequential, fails, serial, for and prop cases', () => {
+  it('finds concurrent, sequential, fails, serial, for, prop and table cases', () => {
     const source = [
       "it.concurrent('concurrent case', async () => {});",
       "it.sequential('sequential case', () => {});",
@@ -25,6 +25,7 @@ describe('testTitles with chained modifiers and templates', () => {
       "test.for([1, 2])('for %i', (value) => {});",
       "test.prop([fc.integer(), fc.string()])('prop case', (n, s) => {});",
       "it.concurrent.each([[1], [2]])('concurrent each %i', () => {});",
+      "it.each`a | b\n${1} | ${2}`('table each', () => {});",
     ].join('\n');
     expect(testTitles(source)).toEqual([
       'concurrent case',
@@ -34,6 +35,7 @@ describe('testTitles with chained modifiers and templates', () => {
       'for %i',
       'prop case',
       'concurrent each %i',
+      'table each',
     ]);
   });
 });
@@ -97,5 +99,25 @@ describe('findLoosenedGates', () => {
         'budgets.json a.ms raised: new scenario',
       ),
     ).toEqual([]);
+  });
+});
+
+describe('findAddedExclusions', () => {
+  it('reports a package newly left out of the bundle-size measurement, unless logged', () => {
+    const base = { bundleExternal: ['three'] };
+    const current = { bundleExternal: ['three', 'lodash'] };
+    expect(findAddedExclusions('quality/budgets.json', 'bundleExternal', base, current, '')).toEqual([
+      'quality/budgets.json bundleExternal: "lodash" added (it loosens the bundle-size budgets)',
+    ]);
+    expect(
+      findAddedExclusions(
+        'quality/budgets.json',
+        'bundleExternal',
+        base,
+        current,
+        'quality/budgets.json bundleExternal lodash',
+      ),
+    ).toEqual([]);
+    expect(findAddedExclusions('quality/budgets.json', 'bundleExternal', current, base, '')).toEqual([]);
   });
 });

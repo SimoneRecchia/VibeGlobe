@@ -11,7 +11,7 @@ Requirements served (`PLAN.md`):
 - **Navigation and controls:** every zoom, pan, rotate/tilt, orientation, view and movement-API capability in the table. "All animations are frame-rate independent. Any user input interrupts a running animation and takes over smoothly, without a jump."
 - **Map experience:** the cursor (or screen-center) point stays fixed during the globe-to-flat morph. Manual tilt and heading persist through zoom, phases and flights. Chosen and applied values are stored separately. Long flights pass through the phases.
 - **Constraints:** min/max zoom, max tilt, geographic bounds, terrain collision. **Accessibility:** keyboard operation and reduced motion. **Targets:** 60 fps with p95 ≤ 16.7 ms, no stutter, no jumps.
-- **Feature list:** F047, F048, F060 and F061 (M2); F146 and F147 (M4); F155, F156 and F163–F166, F215, F216 (M5); F168–F214, F217, F387 (M6).
+- **Feature list:** F047, F048, F060 and F061 (M2); F146 and F147 (M4); F155, F156 and F163–F166 (M5); F168–F217 (M6); F387 (M10).
 - **Architecture:** `docs/plan/architecture.md` §2 (frame steps 1–4), §5 (chosen vs applied) and §11 (controls and animation).
 
 ## 2. Projects studied

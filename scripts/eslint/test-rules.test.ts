@@ -51,6 +51,10 @@ describe('lint rules that keep tests from being skipped or focused (KB-005)', ()
       'packages/core/src/zz-lint-probe.test.ts',
       "import { test } from 'vitest';\ntest('a', (context) => {\n  context.skip();\n});\n",
     ],
+    [
+      'packages/core/src/zz-lint-probe.test.ts',
+      "import { test } from 'vitest';\ntest('a', (context) => {\n  const { skip } = context;\n  skip();\n});\n",
+    ],
   ])('rejects a skip taken from the test context in %s', async (filePath, code) => {
     expect(await ruleIds(code, filePath)).not.toEqual([]);
   });

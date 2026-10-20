@@ -14,7 +14,7 @@
 - manual tilt and heading that persist, stored as chosen values separate from the applied ones;
 - "All animations are frame-rate independent. Any user input interrupts a running animation and takes over smoothly, without a jump."
 
-The feature list makes this concrete in F047, F048, F060 and F061 (M2), F146 and F147 (M4), F155, F156 and F163–F166, F215, F216 (M5), and F168–F214, F217, F387 (M6).
+The feature list makes this concrete in F047, F048, F060 and F061 (M2), F146 and F147 (M4), F155, F156 and F163–F166 (M5), F168–F217 (M6), and F387 (M10).
 
 `docs/plan/architecture.md` §2 (frame steps 1–4), §5 (chosen vs applied) and §11 (controls and animation) sketch the design; none of it is marked Proposed. The survey is [docs/research/camera-control.md](../research/camera-control.md). Related decisions:
 

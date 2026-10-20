@@ -3,11 +3,12 @@
 
 /**
  * Titles of the test cases and suites declared in a test file: `it`, `test` and `describe` with any chained modifiers
- * (`.concurrent`, `.sequential`, `.fails`, `.serial`, …) and `.each`, `.for` or `.prop` templates.
+ * (`.concurrent`, `.sequential`, `.fails`, `.serial`, …) and `.each`, `.for` or `.prop` templates, including
+ * tagged-template tables.
  */
 export function testTitles(content: string): string[] {
   const pattern =
-    /\b(?:it|test|describe)(?:\.(?!each\b|for\b|prop\b)[A-Za-z]+)*(?:\.(?:each|for|prop)\b[\s\S]*?\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+    /\b(?:it|test|describe)(?:\.(?!each\b|for\b|prop\b)[A-Za-z]+)*(?:\.(?:each|for|prop)\b(?:`[^`]*`\s*|[\s\S]*?\)\s*))?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
   return [...content.matchAll(pattern)].map((match) => match[2] as string);
 }
 
@@ -70,4 +71,19 @@ export function findLoosenedGates(
     }
   }
   return violations;
+}
+
+/**
+ * Entries newly added to an exclusion list in a JSON gate file (for example `bundleExternal`, which leaves packages
+ * out of the bundle-size measurement and so loosens the budgets), unless the log names `<file> <key> <entry>`.
+ */
+export function findAddedExclusions(file: string, key: string, base: unknown, current: unknown, log: string): string[] {
+  const list = (value: unknown): string[] => {
+    const entries = (value as Record<string, unknown> | null)?.[key];
+    return Array.isArray(entries) ? entries.map(String) : [];
+  };
+  const before = new Set(list(base));
+  return list(current)
+    .filter((entry) => !before.has(entry) && !log.includes(`${file} ${key} ${entry}`))
+    .map((entry) => `${file} ${key}: "${entry}" added (it loosens the bundle-size budgets)`);
 }

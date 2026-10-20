@@ -12,7 +12,10 @@ export default defineConfig({
   ssr: { resolve: { conditions: ['source', ...defaultServerConditions] } },
   test: {
     projects: [
-      { extends: true, test: { name: 'packages', include: ['packages/*/src/**/*.test.ts'] } },
+      {
+        extends: true,
+        test: { name: 'packages', include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'] },
+      },
       { extends: true, test: { name: 'scripts', include: ['scripts/**/*.test.ts', 'benchmarks/**/*.test.ts'] } },
     ],
     coverage: {

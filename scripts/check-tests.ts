@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findLoosenedGates, findRemovedTests } from './checks/test-guard.ts';
+import { findAddedExclusions, findLoosenedGates, findRemovedTests } from './checks/test-guard.ts';
 import { ROOT_DIR } from './workspace.ts';
 
 const GATES = [
@@ -54,6 +54,9 @@ for (const gate of GATES) {
   if (before === undefined) continue;
   const now = existsSync(join(ROOT_DIR, gate.file)) ? readFileSync(join(ROOT_DIR, gate.file), 'utf8') : '{}';
   violations.push(...findLoosenedGates(gate.file, gate.direction, JSON.parse(before), JSON.parse(now), log));
+  if (gate.file === 'quality/budgets.json') {
+    violations.push(...findAddedExclusions(gate.file, 'bundleExternal', JSON.parse(before), JSON.parse(now), log));
+  }
 }
 
 for (const violation of violations) console.error(violation);

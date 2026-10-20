@@ -69,7 +69,7 @@ export default defineConfig(
           message: 'Tests are never skipped conditionally.',
         },
         {
-          selector: ':function > ObjectPattern > Property[key.name=/^(skip|fixme)$/]',
+          selector: 'ObjectPattern > Property[key.name=/^(skip|fixme)$/]',
           message: 'Tests are never skipped through their test context.',
         },
         {

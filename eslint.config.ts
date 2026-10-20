@@ -68,6 +68,14 @@ export default defineConfig(
           selector: 'MemberExpression[property.name=/^(skipIf|runIf)$/]',
           message: 'Tests are never skipped conditionally.',
         },
+        {
+          selector: ':function > ObjectPattern > Property[key.name=/^(skip|fixme)$/]',
+          message: 'Tests are never skipped through their test context.',
+        },
+        {
+          selector: 'CallExpression[callee.type="MemberExpression"][callee.property.name=/^(skip|fixme)$/]',
+          message: 'Tests are never skipped.',
+        },
       ],
     },
   },

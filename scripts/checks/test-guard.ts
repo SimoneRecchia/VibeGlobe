@@ -1,9 +1,13 @@
 // Detects removed tests and loosened quality gates between two versions of the repository (PLAN.md: tests protect
 // the work). Anything named in the test-changes log is accepted as a recorded, justified change.
 
-/** Titles of the test cases and suites declared in a test file, including `.each` templates. */
+/**
+ * Titles of the test cases and suites declared in a test file: `it`, `test` and `describe` with any chained modifiers
+ * (`.concurrent`, `.sequential`, `.fails`, `.serial`, …) and `.each`, `.for` or `.prop` templates.
+ */
 export function testTitles(content: string): string[] {
-  const pattern = /\b(?:it|test|describe)(?:\.each\b[\s\S]*?\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  const pattern =
+    /\b(?:it|test|describe)(?:\.(?!each\b|for\b|prop\b)[A-Za-z]+)*(?:\.(?:each|for|prop)\b[\s\S]*?\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
   return [...content.matchAll(pattern)].map((match) => match[2] as string);
 }
 

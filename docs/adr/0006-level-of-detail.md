@@ -6,7 +6,7 @@
 
 ## Context
 
-`PLAN.md` asks for quadtree pyramids selected by screen-space error (SSE) from each source's geometric error, and a parent that is never discarded before its replacing children are ready. Missing tiles show their best ancestor, upsampled. A pinned base keeps the picture complete, and detail refines progressively and adapts to motion. Terrain and imagery choose their levels independently. Imagery cross-fades, terrain geomorphs, and there are no cracks, seams, holes, or gaps at the poles or the antimeridian. Targets: zero black pixels after the base loads, no visible popping, 60 fps on the reference desktop. Features F074–F142 turn this into tests.
+`PLAN.md` asks for quadtree pyramids selected by screen-space error (SSE) from each source's geometric error, and a parent that is never discarded before its replacing children are ready. Missing tiles show their best ancestor, upsampled. A pinned base keeps the picture complete, and detail refines progressively and adapts to motion. Terrain and imagery choose their levels independently. Imagery cross-fades, terrain geomorphs, and there are no cracks, seams, holes, or gaps at the poles or the antimeridian. Targets: zero black pixels after the base loads, no visible popping, 60 fps on the reference desktop. Features F080–F148 turn this into tests.
 
 The survey [docs/research/level-of-detail.md](../research/level-of-detail.md) studied CesiumJS, osgEarth, iTowns, OpenGlobus, NASA WorldWind, 3DTilesRendererJS, MapLibre GL JS, Martini and Delatin, plus their issue trackers. The recurring failures are:
 
@@ -64,11 +64,11 @@ Terrain and imagery sources keep their own tiling schemes (Web Mercator, geograp
 **2. Selection.** Each frame, traverse visible surface tiles near to far.
 
 - Culling: frustum against a bounding volume built from the tile's extent and the displayed terrain's height range, widened by the ancestor's geometric error when the range is inherited. Horizon culling against the ellipsoid uses a horizon point built from the maximum height.
-- Pixel size: `p = 2·d·tan(fovY/2) / H`, with `d` the float64 distance from the camera to the bounding volume and `H` the render-target height in pixels (CSS pixels × DPR × resolution scale, so tiles stay sharp at scale 1; F103).
+- Pixel size: `p = 2·d·tan(fovY/2) / H`, with `d` the float64 distance from the camera to the bounding volume and `H` the render-target height in pixels (CSS pixels × DPR × resolution scale, so tiles stay sharp at scale 1; F109).
 - A tile refines while any layer needs more than the tile can carry:
   - Terrain, while `e / p > τ_terrain`, where `e` is the geometric error of the terrain the tile can show: the error of the data level matched to the tile's grid spacing, plus the measured grid decimation error and the ellipsoid sagitta. Terrain stops driving refinement once its finest level is reached.
   - Each imagery layer, while the ground size of a texel at the finest level the tile can carry, divided by `p`, exceeds `τ_imagery`. The finest level the tile can carry is the deepest level at which at most two source tiles cover it.
-- Each leaf shows, per layer, the coarsest level at or below that one that meets the threshold. Imagery levels therefore never depend on terrain levels (F134).
+- Each leaf shows, per layer, the coarsest level at or below that one that meets the threshold. Imagery levels therefore never depend on terrain levels (F140).
 - Thresholds start at `τ_terrain = 2` and `τ_imagery = 1.5` render-target pixels. They are multiplied by factors for motion, quality preset, distance haze (a placeholder until M11) and a drawn-tile cap (1,000), all of which only change smoothly. Tiles coarsen only below 0.8 × the threshold (hysteresis), so a tile at the boundary does not flip every frame.
 
 **3. Fallback and loading.**
@@ -78,7 +78,7 @@ Terrain and imagery sources keep their own tiling schemes (Web Mercator, geograp
 - The only time a parent stays drawn in place of its children is when the shared vertex buffer for a child's (root, level, row, grid size) is not built yet.
 - Any data referenced by a drawn tile is pinned in memory, so the parent's data cannot be discarded before the children's own data has replaced it on screen.
 - HTTP 404 and out-of-coverage are terminal no-data. Failures retry under the scheduler's policy while the ancestor stays shown.
-- Requests go to the wanted level and to every second missing ancestor level between it and the shown level, coarse first. This gives progressive refinement (F079) at a few percent extra requests; priorities belong to the scheduling ADR.
+- Requests go to the wanted level and to every second missing ancestor level between it and the shown level, coarse first. This gives progressive refinement (F085) at a few percent extra requests; priorities belong to the scheduling ADR.
 
 **4. Transitions.** Every surface tile keeps, for terrain heights and for each imagery layer, a pair `from → to` (each a data-tile reference with a UV transform) and a progress `t`.
 
@@ -86,7 +86,7 @@ Terrain and imagery sources keep their own tiling schemes (Web Mercator, geograp
 - A transition starts whenever the data a visible tile shows changes: its own data arrives, a better ancestor arrives, or it coarsens to its parent's data. Changes while a tile is culled apply instantly.
 - Split: the four children inherit the parent's pairs and `t` with sub-rectangle UVs, so the image is identical.
 - Merge: the children run transitions toward the parent's shown data (reversing a running transition whose `from` already equals it). When all four reach `t = 1`, the parent replaces them; the image is identical. If the parent's data is not resident, the children stay drawn and request it.
-- Terrain height is `mix(H_from, H_to, t)`. Each `H` is the piecewise-linear surface of its data on grids that all use the same diagonal direction, so nested grids are exact. A transition therefore ends exactly on the target surface (F132), and a child sampling its parent's data reproduces the parent's surface (the CesiumJS #13065 lesson).
+- Terrain height is `mix(H_from, H_to, t)`. Each `H` is the piecewise-linear surface of its data on grids that all use the same diagonal direction, so nested grids are exact. A transition therefore ends exactly on the target surface (F138), and a child sampling its parent's data reproduces the parent's surface (the CesiumJS #13065 lesson).
 - Parent and child are never drawn at the same time, so there is no blending order, no z-fighting and no background showing through.
 - A tile with a running transition keeps the render loop alive only until `t = 1`.
 - Where the source texture changes inside a triangle, sampling uses explicit gradients so mip selection does not create seams.
@@ -94,7 +94,7 @@ Terrain and imagery sources keep their own tiling schemes (Web Mercator, geograp
 **5. Terrain geometry.**
 
 - Workers decode every terrain source into float32 height grids per data tile, with the minimum and maximum height and the decimation error for each grid size. Quantized-mesh is rasterized after decoding. Terrarium and Terrain-RGB are decoded and clamped within their own pixels, so no neighbor data is needed. Vertical datums are converted there.
-- A surface tile is a regular grid of `g` cells per side, `g` ∈ {8, 16, 32, 64}: the smallest whose measured error meets the level's bound (F128).
+- A surface tile is a regular grid of `g` cells per side, `g` ∈ {8, 16, 32, 64}: the smallest whose measured error meets the level's bound (F134).
 - Vertex buffers are shared per (root, level, row, `g`). They hold tile-center-relative ellipsoid positions and normals, flat-map positions for M5, and per-vertex source coordinates. Each tile is placed by a float64 model-view (rotation about the polar axis plus translation) under the precision ADR.
 - The vertex shader reads heights with `texelFetch` (WebGL2) or `textureLoad` (WebGPU) and displaces along the ellipsoid normal.
 - CPU elevation queries and the shader evaluate the same interpolation function. A TypeScript reference implementation backs both the queries and the shader tests.
@@ -110,7 +110,7 @@ Stitching is not used. If the crack sweep shows visible walls, snapping odd edge
 
 **7. Poles.**
 
-- Mercator imagery fades to transparent over its last ~0.5° before 85.0511°, so the geographic base in the caps joins without a line (F104).
+- Mercator imagery fades to transparent over its last ~0.5° before 85.0511°, so the geographic base in the caps joins without a line (F110).
 - Mercator-only terrain continues its 85.0511° heights into the caps.
 - The flat map does not draw the caps.
 

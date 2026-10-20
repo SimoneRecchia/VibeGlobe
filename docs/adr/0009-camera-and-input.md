@@ -14,7 +14,7 @@
 - manual tilt and heading that persist, stored as chosen values separate from the applied ones;
 - "All animations are frame-rate independent. Any user input interrupts a running animation and takes over smoothly, without a jump."
 
-The feature list makes this concrete in F044, F045, F057 and F058 (M2), F140 and F141 (M4), F149, F150 and F157–F162 (M5), and F164–F212 (M6).
+The feature list makes this concrete in F047, F048, F060 and F061 (M2), F146 and F147 (M4), F155, F156 and F163–F166, F215, F216 (M5), and F168–F214, F217, F387 (M6).
 
 `docs/plan/architecture.md` §2 (frame steps 1–4), §5 (chosen vs applied) and §11 (controls and animation) sketch the design; none of it is marked Proposed. The survey is [docs/research/camera-control.md](../research/camera-control.md). Related decisions:
 
@@ -48,7 +48,7 @@ Forces found in the survey:
    - **How:** keeps the good ideas of option 2 and generalizes anchoring to one solver that runs through the renderer's projection, so it works in every phase.
    - **Pros:** every failure above has a structural answer, and the same code serves globe, morph, flat and tilted views.
    - **Cons:** a numerical solver instead of closed forms (a few float64 projections per frame), and new code to tune.
-4. **Per-frame multiplicative damping or smoothing** (iTowns, three.js `OrbitControls` and `TrackballControls`, WorldWind Java move-to animators). Simple, but the trajectory depends on the refresh rate, which violates F200. Rejected.
+4. **Per-frame multiplicative damping or smoothing** (iTowns, three.js `OrbitControls` and `TrackballControls`, WorldWind Java move-to animators). Simple, but the trajectory depends on the refresh rate, which violates F203. Rejected.
 5. **Other flight paths:** Cesium's power-8 height hump capped at 3 s, WebWorldWind's constant velocities, iTowns' eased rig lerp, and OpenLayers' chained zoom-out/zoom-in with linear resolution interpolation. These give uneven perceived speed and no principled duration. Rejected in favor of van Wijk–Nuij, which has an optimality argument and is proven in Leaflet and MapLibre.
 
 ## Decision
@@ -59,7 +59,7 @@ Option 3. Package placement follows architecture.md §1.
 - **`controls`:** DOM input, recognizers, velocity estimation and inertia. It drives the core API.
 
 1. **Camera state (core, M2).**
-   - **Fields:** target `{longitude, latitude, height}` (radians and meters, float64), `range` (meters, eye to target), `heading`, `tilt` (0 = looking straight down) and `roll` (0 for navigation; it exists for F044). Eye, view and projection matrices are derived each frame in float64 ([ADR 0004](0004-precision-strategy.md)).
+   - **Fields:** target `{longitude, latitude, height}` (radians and meters, float64), `range` (meters, eye to target), `heading`, `tilt` (0 = looking straight down) and `roll` (0 for navigation; it exists for F047). Eye, view and projection matrices are derived each frame in float64 ([ADR 0004](0004-precision-strategy.md)).
    - **Zoom:** range (ground scale) is the zoom state, and the ground zoom z_g of [ADR 0008](0008-globe-to-flat-morph.md) is a log2 function of it. All zoom input and animation run in zoom units, so equal input gives equal perceived scale change at every altitude.
    - **Pans keep range:** pans and orbits never change range, so they never move the morph, tilt or relief curves (the follow-up ADR 0008 asks for). The public Mercator-convention `zoom` = z_g − log2 k(φ_target) therefore drifts slightly with latitude in the flat phase (about 0.023 per 100 km at 45°). The owner must confirm that trade-off (ADR 0008).
 2. **Chosen vs applied (M5)** for tilt, heading **and range**.
@@ -69,7 +69,7 @@ Option 3. Package placement follows architecture.md §1.
    - **Gestures:** a gesture that manipulates a parameter first sets chosen to applied, then applies its deltas, so input always starts from what is on screen. A gesture never stores a value beyond a current hard limit.
    - **Refinement:** extending chosen vs applied to range refines architecture.md §5. It keeps a collision from leaving a permanent zoom change.
 3. **Input capture (controls, M2 basic, M6 complete).**
-   - **Events:** Pointer Events with `setPointerCapture`, `pointercancel` handling and `touch-action: none` on the map. A non-passive `wheel` listener calls `preventDefault` only over the map (F186). On Safari, `gesturestart` and `gesturechange` provide trackpad pinch and rotation. Keyboard input arrives on the focusable container. The `contextmenu` event is suppressed while rotate-drag is enabled.
+   - **Events:** Pointer Events with `setPointerCapture`, `pointercancel` handling and `touch-action: none` on the map. A non-passive `wheel` listener calls `preventDefault` only over the map (F189). On Safari, `gesturestart` and `gesturechange` provide trackpad pinch and rotation. Keyboard input arrives on the focusable container. The `contextmenu` event is suppressed while rotate-drag is enabled.
    - **Coalescing:** DOM handlers only record into an input state: per pointer, the latest position and a ring of timestamped samples (`event.timeStamp`, last 150 ms); wheel accumulators; key states. They do no camera math.
 4. **Recognizers run once per frame (frame step 2)** on that state and emit intents: `pan(anchor, pixel)`, `zoomAt(pixel, Δzoom)`, `orbit(pivot, Δheading, Δtilt)`, plus keyboard velocities. Starting values, tuned in M6:
    - **Mouse:** primary drag pans. Right-drag or Ctrl+primary orbits the screen-center target at 180° heading per viewport width and 90° tilt per viewport height.
@@ -85,7 +85,7 @@ Option 3. Package placement follows architecture.md §1.
    - **Keyboard:** arrows, Shift+arrows and +/− set target velocities that the camera approaches with exponential smoothing integrated exactly over `dt`. Each +/− press adds one level to the smoothed zoom target, so rapid presses accumulate.
 5. **Anchor-constraint solver (core, M2; extended in M5).**
    - **Constraint:** every anchored operation is "geodetic point A, at its height frozen when the gesture starts, stays at pixel p", applied together with the change of range, heading or tilt.
-   - **Solve:** a 2×2 Gauss–Newton on the target (longitude, latitude), with the heading held, through the same projection the renderer uses: globe, morph factor, flat, tilt and relief scale. It warm-starts from the last frame and needs 1–3 iterations to reach under 0.01 px. This is the Newton solve ADR 0008 specifies for the morph: the same code keeps the cursor or screen-center point fixed during the morph (F149, F150).
+   - **Solve:** a 2×2 Gauss–Newton on the target (longitude, latitude), with the heading held, through the same projection the renderer uses: globe, morph factor, flat, tilt and relief scale. It warm-starts from the last frame and needs 1–3 iterations to reach under 0.01 px. This is the Newton solve ADR 0008 specifies for the morph: the same code keeps the cursor or screen-center point fixed during the morph (F155, F156).
    - **Picking:** anchors and pivots are picked on the _displayed_ surface by a float64 CPU ray cast against the drawn terrain tiles, falling back to the ellipsoid or plane. It is synchronous on both backends; WebGPU readback is asynchronous.
    - **Ill-conditioned cases:**
      - **Near the poles in the globe phase**, when the heading-held system is singular, the solver switches to a free rotation (versor). The resulting heading change is written to chosen, because the user caused it.
@@ -100,25 +100,25 @@ Option 3. Package placement follows architecture.md §1.
      - **Peak cap:** ρ ← min(ρ, √(2·w_max/u1)), where w_max is the full-globe view.
      - **Easing:** cubic ease-in-out applied to _s_; duration S/V, clamped to the option bounds.
      - **Degenerate paths:** u1 ≈ 0 uses exponential zoom; no change uses `easeTo`.
-     - **Orientation:** heading and tilt are kept unless the call specifies them, and the chosen/applied stage clamps tilt by the sky limit at the peak. Phases follow from zoom (F193).
+     - **Orientation:** heading and tilt are kept unless the call specifies them, and the chosen/applied stage clamps tilt by the sky limit at the peak. Phases follow from zoom (F196).
      - **Terrain:** the destination height is refined mid-flight by re-anchoring the height interpolation so the current value is unchanged. The final frame is exactly the target.
    - **Other movements:** `easeTo` interpolates log-range, the geodesic center, the shortest heading arc and tilt. `jumpTo` applies in one frame. `fitBounds` solves range for any heading and tilt, including bounds across the antimeridian and the poles.
    - **Interruption:** any intent stops the running animation before its first delta and continues from the applied state. A programmatic call during an animation starts from the current state with an easing whose initial slope matches the current speed.
-   - **Settling:** promises resolve on completion and reject with an `AbortError` that carries the cause. `movestart`, `move` and `moveend` carry the cause (F197).
-   - **Reduced motion:** flights become a fade of at most 300 ms around a `jumpTo`, and inertia τ is quartered (F211).
+   - **Settling:** promises resolve on completion and reject with an `AbortError` that carries the cause. `movestart`, `move` and `moveend` carry the cause (F200).
+   - **Reduced motion:** flights become a fade of at most 300 ms around a `jumpTo`, and inertia τ is quartered (F214).
 8. **Terrain collision (core, M4; animations M6).**
    - **Rule:** the eye and the near-plane corners must clear the displayed surface by `minClearanceMeters` (default 1 m) plus the near-plane margin. Correction order: applied tilt first, then applied range.
    - **Height source:** a `SurfaceHeightProvider` interface supplies heights. The terrain implementation answers from exactly the drawn, geomorphed tiles; 3D Tiles join in M13.
    - **During gestures:** target height and anchor heights are frozen.
    - **Afterwards:** the target is re-seated onto the terrain under the screen center by changing target height and range together, so the eye and the view do not move.
-   - **Animations:** keep applied range above the clearance each frame (F209).
+   - **Animations:** keep applied range above the clearance each frame (F212).
 
 ## Consequences
 
 - **Easier:**
-  - Every anchored behavior (F057, F058, F149, F150, F164–F169, F175, F177, F181, F189) is one tested solver, not a set of per-projection derivations.
-  - Persistence rules (F157–F162, F198) and constraints (F206–F208) follow from one resolution stage.
-  - Frame-rate independence (F200) and interruption (F199) hold by construction, not by tuning.
+  - Every anchored behavior (F060, F061, F155, F156, F168–F173, F178, F180, F184, F192) is one tested solver, not a set of per-projection derivations.
+  - Persistence rules (F163–F166, F215, F216, F201) and constraints (F209–F211) follow from one resolution stage.
+  - Frame-rate independence (F203) and interruption (F202) hold by construction, not by tuning.
   - Recognizers are pure functions of an input snapshot, so they can run wherever the frame is computed if the M2 OffscreenCanvas evaluation moves rendering to a worker.
 - **Harder:**
   - The solver needs ill-conditioning detection and careful fallbacks (poles, horizon).

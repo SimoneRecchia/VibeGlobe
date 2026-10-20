@@ -3,12 +3,12 @@
   "features": {
     "frame-loop": {
       "scenario": "frame-loop",
-      "frameTimeP95Ms": 18,
+      "frameTimeP95Ms": 17.2,
       "cpuFrameP95Ms": 2
     },
     "debug-overlay": {
       "scenario": "debug-overlay",
-      "frameTimeP95Ms": 18,
+      "frameTimeP95Ms": 17.2,
       "cpuFrameP95Ms": 2
     }
   },

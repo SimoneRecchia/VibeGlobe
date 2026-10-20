@@ -38,6 +38,23 @@ describe('lint rules that keep tests from being skipped or focused (KB-005)', ()
     expect(await ruleIds(code, 'packages/core/src/zz-lint-probe.test.ts')).not.toEqual([]);
   });
 
+  it.each([
+    [
+      'e2e/zz-lint-probe.spec.ts',
+      "import { test } from '@playwright/test';\ntest('a', async ({ page }, { skip }) => {\n  skip(true);\n  await page.goto('/');\n});\n",
+    ],
+    [
+      'packages/core/src/zz-lint-probe.test.ts',
+      "import { test } from 'vitest';\ntest('a', ({ skip }) => {\n  skip(true);\n});\n",
+    ],
+    [
+      'packages/core/src/zz-lint-probe.test.ts',
+      "import { test } from 'vitest';\ntest('a', (context) => {\n  context.skip();\n});\n",
+    ],
+  ])('rejects a skip taken from the test context in %s', async (filePath, code) => {
+    expect(await ruleIds(code, filePath)).not.toEqual([]);
+  });
+
   it('accepts ordinary tests', async () => {
     expect(
       await ruleIds(

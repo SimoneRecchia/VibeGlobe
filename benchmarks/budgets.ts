@@ -14,7 +14,7 @@ export interface Distribution {
 
 export interface RunResult {
   frames: number;
-  /** `over16_7`: frames that missed a 60 Hz refresh; `over33_3`: frames that lasted two refreshes or more. */
+  /** `over16_7`: frames that missed at least one 60 Hz refresh; `over33_3`: at least two (ADR 0014). */
   frameTimeMs: Distribution & { over16_7: number; over33_3: number };
   cpuFrameMs: Distribution;
   jsHeapMB: number;
@@ -25,8 +25,8 @@ export interface RunResult {
   steadyStateAllocations: number | null;
 }
 
-// rAF intervals carry vsync and timestamp-coarsening jitter of a few tenths of a millisecond (ADR 0013), so a frame
-// counts as late only beyond that jitter: an on-time 16.8 ms interval is not late, a 33.2999 ms one is two refreshes.
+// rAF intervals carry vsync and timestamp-coarsening jitter, so a frame counts as late only beyond it (ADR 0014): an
+// on-time 16.8 ms interval is not late, a 33.3 ms one missed one refresh, a 50 ms one missed two.
 const TIMER_JITTER_MS = 0.5;
 
 export interface ScenarioSummary {
@@ -67,7 +67,7 @@ export function summarizeRun(
     frameTimeMs: {
       ...distribution(frameTimesMs),
       over16_7: frameTimesMs.filter((time) => time > 16.7 + TIMER_JITTER_MS).length,
-      over33_3: frameTimesMs.filter((time) => time >= 33.3 - TIMER_JITTER_MS).length,
+      over33_3: frameTimesMs.filter((time) => time > 33.3 + TIMER_JITTER_MS).length,
     },
     cpuFrameMs: distribution(cpuFrameMs),
     jsHeapMB: jsHeapBytes / (1024 * 1024),

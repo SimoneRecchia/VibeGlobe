@@ -22,4 +22,5 @@ Conventions:
 | [0010](0010-renderer-base.md)                 | Renderer base: three.js WebGPURenderer pinned to 0.186.1                                                  | Accepted (partly superseded by 0013) |
 | [0011](0011-workers.md)                       | Worker architecture                                                                                       | Accepted                             |
 | [0012](0012-test-tooling.md)                  | Test tooling, image tolerances and benchmark method                                                       | Accepted (partly superseded by 0013) |
-| [0013](0013-reconcile-m1-decisions.md)        | Reconcile the M1 decisions                                                                                | Accepted                             |
+| [0013](0013-reconcile-m1-decisions.md)        | Reconcile the M1 decisions                                                                                | Accepted (partly superseded by 0014) |
+| [0014](0014-frame-time-classification.md)     | Frame-time classification and gates                                                                       | Accepted                             |

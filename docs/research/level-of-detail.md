@@ -11,7 +11,7 @@ How a globe engine chooses which terrain and imagery tiles to draw, what it draw
 - Tiles, level of detail and streaming: quadtree pyramids, selection by SSE from each source's geometric error, parent fallback, pinned base, lazy refinement, no-data handling, motion-aware detail.
 - Rendering and visual quality: no black areas, no popping (imagery cross-fades, terrain geomorphs), no seams or cracks, independent terrain and imagery levels, no gaps at the poles or the antimeridian, frustum and horizon culling.
 - Performance and quality targets: zero black pixels after the base loads, no visible popping, 60 fps (p95 ≤ 16.7 ms) on the reference desktop.
-- Features F074–F142 in `feature_list.json`, in particular F075–F079, F099, F100, F104, F105 (M3) and F120, F128, F131–F137 (M4).
+- Features F080–F148 in `feature_list.json`, in particular F081–F085, F105, F106, F110, F111 (M3) and F126, F134, F137–F143 (M4).
 
 ## 2. Projects studied
 
@@ -219,12 +219,12 @@ Full decision and options: [ADR 0006](../adr/0006-level-of-detail.md).
 - Grid sizes (16, 32, 64 cells): triangles, GPU time on the reference devices, and the vertex budget against a Martini mesh at the same error.
 - Skirt length factor: sentinel pixels and wall visibility in `terrain-crack-sweep`.
 - Rasterization error of quantized-mesh fixtures.
-- Registration error of cross-scheme imagery at 0°, 45° and 75° (F135).
+- Registration error of cross-scheme imagery at 0°, 45° and 75° (F141).
 
 ## 9. Open questions
 
 - Default terrain format from the M9 pipeline: a heightmap with shared edges fits this design best; quantized-mesh brings no runtime benefit here. To be decided in the sources and data-pipeline surveys.
-- Whether clamp-to-edge alone passes the border test (F100) under magnification, or neighbor-texel borders are needed (Cesium #6190).
+- Whether clamp-to-edge alone passes the border test (F106) under magnification, or neighbor-texel borders are needed (Cesium #6190).
 - How three.js TSL exposes texture arrays and `textureLoad` on both backends (GPU survey). Fallback: separate textures with at most 4 per layer per draw.
 - Haze-based threshold relaxation needs the M11 atmosphere; M3 uses a distance-only placeholder.
 - Whether vector tiles and 3D Tiles (M13) reuse the same from/to transitions, or need a dithered fade for meshes that are not height fields.

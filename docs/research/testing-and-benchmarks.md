@@ -8,7 +8,7 @@ How VibeGlobeEngine proves its visual and performance targets: render and visual
 
 - `PLAN.md` Testing and verification: visual regression of canonical views on both backends; scenario tests that record frames and detect black pixels, holes and popping; temporal glitch detection (flicker, z-fighting shimmer, seams); benchmarks tracked over time; CI without a GPU runs visual tests on software-rendered WebGL2, WebGPU and performance run on real hardware with a documented procedure; property-based tests with reproducible seeds; fuzzing of every decoder; soak and chaos tests.
 - `PLAN.md` Performance and quality targets and the budgets in [quality.md](../plan/quality.md): p95 frame time ≤ 16.7 ms, main-thread CPU ≤ 6 ms p95, GPU ≤ 10 ms p95, zero steady-state allocations, first complete frame ≤ 1 s, zero black pixels, no popping, backend consistency within the visual-test tolerance.
-- Features F015 (this survey), F033 (benchmark harness), F043 (property tests), F047, F108, F125 (fuzzing), F061 (zero allocation), F069, F071, F072 (visual regression, software-rendered CI, hardware procedure), F109, F118 (start-up and streaming benchmarks).
+- Features F015 (this survey), F033 (benchmark harness), F046 (property tests), F050, F114, F131 (fuzzing), F064 (zero allocation), F072, F074, F075 (visual regression, software-rendered CI, hardware procedure), F115, F124 (start-up and streaming benchmarks).
 - Fixed by [ADR 0002](../adr/0002-monorepo-and-tooling.md): Vitest 5.0.5 and Playwright 1.64.1. Permissive licenses only.
 
 ## Projects studied
@@ -141,7 +141,7 @@ Recorded in [ADR 0012](../adr/0012-test-tooling.md):
 ### What must still be measured
 
 - **M1:** repeat the determinism, backend-consistency and cost probes on Playwright 1.64.1's own Chromium 156.0.8078.4 on the CI runner (the container has 141); confirm that `--deterministic-mode` changes no frame pacing; time one canonical view per backend in CI.
-- **M2:** calibrate the hardware tolerance on the reference desktop devices (all canonical views, record the benign distribution, set the limit at twice the worst benign value and never above 0.5%); prove the CI tolerance fails on a changed shader color and on a 1-pixel geometry shift (F069).
+- **M2:** calibrate the hardware tolerance on the reference desktop devices (all canonical views, record the benign distribution, set the limit at twice the worst benign value and never above 0.5%); prove the CI tolerance fails on a changed shader color and on a 1-pixel geometry shift (F072).
 - **M3:** validate every scenario detector against injected defects (missing tile, fade bypass, one-pixel seam, z-fighting pair): each must fail its defect and pass the clean run; measure capture overhead and the run-to-run coefficient of variation of p95 frame time on the reference desktop (target below 5%).
 - **M3–M4:** fuzz throughput per decoder, to size the CI and nightly input budgets.
 

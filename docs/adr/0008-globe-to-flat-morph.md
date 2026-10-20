@@ -13,7 +13,7 @@
 - a flat map at region and city scale;
 - a gradual tilt to 45–60° with full relief at street scale.
 
-Every transition must be a smooth function of zoom with no jump. The morph must interpolate positions between the ellipsoid and the plane on the GPU, "as MapLibre does". The point under the cursor (or at the screen center) must stay fixed while flattening. On the plane, heights are scaled by the projection's scale factor. Measurements stay on the ellipsoid. Poles and the antimeridian show no gaps or seams. Feature list entries F143–F156 make these testable, and later entries require data layers, vector tiles, 3D Tiles and the atmosphere to stay continuous through the morph.
+Every transition must be a smooth function of zoom with no jump. The morph must interpolate positions between the ellipsoid and the plane on the GPU, "as MapLibre does". The point under the cursor (or at the screen center) must stay fixed while flattening. On the plane, heights are scaled by the projection's scale factor. Measurements stay on the ellipsoid. Poles and the antimeridian show no gaps or seams. Feature list entries F149–F162 make these testable, and later entries require data layers, vector tiles, 3D Tiles and the atmosphere to stay continuous through the morph.
 
 The survey is [docs/research/globe-to-flat.md](../research/globe-to-flat.md). Its findings that drive this decision:
 
@@ -127,8 +127,8 @@ Option 5. It is the only option that meets the zero-jump and anchor requirements
 - **Morph:** confirmed. The plane endpoint is now defined in the anchor's tangent frame scaled by σ. The camera up vector needs no mix because the camera lives in frame A.
 - **Anchor:** confirmed with a change. The center anchor holds by construction. The cursor anchor is a Newton solve of the target in geographic coordinates, not a camera translation in morph space, which would break the frame's anchoring.
 - **Curves:** confirmed, with ground zoom as the driving variable.
-- **Relief:** changed. The scale factor is per vertex, k(φ), normalized at the anchor, not the anchor latitude's factor for every vertex. This matches F151 and keeps proportions correct away from the anchor in tilted views (9% error 300 km north of a 60° anchor otherwise).
-- **Poles:** changed. Caps are not clipped on the flat map. They continue as a capped-Mercator strip, which F154 requires in the flat phase and in tilted views.
+- **Relief:** changed. The scale factor is per vertex, k(φ), normalized at the anchor, not the anchor latitude's factor for every vertex. This matches F157 and keeps proportions correct away from the anchor in tilted views (9% error 300 km north of a 60° anchor otherwise).
+- **Poles:** changed. Caps are not clipped on the flat map. They continue as a capped-Mercator strip, which F160 requires in the flat phase and in tilted views.
 - **Antimeridian:** changed. Per-tile wrapping relative to the anchor replaces a horizontally repeating flat map.
 
 ## Consequences
@@ -136,7 +136,7 @@ Option 5. It is the only option that meets the zero-jump and anchor requirements
 Easier:
 
 - One camera and one geometry definition, so no mode-specific state.
-- F150 holds by construction.
+- F156 holds by construction.
 - Panning across 180° has no special case.
 - Picking, labels and data layers are exact during the morph.
 - CI on SwiftShader matches hardware, because there is no GPU trigonometry.
@@ -156,11 +156,11 @@ Follow-up:
 
 Verification in M5:
 
-- **Anchor:** drift ≤ 1 px every frame for cursor and center anchors (F149, F150), with the Newton iteration count recorded.
+- **Anchor:** drift ≤ 1 px every frame for cursor and center anchors (F155, F156), with the Newton iteration count recorded.
 - **Parity:** the TSL and TypeScript morphs agree within 0.1 px on WebGPU, WebGL2 hardware and SwiftShader.
-- **Continuity:** `?scenario=morph-sweep` frame differencing shows no jump and no geometry re-upload (F146).
+- **Continuity:** `?scenario=morph-sweep` frame differencing shows no jump and no geometry re-upload (F152).
 - **Culling:** images are pixel-identical with culling on and off across the sweep, including max manual tilt and 85° latitude.
-- **Relief:** the cone fixture has equal height-to-base ratios at 0°, 45° and 70° (F151).
-- **Poles and antimeridian:** zero sentinel pixels at 80°N and 80°S during the sweep (F154), and in the 2D pan across 180° (F153).
-- **Curves:** curve properties and phase ranges (F143, F144).
+- **Relief:** the cone fixture has equal height-to-base ratios at 0°, 45° and 70° (F157).
+- **Poles and antimeridian:** zero sentinel pixels at 80°N and 80°S during the sweep (F160), and in the 2D pan across 180° (F159).
+- **Curves:** curve properties and phase ranges (F149, F150).
 - **Cost:** added GPU time ≤ 0.3 ms per frame on the reference desktop and tablet. Otherwise add shader variants for m = 0 and m = 1. Record the measurements in this ADR's follow-up.

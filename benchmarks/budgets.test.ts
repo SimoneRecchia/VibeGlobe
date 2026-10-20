@@ -33,7 +33,7 @@ describe('statistics', () => {
     const dropped = [33.2999, 33.4, 50];
     const run = summarizeRun([...onTime, ...dropped], [], 0);
     expect(run.frameTimeMs.over16_7).toBe(3);
-    expect(run.frameTimeMs.over33_3).toBe(3);
+    expect(run.frameTimeMs.over33_3).toBe(1);
   });
 
   it('reports what the engine cannot measure yet as null', () => {

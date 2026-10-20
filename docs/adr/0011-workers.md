@@ -105,7 +105,7 @@ Options **1c, 2d, 3b, 4b and 5a**, with the M2 measurement able to switch to 5b.
 8. **Rendering thread.**
    - Main thread by default.
    - `core` and `renderer` never touch the DOM. The renderer receives an `HTMLCanvasElement | OffscreenCanvas`, and size, pixel ratio and input come from the host layer, so the M2 experiment can host them in a worker.
-   - M2 records the measurements in its own ADR (F062) and adopts worker rendering only if all of these hold:
+   - M2 records the measurements in its own ADR (F065) and adopts worker rendering only if all of these hold:
      - p95 frame interval under synthetic main-thread load (a 30 ms task every 100 ms) improves by at least 25%;
      - p95 without load is no more than 5% worse;
      - added input-to-frame latency is at most 4 ms p95;
@@ -133,8 +133,8 @@ Options **1c, 2d, 3b, 4b and 5a**, with the M2 measurement able to switch to 5b.
   - Unit tests of the pool: priority order, cancellation in both states, crash and timeout recovery, handshake mismatch, fallback, and that destroying the last instance leaves zero workers and listeners.
   - Fuzzing of every task function.
   - Playwright runs:
-    - decoding marks appear only on worker threads (F093);
-    - a strict-CSP run without `blob:`, a different asset base URL, and a search of the built bundles for `eval`, `new Function` and blob-generated code (F094);
+    - decoding marks appear only on worker threads (F099);
+    - a strict-CSP run without `blob:`, a different asset base URL, and a search of the built bundles for `eval`, `new Function` and blob-generated code (F100);
     - Vite dev and build, and `nuxt dev`/`nuxt build` with a non-root base path.
   - Tracked benchmarks:
     - spawn-to-ready ≤ 50 ms p95 on the reference desktop;

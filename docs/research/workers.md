@@ -19,7 +19,7 @@ PLAN.md requirements it serves:
 - **Architecture guidance:** WebAssembly is used only in workers.
 - **Documentation and distribution:** workers and WebAssembly assets are resolvable by bundlers (Vite, Nuxt) or loaded from configurable URLs.
 - **Fixed constraints:** importing a package is SSR-safe, offline mode works, and nothing is sent anywhere except the configured sources.
-- **Feature list:** F014 (this survey), F062 (the OffscreenCanvas ADR, M2), F093 and F094 (decoding in workers and strict CSP, M3), F513 (full CSP run, M15), and the `destroy()` and mount/unmount entries.
+- **Feature list:** F014 (this survey), F065 (the OffscreenCanvas ADR, M2), F099 and F100 (decoding in workers and strict CSP, M3), F518 (full CSP run, M15), and the `destroy()` and mount/unmount entries.
 
 ## 2. Projects studied
 
@@ -273,7 +273,7 @@ Recorded in [ADR 0011](../adr/0011-workers.md). In short:
 - **WebAssembly:** only in workers, fetched by the worker, built without dynamic execution, with a JS fallback or a typed "unsupported" error.
 - **Rendering:** stays on the main thread. The renderer and core stay DOM-free, so the M2 OffscreenCanvas experiment can host them in a worker and decide by measurement.
 
-**M2 (F062), OffscreenCanvas experiment.**
+**M2 (F065), OffscreenCanvas experiment.**
 
 - **Setup:** a playground variant renders in a worker (canvas transferred with `transferControlToOffscreen`, input forwarded) on both backends in Chrome, Edge, Firefox and Safari.
 - **Measurements:**
@@ -286,7 +286,7 @@ Recorded in [ADR 0011](../adr/0011-workers.md). In short:
   - the added latency is at most 4 ms p95;
   - overlay misalignment is 0 px.
 
-**M3 (F093, F094), worker pool.**
+**M3 (F099, F100), worker pool.**
 
 - **Startup:** spawn-to-ready p50/p95 of the real worker program on each reference device and browser (budget ≤ 50 ms p95 on the reference desktop; worker program ≤ 100 KB min+gzip, excluding lazily loaded WebAssembly).
 - **Throughput versus frame time:** decode throughput (tiles/s) for 256 and 512 px JPEG, PNG and WebP, and p95 frame time during a scripted flight, for pool sizes 1–6. This sets the default cap.

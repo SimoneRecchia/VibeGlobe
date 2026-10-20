@@ -13,7 +13,7 @@ Survey for the globe-to-flat morph: projection morphing on the GPU, keeping the 
 - On the flat plane, terrain heights are scaled by the projection's scale factor. Measurements stay on the ellipsoid.
 - The 2D-locked and manual-tilt modes keep the morph working.
 
-Rendering and visual quality: the poles and the antimeridian show no gaps or seams, and the poles need caps beyond about ±85°. Feature list entries F143–F156 (M5) turn these into tests, and later entries (data layers, vector tiles, 3D Tiles, atmosphere) require the same continuity through the morph.
+Rendering and visual quality: the poles and the antimeridian show no gaps or seams, and the poles need caps beyond about ±85°. Feature list entries F149–F162 (M5) turn these into tests, and later entries (data layers, vector tiles, 3D Tiles, atmosphere) require the same continuity through the morph.
 
 ## Projects studied
 
@@ -81,7 +81,7 @@ Mapbox GL JS v2 and later is excluded by license and was not consulted.
   - `GlobeView` returns a `GlobeViewport` up to zoom 12 and a `WebMercatorViewport` above it ([globe-view.ts](https://github.com/visgl/deck.gl/blob/v9.4.0/modules/core/src/views/globe-view.ts#L57)).
   - The globe is scaled by latitude like MapLibre's (`zoomAdjust`, [globe-viewport.ts](https://github.com/visgl/deck.gl/blob/v9.4.0/modules/core/src/viewports/globe-viewport.ts#L123)), so the two converge at the switch.
 - **Following MapLibre.** The MapLibre integration picks `GlobeView` whenever the map's projection type is `globe`, whatever MapLibre's current globeness ([deck-utils.ts](https://github.com/visgl/deck.gl/blob/v9.4.0/modules/mapbox/src/deck-utils.ts#L176)).
-- **Terrain and size scaling.** In `WEB_MERCATOR` mode each vertex's elevation and meter-based size is multiplied by 1/cos(latitude) of that vertex (`project_size_at_latitude`, [project.glsl.ts](https://github.com/visgl/deck.gl/blob/v9.4.0/modules/core/src/shaderlib/project/project.glsl.ts#L61)). A Taylor series in Mercator y stands in when only common-space positions are known. This is per-vertex Mercator scaling of heights, the behavior F151 asks for.
+- **Terrain and size scaling.** In `WEB_MERCATOR` mode each vertex's elevation and meter-based size is multiplied by 1/cos(latitude) of that vertex (`project_size_at_latitude`, [project.glsl.ts](https://github.com/visgl/deck.gl/blob/v9.4.0/modules/core/src/shaderlib/project/project.glsl.ts#L61)). A Taylor series in Mercator y stands in when only common-space positions are known. This is per-vertex Mercator scaling of heights, the behavior F157 asks for.
 
 ### OpenGlobus: several projections on one globe, no flat map
 
@@ -190,9 +190,9 @@ Full rationale and alternatives: [ADR 0008](../adr/0008-globe-to-flat-morph.md).
    | Relief r  | ≤ 6.5 → 10.0 → 15.0 | 0 → 0 → 1 | Flat globe and flattening; subtle at city scale; full at street scale                                 |
    | Auto tilt | 14.0 → 16.5         | 0° → 50°  | 3D view (neighborhood, street)                                                                        |
 
-   The default tilt of 50° is the configurable value F144 requires within 45–60°.
+   The default tilt of 50° is the configurable value F150 requires within 45–60°.
 
-5. **Relief on the plane.** Each vertex's height is scaled by its own k(φ), normalized by σ, so it matches the ground at the anchor. This is deck.gl's per-vertex rule, made exact at the anchor, and it satisfies F151 (h maps to h·k(φ) plane units). In the shader, k = cosh(Y/a)·√(1 − e²·tanh²(Y/a)) uses only `exp`.
+5. **Relief on the plane.** Each vertex's height is scaled by its own k(φ), normalized by σ, so it matches the ground at the anchor. This is deck.gl's per-vertex rule, made exact at the anchor, and it satisfies F157 (h maps to h·k(φ) plane units). In the shader, k = cosh(Y/a)·√(1 − e²·tanh²(Y/a)) uses only `exp`.
 6. **Precision and memory.**
    - Workers precompute each vertex's globe offset (3×f32, relative to the tile's globe center) and plane offset (2×f32, relative to the tile's plane center) in float64, plus its height.
    - The CPU passes per-tile float32 offsets of both tile centers from the eye, so relative-to-center precision holds at every m.
@@ -224,14 +224,14 @@ Full rationale and alternatives: [ADR 0008](../adr/0008-globe-to-flat-morph.md).
 
 | Measurement            | How                                                                                                                                                     | Pass                                                                                    |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Anchor drift           | `?scenario=morph-anchor`: wheel and pinch through the band at center, corners, near the limb and with heading; pick the cursor's coordinate every frame | ≤ 1 px every frame (F149); center ≤ 1 px (F150); Newton converges in ≤ 3 iterations     |
+| Anchor drift           | `?scenario=morph-anchor`: wheel and pinch through the band at center, corners, near the limb and with heading; pick the cursor's coordinate every frame | ≤ 1 px every frame (F155); center ≤ 1 px (F156); Newton converges in ≤ 3 iterations     |
 | CPU/GPU parity         | Readback test (as in deck.gl) of the TSL morph against the TypeScript one at m ∈ {0, 0.25, 0.5, 0.75, 1}, on WebGPU, WebGL2 hardware and SwiftShader    | ≤ 0.1 px screen difference                                                              |
-| Continuity             | `?scenario=morph-sweep` 0 → 1 → 0, frame differencing                                                                                                   | No jump above threshold; no geometry re-upload (F146)                                   |
+| Continuity             | `?scenario=morph-sweep` 0 → 1 → 0, frame differencing                                                                                                   | No jump above threshold; no geometry re-upload (F152)                                   |
 | GPU cost               | Frame time of the sweep against a static globe on the reference desktop and tablet                                                                      | Added vertex cost ≤ 0.3 ms per frame; otherwise add shader variants for m = 0 and m = 1 |
 | Culling correctness    | Render the sweep with horizon and frustum culling on and off, including max manual tilt and 85° latitude                                                | Pixel-identical images                                                                  |
-| Relief                 | Cone fixture at 0°, 45° and 70° (F151)                                                                                                                  | Height-to-base ratio equal within tolerance                                             |
-| Poles and antimeridian | Sentinel clear color at 80°N and 80°S while sweeping morph and tilt (F154); drag-pan across 180° in 2D (F153)                                           | Zero sentinel pixels, no seam                                                           |
-| Curves                 | Fine zoom sampling: continuity, monotonicity, bounded derivative (F143)                                                                                 | Phase ranges match the `PLAN.md` table                                                  |
+| Relief                 | Cone fixture at 0°, 45° and 70° (F157)                                                                                                                  | Height-to-base ratio equal within tolerance                                             |
+| Poles and antimeridian | Sentinel clear color at 80°N and 80°S while sweeping morph and tilt (F160); drag-pan across 180° in 2D (F159)                                           | Zero sentinel pixels, no seam                                                           |
+| Curves                 | Fine zoom sampling: continuity, monotonicity, bounded derivative (F149)                                                                                 | Phase ranges match the `PLAN.md` table                                                  |
 
 ## Open questions
 

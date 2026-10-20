@@ -11,7 +11,7 @@ Requirements served (`PLAN.md`):
 - **Navigation and controls:** every zoom, pan, rotate/tilt, orientation, view and movement-API capability in the table. "All animations are frame-rate independent. Any user input interrupts a running animation and takes over smoothly, without a jump."
 - **Map experience:** the cursor (or screen-center) point stays fixed during the globe-to-flat morph. Manual tilt and heading persist through zoom, phases and flights. Chosen and applied values are stored separately. Long flights pass through the phases.
 - **Constraints:** min/max zoom, max tilt, geographic bounds, terrain collision. **Accessibility:** keyboard operation and reduced motion. **Targets:** 60 fps with p95 ≤ 16.7 ms, no stutter, no jumps.
-- **Feature list:** F044, F045, F057 and F058 (M2); F140 and F141 (M4); F149, F150 and F157–F162 (M5); F164–F212 (M6).
+- **Feature list:** F047, F048, F060 and F061 (M2); F146 and F147 (M4); F155, F156 and F163–F166, F215, F216 (M5); F168–F214, F217, F387 (M6).
 - **Architecture:** `docs/plan/architecture.md` §2 (frame steps 1–4), §5 (chosen vs applied) and §11 (controls and animation).
 
 ## 2. Projects studied
@@ -244,7 +244,7 @@ Full decision, options and consequences: [ADR 0009](../adr/0009-camera-and-input
 
 1. **Geodetic target-based camera (core, M2).**
    - **State:** target (longitude, latitude, height) plus `range`, `heading`, `tilt` and `roll` (0 for navigation); the eye is derived in float64 ECEF. Zoom is a log2 function of range (ground scale, the ground zoom of [ADR 0008](../adr/0008-globe-to-flat-morph.md)), and all zoom input and animation works in zoom units. Pans hold range, so they never move the morph curves.
-   - **Why:** orbiting, persistent heading and tilt (F157, F158) and clamping are direct operations on this state. Flights and the morph never have to recover a target, as a free camera must (Cesium).
+   - **Why:** orbiting, persistent heading and tilt (F215, F216) and clamping are direct operations on this state. Flights and the morph never have to recover a target, as a free camera must (Cesium).
 2. **Chosen vs applied for tilt, heading and range.**
    - **Rule:** constraints (sky limit, max tilt, min/max zoom, bounds, terrain clearance) write only applied values. Applied relaxes toward chosen with a time constant. A gesture starts from the applied values.
    - **Why:** no clamp ever overwrites the user's choice, unlike WorldWind Java. There are no hidden targets to resurface (maplibre#2709). Range is included so a collision near a mountain never leaves a permanent zoom change.
@@ -282,6 +282,6 @@ Full decision, options and consequences: [ADR 0009](../adr/0009-camera-and-input
 
 1. **Safari:** does current Safari still need `gesturestart`/`gesturechange` for trackpad pinch, or does it now send ctrl-wheel? To verify on a device in M6.
 2. **Multi-touch automation:** Playwright has no multi-touch API. Chromium can use CDP `Input.dispatchTouchEvent`; WebKit multi-touch needs real tablets. The procedure is to be documented in M6.
-3. **Heading near the poles:** heading changes when the globe-phase drag falls back to free rotation near the poles. The alternative is MapLibre's default: hold the bearing and stop the center at the pole, which gives up exact anchoring (F175). The owner should confirm the choice against "no automatic north-up" (the change is user-caused).
+3. **Heading near the poles:** heading changes when the globe-phase drag falls back to free rotation near the poles. The alternative is MapLibre's default: hold the bearing and stop the center at the pole, which gives up exact anchoring (F178). The owner should confirm the choice against "no automatic north-up" (the change is user-caused).
 4. **Interruptible flights:** whether velocity-matched easing is enough for retargeted flights, or Reach and North's interruptible paths are needed (decide in M6 from frame-difference measurements).
 5. **Chosen range and zoom drift:** extending chosen vs applied to range (zoom) goes beyond architecture §5, which names tilt and heading. Pans hold range, which is ground scale (the ground zoom of [ADR 0008](../adr/0008-globe-to-flat-morph.md)), so the public Mercator zoom drifts about 0.023 per 100 km at 45° in the flat phase. The owner must confirm this, as ADR 0008 notes.

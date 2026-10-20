@@ -15,6 +15,29 @@ describe('testTitles', () => {
   });
 });
 
+describe('testTitles with chained modifiers and templates', () => {
+  it('finds concurrent, sequential, fails, serial, for and prop cases', () => {
+    const source = [
+      "it.concurrent('concurrent case', async () => {});",
+      "it.sequential('sequential case', () => {});",
+      "it.fails('expected failure', () => {});",
+      "test.describe.serial('serial suite', () => {});",
+      "test.for([1, 2])('for %i', (value) => {});",
+      "test.prop([fc.integer(), fc.string()])('prop case', (n, s) => {});",
+      "it.concurrent.each([[1], [2]])('concurrent each %i', () => {});",
+    ].join('\n');
+    expect(testTitles(source)).toEqual([
+      'concurrent case',
+      'sequential case',
+      'expected failure',
+      'serial suite',
+      'for %i',
+      'prop case',
+      'concurrent each %i',
+    ]);
+  });
+});
+
 describe('findRemovedTests', () => {
   const base = new Map([
     ['a.test.ts', "it('one', () => {});\nit('two', () => {});"],

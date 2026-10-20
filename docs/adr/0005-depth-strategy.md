@@ -9,7 +9,7 @@
 One view can contain geometry 0.5 m from the eye and terrain or space thousands of kilometers away. The requirements:
 
 - `PLAN.md` asks for no z-fighting between near and far geometry, and an M2 zoom from orbit to 1 m above the ground without z-fighting on both backends.
-- F055 requires surfaces a few centimeters apart to resolve in the correct order from 0.5 m to the horizon, with no pixel alternating between frames, on WebGPU and on forced WebGL2.
+- F058 requires surfaces a few centimeters apart to resolve in the correct order from 0.5 m to the horizon, with no pixel alternating between frames, on WebGPU and on forced WebGL2.
 - The same picture must appear in Chrome, Edge, Firefox and Safari, within the GPU budget of `docs/plan/quality.md`.
 
 The [depth survey](../research/depth.md) studied CesiumJS, three.js r186, Babylon.js, Filament, Godot, osgEarth and iTowns, their issue trackers, and the WebGPU, WGSL and WebGL specifications. These findings drive the decision:
@@ -36,7 +36,7 @@ The [depth survey](../research/depth.md) studied CesiumJS, three.js r186, Babylo
 1. **Standard depth with fitted near and far planes.**
    - Pros: no special API.
    - Cons:
-     - With near = 0.1 m the error is 0.85 m at 1 km and 41 m at 10 km on WebGL2's 24-bit canvas, so F055 fails.
+     - With near = 0.1 m the error is 0.85 m at 1 km and 41 m at 10 km on WebGL2's 24-bit canvas, so F058 fails.
      - Raising near enough to help clips nearby geometry.
      - Fixed planes also fail: iTowns' 15 m near clips street views, and osgEarth's far plane clamped to the horizon tangent clips mountains beyond it.
 2. **Reversed-Z, float32, infinite far, [0,1] clip (WebGPU; WebGL2 with `EXT_clip_control`).**
@@ -129,7 +129,7 @@ Option 2 on WebGPU and on WebGL2 with `EXT_clip_control`. Option 6 on WebGL2 wit
   - If a WebGPU shader ever writes depth, use WGSL conservative `frag_depth` (`fragment_depth` language extension) when available.
 - **Verification in M2:**
   - **Analytic unit test.** Emulate each path's arithmetic with `Math.fround`, and assert monotonic order and a resolvable step ≤ 3e-7·d (clip-control paths) and ≤ 5e-7·d (fallback) over [near, 4e7 m].
-  - **Scenario `?scenario=depth-range` (F055).**
+  - **Scenario `?scenario=depth-range` (F058).**
     - Camera 1 m above ground looking at the horizon.
     - Quad pairs 1, 2 and 5 cm apart from 0.5 m to 10 km, plus a draped line and a marker.
     - 120 static frames and 120 frames with sub-pixel jitter, checking order colors and frame differencing for oscillating pixels.

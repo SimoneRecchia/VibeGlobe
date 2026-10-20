@@ -97,7 +97,7 @@ Option 1. three.js is adopted as the rendering base at **exactly `0.186.1`**, un
 ### 1. Pin
 
 - `packages/renderer/package.json` depends on `"three": "0.186.1"`. `@types/three` is an exact `0.186.0` dev dependency, never a runtime one.
-- Imports come only from `three/webgpu` and `three/tsl`, and only inside `packages/renderer`. The dependency-rule check enforces this (F048).
+- Imports come only from `three/webgpu` and `three/tsl`, and only inside `packages/renderer`. The dependency-rule check enforces this (F051).
 - No three.js type appears in any public API. `layers` uses helpers exported by the renderer.
 - The license and copyright go into the third-party notices.
 
@@ -111,12 +111,12 @@ Option 1. three.js is adopted as the rendering base at **exactly `0.186.1`**, un
   - The renderer uploads a mipmapped probe texture and renders the warm-up scene once into a render target, with `onError` and `onDeviceLost` hooked.
   - Any GPU error or loss triggers a dispose and a re-initialization with `forceWebGL`, and emits `backend-fallback` with the reason.
   - Measured case it catches: r186 sends `swizzle: 'rgba'` in every texture-view descriptor, and Chromium 141 rejects it.
-- **No backend available:** the engine emits a typed `unsupported-device` error and leaves the host page running (F052). The active backend is exposed in the API and the debug overlay.
+- **No backend available:** the engine emits a typed `unsupported-device` error and leaves the host page running (F055). The active backend is exposed in the API and the debug overlay.
 
 ### 3. Engine-owned scene state
 
 - The engine owns one `Scene` per instance, with `matrixWorldAutoUpdate = false`.
-- Every engine object sets `matrixAutoUpdate`, `matrixWorldAutoUpdate` and `frustumCulled` to `false` (F049).
+- Every engine object sets `matrixAutoUpdate`, `matrixWorldAutoUpdate` and `frustumCulled` to `false` (F052).
 - Engine shaders set `material.vertexNode` from engine uniforms:
   - the split per-draw offsets and rotation-only view of ADR 0004;
   - the projection of ADR 0005, built for the active backend's clip space.
@@ -249,11 +249,11 @@ This ADR confirms the proposal, with five changes:
 
 | Check         | Covers                                                                                       |
 | ------------- | -------------------------------------------------------------------------------------------- |
-| F048          | Exact pin; three.js imported only inside the renderer                                        |
-| F049          | Matrix updates and culling off; uploads counted per frame                                    |
-| F050          | WebGPU selected by default                                                                   |
-| F051          | WebGL2 fallback, including a simulated adapter failure                                       |
-| F052          | Typed `unsupported-device` error                                                             |
+| F051          | Exact pin; three.js imported only inside the renderer                                        |
+| F052          | Matrix updates and culling off; uploads counted per frame                                    |
+| F053          | WebGPU selected by default                                                                   |
+| F054          | WebGL2 fallback, including a simulated adapter failure                                       |
+| F055          | Typed `unsupported-device` error                                                             |
 | Chaos suite   | Injected `GPUDevice.destroy()` and `WEBGL_lose_context`; recovery without reloading the page |
 | Leak suite    | Heap, `info.memory` and GL object counts flat over 100 mount/unmount cycles                  |
 | Debug overlay | Zero pipeline compiles after warm-up                                                         |

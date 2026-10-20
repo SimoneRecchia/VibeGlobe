@@ -1,20 +1,8 @@
 // Prints how many feature_list.json entries pass and how many fail, per milestone,
 // and the next failing entry (file order is priority order).
-import { readFileSync } from 'node:fs';
+import { loadFeatureList } from './feature-list.ts';
 
-interface Feature {
-  id: string;
-  milestone: number;
-  description: string;
-  status: 'passing' | 'failing';
-}
-
-interface FeatureList {
-  milestones: Record<string, string>;
-  features: Feature[];
-}
-
-const list = JSON.parse(readFileSync(new URL('../feature_list.json', import.meta.url), 'utf8')) as FeatureList;
+const list = loadFeatureList();
 const { features } = list;
 
 const invalid = features.filter((f) => f.status !== 'passing' && f.status !== 'failing');

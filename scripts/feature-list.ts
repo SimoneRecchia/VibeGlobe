@@ -1,7 +1,7 @@
 // The feature list schema (ADR 0003) and its loader, shared by the status and integrity scripts.
 import { readFileSync } from 'node:fs';
 
-export type FeatureStatus = 'passing' | 'failing';
+type FeatureStatus = 'passing' | 'failing';
 
 export interface Feature {
   id: string;
@@ -17,7 +17,7 @@ export interface FeatureList {
   features: Feature[];
 }
 
-export const FEATURE_LIST_URL = new URL('../feature_list.json', import.meta.url);
+const FEATURE_LIST_URL = new URL('../feature_list.json', import.meta.url);
 
 export function parseFeatureList(json: string): FeatureList {
   return JSON.parse(json) as FeatureList;

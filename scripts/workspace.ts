@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-export interface PackageManifest {
+interface PackageManifest {
   name?: string;
   private?: boolean;
   type?: string;
@@ -12,7 +12,7 @@ export interface PackageManifest {
   devDependencies?: Record<string, string>;
 }
 
-export interface TsConfig {
+interface TsConfig {
   compilerOptions?: { outDir?: string; tsBuildInfoFile?: string };
 }
 

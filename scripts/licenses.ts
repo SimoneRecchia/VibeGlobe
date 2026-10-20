@@ -1,6 +1,6 @@
 // Shipped-dependency closure from package-lock.json and SPDX license evaluation (PLAN.md: permissive licenses only).
 
-export interface LockEntry {
+interface LockEntry {
   version?: string;
   license?: string;
   link?: boolean;

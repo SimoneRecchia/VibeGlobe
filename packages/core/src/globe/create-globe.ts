@@ -204,7 +204,15 @@ class GlobeEngine implements Globe {
   jumpTo(target: ViewInit): void {
     this.assertAlive();
     const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
-    applyView(this.cam, validateView(target, currentView(this.cam)), keepRange);
+    let view;
+    try {
+      view = validateView(target, currentView(this.cam));
+    } catch (error) {
+      // The view stays as it was; the error reaches both the caller and the error event.
+      if (error instanceof GlobeError) this.emitter.emit('error', error);
+      throw error;
+    }
+    applyView(this.cam, view, keepRange);
     this.cam.update();
     this.requestRender();
   }

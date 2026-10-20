@@ -124,8 +124,11 @@ describe('input validation (F050)', () => {
     expect(() => createGlobe({ ...base, view: { zoom: Number.NaN } })).toThrowError(/zoom/);
     const { globe } = await started();
     const before = globe.camera;
+    const reported: string[] = [];
+    globe.on('error', (error) => reported.push(error.code));
     expect(() => globe.jumpTo({ latitudeDeg: -120 })).toThrow(GlobeError);
     expect(globe.camera).toEqual(before);
+    expect(reported).toEqual(['invalid-coordinate']);
   });
 
   test.prop([fc.anything()])('never throws anything but a GlobeError for arbitrary options', (options) => {

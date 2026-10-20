@@ -726,7 +726,7 @@
         "Run a fuzz test over the configuration parser with random inputs and confirm it never throws an untyped error or hangs",
         "In the playground, apply an invalid camera position at runtime and confirm the view stays rendered and an error event is emitted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F051",
@@ -877,7 +877,7 @@
         "Drag the globe and confirm frames render during the movement and stop shortly after it ends",
         "Change a setting that alters the image (for example layer opacity) and confirm rendering starts on the next frame and stops within a few frames after the last visible change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F063",
@@ -889,7 +889,7 @@
         "Hide the page (visibility hidden) with Playwright and confirm no frames are drawn",
         "Show the page again and confirm rendering resumes on the next frame with no stale or blank frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F064",
@@ -926,7 +926,7 @@
         "Confirm the engine emits a device-lost event, recreates the device and its GPU resources, and renders a complete view again",
         "Confirm the camera, layers and settings are preserved"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F067",
@@ -939,7 +939,7 @@
         "Confirm the engine emits context-lost and restored events and renders a complete view again",
         "Confirm the camera, layers and settings are preserved"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F068",
@@ -952,7 +952,7 @@
         "Confirm all workers are terminated and all DOM and window event listeners are removed",
         "Confirm calling API methods after destroy() throws a typed error instead of crashing"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F069",
@@ -965,7 +965,7 @@
         "Destroy one and confirm the other keeps rendering correctly",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F070",
@@ -977,7 +977,7 @@
         "Record frames and confirm none is stretched, blank or black",
         "Confirm the globe stays centered on the same geographic point with the correct aspect ratio"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F071",

@@ -79,21 +79,24 @@ export function emptyPixelsInside(image: PNG, radiusPx: number): number {
  * The radius in CSS pixels inside which a straight-down view must show the globe: the projected silhouette of the
  * ellipsoid's polar-radius sphere, which the ellipsoid always contains, shrunk by 1.5 px for anti-aliasing.
  */
-export async function silhouetteRadiusPx(page: Page): Promise<number> {
-  const { rangeMeters, heightPx } = await page.evaluate(() => ({
-    rangeMeters: window.vibeglobePlayground?.globe.camera.rangeMeters ?? NaN,
-    heightPx: document.querySelector('#globe')?.clientHeight ?? NaN,
-  }));
+export async function silhouetteRadiusPx(page: Page, index = 0, selector = '#globe'): Promise<number> {
+  const { rangeMeters, heightPx } = await page.evaluate(
+    ([i, s]) => ({
+      rangeMeters: window.vibeglobePlayground?.globes[i]?.camera.rangeMeters ?? NaN,
+      heightPx: document.querySelector(s)?.clientHeight ?? NaN,
+    }),
+    [index, selector] as const,
+  );
   const distance = rangeMeters + WGS84_B;
   const angular = Math.asin(WGS84_B / distance);
   return (Math.tan(angular) / Math.tan(FOV_Y_RAD / 2)) * (heightPx / 2) - 1.5;
 }
 
 /** Asserts that every pixel inside the globe's silhouette shows imagery. */
-export async function expectCompleteGlobe(page: Page): Promise<void> {
+export async function expectCompleteGlobe(page: Page, index = 0, selector = '#globe'): Promise<void> {
   await waitForIdle(page);
-  const radius = await silhouetteRadiusPx(page);
-  expect(emptyPixelsInside(await canvasImage(page), radius)).toBe(0);
+  const radius = await silhouetteRadiusPx(page, index, selector);
+  expect(emptyPixelsInside(await canvasImage(page, selector), radius)).toBe(0);
 }
 
 /** The screen point of a geographic position, through the engine's public API. */

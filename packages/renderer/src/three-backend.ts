@@ -57,6 +57,7 @@ export class ThreeBackend implements RendererBackend {
   private imagery: HTMLImageElement | undefined;
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
+  private recovering = false;
 
   private constructor(
     private readonly container: HTMLElement,
@@ -104,7 +105,11 @@ export class ThreeBackend implements RendererBackend {
     this.initialCanvas = undefined;
     const renderer = new WebGPURenderer({ canvas, antialias: true, reversedDepthBuffer: true, forceWebGL });
     await renderer.init();
-    renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(info.message ?? 'device lost');
+    renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(renderer, info.message ?? 'device lost');
+    // three.js ignores losses with the reason 'destroyed', assuming it destroyed the device itself; any loss of a
+    // device this backend did not dispose must still recover.
+    const device = (renderer.backend as { device?: GPUDevice }).device;
+    void device?.lost.then((info) => this.handleLoss(renderer, info.message || info.reason));
     if (
       this.choice === 'auto' &&
       !forceWebGL &&
@@ -236,8 +241,10 @@ export class ThreeBackend implements RendererBackend {
     else backend.gl?.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
-  private handleLoss(reason: string): void {
-    if (this.destroyed) return;
+  private handleLoss(lost: WebGPURenderer, reason: string): void {
+    // Only the current renderer's loss counts: one replaced or disposed by this backend is expected to go away.
+    if (this.destroyed || lost !== this.renderer || this.recovering) return;
+    this.recovering = true;
     this.events.deviceLost(reason);
     void this.recover();
   }
@@ -248,6 +255,7 @@ export class ThreeBackend implements RendererBackend {
       for (const entry of this.tiles.values()) entry.mesh.geometry.dispose();
       await this.initRenderer();
       this.createImageryResources();
+      this.recovering = false;
       this.events.deviceRestored();
     } catch (error) {
       this.events.failed(

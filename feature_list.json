@@ -43,7 +43,7 @@
         "Open the open-questions file and confirm each owner-only blocker names the stub or mock used meanwhile; open the follow-up list and confirm it collects ideas beyond the plan's scope",
         "Run git status at the end of a session and confirm the working tree is clean and the build and tests pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F003",
@@ -374,7 +374,7 @@
         "Push a commit with a type error in a scratch branch and confirm CI fails",
         "Confirm the latest CI run on the main branch is green"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F028",
@@ -560,7 +560,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F042",

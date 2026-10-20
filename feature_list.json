@@ -627,7 +627,7 @@
         "Run property-based tests with random positions, heights from -12 km to +40,000 km and latitudes up to exactly ±90°, and confirm round trips stay within 1 mm",
         "Confirm the WGS84 constants (semi-major axis 6378137 m, flattening 1/298.257223563) are the only ellipsoid used"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F043",

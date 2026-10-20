@@ -11,6 +11,7 @@ export default defineConfig({
   // Workspace packages resolve to their TypeScript sources, so tests need no prior build.
   ssr: { resolve: { conditions: ['source', ...defaultServerConditions] } },
   test: {
+    setupFiles: ['scripts/test/property-seed.ts'],
     projects: [
       {
         extends: true,

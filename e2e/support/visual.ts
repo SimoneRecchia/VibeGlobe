@@ -6,7 +6,7 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
 /** Tolerances from ADR 0012. */
-export const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
+const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
 /** Tolerances from ADR 0012. */
 export const CROSS_BACKEND = { threshold: 0.1, maxDiffRatio: 0.001 } as const;
 

@@ -40,7 +40,8 @@ interface GlobeOptions {
   quality?: QualityPreset | 'auto';
   resolutionScale?: number; // multiplies devicePixelRatio
   memory?: { gpuBudgetBytes?: number; ramBudgetBytes?: number };
-  assets?: { workerUrl?: string; wasmBaseUrl?: string };
+  assets?: { workerUrl?: string; wasmBaseUrl?: string }; // same-origin only (ADR 0011)
+  workers?: { maxCount?: number }; // default clamp(hardwareConcurrency - 2, 1, 4)
   logger?: LoggerOptions;
 }
 
@@ -272,6 +273,54 @@ interface GlobeEvents {
   'device-lost': { reason: string };
   'device-restored': void;
   error: EngineError;
+}
+```
+
+## Renderer, controls and network policy plug-ins
+
+The engine owns every globe decision and hands the renderer a finished description of the frame (ADR 0010 picks the implementation, ADR 0004 and ADR 0005 fix precision and depth).
+
+```ts
+interface RendererFactory {
+  (context: { canvas: HTMLCanvasElement; backend: 'auto' | 'webgpu' | 'webgl2' }): Promise<RendererBackend>;
+}
+
+interface RendererBackend {
+  readonly kind: 'webgpu' | 'webgl2';
+  readonly capabilities: GpuCapabilities; // limits, compressed formats, timestamp queries, clip control
+  createTexture(source: ImageBitmap | CompressedTextureData, options: TextureOptions): TextureHandle;
+  createMesh(data: MeshData): MeshHandle; // float32 offsets from a float64 origin (ADR 0004)
+  release(handle: TextureHandle | MeshHandle): void;
+  /** Draws one frame: rotation-only view, per-draw eye-relative offsets, cross-fade alphas, overlays. */
+  render(frame: FrameDescription): void;
+  readPixels(region: ScreenRect): Promise<Uint8Array>; // picking, screenshots, visual tests
+  onDeviceLost(handler: (reason: string) => void): () => void;
+  resize(widthPx: number, heightPx: number, pixelRatio: number): void;
+  destroy(): void;
+}
+
+interface FrameDescription {
+  view: Float64Array; // rotation-only view matrix
+  projection: Float64Array; // reversed-Z, infinite far plane
+  draws: readonly DrawCommand[]; // state-sorted by the engine
+}
+
+interface Controls {
+  attach(element: HTMLElement, camera: CameraInput): void; // camera input API from core
+  /** Applies the input recorded since the last frame; called once per frame by the engine loop. */
+  update(nowMs: number): void;
+  detach(): void;
+}
+
+interface NetworkPolicy {
+  /** Decides, per request, which tiers may be used and whether the network may be touched. */
+  resolve(request: { sourceId: string; layerId: string; purpose: 'visible' | 'prefetch' | 'package' }): {
+    useNetwork: boolean;
+    readPackages: boolean;
+    readPersistentCache: boolean;
+    writePersistentCache: boolean;
+    keepInMemory: boolean;
+  };
 }
 ```
 

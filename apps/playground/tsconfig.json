@@ -16,6 +16,12 @@
     },
     {
       "path": "../../packages/ui"
+    },
+    {
+      "path": "../../packages/renderer"
+    },
+    {
+      "path": "../../packages/controls"
     }
   ]
 }

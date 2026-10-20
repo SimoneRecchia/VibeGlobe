@@ -8,6 +8,40 @@ export { WGS84 } from './geodesy/wgs84.js';
 export type { Ellipsoid } from './geodesy/wgs84.js';
 export { ecefToGeodetic, geodeticToEcef } from './geodesy/ecef.js';
 export type { GeodeticRad } from './geodesy/ecef.js';
+export { Camera } from './camera/camera.js';
+export type { CameraPose } from './camera/camera.js';
+export {
+  DEFAULT_FOV_Y_RAD,
+  groundMetersPerPixel,
+  groundZoomForRange,
+  groundZoomFromMercatorZoom,
+  mercatorZoomFromGroundZoom,
+  rangeForGroundZoom,
+} from './camera/zoom.js';
+export { createGlobe } from './globe/create-globe.js';
+export { GlobeError } from './globe/errors.js';
+export type { GlobeErrorCode } from './globe/errors.js';
+export type {
+  BackendName,
+  CameraState,
+  Controls,
+  ControlsFactory,
+  FrameView,
+  GeoPosition,
+  Globe,
+  GlobeEvents,
+  GlobeOptions,
+  NavigationApi,
+  RendererBackend,
+  RendererCapabilities,
+  RendererEvents,
+  RendererFactory,
+  RenderHost,
+  ResourceCounts,
+  ScreenPoint,
+  ViewInit,
+} from './globe/types.js';
+export type { TileMeshData } from './surface/surface-mesh.js';
 export {
   enuFrame,
   enuFrameDeg,

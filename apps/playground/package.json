@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@vibeglobe/core": "*",
-    "@vibeglobe/ui": "*"
+    "@vibeglobe/ui": "*",
+    "@vibeglobe/controls": "*",
+    "@vibeglobe/renderer": "*"
   }
 }

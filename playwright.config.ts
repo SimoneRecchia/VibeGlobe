@@ -4,6 +4,19 @@ const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
+// ADR 0012: GPU-less machines render WebGL2 through SwiftShader (ANGLE) and WebGPU through its SwiftShader adapter, so
+// every test can choose a backend with ?backend=webgpu or ?backend=webgl2.
+const SOFTWARE_GPU_ARGS = [
+  '--use-angle=swiftshader',
+  '--enable-unsafe-swiftshader',
+  '--enable-unsafe-webgpu',
+  '--enable-features=Vulkan',
+  '--use-vulkan=swiftshader',
+  '--use-webgpu-adapter=swiftshader',
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+];
 
 export default defineConfig({
   testDir: 'e2e',
@@ -15,7 +28,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${port}`,
-    ...(chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {}),
+    launchOptions: { args: SOFTWARE_GPU_ARGS, ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

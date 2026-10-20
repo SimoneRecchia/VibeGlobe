@@ -689,7 +689,7 @@
         "Place the camera at known positions (orbit, 1 km, 1 m above ground) with known heading and tilt and confirm the matrices against reference values",
         "Confirm the camera state API exposes position, heading, tilt and roll with units in their names"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F048",

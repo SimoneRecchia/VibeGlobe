@@ -17,5 +17,6 @@
     "playwright.config.ts",
     "apps/*/vite.config.ts",
     "eslint.config.ts"
-  ]
+  ],
+  "exclude": ["scripts/fixtures"]
 }

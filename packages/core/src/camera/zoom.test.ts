@@ -1,3 +1,4 @@
+import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_FOV_Y_RAD,
@@ -27,5 +28,18 @@ describe('zoom', () => {
     expect(mercatorZoomFromGroundZoom(11, lat)).toBeCloseTo(10, 12);
     // At and beyond the Web Mercator limit the limit's scale factor applies (cosh π ≈ 11.59, so +3.53 levels).
     expect(groundZoomFromMercatorZoom(3, Math.PI / 2)).toBeCloseTo(3 + Math.log2(Math.cosh(Math.PI)), 9);
+  });
+
+  test.prop([
+    fc.double({ min: -2, max: 30, noNaN: true }),
+    fc.double({ min: -Math.PI / 2, max: Math.PI / 2, noNaN: true }),
+    fc.integer({ min: 100, max: 4000 }),
+  ])('round-trips zoom ⇄ range and Mercator ⇄ ground zoom at every latitude, poles included', (zoom, lat, heightPx) => {
+    expect(
+      groundZoomForRange(rangeForGroundZoom(zoom, heightPx, DEFAULT_FOV_Y_RAD), heightPx, DEFAULT_FOV_Y_RAD),
+    ).toBeCloseTo(zoom, 9);
+    expect(mercatorZoomFromGroundZoom(groundZoomFromMercatorZoom(zoom, lat), lat)).toBeCloseTo(zoom, 9);
+    // Symmetric in latitude.
+    expect(groundZoomFromMercatorZoom(zoom, lat)).toBeCloseTo(groundZoomFromMercatorZoom(zoom, -lat), 12);
   });
 });

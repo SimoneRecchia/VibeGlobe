@@ -677,7 +677,7 @@
         "Confirm a failure prints the seed and the shrunk counterexample, and re-running with that seed reproduces it",
         "Confirm CI runs the suites"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F047",

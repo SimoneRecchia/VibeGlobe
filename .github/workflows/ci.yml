@@ -77,6 +77,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
+      - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
+        run: npm run geodtest
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

@@ -1050,7 +1050,7 @@
         "Verify distances match within 0.1 mm and azimuths within 1e-9 degrees, including nearly antipodal points, the poles and the antimeridian",
         "Run property-based tests for symmetry (distance A-B equals B-A) and consistency of the direct and inverse problems"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F077",
@@ -1062,7 +1062,7 @@
         "Verify results match GeographicLib reference values within 1 mm and 1 square meter respectively",
         "Run property-based tests verifying area is invariant to vertex order rotation and sign follows orientation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F546",

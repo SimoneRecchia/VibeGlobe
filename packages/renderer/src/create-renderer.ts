@@ -1,6 +1,5 @@
 import type { RendererFactory } from '@vibeglobe/core';
-import { createBrowserHost } from './browser-host.js';
-import { ThreeBackend, type BackendChoice } from './three-backend.js';
+import type { BackendChoice } from './three-backend.js';
 
 /** Options of {@link createRenderer}. */
 export interface RendererOptions {
@@ -12,12 +11,17 @@ export interface RendererOptions {
 
 /**
  * Creates the renderer plug-in for `createGlobe` (ADR 0010): three.js WebGPURenderer with an automatic WebGL2 fallback.
- * Nothing touches the DOM or the GPU until the globe calls the returned factory, so importing is SSR-safe.
+ * three.js is loaded only when the globe starts (it writes to `window` when imported), so importing this package is
+ * SSR-safe and costs no rendering code until a globe exists.
  */
 export function createRenderer(options: RendererOptions = {}): RendererFactory {
   const choice = options.backend ?? 'auto';
-  return (container, events) => {
+  return async (container, events) => {
     const element = container as HTMLElement;
+    const [{ ThreeBackend }, { createBrowserHost }] = await Promise.all([
+      import('./three-backend.js'),
+      import('./browser-host.js'),
+    ]);
     return ThreeBackend.create(element, createBrowserHost(element), choice, events, options.canvas);
   };
 }

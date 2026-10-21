@@ -37,6 +37,10 @@ const assets = params.get('assets');
 const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'webgl2' ? backendParam : 'auto';
 const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
+const DEG = Math.PI / 180;
+/** A box around Italy, radians: the coverage of `?coverage=italy`. */
+const ITALY = { westRad: 6 * DEG, southRad: 36 * DEG, eastRad: 19 * DEG, northRad: 47.5 * DEG };
+
 /**
  * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
  * fixture tile server (M3 plan §4.1); `&session=` names the server session that holds fault rules and the request log.
@@ -45,9 +49,26 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const pattern = params.get('imagery');
   if (!pattern) return {};
   const session = params.get('session') ?? 'playground';
-  const url = `${import.meta.env.BASE_URL}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
+  // `?tileBase=` serves the tiles from another fixture server (for example `http://{s}:5177/` with
+  // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
+  const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
+  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
+  const timeoutMs = number('timeoutMs');
+  const source = xyzImagery({
+    id: `fixture-${pattern}`,
+    url,
+    minLevel: number('imageryMin') ?? 0,
+    maxLevel: number('imageryMax') ?? 18,
+    ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
+    ...(params.has('perHost') ? { maxRequestsPerHost: Number(params.get('perHost')) } : {}),
+    ...(params.has('multiplexed') ? { multiplexed: true } : {}),
+    ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
+    // `?coverage=italy` limits the source to a box around Italy (F094).
+    ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
+  });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
     params.has(name) ? Math.round(Number(params.get(name)) * 1024 * 1024) : undefined;
@@ -57,7 +78,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers, memory };
+  return { imagery: [source], workers, memory };
 }
 
 /** Creates one engine instance in a container with its own canvas. */

@@ -1239,7 +1239,7 @@
         "Trigger a large refinement and record in-flight requests per host over time",
         "Confirm in-flight requests to each host never exceed its limit and both hosts are used in parallel"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F090",
@@ -1252,7 +1252,7 @@
         "Run a long scripted camera path from Milan to Tokyo (?scenario=path-milan-tokyo) and confirm requests for tiles passed along the path are cancelled",
         "Confirm new visible tiles load without waiting for stale requests"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F091",
@@ -1264,7 +1264,7 @@
         "Confirm those tiles are retried with increasing delays and eventually load",
         "Make a tile fail permanently and confirm retries stop after the configured maximum and the parent stays drawn"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F092",
@@ -1276,7 +1276,7 @@
         "Confirm those requests are aborted after the configured timeout and handled by the retry policy",
         "Confirm the concurrency slots are freed and other tiles keep loading"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F093",
@@ -1288,7 +1288,7 @@
         "Zoom into the area and confirm the parent stays drawn, each missing tile is requested once and no retries follow",
         "Pan away and back and confirm the known-missing tiles are not requested again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F094",
@@ -1300,7 +1300,7 @@
         "Navigate inside and outside the region and beyond the zoom range",
         "Confirm no request is made for tiles outside the declared coverage or zoom range, and the parent is drawn there"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F095",
@@ -1312,7 +1312,7 @@
         "Record all network requests and confirm each tile URL is requested at most once",
         "Pan away and back within the cache budget and confirm no repeated request"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F096",
@@ -1324,7 +1324,7 @@
         "Confirm in the browser network log that tile requests share connections per host",
         "Confirm compressed responses (for example gzip or brotli for vector and terrain data) are accepted and decoded"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F097",
@@ -1525,7 +1525,7 @@
         "Navigate across the affected area and record every frame",
         "Confirm the parent stays drawn, an error is logged or emitted, and no frame has black or empty pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F113",
@@ -1537,7 +1537,7 @@
         "Navigate continuously and record frames and frame times",
         "Confirm frame times stay within budget and no frame has black or empty pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F114",

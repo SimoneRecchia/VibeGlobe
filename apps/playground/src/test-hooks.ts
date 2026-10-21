@@ -45,6 +45,7 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
   'device-lost',
   'device-restored',
   'backend-fallback',
+  'tile-error',
   'error',
 ];
 

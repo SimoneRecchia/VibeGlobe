@@ -36,6 +36,8 @@ export type {
   Globe,
   GlobeEvents,
   GlobeOptions,
+  ImageryStats,
+  MemoryOptions,
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
@@ -45,6 +47,9 @@ export type {
   RenderHost,
   ResourceCounts,
   ScreenPoint,
+  SurfaceStats,
+  SurfaceTileInfo,
+  TileErrorEvent,
   ViewInit,
 } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';

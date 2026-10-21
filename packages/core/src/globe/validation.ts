@@ -152,6 +152,7 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'device-lost',
   'device-restored',
   'backend-fallback',
+  'tile-error',
   'error',
 ]);
 

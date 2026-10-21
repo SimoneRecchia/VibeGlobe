@@ -11,7 +11,7 @@ import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import type { ImageryStats, MemoryOptions, RendererBackend } from './types.js';
+import type { ImageryStats, MemoryOptions, RendererBackend, TileErrorEvent } from './types.js';
 
 /** Texture handles of layer `i` start at `i × HANDLES_PER_LAYER`. */
 const HANDLES_PER_LAYER = 1 << 22;
@@ -21,6 +21,36 @@ const DEFAULT_RAM_BUDGET_BYTES = 256 * 1024 * 1024;
 /** Evictions per frame outside admissions (ADR 0007): at most 64 tiles or 1 ms. */
 const TRIM_TILES = 64;
 const TRIM_MS = 1;
+
+/** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
+let pagePool: { pool: NetworkPool; users: number } | undefined;
+
+function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
+  pagePool ??= {
+    pool: new NetworkPool({
+      now: () => host.now(),
+      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
+      clearTimer: (handle) => host.clearTimer(handle),
+    }),
+    users: 0,
+  };
+  pagePool.users++;
+  return pagePool.pool;
+}
+
+function releaseNetworkPool(pool: NetworkPool): void {
+  if (pagePool?.pool !== pool || --pagePool.users > 0) return;
+  pool.dispose();
+  pagePool = undefined;
+}
+
+/** What the runtime reports to its engine instance. */
+export interface ImageryCallbacks {
+  /** Something arrived that changes the picture or the queue. */
+  requestFrame(): void;
+  /** A tile failed for good; its ancestors stay drawn (F112). */
+  tileError(event: TileErrorEvent): void;
+}
 
 /**
  * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
@@ -67,14 +97,10 @@ export class ImageryRuntime {
     workers: WorkerEndpointFactory,
     memory: MemoryOptions,
     renderer: RendererBackend,
-    requestFrame: () => void,
+    callbacks: ImageryCallbacks,
   ) {
     const host = renderer.host;
-    this.network = new NetworkPool({
-      now: () => host.now(),
-      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
-      clearTimer: (handle) => host.clearTimer(handle),
-    });
+    this.network = acquireNetworkPool(host);
     this.lease = acquireWorkerPool(workers, {
       timers: {
         set: (callback, delayMs) => host.setTimer(callback, delayMs),
@@ -110,7 +136,8 @@ export class ImageryRuntime {
         pinnedLevel: pinned[index] ?? -1,
         uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
         releaseTexture: (handle) => renderer.releaseTexture(handle),
-        requestFrame,
+        requestFrame: () => callbacks.requestFrame(),
+        tileError: (source, level, x, y, reason) => callbacks.tileError({ sourceId: source.id, level, x, y, reason }),
         now: () => host.now(),
         setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
         random: Math.random,
@@ -177,7 +204,7 @@ export class ImageryRuntime {
   /** Cancels every request and task and releases the worker pool share. */
   destroy(): void {
     for (const layer of this.layers) layer.loader.destroy();
-    this.network.dispose();
+    releaseNetworkPool(this.network);
     this.lease.release();
     this.ram.clear();
   }

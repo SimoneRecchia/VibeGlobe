@@ -3,7 +3,7 @@ import type { SurfaceCache } from '../surface/surface-cache.js';
 import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
-import { ImageryRuntime } from './imagery-runtime.js';
+import { ImageryRuntime, type ImageryCallbacks } from './imagery-runtime.js';
 import type {
   GlobeOptions,
   ImageryStats,
@@ -42,10 +42,10 @@ export class SurfaceFrame {
    * Starts the options' tiled imagery, if any: from now on tiles refine until their texels are small enough (F081) and
    * are textured with the layers' tiles.
    */
-  startImagery(options: GlobeOptions, renderer: RendererBackend, requestFrame: () => void): void {
+  startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
     const { imagery: sources, workers } = options;
     if (!sources || sources.length === 0 || !workers) return;
-    const imagery = new ImageryRuntime(sources, workers, options.memory ?? {}, renderer, requestFrame);
+    const imagery = new ImageryRuntime(sources, workers, options.memory ?? {}, renderer, callbacks);
     this.imagery = imagery;
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;

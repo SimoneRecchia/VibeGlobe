@@ -349,7 +349,18 @@ export interface GlobeEvents {
   'device-restored': Record<string, never>;
   /** WebGPU could not be used and WebGL2 took over; the canvas may have been replaced, as for `device-restored`. */
   'backend-fallback': { readonly reason: string };
+  /** An imagery tile failed for good; its area keeps showing an ancestor (F112). */
+  'tile-error': TileErrorEvent;
   error: GlobeError;
+}
+
+/** A tile that failed for good: `corrupt` bytes that do not decode, or `failed` after its retries ran out. */
+export interface TileErrorEvent {
+  readonly sourceId: string;
+  readonly level: number;
+  readonly x: number;
+  readonly y: number;
+  readonly reason: 'corrupt' | 'failed';
 }
 
 /** A surface tile of the last drawn frame, for diagnostics (ADR 0006 §1: a Web Mercator root and two polar caps). */

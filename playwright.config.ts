@@ -6,7 +6,7 @@ const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 /** Tests whose results depend on having the machine to themselves. */
-const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts/;
+const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts/;
 /**
  * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
  * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
@@ -59,6 +59,18 @@ export default defineConfig({
     {
       command: 'npm run preview -w @vibeglobe/lazy-host',
       url: `http://localhost:${process.env['LAZY_HOST_PORT'] ?? 5175}`,
+      reuseExistingServer: true,
+    },
+    // Standalone fixture tile servers: HTTP/1.1 reachable as two hosts (F089) and HTTP/2 over TLS (F096).
+    {
+      command: 'node scripts/fixtures/tiles/serve.ts --port 5177',
+      url: 'http://localhost:5177/_fixture/up/log',
+      reuseExistingServer: true,
+    },
+    {
+      command: 'node scripts/fixtures/tiles/serve.ts --port 5178 --http2',
+      url: 'https://localhost:5178/_fixture/up/log',
+      ignoreHTTPSErrors: true,
       reuseExistingServer: true,
     },
     // The playground's production build (npm run build first), for tests of shipped bundles (F100).

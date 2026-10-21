@@ -191,14 +191,14 @@ class GlobeEngine implements Globe {
       failed: (error) => this.failStart(error),
     };
     const renderer = await this.options.renderer(this.options.container, events);
-    if (this.destroyed) {
-      renderer.destroy();
-      return;
-    }
+    if (this.destroyed) return renderer.destroy();
     this.renderer = renderer;
     this.surface = new SurfaceCache(renderer);
     // Loads finishing after destroy ask for nothing.
-    this.surfaceFrame.startImagery(this.options, renderer, () => this.destroyed || this.requestRender());
+    this.surfaceFrame.startImagery(this.options, renderer, {
+      requestFrame: () => this.destroyed || this.requestRender(),
+      tileError: (event) => this.emitter.emit('tile-error', event),
+    });
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(

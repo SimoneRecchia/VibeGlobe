@@ -7,7 +7,7 @@ import {
   FAILURE_ABORTED,
   FAILURE_NO_DATA,
 } from '../scheduler/failure-policy.js';
-import { NO_SLOT, type NetworkPool, type NetworkPoolClient } from '../scheduler/network-pool.js';
+import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } from '../scheduler/network-pool.js';
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
 import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
@@ -62,6 +62,8 @@ export interface ImageryLoaderOptions {
   releaseTexture(handle: number): void;
   /** Asks for a frame: something arrived that changes the picture or the queue. */
   requestFrame(): void;
+  /** A tile failed for good: its bytes were corrupt, or its retries ran out (F112). Its ancestors stay drawn. */
+  tileError(source: ImagerySource, level: number, x: number, y: number, reason: 'corrupt' | 'failed'): void;
   now(): number;
   setTimer(callback: () => void, delayMs: number): unknown;
   random(): number;
@@ -102,6 +104,7 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly hosts = new Map<string, number>();
   private readonly removeClient: () => void;
   private readonly pinnedTotal: number;
+  private readonly hostOptions: HostOptions;
   private pinnedSettled = 0;
   private frame = 0;
   private requested = 0;
@@ -114,6 +117,11 @@ export class ImageryLoader implements NetworkPoolClient {
     for (let level = 0; level <= options.pinnedLevel; level++)
       total += tiling.rootTilesX * tiling.rootTilesY * 4 ** level;
     this.pinnedTotal = total;
+    const { maxRequestsPerHost, multiplexed } = options.source;
+    this.hostOptions = {
+      ...(maxRequestsPerHost === undefined ? {} : { maxInFlight: maxRequestsPerHost }),
+      ...(multiplexed === undefined ? {} : { multiplexed }),
+    };
     this.uploads = new UploadQueue<PendingUpload>({ upload: (tile, measuredMs) => this.upload(tile, measuredMs) });
     this.removeClient = options.network.addClient(this);
   }
@@ -288,9 +296,13 @@ export class ImageryLoader implements NetworkPoolClient {
       this.settlePinned(record);
       return -1;
     }
-    const key = `${this.options.source.id}/${record.slot}`;
-    const consumer = this.options.network.request(key, this.hostOf(request), this.options.source.transport, (result) =>
-      this.received(record, result),
+    // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
+    const consumer = this.options.network.request(
+      request.url,
+      this.hostOf(request),
+      this.options.source.transport,
+      (result) => this.received(record, result),
+      this.options.source.timeoutsMs,
     );
     if (consumer === NO_SLOT) return 0;
     this.heap.pop();
@@ -309,7 +321,7 @@ export class ImageryLoader implements NetworkPoolClient {
     const origin = /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(request.url)?.[0] ?? '';
     let hostIndex = this.hosts.get(origin);
     if (hostIndex === undefined) {
-      hostIndex = this.options.network.registerHost(origin);
+      hostIndex = this.options.network.registerHost(origin, this.hostOptions);
       this.hosts.set(origin, hostIndex);
     }
     return { url: request.url, hostIndex };
@@ -341,9 +353,15 @@ export class ImageryLoader implements NetworkPoolClient {
       this.options.setTimer(() => this.options.requestFrame(), decision.nextEligibleMs - this.options.now());
     } else {
       record.state = DEAD;
+      this.reportError(record, 'failed');
     }
     this.settlePinned(record);
     this.options.requestFrame();
+  }
+
+  private reportError(record: TileRecord, reason: 'corrupt' | 'failed'): void {
+    const { level, x, y } = record.coord;
+    this.options.tileError(this.options.source, level, x, y, reason);
   }
 
   private decode(record: TileRecord, bytes: ArrayBuffer, contentType: string): void {
@@ -368,9 +386,18 @@ export class ImageryLoader implements NetworkPoolClient {
     if (!outcome.ok) {
       this.leaveActive(record);
       const code = outcome.error.code;
-      if (code === 'cancelled' || code === 'aborted') record.state = UNLOADED;
-      else if (code === 'task-failed') record.state = outcome.error.taskCode === 'unsupported' ? NO_DATA : DEAD;
-      else record.state = FAILED;
+      if (code === 'cancelled' || code === 'aborted') {
+        record.state = UNLOADED;
+      } else if (code === 'task-failed' && outcome.error.taskCode === 'unsupported') {
+        record.state = NO_DATA;
+      } else if (code === 'task-failed') {
+        // Bytes of a declared format that do not decode: quarantined, reported once, never retried (M3 plan risk 9).
+        record.state = DEAD;
+        this.options.memory.ram.delete(this.options.handleBase + record.slot);
+        this.reportError(record, 'corrupt');
+      } else {
+        record.state = FAILED;
+      }
       this.settlePinned(record);
       this.options.requestFrame();
       return;

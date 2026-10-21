@@ -4,9 +4,9 @@ import { waitForIdle } from './globe.js';
 /** Helpers for tests of tiled imagery against the playground's fixture tile server (M3 plan §4.1). */
 
 /** A fresh fixture-server session with its own fault rules and request log (M3 plan §4.1). */
-export async function fixtureSession(page: Page, rules: unknown[] = []): Promise<string> {
+export async function fixtureSession(page: Page, rules: unknown[] = [], server = ''): Promise<string> {
   const id = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  const response = await page.request.post(`/_fixture/${id}/rules`, { data: JSON.stringify(rules) });
+  const response = await page.request.post(`${server}/_fixture/${id}/rules`, { data: JSON.stringify(rules) });
   expect(response.status()).toBe(204);
   return id;
 }
@@ -19,11 +19,15 @@ export interface LoggedRequest {
   y: number;
   startMs: number;
   endMs?: number;
+  aborted?: boolean;
+  status?: number;
+  host?: string;
+  connection?: number;
 }
 
 /** The fixture server's log of a session's requests. */
-export async function requestLog(page: Page, session: string): Promise<LoggedRequest[]> {
-  return (await (await page.request.get(`/_fixture/${session}/log`)).json()) as LoggedRequest[];
+export async function requestLog(page: Page, session: string, server = ''): Promise<LoggedRequest[]> {
+  return (await (await page.request.get(`${server}/_fixture/${session}/log`)).json()) as LoggedRequest[];
 }
 
 /**
@@ -74,4 +78,19 @@ export async function centerTile(page: Page): Promise<{ level: number; imageryLe
     if (!tile) throw new Error('no tile under the center');
     return { level: tile.level, imageryLevel: tile.imageryLevel };
   });
+}
+
+/** Waits until nothing is queued, in flight, decoding or waiting for an upload, then for the engine to go idle. */
+export async function waitForStreaming(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const stats = window.vibeglobePlayground?.globe.imageryStats();
+          return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : -1;
+        }),
+      { timeout: 60_000 },
+    )
+    .toBe(0);
+  await waitForIdle(page);
 }

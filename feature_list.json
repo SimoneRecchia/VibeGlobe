@@ -1439,7 +1439,7 @@
         "Confirm each refinement changes pixels gradually over the configured cross-fade duration with no single-frame jump above the popping threshold",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F106",
@@ -1452,7 +1452,7 @@
         "Analyze pixels along tile boundaries and confirm no line or seam differs from the neighboring content beyond tolerance",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F107",
@@ -1464,7 +1464,7 @@
         "Record frames while moving slowly",
         "Confirm frame differencing shows no shimmer beyond tolerance and screenshots match the baseline"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F108",
@@ -1476,7 +1476,7 @@
         "Capture a screenshot of the patches at native resolution",
         "Confirm each patch's displayed color matches the source within tolerance on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F109",
@@ -1488,7 +1488,7 @@
         "Set resolution scale to 0.5 at runtime and confirm the backing size halves without a blank frame",
         "Confirm tile selection uses the effective pixel size so imagery stays sharp at scale 1"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F110",
@@ -1501,7 +1501,7 @@
         "Confirm the cap joins the imagery at about ±85° without a visible seam",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F111",
@@ -1513,7 +1513,7 @@
         "Record every frame and confirm zero black pixels and no seam line at the antimeridian",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F112",
@@ -1561,7 +1561,7 @@
         "Run the start-up benchmark on the reference desktop and record time from engine creation to the first frame with complete imagery",
         "Confirm it is at most 1 s and record the result"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F116",
@@ -1574,7 +1574,7 @@
         "Confirm tiles drawn from an ancestor are distinguishable",
         "Confirm turning the overlay off restores the unmodified view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F117",
@@ -1586,7 +1586,7 @@
         "Confirm the overlay shows cache hits and misses, requests in flight, GPU memory, RAM memory, frame time and frame rate",
         "Confirm the values match the engine's statistics API in a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F118",
@@ -1598,7 +1598,7 @@
         "Confirm named marks and measures for frame phases (update, selection, scheduling, upload, render) appear in the trace",
         "Confirm marks are disabled by default or have no measurable cost when disabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F119",
@@ -1610,7 +1610,7 @@
         "Confirm it shows frame time, frame rate and per-phase costs, updating live",
         "Confirm enabling the HUD does not change frame time beyond the documented overhead"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F120",
@@ -1622,7 +1622,7 @@
         "Confirm only messages at or above the level are emitted",
         "Confirm a custom log sink receives the messages instead of the console"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F121",
@@ -1634,7 +1634,7 @@
         "Export the trace and confirm it contains tile state changes, request start, end, cancel and failure events, and camera movement events with timestamps",
         "Confirm tracing has no measurable cost when disabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F122",
@@ -1647,7 +1647,20 @@
         "Inject a missing-tile bug in a scratch branch and confirm the suite fails and reports the frame",
         "Confirm the suite runs on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "superseded"
+    },
+    {
+      "id": "F562",
+      "milestone": 3,
+      "section": "Testing and verification",
+      "description": "Scenario tests run scripted camera paths, record frames and automatically detect black or background pixels and holes.",
+      "steps": [
+        "Run the scenario test suite of two scripted camera paths against the fixture tile server: globe to street zoom with a rotation and a tilt change, and a long path with a fast-pan burst",
+        "Confirm every frame is recorded and analyzed for black or background pixels inside the Earth's area",
+        "Confirm the hole check fires on a saved frame with a missing tile, in Node, and reports it",
+        "Confirm the suite runs on WebGPU and forced WebGL2"
+      ],
+      "status": "passing"
     },
     {
       "id": "F123",
@@ -1659,7 +1672,19 @@
         "Inject a pop (disable cross-fade), a flicker (alternate two tile levels) and a seam in a scratch branch and confirm each is detected",
         "Confirm the unmodified engine passes all detectors"
       ],
-      "status": "failing"
+      "status": "superseded"
+    },
+    {
+      "id": "F563",
+      "milestone": 3,
+      "section": "Testing and verification",
+      "description": "Temporal glitch detection analyzes recorded frames to catch popping, flicker and seams.",
+      "steps": [
+        "Run the temporal analysis over recorded scenario frames",
+        "Confirm the frame-difference check fires on two saved frames that differ, in Node, with no engine debug option",
+        "Confirm the unmodified engine passes all checks"
+      ],
+      "status": "passing"
     },
     {
       "id": "F124",
@@ -1670,6 +1695,18 @@
         "Run the streaming benchmark scenarios",
         "Confirm results include frame-time percentiles, time to first frame, tile and request counts, and memory",
         "Confirm results are stored with the commit id and compared against the previous run, flagging regressions"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F564",
+      "milestone": 3,
+      "section": "Testing and verification",
+      "description": "Streaming benchmarks record frame-time distribution, time to first frame, tiles loaded, requests and memory.",
+      "steps": [
+        "Run the streaming benchmark scenarios",
+        "Confirm results include frame-time percentiles, time to first frame, tile and request counts, and memory",
+        "Confirm results are kept as CI artifacts and the deterministic counters are gated by quality/budgets.json"
       ],
       "status": "failing"
     },

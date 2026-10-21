@@ -97,6 +97,10 @@
       "bundleGzipKB": 100
     }
   },
+  "streaming": {
+    "scenario": "stream-path",
+    "maxFailedTiles": 0
+  },
   "startup": {
     "scenario": "frame-loop",
     "firstFrameMedianMs": 1000,

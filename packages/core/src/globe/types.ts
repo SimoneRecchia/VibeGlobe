@@ -1,4 +1,5 @@
 import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { GlobeDiagnostics, LogLevel, LogSink } from '../diagnostics/observability.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
@@ -169,6 +170,12 @@ export interface TileDrawList {
   readonly textures: Int32Array;
   readonly uvTransforms: Float32Array;
   readonly geographic: Uint8Array;
+  /** The imagery each draw cross-fades from (F105): like `textures`, `uvTransforms` and `geographic`. */
+  readonly fromTextures: Int32Array;
+  readonly fromUvTransforms: Float32Array;
+  readonly fromGeographic: Uint8Array;
+  /** Each draw's fade progress: 0 shows only the `from` imagery, 1 only its own. */
+  readonly fades: Float32Array;
 }
 
 /** The engine's renderer interface; three.js stays behind it (ADR 0010). */
@@ -283,6 +290,15 @@ export interface GlobeOptions {
    * 100 ms).
    */
   readonly manualClockStepMs?: number;
+  /**
+   * Duration of the cross-fade when a surface tile's imagery changes, in milliseconds of engine time (F105): 250 by
+   * default; 0 switches at once (a test's injected pop).
+   */
+  readonly imageryFadeMs?: number;
+  /** The quietest messages the engine logs (F120): 'debug', 'info', 'warn' (default), 'error' or 'silent'. */
+  readonly logLevel?: LogLevel;
+  /** Receives the engine's log messages instead of the console (F120). */
+  readonly logSink?: LogSink;
   /**
    * Tiled imagery layers, bottom first (M3): each surface tile shows the topmost layer that has a tile for it, else the
    * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
@@ -411,6 +427,8 @@ export interface SurfaceStats {
 export interface Globe {
   /** Resolves after the first complete frame; rejects with a GlobeError when the engine cannot start. */
   readonly ready: Promise<void>;
+  /** Log level, phase timing and event traces (F118–F121, docs/guides/debugging.md). */
+  readonly diagnostics: GlobeDiagnostics;
   /** Active backend, available after `ready`. */
   readonly backend: BackendName | undefined;
   /** Device capabilities, available after `ready`. */

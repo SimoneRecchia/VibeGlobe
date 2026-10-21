@@ -8,6 +8,19 @@ import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
 /** The Chromium build Playwright 1.64.1 pins (its browsers.json), which CI runs and the baselines come from. */
 const PINNED_CHROMIUM = '156.0.8078.4';
 
+/** What the scenario harness reports (apps/playground/src/scenario-harness.ts). */
+export interface ScenarioReport {
+  frames: number;
+  staticFrames: number;
+  holes: number;
+  firstHoleFrame: number;
+  dark: number;
+  firstDarkFrame: number;
+  firstHole?: { xPx: number; yPx: number; latitudeDeg: number; longitudeDeg: number };
+  pops: number;
+  firstPopFrame: number;
+}
+
 declare global {
   interface Window {
     /** The playground's test hooks (apps/playground/src/test-hooks.ts). */
@@ -22,6 +35,11 @@ declare global {
         backend?: 'auto' | 'webgpu' | 'webgl2',
       ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
       workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
+      recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
+      checkFrame(darkBelow?: number): Promise<ScenarioReport>;
+      showHud(on: boolean): void;
+      loggedLevels(): string[];
+      clearLog(): void;
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };

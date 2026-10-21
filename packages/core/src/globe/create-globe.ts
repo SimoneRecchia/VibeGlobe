@@ -1,7 +1,4 @@
 import { Camera } from '../camera/camera.js';
-import { projectToScreen } from '../camera/projection.js';
-import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
-import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import {
   applyView,
@@ -9,17 +6,18 @@ import {
   newCameraState,
   readCameraState,
   requestedCameraState,
-  wrapDegrees,
   writeCameraState,
 } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
+import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
 import { FrameWaits } from './frame-waits.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
+import { keepGroundScale, positionAt, screenOf } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -54,9 +52,6 @@ import {
   validateView,
   type ValidView,
 } from './validation.js';
-
-const DEG = 180 / Math.PI;
-const RAD = Math.PI / 180;
 
 /**
  * Creates a globe engine instance in a container (architecture §2). The returned object is usable at once; `ready`
@@ -109,6 +104,8 @@ class GlobeEngine implements Globe {
   /** True while a frame runs, so a size change found by its own check does not start a nested frame. */
   private inFrame = false;
   private resolutionScale: number;
+  private readonly diag: ReturnType<typeof createObservability>;
+  readonly diagnostics: GlobeDiagnostics;
   private readonly frameView = {
     view: this.cam.view,
     projection: this.cam.projection,
@@ -121,7 +118,9 @@ class GlobeEngine implements Globe {
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
     this.clock = new EngineClock(options.manualClockStepMs ?? 0);
-    this.surfaceFrame = new SurfaceFrame(options.maxScreenErrorPx ?? 1, options.minSurfaceLevel ?? 2);
+    this.diag = createObservability(options.logLevel ?? 'warn', options.logSink, () => this.renderer?.host.now() ?? 0);
+    this.diagnostics = this.diag.api;
+    this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.
@@ -170,6 +169,7 @@ class GlobeEngine implements Globe {
   /** Reports that nothing will be drawn: the error event, waiting captures, and `ready` if no frame was drawn. */
   private failStart(error: GlobeError): void {
     this.failure = error;
+    this.diag.logger.log('error', error.message);
     this.captureWaits.end(error);
     this.emitter.emit('error', error);
     const reject = this.rejectReady;
@@ -234,8 +234,7 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     if (!renderer) return;
     const { widthPx, heightPx } = renderer.host.containerSize();
-    // A container without a size (hidden, collapsed) has no viewport: frames stop and the camera keeps its pose, so its
-    // range survives whatever sizes the container passes through (KB-046, KB-050).
+    // No size (hidden, collapsed), no viewport: frames stop and the camera keeps its pose and range (KB-046, KB-050).
     this.collapsed = widthPx <= 0 || heightPx <= 0;
     if (this.collapsed) return;
     const pixelRatio = renderer.host.pixelRatio() * this.resolutionScale;
@@ -244,6 +243,7 @@ class GlobeEngine implements Globe {
     this.frameView.widthPx = this.cam.widthPx;
     this.frameView.heightPx = this.cam.heightPx;
     this.frameView.pixelRatio = pixelRatio;
+    this.surfaceFrame.setPixelRatio(pixelRatio);
     renderer.resize(this.cam.widthPx, this.cam.heightPx, pixelRatio);
     this.dirty = true;
     // The requested view becomes a camera once the viewport has a size: its zoom depends on it (KB-034).
@@ -285,9 +285,9 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     const surface = this.surface;
     if (this.destroyed || !renderer || !surface || !this.visible) return;
-    // Size checks and the input recorded since the last frame are handled here, inside the frame: what they change is
-    // drawn by this frame, not by another one.
+    // Size checks and input recorded since the last frame are handled inside the frame, which draws what they change.
     this.clock.advance(this.frameTime);
+    this.diag.timer.begin();
     this.inFrame = true;
     renderer.host.checkSize?.();
     // Until the requested view has a viewport there is no camera to draw or report (KB-040).
@@ -300,6 +300,7 @@ class GlobeEngine implements Globe {
     const draws = this.surfaceFrame.prepare(this.cam, surface);
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
     if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
+    this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
     this.frames++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
@@ -315,8 +316,9 @@ class GlobeEngine implements Globe {
       this.resolveReady();
       this.resolveReady = undefined;
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
+      this.diag.logger.log('info', `started on ${renderer.capabilities.backend}`);
     }
-    if (this.dirty) this.requestRender();
+    if (this.dirty || this.surfaceFrame.fading) this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
       this.idlePayload.frameNumber = this.frames;
       this.emitter.emit('idle', this.idlePayload);
@@ -346,10 +348,7 @@ class GlobeEngine implements Globe {
     }
     if (pending) {
       // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
-      if (keepRange) {
-        const groundZoom = groundZoomFromMercatorZoom(pending.zoom, pending.latitudeDeg * RAD);
-        view.zoom = mercatorZoomFromGroundZoom(groundZoom, view.latitudeDeg * RAD);
-      }
+      if (keepRange) keepGroundScale(pending, view);
       this.pendingView = view;
       return;
     }
@@ -367,8 +366,7 @@ class GlobeEngine implements Globe {
   private pick(point: ScreenPoint): GeoPosition | undefined {
     if (this.waiting) return undefined;
     this.cam.update();
-    if (!this.cam.pickEllipsoid(point.xPx, point.yPx, pick)) return undefined;
-    return { longitudeDeg: wrapDegrees(pick.longitudeRad * DEG), latitudeDeg: pick.latitudeRad * DEG, heightMeters: 0 };
+    return positionAt(this.cam, point);
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
@@ -376,9 +374,7 @@ class GlobeEngine implements Globe {
     validatePosition(position);
     if (this.waiting) return undefined;
     this.cam.update();
-    geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, ecefScratch);
-    if (!projectToScreen(this.cam, ecefScratch, screenScratch)) return undefined;
-    return { xPx: screenScratch[0] ?? 0, yPx: screenScratch[1] ?? 0 };
+    return screenOf(this.cam, position);
   }
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
@@ -475,7 +471,3 @@ class GlobeEngine implements Globe {
     if (this.destroyed) throw new GlobeError('destroyed', 'This globe was destroyed');
   }
 }
-
-const ecefScratch = new Float64Array(3);
-const screenScratch = new Float64Array(2);
-const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };

@@ -69,7 +69,7 @@ interface Session {
   log: RequestRecord[];
 }
 
-const PATTERNS: readonly string[] = ['world', 'levels', 'border'];
+const PATTERNS: readonly string[] = ['world', 'levels', 'border', 'smooth', 'tiles', 'stripes', 'patches'];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
 const TILE_PATH = /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2)$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log))?$/;

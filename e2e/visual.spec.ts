@@ -4,7 +4,10 @@ import { captureCanvas, compareImages, CROSS_BACKEND, expectMatchesBaseline, vie
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
-/** Canonical views (ADR 0012): the globe, a region, a pole, the antimeridian, and both street-level scenarios. */
+/**
+ * Canonical views (ADR 0012): the globe, a region, a pole, the antimeridian, both street-level scenarios, and minified
+ * imagery.
+ */
 const VIEWS: readonly { name: string; query: string; drawCalls?: number }[] = [
   { name: 'orbit', query: 'lon=-30&lat=20&zoom=1.5' },
   { name: 'europe', query: 'lon=12&lat=45&zoom=4' },
@@ -12,6 +15,8 @@ const VIEWS: readonly { name: string; query: string; drawCalls?: number }[] = [
   { name: 'antimeridian', query: 'lon=180&lat=-15&zoom=3' },
   { name: 'street-pattern', query: 'scenario=street-level-jitter&lon=9.19&lat=45.46&zoom=25.5', drawCalls: 2 },
   { name: 'depth-range', query: 'scenario=depth-range&lon=9.19&lat=45.46&zoom=24.9&tilt=80', drawCalls: 100 },
+  // One-texel stripes, minified toward the horizon: mipmapped, they fade to an even gray without moiré (F107).
+  { name: 'stripes-minified', query: 'imagery=stripes&session=visual&lon=12.5&lat=41.9&zoom=6&tilt=70' },
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });

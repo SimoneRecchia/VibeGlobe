@@ -28,6 +28,10 @@ import {
 const SCENARIOS: Record<string, string> = {
   'frame-loop': '?scenario=frame-loop',
   'debug-overlay': '?debug=1',
+  // F115: start-up with the pinned base of tiled imagery from the local fixture server.
+  'startup-imagery': '?scenario=frame-loop&imagery=world',
+  // F564: streaming along the Milan–Tokyo path from the local fixture server.
+  'stream-path': '?scenario=path-milan-tokyo&imagery=world',
   ...Object.fromEntries(
     (['webgl2', 'webgpu'] as const).flatMap((backend) =>
       [
@@ -46,7 +50,11 @@ const DISCARD_MS = 2000;
 const SAMPLE_MS = 3000;
 
 interface PlaygroundHooks {
-  globe: { rendererStats(): { drawCalls: number } };
+  globe: {
+    rendererStats(): { drawCalls: number };
+    imageryStats():
+      { ready: number; requested: number; failed: number; gpuBytes: number; ramBytes: number } | undefined;
+  };
   cpuFrameTimesMs(): number[];
   gpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
@@ -86,6 +94,7 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
         cpuFrameMs: hooks.cpuFrameTimesMs(),
         gpuFrameMs: hooks.gpuFrameTimesMs(),
         drawCalls: hooks.globe.rendererStats().drawCalls,
+        imagery: hooks.globe.imageryStats() ?? null,
       };
     }, SAMPLE_MS);
     const cdp = await page.context().newCDPSession(page);
@@ -98,6 +107,13 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
       startupMs,
       sample.drawCalls,
       sample.gpuFrameMs,
+      sample.imagery && {
+        tiles: sample.imagery.ready,
+        requests: sample.imagery.requested,
+        failed: sample.imagery.failed,
+        gpuMB: sample.imagery.gpuBytes / 1048576,
+        ramMB: sample.imagery.ramBytes / 1048576,
+      },
     );
   } finally {
     await page.close();
@@ -151,10 +167,14 @@ const budgetsPath =
   budgetsIndex === -1 ? join(ROOT_DIR, 'quality/budgets.json') : (process.argv[budgetsIndex + 1] as string);
 const reportOnly = process.argv.includes('--report-only');
 const budgets = JSON.parse(readFileSync(budgetsPath, 'utf8')) as Budgets;
+// `VIBEGLOBE_STARTUP_SCENARIO=startup-imagery` measures the start-up of another scenario against the same budget (F115).
+const startupScenario = process.env['VIBEGLOBE_STARTUP_SCENARIO'];
+if (budgets.startup && startupScenario) budgets.startup = { ...budgets.startup, scenario: startupScenario };
 const scenarios = new Set([
   ...Object.values(budgets.features).map((feature) => feature.scenario),
   ...Object.values(budgets.packages).flatMap((pkg) => (pkg.memoryScenario ? [pkg.memoryScenario] : [])),
   ...(budgets.startup ? [budgets.startup.scenario] : []),
+  ...(budgets.streaming ? [budgets.streaming.scenario] : []),
 ]);
 
 const server = await preview({ root: join(ROOT_DIR, 'apps/playground'), logLevel: 'silent', preview: { port: 4173 } });
@@ -211,6 +231,11 @@ const outFile = join(outDir, `${date.replace(/[:.]/g, '-')}.json`);
 writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
 
 for (const [scenario, summary] of Object.entries(summaries)) {
+  const streaming = summary.runs.at(-1)?.streaming;
+  if (streaming)
+    console.log(
+      `${scenario.padEnd(16)} tiles ${streaming.tiles} · requests ${streaming.requests} · failed ${streaming.failed} · GPU ${streaming.gpuMB.toFixed(1)} MB · RAM ${streaming.ramMB.toFixed(1)} MB`,
+    );
   console.log(
     `${scenario.padEnd(16)} frame p95 (median of ${RUNS}) ${summary.frameTimeP95Ms.toFixed(2)} ms · cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms · heap ${summary.jsHeapMB.toFixed(1)} MB · first frame ${summary.startupMs === null ? 'n/a' : `${summary.startupMs.toFixed(0)} ms`} · draws ${summary.drawCalls ?? 'n/a'} · gpu p95 ${summary.gpuFrameP95Ms === null ? 'n/a' : `${summary.gpuFrameP95Ms.toFixed(3)} ms`}`,
   );

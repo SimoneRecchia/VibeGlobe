@@ -11,6 +11,12 @@ export interface SurfaceDraw {
   readonly transform: Vector4;
   /** 1 when the texture's rows are linear in latitude, 0 when they follow the tile's own rows. */
   geographic: number;
+  /** The imagery the tile cross-fades from (F105): its texture, transform and choice of v. */
+  fromTexture: Texture | undefined;
+  readonly fromTransform: Vector4;
+  fromGeographic: number;
+  /** Fade progress: 0 shows only the `from` imagery, 1 only the tile's own. */
+  fade: number;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -24,11 +30,21 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
  * itself never runs; the bindings read the node's value right after `onBeforeRender`.
  */
 export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
-  const draw: SurfaceDraw = { texture: undefined, transform: new Vector4(1, 1, 0, 0), geographic: 1 };
+  const draw: SurfaceDraw = {
+    texture: undefined,
+    transform: new Vector4(1, 1, 0, 0),
+    geographic: 1,
+    fromTexture: undefined,
+    fromTransform: new Vector4(1, 1, 0, 0),
+    fromGeographic: 1,
+    fade: 1,
+  };
   object.userData['surfaceDraw'] = draw;
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
     const node = material.userData['surfaceTexture'] as { value: Texture } | undefined;
+    const fromNode = material.userData['fromTexture'] as { value: Texture } | undefined;
     if (node && draw.texture) node.value = draw.texture;
+    if (fromNode && draw.fromTexture) fromNode.value = draw.fromTexture;
   };
   return draw;
 }
@@ -43,27 +59,52 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   const tileUv = attribute('tileUv', 'vec3');
   const transform = uniform(new Vector4(1, 1, 0, 0)).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.transform);
   const geographic = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.geographic);
+  const fromTransform = uniform(new Vector4(1, 1, 0, 0)).onObjectUpdate(
+    ({ object }) => surfaceDrawOf(object)?.fromTransform,
+  );
+  const fromGeographic = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.fromGeographic);
+  const fade = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.fade);
   const v = mix(tileUv.y, tileUv.z, geographic);
   const uv = vec2(tileUv.x.mul(transform.x).add(transform.z), v.mul(transform.y).add(transform.w));
+  const fromV = mix(tileUv.y, tileUv.z, fromGeographic);
+  const fromUv = vec2(
+    tileUv.x.mul(fromTransform.x).add(fromTransform.z),
+    fromV.mul(fromTransform.y).add(fromTransform.w),
+  );
   const material = new MeshBasicNodeMaterial();
   const map = texture(placeholder, uv);
+  // A texture object of its own: bindings are shared between nodes of the same texture.
+  const fromMap = texture(placeholder.clone(), fromUv);
   material.userData['surfaceTexture'] = map;
-  material.colorNode = map;
+  material.userData['fromTexture'] = fromMap;
+  // A cross-fade mixes the two imageries in one draw, never two overlapping draws (ADR 0006), and in a perceptual
+  // space (gamma 2, close to sRGB): a linear-light mix would change dark pixels several times faster than bright ones.
+  material.colorNode = mix(fromMap.sqrt(), map.sqrt(), fade).pow2();
   makeEyeRelative(material, depthPath);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;
 }
 
-/** Points a mesh's draw state at draw `i` of a frame's list, sampling `texture`. */
-export function applyDraw(draw: SurfaceDraw, draws: TileDrawList, i: number, texture: Texture): void {
-  draw.texture = texture;
+/**
+ * Points a mesh's draw state at draw `i` of a frame's list: its texture and the one it fades from, looked up in
+ * `textures` by handle, with the world base image for the base handle (or a texture no longer held).
+ */
+export function applyDraw(
+  draw: SurfaceDraw,
+  draws: TileDrawList,
+  i: number,
+  textures: { get(handle: number): Texture | undefined },
+  base: Texture,
+): void {
+  draw.texture = textures.get(draws.textures[i] ?? -1) ?? base;
   draw.geographic = draws.geographic[i] ?? 1;
+  draw.fromTexture = textures.get(draws.fromTextures[i] ?? -1) ?? base;
+  draw.fromGeographic = draws.fromGeographic[i] ?? 1;
+  draw.fade = draws.fades[i] ?? 1;
   const at = i * 4;
-  draw.transform.set(
-    draws.uvTransforms[at] ?? 1,
-    draws.uvTransforms[at + 1] ?? 1,
-    draws.uvTransforms[at + 2] ?? 0,
-    draws.uvTransforms[at + 3] ?? 0,
-  );
+  const u = draws.uvTransforms;
+  draw.transform.set(u[at] ?? 1, u[at + 1] ?? 1, u[at + 2] ?? 0, u[at + 3] ?? 0);
+  const f = draws.fromUvTransforms;
+  draw.fromTransform.set(f[at] ?? 1, f[at + 1] ?? 1, f[at + 2] ?? 0, f[at + 3] ?? 0);
 }

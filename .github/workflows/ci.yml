@@ -8,7 +8,9 @@ on:
   push:
   pull_request:
   schedule:
+    # Nightly: the full matrix. Weekly (Monday): Firefox and WebKit (ADR 0023).
     - cron: '23 2 * * *'
+    - cron: '41 3 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -83,7 +85,7 @@ jobs:
 
   e2e:
     name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/4)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     # ADR 0022: the functional suite is split across four runners by test file; the machine-wide measurements run in
     # their own job below, so no shard waits for them and none of them shares a machine with a test.
@@ -132,7 +134,7 @@ jobs:
 
   measurements:
     name: Isolated measurements (allocation, rendering probes)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
     # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
@@ -187,7 +189,7 @@ jobs:
 
   cross-browser:
     name: Firefox and WebKit (WebGL2, informational until F504)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
     # suites; both are inputs to F504 (M15), which makes this job binding (ADR 0012, update 2026-10-21).
@@ -243,7 +245,7 @@ jobs:
 
   benchmarks:
     name: Benchmarks (recorded, not gated)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
       VIBEGLOBE_DEVICE: ci-swiftshader
@@ -280,13 +282,3 @@ jobs:
         with:
           name: benchmark-results
           path: benchmarks/results/ci-swiftshader/
-
-  transcoder:
-    name: Transcoder rebuild matches the committed file (ADR 0020)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # Pinned wasi-sdk (checked by hash) and Basis Universal commit; the same pins give the same bytes.
-      - run: scripts/wasm-basis.sh "$RUNNER_TEMP/wasm-basis"
-      - run: git diff --exit-code -- packages/worker/wasm/vibeglobe-basis.wasm

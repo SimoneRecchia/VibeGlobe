@@ -1,5 +1,5 @@
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, WGS84, type Globe, type GlobeOptions, type ViewInit } from '@vibeglobe/core';
+import { createGlobe, WGS84, type Globe, type GlobeOptions, type LogEntry, type ViewInit } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
@@ -9,6 +9,8 @@ import { runScenario } from './scenarios.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
+/** Engine log messages collected with `?logSink=1` (F120). */
+const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -109,6 +111,12 @@ function startGlobe(
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
     ...fixtureImagery(),
+    // `?clockStepMs=` steps engine time by a fixed amount per drawn frame and `?fadeMs=` sets the imagery cross-fade
+    // (scenario tests, F105; `fadeMs=0` is their injected pop).
+    ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
+    ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
+    ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });
@@ -170,8 +178,12 @@ function startSecondGlobe(host: HTMLElement): Globe {
 
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
   // Loaded on demand so the overlay code is not part of the default page.
-  const { createDebugOverlay } = await import('@vibeglobe/ui');
+  const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
+    import('@vibeglobe/ui'),
+    import('./tile-view.js'),
+  ]);
   const overlay = createDebugOverlay(host);
+  addTileViewToggle(globe, host, params.has('imagery') ? `fixture-${params.get('imagery')}` : undefined);
   let info: (readonly [string, string])[] = [];
   let pipelineCompiles = -1;
   let surfaceInfo = '';
@@ -213,7 +225,8 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const imagery = globe.imageryStats();
     const mb = (bytes: number): string => (bytes / 1048576).toFixed(1);
     const cache = imagery
-      ? `RAM hits ${imagery.ramHits} · GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
+      ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
+        `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
         `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
       : '';
     if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
@@ -269,5 +282,9 @@ if (params.get('experiment') === 'gpu-probes') {
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
   else if (scenario === 'drag') loop = startDragLoop(globe);
-  exposeTestHooks(globes, loop, firstFrame, mountGlobe);
+  // `?hud=1` shows the performance HUD (F119).
+  const { createHud } = await import('./hud.js');
+  const hud = createHud(globe, app);
+  if (params.has('hud')) hud(true);
+  exposeTestHooks(globes, loop, firstFrame, mountGlobe, { showHud: hud, logEntries });
 }

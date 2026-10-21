@@ -4,7 +4,7 @@
 
 - **M2 Globe core complete** (F078 passing, 2026-10-21: the full CI suite green on 9679fe0, reviews closed by ADR 0021, no open bug). Passing in M2: F042–F064, F066–F074, F076–F078; pending owner steps: F065, F075.
 - Also passing: F546 (initial-JavaScript budgets, start-up median 456 ms), F547 (lazy loading, `apps/lazy-host`). Pending owner steps: F065 (OffscreenCanvas measured and not adopted, ADR 0019; other browsers on real GPUs) and F075 (hardware procedure, `docs/guides/hardware-testing.md`).
-- **M3 Imagery streaming in progress** (docs/plan/m3-imagery-streaming.md). Passing: F079–F104, F112–F114 (increments 1–6: quadtree, fixture servers, sources, scheduler, worker pool, memory tiers, streaming loader, network robustness, draw budget, KTX2 with VibeGlobe's own wasi-sdk build of the Basis transcoder, ADR 0020 update; decoder fuzzing in Node and in the real worker, which found KB-068). Next: increments 7–9 (F105–F111, F115–F125) and the M3 review. F545 waits for the next merge into `main` and a nightly run.
+- **M3 Imagery streaming in progress** (docs/plan/m3-imagery-streaming.md). Passing: F079–F114, F116–F121, F562, F563 (increments 1–8: quadtree, fixture servers, sources, scheduler, worker pool, memory tiers, streaming loader, network robustness, draw budget, KTX2, decoder fuzzing, cross-fades, seams, mipmaps, color, DPR and resolution scale, poles and antimeridian, tile view, overlay, phase marks, HUD, logging, traces, scenario suite). F115 pending (reference desktop). Next: F564 benchmarks, F125 acceptance, the M3 review, full CI and the merge.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
 ## Session log (newest first)

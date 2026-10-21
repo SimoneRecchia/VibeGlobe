@@ -103,6 +103,16 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage } from './imagery/imagery-source.js';
 export type { ImagerySource } from './imagery/imagery-source.js';
+export { FRAME_PHASES } from './diagnostics/observability.js';
+export type {
+  FramePhase,
+  GlobeDiagnostics,
+  LogEntry,
+  LogLevel,
+  LogSink,
+  PhaseTimesMs,
+  TraceEvent,
+} from './diagnostics/observability.js';
 export {
   chooseKtx2Target,
   isKtx2,

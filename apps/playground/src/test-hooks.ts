@@ -1,5 +1,6 @@
-import type { Globe, GlobeEvents, WorkerEndpoint, WorkerMessage } from '@vibeglobe/core';
+import type { Globe, GlobeEvents, LogEntry, WorkerEndpoint, WorkerMessage } from '@vibeglobe/core';
 import { createWorkers } from '@vibeglobe/worker';
+import type { ScenarioReport } from './scenario-harness.js';
 import type { FrameLoop } from './frame-loop.js';
 
 /** An engine event as tests read it back. */
@@ -38,6 +39,25 @@ interface PlaygroundTestHooks {
    * Resolves with the task's error code, or 'ok' (an output bitmap is closed at once).
    */
   workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
+  /**
+   * Plays a frame-stepped scenario (`zoom-orbit-to-street`, `pole-orbit`, `antimeridian-pan`) on the first globe,
+   * drawing and checking every frame in the page (`src/scenario-harness.ts`).
+   */
+  recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
+  /** Draws a frame now and counts its holes and, with `darkBelow`, its dark pixels inside the globe (F106). */
+  checkFrame(darkBelow?: number): Promise<ScenarioReport>;
+  /** Shows or hides the performance HUD (F119). */
+  showHud(on: boolean): void;
+  /** The levels of the engine messages collected with `?logSink=1`, oldest first (F120). */
+  loggedLevels(): string[];
+  /** Forgets the collected log messages. */
+  clearLog(): void;
+}
+
+/** Playground parts the hooks reach. */
+interface PlaygroundParts {
+  readonly showHud: (on: boolean) => void;
+  readonly logEntries: LogEntry[];
 }
 
 declare global {
@@ -79,12 +99,19 @@ function taskRunner(): PlaygroundTestHooks['workerTask'] {
   };
 }
 
+/** The globe element's size in CSS pixels. */
+function globeSize(): { widthPx: number; heightPx: number } {
+  const element = document.querySelector('#globe') ?? document.body;
+  return { widthPx: element.clientWidth, heightPx: element.clientHeight };
+}
+
 /** Exposes the engine and a frame loop's samples to tests and benchmarks. */
 export function exposeTestHooks(
   globes: readonly Globe[],
   loop: FrameLoop | undefined,
   firstFrame: Promise<number | undefined>,
   mount: PlaygroundTestHooks['mount'],
+  parts: PlaygroundParts,
 ): void {
   const globe = globes[0];
   if (!globe) return;
@@ -100,6 +127,19 @@ export function exposeTestHooks(
     firstFrameMs: undefined,
     mount,
     workerTask: taskRunner(),
+    showHud: parts.showHud,
+    loggedLevels: () => parts.logEntries.map((entry) => entry.level),
+    clearLog: () => void (parts.logEntries.length = 0),
+    async recordScenario(name, darkBelow) {
+      const { recordScenario } = await import('./scenario-harness.js');
+      return recordScenario(globe, globeSize(), name, darkBelow);
+    },
+    async checkFrame(darkBelow) {
+      const { checkFrame, emptyReport } = await import('./scenario-harness.js');
+      const report = emptyReport();
+      checkFrame(globe, await globe.captureFrame(), globeSize(), report, 0, darkBelow);
+      return report;
+    },
   };
   void firstFrame.then((timeMs) => (hooks.firstFrameMs = timeMs));
   window.vibeglobePlayground = hooks;

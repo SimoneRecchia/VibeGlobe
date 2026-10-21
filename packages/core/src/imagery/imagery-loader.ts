@@ -11,6 +11,7 @@ import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } f
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
 import type { TileErrorReason } from '../globe/types.js';
+import type { Observability } from '../diagnostics/observability.js';
 import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import type { ImagerySource } from './imagery-source.js';
 import {
@@ -61,6 +62,8 @@ export interface ImageryLoaderOptions {
   readonly pinnedLevel: number;
   /** Compressed texture families the device decodes, for KTX2 sources (`RendererCapabilities`, ADR 0020). */
   readonly compressedFormats: readonly string[];
+  /** Traces and debug messages of tiles and requests (F120, F121); none when absent. */
+  readonly observability?: Observability;
   uploadTexture(handle: number, tile: DecodedTile): void;
   releaseTexture(handle: number): void;
   /** Asks for a frame: something arrived that changes the picture or the queue. */
@@ -207,8 +210,18 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Ends a frame: drops what is no longer wanted, starts requests and uploads decoded tiles within the budget. */
   endFrame(): void {
+    this.scheduleRequests();
+    this.drainUploads();
+  }
+
+  /** Drops what the frame no longer wants and starts the best queued requests (the scheduling phase, F118). */
+  scheduleRequests(): void {
     this.dropUnwanted();
     while (this.heap.size > 0 && this.dispatchOne() !== 0);
+  }
+
+  /** Uploads decoded tiles within the per-frame budget (the upload phase, F118). */
+  drainUploads(): void {
     // A tile uploaded now is drawn from the next frame on; one still waiting needs another frame too.
     if (this.uploads.drain() > 0 || this.uploads.size > 0) this.options.requestFrame();
   }
@@ -219,6 +232,7 @@ export class ImageryLoader implements NetworkPoolClient {
     if (!record) return;
     this.options.releaseTexture(this.options.handleBase + slot);
     record.state = UNLOADED;
+    this.observe(record, 'tile', 'evicted');
   }
 
   /** NetworkPoolClient: the best queued priority (one queue for every host). */
@@ -277,6 +291,7 @@ export class ImageryLoader implements NetworkPoolClient {
   }
 
   private cancel(record: TileRecord): void {
+    if (record.state === LOADING) this.observe(record, 'request', 'cancel');
     if (record.state === LOADING && record.consumer !== NO_SLOT) this.options.network.release(record.consumer);
     if (record.state === DECODING && record.task >= 0) this.options.workers.cancel(record.task);
     if (record.state === DECODED) {
@@ -315,6 +330,7 @@ export class ImageryLoader implements NetworkPoolClient {
     if (consumer === NO_SLOT) return 0;
     this.heap.pop();
     this.requested++;
+    this.observe(record, 'request', 'start');
     // A synchronous transport may already have answered.
     if (record.state === QUEUED) {
       record.state = LOADING;
@@ -338,6 +354,7 @@ export class ImageryLoader implements NetworkPoolClient {
   private received(record: TileRecord, result: TransportResult): void {
     if (this.destroyed) return;
     record.consumer = NO_SLOT;
+    this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
       // The RAM tier keeps a copy: the bytes themselves move to the worker.
       this.options.memory.ram.put(this.options.handleBase + record.slot, {
@@ -368,6 +385,7 @@ export class ImageryLoader implements NetworkPoolClient {
   }
 
   private reportError(record: TileRecord, reason: TileErrorReason): void {
+    this.observe(record, 'tile', 'failed');
     const { level, x, y } = record.coord;
     this.options.tileError(this.options.source, level, x, y, reason);
   }
@@ -443,6 +461,7 @@ export class ImageryLoader implements NetworkPoolClient {
     residency.touch(handle, this.options.memory.frame());
     if (record.pinned) residency.setPinned(handle, true);
     record.state = READY;
+    this.observe(record, 'tile', 'ready');
     this.settlePinned(record);
   }
 
@@ -450,6 +469,18 @@ export class ImageryLoader implements NetworkPoolClient {
   private settlePinned(record: TileRecord): void {
     if (!record.pinned || (record.state !== READY && record.state !== NO_DATA && record.state !== DEAD)) return;
     this.pinnedSettled++;
+  }
+
+  /** Traces an event and logs requests at the debug level; builds nothing while both are off. */
+  private observe(record: TileRecord, kind: 'tile' | 'request', event: string): void {
+    const observability = this.options.observability;
+    if (!observability) return;
+    const tracing = observability.tracer.enabled;
+    const logging = kind === 'request' && event === 'start' && observability.logger.enabled('debug');
+    if (!tracing && !logging) return;
+    const subject = `${record.coord.level}/${record.coord.x}/${record.coord.y}`;
+    if (tracing) observability.tracer.record(kind, event, subject);
+    if (logging) observability.logger.log('debug', `${this.options.source.id}: request ${subject}`);
   }
 
   private leaveActive(record: TileRecord): void {

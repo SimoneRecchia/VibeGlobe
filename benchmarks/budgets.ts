@@ -9,6 +9,17 @@ export interface Budgets {
    * scenario's runs, and the p90 over the cold runs (fresh context, cache disabled; ADR 0012).
    */
   startup?: { scenario: string; firstFrameMedianMs: number; firstFrameP90Ms?: number };
+  /** Streaming (F564): the deterministic counter gated; timings, tiles, requests and memory are recorded. */
+  streaming?: { scenario: string; maxFailedTiles: number };
+}
+
+/** Imagery counters of a streaming run, read at its end (F564). */
+export interface StreamingCounters {
+  tiles: number;
+  requests: number;
+  failed: number;
+  gpuMB: number;
+  ramMB: number;
 }
 
 export interface Distribution {
@@ -31,6 +42,8 @@ export interface RunResult {
   steadyStateAllocations: number | null;
   /** Draw calls of the last frame sampled, which the `drag-*` scenarios are named after; null when not read. */
   drawCalls: number | null;
+  /** Imagery counters at the end of the run; null without tiled imagery. */
+  streaming?: StreamingCounters | null;
 }
 
 // rAF intervals carry vsync and timestamp-coarsening jitter, so a frame counts as late only beyond it (ADR 0014): an
@@ -78,6 +91,7 @@ export function summarizeRun(
   startupMs: number | null = null,
   drawCalls: number | null = null,
   gpuFrameMs: readonly number[] = [],
+  streaming: StreamingCounters | null = null,
 ): RunResult {
   return {
     frames: frameTimesMs.length,
@@ -93,6 +107,7 @@ export function summarizeRun(
     startupMs,
     steadyStateAllocations: null,
     drawCalls,
+    streaming,
   };
 }
 
@@ -161,6 +176,15 @@ export function findBudgetViolations(
         violations.push(
           `startup: p90 time to the first complete frame over ${coldStartsMs.length} cold runs ${p90.toFixed(0)} ms > ${firstFrameP90Ms} ms`,
         );
+    }
+  }
+  if (budgets.streaming) {
+    const { scenario, maxFailedTiles } = budgets.streaming;
+    const runs = summaries[scenario]?.runs;
+    if (!runs) violations.push(`streaming: scenario "${scenario}" did not run`);
+    else {
+      const failed = Math.max(...runs.map((run) => run.streaming?.failed ?? Infinity));
+      if (failed > maxFailedTiles) violations.push(`streaming: ${failed} failed tiles > ${maxFailedTiles}`);
     }
   }
   return violations;

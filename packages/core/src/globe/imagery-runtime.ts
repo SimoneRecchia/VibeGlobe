@@ -1,9 +1,11 @@
 import { rgba8Bytes } from '../cache/byte-size.js';
+import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, type ImageryLayer } from '../imagery/imagery-draws.js';
-import type { DrawList } from '../imagery/draw-list.js';
+import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
+import { ImageryFades } from '../imagery/fades.js';
 import { ImageryLoader, type ImageryLoaderStats, type TileMemory } from '../imagery/imagery-loader.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
@@ -91,6 +93,11 @@ export class ImageryRuntime {
   private readonly residency: Residency;
   private readonly ram: RamTier;
   private frame = 0;
+  private readonly fades = new ImageryFades();
+  /** Keeps a texture still faded from resident this frame. */
+  private readonly keepTexture = (handle: number): void => {
+    if (handle !== BASE_TEXTURE) this.loaderOf(handle)?.markDrawn(handle);
+  };
 
   constructor(
     sources: readonly ImagerySource[],
@@ -98,6 +105,7 @@ export class ImageryRuntime {
     memory: MemoryOptions,
     renderer: RendererBackend,
     callbacks: ImageryCallbacks,
+    observability?: Observability,
   ) {
     const host = renderer.host;
     this.network = acquireNetworkPool(host);
@@ -135,6 +143,7 @@ export class ImageryRuntime {
         handleBase: index * HANDLES_PER_LAYER,
         pinnedLevel: pinned[index] ?? -1,
         compressedFormats: renderer.capabilities.compressedTextureFormats,
+        ...(observability ? { observability } : {}),
         uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
         releaseTexture: (handle) => renderer.releaseTexture(handle),
         requestFrame: () => callbacks.requestFrame(),
@@ -160,13 +169,33 @@ export class ImageryRuntime {
     return true;
   }
 
-  /** Wants the frame's imagery and writes the draws of the tiles it covers (the base image stays elsewhere). */
-  draw(list: DrawList, tiles: readonly QuadtreeTile[], count: number, camera: Camera): void {
+  /** True while a tile of the last frame was cross-fading: the engine keeps drawing (F105). */
+  get fading(): boolean {
+    return this.fades.fading;
+  }
+
+  /**
+   * Wants the frame's imagery, writes the draws of the tiles it covers (the base image stays elsewhere) and their
+   * cross-fades of `fadeMs` at engine time `nowMs[0]`.
+   */
+  draw(
+    list: DrawList,
+    tiles: readonly QuadtreeTile[],
+    count: number,
+    camera: Camera,
+    nowMs: Float64Array,
+    fadeMs: number,
+    timer?: PhaseTimer,
+  ): void {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
     drawImagery(list, tiles, count, this.layers, camera);
-    for (const layer of this.layers) layer.loader.endFrame();
+    this.fades.apply(list, nowMs, fadeMs, this.keepTexture);
+    for (const layer of this.layers) layer.loader.scheduleRequests();
+    timer?.end(PHASE_SCHEDULING);
+    for (const layer of this.layers) layer.loader.drainUploads();
+    timer?.end(PHASE_UPLOAD);
     this.residency.trim(this.frame, TRIM_TILES, TRIM_MS);
     this.lease.pool.update();
   }

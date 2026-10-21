@@ -345,7 +345,7 @@ export class ThreeBackend implements RendererBackend {
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
-      applyDraw(entry.draw, draws, i, this.tileTextures.get(draws.textures[i] ?? -1) ?? this.imageryTexture);
+      applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
       entry.mesh.visible = true;
       this.shown[this.shownCount++] = entry.mesh;
       placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);

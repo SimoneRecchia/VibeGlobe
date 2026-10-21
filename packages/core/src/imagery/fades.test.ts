@@ -35,7 +35,8 @@ describe('ImageryFades (F105)', () => {
     expect([list.textures[0], list.imageryLevels[0], list.fromTextures[0]]).toEqual([11, 4, 10]);
     expect(list.fades[0]).toBeCloseTo(0.5);
     expect(fades.fading).toBe(true);
-    expect(kept).toEqual([10, 12, 10]);
+    // The imagery the fade still shows (11) stays resident too, not only the newer one (M3 review).
+    expect(kept).toEqual([10, 12, 11, 10]);
     now[0] = 350;
     fades.apply(frame(list, 12, 5), now, 250, keep);
     expect([list.fades[0], list.fromTextures[0], list.textures[0]]).toEqual([0, 11, 12]);

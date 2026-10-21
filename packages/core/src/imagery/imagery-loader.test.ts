@@ -6,7 +6,7 @@ import { WorkerTaskError, type WorkerPool, type WorkerTaskDone } from '../schedu
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
-import { ARRIVING, ImageryLoader } from './imagery-loader.js';
+import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
 import type { ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
@@ -30,6 +30,37 @@ class ManualTransport implements TileTransport {
     this.open.delete(url);
     done?.(result);
   }
+}
+
+/**
+ * A worker pool the test drives: tasks wait until `finish` answers them, and `cancel` reports the cancel at once, as
+ * the real pool does.
+ */
+function drivenWorkers() {
+  const pending = new Map<number, WorkerTaskDone>();
+  let id = 0;
+  const pool: WorkerPool = {
+    url: 'driven',
+    run: (_request, done: WorkerTaskDone) => {
+      pending.set(++id, done);
+      return id;
+    },
+    setPriority: () => false,
+    cancel: (task) => {
+      const done = pending.get(task);
+      pending.delete(task);
+      done?.({ ok: false, error: new WorkerTaskError('cancelled', 'cancelled') });
+      return done !== undefined;
+    },
+    update: () => undefined,
+    readStats: (out) => out,
+  };
+  const finish = (task: number, outcome: Parameters<WorkerTaskDone>[0]): void => {
+    const done = pending.get(task);
+    pending.delete(task);
+    done?.(outcome);
+  };
+  return { pool, pending, finish };
 }
 
 /** A worker pool that decodes at once into a fake tile; `tasks` records each task name and input. */
@@ -62,7 +93,14 @@ function fakeWorkers(tasks: { task: string; input: unknown }[] = []): WorkerPool
 
 function setUp(
   maxInFlight = 32,
-  memory: { gpuBytes?: number; ramBytes?: number; pinnedLevel?: number; decoder?: 'image' | 'ktx2' } = {},
+  memory: {
+    gpuBytes?: number;
+    ramBytes?: number;
+    pinnedLevel?: number;
+    decoder?: 'image' | 'ktx2';
+    workers?: WorkerPool;
+    source?: Partial<ImagerySource>;
+  } = {},
 ) {
   const tasks: { task: string; input: unknown }[] = [];
   const timers = new FakeTimers();
@@ -82,6 +120,7 @@ function setUp(
       out.hostIndex = 0;
       return out;
     },
+    ...memory.source,
   };
   const network = new NetworkPool({
     now: () => timers.nowMs,
@@ -105,7 +144,7 @@ function setUp(
   loader = new ImageryLoader({
     source,
     network,
-    workers: fakeWorkers(tasks),
+    workers: memory.workers ?? fakeWorkers(tasks),
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
@@ -431,5 +470,72 @@ describe('ImageryLoader', () => {
       for (const u of [...transport.open.keys()]) transport.answer(u, ok);
     }
     expect(loader.pinnedComplete).toBe(true);
+  });
+
+  it('cancelling a decoding tile keeps every other active tile tracked, so it is cancelled when unwanted (M3 review)', () => {
+    const workers = drivenWorkers();
+    const { transport, ok, runFrame, timers } = setUp(32, { workers: workers.pool });
+    runFrame([
+      [5, 1, 1],
+      [5, 2, 2],
+    ]);
+    // 5/1/1 is decoding; 5/2/2 is still loading.
+    transport.answer(url(5, 1, 1), ok);
+    for (let frame = 0; frame < 3; frame++) runFrame([[5, 2, 2]]);
+    for (let frame = 0; frame < 3; frame++) runFrame([]);
+    timers.advance(5000);
+    expect(transport.aborted).toContain(url(5, 2, 2));
+  });
+
+  it('a tile of a full host steps aside for a tile of a free host (M3 review)', () => {
+    const { transport, runFrame } = setUp(32, {
+      source: {
+        maxRequestsPerHost: 1,
+        request: (coord, out) => {
+          out.url = `https://${coord.x === 9 ? 'b' : 'a'}.tiles.test/${coord.level}/${coord.x}/${coord.y}.png`;
+          out.hostIndex = 0;
+          return out;
+        },
+      },
+    });
+    runFrame([
+      [6, 1, 1],
+      [6, 2, 1],
+      [6, 9, 1],
+    ]);
+    expect(transport.started.map((u) => new URL(u).host)).toEqual(['a.tiles.test', 'b.tiles.test']);
+  });
+
+  it('a tile the GPU budget refuses is not counted as an upload and waits before it is decoded again (M3 review)', () => {
+    const { transport, loader, ok, runFrame, tasks, timers } = setUp(32, { gpuBytes: 1000 });
+    runFrame([[4, 1, 1]]);
+    transport.answer(url(4, 1, 1), ok);
+    for (let frame = 0; frame < 5; frame++) runFrame([[4, 1, 1]]);
+    const stats = { queued: 0, loading: 0, decoding: 0, ready: 0, failed: 0, noData: 0, requested: 0, uploads: 0 };
+    loader.addStats(stats as Parameters<ImageryLoader['addStats']>[0]);
+    expect(stats.uploads).toBe(0);
+    expect(tasks).toHaveLength(1);
+    expect(loader.busy).toBe(false);
+    timers.advance(1000);
+    runFrame([[4, 1, 1]]);
+    expect(tasks).toHaveLength(2);
+  });
+
+  it('a decode the worker cannot finish is retried with backoff, then reported (M3 review)', () => {
+    const workers = drivenWorkers();
+    const { transport, ok, runFrame, errors, timers } = setUp(32, { workers: workers.pool });
+    runFrame([[4, 1, 1]]);
+    transport.answer(url(4, 1, 1), ok);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const [task] = [...workers.pending.keys()];
+      workers.finish(task ?? -1, { ok: false, error: new WorkerTaskError('crash', 'worker crashed') });
+      runFrame([[4, 1, 1]]);
+      expect(workers.pending.size).toBe(0);
+      timers.advance(10_000);
+      runFrame([[4, 1, 1]]);
+    }
+    expect(errors).toEqual(['failed 4/1/1']);
+    // From the RAM copy: the tile was downloaded once.
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
   });
 });

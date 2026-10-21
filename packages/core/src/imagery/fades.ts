@@ -51,6 +51,7 @@ export class ImageryFades {
         if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
           // A fade is under way: it finishes first, so what the tile shows never jumps; the new imagery fades in next.
           keep(texture);
+          keep(this.toTexture[slot] ?? 0);
           this.restore(slot, list, i);
         } else {
           // Fade from what the tile showed to its new imagery.

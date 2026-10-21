@@ -73,8 +73,8 @@ test('requests in flight stay within the limit of each host, and two hosts load 
   for (const request of log) hosts.set(request.host ?? '', [...(hosts.get(request.host ?? '') ?? []), request]);
   expect([...hosts.keys()].sort()).toEqual(['127.0.0.1:5177', 'localhost:5177']);
   for (const requests of hosts.values()) expect(maxInFlight(requests)).toBeLessThanOrEqual(2);
-  // Both hosts busy at the same time: more requests in flight together than either host allows.
-  expect(maxInFlight(log)).toBeGreaterThan(2);
+  // Both hosts busy at the same time, each at its limit: four requests in flight together (KB-072).
+  expect(maxInFlight(log)).toBe(4);
 });
 
 test('requests for tiles passed on the way from Milan to Tokyo are cancelled, and the destination loads at once (F090)', async ({

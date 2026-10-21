@@ -6,7 +6,7 @@ import type { Camera } from '../camera/camera.js';
 import { drawImagery, type ImageryLayer } from '../imagery/imagery-draws.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
-import { ImageryLoader, type ImageryLoaderStats, type TileMemory } from '../imagery/imagery-loader.js';
+import { ImageryLoader, type ImageryLoaderStats, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';

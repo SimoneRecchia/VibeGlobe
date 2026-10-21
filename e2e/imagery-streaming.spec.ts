@@ -171,6 +171,11 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       expect(distance(targets[0] ?? { x: Infinity, y: Infinity })).toBeLessThanOrEqual(
         Math.min(...targets.slice(1).map(distance)) + 1,
       );
+      // Visible before prefetch: the next level under the center (ADR 0007 class 4) starts after every visible tile.
+      const prefetch = after.filter((request) => request.level === target + 1);
+      expect(prefetch.length).toBeGreaterThan(0);
+      const lastVisible = Math.max(...after.filter((request) => request.level <= target).map((r) => r.startMs));
+      for (const request of prefetch) expect(request.startMs).toBeGreaterThanOrEqual(lastVisible);
     });
   });
 }

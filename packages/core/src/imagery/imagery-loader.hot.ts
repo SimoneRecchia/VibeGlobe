@@ -1,6 +1,11 @@
+/**
+ * @hotpath Every visible tile is wanted and every queued request dispatched through here each frame (`want`,
+ * `scheduleRequests`, `drainUploads`); records live in typed arrays and nothing is allocated per frame (ADR 0018).
+ * @benchmark packages/core/src/globe/frame-allocation.test.ts
+ */
 import type { RamTier } from '../cache/ram-tier.js';
 import type { Residency } from '../cache/residency.hot.js';
-import { UploadQueue } from '../cache/upload-queue.hot.js';
+import { UPLOAD_REFUSED, UploadQueue } from '../cache/upload-queue.hot.js';
 import {
   createFailureDecision,
   decideAfterResult,
@@ -36,6 +41,13 @@ export const ARRIVING = -2;
 
 /** Frames a request in flight survives without being wanted before its consumer leaves (ADR 0007). */
 const UNWANTED_FRAMES = 2;
+/** Decodes that fail for a reason other than the bytes (worker crash, timeout) are retried this often, backing off. */
+const MAX_DECODE_RETRIES = 3;
+const DECODE_RETRY_MS = 500;
+/** A tile the GPU budget refused waits this long before it is tried again (no re-decoding every frame). */
+const REFUSED_RETRY_MS = 1000;
+/** Queued tiles of full hosts a dispatch steps over before it gives up for this pass. */
+const MAX_HOST_SKIPS = 32;
 
 /** A decoded tile waiting for its upload, tagged with its record. */
 interface PendingUpload extends DecodedTile {
@@ -105,6 +117,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly heap = new PriorityHeap(256, 1024);
   /** Records loading or decoding, checked each frame for being still wanted. */
   private readonly active: TileRecord[] = [];
+  /** Slots a dispatch stepped over because their host was full, put back when it ends. */
+  private readonly skippedSlots = new Int32Array(MAX_HOST_SKIPS);
   private readonly uploads: UploadQueue<PendingUpload>;
   private readonly decision = createFailureDecision();
   private readonly hosts = new Map<string, number>();
@@ -173,7 +187,9 @@ export class ImageryLoader implements NetworkPoolClient {
     }
     const priorities = this.table.priorities;
     priorities[record.slot] = priority;
-    if (state === UNLOADED) {
+    // A tile backing off after a failure is wanted again once eligible: from its RAM copy when it has one.
+    const retry = state === FAILED && this.options.now() >= (this.table.eligibleAt[record.slot] ?? 0);
+    if (state === UNLOADED || retry) {
       const cached = this.options.memory.ram.get(handle);
       if (cached) {
         this.active.push(record);
@@ -187,9 +203,6 @@ export class ImageryLoader implements NetworkPoolClient {
       return ARRIVING;
     } else if (state === QUEUED) {
       this.heap.updateAt(record.slot, priorities, record.slot);
-    } else if (state === FAILED && this.options.now() >= (this.table.eligibleAt[record.slot] ?? 0)) {
-      record.state = QUEUED;
-      this.heap.pushAt(record.slot, priorities, record.slot);
     }
     return -1;
   }
@@ -286,7 +299,8 @@ export class ImageryLoader implements NetworkPoolClient {
       const record = this.active[i];
       if (!record || this.frame - record.wantedFrame < UNWANTED_FRAMES) continue;
       this.cancel(record);
-      this.active.splice(i, 1);
+      // Cancelling may already have removed it (a worker pool reports the cancel at once): remove it, not index i.
+      this.leaveActive(record);
     }
   }
 
@@ -309,26 +323,52 @@ export class ImageryLoader implements NetworkPoolClient {
    */
   private dispatchOne(): number {
     if (this.destroyed) return 0;
-    const slot = this.heap.peek();
-    const record = slot >= 0 ? this.table.bySlot[slot] : undefined;
-    if (!record || (!record.pinned && !this.pinnedComplete)) return 0;
-    const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 });
-    if (request === 'noData') {
+    // A tile whose host is full steps aside for the next ones, so a busy host never holds back the others (ADR 0007:
+    // one queue, limits per host); the skipped tiles go back to the queue with their keys.
+    let skipped = 0;
+    let result = 0;
+    for (;;) {
+      const slot = this.heap.peek();
+      const record = slot >= 0 ? this.table.bySlot[slot] : undefined;
+      if (!record || (!record.pinned && !this.pinnedComplete)) break;
+      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 });
+      if (request === 'noData') {
+        this.heap.pop();
+        record.state = NO_DATA;
+        this.settlePinned(record);
+        result = -1;
+        break;
+      }
+      // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
+      const consumer = this.options.network.request(
+        request.url,
+        this.hostOf(request),
+        this.options.source.transport,
+        (outcome) => this.received(record, outcome),
+        this.options.source.timeoutsMs,
+      );
       this.heap.pop();
-      record.state = NO_DATA;
-      this.settlePinned(record);
-      return -1;
+      if (consumer === NO_SLOT) {
+        if (skipped === MAX_HOST_SKIPS) {
+          this.heap.pushAt(slot, this.table.priorities, slot);
+          break;
+        }
+        this.skippedSlots[skipped++] = slot;
+        continue;
+      }
+      this.started(record, consumer);
+      result = 1;
+      break;
     }
-    // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
-    const consumer = this.options.network.request(
-      request.url,
-      this.hostOf(request),
-      this.options.source.transport,
-      (result) => this.received(record, result),
-      this.options.source.timeoutsMs,
-    );
-    if (consumer === NO_SLOT) return 0;
-    this.heap.pop();
+    for (let i = 0; i < skipped; i++) {
+      const slot = this.skippedSlots[i] ?? 0;
+      this.heap.pushAt(slot, this.table.priorities, slot);
+    }
+    return result;
+  }
+
+  /** A request of a tile started under `consumer`. */
+  private started(record: TileRecord, consumer: number): void {
     this.requested++;
     this.observe(record, 'request', 'start');
     // A synchronous transport may already have answered.
@@ -337,7 +377,6 @@ export class ImageryLoader implements NetworkPoolClient {
       record.consumer = consumer;
       this.active.push(record);
     }
-    return 1;
   }
 
   /** The request with the page-wide index of its host, registered on first use. */
@@ -384,6 +423,19 @@ export class ImageryLoader implements NetworkPoolClient {
     this.options.requestFrame();
   }
 
+  /** Backs a tile off after a decode that failed for a reason other than its bytes, or reports it for good. */
+  private retryLater(record: TileRecord): void {
+    if (++record.retries > MAX_DECODE_RETRIES) {
+      record.state = DEAD;
+      this.reportError(record, 'failed');
+      return;
+    }
+    record.state = FAILED;
+    const delayMs = DECODE_RETRY_MS * 2 ** (record.retries - 1);
+    this.table.eligibleAt[record.slot] = this.options.now() + delayMs;
+    this.options.setTimer(() => this.options.requestFrame(), delayMs);
+  }
+
   private reportError(record: TileRecord, reason: TileErrorReason): void {
     this.observe(record, 'tile', 'failed');
     const { level, x, y } = record.coord;
@@ -428,7 +480,9 @@ export class ImageryLoader implements NetworkPoolClient {
         this.options.memory.ram.delete(this.options.handleBase + record.slot);
         this.reportError(record, 'corrupt');
       } else {
-        record.state = FAILED;
+        // The worker crashed, timed out or is unavailable: retried with backoff from the RAM copy, at most
+        // MAX_DECODE_RETRIES times, then reported (F091).
+        this.retryLater(record);
       }
       this.settlePinned(record);
       this.options.requestFrame();
@@ -450,9 +504,13 @@ export class ImageryLoader implements NetworkPoolClient {
     this.leaveActive(record);
     // Over the GPU budget with nothing evictable: refused and counted; the bytes stay in RAM for a later frame.
     if (!residency.admit(handle, tile.gpuBytes)) {
+      // Not uploaded: not counted. The bytes stay in RAM; the tile waits before it is tried again, and meanwhile its
+      // ancestors are drawn and requested.
       closeImage(tile);
-      record.state = UNLOADED;
-      measuredMs[0] = 0;
+      record.state = FAILED;
+      this.table.eligibleAt[record.slot] = this.options.now() + REFUSED_RETRY_MS;
+      this.options.setTimer(() => this.options.requestFrame(), REFUSED_RETRY_MS);
+      measuredMs[0] = UPLOAD_REFUSED;
       return;
     }
     const startMs = this.options.now();

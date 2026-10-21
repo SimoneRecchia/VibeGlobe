@@ -132,6 +132,7 @@ export function verifyTerrain(options: {
 }): TerrainCheck {
   const downloads = join(options.root, 'downloads', options.dataset.id);
   const paths = options.files.map((f) => join(downloads, f.key)).filter((p) => existsSync(p));
+  if (paths.length === 0) throw new Error(`${options.dataset.id}: no downloaded source in ${downloads}; build first`);
   const grids = paths.map((path) => gdalGrid(options.image, options.root, path));
   // The comparison reproduces point sampling, which the tiler uses when an output pixel is no larger than ~1.5 source pixels.
   const pixelDeg = 360 / 2 ** options.dataset.maxZoom / TILE_PX;

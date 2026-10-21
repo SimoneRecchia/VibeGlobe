@@ -50,7 +50,7 @@
     {
       "id": "terrain",
       "kind": "terrain",
-      "profile": "copernicus-dem-glo30",
+      "profile": "copernicus-dem-glo90",
       "dataYear": 2021,
       "sourceVersion": "2021_1 (AWS Open Data COG release)",
       "source": {

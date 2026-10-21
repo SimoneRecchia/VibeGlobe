@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { BuildConfig, DatasetConfig } from '../config/schema.js';
+import { syntheticOsmExtract } from '../fixtures/osm-sample.js';
 import { PmtilesReader } from '../output/pmtiles.js';
+import { decodeTile } from '../vector/mvt.js';
 import { type BuildOptions, runBuild } from './build.js';
 import { sha256 } from './step-log.js';
 
@@ -120,7 +122,7 @@ describe('runBuild', () => {
         encoding: 'png',
         source: { type: 'geotiff', url: 'https://tile.openstreetmap.org/0/0/0.png' },
       },
-      /tile usage policy forbids/,
+      /tile usage policies forbid bulk downloading/,
     ],
     [
       'a Google Maps Platform source',
@@ -172,7 +174,7 @@ describe('runBuild', () => {
     const pmtiles = PmtilesReader.open(join(options.outDir, 'output', 'terrain.pmtiles'));
     expect(pmtiles.entries().reduce((n, e) => n + e.runLength, 0)).toBe(result.estimate.tiles);
     expect(pmtiles.metadata()).toMatchObject({
-      attribution: expect.stringMatching(/^Produced using Copernicus WorldDEM-30/),
+      attribution: expect.stringMatching(/^produced using Copernicus WorldDEM-30/),
     });
     pmtiles.close();
   });
@@ -193,5 +195,58 @@ describe('runBuild', () => {
     expect(second.lines.some((l) => /corrupt intermediate tile 14\//.test(l))).toBe(true);
     expect(result.tilesBuilt).toBe(1);
     expect(outputChecksums(join(first.outDir, 'output'))).toEqual(reference);
+  });
+
+  it('rebuilds identical outputs from the same configuration in clean folders (F343)', async () => {
+    const first = setup([terrain]);
+    const second = setup([terrain]);
+    await runBuild(first);
+    await runBuild(second);
+    expect(outputChecksums(join(second.outDir, 'output'))).toEqual(outputChecksums(join(first.outDir, 'output')));
+  });
+
+  it('downloads an OpenStreetMap extract only from its configured provider and writes the three layers (F341)', async () => {
+    const requests: string[] = [];
+    const vectors: DatasetConfig = {
+      ...terrain,
+      id: 'vectors',
+      kind: 'vector',
+      profile: 'openstreetmap-extract',
+      encoding: 'mvt',
+      source: { type: 'osm-extract', url: 'https://download.fixture.test/europe/italy-261020.osm.pbf' },
+      minZoom: 10,
+      maxZoom: 14,
+    };
+    const extract = syntheticOsmExtract();
+    const options = setup([vectors], {
+      fetch: (async (url: string) => {
+        requests.push(url);
+        return new Response(extract);
+      }) as typeof fetch,
+    });
+    writeFileSync(
+      options.configPath,
+      JSON.stringify({
+        ...config([vectors]),
+        region: { bbox: [6.6796875, 45.82879925192134, 7.03125, 46.07323062540836] },
+      }),
+    );
+    await runBuild(options);
+    expect(requests.map((url) => new URL(url).host)).toEqual(['download.fixture.test']);
+    const tile = decodeTile(
+      new Uint8Array(readFileSync(join(options.outDir, 'output', 'vectors', '14', '8510', '5837.pbf'))),
+    );
+    expect(Object.keys(tile).sort()).toEqual(['buildings', 'places', 'roads']);
+    expect(
+      tile['buildings']?.features.some(
+        (f) => f.properties['height'] !== undefined && f.properties['levels'] !== undefined,
+      ),
+    ).toBe(true);
+    const metadata = JSON.parse(
+      readFileSync(join(options.outDir, 'output', 'vectors', 'metadata.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(metadata['attribution']).toBe(
+      '© OpenStreetMap contributors, data available under the Open Database License (ODbL)',
+    );
   });
 });

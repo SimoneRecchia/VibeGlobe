@@ -11,9 +11,17 @@ export interface MosaicEntry {
   load: () => Raster | undefined;
 }
 
+/** Whether a point lies inside a raster's own extent. */
+function contains(raster: Raster, lon: number, lat: number): boolean {
+  const east = raster.westDeg + raster.width * raster.pixelWidthDeg;
+  const south = raster.northDeg - raster.height * raster.pixelHeightDeg;
+  return lon >= raster.westDeg && lon < east && lat > south && lat <= raster.northDeg;
+}
+
 /** A mosaic of rasters with `channels` samples per pixel and a value for areas without data. */
 export class Mosaic {
   private readonly cache = new Map<MosaicEntry, Raster | undefined>();
+  private last: Raster | undefined;
 
   constructor(
     private readonly entries: MosaicEntry[],
@@ -41,16 +49,22 @@ export class Mosaic {
    * beyond its cell), so nearby entries are loaded and their real extents decide.
    */
   private rasterAt(lon: number, lat: number): Raster | undefined {
+    // Consecutive samples nearly always fall in the raster of the previous one.
+    const last = this.last;
+    if (last && contains(last, lon, lat)) return last;
+    const found = this.searchRaster(lon, lat);
+    if (found) this.last = found;
+    return found;
+  }
+
+  private searchRaster(lon: number, lat: number): Raster | undefined {
     const margin = 1e-3;
     for (const entry of this.entries) {
       const b = entry.bounds;
       if (lon < b.west - margin || lon >= b.east + margin || lat <= b.south - margin || lat > b.north + margin)
         continue;
       const raster = this.raster(entry);
-      if (!raster) continue;
-      const east = raster.westDeg + raster.width * raster.pixelWidthDeg;
-      const south = raster.northDeg - raster.height * raster.pixelHeightDeg;
-      if (lon >= raster.westDeg && lon < east && lat > south && lat <= raster.northDeg) return raster;
+      if (raster && contains(raster, lon, lat)) return raster;
     }
     return undefined;
   }

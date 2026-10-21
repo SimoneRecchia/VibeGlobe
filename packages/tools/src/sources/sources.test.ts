@@ -65,6 +65,20 @@ describe('sources', () => {
     expect(ctx.lines.some((l) => l.startsWith('corrupt a.tif'))).toBe(true);
   });
 
+  it('retries a download after a network error', async () => {
+    let calls = 0;
+    const flaky = server([]);
+    const ctx = {
+      ...context((async (url: string, init?: RequestInit) =>
+        ++calls === 1
+          ? Promise.reject(new TypeError('fetch failed', { cause: new Error('read ECONNRESET') }))
+          : flaky(url, init)) as typeof fetch),
+      retryDelayMs: 0,
+    };
+    expect(await downloadFile(file, ctx)).toMatchObject({ status: 'downloaded', transferred: 1000 });
+    expect(ctx.lines[0]).toMatch(/network error .*ECONNRESET.*retrying/);
+  });
+
   it('refuses a file whose checksum differs from the lock file', async () => {
     const ctx = { ...context(server([])), lock: { 'a.tif': '0'.repeat(64) } };
     await expect(downloadFile(file, ctx)).rejects.toThrow(/does not match the lock file/);

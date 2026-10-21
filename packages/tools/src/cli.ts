@@ -26,6 +26,12 @@ export interface CliIo {
 
 /** Folder of the configurations shipped with the package. */
 export const CONFIG_DIR = fileURLToPath(new URL('../configs/', import.meta.url));
+/** Default folder of build outputs and state, `build/<config>[-sample]` inside the package (git-ignored there). */
+const BUILD_DIR = fileURLToPath(new URL('../build/', import.meta.url));
+
+function defaultOut(configPath: string, sample: boolean): string {
+  return join(BUILD_DIR, `${basename(configPath, '.json')}${sample ? '-sample' : ''}`);
+}
 
 /** Parsed `--name value` and `--flag` options plus positional arguments. */
 export interface ParsedArgs {
@@ -77,7 +83,8 @@ export function helpText(): string {
     '  build <config>      Run every step',
     '  verify <config>     Compare terrain heights at --points random points (default 1000) with the source DEM read by',
     '                      GDAL in the configuration’s pinned Docker image',
-    '  Options: --sample (the configuration’s sample area), --dataset <id,…>, --out <folder>,',
+    '  Options: --sample (the configuration’s sample area), --dataset <id,…>,',
+    '           --out <folder> (default packages/tools/build/<config>[-sample], git-ignored),',
     '           --source-url <id>=<url>,… (a mirror, a local copy or a fixture stub instead of the configured source),',
     '           --yes (confirm without a prompt; required in non-interactive runs)',
     '',
@@ -113,13 +120,12 @@ function resolveConfig(name: string | undefined): string {
 async function pipelineCommand(command: Step | 'build', parsed: ParsedArgs, io: CliIo): Promise<number> {
   const configPath = resolveConfig(parsed.positional[0]);
   const sample = parsed.options.has('sample');
-  const name = basename(configPath, '.json');
   const datasets = parsed.options.get('dataset');
   const credentials = credentialsFromEnv(io.env);
   const sourceUrls = parsed.options.get('source-url');
   const result = await runBuild({
     configPath,
-    outDir: String(parsed.options.get('out') ?? join('build', `${name}${sample ? '-sample' : ''}`)),
+    outDir: String(parsed.options.get('out') ?? defaultOut(configPath, sample)),
     sample,
     yes: parsed.options.has('yes'),
     interactive: io.interactive,
@@ -145,9 +151,7 @@ function verifyCommand(parsed: ParsedArgs, io: CliIo): number {
   const configPath = resolveConfig(parsed.positional[0]);
   const loaded = loadConfig(configPath);
   const sample = parsed.options.has('sample');
-  const root = String(
-    parsed.options.get('out') ?? join('build', `${basename(configPath, '.json')}${sample ? '-sample' : ''}`),
-  );
+  const root = String(parsed.options.get('out') ?? defaultOut(configPath, sample));
   const datasets = selectedDatasets(loaded, { sample }).filter((d) => d.kind === 'terrain');
   let failed = false;
   for (const dataset of datasets) {

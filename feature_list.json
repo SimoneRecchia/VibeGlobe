@@ -4012,7 +4012,7 @@
         "Assert the tile count is exact for the given area and range and the byte estimate is within 25% of the built package",
         "Assert the estimate is shown before any tile is downloaded and the user can cancel"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F308",
@@ -4334,7 +4334,7 @@
         "Verify each dataset is confirmed as free for commercial use and redistribution, with its exact required attribution text",
         "Run the automated consistency check and verify the pipeline configuration files use the attribution text recorded in the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F333",
@@ -4424,7 +4424,7 @@
         "Load it as the pinned base in the playground and capture screenshots of the globe from several directions: zero black or empty pixels on the globe",
         "Verify the output's license metadata states its public-domain or equivalent status"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F339",
@@ -4451,7 +4451,7 @@
         "Load the pyramid in the playground and verify imagery displays at about 10 m per pixel at the highest level, with no seams between source tiles",
         "Verify the output carries the EOX and Copernicus attribution text recorded in the license ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F341",
@@ -4504,7 +4504,7 @@
         "Build the same configuration twice in clean directories",
         "Compare both outputs by checksum and verify tiles and metadata are identical"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F344",
@@ -4517,7 +4517,7 @@
         "Assert every request targets the configured self-hosted origin",
         "Scan the built packages' default configuration and bundles for hosts of paid or restricted services and verify none is referenced outside optional adapters"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F345",
@@ -4529,7 +4529,7 @@
         "Verify every default dataset and the optional Sentinel-2 mosaic are listed with license, attribution text, source link and re-verification date",
         "Run the automated check and verify the document matches the license metadata emitted by the pipeline"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F346",
@@ -4541,7 +4541,7 @@
         "Verify it covers size estimation, building from configuration, resuming, integrity and license checks, and publishing outputs",
         "Follow the skill's steps for a small test region end to end and verify they work exactly as written"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F553",

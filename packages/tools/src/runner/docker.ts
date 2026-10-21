@@ -3,6 +3,7 @@
  * network, with only the build folder mounted.
  */
 import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { PINNED_IMAGE } from '../config/load.js';
 
 /** One external tool invocation. */
@@ -25,7 +26,8 @@ function dockerArgs(run: ToolRun): string[] {
     'none',
     ...user,
     '-v',
-    `${run.folder}:/work`,
+    // Docker reads a relative path as the name of a volume, so the folder is made absolute (DP-001).
+    `${resolve(run.folder)}:/work`,
     '-w',
     '/work',
     run.image,

@@ -7,7 +7,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { syntheticOsmExtract } from './osm-sample.js';
-import { syntheticS2File, syntheticXyzTile } from './synthetic.js';
+import { syntheticS2File, syntheticWorld, syntheticXyzTile } from './synthetic.js';
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -84,6 +84,7 @@ export function startFixtureServer(
     const xyz = /^\/xyz\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(path);
     if (xyz)
       return send(request, response, syntheticXyzTile(Number(xyz[1]), Number(xyz[2]), Number(xyz[3])), 'image/png');
+    if (path === '/world.tif') return send(request, response, syntheticWorld(2048), 'image/tiff');
     if (/^\/osm\/[\w.-]+\.osm\.pbf$/.test(path))
       return send(request, response, syntheticOsmExtract(), 'application/octet-stream');
     if (options.staticFolder && path.startsWith('/static/'))

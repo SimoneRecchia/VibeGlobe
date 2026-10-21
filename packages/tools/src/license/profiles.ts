@@ -30,8 +30,8 @@ export interface ProviderProfile {
   forbiddingTerm?: string;
 }
 
-const COPERNICUS_DEM_ATTRIBUTION =
-  'Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.';
+const COPERNICUS_DEM_ATTRIBUTION = (product: string): string =>
+  `produced using Copernicus ${product} © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved`;
 
 /** Every built-in profile, allowed and forbidden. */
 export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
@@ -39,9 +39,23 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     id: 'copernicus-dem-glo30',
     name: 'Copernicus DEM GLO-30 Public',
     license: 'Copernicus DEM licence (free, with attribution)',
-    licenseUrl: 'https://spacedata.copernicus.eu/documents/20123/121286/CSCDA_ESA_Mission-specific+Annex_31_Oct_22.pdf',
+    licenseUrl:
+      'https://docs.sentinel-hub.com/api/latest/static/files/data/dem/resources/license/License-COPDEM-30.pdf',
     termsReadDate: '2026-10-21',
-    attribution: COPERNICUS_DEM_ATTRIBUTION,
+    attribution: COPERNICUS_DEM_ATTRIBUTION('WorldDEM-30'),
+    sourceUrl: 'https://registry.opendata.aws/copernicus-dem/',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
+    id: 'copernicus-dem-glo90',
+    name: 'Copernicus DEM GLO-90',
+    license: 'Copernicus DEM licence (free, with attribution)',
+    licenseUrl:
+      'https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM',
+    termsReadDate: '2026-10-21',
+    attribution: COPERNICUS_DEM_ATTRIBUTION('WorldDEM-90'),
     sourceUrl: 'https://registry.opendata.aws/copernicus-dem/',
     commercialUse: true,
     redistribution: true,
@@ -51,10 +65,10 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     id: 's2cloudless-2016',
     name: 'Sentinel-2 cloudless 2016 by EOX',
     license: 'CC-BY-4.0',
-    licenseUrl: 'https://cloudless.eox.at/pricing',
+    licenseUrl: 'https://eox.at/2025/03/sentinel-2-cloudless-2024/',
     termsReadDate: '2026-10-21',
     attribution:
-      'Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)',
+      'Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)',
     sourceUrl: 'https://s2maps.eu',
     commercialUse: true,
     redistribution: true,
@@ -79,7 +93,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     license: 'Public domain',
     licenseUrl: 'https://www.naturalearthdata.com/about/terms-of-use/',
     termsReadDate: '2026-10-21',
-    attribution: 'Made with Natural Earth (public domain)',
+    attribution: 'Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.',
     sourceUrl: 'https://www.naturalearthdata.com/downloads/50m-raster-data/',
     commercialUse: true,
     redistribution: true,
@@ -101,7 +115,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     id: 'copernicus-sentinel-2',
     name: 'Copernicus Sentinel-2 data',
     license: 'Copernicus Sentinel data licence (free, full and open)',
-    licenseUrl: 'https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice',
+    licenseUrl: 'https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice',
     termsReadDate: '2026-10-21',
     attribution: 'Contains modified Copernicus Sentinel data {year}',
     sourceUrl: 'https://registry.opendata.aws/sentinel-2-l2a-cogs/',
@@ -121,7 +135,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     redistribution: false,
     offlinePackaging: false,
     forbiddingTerm:
-      'the OSMF tile usage policy forbids bulk downloading (scraping) and offline use of its tile servers',
+      'the OSMF tile usage policies forbid bulk downloading (fetching tiles ahead of time, tile archives, offline use) from its tile servers',
   },
   {
     id: 'google-maps-platform',

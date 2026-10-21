@@ -14,6 +14,8 @@ export interface DownloadContext {
   /** Expected SHA-256 per file key, from the configuration's lock file. */
   lock: Record<string, string>;
   report: (line: string) => void;
+  /** First retry delay after a network error (doubled on each retry); tests set it to 0. */
+  retryDelayMs?: number;
 }
 
 /** Outcome of one file. */
@@ -38,7 +40,27 @@ async function request(file: SourceFile, context: DownloadContext, offset: numbe
       signS3Get(new URL(file.url), context.credentials, new Date(), { ...headers, 'x-amz-request-payer': 'requester' }),
     );
   }
-  return context.fetch(file.url, { headers });
+  return fetchWithRetry(context, file.url, headers);
+}
+
+/**
+ * Fetches with up to three retries on network errors (a reset connection, a dropped proxy), waiting 1, 2 and 4 s; an
+ * HTTP error status is returned, not retried.
+ */
+async function fetchWithRetry(
+  context: DownloadContext,
+  url: string,
+  headers: Record<string, string>,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await context.fetch(url, { headers });
+    } catch (error) {
+      if (attempt >= 3) throw error;
+      context.report(`network error on ${url} (${String((error as Error).cause ?? error)}); retrying`);
+      await new Promise((resolve) => setTimeout(resolve, (context.retryDelayMs ?? 1000) * 2 ** attempt));
+    }
+  }
 }
 
 /** Appends the response body to `path` chunk by chunk, so an interrupted download keeps what arrived. */

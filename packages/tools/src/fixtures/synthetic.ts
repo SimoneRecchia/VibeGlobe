@@ -19,29 +19,27 @@ function syntheticColor(lon: number, lat: number): [number, number, number] {
 }
 
 /** RGB pixels of the synthetic imagery over a square whose north-west corner is at lon, lat. */
-function syntheticPixels(west: number, north: number, extentDeg: number, size: number): Uint8Array {
-  const pixels = new Uint8Array(size * size * 3);
-  const step = extentDeg / size;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++)
-      pixels.set(syntheticColor(west + (x + 0.5) * step, north - (y + 0.5) * step), (y * size + x) * 3);
+function syntheticPixels(west: number, north: number, step: number, width: number, height: number): Uint8Array {
+  const pixels = new Uint8Array(width * height * 3);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++)
+      pixels.set(syntheticColor(west + (x + 0.5) * step, north - (y + 0.5) * step), (y * width + x) * 3);
   }
   return pixels;
 }
 
-/** An uncompressed RGB GeoTIFF (pixel-is-area, EPSG:4326) of `size` px whose north-west corner is at lon, lat. */
-function syntheticGeoTiff(west: number, north: number, extentDeg: number, size: number): Uint8Array {
-  const pixels = syntheticPixels(west, north, extentDeg, size);
-  const step = extentDeg / size;
+/** An uncompressed RGB GeoTIFF (pixel-is-area, EPSG:4326) of square `step`-degree pixels from its north-west corner. */
+function syntheticGeoTiff(west: number, north: number, step: number, width: number, height: number): Uint8Array {
+  const pixels = syntheticPixels(west, north, step, width, height);
   const entries: [number, number, number[]][] = [
-    [256, 3, [size]],
-    [257, 3, [size]],
+    [256, 3, [width]],
+    [257, 3, [height]],
     [258, 3, [8, 8, 8]],
     [259, 3, [1]],
     [262, 3, [2]],
     [273, 4, [0]],
     [277, 3, [3]],
-    [278, 3, [size]],
+    [278, 3, [height]],
     [279, 4, [pixels.length]],
     [284, 3, [1]],
     [33550, 12, [step, step, 0]],
@@ -91,10 +89,15 @@ function syntheticGeoTiff(west: number, north: number, extentDeg: number, size: 
   return out;
 }
 
+/** A synthetic whole-world raster (EPSG:4326, 2:1), the fixture of the global fallback. */
+export function syntheticWorld(width: number): Uint8Array {
+  return syntheticGeoTiff(-180, 90, 360 / width, width, width / 2);
+}
+
 /** The synthetic Sentinel-2 cloudless original file `tiles/{level}/{col}/{row}.tif` (512 px metatiles). */
 export function syntheticS2File(level: number, col: number, row: number): Uint8Array {
   const extent = s2FileExtentDeg(level);
-  return syntheticGeoTiff(col * extent - 180, 90 - row * extent, extent, 512);
+  return syntheticGeoTiff(col * extent - 180, 90 - row * extent, extent / 512, 512, 512);
 }
 
 /** A synthetic XYZ tile (PNG) for the package builder's fixture source. */

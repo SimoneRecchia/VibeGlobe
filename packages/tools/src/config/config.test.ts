@@ -33,7 +33,7 @@ describe('configuration files', () => {
     const italy = loadConfig(join(CONFIG_DIR, 'italy-high.json'));
     const profiles = (c: typeof world): string[] => c.config.datasets.map((d) => d.profile).sort();
     expect(profiles(world)).toEqual([
-      'copernicus-dem-glo30',
+      'copernicus-dem-glo90',
       'natural-earth',
       'openstreetmap-extract',
       's2cloudless-2016',

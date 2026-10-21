@@ -188,8 +188,19 @@ for (const backend of ['webgl2', 'webgpu'] as const) {
     const cdp = await page.context().newCDPSession(page);
     // Warm-up: compiled code, shader caches and lazily created singletons are not leaks.
     await cycle(page, WARM_UP_CYCLES);
+    // Only the playground's own globe holds a device or context. A destroyed device reports its loss asynchronously,
+    // so a snapshot taken at once may still count one being released (KB-065): both wait for the count to settle (a
+    // held one never would).
+    const settled = (): Promise<void> =>
+      expect
+        .poll(() => page.evaluate(() => (window as unknown as { liveContexts: () => number }).liveContexts()), {
+          timeout: 10_000,
+        })
+        .toBe(1);
+    await settled();
     const before = await snapshot(page, cdp);
     await cycle(page, CYCLES);
+    await settled();
     const after = await snapshot(page, cdp);
     // Constructors with more instances than before: a leak of one object per cycle shows as a growth of CYCLES.
     const grown = [...after.instances]
@@ -201,13 +212,7 @@ for (const backend of ['webgl2', 'webgpu'] as const) {
       `leak suite ${backend}: before ${show(before)} after ${show(after)} grown ${JSON.stringify(grown.slice(0, 5))}`,
     );
     expect(grown.filter(([, growth]) => growth >= CYCLES / 2)).toEqual([]);
-    // Only the playground's own globe holds a device or context. A destroyed device reports its loss asynchronously,
-    // so either snapshot may still count one being released: wait for the count to settle (a held one never would).
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { liveContexts: () => number }).liveContexts()), {
-        timeout: 10_000,
-      })
-      .toBe(1);
+    expect(after.contexts).toBe(1);
     expect(after.gpuObjects).toBe(before.gpuObjects);
     expect(after.nodes).toBeLessThanOrEqual(before.nodes);
     expect(after.listeners).toBeLessThanOrEqual(before.listeners);

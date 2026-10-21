@@ -40,6 +40,7 @@ import {
   RecoveryLimiter,
   createFailureMessage,
   releaseDevice,
+  recordContext,
   releaseRenderer,
   watchLoss,
   type LossWatch,
@@ -205,8 +206,10 @@ export class ThreeBackend implements RendererBackend {
     releaseVertexArraysWithBuffers(renderer.backend);
     // three.js falls back to WebGL2 silently when WebGPU fails to initialize: reported for 'auto', an error for 'webgpu'.
     const fellBack = !forceWebGL && (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true;
+    // The canvas holds a WebGL2 context now: recorded, or released with the renderer, so it is not reused for WebGPU.
+    if (fellBack) recordContext(canvas, false);
     if (fellBack && this.settings.choice === 'webgpu') {
-      renderer.dispose();
+      releaseRenderer(renderer);
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but it failed to initialize.');
     }
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');

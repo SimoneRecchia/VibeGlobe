@@ -446,19 +446,21 @@ for (const backend of BACKENDS) {
       await first.globe.ready;
       first.unmount();
       const second = hooks.mount(first.canvas);
+      // The given canvas is in this element now; whichever canvas draws must be the one shown there.
+      const host = first.canvas.parentElement;
       try {
         await second.globe.ready;
         const frame = await second.globe.captureFrame();
         let drawn = 0;
         for (let i = 3; i < frame.rgba.length; i += 4) if ((frame.rgba[i] ?? 0) > 0) drawn++;
-        return { ready: true, drawn, backend: second.globe.backend };
+        return { ready: true, drawn, backend: second.globe.backend, canvases: host?.querySelectorAll('canvas').length };
       } catch (error) {
         return { ready: false, error: String(error) };
       } finally {
         second.unmount();
       }
     });
-    expect(result).toMatchObject({ ready: true, backend });
+    expect(result).toMatchObject({ ready: true, backend, canvases: 1 });
     expect(result.drawn).toBeGreaterThan(1000);
   });
 }
@@ -478,12 +480,19 @@ for (const [first, second] of [
         await before.globe.ready;
         before.unmount();
         const after = hooks.mount(before.canvas, secondBackend);
+        // The given canvas is in this element now; whichever canvas draws must be the one shown there.
+        const host = before.canvas.parentElement;
         try {
           await after.globe.ready;
           const frame = await after.globe.captureFrame();
           let drawn = 0;
           for (let i = 3; i < frame.rgba.length; i += 4) if ((frame.rgba[i] ?? 0) > 0) drawn++;
-          return { ready: true, drawn, backend: after.globe.backend };
+          return {
+            ready: true,
+            drawn,
+            backend: after.globe.backend,
+            canvases: host?.querySelectorAll('canvas').length,
+          };
         } catch (error) {
           return { ready: false, error: String(error) };
         } finally {
@@ -492,10 +501,51 @@ for (const [first, second] of [
       },
       [first, second] as const,
     );
-    expect(result).toMatchObject({ ready: true, backend: second });
+    expect(result).toMatchObject({ ready: true, backend: second, canvases: 1 });
     expect(result.drawn).toBeGreaterThan(1000);
   });
 }
+
+test('a host canvas whose WebGPU start fell back to WebGL2 can be given to a new globe (KB-064)', async ({ page }) => {
+  // An adapter whose device request fails: three.js falls back to WebGL2 on the same canvas.
+  await page.addInitScript(() => {
+    const adapter = (globalThis as { GPUAdapter?: { prototype: GPUAdapter } }).GPUAdapter?.prototype;
+    if (adapter) adapter.requestDevice = () => Promise.reject(new Error('no device'));
+  });
+  await openGlobe(page, 'backend=webgl2&zoom=1');
+  const result = await page.evaluate(async () => {
+    const hooks = window.vibeglobePlayground;
+    if (!hooks) throw new Error('no playground');
+    const forced = hooks.mount(undefined, 'webgpu');
+    const firstError = await forced.globe.ready.then(
+      () => 'started',
+      (error: { code?: string }) => error.code,
+    );
+    forced.unmount();
+    const retry = hooks.mount(forced.canvas, 'auto');
+    // The given canvas is in this element now; whichever canvas draws must be the one shown there.
+    const host = forced.canvas.parentElement;
+    try {
+      await retry.globe.ready;
+      const frame = await retry.globe.captureFrame();
+      let drawn = 0;
+      for (let i = 3; i < frame.rgba.length; i += 4) if ((frame.rgba[i] ?? 0) > 0) drawn++;
+      return {
+        firstError,
+        ready: true,
+        drawn,
+        backend: retry.globe.backend,
+        canvases: host?.querySelectorAll('canvas').length,
+      };
+    } catch (error) {
+      return { firstError, ready: false, error: String(error) };
+    } finally {
+      retry.unmount();
+    }
+  });
+  expect(result).toMatchObject({ firstError: 'unsupported-device', ready: true, backend: 'webgl2', canvases: 1 });
+  expect(result.drawn).toBeGreaterThan(1000);
+});
 
 test('resizing renders at the new size, centered, never stretched or blank (F070)', async ({ page }) => {
   await openGlobe(page, 'lon=20&lat=10&zoom=1');

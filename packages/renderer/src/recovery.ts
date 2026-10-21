@@ -56,8 +56,8 @@ export function releaseRenderer(renderer: WebGPURenderer): void {
 export interface LossWatch {
   held(): boolean;
   /**
-   * Stops reporting and lets go of the loss callback and of the device or context: a device's own listeners reference
-   * its renderer (KB-053). Nothing is held afterwards.
+   * Stops reporting and lets go of the loss callback. The device or context is only weakly referenced, since its own
+   * listeners reference the renderer (KB-053), so `held()` still tells whether it was released (KB-023, KB-054).
    */
   stop(): void;
 }
@@ -70,19 +70,19 @@ export interface LossWatch {
 export function watchLoss(renderer: WebGPURenderer, onLoss: (reason: string) => void): LossWatch {
   let report: ((reason: string) => void) | undefined = onLoss;
   renderer.onDeviceLost = (info: { message?: string }) => report?.(info.message ?? 'device lost');
-  let device = (renderer.backend as { device?: GPUDevice }).device;
-  let gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
+  const device = (renderer.backend as { device?: GPUDevice }).device;
+  const gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
+  const deviceRef = device && new WeakRef(device);
+  const glRef = gl && new WeakRef(gl);
   let deviceLost = false;
   void device?.lost.then((info) => {
     deviceLost = true;
     report?.(info.message || info.reason);
   });
   return {
-    held: () => (device ? !deviceLost : gl ? !gl.isContextLost() : false),
-    stop: () => {
-      report = undefined;
-      device = undefined;
-      gl = undefined;
-    },
+    // A device or context collected as garbage is not held either.
+    held: () =>
+      deviceRef ? !deviceLost && deviceRef.deref() !== undefined : glRef?.deref()?.isContextLost() === false,
+    stop: () => (report = undefined),
   };
 }

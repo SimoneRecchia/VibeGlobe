@@ -335,8 +335,9 @@ class GlobeEngine implements Globe {
   jumpTo(target: ViewInit): void {
     this.assertAlive();
     const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
-    // While the container has no size a jump is kept as a request, like before start (KB-046).
-    const pending = this.pendingView ?? (this.collapsed ? currentView(this.cam) : undefined);
+    // While the container has no size a jump with a zoom is kept as a request, like before start (KB-046); one without
+    // keeps the camera's range, which needs no viewport (KB-056).
+    const pending = this.pendingView ?? (this.collapsed && !keepRange ? currentView(this.cam) : undefined);
     let view;
     try {
       view = validateView(target, pending ?? currentView(this.cam));

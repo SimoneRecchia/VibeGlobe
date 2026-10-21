@@ -53,12 +53,20 @@ export function createCanvas(document: Document, previous: HTMLCanvasElement | u
     const value = previous?.getAttribute(name);
     if (value) canvas.setAttribute(name, value);
   }
-  canvas.style.display = 'block';
-  canvas.style.width = '100%';
-  canvas.style.height = '100%';
+  fillContainer(canvas);
   canvas.style.touchAction = 'none';
   canvas.tabIndex = 0;
   return canvas;
+}
+
+/**
+ * Makes a canvas fill its container's content box, which is the engine's viewport (KB-048): without a CSS size a canvas
+ * is shown at its backing size, the viewport times the pixel ratio (KB-055).
+ */
+export function fillContainer(canvas: HTMLCanvasElement): void {
+  canvas.style.display = 'block';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
 }
 
 /**

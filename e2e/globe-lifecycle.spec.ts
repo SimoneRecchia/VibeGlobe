@@ -407,6 +407,32 @@ for (const backend of BACKENDS) {
   });
 }
 
+test.describe('on a 2x display', () => {
+  test.use({ deviceScaleFactor: 2 });
+  test('a canvas the host passes in fills its container and picks where it is shown (KB-055)', async ({ page }) => {
+    await openGlobe(page, 'scenario=two-globes&lon=20&lat=10&zoom=1');
+    await page.evaluate(async () => window.vibeglobePlayground?.globes[1]?.ready);
+    await page.evaluate(() => window.vibeglobePlayground?.globes[1]?.jumpTo({ longitudeDeg: 20, latitudeDeg: 10 }));
+    await waitForIdle(page);
+    const state = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#globe-2');
+      const container = canvas?.parentElement;
+      const width = canvas?.clientWidth ?? 0;
+      const height = canvas?.clientHeight ?? 0;
+      return {
+        canvas: [width, height],
+        container: [container?.clientWidth, container?.clientHeight],
+        backing: [canvas?.width, canvas?.height],
+        center: window.vibeglobePlayground?.globes[1]?.screenToGeo({ xPx: width / 2, yPx: height / 2 }),
+      };
+    });
+    expect(state.canvas).toEqual(state.container);
+    expect(state.backing).toEqual(state.canvas.map((size) => Math.round(size * 2)));
+    expect(state.center?.longitudeDeg).toBeCloseTo(20, 6);
+    expect(state.center?.latitudeDeg).toBeCloseTo(10, 6);
+  });
+});
+
 test('resizing renders at the new size, centered, never stretched or blank (F070)', async ({ page }) => {
   await openGlobe(page, 'lon=20&lat=10&zoom=1');
   // The page's text overlays lie over the canvas; with wider fonts they reached the measured center column.

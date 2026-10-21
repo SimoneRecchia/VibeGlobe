@@ -225,6 +225,20 @@ describe('createGlobe', () => {
     expect(globe.camera.zoom).toBeCloseTo(before.zoom, 9);
   });
 
+  it('keeps the range of a position-only jump made while the container has no size (KB-056)', async () => {
+    const { globe, renderer } = await started({ view: { zoom: 2 } });
+    const range = globe.camera.rangeMeters;
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    renderer.resizeListener?.();
+    globe.jumpTo({ longitudeDeg: 10 });
+    expect(globe.camera.rangeMeters).toBeCloseTo(range, 3);
+    renderer.size = { widthPx: 800, heightPx: 300 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    expect(globe.camera.longitudeDeg).toBeCloseTo(10, 9);
+    expect(globe.camera.rangeMeters / range).toBeCloseTo(1, 9);
+  });
+
   it('captures only a frame it drew: waits while nothing can be drawn (KB-051)', async () => {
     const { globe, renderer } = await started();
     renderer.drawing = false;

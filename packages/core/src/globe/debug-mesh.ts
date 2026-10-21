@@ -5,12 +5,36 @@ import type { DebugMeshData, DebugShape } from './types.js';
 const RAD = Math.PI / 180;
 const corner = new Float64Array(3);
 
+/** Throws a typed error unless `shapes` is a list of debug quads (F050, KB-038); corners are checked when built. */
+export function validateDebugShapes(shapes: unknown): asserts shapes is readonly DebugShape[] {
+  if (!Array.isArray(shapes)) throw new GlobeError('invalid-option', 'setDebugShapes needs an array of shapes');
+  for (const shape of shapes as unknown[]) {
+    const { corners, colorRgb, checkerMeters } = (shape ?? {}) as Partial<Record<keyof DebugShape, unknown>>;
+    if (shape === null || typeof shape !== 'object') {
+      throw new GlobeError('invalid-option', `A debug shape must be an object, got ${String(shape)}`);
+    }
+    if (!Array.isArray(corners) || corners.length !== 4 || corners.some((c) => c === null || typeof c !== 'object')) {
+      throw new GlobeError('invalid-option', 'A debug shape needs four corner positions');
+    }
+    if (
+      !Array.isArray(colorRgb) ||
+      colorRgb.length !== 3 ||
+      !colorRgb.every((c) => typeof c === 'number' && c >= 0 && c <= 1)
+    ) {
+      throw new GlobeError('invalid-option', 'A debug shape color needs three channels between 0 and 1');
+    }
+    if (checkerMeters !== undefined && !(typeof checkerMeters === 'number' && checkerMeters > 0)) {
+      throw new GlobeError('invalid-option', `checkerMeters must be a positive number, got ${String(checkerMeters)}`);
+    }
+  }
+}
+
 /** Converts a debug quad to renderer data: corners as float32 offsets from their float64 centroid (ADR 0004). */
 export function buildDebugMesh(shape: DebugShape): DebugMeshData {
   const ecef: number[] = [];
   for (const position of shape.corners) {
     const values = [position.longitudeDeg, position.latitudeDeg, position.heightMeters ?? 0];
-    if (!values.every(Number.isFinite) || Math.abs(position.latitudeDeg) > 90) {
+    if (!values.every((v) => typeof v === 'number' && Number.isFinite(v)) || Math.abs(position.latitudeDeg) > 90) {
       throw new GlobeError('invalid-coordinate', `Debug shape corner out of range: ${JSON.stringify(position)}`);
     }
     geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, corner);

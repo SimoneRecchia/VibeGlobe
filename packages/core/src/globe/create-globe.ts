@@ -4,11 +4,18 @@ import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camer
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selection.hot.js';
-import { applyView, currentView, readCameraState, wrapDegrees } from './camera-state.js';
+import {
+  applyView,
+  currentView,
+  newCameraState,
+  readCameraState,
+  wrapDegrees,
+  writeCameraState,
+} from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { dragCamera, zoomCamera } from './navigation.hot.js';
-import { buildDebugMesh } from './debug-mesh.js';
+import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import type {
   BackendName,
   DebugShape,
@@ -27,7 +34,7 @@ import type {
   ScreenPoint,
   ViewInit,
 } from './types.js';
-import { DEFAULT_VIEW, validateOptions, validateView, type ValidView } from './validation.js';
+import { DEFAULT_VIEW, validateHandler, validateOptions, validateView, type ValidView } from './validation.js';
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -58,6 +65,8 @@ class GlobeEngine implements Globe {
   private frames = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
   private readonly idlePayload = { frameNumber: 0 };
+  /** The camera-change payload, reused every frame (KB-037). */
+  private readonly cameraPayload = newCameraState();
   private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL, minLevel: 2 };
   /**
    * Bound once, so scheduling a frame allocates no closure; a bound method rather than an arrow function, so no wrapper
@@ -149,7 +158,14 @@ class GlobeEngine implements Globe {
         this.requestRender();
       },
       backendFallback: (reason) => this.emitter.emit('backend-fallback', { reason }),
-      failed: (error) => this.emitter.emit('error', error),
+      failed: (error) => {
+        this.emitter.emit('error', error);
+        // Nothing is drawn any more: a first frame that never came will not come (KB-036).
+        if (this.resolveReady) {
+          this.resolveReady = undefined;
+          this.rejectReady?.(error);
+        }
+      },
     };
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) {
@@ -159,8 +175,6 @@ class GlobeEngine implements Globe {
     this.renderer = renderer;
     this.surface = new SurfaceCache(renderer);
     this.syncSize();
-    applyView(this.cam, this.pendingView ?? currentView(this.cam));
-    this.pendingView = undefined;
     this.cleanups.push(
       renderer.host.observeSize(() => {
         this.syncSize();
@@ -202,6 +216,11 @@ class GlobeEngine implements Globe {
     this.frameView.pixelRatio = pixelRatio;
     renderer.resize(this.cam.widthPx, this.cam.heightPx, pixelRatio);
     this.dirty = true;
+    // The requested view becomes a camera once the viewport has a size: its zoom depends on it (KB-034).
+    if (this.pendingView && widthPx > 0 && heightPx > 0) {
+      applyView(this.cam, this.pendingView);
+      this.pendingView = undefined;
+    }
   }
 
   /** Draws a frame now when one can be drawn (instead of on the next display frame), else requests one. */
@@ -246,7 +265,8 @@ class GlobeEngine implements Globe {
       this.framePayload.tiles = count;
       this.emitter.emit('frame', this.framePayload);
     }
-    if (this.emitter.has('camera-change')) this.emitter.emit('camera-change', readCameraState(this.cam));
+    if (this.emitter.has('camera-change'))
+      this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload));
     if (this.resolveReady) {
       this.resolveReady();
       this.resolveReady = undefined;
@@ -343,6 +363,7 @@ class GlobeEngine implements Globe {
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {
     this.assertAlive();
+    validateHandler(event, handler);
     return this.emitter.on(event, handler);
   }
 
@@ -365,6 +386,7 @@ class GlobeEngine implements Globe {
 
   setDebugShapes(shapes: readonly DebugShape[]): void {
     this.assertAlive();
+    validateDebugShapes(shapes);
     const meshes = shapes.map((shape) => buildDebugMesh(shape));
     this.renderer?.setDebugMeshes(meshes);
     this.requestRender();

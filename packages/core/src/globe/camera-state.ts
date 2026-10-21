@@ -22,18 +22,39 @@ export function wrapDegrees(angleDeg: number): number {
 
 /** Reads the public camera state from the camera (applied values, degrees, Mercator zoom). */
 export function readCameraState(camera: Camera): CameraState {
+  return writeCameraState(camera, newCameraState());
+}
+
+/** A camera state whose fields can be overwritten, for a payload reused every frame. */
+export type MutableCameraState = { -readonly [K in keyof CameraState]: CameraState[K] };
+
+/** A state object to fill with {@link writeCameraState}; fractional initial values keep its fields doubles (ADR 0018). */
+export function newCameraState(): MutableCameraState {
+  return {
+    longitudeDeg: 0.5,
+    latitudeDeg: 0.5,
+    zoom: 0.5,
+    altitudeMeters: 0.5,
+    headingDeg: 0.5,
+    tiltDeg: 0.5,
+    rollDeg: 0.5,
+    rangeMeters: 0.5,
+  };
+}
+
+/** Writes the camera's public state into `out` and returns it; allocates nothing, so the frame loop can use it. */
+export function writeCameraState(camera: Camera, out: MutableCameraState): MutableCameraState {
   const { pose } = camera;
   const groundZoom = groundZoomForRange(pose.rangeMeters, camera.heightPx, camera.fovYRad);
-  return {
-    longitudeDeg: wrapDegrees(pose.targetLongitudeRad * DEG),
-    latitudeDeg: pose.targetLatitudeRad * DEG,
-    zoom: mercatorZoomFromGroundZoom(groundZoom, pose.targetLatitudeRad),
-    altitudeMeters: camera.eyeGeodetic.heightMeters,
-    headingDeg: wrapDegrees(pose.headingRad * DEG),
-    tiltDeg: pose.tiltRad * DEG,
-    rollDeg: pose.rollRad * DEG,
-    rangeMeters: pose.rangeMeters,
-  };
+  out.longitudeDeg = wrapDegrees(pose.targetLongitudeRad * DEG);
+  out.latitudeDeg = pose.targetLatitudeRad * DEG;
+  out.zoom = mercatorZoomFromGroundZoom(groundZoom, pose.targetLatitudeRad);
+  out.altitudeMeters = camera.eyeGeodetic.heightMeters;
+  out.headingDeg = wrapDegrees(pose.headingRad * DEG);
+  out.tiltDeg = pose.tiltRad * DEG;
+  out.rollDeg = pose.rollRad * DEG;
+  out.rangeMeters = pose.rangeMeters;
+  return out;
 }
 
 /**

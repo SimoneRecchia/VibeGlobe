@@ -243,6 +243,7 @@ export interface GlobeEvents {
   frame: { readonly frameNumber: number; readonly tiles: number };
   /** Rendering stopped because nothing changes. The payload object is reused: read it inside the handler. */
   idle: { readonly frameNumber: number };
+  /** The camera moved, once per drawn frame. The payload object is reused: read it inside the handler, do not keep it. */
   'camera-change': CameraState;
   'device-lost': { readonly reason: string };
   /**

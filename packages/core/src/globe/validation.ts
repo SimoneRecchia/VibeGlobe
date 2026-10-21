@@ -1,5 +1,5 @@
 import { GlobeError } from './errors.js';
-import type { GlobeOptions, ViewInit } from './types.js';
+import type { GlobeEvents, GlobeOptions, ViewInit } from './types.js';
 
 // Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
 const MAX_ZOOM = 28;
@@ -93,3 +93,29 @@ export function validateOptions(options: unknown): GlobeOptions {
 
 /** The view when none is given: the whole globe centered on 0°, 20°N. */
 export const DEFAULT_VIEW: ValidView = { longitudeDeg: 0, latitudeDeg: 20, zoom: 1.5, headingDeg: 0, tiltDeg: 0 };
+
+/** Every event `on` accepts. */
+const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
+  'ready',
+  'frame',
+  'idle',
+  'camera-change',
+  'device-lost',
+  'device-restored',
+  'backend-fallback',
+  'error',
+]);
+
+/** Throws a typed error unless `event` is a globe event and `handler` a function (KB-038). */
+export function validateHandler(event: unknown, handler: unknown): void {
+  if (!EVENT_NAMES.has(event as keyof GlobeEvents)) {
+    throw new GlobeError('invalid-option', `Unknown event ${String(event)}`);
+  }
+  // A handler that is not a function would throw on every emit, from inside the frame loop.
+  if (typeof handler !== 'function') {
+    throw new GlobeError(
+      'invalid-option',
+      `The handler for ${String(event)} must be a function, got ${String(handler)}`,
+    );
+  }
+}

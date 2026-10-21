@@ -162,6 +162,60 @@ for (const backend of BACKENDS) {
   });
 }
 
+// The recovery's asynchronous steps, slowed once `slowRecovery` is set: the device request (initRenderer) and pipeline
+// compilation (the warm-up). Each records its name in `recoveryStep` while it waits, so a test can destroy the globe
+// inside it. destroy() there must leave nothing behind (KB-035).
+function slowRecoverySteps(): void {
+  const state = window as unknown as { slowRecovery?: boolean; recoveryStep?: string };
+  const slowed = async <T>(step: string, value: Promise<T>): Promise<T> => {
+    const result = await value;
+    if (state.slowRecovery) {
+      state.recoveryStep = step;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return result;
+  };
+  const adapter = globalThis.GPUAdapter?.prototype;
+  if (!adapter) return;
+  const requestDevice = adapter.requestDevice;
+  adapter.requestDevice = function (this: GPUAdapter, ...args: Parameters<GPUAdapter['requestDevice']>) {
+    return slowed('device request', requestDevice.apply(this, args));
+  };
+  const createPipeline = GPUDevice.prototype.createRenderPipelineAsync;
+  GPUDevice.prototype.createRenderPipelineAsync = function (
+    this: GPUDevice,
+    ...args: Parameters<GPUDevice['createRenderPipelineAsync']>
+  ) {
+    return slowed('pipeline warm-up', createPipeline.apply(this, args));
+  };
+}
+
+for (const step of ['device request', 'pipeline warm-up'] as const) {
+  test(`destroy() during the recovery's ${step} leaves no canvas, message or controls behind (KB-035)`, async ({
+    page,
+  }) => {
+    await page.addInitScript(slowRecoverySteps);
+    await openGlobe(page, 'backend=webgpu&zoom=3');
+    await page.evaluate(() => {
+      (window as unknown as { slowRecovery?: boolean }).slowRecovery = true;
+      window.vibeglobePlayground?.globe.simulateDeviceLoss();
+    });
+    await page.waitForFunction((name) => (window as unknown as { recoveryStep?: string }).recoveryStep === name, step);
+    await page.evaluate(() => window.vibeglobePlayground?.globe.destroy());
+    await page.waitForTimeout(3000);
+    const left = await page.evaluate(() => ({
+      canvases: document.querySelectorAll('#app canvas').length,
+      alerts: document.querySelectorAll('#app [role="alert"]').length,
+      events: window.vibeglobePlayground?.events.map((event) => event.type),
+    }));
+    expect(left.canvases).toBe(0);
+    expect(left.alerts).toBe(0);
+    expect(left.events).not.toContain('device-restored');
+    expect(left.events).not.toContain('error');
+    expect(await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts().contexts)).toBe(0);
+  });
+}
+
 test('replacing geometry does not leak WebGL2 vertex arrays (KB-021)', async ({ page }) => {
   await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=4');
   const counts = (): Promise<{ meshes: number; vertexArrays: number } | undefined> =>

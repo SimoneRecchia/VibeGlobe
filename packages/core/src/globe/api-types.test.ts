@@ -28,8 +28,8 @@ describe('typed public API (F049)', () => {
     const { factory } = fakeRenderer();
     const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'world.jpg' });
     globe.on('frame', (payload) => expectTypeOf(payload.frameNumber).toBeNumber());
-    // @ts-expect-error unknown event names are rejected
-    globe.on('frames', () => undefined);
+    // @ts-expect-error unknown event names are rejected, at compile time and with a typed error at run time (KB-038)
+    expect(() => globe.on('frames', () => undefined)).toThrow(/Unknown event frames/);
     globe.destroy();
   });
 

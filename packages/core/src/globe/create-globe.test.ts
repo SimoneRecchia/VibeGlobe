@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createGlobe } from './create-globe.js';
 import { GlobeError } from './errors.js';
 import { fakeRenderer } from './test-renderer.js';
-import type { GeoPosition, GlobeOptions, NavigationApi, ScreenPoint } from './types.js';
+import type { DebugShape, GeoPosition, GlobeOptions, NavigationApi, ScreenPoint } from './types.js';
 
 async function started(overrides: Partial<GlobeOptions> = {}) {
   const { renderer, factory } = fakeRenderer();
@@ -91,6 +91,34 @@ describe('createGlobe', () => {
     expect(globe.camera.latitudeDeg).toBeCloseTo(0, 9);
     // A position-only jump keeps the ground scale, as after start: zoom 6 at 50° is zoom 6 + log2(1/cos 50°) at 0°.
     expect(globe.camera.zoom).toBeCloseTo(6 + Math.log2(1 / Math.cos((50 * Math.PI) / 180)), 6);
+  });
+
+  it('rejects ready when the renderer gives up before the first frame (KB-036)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg' });
+    const events: string[] = [];
+    globe.on('ready', () => events.push('ready'));
+    globe.on('error', (error) => events.push(error.code));
+    await Promise.resolve();
+    renderer.events?.failed(new GlobeError('renderer-failed', 'gave up'));
+    await Promise.resolve();
+    renderer.flush();
+    await expect(globe.ready).rejects.toMatchObject({ code: 'renderer-failed' });
+    expect(events).toEqual(['renderer-failed']);
+  });
+
+  it('keeps the requested view until the container has a size (KB-034)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg', view: { zoom: 4 } });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    expect(globe.camera.zoom).toBeCloseTo(4, 9);
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    expect(globe.camera.zoom).toBeCloseTo(4, 9);
+    expect(globe.camera.altitudeMeters).toBeGreaterThan(1e6);
   });
 
   it('keeps the eye at least 0.5 m above the ground at the steepest tilt (KB-015)', async () => {
@@ -242,6 +270,37 @@ describe('input validation (F050)', () => {
     expect(() => globe.jumpTo({ latitudeDeg: -120 })).toThrow(GlobeError);
     expect(globe.camera).toEqual(before);
     expect(reported).toEqual(['invalid-coordinate']);
+  });
+
+  it('rejects invalid debug shapes and event handlers with typed errors (KB-038)', async () => {
+    const { globe } = await started();
+    const code = (call: () => unknown): string => {
+      try {
+        call();
+        return 'no error';
+      } catch (error) {
+        return error instanceof GlobeError ? error.code : `untyped ${String(error)}`;
+      }
+    };
+    const corner = { longitudeDeg: 0, latitudeDeg: 0 };
+    const quad = [corner, corner, corner, corner];
+    const shapes =
+      (value: unknown): (() => void) =>
+      () =>
+        globe.setDebugShapes(value as DebugShape[]);
+    expect(code(shapes(null))).toBe('invalid-option');
+    expect(code(shapes([null]))).toBe('invalid-option');
+    expect(code(shapes([{}]))).toBe('invalid-option');
+    expect(code(shapes([{ corners: [], colorRgb: [1, 0, 0] }]))).toBe('invalid-option');
+    expect(code(shapes([{ corners: quad, colorRgb: 'red' }]))).toBe('invalid-option');
+    expect(code(shapes([{ corners: quad, colorRgb: [1, 0, 0], checkerMeters: -1 }]))).toBe('invalid-option');
+    expect(
+      code(shapes([{ corners: [corner, corner, corner, { latitudeDeg: 95, longitudeDeg: 0 }], colorRgb: [1, 0, 0] }])),
+    ).toBe('invalid-coordinate');
+    expect(code(shapes([{ corners: quad, colorRgb: [1, 0, 0] }]))).toBe('no error');
+    const on = globe.on.bind(globe) as (event: unknown, handler: unknown) => unknown;
+    expect(code(() => on('frame', 42))).toBe('invalid-option');
+    expect(code(() => on('no-such-event', () => undefined))).toBe('invalid-option');
   });
 
   test.prop([fc.anything()])('never throws anything but a GlobeError for arbitrary options', (options) => {

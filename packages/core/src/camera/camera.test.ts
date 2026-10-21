@@ -58,11 +58,24 @@ describe('Camera', () => {
     transformPoint4(point, camera.projection, at(point, 0), at(point, 1), at(point, 2));
     // Relative 1e-8: at a 1 m range float64 cancellation against 6.4e6 m ECEF values leaves about 1e-9.
     expect(Math.abs((at(point, 2) / at(point, 3)) * (range / camera.nearMeters) - 1)).toBeLessThan(1e-8);
-    // Heading: the horizontal part of the view direction points at the heading, clockwise from north.
     const screen = new Float64Array(2);
     expect(projectToScreen(camera, camera.targetEcef, screen)).toBe(true);
     expect(at(screen, 0)).toBeCloseTo(400, 6);
     expect(at(screen, 1)).toBeCloseTo(300, 6);
+  });
+
+  it.each([0, 30, 90, -120])('turns the view clockwise from north with heading %s° (F047)', (heading) => {
+    // At (0°, 0°) east is +y, north is +z and up is +x in ECEF.
+    const camera = cameraAt(0, 0, 1000, heading, 45);
+    const h = heading * DEG;
+    const t = 45 * DEG;
+    const forward = [-Math.cos(t), Math.sin(t) * Math.sin(h), Math.sin(t) * Math.cos(h)];
+    // Screen right is the horizontal direction 90° clockwise from the heading.
+    const right = [0, Math.cos(h), -Math.sin(h)];
+    for (let i = 0; i < 3; i++) {
+      expect(at(camera.forward, i)).toBeCloseTo(forward[i] ?? 0, 9);
+      expect(at(camera.right, i)).toBeCloseTo(right[i] ?? 0, 9);
+    }
   });
 
   it('puts the eye range·cos(tilt) above the target, plus the Earth curvature drop over the horizontal offset', () => {

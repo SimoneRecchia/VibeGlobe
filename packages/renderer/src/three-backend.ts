@@ -23,6 +23,7 @@ import {
   type MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
+import { CanvasSlot } from './canvas-slot.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
@@ -32,7 +33,7 @@ import { createSurfaceMaterial } from './surface-material.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
-import { countCalls, countMatrixUpdates, createCanvas, stopInternalLoop } from './three-hooks.js';
+import { countCalls, countMatrixUpdates, stopInternalLoop } from './three-hooks.js';
 import { createWarmUpScene, webgpuSelfTest } from './warm-up.js';
 import { createFailureMessage, RecoveryLimiter, releaseDevice, releaseRenderer } from './recovery.js';
 
@@ -76,7 +77,7 @@ export type DrawingSurface =
 export class ThreeBackend implements RendererBackend {
   capabilities!: RendererCapabilities;
   private renderer!: WebGPURenderer;
-  private canvas: HTMLCanvasElement | OffscreenCanvas | undefined;
+  private readonly canvases: CanvasSlot;
   private readonly scene = new Scene();
   private readonly camera = new EngineCamera();
   /** Surface tiles by key (no Map: it boxes keys beyond 31 bits on every per-frame lookup, ADR 0018). */
@@ -117,6 +118,7 @@ export class ThreeBackend implements RendererBackend {
     private readonly events: RendererEvents,
     private readonly settings: BackendSettings,
   ) {
+    this.canvases = new CanvasSlot(surface);
     this.camera.matrixAutoUpdate = false;
     this.camera.matrixWorldAutoUpdate = false;
     this.scene.matrixWorldAutoUpdate = false;
@@ -131,12 +133,13 @@ export class ThreeBackend implements RendererBackend {
   ): Promise<ThreeBackend> {
     const backend = new ThreeBackend(surface, host, events, settings);
     await backend.initRenderer();
+    backend.canvases.attach();
     return backend;
   }
 
   /** The canvas, which receives input; none for an OffscreenCanvas (its host forwards input). */
   get inputElement(): HTMLCanvasElement | undefined {
-    return this.surface.kind === 'element' ? (this.canvas as HTMLCanvasElement | undefined) : undefined;
+    return this.canvases.inputElement;
   }
 
   /** The global scope the canvas lives in: the page's window, or the worker's global scope. */
@@ -161,7 +164,7 @@ export class ThreeBackend implements RendererBackend {
     }
     const forceWebGL = !webgpu;
     if (webgpu) patchIdentitySwizzle(scope);
-    const canvas = this.nextCanvas();
+    const canvas = this.canvases.next();
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
       antialias: true,
@@ -199,13 +202,6 @@ export class ThreeBackend implements RendererBackend {
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
     countCalls(renderer.backend, 'updateTexture', () => this.textureUploads++);
     countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
-    if (this.surface.kind === 'element') {
-      const element = canvas as HTMLCanvasElement;
-      const previous = this.canvas as HTMLCanvasElement | undefined;
-      if (previous?.isConnected && previous !== element) previous.replaceWith(element);
-      else if (!element.isConnected) this.surface.container.appendChild(element);
-    }
-    this.canvas = canvas;
     this.renderer = renderer;
     this.capabilities = readCapabilities(renderer, sceneDepth);
     renderer.setPixelRatio(this.size.pixelRatio);
@@ -229,26 +225,9 @@ export class ThreeBackend implements RendererBackend {
       );
     }
     this.webgpuFailure = reason;
-    this.canvas = canvas;
+    this.canvases.replaceFailed(canvas);
     await this.initRenderer();
     this.events.backendFallback(`WebGPU failed its start-up self-test (${reason}); using WebGL2`);
-  }
-
-  /**
-   * The canvas for a new renderer: the given one first; after a loss, a fresh element in a page container (an
-   * OffscreenCanvas cannot be replaced, so recovery fails there).
-   */
-  private nextCanvas(): HTMLCanvasElement | OffscreenCanvas {
-    if (this.canvas === undefined) return this.surface.canvas ?? this.replacementCanvas();
-    if (this.surface.kind === 'offscreen') {
-      throw new GlobeError('renderer-failed', 'An OffscreenCanvas cannot be replaced after a device or context loss');
-    }
-    return this.replacementCanvas();
-  }
-
-  private replacementCanvas(): HTMLCanvasElement {
-    if (this.surface.kind !== 'element') throw new Error('A replacement canvas needs a page container');
-    return createCanvas(this.surface.container.ownerDocument, this.canvas as HTMLCanvasElement | undefined);
   }
 
   /** Creates the GPU mesh of a surface tile and keeps its CPU copy for loss recovery. */
@@ -450,17 +429,23 @@ export class ThreeBackend implements RendererBackend {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       if (this.destroyed) return;
       await this.initRenderer();
+      // Destroyed while the new renderer started or warmed up: release it, show nothing (KB-035).
       if (this.destroyed) {
-        // Destroyed while the new renderer started: release it too.
         releaseRenderer(this.renderer);
         return;
       }
       this.createImageryResources();
       await this.warmUpPipelines();
+      if (this.destroyed) {
+        releaseRenderer(this.renderer);
+        return;
+      }
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
+      this.canvases.attach();
       this.recovering = false;
       this.events.deviceRestored();
     } catch (error) {
+      if (this.destroyed) return;
       this.fail(
         new GlobeError('renderer-failed', 'The renderer could not recover from a device loss', { cause: error }),
       );
@@ -472,13 +457,12 @@ export class ThreeBackend implements RendererBackend {
    * the canvas so the map area does not stay frozen or blank without explanation.
    */
   private fail(error: GlobeError): void {
+    if (this.destroyed) return;
     this.failed = true;
     this.recovering = false;
     if (this.surface.kind === 'element' && !this.failureMessage) {
       const message = createFailureMessage(this.surface.container.ownerDocument);
-      const canvas = this.canvas as HTMLCanvasElement | undefined;
-      if (canvas?.isConnected) canvas.replaceWith(message);
-      else this.surface.container.appendChild(message);
+      this.canvases.replaceWith(message);
       this.failureMessage = message;
     }
     this.events.failed(error);
@@ -497,7 +481,7 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture?.dispose();
     this.imageryTexture = undefined;
     releaseRenderer(this.renderer);
-    if (this.surface.kind === 'element') (this.canvas as HTMLCanvasElement | undefined)?.remove();
+    this.canvases.remove();
     this.failureMessage?.remove();
   }
 }

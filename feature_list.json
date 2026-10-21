@@ -5304,7 +5304,7 @@
         "Define a custom reference system from a projection definition string and verify a transform through it",
         "Verify the projection library's license passes the license audit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F405",

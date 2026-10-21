@@ -87,6 +87,9 @@
       "memoryScenario": "debug-overlay",
       "jsHeapMB": 32
     },
+    "gis": {
+      "bundleGzipKB": 40
+    },
     "vue": {
       "bundleGzipKB": 5
     },

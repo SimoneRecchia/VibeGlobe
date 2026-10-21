@@ -1,6 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { canvasImage, emptyPixelsInside, openGlobe, silhouetteRadiusPx, waitForIdle } from './support/globe.js';
+import {
+  canvasImage,
+  emptyPixelsInside,
+  nextFrame,
+  openGlobe,
+  silhouetteRadiusPx,
+  waitForIdle,
+} from './support/globe.js';
+
+// Streaming over the software GPU is slow: the context set-up counts against the timeout too.
+test.describe.configure({ timeout: 120_000 });
 
 /** M3's streaming slice (docs/plan/m3-imagery-streaming.md, increment 3b) against the playground's fixture tiles. */
 
@@ -91,7 +101,6 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test(`every drawn tile's texels stay within 1.5 px, and a tilted view is finer near the camera (F081)`, async ({
       page,
     }) => {
-      test.setTimeout(120_000);
       const session = await fixtureSession(page);
       await openGlobe(
         page,
@@ -102,6 +111,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       expect(flat.length).toBeGreaterThan(0);
       for (const tile of flat) expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
       await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ tiltDeg: 70 }));
+      // The tiles of the frame drawn for the tilted camera, not those of the last flat frame.
+      await nextFrame(page);
       await waitForImagery(page);
       const tilted = await page.evaluate(() => window.vibeglobePlayground?.globe.surfaceTiles() ?? []);
       for (const tile of tilted) expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
@@ -115,7 +126,6 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test('a refining tile keeps its parent drawn until its own child arrives, with no hole in any frame (F082)', async ({
       page,
     }) => {
-      test.setTimeout(120_000);
       const session = await fixtureSession(page);
       await openGlobe(
         page,
@@ -148,7 +158,6 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test('tiles whose levels never arrive show their best ancestor upsampled, marked in the overlay (F083)', async ({
       page,
     }) => {
-      test.setTimeout(120_000);
       // Level 9 and finer never answer; level 8 and coarser load normally (zoom 7 draws level-8 tiles here).
       const session = await fixtureSession(page, [{ source: 'levels', minLevel: 9, hang: true }]);
       await openGlobe(
@@ -172,29 +181,51 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test('after a jump to a city, the base shows first, then intermediate levels, then the target (F085, F088)', async ({
       page,
     }) => {
-      test.setTimeout(120_000);
       const session = await fixtureSession(page, [{ source: 'levels', latencyMs: 250 }]);
       await openGlobe(page, `backend=${backend}&imagery=levels&session=${session}&zoom=2`);
       await waitForImagery(page);
       const before = (await requestLog(page, session)).length;
+      // The page records the level and the imagery level of the center tile at every drawn frame.
+      await page.evaluate(() => {
+        const globe = window.vibeglobePlayground?.globe;
+        const host = document.querySelector('#globe');
+        const record: [number, number][] = [];
+        (window as unknown as { centerLevels: [number, number][] }).centerLevels = record;
+        globe?.on('frame', () => {
+          const center = globe.screenToGeo({ xPx: (host?.clientWidth ?? 0) / 2, yPx: (host?.clientHeight ?? 0) / 2 });
+          const tile = globe
+            .surfaceTiles()
+            .find(
+              (t) =>
+                center &&
+                t.westDeg <= center.longitudeDeg &&
+                center.longitudeDeg <= t.eastDeg &&
+                t.southDeg <= center.latitudeDeg &&
+                center.latitudeDeg <= t.northDeg,
+            );
+          if (tile) record.push([tile.level, tile.imageryLevel ?? -1]);
+        });
+      });
       await page.evaluate(
         ({ lon, lat }) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: lon, latitudeDeg: lat, zoom: 13 }),
         ROME,
       );
-      // Record what the center shows, frame by frame, until it shows its own level; every frame complete.
-      const shown: number[] = [];
-      let target = -1;
+      // Frames are captured while the detail arrives: every one is complete.
       const radius = await silhouetteRadiusPx(page);
+      const recorded = (): Promise<[number, number][]> =>
+        page.evaluate(() => (window as unknown as { centerLevels: [number, number][] }).centerLevels);
       const deadline = Date.now() + 90_000;
-      while (Date.now() < deadline) {
+      for (;;) {
         expect(emptyPixelsInside(await canvasImage(page), radius)).toBe(0);
-        const center = await centerTile(page);
-        target = center.level;
-        shown.push(center.imageryLevel ?? -1);
-        if (center.imageryLevel === center.level) break;
+        const last = (await recorded()).at(-1);
+        if ((last && last[0] === last[1]) || Date.now() > deadline) break;
       }
+      const frames = await recorded();
+      const target = frames.at(-1)?.[0] ?? -1;
+      const shown = frames.map(([, imageryLevel]) => imageryLevel);
       // Progressive: never coarser than a level already shown, and the target reached through intermediate levels.
       for (let i = 1; i < shown.length; i++) expect(shown[i]).toBeGreaterThanOrEqual(shown[i - 1] ?? -1);
+      expect(shown[0]).toBeLessThan(target - 4);
       expect(shown.at(-1)).toBe(target);
       expect(new Set(shown.filter((level) => level >= 0 && level < target)).size).toBeGreaterThanOrEqual(2);
       // Request order after the jump (F088): coarser levels first, and at the target level the center tile first.
@@ -216,7 +247,6 @@ test('image decoding runs off the main thread while imagery streams, with no lon
   page,
   browser,
 }, testInfo) => {
-  test.setTimeout(120_000);
   const session = await fixtureSession(page);
   const tracePath = testInfo.outputPath('trace.json');
   await browser.startTracing(page, {

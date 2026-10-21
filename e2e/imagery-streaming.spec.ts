@@ -59,21 +59,28 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       page,
     }) => {
       const session = await fixtureSession(page);
-      await openGlobe(
-        page,
-        `backend=${backend}&imagery=levels&session=${session}&lon=${ROME.lon}&lat=${ROME.lat}&zoom=7`,
-      );
+      const query = `backend=${backend}&imagery=levels&session=${session}&lon=${ROME.lon}&lat=${ROME.lat}&zoom=7`;
+      // A first visit finds the center tile's level; the second one holds every tile under the center below it
+      // (Playwright route interception, as the step asks), in place before the page opens because the next level under
+      // the center is prefetched at once (F088).
+      await openGlobe(page, query);
+      await waitForImagery(page);
+      const { level } = await centerTile(page);
+      let release: () => void = () => undefined;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      await page.route(/\/levels\/mercator\/\d+\/\d+\/\d+\.png/, async (route) => {
+        const [z = 0, x, y] = (new URL(route.request().url()).pathname.match(/(\d+)\/(\d+)\/(\d+)\.png$/) ?? [])
+          .slice(1)
+          .map(Number);
+        const center = mercatorTile(z, ROME.lon, ROME.lat);
+        if (z > level && x === center.x && y === center.y) await released;
+        await route.continue();
+      });
+      await openGlobe(page, query);
       await waitForImagery(page);
       const parent = await centerTile(page);
       expect(parent.imageryLevel).toBe(parent.level);
-      // Delay the child of the center tile one level down (Playwright route interception, as the step asks).
-      const child = { level: parent.level + 1, ...mercatorTile(parent.level + 1, ROME.lon, ROME.lat) };
-      let release: () => void = () => undefined;
-      const released = new Promise<void>((resolve) => (release = resolve));
-      await page.route(`**/levels/mercator/${child.level}/${child.x}/${child.y}.png`, async (route) => {
-        await released;
-        await route.continue();
-      });
+      const child = { level: parent.level + 1 };
       await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 8 }));
       const during = await recordFrames(page, 8);
       for (const frame of during) {
@@ -160,7 +167,11 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       expect(shown[0]).toBeLessThan(target - 4);
       expect(shown.at(-1)).toBe(target);
       expect(new Set(shown.filter((level) => level >= 0 && level < target)).size).toBeGreaterThanOrEqual(2);
-      // Request order after the jump (F088): coarser levels first, and at the target level the center tile first.
+      // Request order after the jump (F088): coarser levels first, and at the target level the center tile first. The
+      // prefetch of the next level starts after the visible tiles, so the log is read once it has started.
+      await expect
+        .poll(async () => (await requestLog(page, session)).slice(before).some((r) => r.level === target + 1))
+        .toBe(true);
       const after = (await requestLog(page, session)).slice(before).sort((a, b) => a.startMs - b.startMs);
       expect(after[0]?.level).toBe(Math.min(...after.map((request) => request.level)));
       const firstTarget = after.findIndex((request) => request.level === target);
@@ -194,8 +205,11 @@ test('image decoding runs off the main thread while imagery streams, with no lon
   await waitForImagery(page);
   await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 9 }));
   await waitForImagery(page);
+  // Prefetched tiles (F088) may still be on their way: trace until every request has ended, then count the tiles that
+  // arrived (a request cancelled on the way decodes nothing).
+  await expect.poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats().loading)).toBe(0);
   await browser.stopTracing();
-  const tiles = (await requestLog(page, session)).length;
+  const tiles = (await requestLog(page, session)).filter((r) => r.status === 200 && !r.aborted).length;
   const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
     traceEvents: { name: string; pid: number; tid: number; dur?: number; args?: { name?: string } }[];
   };

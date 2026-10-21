@@ -163,14 +163,13 @@ export class ThreeBackend implements RendererBackend {
 
   private async initRenderer(): Promise<void> {
     const scope = this.scope();
-    const webgpu = await chooseWebGPU(
-      scope,
-      this.surface,
-      this.webgpuFailure === undefined ? this.settings.choice : 'webgl2',
-    );
+    const choice = this.webgpuFailure === undefined ? this.settings.choice : 'webgl2';
+    const webgpu = await chooseWebGPU(scope, this.surface, choice);
     const forceWebGL = !webgpu;
-    // A recovery may find WebGPU gone, blocked after a GPU-process crash: WebGL2 takes over, reported (KB-049).
-    if (forceWebGL && (this.capabilities as RendererCapabilities | undefined)?.backend === 'webgpu') {
+    // A recovery may find WebGPU gone (blocked after a GPU-process crash): WebGL2 takes over, reported (KB-049),
+    // unless a self-test failure reports it (KB-052).
+    const previous = (this.capabilities as RendererCapabilities | undefined)?.backend;
+    if (forceWebGL && previous === 'webgpu' && this.webgpuFailure === undefined) {
       this.events.backendFallback('WebGPU is no longer available after a device loss; using WebGL2');
     }
     if (webgpu) patchIdentitySwizzle(scope);
@@ -426,17 +425,10 @@ export class ThreeBackend implements RendererBackend {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       if (this.destroyed) return;
       await this.initRenderer();
-      // Destroyed while the new renderer started or warmed up: release it, show nothing (KB-035).
-      if (this.destroyed) {
-        releaseRenderer(this.renderer);
-        return;
-      }
+      if (this.abandoned()) return;
       this.createImageryResources();
       await this.warmUpPipelines();
-      if (this.destroyed) {
-        releaseRenderer(this.renderer);
-        return;
-      }
+      if (this.abandoned()) return;
       if (this.lostWhileRecovering || !this.lossWatch.held()) {
         this.lostWhileRecovering = false;
         this.recovering = false;
@@ -471,6 +463,24 @@ export class ThreeBackend implements RendererBackend {
     this.events.failed(error);
   }
 
+  /** Destroyed while the new renderer started or warmed up: release it, show nothing, keep nothing (KB-035, KB-053). */
+  private abandoned(): boolean {
+    if (!this.destroyed) return false;
+    releaseRenderer(this.renderer);
+    this.forgetRenderer();
+    return true;
+  }
+
+  /**
+   * A host may keep its reference to the globe after unmounting: nothing large stays reachable from it (KB-045). No
+   * method touches the renderer or the imagery after destroy.
+   */
+  private forgetRenderer(): void {
+    (this as unknown as { renderer: WebGPURenderer | undefined }).renderer = undefined;
+    this.beginFrame = () => undefined;
+    this.lossWatch.stop();
+  }
+
   /** Frees every GPU resource and removes the canvas. */
   destroy(): void {
     if (this.destroyed) return;
@@ -485,11 +495,7 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture = undefined;
     releaseRenderer(this.renderer);
     this.vertexArraysLeft = countVertexArrays(this.renderer.backend);
-    // A host may keep its reference to the globe after unmounting: nothing large stays reachable from it (KB-045).
-    // No method touches the renderer or the imagery after destroy.
-    (this as unknown as { renderer: WebGPURenderer | undefined }).renderer = undefined;
-    this.beginFrame = () => undefined;
-    this.lossWatch.stop();
+    this.forgetRenderer();
     this.imagery = undefined;
     this.canvases.remove();
     this.failureMessage?.remove();

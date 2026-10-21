@@ -1,5 +1,5 @@
 import { GlobeError } from './errors.js';
-import type { GeoPosition, GlobeEvents, GlobeOptions, ViewInit } from './types.js';
+import type { GeoPosition, GlobeEvents, GlobeOptions, ScreenPoint, ViewInit } from './types.js';
 
 // Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
 const MAX_ZOOM = 28;
@@ -142,6 +142,32 @@ export function validatePosition(position: unknown): void {
       `latitudeDeg must be between -90 and 90, got ${describeInput(latitudeDeg)}`,
     );
   }
+}
+
+/** Validates a resolution scale given at runtime; throws a typed GlobeError. */
+export function validateResolutionScale(scale: unknown): number {
+  if (typeof scale !== 'number' || !(scale >= 0.1 && scale <= 4)) {
+    throw new GlobeError(
+      'invalid-option',
+      `resolutionScale must be a number between 0.1 and 4, got ${describeInput(scale)}`,
+    );
+  }
+  return scale;
+}
+
+/** Validates a screen point given to a query; throws a typed GlobeError. */
+export function validateScreenPoint(point: unknown): ScreenPoint {
+  if (!isScreenPoint(point)) {
+    throw new GlobeError('invalid-coordinate', `A screen point needs finite xPx and yPx, got ${describeInput(point)}`);
+  }
+  return point;
+}
+
+/** True for an object with finite xPx and yPx. */
+export function isScreenPoint(point: unknown): point is ScreenPoint {
+  if (point === null || typeof point !== 'object') return false;
+  const { xPx, yPx } = point as Partial<ScreenPoint>;
+  return typeof xPx === 'number' && Number.isFinite(xPx) && typeof yPx === 'number' && Number.isFinite(yPx);
 }
 
 /** A short description of an invalid input for error messages. */

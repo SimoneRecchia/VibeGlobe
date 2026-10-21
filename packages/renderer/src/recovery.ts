@@ -55,7 +55,10 @@ export function releaseRenderer(renderer: WebGPURenderer): void {
 /** A watched renderer's device or context: whether it is held, and a way to stop reporting its loss. */
 export interface LossWatch {
   held(): boolean;
-  /** Stops reporting and lets go of the loss callback (and, through it, of whatever it references). */
+  /**
+   * Stops reporting and lets go of the loss callback and of the device or context: a device's own listeners reference
+   * its renderer (KB-053). Nothing is held afterwards.
+   */
   stop(): void;
 }
 
@@ -67,8 +70,8 @@ export interface LossWatch {
 export function watchLoss(renderer: WebGPURenderer, onLoss: (reason: string) => void): LossWatch {
   let report: ((reason: string) => void) | undefined = onLoss;
   renderer.onDeviceLost = (info: { message?: string }) => report?.(info.message ?? 'device lost');
-  const device = (renderer.backend as { device?: GPUDevice }).device;
-  const gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
+  let device = (renderer.backend as { device?: GPUDevice }).device;
+  let gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
   let deviceLost = false;
   void device?.lost.then((info) => {
     deviceLost = true;
@@ -76,6 +79,10 @@ export function watchLoss(renderer: WebGPURenderer, onLoss: (reason: string) => 
   });
   return {
     held: () => (device ? !deviceLost : gl ? !gl.isContextLost() : false),
-    stop: () => (report = undefined),
+    stop: () => {
+      report = undefined;
+      device = undefined;
+      gl = undefined;
+    },
   };
 }

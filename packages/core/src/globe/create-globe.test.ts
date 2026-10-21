@@ -213,6 +213,50 @@ describe('createGlobe', () => {
     }
   });
 
+  it('keeps the range of a container that collapses through small sizes (KB-050)', async () => {
+    const { globe, renderer } = await started({ view: { zoom: 2 } });
+    const before = globe.camera;
+    for (const heightPx of [4, 0, 20, 600]) {
+      renderer.size = { widthPx: 800, heightPx };
+      renderer.resizeListener?.();
+      renderer.flush();
+    }
+    expect(globe.camera.rangeMeters).toBeCloseTo(before.rangeMeters, 3);
+    expect(globe.camera.zoom).toBeCloseTo(before.zoom, 9);
+  });
+
+  it('captures only a frame it drew: waits while nothing can be drawn (KB-051)', async () => {
+    const { globe, renderer } = await started();
+    renderer.drawing = false;
+    let captured = false;
+    const capture = globe.captureFrame().then(() => (captured = true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    renderer.flush();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(captured).toBe(false);
+    renderer.drawing = true;
+    globe.requestRender();
+    renderer.flush();
+    await capture;
+    expect(captured).toBe(true);
+  });
+
+  it('rejects a waiting capture when the renderer gives up or the globe is destroyed (KB-051)', async () => {
+    const { globe, renderer } = await started();
+    renderer.drawing = false;
+    const failed = globe.captureFrame();
+    await Promise.resolve();
+    renderer.events?.failed(new GlobeError('renderer-failed', 'gave up'));
+    await expect(failed).rejects.toMatchObject({ code: 'renderer-failed' });
+    await expect(globe.captureFrame()).rejects.toMatchObject({ code: 'renderer-failed' });
+    const other = await started();
+    other.renderer.drawing = false;
+    const destroyed = other.globe.captureFrame();
+    await Promise.resolve();
+    other.globe.destroy();
+    await expect(destroyed).rejects.toMatchObject({ code: 'destroyed' });
+  });
+
   it('reports the altitude as soon as the viewport has a size, before the first frame (KB-047)', async () => {
     const { renderer, factory } = fakeRenderer();
     let loaded: (() => void) | undefined;

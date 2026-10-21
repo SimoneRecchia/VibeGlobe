@@ -18,6 +18,7 @@ import { GlobeError } from './errors.js';
 import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { EngineClock } from './engine-clock.js';
+import { FrameWaits } from './frame-waits.js';
 import type {
   BackendName,
   CameraState,
@@ -40,8 +41,10 @@ import type {
 } from './types.js';
 import {
   DEFAULT_VIEW,
-  describeInput,
+  isScreenPoint,
   validateHandler,
+  validateResolutionScale,
+  validateScreenPoint,
   validateOptions,
   validatePosition,
   validateView,
@@ -101,6 +104,11 @@ class GlobeEngine implements Globe {
   private rejectReady: ((error: GlobeError) => void) | undefined;
   /** The requested view until the renderer gives the viewport its size; then the camera holds it. */
   private pendingView: ValidView | undefined;
+  /** True while the container has no size (hidden, collapsed): no frame runs and the camera keeps its pose (KB-050). */
+  private collapsed = false;
+  /** Why the renderer gave up, once it has (KB-051). */
+  private failure: GlobeError | undefined;
+  private readonly captureWaits = new FrameWaits(this.emitter);
   /** True while a frame runs, so a size change found by its own check does not start a nested frame. */
   private inFrame = false;
   private resolutionScale: number;
@@ -121,7 +129,7 @@ class GlobeEngine implements Globe {
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.
-      grab: (point) => (this.validPoint(point) ? this.pick(point) : undefined),
+      grab: (point) => (isScreenPoint(point) ? this.pick(point) : undefined),
       dragTo: (anchor, point) => this.dragTo(anchor, point),
       zoomAt: (point, deltaZoom) => this.zoomAt(point, deltaZoom),
       requestUpdate: () => this.requestRender(),
@@ -181,8 +189,12 @@ class GlobeEngine implements Globe {
         this.requestRender();
       },
       backendFallback: (reason) => this.emitter.emit('backend-fallback', { reason }),
-      // Nothing is drawn any more: a first frame that never came will not come (KB-036).
-      failed: (error) => this.failStart(error),
+      // Nothing is drawn any more: a first frame that never came will not come (KB-036), nor a frame to capture.
+      failed: (error) => {
+        this.failure = error;
+        this.captureWaits.end(error);
+        this.failStart(error);
+      },
     };
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) {
@@ -226,19 +238,20 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     if (!renderer) return;
     const { widthPx, heightPx } = renderer.host.containerSize();
+    // A container without a size (hidden, collapsed) has no viewport: frames stop and the camera keeps its pose, so its
+    // range survives whatever sizes the container passes through (KB-046, KB-050).
+    this.collapsed = widthPx <= 0 || heightPx <= 0;
+    if (this.collapsed) return;
     const pixelRatio = renderer.host.pixelRatio() * this.resolutionScale;
-    // A container without a size (hidden, collapsed) has no zoom: the view waits for a size again, read while the
-    // camera still has its last one (KB-046).
-    if (!this.pendingView && (widthPx <= 0 || heightPx <= 0)) this.pendingView = currentView(this.cam);
-    this.cam.widthPx = Math.max(1, widthPx);
-    this.cam.heightPx = Math.max(1, heightPx);
+    this.cam.widthPx = widthPx;
+    this.cam.heightPx = heightPx;
     this.frameView.widthPx = this.cam.widthPx;
     this.frameView.heightPx = this.cam.heightPx;
     this.frameView.pixelRatio = pixelRatio;
     renderer.resize(this.cam.widthPx, this.cam.heightPx, pixelRatio);
     this.dirty = true;
     // The requested view becomes a camera once the viewport has a size: its zoom depends on it (KB-034).
-    if (this.pendingView && widthPx > 0 && heightPx > 0) {
+    if (this.pendingView) {
       applyView(this.cam, this.pendingView);
       this.pendingView = undefined;
       // The eye is known from now on, before any frame (KB-047).
@@ -282,10 +295,10 @@ class GlobeEngine implements Globe {
     this.inFrame = true;
     renderer.host.checkSize?.();
     // Until the requested view has a viewport there is no camera to draw or report (KB-040).
-    if (!this.pendingView) this.controls?.update?.();
+    if (!this.waiting) this.controls?.update?.();
     this.inFrame = false;
     this.dirty = false;
-    if (this.pendingView) return;
+    if (this.waiting) return;
     this.cam.update();
     const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
     surface.prepare(this.tiles, count, this.keys);
@@ -314,13 +327,7 @@ class GlobeEngine implements Globe {
 
   setResolutionScale(scale: number): void {
     this.assertAlive();
-    if (typeof scale !== 'number' || !(scale >= 0.1 && scale <= 4)) {
-      throw new GlobeError(
-        'invalid-option',
-        `resolutionScale must be a number between 0.1 and 4, got ${describeInput(scale)}`,
-      );
-    }
-    this.resolutionScale = scale;
+    this.resolutionScale = validateResolutionScale(scale);
     this.syncSize();
     this.requestRender();
   }
@@ -328,7 +335,8 @@ class GlobeEngine implements Globe {
   jumpTo(target: ViewInit): void {
     this.assertAlive();
     const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
-    const pending = this.pendingView;
+    // While the container has no size a jump is kept as a request, like before start (KB-046).
+    const pending = this.pendingView ?? (this.collapsed ? currentView(this.cam) : undefined);
     let view;
     try {
       view = validateView(target, pending ?? currentView(this.cam));
@@ -353,25 +361,12 @@ class GlobeEngine implements Globe {
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
-    if (!this.validPoint(point)) {
-      throw new GlobeError(
-        'invalid-coordinate',
-        `A screen point needs finite xPx and yPx, got ${describeInput(point)}`,
-      );
-    }
-    return this.pick(point);
-  }
-
-  /** True for an object with finite xPx and yPx. */
-  private validPoint(point: unknown): point is ScreenPoint {
-    if (point === null || typeof point !== 'object') return false;
-    const { xPx, yPx } = point as Partial<ScreenPoint>;
-    return typeof xPx === 'number' && Number.isFinite(xPx) && typeof yPx === 'number' && Number.isFinite(yPx);
+    return this.pick(validateScreenPoint(point));
   }
 
   /** The position under a valid screen point; none before the viewport has a size. */
   private pick(point: ScreenPoint): GeoPosition | undefined {
-    if (this.pendingView) return undefined;
+    if (this.waiting) return undefined;
     this.cam.update();
     if (!this.cam.pickEllipsoid(point.xPx, point.yPx, pick)) return undefined;
     return { longitudeDeg: wrapDegrees(pick.longitudeRad * DEG), latitudeDeg: pick.latitudeRad * DEG, heightMeters: 0 };
@@ -380,7 +375,7 @@ class GlobeEngine implements Globe {
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
     this.assertAlive();
     validatePosition(position);
-    if (this.pendingView) return undefined;
+    if (this.waiting) return undefined;
     this.cam.update();
     geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, ecefScratch);
     if (!projectToScreen(this.cam, ecefScratch, screenScratch)) return undefined;
@@ -389,12 +384,12 @@ class GlobeEngine implements Globe {
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.assertAlive();
-    if (!this.pendingView && dragCamera(this.cam, anchor, point)) this.requestRender();
+    if (!this.waiting && dragCamera(this.cam, anchor, point)) this.requestRender();
   }
 
   private zoomAt(point: ScreenPoint, deltaZoom: number): void {
     this.assertAlive();
-    if (!this.pendingView && zoomCamera(this.cam, point, deltaZoom)) this.requestRender();
+    if (!this.waiting && zoomCamera(this.cam, point, deltaZoom)) this.requestRender();
   }
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {
@@ -432,11 +427,22 @@ class GlobeEngine implements Globe {
   async captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
     await this.ready;
-    const renderer = this.renderer;
-    if (this.destroyed || !renderer) throw new GlobeError('destroyed', 'The globe was destroyed');
-    // Drawn and read in one task: the canvas keeps the frame only until the browser presents it.
-    this.drawNow(renderer);
-    return renderer.capture();
+    for (;;) {
+      const renderer = this.renderer;
+      if (this.destroyed || !renderer) throw new GlobeError('destroyed', 'The globe was destroyed');
+      if (this.failure) throw this.failure;
+      const drawn = this.frames;
+      // Drawn and read in one task: the canvas keeps the frame only until the browser presents it.
+      this.drawNow(renderer);
+      if (this.frames > drawn) return renderer.capture();
+      // Nothing could be drawn (a recovery, a container without a size): wait for a drawn frame (KB-051).
+      await this.captureWaits.next();
+    }
+  }
+
+  /** True while there is no camera to draw or query: before the first size, and while the container has none. */
+  private get waiting(): boolean {
+    return this.pendingView !== undefined || this.collapsed;
   }
 
   simulateDeviceLoss(): void {
@@ -453,9 +459,12 @@ class GlobeEngine implements Globe {
     }
     if (this.frameId !== undefined) this.renderer?.host.cancelFrame(this.frameId);
     this.controls?.destroy();
+    // The canvas holds its GPU context, whose device holds the renderer (KB-053).
+    this.controlsElement = undefined;
     for (const cleanup of this.cleanups) cleanup();
     this.surface?.clear();
     this.renderer?.destroy();
+    this.captureWaits.end(new GlobeError('destroyed', 'The globe was destroyed'));
     this.emitter.clear();
   }
 

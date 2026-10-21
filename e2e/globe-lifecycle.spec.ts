@@ -11,6 +11,7 @@ import {
   screenToGeo,
   waitForIdle,
 } from './support/globe.ts';
+import { slowRecoverySteps } from './support/recovery.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
@@ -163,34 +164,6 @@ for (const backend of BACKENDS) {
   });
 }
 
-// The recovery's asynchronous steps, slowed once `slowRecovery` is set: the device request (initRenderer) and pipeline
-// compilation (the warm-up). Each records its name in `recoveryStep` while it waits, so a test can destroy the globe
-// inside it. destroy() there must leave nothing behind (KB-035).
-function slowRecoverySteps(): void {
-  const state = window as unknown as { slowRecovery?: boolean; recoveryStep?: string };
-  const slowed = async <T>(step: string, value: Promise<T>): Promise<T> => {
-    const result = await value;
-    if (state.slowRecovery) {
-      state.recoveryStep = step;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-    return result;
-  };
-  const adapter = globalThis.GPUAdapter?.prototype;
-  if (!adapter) return;
-  const requestDevice = adapter.requestDevice;
-  adapter.requestDevice = function (this: GPUAdapter, ...args: Parameters<GPUAdapter['requestDevice']>) {
-    return slowed('device request', requestDevice.apply(this, args));
-  };
-  const createPipeline = GPUDevice.prototype.createRenderPipelineAsync;
-  GPUDevice.prototype.createRenderPipelineAsync = function (
-    this: GPUDevice,
-    ...args: Parameters<GPUDevice['createRenderPipelineAsync']>
-  ) {
-    return slowed('pipeline warm-up', createPipeline.apply(this, args));
-  };
-}
-
 for (const step of ['device request', 'pipeline warm-up'] as const) {
   test(`destroy() during the WebGPU recovery's ${step} leaves no canvas, message or controls behind (KB-035)`, async ({
     page,
@@ -236,6 +209,40 @@ test('a recovery that finds WebGPU gone switches to WebGL2 and reports backend-f
   const types = await page.evaluate(() => window.vibeglobePlayground?.events.map((event) => event.type));
   expect(types).toContain('backend-fallback');
   expect(types?.indexOf('backend-fallback')).toBeGreaterThan(types?.indexOf('device-lost') ?? Infinity);
+  await waitForIdle(page);
+  await expectCompleteGlobe(page);
+});
+
+test('a recovery whose WebGPU fails its self-test reports one backend-fallback naming the self-test (KB-052)', async ({
+  page,
+}) => {
+  // Once `breakViews` is set, every texture view WebGPU creates is invalid: the recovery's self-test fails.
+  await page.addInitScript(() => {
+    const prototype = (globalThis as { GPUTexture?: { prototype: GPUTexture } }).GPUTexture?.prototype;
+    if (!prototype) return;
+    const createView = prototype.createView;
+    prototype.createView = function (this: GPUTexture, descriptor?: GPUTextureViewDescriptor): GPUTextureView {
+      const broken = (window as unknown as { breakViews?: boolean }).breakViews === true;
+      return createView.call(this, broken ? { ...descriptor, mipLevelCount: 99 } : descriptor);
+    };
+  });
+  await openGlobe(page, 'zoom=3');
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgpu');
+  await page.evaluate(() => {
+    (window as unknown as { breakViews?: boolean }).breakViews = true;
+    window.vibeglobePlayground?.globe.simulateDeviceLoss();
+  });
+  await page.waitForFunction(() =>
+    window.vibeglobePlayground?.events.some((event) => event.type === 'device-restored'),
+  );
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgl2');
+  const fallbacks = await page.evaluate(() =>
+    window.vibeglobePlayground?.events
+      .filter((event) => event.type === 'backend-fallback')
+      .map((event) => JSON.stringify(event.payload)),
+  );
+  expect(fallbacks).toHaveLength(1);
+  expect(fallbacks?.[0]).toContain('self-test');
   await waitForIdle(page);
   await expectCompleteGlobe(page);
 });

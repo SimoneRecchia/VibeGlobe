@@ -1,5 +1,6 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { openGlobe } from './support/globe.ts';
+import { slowRecoverySteps } from './support/recovery.ts';
 
 // ADR 0010's leak suite: 100 mount/unmount cycles, as a single-page app does on navigation, must leave the JS heap, the
 // DOM, the event listeners and the live GPU objects where they were. Chromium only (CDP heap and DOM counters).
@@ -238,4 +239,27 @@ test('a destroyed globe that the host still references holds no renderer (KB-045
   });
   // At most one more: three.js's module-level output node keeps a reference to the last renderer it served.
   expect(await renderers()).toBeLessThanOrEqual(before + 1);
+});
+
+test('a globe destroyed while its recovery starts a renderer holds no renderer (KB-053)', async ({ page }) => {
+  await page.addInitScript(slowRecoverySteps);
+  await openGlobe(page, 'backend=webgpu&zoom=3');
+  const cdp = await page.context().newCDPSession(page);
+  const renderers = async (): Promise<number> => {
+    await page.waitForTimeout(500);
+    await cdp.send('HeapProfiler.collectGarbage');
+    return (await heapObjects(cdp)).instances.get('WebGPURenderer') ?? 0;
+  };
+  const before = await renderers();
+  await page.evaluate(() => {
+    (window as unknown as { slowRecovery?: boolean }).slowRecovery = true;
+    window.vibeglobePlayground?.globe.simulateDeviceLoss();
+  });
+  await page.waitForFunction(() => (window as unknown as { recoveryStep?: string }).recoveryStep === 'device request');
+  // The playground keeps its reference to the destroyed globe, as a host would.
+  await page.evaluate(() => window.vibeglobePlayground?.globe.destroy());
+  // The recovery's device request resumes after a second and its renderer starts.
+  await page.waitForTimeout(3000);
+  // Not more than before: three.js's module-level output node may keep the destroyed globe's last renderer (KB-045).
+  expect(await renderers()).toBeLessThanOrEqual(before);
 });

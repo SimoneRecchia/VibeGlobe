@@ -1,5 +1,5 @@
 import { GlobeError } from './errors.js';
-import type { GlobeEvents, GlobeOptions, ViewInit } from './types.js';
+import type { GeoPosition, GlobeEvents, GlobeOptions, ViewInit } from './types.js';
 
 // Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
 const MAX_ZOOM = 28;
@@ -65,6 +65,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   for (const [name, min, max] of [
     ['resolutionScale', 0.1, 4],
     ['maxScreenErrorPx', 0.1, 64],
+    ['manualClockStepMs', 0.001, 1000],
   ] as const) {
     const value = input[name];
     if (value !== undefined) {
@@ -117,5 +118,34 @@ export function validateHandler(event: unknown, handler: unknown): void {
       'invalid-option',
       `The handler for ${String(event)} must be a function, got ${String(handler)}`,
     );
+  }
+}
+
+/** Validates a WGS84 position given to a query; throws a typed GlobeError. */
+export function validatePosition(position: unknown): void {
+  if (position === null || typeof position !== 'object') {
+    throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describeInput(position)}`);
+  }
+  const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
+  for (const [name, value] of [
+    ['longitudeDeg', longitudeDeg],
+    ['latitudeDeg', latitudeDeg],
+    ['heightMeters', heightMeters ?? 0],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
+    }
+  }
+  if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
+    throw new GlobeError('invalid-coordinate', `latitudeDeg must be between -90 and 90, got ${String(latitudeDeg)}`);
+  }
+}
+
+/** A short description of an invalid input for error messages. */
+export function describeInput(value: unknown): string {
+  try {
+    return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+  } catch {
+    return Object.prototype.toString.call(value);
   }
 }

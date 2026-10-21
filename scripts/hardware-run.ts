@@ -62,6 +62,7 @@ outcomes['e2e'] = step(
 );
 // Timing budgets are meaningful only on a real GPU.
 outcomes['bench'] = step('bench', 'npm', ['run', 'bench', ...(software ? ['--', '--report-only'] : [])]);
+outcomes['bench-micro'] = step('bench-micro', 'npm', ['run', 'bench:micro']);
 for (const browser of browsers) {
   const selector = ['chrome', 'msedge'].includes(browser) ? ['--channel', browser] : ['--browser', browser];
   outcomes[`offscreen-${browser}`] = step(`offscreen-${browser}`, 'npm', [

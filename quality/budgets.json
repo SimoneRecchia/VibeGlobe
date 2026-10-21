@@ -98,5 +98,10 @@
     "scenario": "frame-loop",
     "firstFrameMedianMs": 1000,
     "firstFrameP90Ms": 1000
+  },
+  "micro": {
+    "eye-relative-5000-draws": {
+      "medianMs": 0.1
+    }
   }
 }

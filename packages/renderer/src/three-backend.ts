@@ -5,6 +5,7 @@ import {
   type DepthPath,
   type FrameView,
   type RendererBackend,
+  type FrameCapture,
   type RendererCapabilities,
   type RendererEvents,
   type RendererStats,
@@ -23,7 +24,7 @@ import {
   type MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
-import { CanvasSlot } from './canvas-slot.js';
+import { CanvasSlot, captureCanvas } from './canvas-slot.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
@@ -401,6 +402,11 @@ export class ThreeBackend implements RendererBackend {
       vertexArrays: countVertexArrays(this.renderer.backend),
       contexts: this.contextHeld() ? 1 : 0,
     };
+  }
+
+  /** The frame just drawn, read from the canvas in the calling task (ADR 0012, Capture). */
+  capture(): Promise<FrameCapture> {
+    return captureCanvas(this.canvases.drawingCanvas);
   }
 
   /** Test hook: destroys the WebGPU device or loses the WebGL2 context. */

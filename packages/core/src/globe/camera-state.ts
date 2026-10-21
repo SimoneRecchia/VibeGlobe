@@ -111,3 +111,17 @@ export function currentView(camera: Camera): ValidView {
     tiltDeg: state.tiltDeg,
   };
 }
+
+/** The camera state of a view requested before the viewport has a size: range and altitude are not known yet. */
+export function requestedCameraState(view: ValidView): CameraState {
+  return {
+    longitudeDeg: wrapDegrees(view.longitudeDeg),
+    latitudeDeg: view.latitudeDeg,
+    zoom: view.zoom,
+    altitudeMeters: Number.NaN,
+    headingDeg: wrapDegrees(view.headingDeg),
+    tiltDeg: view.tiltDeg,
+    rollDeg: 0,
+    rangeMeters: Number.NaN,
+  };
+}

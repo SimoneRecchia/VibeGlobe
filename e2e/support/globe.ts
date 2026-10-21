@@ -3,6 +3,10 @@ import { expect, type Page } from '@playwright/test';
 import type { Globe } from '@vibeglobe/core';
 import type { GpuProbeResult } from '@vibeglobe/renderer';
 import { PNG } from 'pngjs';
+import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
+
+/** The Chromium build Playwright 1.64.1 pins (its browsers.json), which CI runs and the baselines come from. */
+const PINNED_CHROMIUM = '156.0.8078.4';
 
 declare global {
   interface Window {
@@ -33,6 +37,7 @@ export async function openGlobe(page: Page, query = ''): Promise<void> {
   // A test that names a backend runs on it: a forced backend never falls back (KB-019).
   const forced = /backend=(webgpu|webgl2)/.exec(query)?.[1];
   if (forced) expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe(forced);
+  await expectTestEnvironment(page);
 }
 
 /**
@@ -66,9 +71,48 @@ export async function waitForIdle(page: Page): Promise<number> {
   );
 }
 
-/** Decodes a screenshot of the globe canvas. */
-export async function canvasImage(page: Page, selector = '#globe'): Promise<PNG> {
+/**
+ * The globe's current frame, read back by the engine (ADR 0012, Capture: never a page screenshot) and composited over
+ * the page background the canvas is transparent against. `index` picks the instance on pages with several.
+ */
+export async function canvasImage(page: Page, index = 0): Promise<PNG> {
+  const frame = await page.evaluate(async (i) => {
+    const capture = await window.vibeglobePlayground?.globes[i]?.captureFrame();
+    if (!capture) throw new Error(`no globe ${i}`);
+    const bytes = new Uint8Array(capture.rgba.buffer, capture.rgba.byteOffset, capture.rgba.byteLength);
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    return { widthPx: capture.widthPx, heightPx: capture.heightPx, base64: btoa(binary) };
+  }, index);
+  const rgba = Buffer.from(frame.base64, 'base64');
+  const image = new PNG({ width: frame.widthPx, height: frame.heightPx });
+  for (let i = 0; i < rgba.length; i += 4) {
+    const alpha = rgba[i + 3] ?? 0;
+    for (let channel = 0; channel < 3; channel++) {
+      const color = rgba[i + channel] ?? 0;
+      image.data[i + channel] = Math.round((color * alpha + (BACKGROUND_RGB[channel] ?? 0) * (255 - alpha)) / 255);
+    }
+    image.data[i + 3] = 255;
+  }
+  return image;
+}
+
+/** A screenshot of an element as the page shows it: for DOM behavior (what the browser composites), not frames. */
+export async function pageImage(page: Page, selector: string): Promise<PNG> {
   return PNG.sync.read(await page.locator(selector).screenshot());
+}
+
+/**
+ * ADR 0012's start-up assertions: on Chromium with the software GPU the renderer is SwiftShader, and in CI the browser
+ * is the pinned build. A mismatch fails the test; it is never a skip.
+ */
+async function expectTestEnvironment(page: Page): Promise<void> {
+  const browser = page.context().browser();
+  if (browser?.browserType().name() !== 'chromium' || hardwareGpu()) return;
+  const adapter = await page.evaluate(() => window.vibeglobePlayground?.globe.capabilities?.adapter ?? '');
+  expect(adapter, 'the software GPU').toMatch(/swiftshader/i);
+  if (process.env['CI']) expect(browser.version(), 'the pinned Chromium').toBe(PINNED_CHROMIUM);
 }
 
 /** Counts background-colored (or black) pixels inside a circle around the image center. */
@@ -112,7 +156,7 @@ async function silhouetteRadiusPx(page: Page, index = 0, selector = '#globe'): P
 export async function expectCompleteGlobe(page: Page, index = 0, selector = '#globe'): Promise<void> {
   await waitForIdle(page);
   const radius = await silhouetteRadiusPx(page, index, selector);
-  expect(emptyPixelsInside(await canvasImage(page, selector), radius)).toBe(0);
+  expect(emptyPixelsInside(await canvasImage(page, index), radius)).toBe(0);
 }
 
 /** The screen point of a geographic position, through the engine's public API. */

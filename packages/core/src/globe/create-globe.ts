@@ -9,6 +9,7 @@ import {
   currentView,
   newCameraState,
   readCameraState,
+  requestedCameraState,
   wrapDegrees,
   writeCameraState,
 } from './camera-state.js';
@@ -16,12 +17,13 @@ import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
+import { EngineClock } from './engine-clock.js';
 import type {
   BackendName,
-  DebugShape,
-  RendererStats,
   CameraState,
   Controls,
+  DebugShape,
+  FrameCapture,
   GeoPosition,
   Globe,
   GlobeEvents,
@@ -30,11 +32,20 @@ import type {
   RendererBackend,
   RendererCapabilities,
   RendererEvents,
+  RendererStats,
   ResourceCounts,
   ScreenPoint,
   ViewInit,
 } from './types.js';
-import { DEFAULT_VIEW, validateHandler, validateOptions, validateView, type ValidView } from './validation.js';
+import {
+  DEFAULT_VIEW,
+  describeInput,
+  validateHandler,
+  validateOptions,
+  validatePosition,
+  validateView,
+  type ValidView,
+} from './validation.js';
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -72,7 +83,13 @@ class GlobeEngine implements Globe {
    * Bound once, so scheduling a frame allocates no closure; a bound method rather than an arrow function, so no wrapper
    * function has to wait for the optimizing compiler (it is called only once per frame).
    */
-  private readonly onFrame: () => void = this.frame.bind(this);
+  /** The timestamp of the frame being drawn, for the clock (in an array: ADR 0018). */
+  private readonly frameTime = new Float64Array(1);
+  private readonly onFrame = (timeMs: number): void => {
+    this.frameTime[0] = timeMs;
+    this.frame();
+  };
+  private readonly clock: EngineClock;
   private dirty = true;
   private visible = true;
   private imageryLoaded = false;
@@ -95,6 +112,7 @@ class GlobeEngine implements Globe {
 
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
+    this.clock = new EngineClock(options.manualClockStepMs ?? 0);
     this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
     this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
@@ -108,14 +126,13 @@ class GlobeEngine implements Globe {
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
-      this.start().catch((error: unknown) => {
-        const globeError =
+      this.start().catch((error: unknown) =>
+        this.failStart(
           error instanceof GlobeError
             ? error
-            : new GlobeError('renderer-failed', 'The renderer failed to start', { cause: error });
-        this.emitter.emit('error', globeError);
-        reject(globeError);
-      });
+            : new GlobeError('renderer-failed', 'The renderer failed to start', { cause: error }),
+        ),
+      );
     });
     // Callers that never await `ready` must not see an unhandled rejection; the error event reports it.
     this.ready.catch(() => undefined);
@@ -131,22 +148,25 @@ class GlobeEngine implements Globe {
 
   get camera(): CameraState {
     const pending = this.pendingView;
-    if (!pending) return readCameraState(this.cam);
     // Before the viewport has a size, range and altitude are unknown (types.ts, Globe.camera).
-    return {
-      longitudeDeg: wrapDegrees(pending.longitudeDeg),
-      latitudeDeg: pending.latitudeDeg,
-      zoom: pending.zoom,
-      altitudeMeters: Number.NaN,
-      headingDeg: wrapDegrees(pending.headingDeg),
-      tiltDeg: pending.tiltDeg,
-      rollDeg: 0,
-      rangeMeters: Number.NaN,
-    };
+    return pending ? requestedCameraState(pending) : readCameraState(this.cam);
   }
 
   get frameNumber(): number {
     return this.frames;
+  }
+
+  get timeMs(): number {
+    return this.clock.timeMs;
+  }
+
+  /** Reports an error and rejects `ready` if the first frame has not been drawn. */
+  private failStart(error: GlobeError): void {
+    this.emitter.emit('error', error);
+    const reject = this.rejectReady;
+    if (!this.resolveReady || !reject) return;
+    this.resolveReady = undefined;
+    reject(error);
   }
 
   private async start(): Promise<void> {
@@ -158,14 +178,8 @@ class GlobeEngine implements Globe {
         this.requestRender();
       },
       backendFallback: (reason) => this.emitter.emit('backend-fallback', { reason }),
-      failed: (error) => {
-        this.emitter.emit('error', error);
-        // Nothing is drawn any more: a first frame that never came will not come (KB-036).
-        if (this.resolveReady) {
-          this.resolveReady = undefined;
-          this.rejectReady?.(error);
-        }
-      },
+      // Nothing is drawn any more: a first frame that never came will not come (KB-036).
+      failed: (error) => this.failStart(error),
     };
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) {
@@ -230,7 +244,13 @@ class GlobeEngine implements Globe {
       this.requestRender();
       return;
     }
+    this.drawNow(renderer);
+  }
+
+  /** Draws a frame right away instead of at the next display frame. */
+  private drawNow(renderer: RendererBackend): void {
     if (this.frameId !== undefined) renderer.host.cancelFrame(this.frameId);
+    this.frameTime[0] = renderer.host.now();
     this.frame();
   }
 
@@ -249,6 +269,7 @@ class GlobeEngine implements Globe {
     if (this.destroyed || !renderer || !surface || !this.visible) return;
     // Size checks and the input recorded since the last frame are handled here, inside the frame: what they change is
     // drawn by this frame, not by another one.
+    this.clock.advance(this.frameTime);
     this.inFrame = true;
     renderer.host.checkSize?.();
     this.controls?.update?.();
@@ -321,7 +342,10 @@ class GlobeEngine implements Globe {
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
     if (!this.validPoint(point)) {
-      throw new GlobeError('invalid-coordinate', `A screen point needs finite xPx and yPx, got ${describe(point)}`);
+      throw new GlobeError(
+        'invalid-coordinate',
+        `A screen point needs finite xPx and yPx, got ${describeInput(point)}`,
+      );
     }
     return this.pick(point);
   }
@@ -392,6 +416,16 @@ class GlobeEngine implements Globe {
     this.requestRender();
   }
 
+  async captureFrame(): Promise<FrameCapture> {
+    this.assertAlive();
+    await this.ready;
+    const renderer = this.renderer;
+    if (this.destroyed || !renderer) throw new GlobeError('destroyed', 'The globe was destroyed');
+    // Drawn and read in one task: the canvas keeps the frame only until the browser presents it.
+    this.drawNow(renderer);
+    return renderer.capture();
+  }
+
   simulateDeviceLoss(): void {
     this.assertAlive();
     this.renderer?.simulateDeviceLoss();
@@ -417,37 +451,6 @@ class GlobeEngine implements Globe {
   }
 }
 
-/** Validates a WGS84 position given to a query; throws a typed GlobeError. */
-function validatePosition(position: unknown): void {
-  if (position === null || typeof position !== 'object') {
-    throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describe(position)}`);
-  }
-  const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  for (const [name, value] of [
-    ['longitudeDeg', longitudeDeg],
-    ['latitudeDeg', latitudeDeg],
-    ['heightMeters', heightMeters ?? 0],
-  ] as const) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describe(value)}`);
-    }
-  }
-  if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
-    throw new GlobeError('invalid-coordinate', `latitudeDeg must be between -90 and 90, got ${String(latitudeDeg)}`);
-  }
-}
-
-/** A short description of an invalid input for error messages. */
-function describe(value: unknown): string {
-  try {
-    return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
-  } catch {
-    return Object.prototype.toString.call(value);
-  }
-}
-
 const ecefScratch = new Float64Array(3);
 const screenScratch = new Float64Array(2);
-/** Drag inputs: the anchor (longitude, latitude in radians, height), the pixel and the pose to restore on failure. */
-
 const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };

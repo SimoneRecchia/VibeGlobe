@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { canvasImage } from './support/globe.ts';
+import { pageImage } from './support/globe.ts';
 
 /** The fixture host application (apps/lazy-host), served from its production build. */
 const LAZY_HOST = `http://localhost:${process.env['LAZY_HOST_PORT'] ?? 5175}/`;
@@ -67,7 +67,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     expect(scripts.some((script) => threeChunk?.file === script)).toBe(true);
     // The view fills the canvas with imagery: no pixel of the white page shows through, none is left black. The
     // outermost pixels are skipped: an element screenshot rounds a fractional page offset into one row of the page.
-    const image = await canvasImage(page, '#map canvas');
+    const image = await pageImage(page, '#map canvas');
     let empty = 0;
     for (let y = 1; y < image.height - 1; y++) {
       for (let x = 1; x < image.width - 1; x++) {

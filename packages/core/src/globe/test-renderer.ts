@@ -1,5 +1,6 @@
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type {
+  FrameCapture,
   FrameView,
   RendererBackend,
   RendererCapabilities,
@@ -86,6 +87,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       contexts: renderer.destroyed ? 0 : 1,
     }),
     simulateDeviceLoss: () => renderer.events?.deviceLost('simulated'),
+    capture: () => Promise.resolve(blankFrame(renderer.size)),
     destroy: () => {
       renderer.destroyed = true;
     },
@@ -165,4 +167,9 @@ class FrameQueue {
     for (let i = 0; i < count; i++) this.running[i]?.(0);
     return count;
   }
+}
+
+/** A transparent frame of the given size: the fake renderer draws nothing. */
+function blankFrame(size: { widthPx: number; heightPx: number }): FrameCapture {
+  return { ...size, rgba: new Uint8ClampedArray(size.widthPx * size.heightPx * 4) };
 }

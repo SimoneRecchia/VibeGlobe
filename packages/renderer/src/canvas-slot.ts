@@ -1,4 +1,4 @@
-import { GlobeError } from '@vibeglobe/core';
+import { GlobeError, type FrameCapture } from '@vibeglobe/core';
 import type { DrawingSurface } from './three-backend.js';
 import { createCanvas } from './three-hooks.js';
 
@@ -41,6 +41,11 @@ export class CanvasSlot {
     return canvas;
   }
 
+  /** The canvas the current renderer draws into. */
+  get drawingCanvas(): AnyCanvas | undefined {
+    return this.drawing;
+  }
+
   /** Marks the canvas of a renderer that failed its self-test as shown, so the next one replaces it. */
   replaceFailed(canvas: AnyCanvas): void {
     this.shown ??= canvas;
@@ -74,5 +79,25 @@ export class CanvasSlot {
   private fresh(): HTMLCanvasElement {
     if (this.surface.kind !== 'element') throw new Error('A replacement canvas needs a page container');
     return createCanvas(this.surface.container.ownerDocument, this.shown as HTMLCanvasElement | undefined);
+  }
+}
+
+/**
+ * Reads a canvas's current frame. The snapshot is taken synchronously by `createImageBitmap`, so a caller that drew in
+ * the same task gets that frame (a WebGL drawing buffer or a WebGPU canvas texture lasts until the browser presents
+ * it); it is then unpacked through a 2D canvas, which returns RGBA without premultiplication.
+ */
+export async function captureCanvas(canvas: AnyCanvas | undefined): Promise<FrameCapture> {
+  if (!canvas) throw new GlobeError('renderer-failed', 'There is no canvas to capture');
+  const bitmap = await createImageBitmap(canvas);
+  try {
+    const surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = surface.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new GlobeError('renderer-failed', 'No 2D context to read the frame');
+    context.drawImage(bitmap, 0, 0);
+    const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    return { widthPx: pixels.width, heightPx: pixels.height, rgba: pixels.data };
+  } finally {
+    bitmap.close();
   }
 }

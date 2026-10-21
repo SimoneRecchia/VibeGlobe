@@ -5,6 +5,7 @@ import { expect, type Page, type TestInfo } from '@playwright/test';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
+import { canvasImage } from './globe.ts';
 
 /** Tolerances from ADR 0012. */
 const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
@@ -13,10 +14,9 @@ export const CROSS_BACKEND = { threshold: 0.1, maxDiffRatio: 0.001 } as const;
 
 const BASELINE_BROWSER_FILE = new URL('../__baselines__/browser.json', import.meta.url);
 
-/** Captures the globe canvas without the page's text overlays. */
-export async function captureCanvas(page: Page, selector = '#globe'): Promise<PNG> {
-  await page.addStyleTag({ content: '#status, #cursor { visibility: hidden !important; }' });
-  return PNG.sync.read(await page.locator(selector).screenshot());
+/** The globe's frame, read back by the engine (ADR 0012, Capture). */
+export async function captureCanvas(page: Page): Promise<PNG> {
+  return canvasImage(page);
 }
 
 /** Counts pixels that differ beyond the threshold (anti-aliasing detection on) and writes the diff image. */

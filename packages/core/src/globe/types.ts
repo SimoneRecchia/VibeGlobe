@@ -55,6 +55,15 @@ export interface FrameView {
   readonly pixelRatio: number;
 }
 
+/** A drawn frame's pixels (test hook). */
+export interface FrameCapture {
+  /** Drawing-buffer size in device pixels. */
+  readonly widthPx: number;
+  readonly heightPx: number;
+  /** RGBA, 8 bits per channel, not premultiplied, top row first; transparent where nothing was drawn. */
+  readonly rgba: Uint8ClampedArray;
+}
+
 /** GPU resource counters, all zero after destroy (F068). */
 export interface ResourceCounts {
   /** Surface and debug meshes held on the GPU. */
@@ -158,6 +167,8 @@ export interface RendererBackend {
   resourceCounts(): ResourceCounts;
   /** Test hook: forces a device or context loss. */
   simulateDeviceLoss(): void;
+  /** Test hook: the pixels of the frame just drawn, read in the same task (ADR 0012, Capture). */
+  capture(): Promise<FrameCapture>;
   destroy(): void;
 }
 
@@ -233,6 +244,12 @@ export interface GlobeOptions {
    * fine. Raising it costs draws and buys nothing visible in M2; benchmarks use it to set the tile count.
    */
   readonly minSurfaceLevel?: number;
+  /**
+   * Test mode (ADR 0012): engine time advances by exactly this many milliseconds per drawn frame, whatever the display
+   * does, so animations and fades are reproducible frame by frame. Unset, it follows the display (each step at most
+   * 100 ms).
+   */
+  readonly manualClockStepMs?: number;
 }
 
 /** Events and their payloads. */
@@ -269,6 +286,8 @@ export interface Globe {
    * `rangeMeters` and `altitudeMeters` NaN.
    */
   readonly camera: CameraState;
+  /** Engine time in milliseconds, which animations and fades run on (ADR 0009): display steps clamped to 100 ms. */
+  readonly timeMs: number;
   /** Frames drawn since creation. */
   readonly frameNumber: number;
   /** Input intents, used by the controls plug-in and available to applications. */
@@ -302,6 +321,11 @@ export interface Globe {
   setDebugShapes(shapes: readonly DebugShape[]): void;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */
   simulateDeviceLoss(): void;
+  /**
+   * Test hook: draws a frame now and returns its pixels as the canvas holds them (ADR 0012: tests read frames from the
+   * engine, never from page screenshots). Resolves after `ready`; rejects with 'destroyed' after `destroy()`.
+   */
+  captureFrame(): Promise<FrameCapture>;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */
   destroy(): void;
 }

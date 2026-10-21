@@ -29,6 +29,7 @@ export type {
   DebugMeshData,
   DebugShape,
   ControlsFactory,
+  FrameCapture,
   FrameView,
   GeoPosition,
   Globe,

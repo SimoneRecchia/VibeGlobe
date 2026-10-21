@@ -152,6 +152,7 @@ jobs:
       - run: npm run build
       # Timings on SwiftShader are not meaningful (ADR 0012): record them as a trend, gate only deterministic counters.
       - run: npm run bench -- --report-only
+      - run: npm run bench:micro -- --report-only
       - if: always()
         uses: actions/upload-artifact@v7
         with:

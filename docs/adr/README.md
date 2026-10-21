@@ -32,3 +32,4 @@ Conventions:
 | [0020](0020-texture-and-geometry-compression.md) | GPU texture compression (KTX2 transcoded in workers) and compressed geometry (Draco and meshopt in workers) | Accepted                                                          |
 | [0021](0021-milestone-review-closure.md)         | Closing a milestone's reviews                                                                               | Accepted (§4–5 replaced by 0022)                                  |
 | [0022](0022-faster-milestone-process.md)         | A faster process for the remaining milestones                                                               | Accepted                                                          |
+| [0023](0023-data-pipeline.md)                    | Data pipeline: a TypeScript pipeline with built-in readers, external tools only in pinned Docker images     | Accepted                                                          |

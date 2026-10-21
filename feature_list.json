@@ -4308,7 +4308,7 @@
         "Verify it lists correctness, seam, performance and reproducibility issues from their issue trackers, with links",
         "Verify it states the chosen pipeline approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F331",

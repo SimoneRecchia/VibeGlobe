@@ -38,6 +38,12 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - Milestone process (ADR 0021, ADR 0022): one complete fresh-context review per milestone, then one pass that checks only that round's fixes; no further complete rounds. Every fix starts with a regression test that fails before it.
 - End-to-end tests: during feature work run only the specs the change affects (`npx playwright test <specs>`, `-g <feature id>`). The full suite runs at the end of each milestone (manual CI run, four shards) and nightly. Machine-wide measurements (`--project=measurements --no-deps`) and the rendering probes run in their own CI job, never next to other tests, and never gate feature work; a red measurement is still a bug to fix before the milestone closes.
 - Subagents work in separate packages or files, create files and never commit; integrate each one when it finishes and run the tests it affects.
+- Time matters: avoid work that does not move a feature to passing; the earlier a correct result, the better. Commit and push after every completed feature.
+- Research: read only the parts of other engines that answer the current question; keep notes short.
+- A problem that resists three different approaches: record the options in `docs/open-questions.md`, choose the simplest that meets PLAN.md, and move on.
+- Tests: write them only for behaviors the plan or a fixed bug requires, roughly one focused test per stated behavior; scratch checks used while working are not committed. Do not re-run a test whose code and dependencies have not changed since it last passed; run only the tests your change affects (the full suite runs at the end of each milestone and in CI).
+- CI: re-run only failed jobs, never passing ones; re-run a flaky failure at most once, then investigate it.
+- Duplicate tests may be merged only if no behavior loses coverage, each merge recorded in `docs/test-changes.md`. Never delete or weaken a test just to make it pass.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.

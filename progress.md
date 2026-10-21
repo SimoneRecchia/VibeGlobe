@@ -33,6 +33,8 @@ Eighth M2 review found 2 issues (KB-057, a real device loss reported twice; KB-0
 
 Incremental reviews (ADR 0021): the first found KB-063 (medium: a host canvas that drew with WebGPU could not be given to a WebGL2 globe); the second was clean, with one low finding fixed (KB-064). M2's reviews are closed.
 
+Process from M3 (owner, 2026-10-21; ADR 0022, extends ADR 0021): one complete review per milestone plus one pass on its fixes only; the Chromium end-to-end suite runs in four CI shards, with the machine-wide measurements and rendering probes in their own isolated job; during feature work only the affected end-to-end specs run locally, the full suite at milestone end and nightly; subagents keep to separate packages or files. The repository was public on 2026-10-21; a scan of the whole git history found no secret; `LICENSE.md` (PolyForm Noncommercial 1.0.0) reaches `main` with the M2 merge.
+
 Also decided: texture and geometry compression (ADR 0020, `docs/research/compression.md`), ahead of M3 (F079 is marked when M3 starts).
 
 Notes for the next session:

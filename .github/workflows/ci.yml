@@ -1,7 +1,8 @@
 name: CI
 
 # Saves minutes (ADR 0015): every push, and pull requests from forks, run one job with every fast check; pushes to
-# main, the nightly schedule and manual runs add the browser jobs (end-to-end tests and recorded benchmarks).
+# main, the nightly schedule and manual runs add the browser jobs: the end-to-end suite in four shards, the isolated
+# measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
 on:
   push:
   pull_request:
@@ -64,9 +65,15 @@ jobs:
         run: npm run treeshake
 
   e2e:
-    name: End-to-end tests (Chromium)
+    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/4)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    # ADR 0022: the functional suite is split across four runners by test file; the machine-wide measurements run in
+    # their own job below, so no shard waits for them and none of them shares a machine with a test.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
       CI: true
     steps:
@@ -76,9 +83,35 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npm run test:e2e
+      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
       - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
+        if: matrix.shard == 1
         run: npm run geodtest
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+
+  measurements:
+    name: Isolated measurements (allocation, rendering probes)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
+    # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
+    # a bug that must be fixed before the milestone closes.
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test --project=measurements --no-deps
       # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
       - name: Rendering probes (recorded)
         if: always()
@@ -89,7 +122,7 @@ jobs:
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: measurements-report
           path: |
             playwright-report/
             test-results/

@@ -27,3 +27,7 @@ Option 3.
 
 - Progress figures stay truthful: pending entries never count as passing, and the owner gets one list of everything waiting on them.
 - The record adds one table and one check, like ADR 0016's.
+
+## Update 2026-10-21
+
+The owner made the repository public on 2026-10-21, so "making the repository public" is no longer a pending step for any entry; the only owner step left in F561 is enabling private vulnerability reporting, a repository setting ([ADR 0015](0015-owner-decisions-2026-10-20.md), update of 2026-10-21).

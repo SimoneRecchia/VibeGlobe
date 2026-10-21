@@ -1,6 +1,6 @@
 # 0021. Closing a milestone's reviews
 
-- Status: Accepted
+- Status: Accepted; §4 and §5 replaced by [ADR 0022](0022-faster-milestone-process.md) from M3
 - Date: 2026-10-21
 - Milestone: every milestone (process), from M2
 

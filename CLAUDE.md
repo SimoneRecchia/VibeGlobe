@@ -35,6 +35,9 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
 - VibeGlobe is under PolyForm Noncommercial 1.0.0 (`LICENSE.md`); every package.json declares `PolyForm-Noncommercial-1.0.0` (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
 - The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys (`GOOGLE_MAPS_API_KEY` comes from the environment).
+- Milestone process (ADR 0021, ADR 0022): one complete fresh-context review per milestone, then one pass that checks only that round's fixes; no further complete rounds. Every fix starts with a regression test that fails before it.
+- End-to-end tests: during feature work run only the specs the change affects (`npx playwright test <specs>`, `-g <feature id>`). The full suite runs at the end of each milestone (manual CI run, four shards) and nightly. Machine-wide measurements (`--project=measurements --no-deps`) and the rendering probes run in their own CI job, never next to other tests, and never gate feature work; a red measurement is still a bug to fix before the milestone closes.
+- Subagents work in separate packages or files, create files and never commit; integrate each one when it finishes and run the tests it affects.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
@@ -46,5 +49,6 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - Relative imports in libraries use `.js` extensions (NodeNext); tooling scripts import `.ts` and run directly with Node ≥ 22.18.
 - TypeScript is pinned to 6.0.x (typescript-eslint and TypeDoc do not support 7.x yet); eslint-plugin-jsdoc to 63.x (64+ needs Node 22.22.2).
 - A PostToolUse hook (`.claude/hooks/check-edited-file.sh`) formats, lints and type-checks every file Claude edits.
-- CI (ADR 0015): every push runs one fast job with every non-browser check; end-to-end tests and benchmarks run only on `main`, nightly and manual runs, so run `npm run test:e2e` locally before pushing.
+- CI (ADR 0015, ADR 0022): every push runs one fast job with every non-browser check; the sharded end-to-end suite, the isolated measurements, cross-browser runs and benchmarks run only on `main`, nightly and manual runs (`workflow_dispatch`), so run the affected end-to-end specs locally before pushing.
+- The repository (`SimoneRecchia/VibeGlobe`) is public since 2026-10-21: everything pushed is published, so never commit secrets, personal data or third-party material whose license does not allow it.
 - Cloud containers: Playwright uses the preinstalled Chromium via `VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium` (`init.sh` sets it).

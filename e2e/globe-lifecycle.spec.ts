@@ -244,6 +244,9 @@ test('resizing renders at the new size, centered, never stretched or blank (F070
     let vertical = 0;
     for (let x = 0; x < image.width; x++) if (isGlobe(x, cy)) horizontal++;
     for (let y = 0; y < image.height; y++) if (isGlobe(cx, y)) vertical++;
-    expect(Math.abs(horizontal - vertical)).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(horizontal - vertical),
+      JSON.stringify({ size: [width, height], image: [image.width, image.height], horizontal, vertical, state }),
+    ).toBeLessThanOrEqual(2);
   }
 });

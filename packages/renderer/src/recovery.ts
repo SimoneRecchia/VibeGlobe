@@ -45,16 +45,27 @@ export function releaseDevice(backend: unknown): void {
   else if (internals.gl) {
     const canvas = internals.gl.canvas;
     internals.gl.getExtension('WEBGL_lose_context')?.loseContext();
-    lostCanvases.add(canvas);
+    canvasContexts.set(canvas, 'released');
   }
 }
 
-/** Canvases whose WebGL2 context the engine lost on purpose: such a context never comes back (KB-059). */
-const lostCanvases = new WeakSet<HTMLCanvasElement | OffscreenCanvas>();
+type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
 
-/** True for a canvas whose WebGL2 context the engine released: a new renderer needs another canvas. */
-export function contextReleased(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
-  return lostCanvases.has(canvas);
+/**
+ * The context the engine created on each canvas, or 'released' for a WebGL2 context it lost on purpose. A canvas keeps
+ * its first context kind for good, and a lost WebGL2 context never comes back (KB-059, KB-063).
+ */
+const canvasContexts = new WeakMap<AnyCanvas, 'webgpu' | 'webgl2' | 'released'>();
+
+/** Records the context a renderer creates on a canvas. */
+export function recordContext(canvas: AnyCanvas, webgpu: boolean): void {
+  canvasContexts.set(canvas, webgpu ? 'webgpu' : 'webgl2');
+}
+
+/** True when a renderer can create the context it needs on a canvas the engine may have drawn into before. */
+export function canvasFits(canvas: AnyCanvas, webgpu: boolean): boolean {
+  const context = canvasContexts.get(canvas);
+  return context === undefined || context === (webgpu ? 'webgpu' : 'webgl2');
 }
 
 /** Disposes a renderer and releases its device or context at once, with every cached vertex array (KB-030). */

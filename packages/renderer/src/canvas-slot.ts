@@ -1,6 +1,6 @@
 import { GlobeError, type FrameCapture } from '@vibeglobe/core';
 import type { DrawingSurface } from './three-backend.js';
-import { contextReleased } from './recovery.js';
+import { canvasFits, recordContext } from './recovery.js';
 import { createCanvas, fillContainer } from './three-hooks.js';
 
 type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
@@ -25,15 +25,15 @@ export class CanvasSlot {
   }
 
   /**
-   * The canvas for a new renderer: the given one first; then a fresh element in a page container (an OffscreenCanvas
-   * cannot be replaced, so recovery fails there).
+   * The canvas for a new renderer that needs a WebGPU (`webgpu`) or WebGL2 context: the given one first; then a fresh
+   * element in a page container (an OffscreenCanvas cannot be replaced, so recovery fails there).
    */
-  next(): AnyCanvas {
+  next(webgpu: boolean): AnyCanvas {
     let canvas: AnyCanvas;
     const given = this.surface.canvas;
-    if (!this.givenUsed && given && this.surface.kind === 'element' && contextReleased(given)) {
-      // A canvas an earlier globe drew into with WebGL2 and released (a framework mounting twice): a fresh canvas with
-      // its attributes takes its place (KB-059).
+    if (!this.givenUsed && given && this.surface.kind === 'element' && !canvasFits(given, webgpu)) {
+      // A canvas an earlier globe drew into with the other context, or whose WebGL2 context it released (a framework
+      // mounting again, a backend switch): a fresh canvas with its attributes takes its place (KB-059, KB-063).
       this.givenUsed = true;
       this.shown = given;
       canvas = this.fresh();
@@ -46,6 +46,7 @@ export class CanvasSlot {
     } else {
       canvas = this.fresh();
     }
+    recordContext(canvas, webgpu);
     this.drawing = canvas;
     return canvas;
   }

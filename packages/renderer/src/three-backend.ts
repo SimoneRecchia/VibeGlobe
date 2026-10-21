@@ -173,7 +173,7 @@ export class ThreeBackend implements RendererBackend {
       this.events.backendFallback('WebGPU is no longer available after a device loss; using WebGL2');
     }
     if (webgpu) patchIdentitySwizzle(scope);
-    const canvas = this.canvases.next();
+    const canvas = this.canvases.next(webgpu);
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
       antialias: true,

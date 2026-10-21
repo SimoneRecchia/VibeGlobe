@@ -35,11 +35,16 @@ const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'we
 const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
 /** Creates one engine instance in a container with its own canvas. */
-function startGlobe(container: HTMLElement, target: HTMLCanvasElement, view: ViewInit): Globe {
+function startGlobe(
+  container: HTMLElement,
+  target: HTMLCanvasElement,
+  view: ViewInit,
+  choice: BackendChoice = backend,
+): Globe {
   return createGlobe({
     container,
     // `?gpuTiming=1` measures GPU time per frame where timestamp queries exist (benchmark scenarios `drag-*`).
-    renderer: createRenderer({ backend, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
+    renderer: createRenderer({ backend: choice, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
     controls: createControls(),
     baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
     view,
@@ -68,13 +73,16 @@ function showCursorReadout(globe: Globe, container: HTMLElement): void {
  * Mounts another engine instance in a new element and returns it with a function that destroys it and removes the
  * element, as a single-page app does on navigation (leak suite, ADR 0010).
  */
-function mountGlobe(canvas?: HTMLCanvasElement): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void } {
+function mountGlobe(
+  canvas?: HTMLCanvasElement,
+  choice?: BackendChoice,
+): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void } {
   const host = document.createElement('div');
   host.style.cssText = 'position:absolute;left:0;top:0;width:320px;height:240px';
   const target = canvas ?? document.createElement('canvas');
   host.append(target);
   document.body.append(host);
-  const globe = startGlobe(host, target, viewFromUrl());
+  const globe = startGlobe(host, target, viewFromUrl(), choice);
   return {
     globe,
     canvas: target,

@@ -25,10 +25,13 @@ interface PlaygroundTestHooks {
   /** Milliseconds from navigation start to the first complete frame, once drawn (F546). */
   firstFrameMs: number | undefined;
   /**
-   * Mounts another engine instance in a new element, drawing into `canvas` when given (else a new one); `unmount`
-   * destroys it and removes the element.
+   * Mounts another engine instance in a new element, drawing into `canvas` when given (else a new one) with `backend`
+   * when given (else the page's); `unmount` destroys it and removes the element.
    */
-  mount(canvas?: HTMLCanvasElement): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
+  mount(
+    canvas?: HTMLCanvasElement,
+    backend?: 'auto' | 'webgpu' | 'webgl2',
+  ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
 }
 
 declare global {

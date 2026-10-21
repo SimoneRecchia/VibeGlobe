@@ -463,6 +463,40 @@ for (const backend of BACKENDS) {
   });
 }
 
+for (const [first, second] of [
+  ['webgpu', 'webgl2'],
+  ['webgl2', 'webgpu'],
+] as const) {
+  test(`a host canvas that drew with ${first} can be given to a new globe on ${second} (KB-063)`, async ({ page }) => {
+    await openGlobe(page, 'zoom=1');
+    const result = await page.evaluate(
+      async ([firstBackend, secondBackend]) => {
+        const hooks = window.vibeglobePlayground;
+        if (!hooks) throw new Error('no playground');
+        // A host with a backend switch that mounts again on the same canvas element.
+        const before = hooks.mount(undefined, firstBackend);
+        await before.globe.ready;
+        before.unmount();
+        const after = hooks.mount(before.canvas, secondBackend);
+        try {
+          await after.globe.ready;
+          const frame = await after.globe.captureFrame();
+          let drawn = 0;
+          for (let i = 3; i < frame.rgba.length; i += 4) if ((frame.rgba[i] ?? 0) > 0) drawn++;
+          return { ready: true, drawn, backend: after.globe.backend };
+        } catch (error) {
+          return { ready: false, error: String(error) };
+        } finally {
+          after.unmount();
+        }
+      },
+      [first, second] as const,
+    );
+    expect(result).toMatchObject({ ready: true, backend: second });
+    expect(result.drawn).toBeGreaterThan(1000);
+  });
+}
+
 test('resizing renders at the new size, centered, never stretched or blank (F070)', async ({ page }) => {
   await openGlobe(page, 'lon=20&lat=10&zoom=1');
   // The page's text overlays lie over the canvas; with wider fonts they reached the measured center column.

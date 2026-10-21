@@ -25,6 +25,10 @@ Fifth M2 review (fresh context) found 4 issues; all are fixed: KB-046 (a contain
 
 Sixth M2 review (fresh context) found 4 issues; all are fixed: KB-050 (a collapse through small sizes keeps the range: the camera keeps its pose while the container has no size), KB-051 (`captureFrame()` reads only a frame it drew), KB-052 (one `backend-fallback` when a recovery's self-test fails) and KB-053 (a globe destroyed during its recovery keeps no renderer). F064's allocation rule named the frame callback `frame` after it became `onFrame` (test fixed, docs/test-changes.md).
 
+Seventh M2 review (fresh context) found 3 issues; all are fixed: KB-054 (a stopped loss watch keeps weak references, so the context count after destroy is real again), KB-055 (a canvas the host passes in fills its container) and KB-056 (a position-only jump while the container has no size keeps the range).
+
+M3 groundwork, not yet used by the engine: `packages/core/src/tiling/` (Web Mercator and geographic tiling schemes, packed tile keys with the root id; F080's tests).
+
 Also decided: texture and geometry compression (ADR 0020, `docs/research/compression.md`), ahead of M3 (F079 is marked when M3 starts).
 
 Notes for the next session:

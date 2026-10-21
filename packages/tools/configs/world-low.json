@@ -1,0 +1,120 @@
+{
+  "configVersion": "1.0.0",
+  "name": "world-low",
+  "description": "whole world at low detail",
+  "region": {
+    "bbox": [-180, -85.0511287798066, 180, 85.0511287798066]
+  },
+  "sampleArea": {
+    "bbox": [5.625, 45.089035564831015, 11.25, 48.92249926375824],
+    "minZoom": 6
+  },
+  "prices": {
+    "currency": "USD",
+    "readDate": "2026-10-21",
+    "sourceUrl": "https://aws.amazon.com/s3/pricing/ (figures as quoted by https://upstash.com/blog/aws-s3-pricing-explained-2026; the official page was not reachable from the build container)",
+    "requesterPaysTransferPerGB": 0.09,
+    "requesterPaysGetPer1000": 0.0004,
+    "freeTransferPerGB": 0
+  },
+  "tools": {
+    "gdal": "docker.io/osgeo/gdal:ubuntu-small-3.6.3@sha256:398d5aca0ca88295c13ada87e0f382ed409dac13a952461187be72ce3c376513"
+  },
+  "datasets": [
+    {
+      "id": "fallback",
+      "kind": "imagery",
+      "profile": "natural-earth",
+      "dataYear": 2012,
+      "sourceVersion": "Natural Earth NE1_50M_SR_W 4.1.0",
+      "source": {
+        "type": "geotiff",
+        "url": "https://naturalearth.s3.amazonaws.com/50m_raster/NE1_50M_SR_W.zip",
+        "member": "NE1_50M_SR_W.tif"
+      },
+      "minZoom": 0,
+      "maxZoom": 5,
+      "encoding": "png",
+      "bytesPerTile": 60000,
+      "downloadBytesPerFile": 88413091,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": true
+      },
+      "baseImage": {
+        "widthPx": 4096,
+        "quality": 88
+      }
+    },
+    {
+      "id": "terrain",
+      "kind": "terrain",
+      "profile": "copernicus-dem-glo30",
+      "dataYear": 2021,
+      "sourceVersion": "2021_1 (AWS Open Data COG release)",
+      "source": {
+        "type": "copernicus-dem",
+        "baseUrl": "https://copernicus-dem-90m.s3.amazonaws.com",
+        "release": "2021_1",
+        "arcSeconds": 3
+      },
+      "minZoom": 0,
+      "maxZoom": 8,
+      "encoding": "terrarium",
+      "bytesPerTile": 40000,
+      "downloadBytesPerFile": 4000000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    },
+    {
+      "id": "imagery",
+      "kind": "imagery",
+      "profile": "s2cloudless-2016",
+      "dataYear": 2016,
+      "sourceVersion": "s2cloudless 2016 original tiles",
+      "source": {
+        "type": "s2cloudless",
+        "baseUrl": "https://eox-s2maps.s3.eu-central-1.amazonaws.com",
+        "edition": 2016,
+        "level": 7,
+        "requesterPays": true
+      },
+      "minZoom": 0,
+      "maxZoom": 8,
+      "encoding": "jpeg",
+      "quality": 85,
+      "bytesPerTile": 20000,
+      "downloadBytesPerFile": 450000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    },
+    {
+      "id": "vectors",
+      "kind": "vector",
+      "profile": "openstreetmap-extract",
+      "dataYear": 2026,
+      "sourceVersion": "planet-261012",
+      "source": {
+        "type": "osm-extract",
+        "url": "https://osm-pds.s3.amazonaws.com/2026/planet-261012.osm.pbf"
+      },
+      "minZoom": 0,
+      "maxZoom": 6,
+      "encoding": "mvt",
+      "bytesPerTile": 20000,
+      "downloadBytesPerFile": 95380942829,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    }
+  ]
+}

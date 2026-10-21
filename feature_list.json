@@ -4321,7 +4321,7 @@
         "Verify GDAL and every other external tool run inside a Docker image pinned by digest, with nothing needed on the host beyond Node and Docker",
         "Run `npm test` and verify the pipeline's unit tests (configuration validation, tile math, build planning) pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F332",
@@ -4347,7 +4347,7 @@
         "Verify no partial output folder or package is left behind",
         "Run the unit tests of the license gate against every built-in provider profile and verify allowed and forbidden cases"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F334",
@@ -4360,7 +4360,7 @@
         "Verify tile counts grow by about 4x per added zoom level for a fixed area",
         "Build a small region and verify the actual output size is within 30% of the estimate"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F552",
@@ -4373,7 +4373,7 @@
         "Run the same build non-interactively without the confirmation flag and confirm it stops before any download",
         "Confirm the cost estimate uses per-GB prices recorded in the pipeline configuration with their reading date, and the actual transfer of the sample build is within 30% of the estimate"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F335",
@@ -4386,7 +4386,7 @@
         "Verify the resumed output is identical by checksum to an uninterrupted build of the same configuration",
         "Corrupt one downloaded source file and one intermediate tile, rerun, and verify both are detected by checksum and regenerated"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F336",

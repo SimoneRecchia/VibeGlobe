@@ -1,0 +1,52 @@
+{
+  "configVersion": "1.0.0",
+  "name": "test-mont-blanc",
+  "description": "Mont Blanc test region (terrain)",
+  "region": {
+    "bbox": [6.6796875, 45.82879925192134, 7.03125, 46.07323062540836]
+  },
+  "sampleArea": {
+    "bbox": [6.6796875, 45.82879925192134, 7.03125, 46.07323062540836]
+  },
+  "prices": {
+    "currency": "USD",
+    "readDate": "2026-10-21",
+    "sourceUrl": "https://aws.amazon.com/s3/pricing/ (figures as quoted by https://upstash.com/blog/aws-s3-pricing-explained-2026; the official page was not reachable from the build container)",
+    "requesterPaysTransferPerGB": 0.09,
+    "requesterPaysGetPer1000": 0.0004,
+    "freeTransferPerGB": 0
+  },
+  "tools": {
+    "gdal": "docker.io/osgeo/gdal:ubuntu-small-3.6.3@sha256:398d5aca0ca88295c13ada87e0f382ed409dac13a952461187be72ce3c376513"
+  },
+  "datasets": [
+    {
+      "id": "terrain",
+      "kind": "terrain",
+      "profile": "copernicus-dem-glo30",
+      "dataYear": 2021,
+      "sourceVersion": "2021_1 (AWS Open Data COG release)",
+      "source": {
+        "type": "copernicus-dem",
+        "baseUrl": "https://copernicus-dem-30m.s3.amazonaws.com",
+        "release": "2021_1",
+        "arcSeconds": 1
+      },
+      "minZoom": 10,
+      "maxZoom": 13,
+      "encoding": "terrarium",
+      "bytesPerTile": {
+        "10": 154530,
+        "11": 145891,
+        "12": 134567,
+        "13": 121450
+      },
+      "downloadBytesPerFile": 35000000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    }
+  ]
+}

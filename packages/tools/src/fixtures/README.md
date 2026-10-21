@@ -1,0 +1,4 @@
+# Test fixtures
+
+- `copernicus-dem-mont-blanc.tif`: a 256 × 256 crop around the Mont Blanc summit (rows 472–727, columns 2984–3239) of `Copernicus_DSM_COG_10_N45_00_E006_00_DEM.tif` from the Copernicus DEM GLO-30 AWS Open Data bucket, rewritten as a tiled (128 px) float32 GeoTIFF with DEFLATE and the floating-point predictor, pixel-is-point, like the source. Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.
+- `rgb-lzw.tif`: a synthetic 64 × 32 RGB GeoTIFF with LZW strips in EPSG:4326 (pixel-is-area, 0.25° pixels from 10°E, 45°N), the encoding of the Sentinel-2 cloudless original tiles. Pixel (x, y) is `(4x mod 256, 8y mod 256, 16(x xor y) mod 256)`.

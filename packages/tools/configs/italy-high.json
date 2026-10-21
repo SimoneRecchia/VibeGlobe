@@ -1,0 +1,99 @@
+{
+  "configVersion": "1.0.0",
+  "name": "italy-high",
+  "description": "Italy at high detail",
+  "region": {
+    "polygon": "regions/italy.geojson"
+  },
+  "sampleArea": {
+    "bbox": [6.6796875, 45.82879925192134, 7.03125, 46.07323062540836],
+    "minZoom": 10
+  },
+  "prices": {
+    "currency": "USD",
+    "readDate": "2026-10-21",
+    "sourceUrl": "https://aws.amazon.com/s3/pricing/ (figures as quoted by https://upstash.com/blog/aws-s3-pricing-explained-2026; the official page was not reachable from the build container)",
+    "requesterPaysTransferPerGB": 0.09,
+    "requesterPaysGetPer1000": 0.0004,
+    "freeTransferPerGB": 0
+  },
+  "tools": {
+    "gdal": "docker.io/osgeo/gdal:ubuntu-small-3.6.3@sha256:398d5aca0ca88295c13ada87e0f382ed409dac13a952461187be72ce3c376513"
+  },
+  "datasets": [
+    {
+      "id": "terrain",
+      "kind": "terrain",
+      "profile": "copernicus-dem-glo30",
+      "dataYear": 2021,
+      "sourceVersion": "2021_1 (AWS Open Data COG release)",
+      "source": {
+        "type": "copernicus-dem",
+        "baseUrl": "https://copernicus-dem-30m.s3.amazonaws.com",
+        "release": "2021_1",
+        "arcSeconds": 1
+      },
+      "minZoom": 9,
+      "maxZoom": 13,
+      "encoding": "terrarium",
+      "bytesPerTile": {
+        "10": 154530,
+        "11": 145891,
+        "12": 134567,
+        "13": 121450
+      },
+      "downloadBytesPerFile": 35000000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    },
+    {
+      "id": "imagery",
+      "kind": "imagery",
+      "profile": "s2cloudless-2016",
+      "dataYear": 2016,
+      "sourceVersion": "s2cloudless 2016 original tiles",
+      "source": {
+        "type": "s2cloudless",
+        "baseUrl": "https://eox-s2maps.s3.eu-central-1.amazonaws.com",
+        "edition": 2016,
+        "level": 13,
+        "requesterPays": true
+      },
+      "minZoom": 9,
+      "maxZoom": 14,
+      "encoding": "jpeg",
+      "quality": 85,
+      "bytesPerTile": 20000,
+      "downloadBytesPerFile": 450000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    },
+    {
+      "id": "vectors",
+      "kind": "vector",
+      "profile": "openstreetmap-extract",
+      "dataYear": 2026,
+      "sourceVersion": "italy-261020",
+      "source": {
+        "type": "osm-extract",
+        "url": "https://download.geofabrik.de/europe/italy-261020.osm.pbf"
+      },
+      "minZoom": 9,
+      "maxZoom": 14,
+      "encoding": "mvt",
+      "bytesPerTile": 30000,
+      "downloadBytesPerFile": 2100000000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    }
+  ]
+}

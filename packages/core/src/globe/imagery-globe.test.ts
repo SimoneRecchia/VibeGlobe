@@ -70,18 +70,23 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
       workers: instantWorkers(),
       view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
     });
+    let ready = false;
+    void globe.ready.then(() => (ready = true));
     await settle();
     renderer.flush();
-    await globe.ready;
-    // The first frame shows the base image everywhere and requests the imagery.
+    // The first frame shows the base image everywhere and requests the pinned base and the imagery.
     const first = renderer.lastDraws;
     expect(Array.from(first?.textures.subarray(0, first.count) ?? [])).toEqual(new Array(first?.count).fill(-1));
     expect(urls.length).toBeGreaterThan(0);
+    // `ready` waits for the pinned base (levels 0–3 of a 256 px source: 85 tiles, F084).
+    expect(ready).toBe(false);
     for (let frame = 0; frame < 30; frame++) {
       await settle();
       renderer.timers.advance(16);
       renderer.flush();
     }
+    expect(ready).toBe(true);
+    expect(globe.imageryStats()?.pinnedSettled).toBe(85);
     const draws = renderer.lastDraws;
     const textured = Array.from(draws?.textures.subarray(0, draws.count) ?? []).filter((handle) => handle >= 0);
     expect(textured.length).toBe(draws?.count);

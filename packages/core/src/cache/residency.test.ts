@@ -69,6 +69,30 @@ describe('Residency accounting', () => {
 });
 
 describe('Residency eviction order (F098)', () => {
+  it('lets an admission at the start of a frame evict what only the previous frame used', () => {
+    const { cache, evicted } = residency(20);
+    cache.admit(1, 10);
+    cache.admit(2, 10);
+    cache.touch(1, 1);
+    cache.touch(2, 1);
+    expect(cache.admit(3, 10)).toBe(false);
+    cache.startFrame(2);
+    expect(cache.admit(3, 10)).toBe(true);
+    expect(evicted).toEqual([1]);
+  });
+
+  it('tells which resident keys must stay this frame: pinned, busy, touched or drawn', () => {
+    const { cache } = residency(1000);
+    for (const key of [1, 2, 3, 4, 5]) cache.admit(key, 10);
+    cache.touch(1, 1);
+    cache.touch(2, 1);
+    cache.setPinned(3, true);
+    cache.setBusy(4, true);
+    cache.touch(5, 2);
+    cache.markDrawn(2, 2);
+    expect([1, 2, 3, 4, 5, 6].map((key) => cache.isKept(key))).toEqual([false, true, true, true, true, false]);
+  });
+
   it('evicts the least recently used entries first, just enough to admit', () => {
     const { cache, evicted } = residency(1000);
     for (const key of [1, 2, 3, 4]) cache.admit(key, 250);

@@ -255,6 +255,26 @@ export class Residency {
     return true;
   }
 
+  /**
+   * Starts a frame: from now on only what this frame touches or draws is protected by the frame marker, so admissions
+   * made before the frame's first touch may evict what only the previous frame used.
+   */
+  startFrame(frame: number): void {
+    this.advance(frame);
+  }
+
+  /**
+   * True when a resident key may not be evicted now: pinned, busy, or touched or drawn in the current frame (outside
+   * the frame loop). The RAM tier asks it before dropping a tile's bytes, which would drop its GPU copy too.
+   */
+  isKept(key: number): boolean {
+    const slot = this.map.get(key);
+    if (slot === undefined) return false;
+    return (
+      ((this.flags[slot] ?? 0) & PINNED) !== 0 || this.isProtected(slot) || this.lastUsed[slot] === this.state[FRAME]
+    );
+  }
+
   /** True when a resident key is pinned. */
   isPinned(key: number): boolean {
     const slot = this.map.get(key);

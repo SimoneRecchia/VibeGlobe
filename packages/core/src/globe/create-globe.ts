@@ -31,6 +31,7 @@ import type {
   Globe,
   GlobeEvents,
   GlobeOptions,
+  ImageryStats,
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
@@ -309,7 +310,8 @@ class GlobeEngine implements Globe {
     }
     if (this.emitter.has('camera-change'))
       this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload));
-    if (this.resolveReady) {
+    // With imagery, `ready` waits for the pinned base: from then on zooming out always shows a complete picture (F084).
+    if (this.resolveReady && this.surfaceFrame.baseReady) {
       this.resolveReady();
       this.resolveReady = undefined;
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
@@ -409,6 +411,10 @@ class GlobeEngine implements Globe {
 
   surfaceStats(): SurfaceStats {
     return this.surfaceFrame.stats();
+  }
+
+  imageryStats(): ImageryStats | undefined {
+    return this.surfaceFrame.imageryStats();
   }
 
   setDebugShapes(shapes: readonly DebugShape[]): void {

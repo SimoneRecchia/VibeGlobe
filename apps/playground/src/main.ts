@@ -41,14 +41,23 @@ const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'au
  * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
  * fixture tile server (M3 plan §4.1); `&session=` names the server session that holds fault rules and the request log.
  */
-function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers'> {
+function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> {
   const pattern = params.get('imagery');
   if (!pattern) return {};
   const session = params.get('session') ?? 'playground';
   const url = `${import.meta.env.BASE_URL}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
-  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers };
+  // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
+  const megabytes = (name: string): number | undefined =>
+    params.has(name) ? Math.round(Number(params.get(name)) * 1024 * 1024) : undefined;
+  const gpuBudgetBytes = megabytes('gpuBudgetMB');
+  const ramBudgetBytes = megabytes('ramBudgetMB');
+  const memory = {
+    ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
+    ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
+  };
+  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers, memory };
 }
 
 /** Creates one engine instance in a container with its own canvas. */
@@ -163,10 +172,22 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
       `horizon ${selection.culledByHorizon} · imagery from ancestor ${selection.fromAncestor}, base ${selection.onBaseImage}` +
       // The largest projected texel of any drawn tile, which the selection keeps at or below 1.5 px (F081).
       ` · texel ≤ ${Math.max(0, ...globe.surfaceTiles().map((tile) => tile.texelErrorPx)).toFixed(2)} px`;
-    if (compiles === pipelineCompiles && surface === surfaceInfo) return;
+    // The imagery caches: RAM hits (F097) and memory against the budgets (F098).
+    const imagery = globe.imageryStats();
+    const mb = (bytes: number): string => (bytes / 1048576).toFixed(1);
+    const cache = imagery
+      ? `RAM hits ${imagery.ramHits} · GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
+        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
+      : '';
+    if (compiles === pipelineCompiles && surface + cache === surfaceInfo) return;
     pipelineCompiles = compiles;
-    surfaceInfo = surface;
-    overlay.setInfo([...info, ['pipeline-compiles', `pipelines after warm-up ${compiles}`], ['surface', surface]]);
+    surfaceInfo = surface + cache;
+    overlay.setInfo([
+      ...info,
+      ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
+      ['surface', surface],
+      ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
+    ]);
   });
 }
 

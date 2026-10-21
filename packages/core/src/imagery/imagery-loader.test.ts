@@ -4,7 +4,9 @@ import { NetworkPool } from '../scheduler/network-pool.js';
 import type { DecodedTile, TileRequest, TileTransport, TransportResult } from '../scheduler/types.js';
 import type { WorkerPool, WorkerTaskDone } from '../scheduler/worker-pool-types.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
-import { ImageryLoader } from './imagery-loader.js';
+import { RamTier } from '../cache/ram-tier.js';
+import { Residency } from '../cache/residency.hot.js';
+import { ARRIVING, ImageryLoader } from './imagery-loader.js';
 import type { ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
@@ -47,7 +49,7 @@ function fakeWorkers(): WorkerPool {
   };
 }
 
-function setUp(maxInFlight = 32) {
+function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number; pinnedLevel?: number } = {}) {
   const timers = new FakeTimers();
   const transport = new ManualTransport();
   const source: ImagerySource = {
@@ -74,20 +76,43 @@ function setUp(maxInFlight = 32) {
     maxInFlight,
   });
   const uploaded: number[] = [];
+  const released: number[] = [];
   let frames = 0;
-  const loader = new ImageryLoader({
+  let frame = 0;
+  // eslint-disable-next-line prefer-const -- assigned after the residency that calls it is built
+  let loader: ImageryLoader;
+  const residency = new Residency({
+    budgetBytes: memory.gpuBytes ?? 1e9,
+    onEvict: (handle) => loader.evicted(handle - 100),
+  });
+  const ram = new RamTier({ budgetBytes: memory.ramBytes ?? 1e9 });
+  loader = new ImageryLoader({
     source,
     network,
     workers: fakeWorkers(),
+    memory: { residency, ram, frame: () => frame },
     handleBase: 100,
+    pinnedLevel: memory.pinnedLevel ?? -1,
     uploadTexture: (handle) => uploaded.push(handle),
+    releaseTexture: (handle) => released.push(handle),
     requestFrame: () => frames++,
     now: () => timers.nowMs,
     setTimer: (callback, delayMs) => timers.set(callback, delayMs),
     random: () => 0.5,
   });
   const ok: TransportResult = { kind: 'ok', bytes: new ArrayBuffer(8), contentType: 'image/png' };
-  return { timers, transport, loader, uploaded, ok, frames: () => frames };
+  /** One frame wanting `tiles` (level, x, y), the way the engine drives the loader. */
+  const runFrame = (tiles: [number, number, number][]): number[] => {
+    frame++;
+    residency.startFrame(frame);
+    loader.beginFrame();
+    const handles = tiles.map(([level, x, y], i) => loader.want(level, x, y, 1024 + level + i / 1000));
+    for (const handle of handles) if (handle >= 0) loader.markDrawn(handle);
+    loader.endFrame();
+    residency.trim(frame, 64);
+    return handles;
+  };
+  return { timers, transport, loader, uploaded, released, residency, ram, ok, runFrame, frames: () => frames };
 }
 
 const url = (level: number, x: number, y: number): string => `https://tiles.test/${level}/${x}/${y}.png`;
@@ -104,7 +129,8 @@ describe('ImageryLoader', () => {
     expect(transport.started).toEqual([url(3, 0, 0), url(4, 0, 0)]);
     transport.answer(url(3, 0, 0), ok);
     loader.beginFrame();
-    expect(loader.want(3, 0, 0, 1027)).toBe(-1);
+    // Decoded, waiting for its upload: arriving, not yet drawable.
+    expect(loader.want(3, 0, 0, 1027)).toBe(ARRIVING);
     loader.want(4, 0, 0, 1028);
     loader.want(5, 1, 1, 1030);
     loader.endFrame();
@@ -173,5 +199,81 @@ describe('ImageryLoader', () => {
     loader.endFrame();
     timers.advance(10);
     expect(transport.started).toEqual([url(4, 0, 0), url(7, 9, 9)]);
+  });
+
+  it('keeps GPU use within its budget, evicting the least recently used tile but never one drawn (F098, F102)', () => {
+    const { transport, uploaded, released, residency, ok, runFrame } = setUp(32, { gpuBytes: 3 * 349_524 });
+    const answer = (): void => {
+      for (const url of [...transport.open.keys()]) transport.answer(url, ok);
+    };
+    runFrame([
+      [5, 0, 0],
+      [5, 1, 0],
+      [5, 2, 0],
+    ]);
+    answer();
+    runFrame([
+      [5, 0, 0],
+      [5, 1, 0],
+      [5, 2, 0],
+    ]);
+    expect(uploaded).toEqual([100, 101, 102]);
+    // Re-showing resident tiles uploads nothing.
+    runFrame([
+      [5, 0, 0],
+      [5, 1, 0],
+      [5, 2, 0],
+    ]);
+    expect(uploaded).toHaveLength(3);
+    // A new tile while two old ones stay on screen: the one left off screen goes, the drawn ones stay.
+    runFrame([
+      [5, 3, 0],
+      [5, 1, 0],
+      [5, 2, 0],
+    ]);
+    answer();
+    runFrame([
+      [5, 3, 0],
+      [5, 1, 0],
+      [5, 2, 0],
+    ]);
+    expect(released).toEqual([100]);
+    expect(uploaded).toEqual([100, 101, 102, 103]);
+    expect(residency.usedBytes).toBeLessThanOrEqual(3 * 349_524);
+  });
+
+  it('serves a tile evicted from the GPU from the RAM tier, with no new request (F097)', () => {
+    const { transport, uploaded, ram, ok, runFrame } = setUp(32, { gpuBytes: 349_524 });
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), ok);
+    runFrame([[5, 0, 0]]);
+    runFrame([[5, 1, 0]]);
+    transport.answer(url(5, 1, 0), ok);
+    runFrame([[5, 1, 0]]);
+    // Back to the first tile: decoded from its RAM copy and uploaded again, without the network.
+    runFrame([[5, 0, 0]]);
+    runFrame([[5, 0, 0]]);
+    expect(transport.started).toEqual([url(5, 0, 0), url(5, 1, 0)]);
+    expect(uploaded).toEqual([100, 101, 100]);
+    expect(ram.hits).toBe(1);
+  });
+
+  it('loads the pinned base before any other tile and never evicts it (F084)', () => {
+    const { transport, residency, loader, ok, runFrame } = setUp(32, { pinnedLevel: 1, gpuBytes: 6 * 349_524 });
+    runFrame([[6, 30, 20]]);
+    // Levels 0 and 1: five tiles requested, the visible one held back until they are resident.
+    expect(transport.started.map((u) => u.split('/').slice(3, 4)[0])).toEqual(['0', '1', '1', '1', '1']);
+    for (const u of [...transport.open.keys()]) transport.answer(u, ok);
+    runFrame([[6, 30, 20]]);
+    expect(loader.pinnedComplete).toBe(true);
+    runFrame([[6, 30, 20]]);
+    expect(transport.started).toContain(url(6, 30, 20));
+    transport.answer(url(6, 30, 20), ok);
+    runFrame([[6, 30, 20]]);
+    // The budget holds six tiles: a seventh, off screen next frame, can only push out the visible one, never the base.
+    runFrame([[6, 31, 20]]);
+    transport.answer(url(6, 31, 20), ok);
+    runFrame([[6, 31, 20]]);
+    for (const handle of [100, 101, 102, 103, 104]) expect(residency.isPinned(handle)).toBe(true);
   });
 });

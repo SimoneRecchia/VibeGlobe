@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { DrawList } from './draw-list.js';
-import type { ImageryLoader } from './imagery-loader.js';
+import { ARRIVING, type ImageryLoader } from './imagery-loader.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -55,6 +55,7 @@ export function drawImagery(
       const handle = wantLayer(entry, tile, distance);
       if (drawn || handle < 0) continue;
       drawn = true;
+      entry.loader.markDrawn(handle);
       list.textures[index] = handle;
       list.geographic[index] = entry.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
       list.imageryLevels[index] = mapping[MAPPING_LEVEL] ?? -1;
@@ -80,15 +81,18 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number): n
     return -1;
   }
   const wanted = mapping[MAPPING_LEVEL] ?? 0;
+  // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
+  let arriving = false;
   for (let current = wanted; current >= source.minLevel; current--) {
     const x = mapping[MAPPING_X] ?? 0;
     const y = mapping[MAPPING_Y] ?? 0;
     // The wanted tile and every second ancestor are requested; the others are only looked up.
     const handle =
-      (wanted - current) % 2 === 0
+      !arriving && (wanted - current) % 2 === 0
         ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) return handle;
+    if (handle === ARRIVING) arriving = true;
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);
   }
   return -1;

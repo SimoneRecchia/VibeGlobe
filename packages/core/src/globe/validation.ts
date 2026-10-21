@@ -90,6 +90,20 @@ export function validateOptions(options: unknown): GlobeOptions {
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
   validateImagery(input.imagery, input.workers);
+  const memory = input.memory as Partial<Record<string, unknown>> | undefined;
+  if (memory !== undefined) {
+    if (memory === null || typeof memory !== 'object')
+      throw new GlobeError('invalid-option', 'memory must be an object');
+    for (const name of ['gpuBudgetBytes', 'ramBudgetBytes']) {
+      const value = memory[name];
+      if (value !== undefined && !(Number.isInteger(value) && (value as number) >= 1)) {
+        throw new GlobeError(
+          'invalid-option',
+          `memory.${name} must be a positive integer, got ${describeInput(value)}`,
+        );
+      }
+    }
+  }
   return options as GlobeOptions;
 }
 

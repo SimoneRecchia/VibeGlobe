@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { canvasImage, emptyPixelsInside, nextFrame, openGlobe, silhouetteRadiusPx } from './support/globe.js';
 import {
-  canvasImage,
-  emptyPixelsInside,
-  nextFrame,
-  openGlobe,
-  silhouetteRadiusPx,
-  waitForIdle,
-} from './support/globe.js';
+  centerTile,
+  fixtureSession,
+  mercatorTile,
+  requestLog,
+  waitForImagery,
+  type LoggedRequest,
+} from './support/imagery.js';
 
 // Streaming over the software GPU is slow: the context set-up counts against the timeout too.
 test.describe.configure({ timeout: 120_000 });
@@ -15,75 +16,6 @@ test.describe.configure({ timeout: 120_000 });
 /** M3's streaming slice (docs/plan/m3-imagery-streaming.md, increment 3b) against the playground's fixture tiles. */
 
 const ROME = { lon: 12.5, lat: 41.9 };
-
-/** A fresh fixture-server session with its own fault rules and request log (M3 plan §4.1). */
-async function fixtureSession(page: Page, rules: unknown[] = []): Promise<string> {
-  const id = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  const response = await page.request.post(`/_fixture/${id}/rules`, { data: JSON.stringify(rules) });
-  expect(response.status()).toBe(204);
-  return id;
-}
-
-interface LoggedRequest {
-  level: number;
-  x: number;
-  y: number;
-  startMs: number;
-}
-
-async function requestLog(page: Page, session: string): Promise<LoggedRequest[]> {
-  return (await (await page.request.get(`/_fixture/${session}/log`)).json()) as LoggedRequest[];
-}
-
-/**
- * Waits until every Mercator tile of the view shows imagery of its own level (the polar caps keep the base image),
- * then for the engine to go idle.
- */
-async function waitForImagery(page: Page): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const globe = window.vibeglobePlayground?.globe;
-          const tiles = globe?.surfaceTiles() ?? [];
-          return tiles.length > 0 && tiles.every((t) => t.root !== 'mercator' || t.imageryLevel === t.level);
-        }),
-      { timeout: 60_000 },
-    )
-    .toBe(true);
-  await waitForIdle(page);
-}
-
-/** The Web Mercator tile at a level that contains a position. */
-function mercatorTile(level: number, lonDeg: number, latDeg: number): { x: number; y: number } {
-  const n = 2 ** level;
-  const lat = (latDeg * Math.PI) / 180;
-  return {
-    x: Math.floor(((lonDeg + 180) / 360) * n),
-    y: Math.floor(((1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2) * n),
-  };
-}
-
-/** The drawn surface tile under the screen center, with the imagery level it shows. */
-async function centerTile(page: Page): Promise<{ level: number; imageryLevel: number | null }> {
-  return page.evaluate(() => {
-    const globe = window.vibeglobePlayground?.globe;
-    const host = document.querySelector('#globe');
-    const center = globe?.screenToGeo({ xPx: (host?.clientWidth ?? 0) / 2, yPx: (host?.clientHeight ?? 0) / 2 });
-    const tile = globe
-      ?.surfaceTiles()
-      .find(
-        (t) =>
-          center &&
-          t.westDeg <= center.longitudeDeg &&
-          center.longitudeDeg <= t.eastDeg &&
-          t.southDeg <= center.latitudeDeg &&
-          center.latitudeDeg <= t.northDeg,
-      );
-    if (!tile) throw new Error('no tile under the center');
-    return { level: tile.level, imageryLevel: tile.imageryLevel };
-  });
-}
 
 /** Captures `frames` successive frames (nadir views) and returns the empty-pixel count of each and its center tile. */
 async function recordFrames(page: Page, frames: number) {
@@ -235,8 +167,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       expect(after.slice(0, firstTarget).every((request) => request.level < target)).toBe(true);
       const center = mercatorTile(target, ROME.lon, ROME.lat);
       const targets = after.filter((request) => request.level === target);
-      const distance = (r: LoggedRequest): number => Math.hypot(r.x - center.x, r.y - center.y);
-      expect(distance(targets[0] ?? { level: 0, x: Infinity, y: Infinity, startMs: 0 })).toBeLessThanOrEqual(
+      const distance = (r: Pick<LoggedRequest, 'x' | 'y'>): number => Math.hypot(r.x - center.x, r.y - center.y);
+      expect(distance(targets[0] ?? { x: Infinity, y: Infinity })).toBeLessThanOrEqual(
         Math.min(...targets.slice(1).map(distance)) + 1,
       );
     });

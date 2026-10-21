@@ -4,7 +4,14 @@ import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadt
 import type { Camera } from '../camera/camera.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime } from './imagery-runtime.js';
-import type { GlobeOptions, RendererBackend, SurfaceStats, SurfaceTileInfo, TileDrawList } from './types.js';
+import type {
+  GlobeOptions,
+  ImageryStats,
+  RendererBackend,
+  SurfaceStats,
+  SurfaceTileInfo,
+  TileDrawList,
+} from './types.js';
 
 /** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
@@ -38,7 +45,7 @@ export class SurfaceFrame {
   startImagery(options: GlobeOptions, renderer: RendererBackend, requestFrame: () => void): void {
     const { imagery: sources, workers } = options;
     if (!sources || sources.length === 0 || !workers) return;
-    const imagery = new ImageryRuntime(sources, workers, renderer, requestFrame);
+    const imagery = new ImageryRuntime(sources, workers, options.memory ?? {}, renderer, requestFrame);
     this.imagery = imagery;
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
@@ -52,6 +59,16 @@ export class SurfaceFrame {
     drawOnBaseImage(this.draws, this.tiles, count);
     this.imagery?.draw(this.draws, this.tiles, count, camera);
     return this.draws;
+  }
+
+  /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */
+  get baseReady(): boolean {
+    return this.imagery?.baseReady ?? true;
+  }
+
+  /** The imagery counters, if there is imagery. */
+  imageryStats(): ImageryStats | undefined {
+    return this.imagery?.stats();
   }
 
   /** True while imagery the view wants is still loading. */

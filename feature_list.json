@@ -1179,7 +1179,7 @@
         "Set a very small memory budget and navigate widely until eviction occurs",
         "Confirm pinned tiles are never evicted and zooming out to the globe immediately shows complete imagery with no new request for pinned tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F085",
@@ -1337,7 +1337,7 @@
         "Confirm the returning tiles are served from the RAM cache with no new request",
         "Confirm the debug overlay counts cache hits for them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F098",
@@ -1351,7 +1351,7 @@
         "Confirm memory use never exceeds the budgets",
         "Confirm the evicted tiles are the least recently used and no tile on screen is ever evicted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F099",
@@ -1389,7 +1389,7 @@
         "Confirm no frame exceeds the per-frame upload budget and the total frame budget defined in docs/plan",
         "Confirm all uploads complete within a bounded number of frames"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F102",
@@ -1401,7 +1401,7 @@
         "Confirm each resident tile is uploaded exactly once",
         "Confirm re-showing a cached tile triggers no upload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F103",

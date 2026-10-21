@@ -5620,7 +5620,7 @@
         "Capture screenshots of every control and verify each visual property changed as expected",
         "Run an automated check that the ui package stylesheets contain no hard-coded colors, fonts or sizes outside the variable defaults"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F430",
@@ -5644,7 +5644,7 @@
         "Run an automated check that both languages define every translation key",
         "Verify numbers and units are formatted according to the selected locale"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F432",
@@ -5656,7 +5656,7 @@
         "Verify every control shows the new strings and missing keys fall back to English",
         "Override a single English string and verify only that string changes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F433",
@@ -5668,7 +5668,7 @@
         "Verify every focused control shows a visible focus indicator in light and dark themes",
         "Operate every control with Enter, Space, arrows and Escape as documented"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F434",
@@ -5692,7 +5692,7 @@
         "Verify every ratio meets WCAG 2.1 AA",
         "Verify icons over the map keep sufficient contrast over light and dark imagery (backing shape or outline)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F436",

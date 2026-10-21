@@ -10,3 +10,4 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-21T09:40:01Z: frames read through Globe.captureFrame() in device pixels instead of page screenshots (ADR 0012, third M2 review)
 - 2026-10-21T13:30:00Z: polar tiles split in latitude only (KB-043, ADR 0006), changing the north-pole view (fourth M2 review)
 - 2026-10-21T15:40:00Z: the surface is a Web Mercator quadtree with polar caps (M3 increment 1, ADR 0006 §1): mesh rows follow Mercator y
+- 2026-10-21T23:00:00Z: the ui package's controls in the light and dark themes (F430, UI and GIS track)

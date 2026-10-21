@@ -29,6 +29,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npx playwright test e2e/visual.spec.ts --update-snapshots=all
+      # The ui package's controls in the light and dark themes (F430).
+      - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --update-snapshots=all
       - name: Commit the baselines
         run: |
           git config user.name 'github-actions[bot]'

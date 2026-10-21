@@ -77,8 +77,9 @@ function declarations(values: Readonly<Record<string, string>>): string {
 
 /** The theme blocks: the only place where literal colors, fonts and sizes appear. */
 export const THEME_CSS =
-  `.vg-ui,.vibeglobe-debug-overlay{${declarations(LIGHT)}}` +
-  `.vg-ui[data-theme="dark"],.vg-ui[data-theme="dark"] .vibeglobe-debug-overlay{${declarations(DARK)}}` +
+  // A debug panel outside a UI layer (the playground's) takes the defaults itself; inside one it inherits the layer's.
+  `.vg-ui,.vibeglobe-debug-overlay:not(.vg-ui .vibeglobe-debug-overlay){${declarations(LIGHT)}}` +
+  `.vg-ui[data-theme="dark"]{${declarations(DARK)}}` +
   '@media (prefers-reduced-motion: reduce){.vg-ui{--vg-ui-transition-duration:0s;}}';
 
 /** The rules of every control: values come from the theme variables only (F429, checked by styles.test.ts). */

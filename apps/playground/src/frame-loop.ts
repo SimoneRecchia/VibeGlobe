@@ -9,6 +9,8 @@ export interface FrameLoop {
   cpuFrameTimesMs(): number[];
   /** Forgets the CPU samples, so a measurement window starts empty. */
   resetCpuSamples(): void;
+  /** GPU time of the most recent frames where the renderer measures it (`?gpuTiming=1`), oldest first. */
+  gpuFrameTimesMs?(): number[];
   stop(): void;
 }
 
@@ -57,13 +59,16 @@ export function startFrameLoop(onFrame: FrameListener): FrameLoop {
  */
 export function startDragLoop(globe: Globe): FrameLoop {
   const cpuMs = new Float64Array(CPU_SAMPLE_CAPACITY);
+  const gpuMs = new Float64Array(CPU_SAMPLE_CAPACITY);
   let cpuCount = 0;
+  let gpuCount = 0;
   let frameStartMs = -1;
   let handle = 0;
   let angle = 0;
   const center = { xPx: 0, yPx: 0 };
   const point = { xPx: 0, yPx: 0 };
   let anchor: GeoPosition | undefined;
+  const gpuTiming = new URLSearchParams(location.search).has('gpuTiming');
   const markStart = (): void => {
     frameStartMs = performance.now();
   };
@@ -72,6 +77,9 @@ export function startDragLoop(globe: Globe): FrameLoop {
     cpuMs[cpuCount % CPU_SAMPLE_CAPACITY] = performance.now() - frameStartMs;
     cpuCount++;
     frameStartMs = -1;
+    // The latest GPU time the renderer resolved (timestamp queries arrive a few frames late).
+    const gpu = gpuTiming ? globe.rendererStats().gpuFrameMs : null;
+    if (gpu !== null) gpuMs[gpuCount++ % CPU_SAMPLE_CAPACITY] = gpu;
   });
   const tick = (): void => {
     anchor ??= globe.navigation.grab(center);
@@ -100,10 +108,18 @@ export function startDragLoop(globe: Globe): FrameLoop {
     },
     resetCpuSamples() {
       cpuCount = 0;
+      gpuCount = 0;
     },
+    gpuFrameTimesMs: () => ringSamples(gpuMs, gpuCount),
     stop() {
       cancelAnimationFrame(handle);
       unsubscribe();
     },
   };
+}
+
+/** The samples of a ring buffer that has received `count` values, oldest first. */
+function ringSamples(ring: Float64Array, count: number): number[] {
+  const kept = Math.min(count, ring.length);
+  return Array.from({ length: kept }, (_, index) => ring[(count - kept + index) % ring.length] as number);
 }

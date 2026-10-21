@@ -76,6 +76,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       textureUploads: 1,
       matrixUpdates: 0,
       pipelineCompiles: 0,
+      gpuFrameMs: null,
     }),
     resourceCounts: () => ({
       meshes: renderer.meshes.size,

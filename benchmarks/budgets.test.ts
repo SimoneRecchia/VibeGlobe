@@ -104,6 +104,19 @@ describe('findBudgetViolations', () => {
     ]);
   });
 
+  it('checks the GPU budget only where the GPU time was measured', () => {
+    const withGpu: Budgets = {
+      features: { drag: { scenario: 's', frameTimeP95Ms: 18, cpuFrameP95Ms: 6, gpuFrameP95Ms: 10 } },
+      packages: {},
+    };
+    const measured = summarizeScenario([summarizeRun([16], [1], 0, null, 400, [8, 9, 12])]);
+    expect(measured.gpuFrameP95Ms).toBe(12);
+    expect(findBudgetViolations(withGpu, { s: measured })).toEqual(['drag: median gpu p95 12.000 ms > 10 ms']);
+    const unmeasured = summarizeScenario([summarizeRun([16], [1], 0, null, 400)]);
+    expect(unmeasured.gpuFrameP95Ms).toBeNull();
+    expect(findBudgetViolations(withGpu, { s: unmeasured })).toEqual([]);
+  });
+
   it('records the median draw calls of a scenario', () => {
     const runs = [208, 210, 207].map((draws) => summarizeRun([16], [1], 0, null, draws));
     expect(summarizeScenario(runs).drawCalls).toBe(208);

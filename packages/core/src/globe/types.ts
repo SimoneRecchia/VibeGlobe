@@ -82,6 +82,11 @@ export interface RendererStats {
    * material variants draw. Debug shapes have their own materials and count.
    */
   readonly pipelineCompiles: number;
+  /**
+   * GPU time of the last frame measured, in milliseconds: null unless the renderer was asked to measure it and the
+   * device offers timestamp queries (benchmarks).
+   */
+  readonly gpuFrameMs: number | null;
 }
 
 /** A flat test quad drawn with the surface's precision path, for scenario tests of jitter and depth (F057, F058). */

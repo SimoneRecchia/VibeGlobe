@@ -1,7 +1,8 @@
 // Benchmark statistics and budget comparison (ADR 0012), kept free of browser and file access for unit tests.
 
 export interface Budgets {
-  features: Record<string, { scenario: string; frameTimeP95Ms: number; cpuFrameP95Ms: number }>;
+  /** `gpuFrameP95Ms` is checked only where the GPU time was measured (timestamp queries; not on SwiftShader). */
+  features: Record<string, { scenario: string; frameTimeP95Ms: number; cpuFrameP95Ms: number; gpuFrameP95Ms?: number }>;
   packages: Record<string, { memoryScenario?: string; jsHeapMB?: number }>;
   /**
    * Time from navigation to the first complete frame, served from a local server (F546): the median over the
@@ -46,6 +47,8 @@ export interface ScenarioSummary {
   startupMs: number | null;
   /** Median of the runs' draw calls, or null when a run did not record them. */
   drawCalls: number | null;
+  /** Median of the per-run GPU frame p95, or null when a run measured no GPU time. */
+  gpuFrameP95Ms: number | null;
 }
 
 /** The value below which `fraction` of the samples fall (nearest-rank method); 0 for no samples. */
@@ -74,6 +77,7 @@ export function summarizeRun(
   jsHeapBytes: number,
   startupMs: number | null = null,
   drawCalls: number | null = null,
+  gpuFrameMs: readonly number[] = [],
 ): RunResult {
   return {
     frames: frameTimesMs.length,
@@ -84,7 +88,7 @@ export function summarizeRun(
     },
     cpuFrameMs: distribution(cpuFrameMs),
     jsHeapMB: jsHeapBytes / (1024 * 1024),
-    gpuFrameMs: null,
+    gpuFrameMs: gpuFrameMs.length > 0 ? distribution(gpuFrameMs) : null,
     gpuMemoryMB: null,
     startupMs,
     steadyStateAllocations: null,
@@ -100,6 +104,9 @@ export function summarizeScenario(runs: RunResult[]): ScenarioSummary {
     jsHeapMB: median(runs.map((run) => run.jsHeapMB)),
     startupMs: runs.every((run) => run.startupMs !== null) ? median(runs.map((run) => run.startupMs ?? 0)) : null,
     drawCalls: runs.every((run) => run.drawCalls !== null) ? median(runs.map((run) => run.drawCalls ?? 0)) : null,
+    gpuFrameP95Ms: runs.every((run) => run.gpuFrameMs !== null)
+      ? median(runs.map((run) => run.gpuFrameMs?.p95 ?? 0))
+      : null,
   };
 }
 
@@ -125,6 +132,9 @@ export function findBudgetViolations(
         violations.push(
           `${feature}: median cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms > ${budget.cpuFrameP95Ms} ms`,
         );
+      const gpu = summary.gpuFrameP95Ms;
+      if (budget.gpuFrameP95Ms !== undefined && gpu !== null && gpu > budget.gpuFrameP95Ms)
+        violations.push(`${feature}: median gpu p95 ${gpu.toFixed(3)} ms > ${budget.gpuFrameP95Ms} ms`);
     }
   }
   for (const [pkg, budget] of Object.entries(budgets.packages)) {

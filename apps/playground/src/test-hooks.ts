@@ -20,6 +20,8 @@ interface PlaygroundTestHooks {
   readonly events: RecordedEvent[];
   cpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
+  /** GPU frame times where measured (`?gpuTiming=1` and timestamp queries), else empty. */
+  gpuFrameTimesMs(): number[];
   /** Milliseconds from navigation start to the first complete frame, once drawn (F546). */
   firstFrameMs: number | undefined;
   /** Mounts another engine instance in a new element; `unmount` destroys it and removes the element. */
@@ -57,6 +59,7 @@ export function exposeTestHooks(
     events,
     cpuFrameTimesMs: () => loop?.cpuFrameTimesMs() ?? [],
     resetCpuSamples: () => loop?.resetCpuSamples(),
+    gpuFrameTimesMs: () => loop?.gpuFrameTimesMs?.() ?? [],
     firstFrameMs: undefined,
     mount,
   };

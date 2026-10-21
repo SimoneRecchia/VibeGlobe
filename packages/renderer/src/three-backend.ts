@@ -51,6 +51,14 @@ export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
  */
 export type DepthChoice = 'auto' | 'fragment';
 
+/** How a backend is set up: the {@link RendererOptions} it uses. */
+export interface BackendSettings {
+  readonly choice: BackendChoice;
+  readonly depth: DepthChoice;
+  /** Measures each frame's GPU time with timestamp queries where the device offers them (benchmarks only). */
+  readonly gpuTiming: boolean;
+}
+
 /**
  * Where the backend draws (ADR 0011): a canvas it manages inside a page container (an existing one, or one it
  * creates), or an OffscreenCanvas it is given, for example in a worker. An OffscreenCanvas cannot be replaced, so a
@@ -81,6 +89,8 @@ export class ThreeBackend implements RendererBackend {
   private webgpuFailure: string | undefined;
   private lastDrawCalls = 0;
   private lastTriangles = 0;
+  /** GPU time of the last frame measured, with the `gpuTiming` option and timestamp queries; null otherwise. */
+  private gpuFrameMs: number | null = null;
   private beginFrame: () => void = () => undefined;
   /** Meshes shown by the last frame, reused across frames. */
   private readonly shown: (Mesh | undefined)[] = [];
@@ -104,9 +114,8 @@ export class ThreeBackend implements RendererBackend {
   private constructor(
     private readonly surface: DrawingSurface,
     readonly host: RenderHost,
-    private readonly choice: BackendChoice,
     private readonly events: RendererEvents,
-    private readonly depth: DepthChoice,
+    private readonly settings: BackendSettings,
   ) {
     this.camera.matrixAutoUpdate = false;
     this.camera.matrixWorldAutoUpdate = false;
@@ -117,11 +126,10 @@ export class ThreeBackend implements RendererBackend {
   static async create(
     surface: DrawingSurface,
     host: RenderHost,
-    choice: BackendChoice,
     events: RendererEvents,
-    depth: DepthChoice = 'auto',
+    settings: BackendSettings,
   ): Promise<ThreeBackend> {
-    const backend = new ThreeBackend(surface, host, choice, events, depth);
+    const backend = new ThreeBackend(surface, host, events, settings);
     await backend.initRenderer();
     return backend;
   }
@@ -140,9 +148,9 @@ export class ThreeBackend implements RendererBackend {
 
   private async initRenderer(): Promise<void> {
     const scope = this.scope();
-    const webgpu = this.choice !== 'webgl2' && this.webgpuFailure === undefined && (await webgpuUsable(scope));
+    const webgpu = this.settings.choice !== 'webgl2' && this.webgpuFailure === undefined && (await webgpuUsable(scope));
     // A forced backend never falls back (ADR 0010 §2).
-    if (this.choice === 'webgpu' && !webgpu) {
+    if (this.settings.choice === 'webgpu' && !webgpu) {
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but this browser offers no WebGPU adapter.');
     }
     if (!webgpu && !webgl2Usable(this.surface)) {
@@ -158,8 +166,9 @@ export class ThreeBackend implements RendererBackend {
       canvas: canvas as HTMLCanvasElement,
       antialias: true,
       // three.js turns this off on WebGL2 without EXT_clip_control; the engine then writes depth itself.
-      reversedDepthBuffer: webgpu || this.depth === 'auto',
+      reversedDepthBuffer: webgpu || this.settings.depth === 'auto',
       forceWebGL,
+      trackTimestamp: this.settings.gpuTiming,
     });
     await renderer.init();
     this.depthPath = depthPathOf(renderer);
@@ -183,7 +192,7 @@ export class ThreeBackend implements RendererBackend {
     releaseVertexArraysWithBuffers(renderer.backend);
     // three.js falls back to WebGL2 silently when WebGPU fails to initialize: reported for 'auto', an error for 'webgpu'.
     const fellBack = !forceWebGL && (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true;
-    if (fellBack && this.choice === 'webgpu') {
+    if (fellBack && this.settings.choice === 'webgpu') {
       renderer.dispose();
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but it failed to initialize.');
     }
@@ -213,7 +222,7 @@ export class ThreeBackend implements RendererBackend {
     reason: string,
   ): Promise<void> {
     releaseRenderer(renderer);
-    if (this.choice === 'webgpu') {
+    if (this.settings.choice === 'webgpu') {
       throw new GlobeError(
         'unsupported-device',
         `WebGPU was requested, but it failed its start-up self-test: ${reason}`,
@@ -280,6 +289,16 @@ export class ThreeBackend implements RendererBackend {
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
   }
 
+  /**
+   * Reads back the GPU time of the frames rendered so far (timestamp queries resolve a few frames late); allocates
+   * promises, so only with the `gpuTiming` option. Unsupported devices leave it null.
+   */
+  private resolveGpuTime(renderer: WebGPURenderer): void {
+    void renderer.resolveTimestampsAsync('render').then((ms) => {
+      if (typeof ms === 'number' && ms > 0) this.gpuFrameMs = ms;
+    });
+  }
+
   /** Cumulative counters (F052). */
   stats(): RendererStats {
     return {
@@ -288,6 +307,7 @@ export class ThreeBackend implements RendererBackend {
       textureUploads: this.textureUploads,
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
+      gpuFrameMs: this.gpuFrameMs,
     };
   }
 
@@ -375,6 +395,7 @@ export class ThreeBackend implements RendererBackend {
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.renderer.render(this.scene, this.camera);
+    if (this.settings.gpuTiming) this.resolveGpuTime(this.renderer);
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };
     this.lastDrawCalls = info.drawCalls ?? info.calls ?? 0;
     this.lastTriangles = info.triangles;

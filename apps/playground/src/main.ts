@@ -38,7 +38,8 @@ const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'au
 function startGlobe(container: HTMLElement, target: HTMLCanvasElement, view: ViewInit): Globe {
   return createGlobe({
     container,
-    renderer: createRenderer({ backend, depth, canvas: target }),
+    // `?gpuTiming=1` measures GPU time per frame where timestamp queries exist (benchmark scenarios `drag-*`).
+    renderer: createRenderer({ backend, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
     controls: createControls(),
     baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
     view,

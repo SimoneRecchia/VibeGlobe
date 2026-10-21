@@ -34,9 +34,11 @@ const SCENARIOS: Record<string, string> = {
         [200, 'zoom=2.5&level=4'],
         [400, 'zoom=3&level=5'],
         [800, 'zoom=2&level=5'],
-      ].map(([draws, view]) => [`drag-${draws}-${backend}`, `?scenario=drag&backend=${backend}&${view}`]),
+      ].map(([draws, view]) => [`drag-${draws}-${backend}`, `?scenario=drag&gpuTiming=1&backend=${backend}&${view}`]),
     ),
   ),
+  // ADR 0005: the fragment depth path may cost at most 1.25 times the clip-control path in GPU time.
+  'drag-400-webgl2-fragment': '?scenario=drag&gpuTiming=1&backend=webgl2&depth=fragment&zoom=3&level=5',
 };
 const RUNS = 5;
 const COLD_RUNS = 10;
@@ -46,6 +48,7 @@ const SAMPLE_MS = 3000;
 interface PlaygroundHooks {
   globe: { rendererStats(): { drawCalls: number } };
   cpuFrameTimesMs(): number[];
+  gpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
   firstFrameMs: number | undefined;
 }
@@ -78,12 +81,24 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
         requestAnimationFrame(tick);
       });
       const frameTimesMs = timestamps.slice(1).map((time, index) => time - (timestamps[index] as number));
-      return { frameTimesMs, cpuFrameMs: hooks.cpuFrameTimesMs(), drawCalls: hooks.globe.rendererStats().drawCalls };
+      return {
+        frameTimesMs,
+        cpuFrameMs: hooks.cpuFrameTimesMs(),
+        gpuFrameMs: hooks.gpuFrameTimesMs(),
+        drawCalls: hooks.globe.rendererStats().drawCalls,
+      };
     }, SAMPLE_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.collectGarbage');
     const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
-    return summarizeRun(sample.frameTimesMs, sample.cpuFrameMs, usedSize, startupMs, sample.drawCalls);
+    return summarizeRun(
+      sample.frameTimesMs,
+      sample.cpuFrameMs,
+      usedSize,
+      startupMs,
+      sample.drawCalls,
+      sample.gpuFrameMs,
+    );
   } finally {
     await page.close();
   }
@@ -197,7 +212,7 @@ writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
 
 for (const [scenario, summary] of Object.entries(summaries)) {
   console.log(
-    `${scenario.padEnd(16)} frame p95 (median of ${RUNS}) ${summary.frameTimeP95Ms.toFixed(2)} ms · cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms · heap ${summary.jsHeapMB.toFixed(1)} MB · first frame ${summary.startupMs === null ? 'n/a' : `${summary.startupMs.toFixed(0)} ms`} · draws ${summary.drawCalls ?? 'n/a'} · gpu n/a`,
+    `${scenario.padEnd(16)} frame p95 (median of ${RUNS}) ${summary.frameTimeP95Ms.toFixed(2)} ms · cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms · heap ${summary.jsHeapMB.toFixed(1)} MB · first frame ${summary.startupMs === null ? 'n/a' : `${summary.startupMs.toFixed(0)} ms`} · draws ${summary.drawCalls ?? 'n/a'} · gpu p95 ${summary.gpuFrameP95Ms === null ? 'n/a' : `${summary.gpuFrameP95Ms.toFixed(3)} ms`}`,
   );
 }
 if (coldStartsMs.length > 0)

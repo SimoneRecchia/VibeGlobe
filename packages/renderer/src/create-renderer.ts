@@ -20,6 +20,11 @@ export interface RendererOptions {
    * renderer observes the container itself.
    */
   readonly host?: RenderHost;
+  /**
+   * Measures each frame's GPU time with timestamp queries where the device offers them, reported as
+   * `RendererStats.gpuFrameMs` (default false). For benchmarks: reading the queries back allocates every frame.
+   */
+  readonly gpuTiming?: boolean;
 }
 
 /**
@@ -28,8 +33,11 @@ export interface RendererOptions {
  * SSR-safe and costs no rendering code until a globe exists.
  */
 export function createRenderer(options: RendererOptions = {}): RendererFactory {
-  const choice = options.backend ?? 'auto';
-  const depth = options.depth ?? 'auto';
+  const settings = {
+    choice: options.backend ?? 'auto',
+    depth: options.depth ?? 'auto',
+    gpuTiming: options.gpuTiming ?? false,
+  } as const;
   return async (container, events) => {
     const canvas = options.canvas;
     const offscreen = typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
@@ -39,16 +47,15 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     ]);
     if (offscreen) {
       if (!options.host) throw new GlobeError('invalid-option', 'An OffscreenCanvas renderer needs a host');
-      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, choice, events, depth);
+      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, events, settings);
     }
     const element = container as HTMLElement;
     const { createBrowserHost } = hostModule ?? (await import('./browser-host.js'));
     return ThreeBackend.create(
       { kind: 'element', container: element, canvas: canvas as HTMLCanvasElement | undefined },
       options.host ?? createBrowserHost(element),
-      choice,
       events,
-      depth,
+      settings,
     );
   };
 }

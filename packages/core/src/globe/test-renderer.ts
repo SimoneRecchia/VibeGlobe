@@ -12,6 +12,10 @@ export interface FakeRenderer extends RendererBackend {
   visibility: ((visible: boolean) => void) | undefined;
   resizeListener: (() => void) | undefined;
   size: { widthPx: number; heightPx: number };
+  /** Set to make the host report the current size only when the engine checks at the start of a frame. */
+  unreportedResize: boolean;
+  /** The size of the last resize. */
+  lastResize: { widthPx: number; heightPx: number } | undefined;
   destroyed: boolean;
   /** Runs pending frame callbacks; returns how many ran. */
   flush(): number;
@@ -39,6 +43,8 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     visibility: undefined,
     resizeListener: undefined,
     size: { widthPx: 800, heightPx: 600 },
+    unreportedResize: false,
+    lastResize: undefined,
     destroyed: false,
     addMesh: (mesh) => void renderer.meshes.set(mesh.key, mesh),
     removeMesh: (key) => void renderer.meshes.delete(key),
@@ -47,7 +53,9 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       renderer.drawCount++;
       renderer.lastTiles = count;
     },
-    resize: () => undefined,
+    resize: (widthPx: number, heightPx: number) => {
+      renderer.lastResize = { widthPx, heightPx };
+    },
     setDebugMeshes: () => undefined,
     stats: () => ({ drawCalls: renderer.drawCount, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
     resourceCounts: () => ({
@@ -87,6 +95,11 @@ function fakeHost(pending: FrameQueue, renderer: () => FakeRenderer): RenderHost
     observeVisibility: (callback) => {
       renderer().visibility = callback;
       return () => (renderer().visibility = undefined);
+    },
+    checkSize: () => {
+      if (!renderer().unreportedResize) return;
+      renderer().unreportedResize = false;
+      renderer().resizeListener?.();
     },
     containerSize: () => renderer().size,
     pixelRatio: () => 1,

@@ -51,6 +51,19 @@ describe('createGlobe', () => {
     expect(globe.frameNumber).toBe(2);
   });
 
+  it('asks the host for unreported size and pixel-ratio changes at the start of every frame (KB-011)', async () => {
+    const { globe, renderer } = await started();
+    // The host notices a change no browser event reported (a pixel ratio under some emulations).
+    renderer.size = { widthPx: 640, heightPx: 480 };
+    renderer.unreportedResize = true;
+    globe.requestRender();
+    renderer.flush();
+    expect(renderer.lastResize).toEqual({ widthPx: 640, heightPx: 480 });
+    expect(renderer.unreportedResize).toBe(false);
+    // The resize asks for another frame at the new size.
+    expect(renderer.flush()).toBe(1);
+  });
+
   it('draws nothing while hidden and resumes on the next frame when shown (F063)', async () => {
     const { globe, renderer } = await started();
     renderer.visibility?.(false);

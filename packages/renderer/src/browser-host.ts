@@ -3,6 +3,9 @@ import type { RenderHost } from '@vibeglobe/core';
 /** Browser services for the engine: frames, size and pixel-ratio changes, page visibility (architecture §2). */
 export function createBrowserHost(container: HTMLElement): RenderHost {
   const view = container.ownerDocument.defaultView ?? window;
+  /** Matches while the pixel ratio is the one the canvas was last sized for. */
+  let ratioQuery: MediaQueryList | undefined;
+  let onRatioChange: (() => void) | undefined;
   return {
     requestFrame: (callback) => view.requestAnimationFrame(callback),
     cancelFrame: (id) => view.cancelAnimationFrame(id),
@@ -19,21 +22,28 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
         observer.observe(container);
       }
       // A pixel-ratio change also fires the media query for the current ratio once.
-      let query: MediaQueryList | undefined;
       const watchRatio = (): void => {
-        query?.removeEventListener('change', onRatio);
-        query = view.matchMedia(`(resolution: ${view.devicePixelRatio || 1}dppx)`);
-        query.addEventListener('change', onRatio);
+        ratioQuery?.removeEventListener('change', onRatio);
+        ratioQuery = view.matchMedia(`(resolution: ${view.devicePixelRatio || 1}dppx)`);
+        ratioQuery.addEventListener('change', onRatio);
       };
       const onRatio = (): void => {
         watchRatio();
         callback();
       };
+      onRatioChange = onRatio;
       watchRatio();
       return () => {
         observer.disconnect();
-        query?.removeEventListener('change', onRatio);
+        ratioQuery?.removeEventListener('change', onRatio);
+        ratioQuery = undefined;
+        onRatioChange = undefined;
       };
+    },
+    // Some environments change the pixel ratio without any event (Chromium 156 under DevTools-protocol emulation,
+    // KB-011). Reading whether the query still matches is a boolean, so this check allocates nothing.
+    checkSize() {
+      if (ratioQuery && !ratioQuery.matches) onRatioChange?.();
     },
     observeVisibility(callback) {
       const document = container.ownerDocument;

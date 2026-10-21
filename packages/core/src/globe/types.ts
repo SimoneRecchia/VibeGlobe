@@ -91,6 +91,11 @@ export interface RenderHost {
   now(): number;
   /** Calls `callback` when the container's CSS size or the device pixel ratio changes; returns an unsubscribe. */
   observeSize(callback: () => void): () => void;
+  /**
+   * Optional: called at the start of every frame to catch a size or pixel-ratio change the browser reported no event
+   * for; it reports one through the `observeSize` callback. Runs every frame, so it must not allocate.
+   */
+  checkSize?(): void;
   /** Calls `callback` with false when the page is hidden and true when it is shown again; returns an unsubscribe. */
   observeVisibility(callback: (visible: boolean) => void): () => void;
   /** The container's CSS size. */

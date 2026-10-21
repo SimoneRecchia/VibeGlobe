@@ -179,6 +179,7 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     const surface = this.surface;
     if (this.destroyed || !renderer || !surface || !this.visible) return;
+    renderer.host.checkSize?.();
     this.dirty = false;
     this.cam.update();
     const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);

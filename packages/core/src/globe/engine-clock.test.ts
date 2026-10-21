@@ -23,6 +23,19 @@ describe('EngineClock (ADR 0009, ADR 0012)', () => {
     expect(clock.timeMs).toBe(100);
   });
 
+  it('takes back a manual step for a frame that was not drawn, and keeps real time (KB-058)', () => {
+    const manual = new EngineClock(10);
+    at(manual, 0);
+    manual.skipped();
+    at(manual, 16);
+    expect(manual.timeMs).toBe(10);
+    const real = new EngineClock();
+    at(real, 0);
+    at(real, 16);
+    real.skipped();
+    expect(real.timeMs).toBe(16);
+  });
+
   it('advances a fixed step per frame in manual mode, whatever the timestamps', () => {
     const clock = new EngineClock(1000 / 60);
     for (const ms of [0, 0, 500, 501]) at(clock, ms);

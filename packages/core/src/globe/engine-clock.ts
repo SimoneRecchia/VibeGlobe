@@ -45,4 +45,14 @@ export class EngineClock {
     state[DELTA] = step;
     state[TIME] = (state[TIME] ?? 0) + step;
   }
+
+  /** The frame just advanced was not drawn: in manual mode its step is taken back, one step per drawn frame (KB-058). */
+  skipped(): void {
+    const state = this.state;
+    const manual = state[MANUAL] ?? 0;
+    if (manual > 0) {
+      state[TIME] = (state[TIME] ?? 0) - manual;
+      state[DELTA] = 0;
+    }
+  }
 }

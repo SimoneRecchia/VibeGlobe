@@ -239,6 +239,25 @@ describe('createGlobe', () => {
     expect(globe.camera.rangeMeters / range).toBeCloseTo(1, 9);
   });
 
+  it('advances the manual clock one step per drawn frame only (KB-058)', async () => {
+    const { globe, renderer } = await started({ manualClockStepMs: 10 });
+    renderer.drawing = false;
+    for (let i = 0; i < 5; i++) {
+      globe.requestRender();
+      renderer.flush();
+    }
+    renderer.drawing = true;
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    renderer.resizeListener?.();
+    globe.requestRender();
+    renderer.flush();
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    expect(globe.frameNumber).toBeGreaterThan(1);
+    expect(globe.timeMs).toBe(globe.frameNumber * 10);
+  });
+
   it('captures only a frame it drew: waits while nothing can be drawn (KB-051)', async () => {
     const { globe, renderer } = await started();
     renderer.drawing = false;

@@ -171,8 +171,10 @@ class GlobeEngine implements Globe {
     return this.clock.timeMs;
   }
 
-  /** Reports an error and rejects `ready` if the first frame has not been drawn. */
+  /** Reports that nothing will be drawn: the error event, waiting captures, and `ready` if no frame was drawn. */
   private failStart(error: GlobeError): void {
+    this.failure = error;
+    this.captureWaits.end(error);
     this.emitter.emit('error', error);
     const reject = this.rejectReady;
     if (!this.resolveReady || !reject) return;
@@ -190,11 +192,7 @@ class GlobeEngine implements Globe {
       },
       backendFallback: (reason) => this.emitter.emit('backend-fallback', { reason }),
       // Nothing is drawn any more: a first frame that never came will not come (KB-036), nor a frame to capture.
-      failed: (error) => {
-        this.failure = error;
-        this.captureWaits.end(error);
-        this.failStart(error);
-      },
+      failed: (error) => this.failStart(error),
     };
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) {
@@ -298,12 +296,13 @@ class GlobeEngine implements Globe {
     if (!this.waiting) this.controls?.update?.();
     this.inFrame = false;
     this.dirty = false;
-    if (this.waiting) return;
+    // A frame not drawn takes no step of the manual clock (KB-058).
+    if (this.waiting) return this.clock.skipped();
     this.cam.update();
     const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
     surface.prepare(this.tiles, count, this.keys);
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
-    if (!renderer.render(this.frameView, this.keys, count)) return;
+    if (!renderer.render(this.frameView, this.keys, count)) return this.clock.skipped();
     this.frames++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {

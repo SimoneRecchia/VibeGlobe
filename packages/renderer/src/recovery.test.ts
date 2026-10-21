@@ -44,3 +44,22 @@ describe('watchLoss (KB-023, KB-053, KB-054)', () => {
     expect(watch.held()).toBe(false);
   });
 });
+
+describe('watchLoss reports a loss once (KB-057)', () => {
+  it('reports a real device loss once, although three.js forwards it too', async () => {
+    let lose: (info: { message: string; reason: string }) => void = () => undefined;
+    const device = { lost: new Promise<{ message: string; reason: string }>((resolve) => (lose = resolve)) };
+    const renderer: { backend: { device: typeof device }; onDeviceLost?: (info: { message?: string }) => void } = {
+      backend: { device },
+    };
+    // three.js 0.186 calls onDeviceLost from its own `lost` handler for every reason except 'destroyed'.
+    void device.lost.then((info) => {
+      if (info.reason !== 'destroyed') renderer.onDeviceLost?.(info);
+    });
+    const reports: string[] = [];
+    watchLoss(renderer as never, (reason) => reports.push(reason));
+    lose({ message: 'GPU process crashed', reason: 'unknown' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reports).toEqual(['GPU process crashed']);
+  });
+});

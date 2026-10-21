@@ -68,7 +68,13 @@ export interface LossWatch {
  * device's own `lost` promise is watched too.
  */
 export function watchLoss(renderer: WebGPURenderer, onLoss: (reason: string) => void): LossWatch {
-  let report: ((reason: string) => void) | undefined = onLoss;
+  // Both channels see a real loss (three.js forwards every reason but 'destroyed'): report it once (KB-057).
+  let pending: ((reason: string) => void) | undefined = onLoss;
+  let report: ((reason: string) => void) | undefined = (reason) => {
+    const once = pending;
+    pending = undefined;
+    once?.(reason);
+  };
   renderer.onDeviceLost = (info: { message?: string }) => report?.(info.message ?? 'device lost');
   const device = (renderer.backend as { device?: GPUDevice }).device;
   const gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;

@@ -72,3 +72,79 @@ describe('solveAnchor properties (F046)', () => {
     expect(Math.hypot(x - to[0], y - to[1])).toBeLessThan(0.5);
   });
 });
+
+/** A camera at a random pose, tilt included (ADR 0009: the anchor solver's verification covers tilt). */
+function tiltedCamera(lon: number, lat: number, range: number, heading: number, tiltDeg: number): Camera {
+  const c = camera(lon, lat, range, heading);
+  c.pose.tiltRad = tiltDeg * DEG;
+  c.update();
+  return c;
+}
+
+const pose = fc.tuple(
+  fc.double({ min: -180, max: 180, noNaN: true }),
+  fc.oneof(
+    fc.double({ min: -89.9, max: 89.9, noNaN: true }),
+    fc.double({ min: 80, max: 89.9, noNaN: true }),
+    fc.double({ min: -89.9, max: -80, noNaN: true }),
+  ),
+  fc.double({ min: 0, max: 7, noNaN: true }).map((exponent) => 10 ** exponent),
+  fc.double({ min: 0, max: 360, noNaN: true }),
+  fc.oneof(fc.constant(0), fc.double({ min: 0, max: 60, noNaN: true })),
+);
+
+describe('solveAnchor drift (ADR 0009: at most 0.01 px)', () => {
+  test.prop([
+    pose,
+    fc.tuple(fc.integer({ min: 200, max: 800 }), fc.integer({ min: 200, max: 600 })),
+    fc.tuple(fc.double({ min: -40, max: 40, noNaN: true }), fc.double({ min: -40, max: 40, noNaN: true })),
+  ])('pan: a drag step keeps the grabbed point under the pointer', ([lon, lat, range, heading, tilt], from, step) => {
+    const c = tiltedCamera(lon, lat, range, heading, tilt);
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    if (!c.pickEllipsoid(from[0], from[1], hit)) return;
+    const to = [from[0] + step[0], from[1] + step[1]] as const;
+    if (!solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(...to))) return;
+    const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
+    expect(Math.hypot(x - to[0], y - to[1])).toBeLessThanOrEqual(0.01);
+  });
+
+  test.prop([
+    pose,
+    fc.tuple(fc.integer({ min: 200, max: 800 }), fc.integer({ min: 200, max: 600 })),
+    fc.double({ min: -0.5, max: 0.5, noNaN: true }),
+  ])('zoom-at: a wheel step keeps the point under the cursor', ([lon, lat, range, heading, tilt], at, levels) => {
+    const c = tiltedCamera(lon, lat, range, heading, tilt);
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    if (!c.pickEllipsoid(at[0], at[1], hit)) return;
+    c.pose.rangeMeters = Math.max(1, c.pose.rangeMeters * 2 ** -levels);
+    if (!solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(...at))) return;
+    const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
+    expect(Math.hypot(x - at[0], y - at[1])).toBeLessThanOrEqual(0.01);
+  });
+
+  it('solves nearly every realistic drag step, poles and antimeridian included', () => {
+    let tried = 0;
+    let solved = 0;
+    const samples = fc.sample(
+      fc.tuple(
+        pose,
+        fc.tuple(fc.integer({ min: 200, max: 800 }), fc.integer({ min: 200, max: 600 })),
+        fc.tuple(fc.double({ min: -20, max: 20, noNaN: true }), fc.double({ min: -20, max: 20, noNaN: true })),
+      ),
+      { numRuns: 2000, seed: 42 },
+    );
+    for (const [[lon, lat, range, heading, tilt], from, step] of samples) {
+      const c = tiltedCamera(lon, lat, range, heading, tilt);
+      const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      if (!c.pickEllipsoid(from[0], from[1], hit)) continue;
+      // Only steps whose target pixel still shows the globe can be solved.
+      const probe = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      if (!c.pickEllipsoid(from[0] + step[0], from[1] + step[1], probe)) continue;
+      tried++;
+      const target = Float64Array.of(from[0] + step[0], from[1] + step[1]);
+      if (solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), target)) solved++;
+    }
+    expect(tried).toBeGreaterThan(1000);
+    expect(solved / tried).toBeGreaterThanOrEqual(0.99);
+  });
+});

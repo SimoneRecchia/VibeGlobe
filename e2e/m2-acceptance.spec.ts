@@ -1,5 +1,5 @@
 // Milestone 2 acceptance (F078): a scripted wheel zoom from orbit to about 1 m above Milan on each backend, checking
-// every frame for complete imagery and, along the way, frame stability, drag anchoring and finally sub-pixel jitter.
+// every frame for complete imagery and, along the way, frame stability, sub-pixel jitter and drag anchoring.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -43,6 +43,78 @@ async function expectAnchoredDrag(page: Page, box: { x: number; y: number; width
   await page.mouse.up();
 }
 
+/**
+ * Lays a checkered quad as wide as the eye is high under the camera (its vertices are float32 offsets of the same
+ * magnitude as a surface tile's at this altitude, and its pattern gives the shift estimate something to follow where
+ * the pinned imagery is smooth), moves the camera east in steps of about a tenth of a pixel and checks that the image
+ * follows the projected motion within 0.1 px (no vertex jitter), then returns to the starting view.
+ */
+async function expectNoJitter(page: Page): Promise<void> {
+  await waitForIdle(page);
+  const camera = await page.evaluate(() => {
+    const state = window.vibeglobePlayground?.globe.camera;
+    return {
+      longitudeDeg: state?.longitudeDeg ?? NaN,
+      latitudeDeg: state?.latitudeDeg ?? NaN,
+      altitudeMeters: state?.altitudeMeters ?? NaN,
+    };
+  });
+  const metersPerDegree = 111320 * Math.cos((camera.latitudeDeg * Math.PI) / 180);
+  const halfWidthMeters = camera.altitudeMeters / 2;
+  // Raised by its chord sag plus a margin, so the planar quad lies above the curved ground everywhere.
+  const heightMeters = (2 * halfWidthMeters) ** 2 / (8 * 6371000) + Math.min(1, camera.altitudeMeters / 100);
+  const dLat = halfWidthMeters / 111320;
+  const dLon = halfWidthMeters / metersPerDegree;
+  await page.evaluate(
+    ({ lon, lat, dLon, dLat, heightMeters, checkerMeters }) =>
+      window.vibeglobePlayground?.globe.setDebugShapes([
+        {
+          corners: [
+            { longitudeDeg: lon - dLon, latitudeDeg: lat - dLat, heightMeters },
+            { longitudeDeg: lon + dLon, latitudeDeg: lat - dLat, heightMeters },
+            { longitudeDeg: lon + dLon, latitudeDeg: lat + dLat, heightMeters },
+            { longitudeDeg: lon - dLon, latitudeDeg: lat + dLat, heightMeters },
+          ],
+          colorRgb: [0.95, 0.9, 0.2],
+          checkerMeters,
+        },
+      ]),
+    {
+      lon: camera.longitudeDeg,
+      lat: camera.latitudeDeg,
+      dLon,
+      dLat,
+      heightMeters,
+      checkerMeters: (2 * halfWidthMeters) / 30,
+    },
+  );
+  await waitForIdle(page);
+  const target = { longitudeDeg: camera.longitudeDeg, latitudeDeg: camera.latitudeDeg };
+  const baseScreen = await geoToScreen(page, target);
+  const east = await geoToScreen(page, { ...target, longitudeDeg: target.longitudeDeg + 1 / metersPerDegree });
+  const pxPerMeter = Math.hypot(east.xPx - baseScreen.xPx, east.yPx - baseScreen.yPx);
+  const stepMeters = 0.1 / pxPerMeter;
+  const base = await canvasImage(page);
+  for (let step = 1; step <= 3; step++) {
+    await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
+      longitudeDeg: camera.longitudeDeg + (step * stepMeters) / metersPerDegree,
+      latitudeDeg: camera.latitudeDeg,
+    });
+    await waitForIdle(page);
+    const shown = await geoToScreen(page, target);
+    const measured = measureShift(base, await canvasImage(page));
+    expect(
+      Math.hypot(measured.dx - (shown.xPx - baseScreen.xPx), measured.dy - (shown.yPx - baseScreen.yPx)),
+      `jitter at step ${step}, ${JSON.stringify(await page.evaluate(() => window.vibeglobePlayground?.globe.camera))}, measured ${JSON.stringify(measured)}, expected ${shown.xPx - baseScreen.xPx}, ${shown.yPx - baseScreen.yPx}`,
+    ).toBeLessThan(0.1);
+  }
+  await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
+    longitudeDeg: camera.longitudeDeg,
+    latitudeDeg: camera.latitudeDeg,
+  });
+  await waitForIdle(page);
+}
+
 test('no known bug is open at the end of milestone 2 (F078)', () => {
   const rows = readFileSync(new URL('../docs/known-bugs.md', import.meta.url), 'utf8')
     .split('\n')
@@ -73,6 +145,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       await expectCompleteGlobe(page);
       if (step % 20 === 0) {
         await expectStableFrames(page);
+        // Along the zoom, where large tiles make the low part of the eye offset matter (ADR 0004).
+        await expectNoJitter(page);
         await expectAnchoredDrag(page, box);
         await page.mouse.move(box.x + center.xPx, box.y + center.yPx);
       }
@@ -81,28 +155,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     expect(altitude).toBeGreaterThanOrEqual(0.5);
     expect(altitude).toBeLessThan(1.5);
     await expectStableFrames(page);
-
-    // Sub-millimeter moves at about 1 m: the image follows the projected motion within 0.1 px. The step scales with the
-    // altitude so each one moves the image by about a tenth of a pixel, where the shift estimate is linear (as in F057).
-    const stepMeters = 0.0002 * (altitude / 0.94);
-    const camera = await page.evaluate(() => {
-      const state = window.vibeglobePlayground?.globe.camera;
-      return { longitudeDeg: state?.longitudeDeg ?? NaN, latitudeDeg: state?.latitudeDeg ?? NaN };
-    });
-    const base = await canvasImage(page);
-    const baseScreen = await geoToScreen(page, camera);
-    const metersPerDegree = 111320 * Math.cos((camera.latitudeDeg * Math.PI) / 180);
-    for (let step = 1; step <= 4; step++) {
-      await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
-        longitudeDeg: camera.longitudeDeg + (step * stepMeters) / metersPerDegree,
-        latitudeDeg: camera.latitudeDeg,
-      });
-      await waitForIdle(page);
-      const shown = await geoToScreen(page, camera);
-      const measured = measureShift(base, await canvasImage(page));
-      expect(
-        Math.hypot(measured.dx - (shown.xPx - baseScreen.xPx), measured.dy - (shown.yPx - baseScreen.yPx)),
-      ).toBeLessThan(0.1);
-    }
+    // Sub-millimeter moves at about 1 m, over the checkered quad: the image follows within 0.1 px.
+    await expectNoJitter(page);
   });
 }

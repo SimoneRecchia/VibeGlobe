@@ -4,9 +4,12 @@ import { wrapLongitudeRad } from '../projections/longitude.js';
 import type { Camera } from './camera.js';
 import { projectToScreen } from './projection.js';
 
-const MAX_ITERATIONS = 6;
-const TOLERANCE_PX = 0.01;
-const ACCEPT_PX = 0.5;
+const MAX_ITERATIONS = 8;
+/** Iterations stop below this residual. */
+const TOLERANCE_PX = 0.001;
+/** A solve succeeds only within this residual (ADR 0009: anchor drift at most 0.01 px). */
+const ACCEPT_PX = 0.01;
+const RIGID_ITERATIONS = 4;
 
 const anchorEcef = new Float64Array(3);
 /** The pixel the anchor must reach, CSS pixels. */
@@ -50,7 +53,12 @@ export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64
   if (gaussNewton(camera)) return true;
   pose.targetLongitudeRad = start[0] ?? 0;
   pose.targetLatitudeRad = start[1] ?? 0;
-  return rotateRigidly(camera);
+  // Each rotation is exact for a sphere; on the ellipsoid a few converge to the pixel.
+  for (let i = 0; i < RIGID_ITERATIONS; i++) {
+    if (!rotateRigidly(camera)) return false;
+    if (shorterThan(r0, TOLERANCE_PX)) return true;
+  }
+  return shorterThan(r0, ACCEPT_PX);
 }
 
 function gaussNewton(camera: Camera): boolean {
@@ -95,7 +103,11 @@ const rotation = new Float64Array(9);
 const enu = new Float64Array(9);
 const vector = new Float64Array(3);
 
-/** Rotates the camera about the Earth's center so the anchor moves under the pixel; updates the heading to match. */
+/**
+ * Rotates the camera about the Earth's center so the anchor moves under the pixel and updates the heading to match;
+ * leaves the residual in `r0`. Returns false when the pixel's ray misses the anchor's sphere or the anchor goes behind
+ * the eye.
+ */
 function rotateRigidly(camera: Camera): boolean {
   camera.update();
   camera.rayDirection(targetPx[0] ?? 0, targetPx[1] ?? 0, ray);
@@ -120,9 +132,8 @@ function rotateRigidly(camera: Camera): boolean {
   const east = dot(heading, enu, 0);
   const north = dot(heading, enu, 3);
   if (Math.hypot(east, north) > 1e-9) pose.headingRad = Math.atan2(east, north);
-  // The rotation is exact for a sphere; on the ellipsoid it lands close, which the residual confirms.
-  if (!residual(camera, r0)) return false;
-  return shorterThan(r0, ACCEPT_PX);
+  // The residual, in r0, tells the caller how close the rotation landed.
+  return residual(camera, r0);
 }
 
 const rotatedTarget = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };

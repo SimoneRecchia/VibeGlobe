@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { canvasImage, geoToScreen, openGlobe, waitForIdle } from './support/globe.ts';
+import { canvasImage, geoToScreen, nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
 import { measureShift } from './support/image.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
@@ -105,30 +105,45 @@ for (const path of DEPTH_PATHS) {
   test(`near and far geometry show no z-fighting toward the horizon from 1 m on ${path.name} (F058)`, async ({
     page,
   }) => {
+    test.setTimeout(240_000);
+    // A small canvas keeps 240 captures affordable on a software GPU.
+    await page.setViewportSize({ width: 480, height: 360 });
     await openGlobe(page, `${path.query}&scenario=depth-range&lon=9.19&lat=45.46&zoom=24.9&tilt=80`);
     await page.waitForFunction(() => (window.vibeglobePlayground?.globe.rendererStats().drawCalls ?? 0) > 100);
     await waitForIdle(page);
-    expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.altitudeMeters)).toBeCloseTo(1, 0);
-    const frames: PNG[] = [];
-    for (let i = 0; i < 4; i++) {
+    const start = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
+    if (!start) throw new Error('no camera');
+    expect(start.altitudeMeters).toBeCloseTo(1, 0);
+    const colors = (image: PNG): { red: number; blue: number } => {
+      let red = 0;
+      let blue = 0;
+      for (let i = 0; i < image.data.length; i += 4) {
+        const r = image.data[i] ?? 0;
+        const b = image.data[i + 2] ?? 0;
+        if (r > 180 && b < 120) red++;
+        if (b > 180 && r < 120) blue++;
+      }
+      return { red, blue };
+    };
+    const first = await canvasImage(page);
+    // Each red quad covers its blue one at every distance (1, 2 and 5 cm apart), and the lanes fill part of the view.
+    expect(colors(first).blue).toBe(0);
+    expect(colors(first).red).toBeGreaterThan(first.width * first.height * 0.2);
+    // 120 static frames: identical, so no pixel alternates between surfaces (ADR 0005).
+    for (let i = 0; i < 120; i++) {
       await page.evaluate(() => window.vibeglobePlayground?.globe.requestRender());
-      await waitForIdle(page);
-      frames.push(await canvasImage(page));
+      await nextFrame(page);
+      expect(Buffer.compare((await canvasImage(page)).data, first.data), `static frame ${i}`).toBe(0);
     }
-    const first = frames[0];
-    if (!first) throw new Error('no frame');
-    let red = 0;
-    let blue = 0;
-    for (let i = 0; i < first.data.length; i += 4) {
-      const r = first.data[i] ?? 0;
-      const b = first.data[i + 2] ?? 0;
-      if (r > 180 && b < 120) red++;
-      if (b > 180 && r < 120) blue++;
+    // 120 frames of sub-pixel camera motion (0.1 mm steps east and back): the order holds in every one.
+    const metersPerDegree = 111320 * Math.cos((start.latitudeDeg * Math.PI) / 180);
+    for (let i = 0; i < 120; i++) {
+      await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
+        longitudeDeg: start.longitudeDeg + ((i % 2) * 0.0001) / metersPerDegree,
+        latitudeDeg: start.latitudeDeg,
+      });
+      await nextFrame(page);
+      expect(colors(await canvasImage(page)).blue, `moving frame ${i}`).toBe(0);
     }
-    // The 4 cm layer covers the 1 cm layer at every distance (correct order), and it fills a large part of the view.
-    expect(blue).toBe(0);
-    expect(red).toBeGreaterThan(first.width * first.height * 0.2);
-    // A static camera draws identical frames: no pixel alternates between surfaces.
-    for (const frame of frames.slice(1)) expect(Buffer.compare(frame.data, first.data)).toBe(0);
   });
 }

@@ -4553,7 +4553,7 @@
         "Follow the guide to host the sample outputs and engine assets with a plain static server and confirm the playground runs from them",
         "Confirm the guide and the default configuration reference no server run by the project"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F347",

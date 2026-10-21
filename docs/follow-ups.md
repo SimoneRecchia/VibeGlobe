@@ -13,3 +13,12 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 | Remove three.js's per-frame garbage (about 5.6 KB per frame: render-object cache keys, uniform update ranges, render lists) | The last source of garbage-collection events in steady motion; would let F064 hold with no GC event at all                                                                                                                                                              | ADR 0018                                                |
 | Reuse a host's canvas element after a released WebGL2 context, through `WEBGL_lose_context.restoreContext()`                | KB-059 and KB-063 replace the element, so a host's own listeners, inline styles and framework bindings on it are lost when it mounts again (React StrictMode in development); restoring the context would keep the element (tenth M2 review, ADR 0021 §3)               |
 | A typed error up front for an OffscreenCanvas that cannot take the new renderer's context                                   | An OffscreenCanvas cannot be replaced, so one that held the other backend's context or a released WebGL2 context fails inside three.js with an unclear error; `canvasFits` could report it as `renderer-failed` before init (second incremental M2 review, ADR 0021 §3) |
+
+## Data pipeline track (`packages/tools`)
+
+- **Faster raster tiling for full builds:** about 0.1 s per 256-px tile on one core (Italy at z14 is about 130,000 imagery tiles, a few hours). Options: tile in worker threads, reuse row latitudes, sample whole tile rows per source raster.
+- **World terrain from COG overviews:** `world-low` downloads every GLO-90 file (upper bound 248 GB, about 100 GB of land files) to build zoom 0–8; HTTP range reads of the COGs' overview levels would cut that to a few GB.
+- **Streaming OSM reader for the planet:** the three-pass reader keeps the needed nodes in typed arrays (about 16 bytes per node; Italy needs about 2 GB). The planet (`world-low`, zooms 0–6, places and major roads only) needs a disk-backed node index.
+- **Multipolygon buildings:** OSM relations (multipolygon buildings and building parts) are not read yet; only closed ways become buildings.
+- **Smaller Terrarium tiles:** tiles keep the 1/256 m step even though the DEM's accuracy is metres; quantizing to 1/16 m before encoding would shrink them considerably without visible relief change.
+- **Bordered terrain tiles (258 px):** decide after M4's crack sweep (ADR 0023, survey open question 1).

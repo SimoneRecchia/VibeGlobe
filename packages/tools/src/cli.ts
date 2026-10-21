@@ -26,8 +26,11 @@ export interface CliIo {
 
 /** Folder of the configurations shipped with the package. */
 export const CONFIG_DIR = fileURLToPath(new URL('../configs/', import.meta.url));
-/** Default folder of build outputs and state, `build/<config>[-sample]` inside the package (git-ignored there). */
-const BUILD_DIR = fileURLToPath(new URL('../build/', import.meta.url));
+/**
+ * Default folder of build outputs and state, `node_modules/.vibeglobe-data/<config>[-sample]` inside the package:
+ * ignored by git, the formatters and the linters, and kept across runs so builds resume.
+ */
+const BUILD_DIR = fileURLToPath(new URL('../node_modules/.vibeglobe-data/', import.meta.url));
 
 function defaultOut(configPath: string, sample: boolean): string {
   return join(BUILD_DIR, `${basename(configPath, '.json')}${sample ? '-sample' : ''}`);
@@ -84,7 +87,7 @@ export function helpText(): string {
     '  verify <config>     Compare terrain heights at --points random points (default 1000) with the source DEM read by',
     '                      GDAL in the configuration’s pinned Docker image',
     '  Options: --sample (the configuration’s sample area), --dataset <id,…>,',
-    '           --out <folder> (default packages/tools/build/<config>[-sample], git-ignored),',
+    '           --out <folder> (default packages/tools/node_modules/.vibeglobe-data/<config>[-sample]),',
     '           --source-url <id>=<url>,… (a mirror, a local copy or a fixture stub instead of the configured source),',
     '           --yes (confirm without a prompt; required in non-interactive runs)',
     '',

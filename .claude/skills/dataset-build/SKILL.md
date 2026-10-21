@@ -44,7 +44,7 @@ vibeglobe-data build italy-high.json --sample --yes \
 
 With real Sentinel-2 cloudless access, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in the environment (never in a file) and pass `--source-url imagery=<bucket or mirror URL>` until the configuration names the new source (open question 21).
 
-Outputs go to `packages/tools/build/<config>[-sample]/` (git-ignored; `--out <folder>` chooses another folder):
+Outputs go to `packages/tools/node_modules/.vibeglobe-data/<config>[-sample]/` (ignored by git and the linters; `--out <folder>` chooses another folder):
 
 - `output/<dataset>/{z}/{x}/{y}.<ext>` and `output/<dataset>/metadata.json`: the static folder;
 - `output/<dataset>.pmtiles` (and `.mbtiles` when enabled): the packages;

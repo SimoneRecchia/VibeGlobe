@@ -37,7 +37,7 @@ createGlobe({
 });
 ```
 
-Copy `node_modules/@vibeglobe/worker/dist/vibeglobe-worker.js` into that folder at build time (bundlers that resolve `@vibeglobe/worker/vibeglobe-worker.js` as an asset URL do it for you). Tiles and packages may live on another origin, as long as it sends the CORS headers below.
+The worker program must be one self-contained module. Bundlers that resolve `new URL('@vibeglobe/worker/vibeglobe-worker.js', import.meta.url)` (Vite, webpack 5, Rollup) emit it into your build as `vibeglobe-worker-<hash>.js`: serve that file under your base path as `vibeglobe-worker.js`, or point `createWorkers({ url })` at the emitted name. The unbundled files in `node_modules/@vibeglobe/worker/dist/` import other packages by name and cannot be served as they are.
 
 ## HTTP requirements
 
@@ -66,7 +66,7 @@ Lay out one folder:
 ```text
 site/
   index.html, assets/…          your application's build
-  static/vibeglobe/             vibeglobe-worker.js, fallback-base.jpg
+  static/vibeglobe/             vibeglobe-worker.js (the bundled worker), fallback-base.jpg
   tiles/<config>-<version>/     the pipeline's output/ folder: imagery/, terrain/, vectors/, *.pmtiles
 ```
 

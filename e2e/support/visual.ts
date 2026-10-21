@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
 
 /** Tolerances from ADR 0012. */
 const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
@@ -56,7 +57,9 @@ export async function expectMatchesBaseline(page: Page, testInfo: TestInfo, name
     writeFileSync(BASELINE_BROWSER_FILE, `${JSON.stringify({ chromium: browser }, null, 2)}\n`);
     return;
   }
-  const advisory = !process.env['CI'] && baselineBrowserVersion() !== browser;
+  // Baselines come from the pinned CI environment's software GPU: elsewhere (another browser build, or a real GPU in
+  // the hardware procedure) a mismatch is reported, not failed.
+  const advisory = !process.env['CI'] && (baselineBrowserVersion() !== browser || hardwareGpu());
   if (!existsSync(path)) {
     expect(advisory, `No baseline ${path}: run the "Visual baselines" workflow (docs/guides/visual-tests.md)`).toBe(
       true,

@@ -149,3 +149,7 @@ Options **1c, 2d, 3b, 4b and 5a**, with the M2 measurement able to switch to 5b.
 ## Update 2026-10-20
 
 The owner confirmed same-origin only ([ADR 0015](0015-owner-decisions-2026-10-20.md), decision 11): consumers serve engine assets from their own origin, offline LAN installs included. `assets.workerUrl` and `assets.wasmBaseUrl` stay configurable; no CDN support is planned (follow-up list).
+
+## Update 2026-10-21
+
+Decision 8's measurement ran in M2 ([ADR 0019](0019-offscreencanvas-evaluation.md)). Worker rendering added input latency and misaligned DOM overlays, so rendering stays on the main thread. The renderer keeps its OffscreenCanvas path.

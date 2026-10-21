@@ -4,7 +4,8 @@
 // the scene marker it frames (from screenshots taken during the drag). Needs `npm run build`.
 // Results go to benchmarks/results/<device>/offscreen-<date>.json (device from VIBEGLOBE_DEVICE, default "local").
 // Options: --browser chromium|firefox|webkit (Playwright engines), --channel chrome|msedge (installed Chrome or Edge),
-// --hardware (use the machine's GPU instead of the software GPU of GPU-less CI; docs/guides/hardware-testing.md).
+// --hardware or VIBEGLOBE_HARDWARE_GPU=1 (the machine's GPU instead of the software GPU of GPU-less CI;
+// docs/guides/hardware-testing.md).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { release } from 'node:os';
@@ -12,7 +13,7 @@ import { join } from 'node:path';
 import { chromium, firefox, webkit, type Browser, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 import { preview } from 'vite';
-import { SOFTWARE_GPU_ARGS } from '../scripts/browser/software-gpu.ts';
+import { gpuArgs, hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import { ROOT_DIR } from '../scripts/workspace.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
@@ -159,10 +160,10 @@ const engineName = option('--browser') ?? 'chromium';
 const engine = { chromium, firefox, webkit }[engineName];
 if (!engine) throw new Error(`Unknown --browser ${engineName}`);
 const channel = option('--channel');
-const hardware = process.argv.includes('--hardware');
+const hardware = process.argv.includes('--hardware') || hardwareGpu();
 const executablePath = engineName === 'chromium' && !channel ? process.env['VIBEGLOBE_CHROMIUM_PATH'] : undefined;
 const browser = await engine.launch({
-  ...(engineName === 'chromium' && !hardware ? { args: SOFTWARE_GPU_ARGS } : {}),
+  ...(engineName === 'chromium' ? { args: gpuArgs(hardware) } : {}),
   ...(channel ? { channel } : {}),
   ...(executablePath ? { executablePath } : {}),
 });

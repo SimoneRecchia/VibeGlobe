@@ -913,7 +913,7 @@
         "Confirm it records frame-time and input-latency measurements for main-thread and worker rendering in the supported browsers",
         "Confirm it states the decision and, if adopted, which browsers use it and how the fallback works"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F066",
@@ -1038,7 +1038,7 @@
         "Follow it on a machine with a GPU and confirm the WebGPU visual tests and the benchmarks run",
         "Confirm results are saved in the documented location with the device, OS, browser and GPU recorded"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F076",

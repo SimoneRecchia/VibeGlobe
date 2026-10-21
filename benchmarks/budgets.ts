@@ -3,6 +3,8 @@
 export interface Budgets {
   features: Record<string, { scenario: string; frameTimeP95Ms: number; cpuFrameP95Ms: number }>;
   packages: Record<string, { memoryScenario?: string; jsHeapMB?: number }>;
+  /** Time from navigation to the first complete frame, served from a local server (F546). */
+  startup?: { scenario: string; firstFrameMedianMs: number };
 }
 
 export interface Distribution {
@@ -35,6 +37,8 @@ export interface ScenarioSummary {
   frameTimeP95Ms: number;
   cpuFrameP95Ms: number;
   jsHeapMB: number;
+  /** Median time to the first complete frame, or null when a run did not record it. */
+  startupMs: number | null;
 }
 
 /** The value below which `fraction` of the samples fall (nearest-rank method); 0 for no samples. */
@@ -61,6 +65,7 @@ export function summarizeRun(
   frameTimesMs: readonly number[],
   cpuFrameMs: readonly number[],
   jsHeapBytes: number,
+  startupMs: number | null = null,
 ): RunResult {
   return {
     frames: frameTimesMs.length,
@@ -73,7 +78,7 @@ export function summarizeRun(
     jsHeapMB: jsHeapBytes / (1024 * 1024),
     gpuFrameMs: null,
     gpuMemoryMB: null,
-    startupMs: null,
+    startupMs,
     steadyStateAllocations: null,
   };
 }
@@ -84,6 +89,7 @@ export function summarizeScenario(runs: RunResult[]): ScenarioSummary {
     frameTimeP95Ms: median(runs.map((run) => run.frameTimeMs.p95)),
     cpuFrameP95Ms: median(runs.map((run) => run.cpuFrameMs.p95)),
     jsHeapMB: median(runs.map((run) => run.jsHeapMB)),
+    startupMs: runs.every((run) => run.startupMs !== null) ? median(runs.map((run) => run.startupMs ?? 0)) : null,
   };
 }
 
@@ -109,6 +115,16 @@ export function findBudgetViolations(budgets: Budgets, summaries: Record<string,
     if (!summary) violations.push(`${pkg}: scenario "${budget.memoryScenario}" did not run`);
     else if (summary.jsHeapMB > budget.jsHeapMB)
       violations.push(`${pkg}: median JS heap ${summary.jsHeapMB.toFixed(1)} MB > ${budget.jsHeapMB} MB`);
+  }
+  if (budgets.startup) {
+    const { scenario, firstFrameMedianMs } = budgets.startup;
+    const startupMs = summaries[scenario]?.startupMs;
+    if (startupMs === undefined) violations.push(`startup: scenario "${scenario}" did not run`);
+    else if (startupMs === null) violations.push(`startup: scenario "${scenario}" recorded no time to the first frame`);
+    else if (startupMs > firstFrameMedianMs)
+      violations.push(
+        `startup: median time to the first complete frame ${startupMs.toFixed(0)} ms > ${firstFrameMedianMs} ms`,
+      );
   }
   return violations;
 }

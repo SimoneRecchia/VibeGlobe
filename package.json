@@ -37,7 +37,8 @@
     "status": "node scripts/status.ts",
     "check:consumer": "node scripts/check-consumer.ts",
     "geodtest": "node scripts/geodtest.ts",
-    "bench:offscreen": "node benchmarks/offscreen.ts"
+    "bench:offscreen": "node benchmarks/offscreen.ts",
+    "test:hardware": "node scripts/hardware-run.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -20,6 +20,8 @@ interface PlaygroundTestHooks {
   readonly events: RecordedEvent[];
   cpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
+  /** Milliseconds from navigation start to the first complete frame, once drawn (F546). */
+  firstFrameMs: number | undefined;
 }
 
 declare global {
@@ -37,16 +39,23 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
 ];
 
 /** Exposes the engine and a frame loop's samples to tests and benchmarks. */
-export function exposeTestHooks(globes: readonly Globe[], loop: FrameLoop | undefined): void {
+export function exposeTestHooks(
+  globes: readonly Globe[],
+  loop: FrameLoop | undefined,
+  firstFrame: Promise<number>,
+): void {
   const globe = globes[0];
   if (!globe) return;
   const events: RecordedEvent[] = [];
   for (const type of RECORDED) globe.on(type, (payload) => events.push({ type, payload }));
-  window.vibeglobePlayground = {
+  const hooks: PlaygroundTestHooks = {
     globe,
     globes,
     events,
     cpuFrameTimesMs: () => loop?.cpuFrameTimesMs() ?? [],
     resetCpuSamples: () => loop?.resetCpuSamples(),
+    firstFrameMs: undefined,
   };
+  void firstFrame.then((timeMs) => (hooks.firstFrameMs = timeMs));
+  window.vibeglobePlayground = hooks;
 }

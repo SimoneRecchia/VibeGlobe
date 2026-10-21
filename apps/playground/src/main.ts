@@ -106,6 +106,8 @@ if (app && canvas && experiment === 'worker') {
 } else if (app && canvas) {
   const scenario = params.get('scenario');
   const globe = startGlobe(app, canvas, viewFromUrl());
+  // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
+  const firstFrame = globe.ready.then(() => performance.now());
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, canvas);
   runScenario(globe, scenario);
@@ -122,5 +124,5 @@ if (app && canvas && experiment === 'worker') {
   let loop: FrameLoop | undefined;
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
-  exposeTestHooks(globes, loop);
+  exposeTestHooks(globes, loop, firstFrame);
 }

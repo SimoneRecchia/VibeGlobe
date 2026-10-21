@@ -1,5 +1,9 @@
 {
   "bundleExternal": ["three"],
+  "initialJs": {
+    "threeGzipKB": 236,
+    "totalGzipKB": 351
+  },
   "features": {
     "frame-loop": {
       "scenario": "frame-loop",
@@ -47,5 +51,9 @@
     "tools": {
       "bundleGzipKB": 100
     }
+  },
+  "startup": {
+    "scenario": "frame-loop",
+    "firstFrameMedianMs": 1000
   }
 }

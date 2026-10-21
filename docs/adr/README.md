@@ -28,3 +28,4 @@ Conventions:
 | [0016](0016-superseded-feature-entries.md)    | Superseded feature-list entries                                                                           | Accepted                                                          |
 | [0017](0017-pending-owner-steps.md)           | Entries waiting only for owner-only steps                                                                 | Accepted                                                          |
 | [0018](0018-zero-allocation-frame-loop.md)    | A frame loop without garbage                                                                              | Accepted                                                          |
+| [0019](0019-offscreencanvas-evaluation.md)    | Rendering from a worker with OffscreenCanvas: evaluated, not adopted                                      | Accepted                                                          |

@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { SOFTWARE_GPU_ARGS } from './scripts/browser/software-gpu.ts';
+import { gpuArgs } from './scripts/browser/gpu-args.ts';
 
 const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
@@ -18,7 +18,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${port}`,
-    launchOptions: { args: SOFTWARE_GPU_ARGS, ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
+    launchOptions: { args: gpuArgs(), ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

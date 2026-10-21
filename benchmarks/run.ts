@@ -9,6 +9,7 @@ import { release } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser } from '@playwright/test';
 import { preview } from 'vite';
+import { gpuArgs } from '../scripts/browser/gpu-args.ts';
 import { ROOT_DIR } from '../scripts/workspace.ts';
 import {
   findBudgetViolations,
@@ -28,6 +29,7 @@ const SAMPLE_MS = 3000;
 interface PlaygroundHooks {
   cpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
+  firstFrameMs: number | undefined;
 }
 
 async function measureRun(browser: Browser, url: string): Promise<RunResult> {
@@ -35,6 +37,14 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
   try {
     await page.goto(url);
     await page.waitForFunction(() => 'vibeglobePlayground' in window);
+    // Every run is a fresh page in a fresh context (empty cache), as a first visit from the local server.
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground.firstFrameMs !== undefined,
+    );
+    const startupMs = await page.evaluate(
+      () => (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground.firstFrameMs ?? null,
+    );
     await page.waitForTimeout(DISCARD_MS);
     const sample = await page.evaluate(async (durationMs) => {
       const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
@@ -55,7 +65,7 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.collectGarbage');
     const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
-    return summarizeRun(sample.frameTimesMs, sample.cpuFrameMs, usedSize);
+    return summarizeRun(sample.frameTimesMs, sample.cpuFrameMs, usedSize, startupMs);
   } finally {
     await page.close();
   }
@@ -93,12 +103,13 @@ const budgets = JSON.parse(readFileSync(budgetsPath, 'utf8')) as Budgets;
 const scenarios = new Set([
   ...Object.values(budgets.features).map((feature) => feature.scenario),
   ...Object.values(budgets.packages).flatMap((pkg) => (pkg.memoryScenario ? [pkg.memoryScenario] : [])),
+  ...(budgets.startup ? [budgets.startup.scenario] : []),
 ]);
 
 const server = await preview({ root: join(ROOT_DIR, 'apps/playground'), logLevel: 'silent', preview: { port: 4173 } });
 const baseUrl = server.resolvedUrls?.local[0] ?? 'http://localhost:4173/';
 const executablePath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
-const browser = await chromium.launch(executablePath ? { executablePath } : {});
+const browser = await chromium.launch({ args: gpuArgs(), ...(executablePath ? { executablePath } : {}) });
 const summaries: Record<string, ScenarioSummary> = {};
 let device: Record<string, unknown> | undefined;
 try {
@@ -141,7 +152,7 @@ writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
 
 for (const [scenario, summary] of Object.entries(summaries)) {
   console.log(
-    `${scenario.padEnd(16)} frame p95 (median of ${RUNS}) ${summary.frameTimeP95Ms.toFixed(2)} ms · cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms · heap ${summary.jsHeapMB.toFixed(1)} MB · gpu n/a`,
+    `${scenario.padEnd(16)} frame p95 (median of ${RUNS}) ${summary.frameTimeP95Ms.toFixed(2)} ms · cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms · heap ${summary.jsHeapMB.toFixed(1)} MB · first frame ${summary.startupMs === null ? 'n/a' : `${summary.startupMs.toFixed(0)} ms`} · gpu n/a`,
   );
 }
 for (const violation of violations) console.error(`BUDGET  ${violation}`);

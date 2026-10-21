@@ -70,4 +70,20 @@ describe('findBudgetViolations', () => {
       'core: scenario "s" did not run',
     ]);
   });
+
+  it('checks the median time to the first complete frame (F546)', () => {
+    const withStartup: Budgets = { features: {}, packages: {}, startup: { scenario: 's', firstFrameMedianMs: 1000 } };
+    const runs = [900, 1200, 950].map((startupMs) => summarizeRun([16], [1], 0, startupMs));
+    expect(summarizeScenario(runs).startupMs).toBe(950);
+    expect(findBudgetViolations(withStartup, { s: summarizeScenario(runs) })).toEqual([]);
+    const slow = [1100, 1200, 950].map((startupMs) => summarizeRun([16], [1], 0, startupMs));
+    expect(findBudgetViolations(withStartup, { s: summarizeScenario(slow) })).toEqual([
+      'startup: median time to the first complete frame 1100 ms > 1000 ms',
+    ]);
+    const unrecorded = summarizeScenario([summarizeRun([16], [1], 0)]);
+    expect(unrecorded.startupMs).toBeNull();
+    expect(findBudgetViolations(withStartup, { s: unrecorded })).toEqual([
+      'startup: scenario "s" recorded no time to the first frame',
+    ]);
+  });
 });

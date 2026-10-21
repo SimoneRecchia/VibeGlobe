@@ -2,10 +2,10 @@
 
 ## Current state
 
-- **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F070, F076, F077.
+- **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F074, F076, F077.
 - Also passing: F546 (initial-JavaScript budgets, start-up median 456 ms), F547 (lazy loading, `apps/lazy-host`). Pending owner steps: F065 (OffscreenCanvas measured and not adopted, ADR 0019; other browsers on real GPUs) and F075 (hardware procedure, `docs/guides/hardware-testing.md`).
-- Remaining in M2: F071–F074 (need the CI-recorded visual baselines from the "Visual baselines" workflow), F545 (needs the merge into `main` and a nightly run), F078 (acceptance and the fresh-context review).
-- Owner questions open: `docs/open-questions.md` 2 and 13–17; question 18 was decided by the agent (ADR 0018) and may be revisited.
+- Remaining in M2: F078 (acceptance and the third fresh-context review), F545 (needs the merge into `main` and a nightly run).
+- Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
 ## Session log (newest first)
 
@@ -15,8 +15,11 @@ Done so far: F042–F063, F066–F070, F076, F077 (globe core: geodesics, projec
 
 M2 milestone review (fresh context) found 25 issues; all are fixed or recorded (KB-012 to KB-026, ADR updates to 0004, 0005, 0009, 0010, 0012, 0018): blank globe at low altitude (exact horizon test), resize blank frame, `jumpTo` before `ready`, eye height at steep tilt, `ready` on early destroy, coordinate validation, anchor solver fallback, forced-WebGPU fallback, controls after recovery, WebGL2 vertex-array leak, recovery limits, real resource counters, 24-bit scene depth and the missing fragment depth path, single-rounded eye offsets, start-up self-test and pipeline warm-up, per-event camera math in the controls (now once per frame), circular F048 test, weak F060 test, missing property tests, ADR 0012 probes (`npm run bench:probes`), and a Firefox/WebKit CI job.
 
+Second M2 review (fresh context) found 11 issues; all are fixed: KB-027 to KB-032 (tilt-only range jumps, zoom allocation, invalid navigation input, touch-action, canvas replacement and the cursor readout), the static failure message, ADR 0009's 0.01 px anchor accuracy, the three-lane depth-range scenario, jitter checks along the whole acceptance zoom, the tile-draw benchmarks (`drag-200/400/800-<backend>`, `GlobeOptions.minSurfaceLevel`), cold-start p90, the 100-cycle mount/unmount leak suite (`e2e/globe-leaks.spec.ts`), and ADR 0004 and 0005's GPU readback probes (`runGpuProbes`, `e2e/globe-gpu-probes.spec.ts`: 0.0004 px, canary in order, depth within 2.3e-7·d). GPU frame time is measured with timestamp queries where the browser offers them (`gpuTiming`). Also fixed: KB-033 (the anchor solver stayed interpreted under coverage, failing F064 in CI). F071–F074 passed in CI against the recorded baselines. Firefox and WebKit run in CI as a record until F504 (ADR 0012, open question 19).
+
 Notes for the next session:
 
+- Per-frame code keeps rarely taken paths in functions of their own (ADR 0018, KB-033): V8 tiers a function up only after executing about as much bytecode as it holds.
 - The browser allocation test (F064) was unstable at the previous commit (7–22.5 bytes per frame for unchanged code): V8 counts some three.js strings and buffers against the frame callback. The test now gives that function's large samples to the library (ADR 0018 update). Diagnose such cases with `--js-flags=--no-turbo-inlining --no-maglev-inlining` (exact attribution) and a second playground served from a worktree (`vite --config` with `resolve.alias` for `@vibeglobe/*`).
 - The Chromium allocation test needs a 120 s warm-up: functions called once per frame reach V8's optimizing tier only after one to two minutes at 30 frames per second.
 - The Vite dev server's watcher misses files rewritten by `git stash` and some scripted edits; check `ps aux | grep vite` (the pid file can be stale), kill the server and run `./init.sh` when served code looks stale.

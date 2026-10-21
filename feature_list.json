@@ -1075,7 +1075,7 @@
         "Add enough reachable code to the minimal entry to exceed the budget in a scratch branch and confirm the size check fails in the fast CI job",
         "Run the start-up benchmark from a local server and confirm the time to the first complete frame is recorded and its median is at most 1 s"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F547",
@@ -1088,7 +1088,7 @@
         "Trigger the action and confirm the globe renders on both backends with no console error",
         "Confirm the SSR import test passes for every package, so a static import is also safe"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F078",

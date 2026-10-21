@@ -41,7 +41,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 
 ## Layout and gotchas
 
-- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`), the playground in `apps/playground`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
+- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`), the playground in `apps/playground`, a fixture host that loads the engine lazily in `apps/lazy-host`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
 - Workspace packages export a `source` condition: the playground and Vitest run on TypeScript sources without building; bundle-size and tree-shaking checks use `dist/`.
 - Relative imports in libraries use `.js` extensions (NodeNext); tooling scripts import `.ts` and run directly with Node ≥ 22.18.
 - TypeScript is pinned to 6.0.x (typescript-eslint and TypeDoc do not support 7.x yet); eslint-plugin-jsdoc to 63.x (64+ needs Node 22.22.2).

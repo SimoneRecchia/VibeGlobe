@@ -3,7 +3,8 @@
 ## Current state
 
 - **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F070, F076, F077.
-- Remaining in M2: F065 (OffscreenCanvas ADR with measurements), F071–F074 (need the CI-recorded visual baselines: the "Visual baselines" workflow is re-requested through `e2e/__baselines__/request.md`), F075 (hardware procedure; its run on real hardware is an owner step), F545 (needs the merge into `main` and a nightly run), F546 and F547 (initial-JavaScript budget, lazy loading), F078 (acceptance and the fresh-context review).
+- Also passing: F546 (initial-JavaScript budgets, start-up median 456 ms), F547 (lazy loading, `apps/lazy-host`). Pending owner steps: F065 (OffscreenCanvas measured and not adopted, ADR 0019; other browsers on real GPUs) and F075 (hardware procedure, `docs/guides/hardware-testing.md`).
+- Remaining in M2: F071–F074 (need the CI-recorded visual baselines from the "Visual baselines" workflow), F545 (needs the merge into `main` and a nightly run), F078 (acceptance and the fresh-context review).
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; question 18 was decided by the agent (ADR 0018) and may be revisited.
 
 ## Session log (newest first)

@@ -23,6 +23,12 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     { command: 'npm run dev', url: `http://localhost:${port}`, reuseExistingServer: true },
+    // The lazy-loading fixture host (F547) is served from its production build (npm run build first).
+    {
+      command: 'npm run preview -w @vibeglobe/lazy-host',
+      url: `http://localhost:${process.env['LAZY_HOST_PORT'] ?? 5175}`,
+      reuseExistingServer: true,
+    },
     {
       command: `npm run docs && npm run docs:serve -- --port ${docsPort}`,
       url: `http://localhost:${docsPort}`,

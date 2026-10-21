@@ -261,3 +261,12 @@ This ADR confirms the proposal, with five changes:
 ## Update 2026-10-20
 
 Point 5 is settled by the owner ([ADR 0015](0015-owner-decisions-2026-10-20.md), decision 12): no separate lightweight first-frame path. M2 measures three.js after tree-shaking, time to first frame (at most 1 s from a LAN server) is the binding target, the initial-JavaScript byte budget is set from the measurement with a CI size check that blocks regressions (F546), and host apps can load the engine through a dynamic import (F547). The 300 KB proposal is withdrawn.
+
+## Update 2026-10-21
+
+M2's measurements (F546, F547):
+
+- **three.js 0.186.1 after tree-shaking**, as a minimal globe uses it (`WebGPURenderer` with its WebGL2 fallback and node materials): 233.1 KB gzip. The engine adds 12.8 KB, so the whole initial JavaScript of a minimal globe (core, renderer and controls, dynamic imports included) is 245.9 KB gzip (902 KB minified).
+- **Budgets** (`quality/budgets.json`, `initialJs`): 236 KB for three.js's share, about 1% above the measurement, so pulling in any further three.js module fails. 351 KB in total: the three.js budget plus the core, renderer and controls package budgets. `npm run size` checks both in the fast CI job. A scratch commit that pulled in the classic `WebGLRenderer` (three.js's share 316 KB) failed only that step ([CI run 39522798647](https://github.com/SimoneRecchia/VibeGlobe/actions/runs/39522798647)) and was reverted.
+- **Time to the first complete frame:** from navigation to the first frame with every tile and the base imagery drawn, served by a local server (`vite preview`). Median 456 ms over five fresh page loads in the cloud container with the software GPU. `npm run bench` checks the median against the 1 s budget (`quality/budgets.json`, `startup`).
+- **Lazy loading:** a host can import the engine with a dynamic import after a user action. Nothing of the engine or three.js is downloaded before it (`apps/lazy-host`, `e2e/lazy-host.spec.ts`).

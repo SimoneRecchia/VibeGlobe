@@ -13,7 +13,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b && npm run build -w @vibeglobe/playground",
+    "build": "tsc -b && npm run build -w @vibeglobe/playground && npm run build -w @vibeglobe/lazy-host",
     "typecheck": "tsc -b",
     "dev": "npm run dev -w @vibeglobe/playground",
     "test": "vitest run",

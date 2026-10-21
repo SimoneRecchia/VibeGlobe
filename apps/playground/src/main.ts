@@ -68,15 +68,16 @@ function showCursorReadout(globe: Globe, container: HTMLElement): void {
  * Mounts another engine instance in a new element and returns it with a function that destroys it and removes the
  * element, as a single-page app does on navigation (leak suite, ADR 0010).
  */
-function mountGlobe(): { globe: Globe; unmount(): void } {
+function mountGlobe(canvas?: HTMLCanvasElement): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void } {
   const host = document.createElement('div');
   host.style.cssText = 'position:absolute;left:0;top:0;width:320px;height:240px';
-  const target = document.createElement('canvas');
+  const target = canvas ?? document.createElement('canvas');
   host.append(target);
   document.body.append(host);
   const globe = startGlobe(host, target, viewFromUrl());
   return {
     globe,
+    canvas: target,
     unmount() {
       globe.destroy();
       host.remove();

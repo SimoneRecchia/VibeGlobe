@@ -433,6 +433,36 @@ test.describe('on a 2x display', () => {
   });
 });
 
+for (const backend of BACKENDS) {
+  test(`a host canvas can be given to a new globe after the previous one was destroyed on ${backend} (KB-059)`, async ({
+    page,
+  }) => {
+    await openGlobe(page, `backend=${backend}&zoom=1`);
+    const result = await page.evaluate(async () => {
+      const hooks = window.vibeglobePlayground;
+      if (!hooks) throw new Error('no playground');
+      // As a framework does in development: mount, clean up, mount again with the same canvas element.
+      const first = hooks.mount();
+      await first.globe.ready;
+      first.unmount();
+      const second = hooks.mount(first.canvas);
+      try {
+        await second.globe.ready;
+        const frame = await second.globe.captureFrame();
+        let drawn = 0;
+        for (let i = 3; i < frame.rgba.length; i += 4) if ((frame.rgba[i] ?? 0) > 0) drawn++;
+        return { ready: true, drawn, backend: second.globe.backend };
+      } catch (error) {
+        return { ready: false, error: String(error) };
+      } finally {
+        second.unmount();
+      }
+    });
+    expect(result).toMatchObject({ ready: true, backend });
+    expect(result.drawn).toBeGreaterThan(1000);
+  });
+}
+
 test('resizing renders at the new size, centered, never stretched or blank (F070)', async ({ page }) => {
   await openGlobe(page, 'lon=20&lat=10&zoom=1');
   // The page's text overlays lie over the canvas; with wider fonts they reached the measured center column.

@@ -24,8 +24,11 @@ interface PlaygroundTestHooks {
   gpuFrameTimesMs(): number[];
   /** Milliseconds from navigation start to the first complete frame, once drawn (F546). */
   firstFrameMs: number | undefined;
-  /** Mounts another engine instance in a new element; `unmount` destroys it and removes the element. */
-  mount(): { globe: Globe; unmount(): void };
+  /**
+   * Mounts another engine instance in a new element, drawing into `canvas` when given (else a new one); `unmount`
+   * destroys it and removes the element.
+   */
+  mount(canvas?: HTMLCanvasElement): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
 }
 
 declare global {

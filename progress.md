@@ -29,6 +29,8 @@ Seventh M2 review (fresh context) found 3 issues; all are fixed: KB-054 (a stopp
 
 M3 groundwork, not yet used by the engine: `packages/core/src/tiling/` (Web Mercator and geographic tiling schemes, packed tile keys with the root id; F080's tests).
 
+Eighth M2 review found 2 issues (KB-057, a real device loss reported twice; KB-058, the manual clock on frames not drawn); ninth found 3 (KB-059, a host canvas reused on WebGL2 after destroy, medium; KB-060 and KB-061, low). KB-062 (KB-057's fix kept the renderer reachable) was caught by the leak suite. From 2026-10-21 reviews close by ADR 0021: findings are classified high, medium or low; a review without high or medium findings is clean; after the first complete review, reviews are incremental on the last round's fixes, at most three, then one final complete review.
+
 Also decided: texture and geometry compression (ADR 0020, `docs/research/compression.md`), ahead of M3 (F079 is marked when M3 starts).
 
 Notes for the next session:

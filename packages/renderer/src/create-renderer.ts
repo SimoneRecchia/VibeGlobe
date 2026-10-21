@@ -12,7 +12,9 @@ export interface RendererOptions {
   readonly depth?: DepthChoice;
   /**
    * The canvas to draw into: a canvas inside the container (by default the renderer creates one), or an OffscreenCanvas,
-   * for example in a worker (ADR 0011). An OffscreenCanvas needs `host`.
+   * for example in a worker (ADR 0011). An OffscreenCanvas needs `host`. A page canvas is styled to fill the container.
+   * After a device loss, or when an earlier globe released the canvas's WebGL2 context, a new canvas with the same id,
+   * class and ARIA attributes takes its place.
    */
   readonly canvas?: HTMLCanvasElement | OffscreenCanvas;
   /**

@@ -282,9 +282,10 @@ export interface Globe {
   /** Device capabilities, available after `ready`. */
   readonly capabilities: RendererCapabilities | undefined;
   /**
-   * Current camera, applied values. While the viewport has no size (until the renderer starts, and while the container
-   * is hidden or collapsed), the requested view, with `rangeMeters` and `altitudeMeters` NaN; the view is applied when
-   * the viewport has a size again.
+   * Current camera, applied values. While a view with a zoom waits for a viewport (before the renderer gives it a size,
+   * or a `jumpTo` with a zoom while the container is hidden or collapsed), the requested view, with `rangeMeters` and
+   * `altitudeMeters` NaN, applied when the viewport has a size. A collapsed container otherwise keeps the camera as it
+   * was, with its range.
    */
   readonly camera: CameraState;
   /** Engine time in milliseconds, which animations and fades run on (ADR 0009): display steps clamped to 100 ms. */

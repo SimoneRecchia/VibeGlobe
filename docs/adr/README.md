@@ -30,3 +30,4 @@ Conventions:
 | [0018](0018-zero-allocation-frame-loop.md)       | A frame loop without garbage                                                                                | Accepted                                                          |
 | [0019](0019-offscreencanvas-evaluation.md)       | Rendering from a worker with OffscreenCanvas: evaluated, not adopted                                        | Accepted                                                          |
 | [0020](0020-texture-and-geometry-compression.md) | GPU texture compression (KTX2 transcoded in workers) and compressed geometry (Draco and meshopt in workers) | Accepted                                                          |
+| [0021](0021-milestone-review-closure.md)         | Closing a milestone's reviews                                                                               | Accepted                                                          |

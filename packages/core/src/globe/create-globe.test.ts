@@ -225,6 +225,20 @@ describe('createGlobe', () => {
     expect(globe.camera.zoom).toBeCloseTo(before.zoom, 9);
   });
 
+  it('reports the live camera while collapsed, and NaN range only for a zoom waiting for a size (KB-061)', async () => {
+    const { globe, renderer } = await started({ view: { zoom: 2 } });
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    renderer.resizeListener?.();
+    expect(Number.isFinite(globe.camera.rangeMeters)).toBe(true);
+    globe.jumpTo({ zoom: 4 });
+    expect(globe.camera.rangeMeters).toBeNaN();
+    expect(globe.camera.zoom).toBe(4);
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    expect(Number.isFinite(globe.camera.rangeMeters)).toBe(true);
+    expect(globe.camera.zoom).toBeCloseTo(4, 9);
+  });
+
   it('keeps the range of a position-only jump made while the container has no size (KB-056)', async () => {
     const { globe, renderer } = await started({ view: { zoom: 2 } });
     const range = globe.camera.rangeMeters;

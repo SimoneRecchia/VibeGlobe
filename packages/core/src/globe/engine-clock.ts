@@ -2,6 +2,7 @@ const TIME = 0;
 const DELTA = 1;
 const LAST = 2;
 const MANUAL = 3;
+const PREVIOUS_TIME = 4;
 /** The longest step one frame may advance (architecture §2): a stall or a hidden tab never produces a jump. */
 const MAX_STEP_MS = 100;
 
@@ -13,8 +14,8 @@ const MAX_STEP_MS = 100;
  * same variable is boxed by V8's mid-tier compiler on every call (ADR 0018).
  */
 export class EngineClock {
-  /** Engine time, last step, last timestamp and manual step, in milliseconds. */
-  private readonly state = Float64Array.of(0, 0, -1, 0);
+  /** Engine time, last step, last timestamp, manual step and the time before the last step, in milliseconds. */
+  private readonly state = Float64Array.of(0, 0, -1, 0, 0);
 
   constructor(manualStepMs = 0) {
     this.state[MANUAL] = manualStepMs;
@@ -43,6 +44,7 @@ export class EngineClock {
     else if (step > MAX_STEP_MS) step = MAX_STEP_MS;
     state[LAST] = now;
     state[DELTA] = step;
+    state[PREVIOUS_TIME] = state[TIME] ?? 0;
     state[TIME] = (state[TIME] ?? 0) + step;
   }
 
@@ -51,7 +53,8 @@ export class EngineClock {
     const state = this.state;
     const manual = state[MANUAL] ?? 0;
     if (manual > 0) {
-      state[TIME] = (state[TIME] ?? 0) - manual;
+      // Restored, not subtracted: (t + step) − step is not always t in floating point (KB-060).
+      state[TIME] = state[PREVIOUS_TIME] ?? 0;
       state[DELTA] = 0;
     }
   }

@@ -17,7 +17,7 @@ declare global {
       readonly events: { readonly type: string; readonly payload: unknown }[];
       cpuFrameTimesMs(): number[];
       resetCpuSamples(): void;
-      mount(): { globe: Globe; unmount(): void };
+      mount(canvas?: HTMLCanvasElement): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };

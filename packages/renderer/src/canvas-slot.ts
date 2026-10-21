@@ -1,5 +1,6 @@
 import { GlobeError, type FrameCapture } from '@vibeglobe/core';
 import type { DrawingSurface } from './three-backend.js';
+import { contextReleased } from './recovery.js';
 import { createCanvas, fillContainer } from './three-hooks.js';
 
 type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
@@ -29,9 +30,16 @@ export class CanvasSlot {
    */
   next(): AnyCanvas {
     let canvas: AnyCanvas;
-    if (!this.givenUsed) {
+    const given = this.surface.canvas;
+    if (!this.givenUsed && given && this.surface.kind === 'element' && contextReleased(given)) {
+      // A canvas an earlier globe drew into with WebGL2 and released (a framework mounting twice): a fresh canvas with
+      // its attributes takes its place (KB-059).
       this.givenUsed = true;
-      canvas = this.surface.canvas ?? this.fresh();
+      this.shown = given;
+      canvas = this.fresh();
+    } else if (!this.givenUsed) {
+      this.givenUsed = true;
+      canvas = given ?? this.fresh();
       if (this.surface.kind === 'element') fillContainer(canvas as HTMLCanvasElement);
     } else if (this.surface.kind === 'offscreen') {
       throw new GlobeError('renderer-failed', 'An OffscreenCanvas cannot be replaced after a device or context loss');

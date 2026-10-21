@@ -36,6 +36,21 @@ describe('EngineClock (ADR 0009, ADR 0012)', () => {
     expect(real.timeMs).toBe(16);
   });
 
+  it('takes back a skipped frame exactly, also for a step that is not a binary fraction (KB-060)', () => {
+    const step = 1000 / 60;
+    const skipping = new EngineClock(step);
+    const drawing = new EngineClock(step);
+    // A frame that was not drawn before every drawn one: each position in the sequence is tried.
+    for (let frame = 0; frame < 100; frame++) {
+      at(skipping, frame);
+      skipping.skipped();
+      expect(skipping.timeMs).toBe(drawing.timeMs);
+      at(skipping, frame);
+      at(drawing, frame);
+      expect(skipping.timeMs).toBe(drawing.timeMs);
+    }
+  });
+
   it('advances a fixed step per frame in manual mode, whatever the timestamps', () => {
     const clock = new EngineClock(1000 / 60);
     for (const ms of [0, 0, 500, 501]) at(clock, ms);

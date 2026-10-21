@@ -42,7 +42,19 @@ export function createFailureMessage(document: Document): HTMLElement {
 export function releaseDevice(backend: unknown): void {
   const internals = backend as { device?: GPUDevice; gl?: WebGL2RenderingContext };
   if (internals.device) internals.device.destroy();
-  else internals.gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  else if (internals.gl) {
+    const canvas = internals.gl.canvas;
+    internals.gl.getExtension('WEBGL_lose_context')?.loseContext();
+    lostCanvases.add(canvas);
+  }
+}
+
+/** Canvases whose WebGL2 context the engine lost on purpose: such a context never comes back (KB-059). */
+const lostCanvases = new WeakSet<HTMLCanvasElement | OffscreenCanvas>();
+
+/** True for a canvas whose WebGL2 context the engine released: a new renderer needs another canvas. */
+export function contextReleased(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
+  return lostCanvases.has(canvas);
 }
 
 /** Disposes a renderer and releases its device or context at once, with every cached vertex array (KB-030). */
@@ -89,6 +101,10 @@ export function watchLoss(renderer: WebGPURenderer, onLoss: (reason: string) => 
     // A device or context collected as garbage is not held either.
     held: () =>
       deviceRef ? !deviceLost && deviceRef.deref() !== undefined : glRef?.deref()?.isContextLost() === false,
-    stop: () => (report = undefined),
+    // Both: the reporting closure shares this scope with the device's own handler (KB-053).
+    stop: () => {
+      report = undefined;
+      pending = undefined;
+    },
   };
 }

@@ -222,18 +222,20 @@ test('destroy() frees GPU resources, listeners and frames, and later calls throw
       active.delete(key(this, type, listener));
       remove.call(this, type, listener, options);
     };
-    let observers = 0;
+    // Observers observing something, as a set: an engine may call observe() again on the same observer (WebKit has no
+    // device-pixel-content-box, so the renderer retries with the default box).
+    const observers = new Set<ResizeObserver>();
     const observe = ResizeObserver.prototype.observe;
     const disconnect = ResizeObserver.prototype.disconnect;
     ResizeObserver.prototype.observe = function (this: ResizeObserver, ...args: Parameters<ResizeObserver['observe']>) {
-      observers++;
       observe.apply(this, args);
+      observers.add(this);
     };
     ResizeObserver.prototype.disconnect = function (this: ResizeObserver) {
-      observers--;
+      observers.delete(this);
       disconnect.call(this);
     };
-    (window as unknown as { engineListeners: () => number[] }).engineListeners = () => [active.size, observers];
+    (window as unknown as { engineListeners: () => number[] }).engineListeners = () => [active.size, observers.size];
   });
   await openGlobe(page, 'zoom=3');
   const listeners = (): Promise<number[]> =>

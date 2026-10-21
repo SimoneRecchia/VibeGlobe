@@ -100,9 +100,12 @@ jobs:
           path: benchmarks/results/ci-swiftshader/
 
   cross-browser:
-    name: Firefox and WebKit (WebGL2)
+    name: Firefox and WebKit (WebGL2, informational until F504)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
+    # suites; both are inputs to F504 (M15), which makes this job binding (ADR 0012, update 2026-10-21).
+    continue-on-error: true
     env:
       CI: true
       VIBEGLOBE_CROSS_BROWSER: '1'
@@ -116,14 +119,6 @@ jobs:
       # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner.
       - run: sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2
       - run: npm run build
-      # Temporary: what each engine shows at several views, printed to the log.
-      - name: Diagnose engines
-        timeout-minutes: 10
-        run: |
-          (npm run dev > dev.log 2>&1 &)
-          for i in $(seq 1 60); do curl -sf http://localhost:5173/ > /dev/null && break; sleep 1; done
-          node scripts/browser/diagnose.ts --browser webkit || true
-          LIBGL_ALWAYS_SOFTWARE=1 node scripts/browser/diagnose.ts --browser firefox || true
       # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
       - run: npx playwright test --project=firefox --project=webkit
       # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).

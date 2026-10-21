@@ -103,3 +103,12 @@ The probes ADR 0013 #6 moved to M2 are `npm run bench:probes` (`benchmarks/probe
 - **Pacing:** `--deterministic-mode` leaves `requestAnimationFrame` at 16.7 ms (p50 and p95 16.7–16.8 ms).
 
 The 0.01% same-backend tolerance stays: the determinism probe shows no run-to-run variation on the same backend. CI's Chromium 156 results are added to `progress.md` from the first run that has them.
+
+## Update 2026-10-21 (Firefox and WebKit in CI)
+
+The Firefox and WebKit job (main, nightly and manual runs) runs the globe suites on WebGL2. CI run 39557234245 with a diagnostic of five views per engine:
+
+- **Firefox** gets no WebGL context in headless mode on the runner, even with `webgl.force-enabled`, Mesa's EGL and `LIBGL_ALWAYS_SOFTWARE` ("Exhausted GL driver options"), so every globe test fails at start-up with `unsupported-device`, as the engine must.
+- **WebKit** renders (capabilities, draw calls and tile counts as in Chromium, `EXT_clip_control` present) and passes 17 of 25 tests, the orbit completeness and pipeline tests among them. It fails the georeferencing comparison (a 41 px shift), completeness at low altitude and after recovery or an invalid position (most of the disk empty in the screenshot), the edge-drag anchor check (1.15 px against 1 px), the immediate frame after a resize, and the street-level jitter measurement (no trackable pattern). The resize-observer count of F068 was a test error (`docs/test-changes.md`).
+
+Decided by the agent (owner may revisit, `docs/open-questions.md`): the job stays in CI as a record (`continue-on-error`) and becomes binding with F504 (M15), whose scope is the full suite in Firefox and Safari. Its first step there is a renderer that WebKit captures and Firefox can create on CI (headed under Xvfb, or a GPU runner), then each remaining WebKit difference is diagnosed as an engine bug or a capture artifact. The diagnostic is `npm run diagnose:browser -- --browser webkit|firefox|chromium` (`scripts/browser/diagnose.ts`, with the playground served on :5173).

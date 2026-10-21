@@ -5,3 +5,4 @@ Rewriting this file starts the Visual baselines workflow on the pushed branch (d
 Latest request: first baselines of the canonical views and pixel ratios (M2, F071–F074), 2026-10-20; repeated 2026-10-21 after the workflow gained its build step, and again after each pixel-ratio fix (KB-011).
 
 - 2026-10-21T00:57:56Z: frame-start pixel-ratio check
+- 2026-10-21T01:04:06Z: the workflow rebases its commit before pushing

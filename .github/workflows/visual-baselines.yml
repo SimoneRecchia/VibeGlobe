@@ -21,6 +21,8 @@ jobs:
       CI: true
     steps:
       - uses: actions/checkout@v7
+        # Full history, so the baseline commit can be rebased onto commits pushed while the job ran.
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
@@ -36,5 +38,10 @@ jobs:
             echo 'Baselines unchanged.'
           else
             git commit -m 'Record visual baselines in the pinned CI environment'
-            git push
+            # The branch may have moved while the suite ran: the commit adds only baselines, so it rebases cleanly.
+            for attempt in 1 2 3; do
+              git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && exit 0
+              sleep 5
+            done
+            exit 1
           fi

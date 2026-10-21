@@ -11,7 +11,7 @@ describe('perspectiveReversedInfinite', () => {
     fc.double({ min: 0.001, max: 1, noNaN: true }),
     fc.double({ min: 0, max: 1e7, noNaN: true }),
   ])('maps depth d to near / d in (0, 1], decreasing with distance', (fov, aspect, near, extra) => {
-    const m = perspectiveReversedInfinite(new Float64Array(16), fov, aspect, near);
+    const m = perspectiveReversedInfinite(new Float64Array(16), { fovYRad: fov, aspect, nearMeters: near });
     const depth = near + extra;
     transformPoint4(out, m, 0, 0, -depth);
     const z = (out[2] ?? NaN) / (out[3] ?? NaN);

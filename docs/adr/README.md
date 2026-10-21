@@ -27,3 +27,4 @@ Conventions:
 | [0015](0015-owner-decisions-2026-10-20.md)    | Owner decisions of 2026-10-20 (open questions 1–12)                                                       | Accepted                                                          |
 | [0016](0016-superseded-feature-entries.md)    | Superseded feature-list entries                                                                           | Accepted                                                          |
 | [0017](0017-pending-owner-steps.md)           | Entries waiting only for owner-only steps                                                                 | Accepted                                                          |
+| [0018](0018-zero-allocation-frame-loop.md)    | A frame loop without garbage                                                                              | Accepted                                                          |

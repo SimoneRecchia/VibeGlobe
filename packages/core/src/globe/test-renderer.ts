@@ -1,10 +1,13 @@
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { FrameView, RendererBackend, RendererEvents, RendererFactory, RenderHost } from './types.js';
 
-/** A renderer and host for unit tests: frames run when `flush` is called, draws are recorded. */
+/** A renderer and host for unit tests: frames run when `flush` is called. It allocates nothing per frame itself. */
 export interface FakeRenderer extends RendererBackend {
   readonly meshes: Map<number, TileMeshData>;
-  readonly draws: number[];
+  /** Frames drawn so far. */
+  drawCount: number;
+  /** Tiles in the last drawn frame. */
+  lastTiles: number;
   events: RendererEvents | undefined;
   visibility: ((visible: boolean) => void) | undefined;
   resizeListener: (() => void) | undefined;
@@ -16,7 +19,7 @@ export interface FakeRenderer extends RendererBackend {
 
 /** Creates a fake renderer and the factory that hands it to createGlobe. */
 export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFactory } {
-  const pending = new Map<number, (timeMs: number) => void>();
+  const pending = new FrameQueue();
   const host = fakeHost(pending, () => renderer);
   const renderer: FakeRenderer = {
     capabilities: {
@@ -30,7 +33,8 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     host,
     inputElement: {},
     meshes: new Map(),
-    draws: [],
+    drawCount: 0,
+    lastTiles: 0,
     events: undefined,
     visibility: undefined,
     resizeListener: undefined,
@@ -39,10 +43,13 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     addMesh: (mesh) => void renderer.meshes.set(mesh.key, mesh),
     removeMesh: (key) => void renderer.meshes.delete(key),
     setBaseImagery: () => Promise.resolve(),
-    render: (_view: FrameView, _keys: readonly number[], count: number) => void renderer.draws.push(count),
+    render: (_view: FrameView, _keys: readonly number[], count: number) => {
+      renderer.drawCount++;
+      renderer.lastTiles = count;
+    },
     resize: () => undefined,
     setDebugMeshes: () => undefined,
-    stats: () => ({ drawCalls: renderer.draws.length, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
+    stats: () => ({ drawCalls: renderer.drawCount, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
     resourceCounts: () => ({
       meshes: renderer.destroyed ? 0 : renderer.meshes.size,
       textures: renderer.destroyed ? 0 : 1,
@@ -53,10 +60,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       renderer.destroyed = true;
     },
     flush: () => {
-      const callbacks = [...pending.values()];
-      pending.clear();
-      for (const callback of callbacks) callback(0);
-      return callbacks.length;
+      return pending.run();
     },
   };
   const factory: RendererFactory = (_container, events) => {
@@ -67,14 +71,14 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
 }
 
 /** A host whose frames run only when the test flushes them. */
-function fakeHost(pending: Map<number, (timeMs: number) => void>, renderer: () => FakeRenderer): RenderHost {
+function fakeHost(pending: FrameQueue, renderer: () => FakeRenderer): RenderHost {
   let nextId = 1;
   return {
     requestFrame: (callback) => {
-      pending.set(nextId, callback);
+      pending.add(nextId, callback);
       return nextId++;
     },
-    cancelFrame: (id) => pending.delete(id),
+    cancelFrame: (id) => pending.cancel(id),
     now: () => 0,
     observeSize: (callback) => {
       renderer().resizeListener = callback;
@@ -87,4 +91,43 @@ function fakeHost(pending: Map<number, (timeMs: number) => void>, renderer: () =
     containerSize: () => renderer().size,
     pixelRatio: () => 1,
   };
+}
+
+/** Pending frame callbacks in reused arrays (a Map's clear() allocates a new table), so the test double allocates nothing. */
+class FrameQueue {
+  private readonly ids: number[] = [];
+  private readonly callbacks: ((timeMs: number) => void)[] = [];
+  private readonly running: ((timeMs: number) => void)[] = [];
+  private count = 0;
+
+  /** Queues a callback under an id. */
+  add(id: number, callback: (timeMs: number) => void): void {
+    this.ids[this.count] = id;
+    this.callbacks[this.count] = callback;
+    this.count++;
+  }
+
+  /** Removes the callback with this id, if queued. */
+  cancel(id: number): void {
+    for (let i = 0; i < this.count; i++) {
+      if (this.ids[i] !== id) continue;
+      this.count--;
+      this.ids[i] = this.ids[this.count] ?? 0;
+      const last = this.callbacks[this.count];
+      if (last) this.callbacks[i] = last;
+      return;
+    }
+  }
+
+  /** Runs the queued callbacks; ones queued while running wait for the next run. Returns how many ran. */
+  run(): number {
+    const count = this.count;
+    for (let i = 0; i < count; i++) {
+      const callback = this.callbacks[i];
+      if (callback) this.running[i] = callback;
+    }
+    this.count = 0;
+    for (let i = 0; i < count; i++) this.running[i]?.(0);
+    return count;
+  }
 }

@@ -60,9 +60,7 @@ describe('Camera', () => {
     expect(Math.abs((at(point, 2) / at(point, 3)) * (range / camera.nearMeters) - 1)).toBeLessThan(1e-8);
     // Heading: the horizontal part of the view direction points at the heading, clockwise from north.
     const screen = new Float64Array(2);
-    expect(
-      projectToScreen(camera, at(camera.targetEcef, 0), at(camera.targetEcef, 1), at(camera.targetEcef, 2), screen),
-    ).toBe(true);
+    expect(projectToScreen(camera, camera.targetEcef, screen)).toBe(true);
     expect(at(screen, 0)).toBeCloseTo(400, 6);
     expect(at(screen, 1)).toBeCloseTo(300, 6);
   });
@@ -132,7 +130,7 @@ describe('screen to globe', () => {
     const camera = cameraAt(lon, lat, range, heading, tilt);
     const screen = new Float64Array(2);
     const target = camera.targetEcef;
-    projectToScreen(camera, at(target, 0), at(target, 1), at(target, 2), screen);
+    projectToScreen(camera, target, screen);
     expect(camera.pickEllipsoid(at(screen, 0), at(screen, 1), hit)).toBe(true);
     const ecef = new Float64Array(3);
     geodeticToEcef(hit.longitudeRad, hit.latitudeRad, 0, ecef);

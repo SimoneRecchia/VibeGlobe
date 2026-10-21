@@ -1,7 +1,7 @@
-import { ecefToGeodetic, geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
-import { enuFrame } from '../geodesy/enu.js';
+import { ecefArrayToGeodetic, ecefToGeodetic, geodeticArrayToEcef, type GeodeticRad } from '../geodesy/ecef.js';
+import { enuFrameAtArray } from '../geodesy/enu.js';
 import { WGS84 } from '../geodesy/wgs84.js';
-import { perspectiveReversedInfinite, viewRotation } from '../math/mat4.js';
+import { perspectiveReversedInfinite, viewRotation, type PerspectiveLens } from '../math/mat4.js';
 import { DEFAULT_FOV_Y_RAD } from './zoom.js';
 
 /** The camera's controlled state (ADR 0009): a target on or above the ellipsoid, a range and an orientation. */
@@ -30,11 +30,15 @@ const B = WGS84.semiMinorAxisMeters;
 const enu = new Float64Array(9);
 const horizontal = new Float64Array(3);
 const scratchUp = new Float64Array(3);
+const target = new Float64Array(3);
+/** The two scalars of a frustum plane: the tangent of the half angle and the offset. */
+const planeScalars = new Float64Array(2);
 
 /**
  * A float64 camera (ADR 0004, ADR 0005): every derived quantity is recomputed by {@link Camera.update} into
  * preallocated arrays, so per-frame use allocates nothing. World space for the GPU is eye-relative ECEF: the eye is the
- * origin and {@link Camera.view} is a rotation.
+ * origin and {@link Camera.view} is a rotation. Doubles reach the functions it calls through arrays and objects, never
+ * as arguments, which V8 boxes (ADR 0018).
  */
 export class Camera {
   /** The controlled state; call {@link Camera.update} after changing it. */
@@ -77,12 +81,16 @@ export class Camera {
   nearMeters = NEAR_MAX_METERS;
   /** Eye position, geodetic. */
   readonly eyeGeodetic: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+  private readonly lens: PerspectiveLens = { fovYRad: DEFAULT_FOV_Y_RAD, aspect: 1, nearMeters: NEAR_MAX_METERS };
 
   /** Recomputes the eye, axes, matrices and frustum from the pose and viewport. */
   update(): void {
     const { pose } = this;
-    enuFrame(pose.targetLongitudeRad, pose.targetLatitudeRad, enu);
-    geodeticToEcef(pose.targetLongitudeRad, pose.targetLatitudeRad, pose.targetHeightMeters, this.targetEcef);
+    target[0] = pose.targetLongitudeRad;
+    target[1] = pose.targetLatitudeRad;
+    target[2] = pose.targetHeightMeters;
+    enuFrameAtArray(target, enu);
+    geodeticArrayToEcef(target, this.targetEcef);
     const sinH = Math.sin(pose.headingRad);
     const cosH = Math.cos(pose.headingRad);
     const sinT = Math.sin(pose.tiltRad);
@@ -94,12 +102,21 @@ export class Camera {
       scratchUp[i] = cosT * (horizontal[i] ?? 0) + sinT * upAxis;
       this.eyeEcef[i] = (this.targetEcef[i] ?? 0) - pose.rangeMeters * (this.forward[i] ?? 0);
     }
-    this.orientAxes(pose.rollRad);
-    ecefToGeodetic(this.eyeEcef[0] ?? 0, this.eyeEcef[1] ?? 0, this.eyeEcef[2] ?? 0, this.eyeGeodetic);
-    const clearance = Math.max(this.eyeGeodetic.heightMeters, 0);
-    this.nearMeters = Math.max(NEAR_MIN_METERS, Math.min(NEAR_MAX_METERS, 0.5 * clearance));
+    this.orientAxes();
+    ecefArrayToGeodetic(this.eyeEcef, this.eyeGeodetic);
+    // Comparisons, not Math.min and Math.max: code not yet fully optimized calls those with boxed doubles (ADR 0018).
+    const halfClearance = 0.5 * this.eyeGeodetic.heightMeters;
+    this.nearMeters =
+      halfClearance > NEAR_MAX_METERS
+        ? NEAR_MAX_METERS
+        : halfClearance > NEAR_MIN_METERS
+          ? halfClearance
+          : NEAR_MIN_METERS;
     viewRotation(this.view, this.right, this.up, this.forward);
-    perspectiveReversedInfinite(this.projection, this.fovYRad, this.widthPx / this.heightPx, this.nearMeters);
+    this.lens.fovYRad = this.fovYRad;
+    this.lens.aspect = this.widthPx / this.heightPx;
+    this.lens.nearMeters = this.nearMeters;
+    perspectiveReversedInfinite(this.projection, this.lens);
     this.updateFrustum();
   }
 
@@ -136,9 +153,9 @@ export class Camera {
     return true;
   }
 
-  private orientAxes(rollRad: number): void {
-    const cosR = Math.cos(rollRad);
-    const sinR = Math.sin(rollRad);
+  private orientAxes(): void {
+    const cosR = Math.cos(this.pose.rollRad);
+    const sinR = Math.sin(this.pose.rollRad);
     const f = this.forward;
     for (let i = 0; i < 3; i++) {
       const j = (i + 1) % 3;
@@ -154,26 +171,33 @@ export class Camera {
     const tanV = Math.tan(this.fovYRad / 2);
     const tanH = tanV * (this.widthPx / this.heightPx);
     const planes = this.frustumPlanes;
-    writePlane(planes, 0, this.right, 1, this.forward, tanH, 0);
-    writePlane(planes, 1, this.right, -1, this.forward, tanH, 0);
-    writePlane(planes, 2, this.up, 1, this.forward, tanV, 0);
-    writePlane(planes, 3, this.up, -1, this.forward, tanV, 0);
-    writePlane(planes, 4, this.forward, 1, this.forward, 0, -this.nearMeters);
+    planeScalars[0] = tanH;
+    planeScalars[1] = 0;
+    writePlane(planes, 0, this.right, 1, this.forward);
+    writePlane(planes, 1, this.right, -1, this.forward);
+    planeScalars[0] = tanV;
+    writePlane(planes, 2, this.up, 1, this.forward);
+    writePlane(planes, 3, this.up, -1, this.forward);
+    planeScalars[0] = 0;
+    planeScalars[1] = -this.nearMeters;
+    writePlane(planes, 4, this.forward, 1, this.forward);
   }
 }
 
 const rayScratch = new Float64Array(3);
 
-/** Writes the normalized plane n = sign·axis + tan·forward, d = offset, at index `plane`. */
+/**
+ * Writes the normalized plane n = sign·axis + tan·forward, d = offset, at index `plane`, with tan and offset read from
+ * `planeScalars`.
+ */
 function writePlane(
   planes: Float64Array,
   plane: number,
   axis: Float64Array,
   sign: number,
   forward: Float64Array,
-  tan: number,
-  offset: number,
 ): void {
+  const tan = planeScalars[0] ?? 0;
   let lengthSquared = 0;
   for (let i = 0; i < 3; i++) {
     const value = sign * (axis[i] ?? 0) + (tan === 0 ? 0 : tan * (forward[i] ?? 0));
@@ -182,7 +206,7 @@ function writePlane(
   }
   const inverseLength = 1 / Math.sqrt(lengthSquared);
   for (let i = 0; i < 3; i++) planes[plane * 4 + i] = (planes[plane * 4 + i] ?? 0) * inverseLength;
-  planes[plane * 4 + 3] = offset;
+  planes[plane * 4 + 3] = planeScalars[1] ?? 0;
 }
 
 /**

@@ -1,21 +1,27 @@
 // Column-major 4×4 matrices in Float64Array(16), the layout WebGPU and WebGL expect after rounding to float32.
 
+/** The parameters of a perspective projection. */
+export interface PerspectiveLens {
+  /** Vertical field of view, in radians. */
+  fovYRad: number;
+  /** Width over height. */
+  aspect: number;
+  /** Near plane distance, in meters. */
+  nearMeters: number;
+}
+
 /**
  * Writes a reversed-Z perspective projection with an infinite far plane (ADR 0005): view-space depth d maps to
- * clip-space z/w = near / d, so 1 at the near plane and 0 at infinity, for a [0, 1] depth range.
+ * clip-space z/w = near / d, so 1 at the near plane and 0 at infinity, for a [0, 1] depth range. The parameters come in
+ * an object because the camera rebuilds this every frame and V8 boxes doubles passed as arguments (ADR 0018).
  */
-export function perspectiveReversedInfinite(
-  out: Float64Array,
-  fovYRad: number,
-  aspect: number,
-  nearMeters: number,
-): Float64Array {
-  const f = 1 / Math.tan(fovYRad / 2);
+export function perspectiveReversedInfinite(out: Float64Array, lens: PerspectiveLens): Float64Array {
+  const f = 1 / Math.tan(lens.fovYRad / 2);
   out.fill(0);
-  out[0] = f / aspect;
+  out[0] = f / lens.aspect;
   out[5] = f;
   out[11] = -1;
-  out[14] = nearMeters;
+  out[14] = lens.nearMeters;
   return out;
 }
 

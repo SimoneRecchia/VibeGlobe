@@ -24,7 +24,7 @@ function screenOf(c: Camera, lonDeg: number, latDeg: number): [number, number] {
   const ecef = new Float64Array(3);
   geodeticToEcef(lonDeg * DEG, latDeg * DEG, 0, ecef);
   const out = new Float64Array(2);
-  projectToScreen(c, ecef[0] ?? 0, ecef[1] ?? 0, ecef[2] ?? 0, out);
+  projectToScreen(c, ecef, out);
   return [out[0] ?? NaN, out[1] ?? NaN];
 }
 
@@ -37,7 +37,7 @@ describe('solveAnchor', () => {
     const c = camera(lon, lat, range, 25);
     const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
     expect(c.pickEllipsoid(400, 300, hit)).toBe(true);
-    expect(solveAnchor(c, hit.longitudeRad, hit.latitudeRad, 0, 600, 420)).toBe(true);
+    expect(solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(600, 420))).toBe(true);
     const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
     expect(Math.hypot(x - 600, y - 420)).toBeLessThan(0.05);
     expect(c.pose.headingRad).toBeCloseTo(25 * DEG, 12);
@@ -47,7 +47,7 @@ describe('solveAnchor', () => {
     const c = camera(0, 88, 3e6);
     const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
     expect(c.pickEllipsoid(500, 700, hit)).toBe(true);
-    expect(solveAnchor(c, hit.longitudeRad, hit.latitudeRad, 0, 500, 50)).toBe(true);
+    expect(solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(500, 50))).toBe(true);
     const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
     expect(Math.hypot(x - 500, y - 50)).toBeLessThan(1);
   });

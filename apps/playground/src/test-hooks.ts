@@ -13,7 +13,10 @@ interface PlaygroundTestHooks {
   readonly globe: Globe;
   /** Every engine instance on the page (two in the two-globes scenario). */
   readonly globes: readonly Globe[];
-  /** Engine events since the page loaded, oldest first (frame events excluded; see `frameNumber`). */
+  /**
+   * Engine events since the page loaded, oldest first. Frame and idle events are excluded: they come every frame in
+   * continuous motion, and recording them would grow this log without bound (see `frameNumber`).
+   */
   readonly events: RecordedEvent[];
   cpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
@@ -27,7 +30,6 @@ declare global {
 
 const RECORDED: readonly (keyof GlobeEvents)[] = [
   'ready',
-  'idle',
   'device-lost',
   'device-restored',
   'backend-fallback',

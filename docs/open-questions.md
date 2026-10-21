@@ -20,6 +20,14 @@ Feature-list entries whose every other step passes and whose remaining step need
 | Entry | Owner-only step | Prepared |
 | ----- | --------------- | -------- |
 
+## Decided by the agent (owner may revisit)
+
+Questions the agent decided itself under the owner's direction of 2026-10-20: the option that best fits `PLAN.md`'s priorities, recorded in an ADR. The owner may revisit any of them.
+
+| #   | Question                                                                                                                                                                                                                            | Decision                                                                                                                                                                                                                                                                                             | Recorded in    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 18  | **F064 with a rendering library that allocates per frame.** three.js 0.186 allocates about 5.6 KB per rendered frame internally, so a steady-state trace cannot be free of garbage-collection events. What does "no GC pause" mean? | The engine's own code allocates zero bytes per frame (Node and Chromium tests). "No GC pause" means no main-thread collection pause of 8 ms or more (half a 60 Hz frame) in 60 s of motion, with a budget of 8 KB per frame for the library's garbage. Removing the library's garbage is a follow-up | ADR 0018, F064 |
+
 ## Resolved
 
 All answered on 2026-10-20 and recorded in [ADR 0015](adr/0015-owner-decisions-2026-10-20.md). Principle: the project runs no servers; every consumer hosts tiles, offline packages and engine assets in their own backend and frontend, with the tools and documentation in the repository.

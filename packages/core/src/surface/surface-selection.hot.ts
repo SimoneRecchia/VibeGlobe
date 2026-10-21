@@ -1,5 +1,9 @@
+/**
+ * @hotpath Runs every frame over every visited tile; doubles never cross a call boundary here, because V8 boxes doubles
+ * passed to or returned from a call it does not inline (ADR 0018).
+ * @benchmark benchmarks/run.ts
+ */
 import type { Camera } from '../camera/camera.js';
-import { geodeticToEcef } from '../geodesy/ecef.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { TILE_SEGMENTS } from './surface-mesh.js';
 
@@ -28,6 +32,7 @@ const MIN_LEVEL = 2;
 const RADIUS_TO_DISTANCE = 1000;
 const A = WGS84.semiMajorAxisMeters;
 const B = WGS84.semiMinorAxisMeters;
+const E2 = WGS84.firstEccentricitySquared;
 
 /** Packs a tile into an integer key, exact up to level 25: levels are stacked, then rows, then columns. */
 export function surfaceTileKey(level: number, x: number, y: number): number {
@@ -37,7 +42,8 @@ export function surfaceTileKey(level: number, x: number, y: number): number {
 /** Fills a tile's bounds from its level and indices. */
 export function surfaceTileBounds(level: number, x: number, y: number, out: SurfaceTile): SurfaceTile {
   const size = Math.PI / 2 ** level;
-  out.key = surfaceTileKey(level, x, y);
+  // surfaceTileKey, written out: a key beyond 31 bits returned from a call would be boxed.
+  out.key = ((4 ** level - 1) * 2) / 3 + y * 2 ** (level + 1) + x;
   out.level = level;
   out.x = x;
   out.y = y;
@@ -48,8 +54,17 @@ export function surfaceTileBounds(level: number, x: number, y: number, out: Surf
   return out;
 }
 
-const center = new Float64Array(3);
-const corner = new Float64Array(3);
+/** The 3 × 3 grid of tile corners, edge midpoints and center on the ellipsoid, ECEF: the center is point 4. */
+const grid = new Float64Array(27);
+const lonSin = new Float64Array(3);
+const lonCos = new Float64Array(3);
+/** The tile center relative to the eye. */
+const offset = new Float64Array(3);
+/** Per-tile measures written by measureTile. */
+const measure = new Float64Array(3);
+const RADIUS = 0;
+const CLOSEST = 1;
+const SAG = 2;
 
 /**
  * Chooses the surface tiles to draw for a camera: frustum and horizon culling, then refinement while the projected
@@ -91,12 +106,13 @@ function visit(level: number, x: number, y: number): void {
     northRad: 0,
   });
   surfaceTileBounds(level, x, y, tile);
-  const radius = boundingRadius(tile);
-  offsetFromEye(camera.eyeEcef);
-  const closest = Math.hypot(offset[0], offset[1], offset[2]) - radius;
-  const distance = Math.max(closest, camera.nearMeters);
-  if (level >= MIN_LEVEL && (outsideFrustum(camera, radius) || beyondHorizon(camera.eyeEcef, closest))) return;
-  const screenError = (sagMeters(tile) / distance) * state.pixelsPerRadian;
+  measureTile(tile, camera.eyeEcef);
+  const radius = measure[RADIUS] ?? 0;
+  // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
+  const closest = measure[CLOSEST] ?? 0;
+  const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
+  if (level >= MIN_LEVEL && (outsideFrustum(camera) || beyondHorizon(camera.eyeEcef))) return;
+  const screenError = ((measure[SAG] ?? 0) / distance) * state.pixelsPerRadian;
   const refine =
     level < MIN_LEVEL ||
     (level < options.maxLevel && (screenError > options.maxScreenErrorPx || radius > RADIUS_TO_DISTANCE * distance));
@@ -107,56 +123,64 @@ function visit(level: number, x: number, y: number): void {
   for (let child = 0; child < 4; child++) visit(level + 1, 2 * x + (child & 1), 2 * y + (child >> 1));
 }
 
-/** Writes the tile center (on the ellipsoid) into `center` and returns the radius of a sphere around the tile. */
-function boundingRadius(tile: SurfaceTile): number {
+/**
+ * Measures a tile against the eye into `measure`: the radius of a sphere around it, the distance from the eye to that
+ * sphere and the chord sag of its mesh; writes the center relative to the eye into `offset`. The 9 grid points use the
+ * closed form of `geodeticToEcef`, sharing the sines and cosines of 3 latitudes and 3 longitudes.
+ */
+function measureTile(tile: SurfaceTile, eye: Float64Array): void {
   const midLon = (tile.westRad + tile.eastRad) / 2;
-  const midLat = (tile.southRad + tile.northRad) / 2;
-  geodeticToEcef(midLon, midLat, 0, center);
-  let radius = 0;
-  for (let i = 0; i < 9; i++) {
-    const lon = i % 3 === 0 ? tile.westRad : i % 3 === 1 ? midLon : tile.eastRad;
-    const lat = i < 3 ? tile.northRad : i < 6 ? midLat : tile.southRad;
-    geodeticToEcef(lon, lat, 0, corner);
-    radius = Math.max(
-      radius,
-      Math.hypot(
-        (corner[0] ?? 0) - (center[0] ?? 0),
-        (corner[1] ?? 0) - (center[1] ?? 0),
-        (corner[2] ?? 0) - (center[2] ?? 0),
-      ),
-    );
+  for (let column = 0; column < 3; column++) {
+    const lon = column === 0 ? tile.westRad : column === 1 ? midLon : tile.eastRad;
+    lonSin[column] = Math.sin(lon);
+    lonCos[column] = Math.cos(lon);
   }
-  return radius + sagMeters(tile);
-}
-
-const offset: [number, number, number] = [0, 0, 0];
-
-/** The tile center relative to the eye. */
-function offsetFromEye(eye: Float64Array): [number, number, number] {
-  offset[0] = (center[0] ?? 0) - (eye[0] ?? 0);
-  offset[1] = (center[1] ?? 0) - (eye[1] ?? 0);
-  offset[2] = (center[2] ?? 0) - (eye[2] ?? 0);
-  return offset;
+  for (let row = 0; row < 3; row++) {
+    const lat = row === 0 ? tile.northRad : row === 1 ? (tile.southRad + tile.northRad) / 2 : tile.southRad;
+    const sinLat = Math.sin(lat);
+    const primeVerticalRadius = A / Math.sqrt(1 - E2 * sinLat * sinLat);
+    const r = primeVerticalRadius * Math.cos(lat);
+    const z = primeVerticalRadius * (1 - E2) * sinLat;
+    for (let column = 0; column < 3; column++) {
+      const point = (row * 3 + column) * 3;
+      grid[point] = r * (lonCos[column] ?? 0);
+      grid[point + 1] = r * (lonSin[column] ?? 0);
+      grid[point + 2] = z;
+    }
+  }
+  let radiusSquared = 0;
+  for (let point = 0; point < 27; point += 3) {
+    const dx = (grid[point] ?? 0) - (grid[12] ?? 0);
+    const dy = (grid[point + 1] ?? 0) - (grid[13] ?? 0);
+    const dz = (grid[point + 2] ?? 0) - (grid[14] ?? 0);
+    const distanceSquared = dx * dx + dy * dy + dz * dz;
+    if (distanceSquared > radiusSquared) radiusSquared = distanceSquared;
+  }
+  // Maximum chord sag of the tile's grid below the ellipsoid, in meters: the geometric error of its mesh.
+  const step = (tile.northRad - tile.southRad) / TILE_SEGMENTS;
+  const sag = (A * step * step) / 8;
+  const radius = Math.sqrt(radiusSquared) + sag;
+  offset[0] = (grid[12] ?? 0) - (eye[0] ?? 0);
+  offset[1] = (grid[13] ?? 0) - (eye[1] ?? 0);
+  offset[2] = (grid[14] ?? 0) - (eye[2] ?? 0);
+  measure[RADIUS] = radius;
+  measure[CLOSEST] = Math.sqrt((offset[0] ?? 0) ** 2 + (offset[1] ?? 0) ** 2 + (offset[2] ?? 0) ** 2) - radius;
+  measure[SAG] = sag;
 }
 
 /** True when the tile's bounding sphere is entirely outside one of the frustum planes. */
-function outsideFrustum(camera: Camera, radius: number): boolean {
+function outsideFrustum(camera: Camera): boolean {
   const planes = camera.frustumPlanes;
+  const radius = measure[RADIUS] ?? 0;
   for (let plane = 0; plane < 5; plane++) {
     const signedDistance =
-      (planes[plane * 4] ?? 0) * offset[0] +
-      (planes[plane * 4 + 1] ?? 0) * offset[1] +
-      (planes[plane * 4 + 2] ?? 0) * offset[2] +
+      (planes[plane * 4] ?? 0) * (offset[0] ?? 0) +
+      (planes[plane * 4 + 1] ?? 0) * (offset[1] ?? 0) +
+      (planes[plane * 4 + 2] ?? 0) * (offset[2] ?? 0) +
       (planes[plane * 4 + 3] ?? 0);
     if (signedDistance < -radius) return true;
   }
   return false;
-}
-
-/** Maximum chord sag of the tile's grid below the ellipsoid, in meters: the geometric error of its mesh. */
-function sagMeters(tile: SurfaceTile): number {
-  const step = (tile.northRad - tile.southRad) / TILE_SEGMENTS;
-  return (A * step * step) / 8;
 }
 
 /**
@@ -164,8 +188,9 @@ function sagMeters(tile: SurfaceTile): number {
  * √(|eye|² − b²) of the eye (exact for a sphere of radius b, conservative for the ellipsoid), so a bounding sphere
  * entirely farther than that cannot show anything.
  */
-function beyondHorizon(eye: Float64Array, closestDistanceMeters: number): boolean {
+function beyondHorizon(eye: Float64Array): boolean {
+  const closest = measure[CLOSEST] ?? 0;
   const eyeDistanceSquared = (eye[0] ?? 0) ** 2 + (eye[1] ?? 0) ** 2 + (eye[2] ?? 0) ** 2;
   const tangentSquared = eyeDistanceSquared - B * B;
-  return tangentSquared > 0 && closestDistanceMeters * closestDistanceMeters > tangentSquared;
+  return tangentSquared > 0 && closest * closest > tangentSquared;
 }

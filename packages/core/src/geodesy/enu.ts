@@ -35,7 +35,22 @@ const scratchFrame = /* @__PURE__ */ new Float64Array(9);
  * @returns `out`.
  */
 export function enuFrame(longitudeRad: number, latitudeRad: number, out: Float64Array): Float64Array {
-  const latRad = Math.min(Math.max(latitudeRad, -HALF_PI), HALF_PI);
+  scratchPosition[0] = longitudeRad;
+  scratchPosition[1] = latitudeRad;
+  return enuFrameAtArray(scratchPosition, out);
+}
+
+const scratchPosition = /* @__PURE__ */ new Float64Array(2);
+
+/**
+ * {@link enuFrame} with the longitude and latitude, in radians, read from `position[0..1]`: per-frame code passes
+ * doubles in arrays, never as call arguments, which V8 boxes (ADR 0018).
+ */
+export function enuFrameAtArray(position: Float64Array, out: Float64Array): Float64Array {
+  const longitudeRad = position[0] ?? 0;
+  const latitude = position[1] ?? 0;
+  // Comparisons, not Math.min and Math.max, which code not yet fully optimized calls with boxed doubles.
+  const latRad = latitude > HALF_PI ? HALF_PI : latitude < -HALF_PI ? -HALF_PI : latitude;
   const sinLon = Math.sin(longitudeRad);
   const cosLon = Math.cos(longitudeRad);
   const sinLat = Math.sin(latRad);

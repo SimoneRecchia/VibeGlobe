@@ -196,9 +196,9 @@ export interface GlobeOptions {
 export interface GlobeEvents {
   /** The first complete frame was drawn. */
   ready: { readonly backend: BackendName };
-  /** A frame was drawn. */
+  /** A frame was drawn. The payload object is reused: read it inside the handler, do not keep it. */
   frame: { readonly frameNumber: number; readonly tiles: number };
-  /** Rendering stopped because nothing changes. */
+  /** Rendering stopped because nothing changes. The payload object is reused: read it inside the handler. */
   idle: { readonly frameNumber: number };
   'camera-change': CameraState;
   'device-lost': { readonly reason: string };

@@ -1,49 +1,24 @@
-import { positionLocal, texture, uniform, uv } from 'three/tsl';
-import { DoubleSide, MeshBasicNodeMaterial, Vector3, type Object3D, type Texture } from 'three/webgpu';
-
-/** Per-object data the surface material reads: the tile origin minus the eye, split into float32 high and low parts. */
-export interface EyeOffset {
-  readonly high: Vector3;
-  readonly low: Vector3;
-}
-
-const offsets = new WeakMap<Object3D, EyeOffset>();
-
-/** Attaches the eye-relative offset record to a mesh. */
-export function attachEyeOffset(object: Object3D): EyeOffset {
-  const offset = { high: new Vector3(), low: new Vector3() };
-  offsets.set(object, offset);
-  return offset;
-}
+import { texture, uv } from 'three/tsl';
+import { DoubleSide, MeshBasicNodeMaterial, type Object3D, type Texture } from 'three/webgpu';
 
 /**
- * Writes origin − eye (float64) into the mesh's offset record as two float32 parts whose sum is exact to float32
- * rounding of the residual (ADR 0004): the shader adds both before the rotation-only view matrix.
+ * Places an object eye-relative (ADR 0004): the translation of its world matrix becomes origin − eye, computed in
+ * float64, and the rest stays the identity it was created with. three.js multiplies it by the rotation-only view matrix
+ * in float64 and rounds the model-view matrix to float32 only at upload, so the translation keeps float32 precision
+ * relative to the object's distance from the eye, with no per-object uniforms. Splitting the translation into two
+ * float32 parts would add nothing, because the shader sums them in float32 anyway. The elements are written directly:
+ * Matrix4.makeTranslation takes doubles as arguments, which V8 boxes every frame (ADR 0018).
  */
-export function setEyeOffset(offset: EyeOffset, origin: Float64Array, eye: Float64Array): void {
-  const x = (origin[0] ?? 0) - (eye[0] ?? 0);
-  const y = (origin[1] ?? 0) - (eye[1] ?? 0);
-  const z = (origin[2] ?? 0) - (eye[2] ?? 0);
-  const hx = Math.fround(x);
-  const hy = Math.fround(y);
-  const hz = Math.fround(z);
-  offset.high.set(hx, hy, hz);
-  offset.low.set(x - hx, y - hy, z - hz);
+export function placeEyeRelative(object: Object3D, origin: Float64Array, eye: Float64Array): void {
+  const elements = object.matrixWorld.elements;
+  elements[12] = (origin[0] ?? 0) - (eye[0] ?? 0);
+  elements[13] = (origin[1] ?? 0) - (eye[1] ?? 0);
+  elements[14] = (origin[2] ?? 0) - (eye[2] ?? 0);
 }
 
-const zero = new Vector3();
-
-/** The eye-relative offset part an object carries, or zero for objects without one. */
-export function offsetPart(part: 'high' | 'low', object: unknown): Vector3 {
-  return (object ? offsets.get(object as Object3D)?.[part] : undefined) ?? zero;
-}
-
-/** The textured surface material shared by every tile: one shader, per-object offsets. */
+/** The textured surface material shared by every tile: one shader for the whole surface. */
 export function createSurfaceMaterial(baseImagery: Texture): MeshBasicNodeMaterial {
-  const high = uniform(new Vector3()).onObjectUpdate(({ object }) => offsetPart('high', object));
-  const low = uniform(new Vector3()).onObjectUpdate(({ object }) => offsetPart('low', object));
   const material = new MeshBasicNodeMaterial();
-  material.positionNode = positionLocal.add(low).add(high);
   material.colorNode = texture(baseImagery, uv());
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;

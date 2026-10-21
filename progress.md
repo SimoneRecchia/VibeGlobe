@@ -2,12 +2,20 @@
 
 ## Current state
 
-- **The owner's decisions of 2026-10-20 are applied** (ADR 0015): the project is VibeGlobe (repository `SimoneRecchia/VibeGlobe`, packages on public npm under `@vibeglobe`), licensed under PolyForm Noncommercial 1.0.0, with CI split into a fast job on every push and the full suite on `main` and nightly. `PLAN.md` is the owner's new version.
-- **M1 is 43 of 44 active entries** (F038 superseded). M1 was complete and merged into `main` (SimoneRecchia/VibeGlobe#1 and SimoneRecchia/VibeGlobe#2, CI run 23 green); the decisions added F542–F545, and F542–F544 pass.
-- Next: **F545** (CI cadence). It needs this branch merged into `main` through a pull request from the same repository (confirm only the fast job runs there and no duplicate run starts), a green full run on `main`, and a green nightly run. Then M2 Globe core from F042: read ADRs 0004, 0005, 0009, 0010, 0013, 0014 and 0015 first; M2 also owns F546 and F547 (initial-JavaScript budget from the measured three.js size, lazy loading).
-- Owner questions open: `docs/open-questions.md` 2 (device details: the answer arrived without values), 13–17 (CLA legal review, contact address, repository settings, Google key, npm token).
+- **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F070, F076, F077.
+- Remaining in M2: F065 (OffscreenCanvas ADR with measurements), F071–F074 (need the CI-recorded visual baselines: the "Visual baselines" workflow is re-requested through `e2e/__baselines__/request.md`), F075 (hardware procedure; its run on real hardware is an owner step), F545 (needs the merge into `main` and a nightly run), F546 and F547 (initial-JavaScript budget, lazy loading), F078 (acceptance and the fresh-context review).
+- Owner questions open: `docs/open-questions.md` 2 and 13–17; question 18 was decided by the agent (ADR 0018) and may be revisited.
 
 ## Session log (newest first)
+
+### Session 4 — 2026-10-20/21 (milestone 2)
+
+Done so far: F042–F063, F066–F070, F076, F077 (globe core: geodesics, projections, camera, quadtree surface, renderer on three.js with WebGPU and WebGL2, precision and depth, device-loss recovery, multiple instances); the visual regression suite and its baseline workflow; F064 (ADR 0018): per-frame code passes doubles only through typed arrays and object fields, avoids the builtins V8's mid tier calls with boxed arguments, keeps tile keys in `IntegerKeyMap`, and switches off three.js's unused lighting. Engine code allocates nothing per frame in Node and in Chromium; three.js still allocates about 5.6 KB per frame, with GC pauses of at most about 3 ms on CI's software GPU.
+
+Notes for the next session:
+
+- The Chromium allocation test needs a 120 s warm-up: functions called once per frame reach V8's optimizing tier only after one to two minutes at 30 frames per second.
+- The Vite dev server's watcher can miss edits made by scripts; restart the playground (`kill $(cat .playground.pid)`, then `./init.sh`) when served code looks stale.
 
 ### Session 3 — 2026-10-20 (owner decisions)
 

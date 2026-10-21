@@ -1,5 +1,6 @@
 import {
   GlobeError,
+  IntegerKeyMap,
   type DebugMeshData,
   type FrameView,
   type RendererBackend,
@@ -22,16 +23,10 @@ import {
   type MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
-import { createDebugEntry, eyeOffsetUniforms, type DebugEntry } from './debug-meshes.js';
+import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import {
-  attachEyeOffset,
-  createSurfaceMaterial,
-  offsetPart,
-  setEyeOffset,
-  type EyeOffset,
-} from './surface-material.js';
+import { createSurfaceMaterial, placeEyeRelative } from './surface-material.js';
 
 /** A camera whose matrices the engine writes every frame; three.js must not recompute them. */
 class EngineCamera extends Camera {
@@ -42,7 +37,6 @@ class EngineCamera extends Camera {
 interface TileEntry {
   readonly data: TileMeshData;
   readonly mesh: Mesh;
-  readonly offset: EyeOffset;
 }
 
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
@@ -59,13 +53,17 @@ export class ThreeBackend implements RendererBackend {
   private canvas: HTMLCanvasElement | undefined;
   private readonly scene = new Scene();
   private readonly camera = new EngineCamera();
-  private readonly tiles = new Map<number, TileEntry>();
+  /** Surface tiles by key (no Map: it boxes keys beyond 31 bits on every per-frame lookup, ADR 0018). */
+  private readonly tiles = new IntegerKeyMap<TileEntry>(1024);
   private debugEntries: DebugEntry[] = [];
-  private readonly debugUniforms = eyeOffsetUniforms(offsetPart);
   private textureUploads = 0;
   private matrixUpdates = 0;
   private lastDrawCalls = 0;
   private lastTriangles = 0;
+  private beginFrame: () => void = () => undefined;
+  /** Meshes shown by the last frame, reused across frames. */
+  private readonly shown: (Mesh | undefined)[] = [];
+  private shownCount = 0;
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
   private imagery: HTMLImageElement | undefined;
@@ -119,6 +117,12 @@ export class ThreeBackend implements RendererBackend {
     this.initialCanvas = undefined;
     const renderer = new WebGPURenderer({ canvas, antialias: true, reversedDepthBuffer: true, forceWebGL });
     await renderer.init();
+    this.stopInternalLoop(renderer);
+    // Opaque tiles need no depth sorting; sorting would also compute bounds and distances for every object each frame.
+    renderer.sortObjects = false;
+    // Every material is unlit. With lighting enabled three.js still rebuilds the lights node's cache key on every render
+    // call, about 5 KB of garbage per frame (F064, ADR 0018).
+    renderer.lighting.enabled = false;
     renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(renderer, info.message ?? 'device lost');
     // three.js ignores losses with the reason 'destroyed', assuming it destroyed the device itself; any loss of a
     // device this backend did not dispose must still recover.
@@ -163,6 +167,24 @@ export class ThreeBackend implements RendererBackend {
     return canvas;
   }
 
+  /**
+   * three.js 0.186 starts its own requestAnimationFrame loop in init() and keeps it running forever, which defeats
+   * render on demand and allocates every display frame. The engine owns the frame loop, so the internal loop is
+   * stopped and its bookkeeping (counter reset, node-frame clock) runs at the start of each engine render instead.
+   * These are private members of the pinned version (ADR 0010).
+   */
+  private stopInternalLoop(renderer: WebGPURenderer): void {
+    const internals = renderer as unknown as {
+      _animation?: { stop(): void };
+      _nodes?: { nodeFrame: { update(): void } };
+    };
+    internals._animation?.stop();
+    this.beginFrame = () => {
+      if (renderer.info.autoReset) renderer.info.reset();
+      internals._nodes?.nodeFrame.update();
+    };
+  }
+
   /** Creates the GPU mesh of a surface tile and keeps its CPU copy for loss recovery. */
   addMesh(data: TileMeshData): void {
     if (!this.tiles.has(data.key)) this.tiles.set(data.key, this.entryFor(data));
@@ -172,7 +194,7 @@ export class ThreeBackend implements RendererBackend {
     const mesh = createTileMesh(data, this.material);
     this.countMatrixUpdates(mesh);
     this.scene.add(mesh);
-    return { data, mesh, offset: attachEyeOffset(mesh) };
+    return { data, mesh };
   }
 
   /** Counts any automatic matrix update three.js performs on a tile mesh; the engine expects none (F052). */
@@ -196,7 +218,7 @@ export class ThreeBackend implements RendererBackend {
       entry.mesh.geometry.dispose();
       (entry.mesh.material as MeshBasicNodeMaterial).dispose();
     }
-    this.debugEntries = meshes.map((data) => createDebugEntry(data, this.debugUniforms));
+    this.debugEntries = meshes.map((data) => createDebugEntry(data));
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
   }
 
@@ -217,6 +239,8 @@ export class ThreeBackend implements RendererBackend {
     this.scene.remove(entry.mesh);
     entry.mesh.geometry.dispose();
     this.tiles.delete(key);
+    const shownIndex = this.shown.indexOf(entry.mesh);
+    if (shownIndex !== -1 && shownIndex < this.shownCount) this.shown[shownIndex] = undefined;
   }
 
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
@@ -246,24 +270,35 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture = texture;
     this.material?.dispose();
     this.material = createSurfaceMaterial(texture);
-    for (const entry of this.tiles.values()) entry.mesh.material = this.material;
+    const material = this.material;
+    this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
 
   /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004). */
   render(view: FrameView, keys: readonly number[], count: number): void {
     if (this.destroyed || !this.material) return;
-    for (const entry of this.tiles.values()) entry.mesh.visible = false;
+    // Hide only what the previous frame showed: the work and the memory stay proportional to the drawn tiles.
+    for (let i = 0; i < this.shownCount; i++) {
+      const mesh = this.shown[i];
+      if (mesh) mesh.visible = false;
+    }
+    this.shownCount = 0;
     for (let i = 0; i < count; i++) {
-      const entry = this.tiles.get(keys[i] ?? -1);
+      const entry = this.tiles.getAt(keys, i);
       if (!entry) continue;
       entry.mesh.visible = true;
-      setEyeOffset(entry.offset, entry.data.originEcef, view.eyeEcef);
+      this.shown[this.shownCount++] = entry.mesh;
+      placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
     }
-    for (const entry of this.debugEntries) setEyeOffset(entry.offset, entry.data.originEcef, view.eyeEcef);
+    for (let i = 0; i < this.debugEntries.length; i++) {
+      const entry = this.debugEntries[i];
+      if (entry) placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
+    }
     this.camera.matrixWorldInverse.fromArray(view.view);
     this.camera.matrixWorld.copy(this.camera.matrixWorldInverse).invert();
     this.camera.projectionMatrix.fromArray(view.projection);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+    this.beginFrame();
     this.renderer.render(this.scene, this.camera);
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };
     this.lastDrawCalls = info.drawCalls ?? info.calls ?? 0;
@@ -281,7 +316,7 @@ export class ThreeBackend implements RendererBackend {
   resourceCounts(): ResourceCounts {
     if (this.destroyed) return { meshes: 0, textures: 0, gpuBytes: 0 };
     let gpuBytes = 0;
-    for (const entry of this.tiles.values()) gpuBytes += entry.data.byteLength + entry.data.indices.byteLength;
+    this.tiles.forEach((entry) => (gpuBytes += entry.data.byteLength + entry.data.indices.byteLength));
     const image = this.imagery;
     const textureBytes =
       image && this.imageryTexture ? Math.round((image.naturalWidth * image.naturalHeight * 4 * 4) / 3) : 0;
@@ -306,7 +341,7 @@ export class ThreeBackend implements RendererBackend {
   private async recover(): Promise<void> {
     try {
       this.renderer.dispose();
-      for (const entry of this.tiles.values()) entry.mesh.geometry.dispose();
+      this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
       await this.initRenderer();
       this.createImageryResources();
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
@@ -323,7 +358,9 @@ export class ThreeBackend implements RendererBackend {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    for (const key of [...this.tiles.keys()]) this.removeMesh(key);
+    const keys: number[] = [];
+    this.tiles.forEach((_, key) => keys.push(key));
+    for (const key of keys) this.removeMesh(key);
     this.setDebugMeshes([]);
     this.material?.dispose();
     this.imageryTexture?.dispose();

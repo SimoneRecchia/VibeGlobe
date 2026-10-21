@@ -1,25 +1,34 @@
-/** A minimal typed event emitter; handler errors are isolated so one subscriber cannot break the frame loop. */
+/**
+ * A minimal typed event emitter; handler errors are isolated so one subscriber cannot break the frame loop. Handlers
+ * live in arrays replaced on change (copy on write), so emitting allocates nothing.
+ */
 export class Emitter<Events extends object> {
-  private readonly handlers = new Map<keyof Events, Set<(payload: never) => void>>();
+  private readonly handlers = new Map<keyof Events, readonly ((payload: never) => void)[]>();
 
   /** Adds a handler; returns a function that removes it. */
   on<E extends keyof Events>(event: E, handler: (payload: Events[E]) => void): () => void {
-    let set = this.handlers.get(event);
-    if (!set) {
-      set = new Set();
-      this.handlers.set(event, set);
-    }
-    set.add(handler as (payload: never) => void);
-    return () => set.delete(handler as (payload: never) => void);
+    const entry = handler as (payload: never) => void;
+    this.handlers.set(event, [...(this.handlers.get(event) ?? []), entry]);
+    return () => {
+      this.handlers.set(
+        event,
+        (this.handlers.get(event) ?? []).filter((existing) => existing !== entry),
+      );
+    };
+  }
+
+  /** True when `event` has at least one handler, so callers can skip building a payload nobody reads. */
+  has(event: keyof Events): boolean {
+    return (this.handlers.get(event)?.length ?? 0) > 0;
   }
 
   /** Calls every handler of `event`; a throwing handler is reported asynchronously as an unhandled rejection. */
   emit<E extends keyof Events>(event: E, payload: Events[E]): void {
-    const set = this.handlers.get(event);
-    if (!set) return;
-    for (const handler of set) {
+    const list = this.handlers.get(event);
+    if (!list) return;
+    for (let i = 0; i < list.length; i++) {
       try {
-        (handler as (payload: Events[E]) => void)(payload);
+        (list[i] as (payload: Events[E]) => void)(payload);
       } catch (error) {
         void Promise.reject(error);
       }

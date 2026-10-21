@@ -901,7 +901,7 @@
         "Sample heap allocations during the steady state and confirm the frame loop allocates zero bytes per frame",
         "Confirm no garbage-collection pause appears in the recorded trace during the steady state"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F065",

@@ -4,7 +4,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selection.js';
+import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selection.hot.js';
 import { applyView, clampRange, currentView, readCameraState, wrapDegrees } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
@@ -54,6 +54,14 @@ class GlobeEngine implements Globe {
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
   private frames = 0;
+  private readonly framePayload = { frameNumber: 0, tiles: 0 };
+  private readonly idlePayload = { frameNumber: 0 };
+  private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL };
+  /**
+   * Bound once, so scheduling a frame allocates no closure; a bound method rather than an arrow function, so no wrapper
+   * function has to wait for the optimizing compiler (it is called only once per frame).
+   */
+  private readonly onFrame: () => void = this.frame.bind(this);
   private dirty = true;
   private visible = true;
   private imageryLoaded = false;
@@ -71,6 +79,7 @@ class GlobeEngine implements Globe {
 
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
+    this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
     this.navigation = {
       grab: (point) => this.screenToGeo(point),
       dragTo: (anchor, point) => this.dragTo(anchor, point),
@@ -162,7 +171,7 @@ class GlobeEngine implements Globe {
     this.dirty = true;
     const renderer = this.renderer;
     if (!renderer || this.frameId !== undefined || !this.visible || !this.imageryLoaded) return;
-    this.frameId = renderer.host.requestFrame(() => this.frame());
+    this.frameId = renderer.host.requestFrame(this.onFrame);
   }
 
   private frame(): void {
@@ -172,23 +181,27 @@ class GlobeEngine implements Globe {
     if (this.destroyed || !renderer || !surface || !this.visible) return;
     this.dirty = false;
     this.cam.update();
-    const count = selectSurfaceTiles(
-      this.cam,
-      { maxScreenErrorPx: this.options.maxScreenErrorPx ?? 1, maxLevel: MAX_LEVEL },
-      this.tiles,
-    );
+    const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
     surface.prepare(this.tiles, count, this.keys);
     renderer.render(this.frameView, this.keys, count);
     this.frames++;
-    this.emitter.emit('frame', { frameNumber: this.frames, tiles: count });
-    this.emitter.emit('camera-change', readCameraState(this.cam));
+    // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
+    if (this.emitter.has('frame')) {
+      this.framePayload.frameNumber = this.frames;
+      this.framePayload.tiles = count;
+      this.emitter.emit('frame', this.framePayload);
+    }
+    if (this.emitter.has('camera-change')) this.emitter.emit('camera-change', readCameraState(this.cam));
     if (this.resolveReady) {
       this.resolveReady();
       this.resolveReady = undefined;
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
     }
     if (this.dirty) this.requestRender();
-    else this.emitter.emit('idle', { frameNumber: this.frames });
+    else if (this.emitter.has('idle')) {
+      this.idlePayload.frameNumber = this.frames;
+      this.emitter.emit('idle', this.idlePayload);
+    }
   }
 
   setResolutionScale(scale: number): void {
@@ -234,27 +247,39 @@ class GlobeEngine implements Globe {
       return undefined;
     this.cam.update();
     geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, ecefScratch);
-    if (!projectToScreen(this.cam, ecefScratch[0] ?? 0, ecefScratch[1] ?? 0, ecefScratch[2] ?? 0, screenScratch)) {
-      return undefined;
-    }
+    if (!projectToScreen(this.cam, ecefScratch, screenScratch)) return undefined;
     return { xPx: screenScratch[0] ?? 0, yPx: screenScratch[1] ?? 0 };
   }
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.assertAlive();
-    if (![anchor.longitudeDeg, anchor.latitudeDeg, point.xPx, point.yPx].every(Number.isFinite)) return;
+    // Input handling runs every frame of a drag: doubles travel in preallocated arrays, never as call arguments, which
+    // V8 boxes (ADR 0018). Finiteness is tested as x − x === 0 (NaN for NaN and ±Infinity), not with Number.isFinite,
+    // which V8's mid-tier compiler calls with a boxed argument.
+    const lon = anchor.longitudeDeg;
+    const lat = anchor.latitudeDeg;
+    const height = anchor.heightMeters ?? 0;
+    const x = point.xPx;
+    const y = point.yPx;
+    if (typeof lon !== 'number' || typeof lat !== 'number' || typeof height !== 'number') return;
+    if (typeof x !== 'number' || typeof y !== 'number') return;
+    if (!(lon - lon === 0 && lat - lat === 0 && height - height === 0 && x - x === 0 && y - y === 0)) return;
     const pose = this.cam.pose;
-    const before = [pose.targetLongitudeRad, pose.targetLatitudeRad, pose.headingRad] as const;
-    const ok = solveAnchor(
-      this.cam,
-      anchor.longitudeDeg * RAD,
-      anchor.latitudeDeg * RAD,
-      anchor.heightMeters ?? 0,
-      point.xPx,
-      point.yPx,
-    );
-    if (!ok) [pose.targetLongitudeRad, pose.targetLatitudeRad, pose.headingRad] = before;
-    pose.targetLongitudeRad = wrapLongitudeRad(pose.targetLongitudeRad);
+    dragAnchor[0] = lon * RAD;
+    dragAnchor[1] = lat * RAD;
+    dragAnchor[2] = height;
+    dragPixel[0] = x;
+    dragPixel[1] = y;
+    dragStart[0] = pose.targetLongitudeRad;
+    dragStart[1] = pose.targetLatitudeRad;
+    dragStart[2] = pose.headingRad;
+    if (!solveAnchor(this.cam, dragAnchor, dragPixel)) {
+      pose.targetLongitudeRad = dragStart[0] ?? 0;
+      pose.targetLatitudeRad = dragStart[1] ?? 0;
+      pose.headingRad = dragStart[2] ?? 0;
+    }
+    const targetLon = pose.targetLongitudeRad;
+    if (!(targetLon >= -Math.PI && targetLon < Math.PI)) pose.targetLongitudeRad = wrapLongitudeRad(targetLon);
     this.cam.update();
     this.requestRender();
   }
@@ -313,4 +338,9 @@ class GlobeEngine implements Globe {
 
 const ecefScratch = new Float64Array(3);
 const screenScratch = new Float64Array(2);
+/** Drag inputs: the anchor (longitude, latitude in radians, height), the pixel and the pose to restore on failure. */
+const dragAnchor = new Float64Array(3);
+const dragPixel = new Float64Array(2);
+const dragStart = new Float64Array(3);
+
 const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };

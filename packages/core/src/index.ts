@@ -45,6 +45,7 @@ export type {
   ViewInit,
 } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';
+export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
 export {
   enuFrame,

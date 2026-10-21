@@ -19,7 +19,8 @@ describe('createGlobe', () => {
   it('draws a first frame, resolves ready and reports WGS84 degrees and meters', async () => {
     const { globe, renderer } = await started({ view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 4 } });
     expect(globe.frameNumber).toBe(1);
-    expect(renderer.draws[0]).toBeGreaterThan(0);
+    expect(renderer.drawCount).toBe(1);
+    expect(renderer.lastTiles).toBeGreaterThan(0);
     expect(globe.backend).toBe('webgl2');
     const camera = globe.camera;
     expect(camera.longitudeDeg).toBeCloseTo(12.5, 9);

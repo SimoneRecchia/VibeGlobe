@@ -1,4 +1,4 @@
-import { geodeticToEcef } from '../geodesy/ecef.js';
+import { geodeticArrayToEcef } from '../geodesy/ecef.js';
 import { enuFrame } from '../geodesy/enu.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import type { Camera } from './camera.js';
@@ -9,58 +9,64 @@ const TOLERANCE_PX = 0.01;
 const ACCEPT_PX = 0.5;
 
 const anchorEcef = new Float64Array(3);
+/** The pixel the anchor must reach, CSS pixels. */
+const targetPx = new Float64Array(2);
 const screen = new Float64Array(2);
 
-/** Screen residual of the anchor for the camera's current pose, or undefined when it is behind the eye. */
-function residual(camera: Camera, xPx: number, yPx: number, out: Float64Array): boolean {
+/** Screen residual of the anchor for the camera's current pose; false when it is behind the eye. */
+function residual(camera: Camera, out: Float64Array): boolean {
   camera.update();
-  if (!projectToScreen(camera, anchorEcef[0] ?? 0, anchorEcef[1] ?? 0, anchorEcef[2] ?? 0, screen)) return false;
-  out[0] = (screen[0] ?? 0) - xPx;
-  out[1] = (screen[1] ?? 0) - yPx;
+  if (!projectToScreen(camera, anchorEcef, screen)) return false;
+  out[0] = (screen[0] ?? 0) - (targetPx[0] ?? 0);
+  out[1] = (screen[1] ?? 0) - (targetPx[1] ?? 0);
   return true;
+}
+
+/** True when the 2-vector is shorter than `limit` (compared squared: no Math.hypot, whose arguments V8 boxes). */
+function shorterThan(v: Float64Array, limit: number): boolean {
+  return (v[0] ?? 0) * (v[0] ?? 0) + (v[1] ?? 0) * (v[1] ?? 0) < limit * limit;
 }
 
 const r0 = new Float64Array(2);
 const rLon = new Float64Array(2);
 const rLat = new Float64Array(2);
+const start = new Float64Array(2);
 
 /**
- * Moves the camera target so the geodetic anchor appears at the pixel, holding range, heading and tilt (ADR 0009 anchor
- * solver): Gauss–Newton on the target longitude and latitude with a finite-difference Jacobian. When it cannot converge
- * (the heading-held system is singular near the poles) it falls back to rotating the whole camera rigidly about the
- * Earth's center, which changes the heading. Returns false only if neither reaches the pixel.
+ * Moves the camera target so the geodetic anchor (`anchor[0..2]`: longitude and latitude in radians, height in meters)
+ * appears at the pixel `pixel[0..1]`, holding range, heading and tilt (ADR 0009 anchor solver): Gauss–Newton on the
+ * target longitude and latitude with a finite-difference Jacobian. When it cannot converge (the heading-held system is
+ * singular near the poles) it falls back to rotating the whole camera rigidly about the Earth's center, which changes
+ * the heading. Returns false only if neither reaches the pixel. Inputs come in arrays: the solver runs every frame of
+ * a drag and V8 boxes doubles passed as arguments (ADR 0018).
  */
-export function solveAnchor(
-  camera: Camera,
-  anchorLonRad: number,
-  anchorLatRad: number,
-  anchorHeightMeters: number,
-  xPx: number,
-  yPx: number,
-): boolean {
-  geodeticToEcef(anchorLonRad, anchorLatRad, anchorHeightMeters, anchorEcef);
+export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64Array): boolean {
+  geodeticArrayToEcef(anchor, anchorEcef);
+  targetPx[0] = pixel[0] ?? 0;
+  targetPx[1] = pixel[1] ?? 0;
   const pose = camera.pose;
-  const startLon = pose.targetLongitudeRad;
-  const startLat = pose.targetLatitudeRad;
-  if (gaussNewton(camera, xPx, yPx)) return true;
-  pose.targetLongitudeRad = startLon;
-  pose.targetLatitudeRad = startLat;
-  return rotateRigidly(camera, xPx, yPx);
+  start[0] = pose.targetLongitudeRad;
+  start[1] = pose.targetLatitudeRad;
+  if (gaussNewton(camera)) return true;
+  pose.targetLongitudeRad = start[0] ?? 0;
+  pose.targetLatitudeRad = start[1] ?? 0;
+  return rotateRigidly(camera);
 }
 
-function gaussNewton(camera: Camera, xPx: number, yPx: number): boolean {
+function gaussNewton(camera: Camera): boolean {
   const pose = camera.pose;
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-    if (!residual(camera, xPx, yPx, r0)) return false;
-    if (Math.hypot(r0[0] ?? 0, r0[1] ?? 0) < TOLERANCE_PX) return true;
-    const step = Math.max(1e-12, (1e-6 * pose.rangeMeters) / 6.4e6);
+    if (!residual(camera, r0)) return false;
+    if (shorterThan(r0, TOLERANCE_PX)) return true;
+    const scaledStep = (1e-6 * pose.rangeMeters) / 6.4e6;
+    const step = scaledStep > 1e-12 ? scaledStep : 1e-12;
     const lon = pose.targetLongitudeRad;
     const lat = pose.targetLatitudeRad;
     pose.targetLongitudeRad = lon + step;
-    const okLon = residual(camera, xPx, yPx, rLon);
+    const okLon = residual(camera, rLon);
     pose.targetLongitudeRad = lon;
     pose.targetLatitudeRad = lat + step;
-    const okLat = residual(camera, xPx, yPx, rLat);
+    const okLat = residual(camera, rLat);
     pose.targetLatitudeRad = lat;
     if (!okLon || !okLat) return false;
     const j00 = ((rLon[0] ?? 0) - (r0[0] ?? 0)) / step;
@@ -68,15 +74,19 @@ function gaussNewton(camera: Camera, xPx: number, yPx: number): boolean {
     const j01 = ((rLat[0] ?? 0) - (r0[0] ?? 0)) / step;
     const j11 = ((rLat[1] ?? 0) - (r0[1] ?? 0)) / step;
     const determinant = j00 * j11 - j01 * j10;
-    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-30) return false;
+    // determinant − determinant is NaN unless it is finite; Number.isFinite would be a call with a boxed argument.
+    if (!(determinant - determinant === 0) || (determinant < 1e-30 && determinant > -1e-30)) return false;
     const dLon = (j11 * (r0[0] ?? 0) - j01 * (r0[1] ?? 0)) / determinant;
     const dLat = (-j10 * (r0[0] ?? 0) + j00 * (r0[1] ?? 0)) / determinant;
-    pose.targetLongitudeRad = wrapLongitudeRad(lon - dLon);
+    const nextLon = lon - dLon;
+    // Wrapping is a call with a double argument: only when the step leaves [-π, π).
+    pose.targetLongitudeRad = nextLon >= -Math.PI && nextLon < Math.PI ? nextLon : wrapLongitudeRad(nextLon);
     pose.targetLatitudeRad = lat - dLat;
-    if (Math.abs(pose.targetLatitudeRad) > Math.PI / 2 - 1e-9) return false;
+    const latitudeLimit = Math.PI / 2 - 1e-9;
+    if (pose.targetLatitudeRad > latitudeLimit || pose.targetLatitudeRad < -latitudeLimit) return false;
   }
-  if (!residual(camera, xPx, yPx, r0)) return false;
-  return Math.hypot(r0[0] ?? 0, r0[1] ?? 0) < ACCEPT_PX;
+  if (!residual(camera, r0)) return false;
+  return shorterThan(r0, ACCEPT_PX);
 }
 
 const ray = new Float64Array(3);
@@ -86,9 +96,9 @@ const enu = new Float64Array(9);
 const vector = new Float64Array(3);
 
 /** Rotates the camera about the Earth's center so the anchor moves under the pixel; updates the heading to match. */
-function rotateRigidly(camera: Camera, xPx: number, yPx: number): boolean {
+function rotateRigidly(camera: Camera): boolean {
   camera.update();
-  camera.rayDirection(xPx, yPx, ray);
+  camera.rayDirection(targetPx[0] ?? 0, targetPx[1] ?? 0, ray);
   const eye = camera.eyeEcef;
   const distance = sphereHit(eye, ray, Math.hypot(anchorEcef[0] ?? 0, anchorEcef[1] ?? 0, anchorEcef[2] ?? 0));
   if (distance === undefined) return false;
@@ -137,17 +147,15 @@ function rotationBetween(from: Float64Array, to: Float64Array, out: Float64Array
   const cos =
     ((from[0] ?? 0) * (to[0] ?? 0) + (from[1] ?? 0) * (to[1] ?? 0) + (from[2] ?? 0) * (to[2] ?? 0)) / (fl * tl);
   const k = 1 / (1 + cos);
-  out.set([
-    cos + ax * ax * k,
-    ax * ay * k - az,
-    ax * az * k + ay,
-    ay * ax * k + az,
-    cos + ay * ay * k,
-    ay * az * k - ax,
-    az * ax * k - ay,
-    az * ay * k + ax,
-    cos + az * az * k,
-  ]);
+  out[0] = cos + ax * ax * k;
+  out[1] = ax * ay * k - az;
+  out[2] = ax * az * k + ay;
+  out[3] = ay * ax * k + az;
+  out[4] = cos + ay * ay * k;
+  out[5] = ay * az * k - ax;
+  out[6] = az * ax * k - ay;
+  out[7] = az * ay * k + ax;
+  out[8] = cos + az * az * k;
 }
 
 /** Distance along a unit ray to a sphere of the given radius about the origin, or undefined if it misses. */

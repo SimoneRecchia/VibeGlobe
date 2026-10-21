@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Camera } from '../camera/camera.js';
 import { buildTileMesh, tileIndices, TILE_SEGMENTS } from './surface-mesh.js';
-import { selectSurfaceTiles, surfaceTileBounds, surfaceTileKey, type SurfaceTile } from './surface-selection.js';
+import { selectSurfaceTiles, surfaceTileBounds, surfaceTileKey, type SurfaceTile } from './surface-selection.hot.js';
 
 const DEG = Math.PI / 180;
 

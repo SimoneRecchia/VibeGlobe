@@ -1,7 +1,7 @@
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import type { RendererBackend } from '../globe/types.js';
-import { buildTileMesh, type TileMeshData } from './surface-mesh.js';
-import type { SurfaceTile } from './surface-selection.hot.js';
+import { buildQuadtreeTileMesh, type TileMeshData } from './surface-mesh.js';
+import type { QuadtreeTile } from './surface-quadtree.hot.js';
 
 /** Meshes kept on the GPU after they leave the view, before least-recently-used eviction. */
 const CACHE_LIMIT = 1500;
@@ -24,7 +24,7 @@ export class SurfaceCache {
   }
 
   /** Makes sure every selected tile has a mesh and writes their keys into `keys`. */
-  prepare(tiles: readonly SurfaceTile[], count: number, keys: number[]): void {
+  prepare(tiles: readonly QuadtreeTile[], count: number, keys: number[]): void {
     this.frame++;
     for (let i = 0; i < count; i++) {
       const tile = tiles[i];
@@ -42,11 +42,11 @@ export class SurfaceCache {
     this.lastUsed.clear();
   }
 
-  private build(tile: SurfaceTile): TileMeshData {
+  private build(tile: QuadtreeTile): TileMeshData {
     const size = tile.northRad - tile.southRad;
     // Skirts deeper than the chord sag of the coarser neighbor hide every crack between levels.
     const skirtDepthMeters = Math.max(1, 6378137 * size * size * 0.1);
-    return buildTileMesh(tile.key, tile.westRad, tile.southRad, tile.eastRad, tile.northRad, skirtDepthMeters);
+    return buildQuadtreeTileMesh(tile, skirtDepthMeters);
   }
 
   private evict(): void {

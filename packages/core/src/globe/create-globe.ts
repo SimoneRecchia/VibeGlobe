@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selection.hot.js';
+import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import {
   applyView,
   currentView,
@@ -19,6 +19,7 @@ import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { EngineClock } from './engine-clock.js';
 import { FrameWaits } from './frame-waits.js';
+import { describeSurfaceTiles, NO_RENDERER_STATS, surfaceStats } from './diagnostics.js';
 import type {
   BackendName,
   CameraState,
@@ -35,6 +36,8 @@ import type {
   RendererCapabilities,
   RendererEvents,
   RendererStats,
+  SurfaceStats,
+  SurfaceTileInfo,
   ResourceCounts,
   ScreenPoint,
   ViewInit,
@@ -53,7 +56,7 @@ import {
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
-/** Surface tile keys are exact integers up to level 25 (surfaceTileKey). */
+/** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
 
 /**
@@ -69,7 +72,9 @@ class GlobeEngine implements Globe {
   readonly navigation: NavigationApi;
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
-  private readonly tiles: SurfaceTile[] = [];
+  private readonly tiles: QuadtreeTile[] = [];
+  /** Tiles the last drawn frame selected. */
+  private tileCount = 0;
   private readonly keys: number[] = [];
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
@@ -299,10 +304,11 @@ class GlobeEngine implements Globe {
     // A frame not drawn takes no step of the manual clock (KB-058).
     if (this.waiting) return this.clock.skipped();
     this.cam.update();
-    const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
+    const count = selectQuadtreeTiles(this.cam, this.selection, this.tiles);
     surface.prepare(this.tiles, count, this.keys);
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
     if (!renderer.render(this.frameView, this.keys, count)) return this.clock.skipped();
+    this.tileCount = count;
     this.frames++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
@@ -403,16 +409,15 @@ class GlobeEngine implements Globe {
   }
 
   rendererStats(): RendererStats {
-    return (
-      this.renderer?.stats() ?? {
-        drawCalls: 0,
-        triangles: 0,
-        textureUploads: 0,
-        matrixUpdates: 0,
-        pipelineCompiles: 0,
-        gpuFrameMs: null,
-      }
-    );
+    return this.renderer?.stats() ?? NO_RENDERER_STATS;
+  }
+
+  surfaceTiles(): SurfaceTileInfo[] {
+    return describeSurfaceTiles(this.tiles, this.tileCount);
+  }
+
+  surfaceStats(): SurfaceStats {
+    return surfaceStats(this.tiles, this.tileCount, this.selection);
   }
 
   setDebugShapes(shapes: readonly DebugShape[]): void {

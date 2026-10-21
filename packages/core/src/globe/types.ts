@@ -273,6 +273,30 @@ export interface GlobeEvents {
   error: GlobeError;
 }
 
+/** A surface tile of the last drawn frame, for diagnostics (ADR 0006 §1: a Web Mercator root and two polar caps). */
+export interface SurfaceTileInfo {
+  readonly root: 'mercator' | 'north-cap' | 'south-cap';
+  readonly level: number;
+  readonly x: number;
+  readonly y: number;
+  readonly westDeg: number;
+  readonly southDeg: number;
+  readonly eastDeg: number;
+  readonly northDeg: number;
+}
+
+/** Counters of a frame's surface selection. */
+export interface SurfaceStats {
+  /** Tiles drawn. */
+  readonly tiles: number;
+  /** Deepest level drawn. */
+  readonly maxLevel: number;
+  /** Tiles skipped as outside the view frustum (F086). */
+  readonly culledByFrustum: number;
+  /** Tiles skipped as beyond the horizon (F087). */
+  readonly culledByHorizon: number;
+}
+
 /** A globe engine instance. */
 export interface Globe {
   /** Resolves after the first complete frame; rejects with a GlobeError when the engine cannot start. */
@@ -319,6 +343,10 @@ export interface Globe {
   resourceCounts(): ResourceCounts;
   /** Renderer counters: draw calls, triangles, texture uploads, automatic matrix updates and pipeline compiles. */
   rendererStats(): RendererStats;
+  /** Diagnostics: the surface tiles the last drawn frame selected (debug overlay, F086, F087, F116). */
+  surfaceTiles(): SurfaceTileInfo[];
+  /** Diagnostics: counters of the last drawn frame's surface selection. */
+  surfaceStats(): SurfaceStats;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */

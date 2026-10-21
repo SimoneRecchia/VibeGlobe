@@ -113,6 +113,7 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
   const overlay = createDebugOverlay(host);
   let info: (readonly [string, string])[] = [];
   let pipelineCompiles = -1;
+  let surfaceInfo = '';
   // Read at start and again after a recovery, which may have switched the backend (KB-049).
   const readInfo = (): void => {
     const caps = globe.capabilities;
@@ -137,9 +138,13 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
     // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
     const compiles = info.length > 0 ? globe.rendererStats().pipelineCompiles : -1;
-    if (compiles === pipelineCompiles) return;
+    // The surface selection: drawn tiles and what culling skipped (F086, F087).
+    const selection = globe.surfaceStats();
+    const surface = `tiles ${selection.tiles} · level ≤ ${selection.maxLevel} · culled: frustum ${selection.culledByFrustum}, horizon ${selection.culledByHorizon}`;
+    if (compiles === pipelineCompiles && surface === surfaceInfo) return;
     pipelineCompiles = compiles;
-    overlay.setInfo([...info, ['pipeline-compiles', `pipelines after warm-up ${compiles}`]]);
+    surfaceInfo = surface;
+    overlay.setInfo([...info, ['pipeline-compiles', `pipelines after warm-up ${compiles}`], ['surface', surface]]);
   });
 }
 

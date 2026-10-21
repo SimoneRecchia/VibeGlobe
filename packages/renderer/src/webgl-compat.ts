@@ -57,6 +57,20 @@ export function releaseVertexArraysWithBuffers(backend: unknown): void {
   };
 }
 
+/**
+ * Deletes every vertex array object the WebGL2 backend still caches, before its context is released: three.js's own
+ * output-pass quad keeps one that no geometry disposal removes (KB-030).
+ */
+export function releaseAllVertexArrays(backend: unknown): void {
+  const internals = webglBackend(backend);
+  if (!internals) return;
+  for (const key of Object.keys(internals.vaoCache)) {
+    const vertexArray = internals.vaoCache[key];
+    if (vertexArray) internals.gl.deleteVertexArray(vertexArray);
+    Reflect.deleteProperty(internals.vaoCache, key);
+  }
+}
+
 /** The vertex array objects the WebGL2 backend holds; 0 on WebGPU. */
 export function countVertexArrays(backend: unknown): number {
   const internals = webglBackend(backend);

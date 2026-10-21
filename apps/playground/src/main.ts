@@ -45,10 +45,14 @@ function startGlobe(container: HTMLElement, target: HTMLCanvasElement, view: Vie
   });
 }
 
-/** Shows the coordinates under the pointer (F048). */
-function showCursorReadout(globe: Globe, target: HTMLCanvasElement): void {
-  target.addEventListener('pointermove', (event) => {
-    if (!cursor) return;
+/**
+ * Shows the coordinates under the pointer (F048). The listener sits on the container: after a device loss or a
+ * backend fallback the renderer replaces its canvas, keeping its id.
+ */
+function showCursorReadout(globe: Globe, container: HTMLElement): void {
+  container.addEventListener('pointermove', (event) => {
+    const target = container.querySelector('#globe');
+    if (!cursor || !target) return;
     const rect = target.getBoundingClientRect();
     const position = globe.screenToGeo({ xPx: event.clientX - rect.left, yPx: event.clientY - rect.top });
     cursor.textContent = position
@@ -122,7 +126,7 @@ if (app && canvas && experiment === 'worker') {
     () => undefined,
   );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
-  showCursorReadout(globe, canvas);
+  showCursorReadout(globe, app);
   runScenario(globe, scenario);
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {

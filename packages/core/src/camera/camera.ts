@@ -1,4 +1,4 @@
-import { ecefArrayToGeodetic, ecefToGeodetic, geodeticArrayToEcef, type GeodeticRad } from '../geodesy/ecef.js';
+import { ecefArrayToGeodetic, geodeticArrayToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { enuFrameAtArray } from '../geodesy/enu.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { perspectiveReversedInfinite, viewRotation, type PerspectiveLens } from '../math/mat4.js';
@@ -122,6 +122,15 @@ export class Camera {
 
   /** Writes the unit direction of the ray through a CSS pixel (origin top-left) into `out`, in ECEF. */
   rayDirection(xPx: number, yPx: number, out: Float64Array): Float64Array {
+    pixelScratch[0] = xPx;
+    pixelScratch[1] = yPx;
+    return this.rayDirectionAt(pixelScratch, out);
+  }
+
+  /** {@link Camera.rayDirection} with the pixel read from `pixel[0..1]`, for per-frame code (ADR 0018). */
+  rayDirectionAt(pixel: Float64Array, out: Float64Array): Float64Array {
+    const xPx = pixel[0] ?? 0;
+    const yPx = pixel[1] ?? 0;
     const tanV = Math.tan(this.fovYRad / 2);
     const tanH = tanV * (this.widthPx / this.heightPx);
     const ndcX = (2 * xPx) / this.widthPx - 1;
@@ -142,13 +151,18 @@ export class Camera {
    * or returns false when the ray misses the globe.
    */
   pickEllipsoid(xPx: number, yPx: number, out: GeodeticRad): boolean {
-    this.rayDirection(xPx, yPx, rayScratch);
-    const distance = rayEllipsoidDistance(this.eyeEcef, rayScratch);
-    if (distance === undefined) return false;
-    const x = (this.eyeEcef[0] ?? 0) + distance * (rayScratch[0] ?? 0);
-    const y = (this.eyeEcef[1] ?? 0) + distance * (rayScratch[1] ?? 0);
-    const z = (this.eyeEcef[2] ?? 0) + distance * (rayScratch[2] ?? 0);
-    ecefToGeodetic(x, y, z, out);
+    pixelScratch[0] = xPx;
+    pixelScratch[1] = yPx;
+    return this.pickEllipsoidAt(pixelScratch, out);
+  }
+
+  /** {@link Camera.pickEllipsoid} with the pixel read from `pixel[0..1]`, for per-frame code (ADR 0018). */
+  pickEllipsoidAt(pixel: Float64Array, out: GeodeticRad): boolean {
+    this.rayDirectionAt(pixel, rayScratch);
+    if (!rayEllipsoidHit(this.eyeEcef, rayScratch, hitScratch)) return false;
+    const distance = hitScratch[0] ?? 0;
+    for (let i = 0; i < 3; i++) hitScratch[i] = (this.eyeEcef[i] ?? 0) + distance * (rayScratch[i] ?? 0);
+    ecefArrayToGeodetic(hitScratch, out);
     out.heightMeters = 0;
     return true;
   }
@@ -185,6 +199,9 @@ export class Camera {
 }
 
 const rayScratch = new Float64Array(3);
+const pixelScratch = new Float64Array(2);
+const hitScratch = new Float64Array(3);
+const distanceScratch = new Float64Array(1);
 
 /**
  * Writes the normalized plane n = sign·axis + tan·forward, d = offset, at index `plane`, with tan and offset read from
@@ -214,6 +231,14 @@ function writePlane(
  * or undefined when the ray misses. Solved in the frame scaled by the semi-axes, where the ellipsoid is the unit sphere.
  */
 export function rayEllipsoidDistance(origin: Float64Array, direction: Float64Array): number | undefined {
+  return rayEllipsoidHit(origin, direction, distanceScratch) ? distanceScratch[0] : undefined;
+}
+
+/**
+ * {@link rayEllipsoidDistance} writing the distance to `out[0]` and returning whether the ray hits, for per-frame code:
+ * no double is returned or passed as an argument, and no Math.min or Math.max call boxes one (ADR 0018).
+ */
+function rayEllipsoidHit(origin: Float64Array, direction: Float64Array, out: Float64Array): boolean {
   const ox = (origin[0] ?? 0) / A;
   const oy = (origin[1] ?? 0) / A;
   const oz = (origin[2] ?? 0) / B;
@@ -224,14 +249,16 @@ export function rayEllipsoidDistance(origin: Float64Array, direction: Float64Arr
   const halfB = ox * dx + oy * dy + oz * dz;
   const c = ox * ox + oy * oy + oz * oz - 1;
   const discriminant = halfB * halfB - a * c;
-  if (discriminant < 0) return undefined;
+  if (discriminant < 0) return false;
   const root = Math.sqrt(discriminant);
   // Numerically stable roots: q = -(halfB + sign(halfB)·root); t1 = q / a, t2 = c / q.
   const q = -(halfB + (halfB >= 0 ? root : -root));
   const t1 = q / a;
   const t2 = q === 0 ? t1 : c / q;
-  const near = Math.min(t1, t2);
-  const far = Math.max(t1, t2);
-  if (near >= 0) return near;
-  return far >= 0 ? far : undefined;
+  const near = t1 < t2 ? t1 : t2;
+  const far = t1 < t2 ? t2 : t1;
+  if (near >= 0) out[0] = near;
+  else if (far >= 0) out[0] = far;
+  else return false;
+  return true;
 }

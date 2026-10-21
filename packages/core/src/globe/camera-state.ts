@@ -47,18 +47,36 @@ export function applyView(camera: Camera, view: ValidView, keepRange = false): v
   pose.targetHeightMeters = 0;
   pose.headingRad = wrapDegrees(view.headingDeg) * RAD;
   pose.tiltRad = view.tiltDeg * RAD;
-  if (keepRange) return;
+  if (keepRange) {
+    // The kept range may be too short for the new tilt (KB-027).
+    clampPoseRange(camera);
+    return;
+  }
   const groundZoom = groundZoomFromMercatorZoom(view.zoom, pose.targetLatitudeRad);
   pose.rangeMeters = clampRange(camera, rangeForGroundZoom(groundZoom, camera.heightPx, camera.fovYRad));
 }
 
 /** Clamps a range so the eye stays at least {@link MIN_EYE_HEIGHT_METERS} above the ellipsoid. */
-export function clampRange(camera: Camera, rangeMeters: number): number {
+function clampRange(camera: Camera, rangeMeters: number): number {
   // No floor on the cosine beyond rounding: at the steepest allowed tilt (89°) the range must reach about 29 m (KB-015).
   const cosTilt = Math.max(Math.cos(camera.pose.tiltRad), 1e-9);
   // A micrometer of margin keeps float rounding from ever reporting the eye below the minimum.
   const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - Math.min(camera.pose.targetHeightMeters, 0)) / cosTilt;
   return Math.min(MAX_RANGE_METERS, Math.max(minimum, rangeMeters));
+}
+
+/**
+ * {@link clampRange} applied to the pose's own range, for per-frame code: the range never crosses a call boundary as
+ * an argument, and no Math.max or Math.min call boxes it (ADR 0018).
+ */
+export function clampPoseRange(camera: Camera): void {
+  const pose = camera.pose;
+  const cos = Math.cos(pose.tiltRad);
+  const cosTilt = cos > 1e-9 ? cos : 1e-9;
+  const below = pose.targetHeightMeters < 0 ? pose.targetHeightMeters : 0;
+  const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - below) / cosTilt;
+  const range = pose.rangeMeters;
+  pose.rangeMeters = range < minimum ? minimum : range > MAX_RANGE_METERS ? MAX_RANGE_METERS : range;
 }
 
 /** The current view as validated fields, the base for partial updates. */

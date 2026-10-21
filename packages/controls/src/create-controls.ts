@@ -124,11 +124,15 @@ function attach(element: HTMLElement, navigation: NavigationApi): Controls {
   ] as const;
   for (const [type, listener] of listeners) element.addEventListener(type, listener);
   element.addEventListener('wheel', onWheel, { passive: false });
+  // The browser must not take one-finger drags and pinches for scrolling or page zoom (ADR 0009 §3).
+  const touchAction = element.style.touchAction;
+  element.style.touchAction = 'none';
   return {
     update: () => input.apply(navigation),
     destroy() {
       for (const [type, listener] of listeners) element.removeEventListener(type, listener);
       element.removeEventListener('wheel', onWheel);
+      element.style.touchAction = touchAction;
     },
   };
 }

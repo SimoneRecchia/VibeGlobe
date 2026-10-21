@@ -65,6 +65,32 @@ try {
     console.log(
       `DIAG ${name} ${view}\n  ${JSON.stringify(info)}\n  colors(÷32): ${JSON.stringify(top)}\n  ${messages.slice(0, 12).join('\n  ')}`,
     );
+    // The same view captured while frames are being drawn, then the counts after destroy.
+    await page.evaluate(() => {
+      const globe = window.vibeglobePlayground?.globe;
+      const tick = (): void => {
+        globe?.requestRender();
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    await page.waitForTimeout(500);
+    const live = PNG.sync.read(await page.locator('#globe').screenshot());
+    let dark = 0;
+    for (let i = 0; i < live.data.length; i += 4) if ((live.data[i] ?? 0) < 32 && (live.data[i + 2] ?? 0) < 64) dark++;
+    const after = await page.evaluate(async () => {
+      const globe = window.vibeglobePlayground?.globe;
+      globe?.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        return globe?.resourceCounts();
+      } catch (error) {
+        return String(error);
+      }
+    });
+    console.log(
+      `  while drawing: ${dark} of ${live.width * live.height} dark; after destroy: ${JSON.stringify(after)}`,
+    );
     await page.close();
   }
 } finally {

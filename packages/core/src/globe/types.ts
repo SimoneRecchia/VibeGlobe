@@ -235,7 +235,12 @@ export interface GlobeEvents {
   idle: { readonly frameNumber: number };
   'camera-change': CameraState;
   'device-lost': { readonly reason: string };
+  /**
+   * The renderer was recreated after a device or context loss. It may have replaced its canvas with a new one carrying
+   * the same id, class and ARIA attributes: listen for pointer events on the container, not on the canvas.
+   */
   'device-restored': Record<string, never>;
+  /** WebGPU could not be used and WebGL2 took over; the canvas may have been replaced, as for `device-restored`. */
   'backend-fallback': { readonly reason: string };
   error: GlobeError;
 }

@@ -100,6 +100,10 @@ for (const backend of BACKENDS) {
     page,
   }) => {
     await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=4&heading=20`);
+    const touchAction = (): Promise<string> =>
+      page.locator('#globe').evaluate((canvas) => getComputedStyle(canvas).touchAction);
+    // The browser must leave one-finger drags to the controls, on the host's canvas and on a replacement (ADR 0009 §3).
+    expect(await touchAction()).toBe('none');
     const before = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
     await page.evaluate(() => window.vibeglobePlayground?.globe.simulateDeviceLoss());
     await page.waitForFunction(() =>
@@ -125,6 +129,14 @@ for (const backend of BACKENDS) {
     await nextFrame(page);
     const shown = await geoToScreen(page, grabbed);
     expect(Math.hypot(shown.xPx - to.xPx, shown.yPx - to.yPx)).toBeLessThan(1);
+    expect(await touchAction()).toBe('none');
+    // The page's own pointer listener (the F048 readout) still works on the new canvas.
+    await page.evaluate(() => {
+      const cursor = document.querySelector('#cursor');
+      if (cursor) cursor.textContent = 'stale';
+    });
+    await page.mouse.move(box.x + from.xPx + 3, box.y + from.yPx + 3);
+    await expect(page.locator('#cursor')).toHaveText(/°, /);
   });
 
   test(`gives up with a typed error after three losses within a minute on ${backend} (KB-022)`, async ({ page }) => {
@@ -144,6 +156,9 @@ for (const backend of BACKENDS) {
         (window.vibeglobePlayground?.events.find((event) => event.type === 'error')?.payload as { code?: string }).code,
     );
     expect(code).toBe('renderer-failed');
+    // A static message takes the canvas's place (ADR 0010 §8).
+    await expect(page.locator('.vibeglobe-renderer-failed')).toHaveText(/cannot be shown/);
+    await expect(page.locator('.vibeglobe-renderer-failed')).toHaveAttribute('role', 'alert');
   });
 }
 
@@ -330,4 +345,17 @@ test('resizing renders at the new size, centered, never stretched or blank (F070
       JSON.stringify({ size: [width, height], image: [image.width, image.height], horizontal, vertical, state }),
     ).toBeLessThanOrEqual(2);
   }
+});
+
+test('destroy() leaves no WebGL2 resource behind, the output pass included (KB-030)', async ({ page }) => {
+  await openGlobe(page, 'backend=webgl2&zoom=3');
+  await page.evaluate(() => window.vibeglobePlayground?.globe.destroy());
+  await page.waitForFunction(() => window.vibeglobePlayground?.globe.resourceCounts().contexts === 0);
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts())).toEqual({
+    meshes: 0,
+    textures: 0,
+    gpuBytes: 0,
+    vertexArrays: 0,
+    contexts: 0,
+  });
 });

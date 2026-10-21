@@ -34,6 +34,7 @@ import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
 import { countCalls, countMatrixUpdates, createCanvas, stopInternalLoop } from './three-hooks.js';
 import { createWarmUpScene, webgpuSelfTest } from './warm-up.js';
+import { createFailureMessage, RecoveryLimiter, releaseDevice, releaseRenderer } from './recovery.js';
 
 interface TileEntry {
   readonly data: TileMeshData;
@@ -92,8 +93,9 @@ export class ThreeBackend implements RendererBackend {
   private recovering = false;
   /** Set when recovery gave up: nothing is drawn any more. */
   private failed = false;
-  /** When the recent losses happened (host milliseconds), for the recovery limit. */
-  private readonly lossTimesMs: number[] = [];
+  private readonly recoveries = new RecoveryLimiter();
+  /** The static message shown after recovery gave up. */
+  private failureMessage: HTMLElement | undefined;
   /** Whether the current device or context is still held. */
   private contextHeld: () => boolean = () => false;
   /** The active depth path (ADR 0005 §4). */
@@ -210,8 +212,7 @@ export class ThreeBackend implements RendererBackend {
     canvas: HTMLCanvasElement | OffscreenCanvas,
     reason: string,
   ): Promise<void> {
-    renderer.dispose();
-    (renderer.backend as { device?: GPUDevice }).device?.destroy();
+    releaseRenderer(renderer);
     if (this.choice === 'webgpu') {
       throw new GlobeError(
         'unsupported-device',
@@ -418,9 +419,7 @@ export class ThreeBackend implements RendererBackend {
 
   /** Test hook: destroys the WebGPU device or loses the WebGL2 context. */
   simulateDeviceLoss(): void {
-    const backend = this.renderer.backend as { device?: GPUDevice; gl?: WebGL2RenderingContext };
-    if (backend.device) backend.device.destroy();
-    else backend.gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    releaseDevice(this.renderer.backend);
   }
 
   private handleLoss(lost: WebGPURenderer, reason: string): void {
@@ -428,23 +427,13 @@ export class ThreeBackend implements RendererBackend {
     if (this.destroyed || this.failed || lost !== this.renderer || this.recovering) return;
     this.recovering = true;
     this.events.deviceLost(reason);
-    // At most 3 recoveries in 60 s, each after a longer pause (ADR 0010 §8, ADR 0013 #4).
-    const nowMs = this.host.now();
-    while (this.lossTimesMs.length > 0 && nowMs - (this.lossTimesMs[0] ?? 0) > RECOVERY_WINDOW_MS)
-      this.lossTimesMs.shift();
-    this.lossTimesMs.push(nowMs);
-    if (this.lossTimesMs.length > MAX_RECOVERIES) {
-      this.failed = true;
-      this.recovering = false;
-      this.events.failed(
-        new GlobeError(
-          'renderer-failed',
-          `The GPU was lost ${this.lossTimesMs.length} times within a minute; giving up`,
-        ),
-      );
+    const pauseMs = this.recoveries.next(this.host.now());
+    if (pauseMs === undefined) {
+      const losses = this.recoveries.recentLosses;
+      this.fail(new GlobeError('renderer-failed', `The GPU was lost ${losses} times within a minute; giving up`));
       return;
     }
-    void this.recover(RECOVERY_BACKOFF_MS * 2 ** (this.lossTimesMs.length - 1));
+    void this.recover(pauseMs);
   }
 
   private async recover(delayMs: number): Promise<void> {
@@ -456,7 +445,7 @@ export class ThreeBackend implements RendererBackend {
       await this.initRenderer();
       if (this.destroyed) {
         // Destroyed while the new renderer started: release it too.
-        this.releaseRenderer();
+        releaseRenderer(this.renderer);
         return;
       }
       this.createImageryResources();
@@ -465,10 +454,27 @@ export class ThreeBackend implements RendererBackend {
       this.recovering = false;
       this.events.deviceRestored();
     } catch (error) {
-      this.events.failed(
+      this.fail(
         new GlobeError('renderer-failed', 'The renderer could not recover from a device loss', { cause: error }),
       );
     }
+  }
+
+  /**
+   * Gives up (ADR 0010 §8): nothing is drawn any more, the error is reported, and in a page a static message replaces
+   * the canvas so the map area does not stay frozen or blank without explanation.
+   */
+  private fail(error: GlobeError): void {
+    this.failed = true;
+    this.recovering = false;
+    if (this.surface.kind === 'element' && !this.failureMessage) {
+      const message = createFailureMessage(this.surface.container.ownerDocument);
+      const canvas = this.canvas as HTMLCanvasElement | undefined;
+      if (canvas?.isConnected) canvas.replaceWith(message);
+      else this.surface.container.appendChild(message);
+      this.failureMessage = message;
+    }
+    this.events.failed(error);
   }
 
   /** Frees every GPU resource and removes the canvas. */
@@ -483,19 +489,8 @@ export class ThreeBackend implements RendererBackend {
     this.material = undefined;
     this.imageryTexture?.dispose();
     this.imageryTexture = undefined;
-    this.releaseRenderer();
+    releaseRenderer(this.renderer);
     if (this.surface.kind === 'element') (this.canvas as HTMLCanvasElement | undefined)?.remove();
-  }
-
-  /** Disposes the renderer and releases its device or context at once instead of waiting for collection. */
-  private releaseRenderer(): void {
-    const backend = this.renderer.backend as { device?: GPUDevice; gl?: WebGL2RenderingContext };
-    this.renderer.dispose();
-    if (backend.device) backend.device.destroy();
-    else backend.gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    this.failureMessage?.remove();
   }
 }
-
-const MAX_RECOVERIES = 3;
-const RECOVERY_WINDOW_MS = 60_000;
-const RECOVERY_BACKOFF_MS = 250;

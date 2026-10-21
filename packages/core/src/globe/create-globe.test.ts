@@ -99,6 +99,12 @@ describe('createGlobe', () => {
     expect(globe.camera.altitudeMeters).toBeGreaterThanOrEqual(0.5);
   });
 
+  it('keeps the eye at least 0.5 m above the ground when only the tilt changes (KB-027)', async () => {
+    const { globe } = await started({ view: { latitudeDeg: 45, zoom: 28 } });
+    globe.jumpTo({ tiltDeg: 89 });
+    expect(globe.camera.altitudeMeters).toBeGreaterThanOrEqual(0.5);
+  });
+
   it('rejects ready with a typed error when destroyed before the first frame (KB-016)', async () => {
     const { factory } = fakeRenderer();
     const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg' });
@@ -264,6 +270,19 @@ describe('input validation (F050)', () => {
     globe.navigation.dragTo({ longitudeDeg: 0, latitudeDeg: 120 }, { xPx: 10, yPx: 10 });
     expect(globe.camera).toEqual(before);
   });
+
+  test.prop([fc.anything(), fc.anything(), fc.anything()])(
+    'ignores invalid input in the navigation calls, never throwing (KB-029)',
+    async (first, second, delta) => {
+      const { globe } = await started();
+      expect(() => globe.navigation.grab(first as never)).not.toThrow();
+      expect(() => globe.navigation.dragTo(first as never, second as never)).not.toThrow();
+      expect(() => globe.navigation.zoomAt(first as never, delta as never)).not.toThrow();
+      expect(() => globe.navigation.zoomAt(null as never, 1)).not.toThrow();
+      expect(() => globe.navigation.dragTo(null as never, { xPx: 1, yPx: 1 })).not.toThrow();
+      expect(() => globe.navigation.dragTo({ longitudeDeg: 1, latitudeDeg: 1 }, null as never)).not.toThrow();
+    },
+  );
 
   test.prop([fc.anything(), fc.anything()])(
     'never throws anything but a GlobeError from the coordinate queries',

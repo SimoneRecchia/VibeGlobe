@@ -7,6 +7,7 @@ function fakeElement() {
   const listeners = new Map<string, (event: object) => void>();
   return {
     listeners,
+    style: { touchAction: 'auto' },
     clientHeight: 600,
     addEventListener: (type: string, listener: (event: object) => void) => void listeners.set(type, listener),
     removeEventListener: (type: string) => void listeners.delete(type),
@@ -80,14 +81,16 @@ describe('createControls (ADR 0009 §3–4)', () => {
     expect(calls).toEqual([`zoom 60,60 ${1 + 48 / 300}`]);
   });
 
-  it('ignores other buttons and removes its listeners on destroy', () => {
+  it('ignores other buttons, owns touch gestures while attached and removes its listeners on destroy', () => {
     const element = fakeElement();
     const { calls, navigation } = recordingNavigation();
     const controls = createControls()(element, navigation);
+    expect(element.style.touchAction).toBe('none');
     element.fire('pointerdown', { clientX: 110, clientY: 120, button: 2 });
     controls.update?.();
     expect(calls).toEqual([]);
     controls.destroy();
     expect(element.listeners.size).toBe(0);
+    expect(element.style.touchAction).toBe('auto');
   });
 });

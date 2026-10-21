@@ -1,14 +1,13 @@
-import { solveAnchor } from '../camera/anchor.js';
 import { Camera } from '../camera/camera.js';
 import { projectToScreen } from '../camera/projection.js';
 import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
-import { wrapLongitudeRad } from '../projections/longitude.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import { selectSurfaceTiles, type SurfaceTile } from '../surface/surface-selection.hot.js';
-import { applyView, clampRange, currentView, readCameraState, wrapDegrees } from './camera-state.js';
+import { applyView, currentView, readCameraState, wrapDegrees } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
+import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh } from './debug-mesh.js';
 import type {
   BackendName,
@@ -333,47 +332,12 @@ class GlobeEngine implements Globe {
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.assertAlive();
-    // Input handling runs every frame of a drag: doubles travel in preallocated arrays, never as call arguments, which
-    // V8 boxes (ADR 0018). Finiteness is tested as x − x === 0 (NaN for NaN and ±Infinity), not with Number.isFinite,
-    // which V8's mid-tier compiler calls with a boxed argument.
-    const lon = anchor.longitudeDeg;
-    const lat = anchor.latitudeDeg;
-    const height = anchor.heightMeters ?? 0;
-    const x = point.xPx;
-    const y = point.yPx;
-    if (typeof lon !== 'number' || typeof lat !== 'number' || typeof height !== 'number') return;
-    if (typeof x !== 'number' || typeof y !== 'number') return;
-    if (!(lon - lon === 0 && lat - lat === 0 && height - height === 0 && x - x === 0 && y - y === 0)) return;
-    if (!(lat >= -90 && lat <= 90)) return;
-    const pose = this.cam.pose;
-    dragAnchor[0] = lon * RAD;
-    dragAnchor[1] = lat * RAD;
-    dragAnchor[2] = height;
-    dragPixel[0] = x;
-    dragPixel[1] = y;
-    dragStart[0] = pose.targetLongitudeRad;
-    dragStart[1] = pose.targetLatitudeRad;
-    dragStart[2] = pose.headingRad;
-    if (!solveAnchor(this.cam, dragAnchor, dragPixel)) {
-      pose.targetLongitudeRad = dragStart[0] ?? 0;
-      pose.targetLatitudeRad = dragStart[1] ?? 0;
-      pose.headingRad = dragStart[2] ?? 0;
-    }
-    const targetLon = pose.targetLongitudeRad;
-    if (!(targetLon >= -Math.PI && targetLon < Math.PI)) pose.targetLongitudeRad = wrapLongitudeRad(targetLon);
-    this.cam.update();
-    this.requestRender();
+    if (dragCamera(this.cam, anchor, point)) this.requestRender();
   }
 
   private zoomAt(point: ScreenPoint, deltaZoom: number): void {
     this.assertAlive();
-    if (!Number.isFinite(deltaZoom) || !Number.isFinite(point.xPx) || !Number.isFinite(point.yPx)) return;
-    const anchor = this.screenToGeo(point);
-    const pose = this.cam.pose;
-    pose.rangeMeters = clampRange(this.cam, pose.rangeMeters * 2 ** -deltaZoom);
-    this.cam.update();
-    if (anchor) this.dragTo(anchor, point);
-    else this.requestRender();
+    if (!this.pendingView && zoomCamera(this.cam, point, deltaZoom)) this.requestRender();
   }
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {
@@ -455,8 +419,5 @@ function describe(value: unknown): string {
 const ecefScratch = new Float64Array(3);
 const screenScratch = new Float64Array(2);
 /** Drag inputs: the anchor (longitude, latitude in radians, height), the pixel and the pose to restore on failure. */
-const dragAnchor = new Float64Array(3);
-const dragPixel = new Float64Array(2);
-const dragStart = new Float64Array(3);
 
 const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };

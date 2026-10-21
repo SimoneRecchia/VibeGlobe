@@ -1,3 +1,4 @@
+import type { DecodedTile } from '../scheduler/types.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
 
@@ -146,6 +147,21 @@ export interface RendererEvents {
   failed(error: GlobeError): void;
 }
 
+/**
+ * The surface tiles a frame draws (M3 plan §2.2), as parallel typed arrays reused every frame: draw `i` is the mesh
+ * `meshKeys[i]` textured by `textures[i]` (a handle from {@link RendererBackend.uploadTexture}, or -1 for the world
+ * base image) through the transform `uvTransforms[4i..4i+3]` = (scale u, scale v, offset u, offset v) from the tile's
+ * own coordinates into the texture's. `geographic[i]` is 1 when the texture's rows are linear in latitude (the tile's
+ * geographic v), 0 when they are in the tile's own scheme.
+ */
+export interface TileDrawList {
+  readonly count: number;
+  readonly meshKeys: Float64Array;
+  readonly textures: Int32Array;
+  readonly uvTransforms: Float32Array;
+  readonly geographic: Uint8Array;
+}
+
 /** The engine's renderer interface; three.js stays behind it (ADR 0010). */
 export interface RendererBackend {
   readonly capabilities: RendererCapabilities;
@@ -157,12 +173,20 @@ export interface RendererBackend {
   removeMesh(key: number): void;
   /** Loads the pinned base imagery (an equirectangular world image); resolves when it is on the GPU. */
   setBaseImagery(url: string): Promise<void>;
+  /**
+   * Creates or replaces the GPU texture of an imagery tile under `handle` (a small integer the engine allocates) and
+   * uploads it now, so no later frame waits for it (M3 plan §3). The renderer keeps the image to restore the texture
+   * after a device loss.
+   */
+  uploadTexture(handle: number, tile: DecodedTile): void;
+  /** Releases the texture under `handle`; nothing happens for an unknown handle. */
+  releaseTexture(handle: number): void;
   /** Replaces the debug quads. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void;
   /** Cumulative counters. */
   stats(): RendererStats;
   /** Draws the listed surface tiles; returns false when nothing was drawn (while recovering or after giving up). */
-  render(view: FrameView, keys: readonly number[], count: number): boolean;
+  render(view: FrameView, draws: TileDrawList): boolean;
   resize(widthPx: number, heightPx: number, pixelRatio: number): void;
   resourceCounts(): ResourceCounts;
   /** Test hook: forces a device or context loss. */

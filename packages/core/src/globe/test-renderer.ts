@@ -1,3 +1,4 @@
+import type { DecodedTile } from '../scheduler/types.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type {
   FrameCapture,
@@ -8,11 +9,16 @@ import type {
   RendererFactory,
   RendererStats,
   RenderHost,
+  TileDrawList,
 } from './types.js';
 
 /** A renderer and host for unit tests: frames run when `flush` is called. It allocates nothing per frame itself. */
 export interface FakeRenderer extends RendererBackend {
   readonly meshes: Map<number, TileMeshData>;
+  /** Uploaded imagery textures by handle. */
+  readonly textures: Map<number, DecodedTile>;
+  /** The draw list of the last drawn frame (the engine's own, reused every frame). */
+  lastDraws: TileDrawList | undefined;
   /** The element the controls attach to; a recovery may replace it. */
   inputElement: unknown;
   /** Frames drawn so far. */
@@ -56,6 +62,8 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     host,
     inputElement: {},
     meshes: new Map(),
+    textures: new Map(),
+    lastDraws: undefined,
     drawCount: 0,
     drawing: true,
     lastTiles: 0,
@@ -70,10 +78,13 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     addMesh: (mesh) => void renderer.meshes.set(mesh.key, mesh),
     removeMesh: (key) => void renderer.meshes.delete(key),
     setBaseImagery: () => Promise.resolve(),
-    render: (_view: FrameView, _keys: readonly number[], count: number) => {
+    uploadTexture: (handle, tile) => void renderer.textures.set(handle, tile),
+    releaseTexture: (handle) => void renderer.textures.delete(handle),
+    render: (_view: FrameView, draws: TileDrawList) => {
       if (!renderer.drawing) return false;
       renderer.drawCount++;
-      renderer.lastTiles = count;
+      renderer.lastTiles = draws.count;
+      renderer.lastDraws = draws;
       return true;
     },
     resize: (widthPx: number, heightPx: number) => {

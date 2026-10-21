@@ -3,7 +3,6 @@ import { projectToScreen } from '../camera/projection.js';
 import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import {
   applyView,
   currentView,
@@ -19,7 +18,8 @@ import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { EngineClock } from './engine-clock.js';
 import { FrameWaits } from './frame-waits.js';
-import { describeSurfaceTiles, NO_RENDERER_STATS, surfaceStats } from './diagnostics.js';
+import { NO_RENDERER_STATS } from './diagnostics.js';
+import { SurfaceFrame } from './surface-frame.js';
 import type {
   BackendName,
   CameraState,
@@ -56,8 +56,6 @@ import {
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
-/** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
-const MAX_LEVEL = 25;
 
 /**
  * Creates a globe engine instance in a container (architecture §2). The returned object is usable at once; `ready`
@@ -72,10 +70,6 @@ class GlobeEngine implements Globe {
   readonly navigation: NavigationApi;
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
-  private readonly tiles: QuadtreeTile[] = [];
-  /** Tiles the last drawn frame selected. */
-  private tileCount = 0;
-  private readonly keys: number[] = [];
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
   private controls: Controls | undefined;
@@ -89,13 +83,10 @@ class GlobeEngine implements Globe {
   private debugMeshes: DebugMeshData[] = [];
   /** The camera-change payload, reused every frame (KB-037). */
   private readonly cameraPayload = newCameraState();
-  private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL, minLevel: 2 };
-  /**
-   * Bound once, so scheduling a frame allocates no closure; a bound method rather than an arrow function, so no wrapper
-   * function has to wait for the optimizing compiler (it is called only once per frame).
-   */
+  private readonly surfaceFrame: SurfaceFrame;
   /** The timestamp of the frame being drawn, for the clock (in an array: ADR 0018). */
   private readonly frameTime = new Float64Array(1);
+  /** Bound once, so scheduling a frame allocates no closure. */
   private readonly onFrame = (timeMs: number): void => {
     this.frameTime[0] = timeMs;
     this.frame();
@@ -129,8 +120,7 @@ class GlobeEngine implements Globe {
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
     this.clock = new EngineClock(options.manualClockStepMs ?? 0);
-    this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
-    this.selection.minLevel = options.minSurfaceLevel ?? 2;
+    this.surfaceFrame = new SurfaceFrame(options.maxScreenErrorPx ?? 1, options.minSurfaceLevel ?? 2);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.
@@ -304,11 +294,10 @@ class GlobeEngine implements Globe {
     // A frame not drawn takes no step of the manual clock (KB-058).
     if (this.waiting) return this.clock.skipped();
     this.cam.update();
-    const count = selectQuadtreeTiles(this.cam, this.selection, this.tiles);
-    surface.prepare(this.tiles, count, this.keys);
+    const draws = this.surfaceFrame.prepare(this.cam, surface);
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
-    if (!renderer.render(this.frameView, this.keys, count)) return this.clock.skipped();
-    this.tileCount = count;
+    if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
+    const count = this.surfaceFrame.drawn();
     this.frames++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
@@ -413,11 +402,11 @@ class GlobeEngine implements Globe {
   }
 
   surfaceTiles(): SurfaceTileInfo[] {
-    return describeSurfaceTiles(this.tiles, this.tileCount);
+    return this.surfaceFrame.describe();
   }
 
   surfaceStats(): SurfaceStats {
-    return surfaceStats(this.tiles, this.tileCount, this.selection);
+    return this.surfaceFrame.stats();
   }
 
   setDebugShapes(shapes: readonly DebugShape[]): void {

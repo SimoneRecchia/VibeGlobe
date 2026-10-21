@@ -18,17 +18,17 @@ import { createSurfaceMaterial } from './surface-material.js';
  * indices) and covering the view of an identity camera: compiling or drawing it creates every pipeline the frames
  * need (ADR 0010 §4).
  */
-export interface WarmUpScene {
+interface WarmUpScene {
   readonly scene: Scene;
   readonly camera: EngineCamera;
   dispose(): void;
 }
 
 /** Builds a warm-up scene drawing each material once. */
-export function createWarmUpScene(materials: readonly Material[]): WarmUpScene {
+function createWarmUpScene(materials: readonly Material[]): WarmUpScene {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(Float32Array.of(-1, -1, 0.5, 3, -1, 0.5, -1, 3, 0.5), 3));
-  geometry.setAttribute('uv', new BufferAttribute(Float32Array.of(0, 0, 2, 0, 0, 2), 2));
+  geometry.setAttribute('tileUv', new BufferAttribute(Float32Array.of(0, 0, 0, 2, 0, 0, 0, 2, 2), 3));
   geometry.setIndex(new BufferAttribute(Uint16Array.of(0, 1, 2), 1));
   const scene = new Scene();
   scene.matrixWorldAutoUpdate = false;
@@ -44,6 +44,21 @@ export function createWarmUpScene(materials: readonly Material[]): WarmUpScene {
   camera.matrixWorldAutoUpdate = false;
   camera.near = 0.5;
   return { scene, camera, dispose: () => geometry.dispose() };
+}
+
+/**
+ * Compiles every material variant before the frames that draw it (ADR 0010 §4), so no frame waits for a pipeline.
+ * Drawing an empty scene once also compiles three.js's output pass, which copies the scene into the canvas; the canvas
+ * shows a cleared frame until the first frame.
+ */
+export async function warmUpPipelines(renderer: WebGPURenderer, materials: readonly Material[]): Promise<void> {
+  const warmUp = createWarmUpScene(materials);
+  try {
+    await renderer.compileAsync(warmUp.scene, warmUp.camera);
+    renderer.render(new Scene(), warmUp.camera);
+  } finally {
+    warmUp.dispose();
+  }
 }
 
 /**

@@ -24,7 +24,7 @@ export class SurfaceCache {
   }
 
   /** Makes sure every selected tile has a mesh and writes their keys into `keys`. */
-  prepare(tiles: readonly QuadtreeTile[], count: number, keys: number[]): void {
+  prepare(tiles: readonly QuadtreeTile[], count: number, keys: Float64Array): void {
     this.frame++;
     for (let i = 0; i < count; i++) {
       const tile = tiles[i];

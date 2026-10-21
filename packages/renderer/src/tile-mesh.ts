@@ -9,7 +9,7 @@ import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webg
 export function createTileMesh(data: TileMeshData, material: Material | undefined): Mesh {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
-  geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
+  geometry.setAttribute('tileUv', new BufferAttribute(data.uvs, 3));
   geometry.setIndex(new BufferAttribute(data.indices, 1));
   const mesh = new Mesh(geometry, material);
   mesh.matrixAutoUpdate = false;

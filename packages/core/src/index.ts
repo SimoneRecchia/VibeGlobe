@@ -31,6 +31,7 @@ export type {
   ControlsFactory,
   FrameCapture,
   FrameView,
+  TileDrawList,
   GeoPosition,
   Globe,
   GlobeEvents,

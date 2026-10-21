@@ -31,11 +31,11 @@ export async function decodeImage(url: string): Promise<HTMLImageElement> {
   return image;
 }
 
-/** Fetches and decodes an image where there is no DOM (ADR 0011), flipped at decode time like the page's images. */
+/** Fetches and decodes an image where there is no DOM (ADR 0011), top row first like the page's images. */
 export async function decodeBitmap(url: string): Promise<ImageBitmap> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
+  return createImageBitmap(await response.blob(), { imageOrientation: 'from-image' });
 }
 
 /**

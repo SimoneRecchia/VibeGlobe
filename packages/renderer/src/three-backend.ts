@@ -11,18 +11,11 @@ import {
   type RendererStats,
   type RenderHost,
   type ResourceCounts,
+  type DecodedTile,
+  type TileDrawList,
   type TileMeshData,
 } from '@vibeglobe/core';
-import {
-  LinearMipmapLinearFilter,
-  Mesh,
-  RepeatWrapping,
-  Scene,
-  SRGBColorSpace,
-  Texture,
-  WebGPURenderer,
-  type MeshBasicNodeMaterial,
-} from 'three/webgpu';
+import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
@@ -30,12 +23,13 @@ import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
 import { chooseWebGPU, decodeBitmap, decodeImage } from './environment.js';
-import { createSurfaceMaterial } from './surface-material.js';
+import { applyDraw, attachSurfaceDraw, createSurfaceMaterial, type SurfaceDraw } from './surface-material.js';
+import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
 import { countCalls, countMatrixUpdates, readGpuTime, stopInternalLoop } from './three-hooks.js';
-import { createWarmUpScene, webgpuSelfTest } from './warm-up.js';
+import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import {
   RecoveryLimiter,
   createFailureMessage,
@@ -49,6 +43,7 @@ import {
 interface TileEntry {
   readonly data: TileMeshData;
   readonly mesh: Mesh;
+  readonly draw: SurfaceDraw;
 }
 
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
@@ -109,6 +104,7 @@ export class ThreeBackend implements RendererBackend {
   private shownCount = 0;
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
+  private readonly tileTextures = new TileTextures(() => this.capabilities.maxAnisotropy);
   private imagery: HTMLImageElement | ImageBitmap | undefined;
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
@@ -252,7 +248,7 @@ export class ThreeBackend implements RendererBackend {
     const mesh = createTileMesh(data, this.material);
     countMatrixUpdates(mesh, () => this.matrixUpdates++);
     this.scene.add(mesh);
-    return { data, mesh };
+    return { data, mesh, draw: attachSurfaceDraw(mesh) };
   }
 
   /** Replaces the debug quads drawn with the surface's precision path. */
@@ -289,6 +285,17 @@ export class ThreeBackend implements RendererBackend {
     if (shownIndex !== -1 && shownIndex < this.shownCount) this.shown[shownIndex] = undefined;
   }
 
+  /** Creates the texture of an imagery tile and uploads it now (M3 plan §3). */
+  uploadTexture(handle: number, tile: DecodedTile): void {
+    if (this.destroyed) return;
+    this.tileTextures.upload(this.renderer, handle, tile);
+  }
+
+  /** Releases an imagery tile texture and its image. */
+  releaseTexture(handle: number): void {
+    this.tileTextures.release(handle);
+  }
+
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
   async setBaseImagery(url: string): Promise<void> {
     let image: HTMLImageElement | ImageBitmap;
@@ -303,33 +310,15 @@ export class ThreeBackend implements RendererBackend {
     await this.warmUpPipelines();
   }
 
-  /**
-   * Compiles every material variant before the frames that draw it (ADR 0010 §4), so no frame waits for a pipeline;
-   * `pipelineCompiles` counts from here. Drawing an empty scene once also compiles three.js's output pass, which copies
-   * the scene into the canvas; the canvas shows a cleared frame until the first frame.
-   */
+  /** Compiles the surface pipelines before the first frame (ADR 0010 §4); `pipelineCompiles` counts from here. */
   private async warmUpPipelines(): Promise<void> {
-    if (!this.material) return;
-    const warmUp = createWarmUpScene([this.material]);
-    try {
-      await this.renderer.compileAsync(warmUp.scene, warmUp.camera);
-      this.renderer.render(new Scene(), warmUp.camera);
-    } finally {
-      warmUp.dispose();
-    }
+    if (this.material) await warmUpPipelines(this.renderer, [this.material]);
     this.pipelineCompiles = 0;
   }
 
   private createImageryResources(): void {
     if (!this.imagery) return;
-    const texture = new Texture(this.imagery);
-    // A bitmap is flipped when it is decoded: WebGL2 ignores the flip flag for bitmaps.
-    if (this.surface.kind === 'offscreen') texture.flipY = false;
-    texture.colorSpace = SRGBColorSpace;
-    texture.wrapS = RepeatWrapping;
-    texture.minFilter = LinearMipmapLinearFilter;
-    texture.anisotropy = this.capabilities.maxAnisotropy;
-    texture.needsUpdate = true;
+    const texture = createBaseTexture(this.imagery, this.capabilities.maxAnisotropy);
     this.imageryTexture?.dispose();
     this.imageryTexture = texture;
     this.material?.dispose();
@@ -339,18 +328,19 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004, ADR 0005). */
-  render(view: FrameView, keys: readonly number[], count: number): boolean {
+  render(view: FrameView, draws: TileDrawList): boolean {
     // Nothing is drawn with a lost renderer: while recovering, or after recovery gave up.
-    if (this.destroyed || this.recovering || this.failed || !this.material) return false;
+    if (this.destroyed || this.recovering || this.failed || !this.material || !this.imageryTexture) return false;
     // Hide only what the previous frame showed: the work and the memory stay proportional to the drawn tiles.
     for (let i = 0; i < this.shownCount; i++) {
       const mesh = this.shown[i];
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
-    for (let i = 0; i < count; i++) {
-      const entry = this.tiles.getAt(keys, i);
+    for (let i = 0; i < draws.count; i++) {
+      const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
+      applyDraw(entry.draw, draws, i, this.tileTextures.get(draws.textures[i] ?? -1) ?? this.imageryTexture);
       entry.mesh.visible = true;
       this.shown[this.shownCount++] = entry.mesh;
       placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
@@ -385,8 +375,8 @@ export class ThreeBackend implements RendererBackend {
     const textureBytes = image && this.imageryTexture ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
     return {
       meshes: this.tiles.size + this.debugEntries.length,
-      textures: this.imageryTexture ? 1 : 0,
-      gpuBytes: gpuBytes + textureBytes,
+      textures: (this.imageryTexture ? 1 : 0) + this.tileTextures.size,
+      gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes,
       vertexArrays: this.destroyed ? this.vertexArraysLeft : countVertexArrays(this.renderer.backend),
       contexts: this.lossWatch.held() ? 1 : 0,
     };
@@ -425,11 +415,13 @@ export class ThreeBackend implements RendererBackend {
     try {
       this.renderer.dispose();
       this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
+      this.tileTextures.disposeTextures();
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       if (this.destroyed) return;
       await this.initRenderer();
       if (this.abandoned()) return;
       this.createImageryResources();
+      this.tileTextures.restore(this.renderer);
       await this.warmUpPipelines();
       if (this.abandoned()) return;
       if (this.lostWhileRecovering || !this.lossWatch.held()) {
@@ -496,6 +488,7 @@ export class ThreeBackend implements RendererBackend {
     this.material = undefined;
     this.imageryTexture?.dispose();
     this.imageryTexture = undefined;
+    this.tileTextures.clear();
     releaseRenderer(this.renderer);
     this.vertexArraysLeft = countVertexArrays(this.renderer.backend);
     this.forgetRenderer();

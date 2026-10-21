@@ -19,6 +19,19 @@ async function started(overrides: Partial<GlobeOptions> = {}) {
 }
 
 describe('createGlobe', () => {
+  it('hands the renderer one draw per selected tile, each on a mesh it holds and textured by the base image', async () => {
+    const { globe, renderer } = await started({ view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 5 } });
+    const draws = renderer.lastDraws;
+    expect(draws?.count).toBe(renderer.lastTiles);
+    const tiles = globe.surfaceTiles();
+    expect(tiles).toHaveLength(draws?.count ?? -1);
+    for (let i = 0; i < (draws?.count ?? 0); i++) {
+      expect(renderer.meshes.has(draws?.meshKeys[i] ?? NaN)).toBe(true);
+      expect(draws?.textures[i]).toBe(-1);
+      expect(draws?.geographic[i]).toBe(1);
+    }
+  });
+
   it('draws a first frame, resolves ready and reports WGS84 degrees and meters', async () => {
     const { globe, renderer } = await started({ view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 4 } });
     expect(globe.frameNumber).toBe(1);

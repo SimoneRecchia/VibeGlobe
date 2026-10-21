@@ -152,15 +152,26 @@ async function captureCost(baseUrl: string): Promise<Record<string, { medianMs: 
 }
 
 /** requestAnimationFrame intervals over a few seconds, with and without `--deterministic-mode`. */
-async function pacing(baseUrl: string): Promise<Record<string, { p50Ms: number; p95Ms: number; frames: number }>> {
-  const out: Record<string, { p50Ms: number; p95Ms: number; frames: number }> = {};
+/** Rejects when `work` takes longer than `ms`: page.evaluate has no timeout of its own. */
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what}: nothing within ${ms} ms`)), ms)),
+  ]);
+}
+
+type Pacing = { p50Ms: number; p95Ms: number; frames: number } | { error: string };
+
+async function pacing(baseUrl: string): Promise<Record<string, Pacing>> {
+  const out: Record<string, Pacing> = {};
   for (const [name, args] of [
     ['default', []],
     ['deterministic-mode', ['--deterministic-mode']],
   ] as const) {
     const browser = await launch([...args]);
     try {
-      const page = await openView(browser, baseUrl, 'webgl2');
+      // Headless Chromium in deterministic mode may produce no frames at all without begin-frame control.
+      const page = await withTimeout(openView(browser, baseUrl, 'webgl2'), 60_000, `${name}: first frame`);
       const intervals = await page.evaluate(
         (durationMs) =>
           new Promise<number[]>((resolve) => {
@@ -181,6 +192,8 @@ async function pacing(baseUrl: string): Promise<Record<string, { p50Ms: number; 
         PACING_MS,
       );
       out[name] = { p50Ms: percentile(intervals, 50), p95Ms: percentile(intervals, 95), frames: intervals.length };
+    } catch (error) {
+      out[name] = { error: error instanceof Error ? error.message : String(error) };
     } finally {
       await browser.close();
     }

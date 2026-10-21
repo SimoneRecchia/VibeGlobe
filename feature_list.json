@@ -989,7 +989,7 @@
         "Confirm the canvas backing size follows the pixel ratio times the resolution scale",
         "Compare screenshots against baselines at each ratio and confirm crisp output without blur"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F072",
@@ -1002,7 +1002,7 @@
         "Change a shader color in a scratch branch and confirm the suite fails with a diff image",
         "Confirm the baseline update procedure is documented"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F073",
@@ -1014,7 +1014,7 @@
         "Compare the two screenshots pixel by pixel",
         "Confirm the difference is within the documented tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F074",
@@ -1026,7 +1026,7 @@
         "Push a commit and confirm the job renders the canonical views and passes",
         "Confirm screenshots and diffs are uploaded as CI artifacts on failure"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F075",

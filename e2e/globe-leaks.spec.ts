@@ -200,12 +200,13 @@ for (const backend of ['webgl2', 'webgpu'] as const) {
       `leak suite ${backend}: before ${show(before)} after ${show(after)} grown ${JSON.stringify(grown.slice(0, 5))}`,
     );
     expect(grown.filter(([, growth]) => growth >= CYCLES / 2)).toEqual([]);
-    // A destroyed device reports its loss asynchronously: wait for the count to settle (a held one never would).
+    // Only the playground's own globe holds a device or context. A destroyed device reports its loss asynchronously,
+    // so either snapshot may still count one being released: wait for the count to settle (a held one never would).
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { liveContexts: () => number }).liveContexts()), {
         timeout: 10_000,
       })
-      .toBe(before.contexts);
+      .toBe(1);
     expect(after.gpuObjects).toBe(before.gpuObjects);
     expect(after.nodes).toBeLessThanOrEqual(before.nodes);
     expect(after.listeners).toBeLessThanOrEqual(before.listeners);

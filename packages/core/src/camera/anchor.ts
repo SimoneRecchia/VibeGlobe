@@ -50,7 +50,16 @@ export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
-  if (gaussNewton(camera)) return true;
+  return gaussNewton(camera) || rotateToPixel(camera);
+}
+
+/**
+ * The fallback of {@link solveAnchor}, kept out of it: V8 tiers a function up after executing about as much bytecode as
+ * it has, so a cold path inside the hot function would keep it interpreted, boxing every double, for thousands of calls
+ * where the optimizing compiler would not have finished warming up (KB-033).
+ */
+function rotateToPixel(camera: Camera): boolean {
+  const pose = camera.pose;
   pose.targetLongitudeRad = start[0] ?? 0;
   pose.targetLatitudeRad = start[1] ?? 0;
   // Each rotation is exact for a sphere; on the ellipsoid a few converge to the pixel.

@@ -1,4 +1,4 @@
-import { geodeticArrayToEcef } from '../geodesy/ecef.js';
+import { ecefArrayToGeodetic, geodeticArrayToEcef } from '../geodesy/ecef.js';
 import { enuFrame } from '../geodesy/enu.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import type { Camera } from './camera.js';
@@ -112,15 +112,20 @@ function rotateRigidly(camera: Camera): boolean {
   for (let i = 0; i < 3; i++) vector[i] = sinH * (enu[i] ?? 0) + cosH * (enu[3 + i] ?? 0);
   const heading = rotate(rotation, vector, ray);
   rotate(rotation, camera.targetEcef, hit);
-  pose.targetLongitudeRad = Math.atan2(hit[1] ?? 0, hit[0] ?? 0);
-  pose.targetLatitudeRad = Math.atan2(hit[2] ?? 0, Math.hypot(hit[0] ?? 0, hit[1] ?? 0) * (1 - 1 / 298.257223563) ** 2);
+  // The rotated target, converted exactly (it keeps its height above the ellipsoid only approximately).
+  ecefArrayToGeodetic(hit, rotatedTarget);
+  pose.targetLongitudeRad = rotatedTarget.longitudeRad;
+  pose.targetLatitudeRad = rotatedTarget.latitudeRad;
   enuFrame(pose.targetLongitudeRad, pose.targetLatitudeRad, enu);
   const east = dot(heading, enu, 0);
   const north = dot(heading, enu, 3);
   if (Math.hypot(east, north) > 1e-9) pose.headingRad = Math.atan2(east, north);
-  camera.update();
-  return true;
+  // The rotation is exact for a sphere; on the ellipsoid it lands close, which the residual confirms.
+  if (!residual(camera, r0)) return false;
+  return shorterThan(r0, ACCEPT_PX);
 }
+
+const rotatedTarget = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
 
 function dot(v: Float64Array, basis: Float64Array, offset: number): number {
   return (

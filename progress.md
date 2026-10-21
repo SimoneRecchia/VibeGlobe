@@ -16,7 +16,7 @@ Done so far: F042–F063, F066–F070, F076, F077 (globe core: geodesics, projec
 Notes for the next session:
 
 - The Chromium allocation test needs a 120 s warm-up: functions called once per frame reach V8's optimizing tier only after one to two minutes at 30 frames per second.
-- The Vite dev server's watcher can miss edits made by scripts; restart the playground (`kill $(cat .playground.pid)`, then `./init.sh`) when served code looks stale.
+- The Vite dev server's watcher misses files rewritten by `git stash` and some scripted edits; check `ps aux | grep vite` (the pid file can be stale), kill the server and run `./init.sh` when served code looks stale.
 
 ### Session 3 — 2026-10-20 (owner decisions)
 

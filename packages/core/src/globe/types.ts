@@ -220,17 +220,29 @@ export interface Globe {
   readonly backend: BackendName | undefined;
   /** Device capabilities, available after `ready`. */
   readonly capabilities: RendererCapabilities | undefined;
-  /** Current camera, applied values. */
+  /**
+   * Current camera, applied values. Before the viewport has a size (until the renderer starts), the requested view, with
+   * `rangeMeters` and `altitudeMeters` NaN.
+   */
   readonly camera: CameraState;
   /** Frames drawn since creation. */
   readonly frameNumber: number;
   /** Input intents, used by the controls plug-in and available to applications. */
   readonly navigation: NavigationApi;
-  /** Moves the camera in one frame. Invalid input throws a GlobeError and leaves the camera unchanged. */
+  /**
+   * Moves the camera in one frame (before `ready`, the start view becomes this one). Invalid input throws a GlobeError
+   * and leaves the camera unchanged.
+   */
   jumpTo(target: ViewInit): void;
-  /** The WGS84 position shown at a screen point, or undefined off the globe. */
+  /**
+   * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. A point
+   * without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').
+   */
   screenToGeo(point: ScreenPoint): GeoPosition | undefined;
-  /** The screen point showing a WGS84 position, or undefined when it is behind the camera. */
+  /**
+   * The screen point showing a WGS84 position, or undefined when it is behind the camera or before the viewport has a
+   * size. A position with non-finite values or a latitude outside ±90° throws a GlobeError ('invalid-coordinate').
+   */
   geoToScreen(position: GeoPosition): ScreenPoint | undefined;
   /** Subscribes to an event; returns an unsubscribe function. */
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void;

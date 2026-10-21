@@ -117,16 +117,19 @@ export class ThreeBackend implements RendererBackend {
 
   private async initRenderer(): Promise<void> {
     const scope = this.scope();
-    const forceWebGL = this.choice === 'webgl2' || !(await webgpuUsable(scope));
-    if (!forceWebGL) patchIdentitySwizzle(scope);
-    if (!forceWebGL && this.choice === 'auto') {
-      // WebGPU is usable: three.js would still fall back silently if init failed, which we detect below.
-    } else if (!webgl2Usable(this.surface)) {
+    const webgpu = this.choice !== 'webgl2' && (await webgpuUsable(scope));
+    // A forced backend never falls back (ADR 0010 §2).
+    if (this.choice === 'webgpu' && !webgpu) {
+      throw new GlobeError('unsupported-device', 'WebGPU was requested, but this browser offers no WebGPU adapter.');
+    }
+    if (!webgpu && !webgl2Usable(this.surface)) {
       throw new GlobeError(
         'unsupported-device',
         'This device supports neither WebGPU nor WebGL2, so the globe cannot render.',
       );
     }
+    const forceWebGL = !webgpu;
+    if (webgpu) patchIdentitySwizzle(scope);
     const canvas = this.nextCanvas();
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
@@ -146,13 +149,13 @@ export class ThreeBackend implements RendererBackend {
     // device this backend did not dispose must still recover.
     const device = (renderer.backend as { device?: GPUDevice }).device;
     void device?.lost.then((info) => this.handleLoss(renderer, info.message || info.reason));
-    if (
-      this.choice === 'auto' &&
-      !forceWebGL &&
-      (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true
-    ) {
-      this.events.backendFallback('WebGPU initialization failed; using WebGL2');
+    // three.js falls back to WebGL2 silently when WebGPU fails to initialize: reported for 'auto', an error for 'webgpu'.
+    const fellBack = !forceWebGL && (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true;
+    if (fellBack && this.choice === 'webgpu') {
+      renderer.dispose();
+      throw new GlobeError('unsupported-device', 'WebGPU was requested, but it failed to initialize.');
     }
+    if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
     const backend = renderer.backend as { updateTexture?: (...args: unknown[]) => unknown };
     const updateTexture = backend.updateTexture?.bind(backend);
     if (updateTexture) {

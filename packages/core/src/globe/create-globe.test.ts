@@ -60,8 +60,50 @@ describe('createGlobe', () => {
     renderer.flush();
     expect(renderer.lastResize).toEqual({ widthPx: 640, heightPx: 480 });
     expect(renderer.unreportedResize).toBe(false);
-    // The resize asks for another frame at the new size.
-    expect(renderer.flush()).toBe(1);
+    // The frame that found the change draws at the new size itself, so no further frame is needed (KB-013).
+    expect(renderer.flush()).toBe(0);
+  });
+
+  it('draws the new size in the resize callback itself, so no cleared canvas is ever shown (F070, KB-013)', async () => {
+    const { globe, renderer } = await started();
+    const before = renderer.drawCount;
+    renderer.size = { widthPx: 500, heightPx: 400 };
+    renderer.resizeListener?.();
+    expect(renderer.lastResize).toEqual({ widthPx: 500, heightPx: 400 });
+    expect(renderer.drawCount).toBe(before + 1);
+    expect(globe.frameNumber).toBe(2);
+    expect(renderer.flush()).toBe(0);
+  });
+
+  it('keeps a jump made before the renderer is ready (KB-014)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg', view: { zoom: 2 } });
+    globe.jumpTo({ longitudeDeg: 30, latitudeDeg: 50, zoom: 6 });
+    // Before the viewport is known, the camera reports the requested view.
+    expect(globe.camera.longitudeDeg).toBeCloseTo(30, 9);
+    expect(globe.camera.zoom).toBeCloseTo(6, 9);
+    globe.jumpTo({ latitudeDeg: 0 });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    expect(globe.camera.longitudeDeg).toBeCloseTo(30, 9);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(0, 9);
+    // A position-only jump keeps the ground scale, as after start: zoom 6 at 50° is zoom 6 + log2(1/cos 50°) at 0°.
+    expect(globe.camera.zoom).toBeCloseTo(6 + Math.log2(1 / Math.cos((50 * Math.PI) / 180)), 6);
+  });
+
+  it('keeps the eye at least 0.5 m above the ground at the steepest tilt (KB-015)', async () => {
+    const { globe } = await started({ view: { latitudeDeg: 45, zoom: 2 } });
+    globe.jumpTo({ tiltDeg: 89, zoom: 28 });
+    expect(globe.camera.altitudeMeters).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it('rejects ready with a typed error when destroyed before the first frame (KB-016)', async () => {
+    const { factory } = fakeRenderer();
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg' });
+    globe.destroy();
+    await expect(globe.ready).rejects.toMatchObject({ code: 'destroyed' });
   });
 
   it('draws nothing while hidden and resumes on the next frame when shown (F063)', async () => {
@@ -161,4 +203,30 @@ describe('input validation (F050)', () => {
       expect(error).toBeInstanceOf(GlobeError);
     }
   });
+
+  it('rejects invalid points and positions in the coordinate queries with typed errors (KB-017)', async () => {
+    const { globe } = await started();
+    expect(() => globe.screenToGeo(null as never)).toThrow(GlobeError);
+    expect(() => globe.screenToGeo({ xPx: Number.NaN, yPx: 0 })).toThrow(GlobeError);
+    expect(() => globe.geoToScreen({ longitudeDeg: 0, latitudeDeg: 95 })).toThrowError(/latitudeDeg/);
+    expect(() => globe.geoToScreen('Rome' as never)).toThrow(GlobeError);
+    // Input plug-ins call navigation every frame: invalid input is ignored there, never thrown or applied.
+    const before = globe.camera;
+    globe.navigation.dragTo({ longitudeDeg: 0, latitudeDeg: 120 }, { xPx: 10, yPx: 10 });
+    expect(globe.camera).toEqual(before);
+  });
+
+  test.prop([fc.anything(), fc.anything()])(
+    'never throws anything but a GlobeError from the coordinate queries',
+    async (point, position) => {
+      const { globe } = await started();
+      for (const query of [() => globe.screenToGeo(point as never), () => globe.geoToScreen(position as never)]) {
+        try {
+          query();
+        } catch (error) {
+          expect(error).toBeInstanceOf(GlobeError);
+        }
+      }
+    },
+  );
 });

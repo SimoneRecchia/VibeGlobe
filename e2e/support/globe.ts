@@ -26,6 +26,9 @@ export async function openGlobe(page: Page, query = ''): Promise<void> {
   await page.goto(`/?${query}`);
   await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
   await page.evaluate(async () => window.vibeglobePlayground?.globe.ready);
+  // A test that names a backend runs on it: a forced backend never falls back (KB-019).
+  const forced = /backend=(webgpu|webgl2)/.exec(query)?.[1];
+  if (forced) expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe(forced);
 }
 
 /** Waits until the engine has drawn every requested frame and gone idle. */

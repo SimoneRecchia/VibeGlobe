@@ -1,6 +1,7 @@
 import { solveAnchor } from '../camera/anchor.js';
 import { Camera } from '../camera/camera.js';
 import { projectToScreen } from '../camera/projection.js';
+import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import { geodeticToEcef, type GeodeticRad } from '../geodesy/ecef.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
@@ -27,11 +28,12 @@ import type {
   ScreenPoint,
   ViewInit,
 } from './types.js';
-import { DEFAULT_VIEW, validateOptions, validateView } from './validation.js';
+import { DEFAULT_VIEW, validateOptions, validateView, type ValidView } from './validation.js';
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
-const MAX_LEVEL = 26;
+/** Surface tile keys are exact integers up to level 25 (surfaceTileKey). */
+const MAX_LEVEL = 25;
 
 /**
  * Creates a globe engine instance in a container (architecture §2). The returned object is usable at once; `ready`
@@ -67,6 +69,11 @@ class GlobeEngine implements Globe {
   private imageryLoaded = false;
   private destroyed = false;
   private resolveReady: (() => void) | undefined;
+  private rejectReady: ((error: GlobeError) => void) | undefined;
+  /** The requested view until the renderer gives the viewport its size; then the camera holds it. */
+  private pendingView: ValidView | undefined;
+  /** True while a frame runs, so a size change found by its own check does not start a nested frame. */
+  private inFrame = false;
   private resolutionScale: number;
   private readonly frameView = {
     view: this.cam.view,
@@ -80,13 +87,16 @@ class GlobeEngine implements Globe {
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
     this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
+    this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
-      grab: (point) => this.screenToGeo(point),
+      // Input plug-ins call these every frame: invalid input is ignored, never thrown.
+      grab: (point) => (this.validPoint(point) ? this.pick(point) : undefined),
       dragTo: (anchor, point) => this.dragTo(anchor, point),
       zoomAt: (point, deltaZoom) => this.zoomAt(point, deltaZoom),
     };
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
+      this.rejectReady = reject;
       this.start().catch((error: unknown) => {
         const globeError =
           error instanceof GlobeError
@@ -109,7 +119,19 @@ class GlobeEngine implements Globe {
   }
 
   get camera(): CameraState {
-    return readCameraState(this.cam);
+    const pending = this.pendingView;
+    if (!pending) return readCameraState(this.cam);
+    // Before the viewport has a size, range and altitude are unknown (types.ts, Globe.camera).
+    return {
+      longitudeDeg: wrapDegrees(pending.longitudeDeg),
+      latitudeDeg: pending.latitudeDeg,
+      zoom: pending.zoom,
+      altitudeMeters: Number.NaN,
+      headingDeg: wrapDegrees(pending.headingDeg),
+      tiltDeg: pending.tiltDeg,
+      rollDeg: 0,
+      rangeMeters: Number.NaN,
+    };
   }
 
   get frameNumber(): number {
@@ -134,11 +156,14 @@ class GlobeEngine implements Globe {
     this.renderer = renderer;
     this.surface = new SurfaceCache(renderer);
     this.syncSize();
-    applyView(this.cam, validateView(this.options.view ?? {}, DEFAULT_VIEW));
+    applyView(this.cam, this.pendingView ?? currentView(this.cam));
+    this.pendingView = undefined;
     this.cleanups.push(
       renderer.host.observeSize(() => {
         this.syncSize();
-        this.requestRender();
+        // A size change found by a frame's own check is drawn by that frame; any other is drawn right away, in the
+        // resize callback, so the browser never paints the cleared canvas (KB-013).
+        if (!this.inFrame) this.renderNow();
       }),
       renderer.host.observeVisibility((visible) => {
         this.visible = visible;
@@ -166,6 +191,17 @@ class GlobeEngine implements Globe {
     this.dirty = true;
   }
 
+  /** Draws a frame now when one can be drawn (instead of on the next display frame), else requests one. */
+  private renderNow(): void {
+    const renderer = this.renderer;
+    if (!renderer || !this.visible || !this.imageryLoaded) {
+      this.requestRender();
+      return;
+    }
+    if (this.frameId !== undefined) renderer.host.cancelFrame(this.frameId);
+    this.frame();
+  }
+
   requestRender(): void {
     this.assertAlive();
     this.dirty = true;
@@ -179,7 +215,9 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     const surface = this.surface;
     if (this.destroyed || !renderer || !surface || !this.visible) return;
+    this.inFrame = true;
     renderer.host.checkSize?.();
+    this.inFrame = false;
     this.dirty = false;
     this.cam.update();
     const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
@@ -221,13 +259,23 @@ class GlobeEngine implements Globe {
   jumpTo(target: ViewInit): void {
     this.assertAlive();
     const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
+    const pending = this.pendingView;
     let view;
     try {
-      view = validateView(target, currentView(this.cam));
+      view = validateView(target, pending ?? currentView(this.cam));
     } catch (error) {
       // The view stays as it was; the error reaches both the caller and the error event.
       if (error instanceof GlobeError) this.emitter.emit('error', error);
       throw error;
+    }
+    if (pending) {
+      // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
+      if (keepRange) {
+        const groundZoom = groundZoomFromMercatorZoom(pending.zoom, pending.latitudeDeg * RAD);
+        view.zoom = mercatorZoomFromGroundZoom(groundZoom, view.latitudeDeg * RAD);
+      }
+      this.pendingView = view;
+      return;
     }
     applyView(this.cam, view, keepRange);
     this.cam.update();
@@ -236,7 +284,22 @@ class GlobeEngine implements Globe {
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
-    if (!Number.isFinite(point.xPx) || !Number.isFinite(point.yPx)) return undefined;
+    if (!this.validPoint(point)) {
+      throw new GlobeError('invalid-coordinate', `A screen point needs finite xPx and yPx, got ${describe(point)}`);
+    }
+    return this.pick(point);
+  }
+
+  /** True for an object with finite xPx and yPx. */
+  private validPoint(point: unknown): point is ScreenPoint {
+    if (point === null || typeof point !== 'object') return false;
+    const { xPx, yPx } = point as Partial<ScreenPoint>;
+    return typeof xPx === 'number' && Number.isFinite(xPx) && typeof yPx === 'number' && Number.isFinite(yPx);
+  }
+
+  /** The position under a valid screen point; none before the viewport has a size. */
+  private pick(point: ScreenPoint): GeoPosition | undefined {
+    if (this.pendingView) return undefined;
     this.cam.update();
     if (!this.cam.pickEllipsoid(point.xPx, point.yPx, pick)) return undefined;
     return { longitudeDeg: wrapDegrees(pick.longitudeRad * DEG), latitudeDeg: pick.latitudeRad * DEG, heightMeters: 0 };
@@ -244,8 +307,8 @@ class GlobeEngine implements Globe {
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
     this.assertAlive();
-    if (![position.longitudeDeg, position.latitudeDeg, position.heightMeters ?? 0].every(Number.isFinite))
-      return undefined;
+    validatePosition(position);
+    if (this.pendingView) return undefined;
     this.cam.update();
     geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, ecefScratch);
     if (!projectToScreen(this.cam, ecefScratch, screenScratch)) return undefined;
@@ -265,6 +328,7 @@ class GlobeEngine implements Globe {
     if (typeof lon !== 'number' || typeof lat !== 'number' || typeof height !== 'number') return;
     if (typeof x !== 'number' || typeof y !== 'number') return;
     if (!(lon - lon === 0 && lat - lat === 0 && height - height === 0 && x - x === 0 && y - y === 0)) return;
+    if (!(lat >= -90 && lat <= 90)) return;
     const pose = this.cam.pose;
     dragAnchor[0] = lon * RAD;
     dragAnchor[1] = lat * RAD;
@@ -324,6 +388,10 @@ class GlobeEngine implements Globe {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.resolveReady) {
+      this.resolveReady = undefined;
+      this.rejectReady?.(new GlobeError('destroyed', 'The globe was destroyed before its first frame'));
+    }
     if (this.frameId !== undefined) this.renderer?.host.cancelFrame(this.frameId);
     this.controls?.destroy();
     for (const cleanup of this.cleanups) cleanup();
@@ -334,6 +402,35 @@ class GlobeEngine implements Globe {
 
   private assertAlive(): void {
     if (this.destroyed) throw new GlobeError('destroyed', 'This globe was destroyed');
+  }
+}
+
+/** Validates a WGS84 position given to a query; throws a typed GlobeError. */
+function validatePosition(position: unknown): void {
+  if (position === null || typeof position !== 'object') {
+    throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describe(position)}`);
+  }
+  const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
+  for (const [name, value] of [
+    ['longitudeDeg', longitudeDeg],
+    ['latitudeDeg', latitudeDeg],
+    ['heightMeters', heightMeters ?? 0],
+  ] as const) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describe(value)}`);
+    }
+  }
+  if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
+    throw new GlobeError('invalid-coordinate', `latitudeDeg must be between -90 and 90, got ${String(latitudeDeg)}`);
+  }
+}
+
+/** A short description of an invalid input for error messages. */
+function describe(value: unknown): string {
+  try {
+    return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+  } catch {
+    return Object.prototype.toString.call(value);
   }
 }
 

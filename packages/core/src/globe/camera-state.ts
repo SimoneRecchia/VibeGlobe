@@ -54,7 +54,8 @@ export function applyView(camera: Camera, view: ValidView, keepRange = false): v
 
 /** Clamps a range so the eye stays at least {@link MIN_EYE_HEIGHT_METERS} above the ellipsoid. */
 export function clampRange(camera: Camera, rangeMeters: number): number {
-  const cosTilt = Math.max(Math.cos(camera.pose.tiltRad), 0.05);
+  // No floor on the cosine beyond rounding: at the steepest allowed tilt (89°) the range must reach about 29 m (KB-015).
+  const cosTilt = Math.max(Math.cos(camera.pose.tiltRad), 1e-9);
   // A micrometer of margin keeps float rounding from ever reporting the eye below the minimum.
   const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - Math.min(camera.pose.targetHeightMeters, 0)) / cosTilt;
   return Math.min(MAX_RANGE_METERS, Math.max(minimum, rangeMeters));

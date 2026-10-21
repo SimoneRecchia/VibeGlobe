@@ -85,6 +85,25 @@ test.describe('falls back to WebGL2 when WebGPU is unavailable (F054)', () => {
   });
 });
 
+test('a forced WebGPU backend reports unsupported-device instead of falling back to WebGL2 (KB-019)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'gpu', { get: () => undefined });
+  });
+  await page.goto('/?backend=webgpu');
+  await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
+  const outcome = await page.evaluate(async () => {
+    try {
+      await window.vibeglobePlayground?.globe.ready;
+      return `started on ${String(window.vibeglobePlayground?.globe.backend)}`;
+    } catch (error) {
+      return String((error as { code?: string }).code);
+    }
+  });
+  expect(outcome).toBe('unsupported-device');
+});
+
 test('reports a typed unsupported-device error when neither WebGPU nor WebGL2 exists, and the page survives (F055)', async ({
   page,
 }) => {

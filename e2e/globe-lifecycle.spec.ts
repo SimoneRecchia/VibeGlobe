@@ -208,6 +208,13 @@ test('resizing renders at the new size, centered, never stretched or blank (F070
     // Rapid changes first, then the final size of this round.
     await page.setViewportSize({ width: width - 50, height: height - 30 });
     await page.setViewportSize({ width, height });
+    // The frame right after the resize, before the engine has gone idle: drawn, not the cleared canvas (KB-013).
+    const immediate = await canvasImage(page);
+    const middle = (Math.floor(immediate.height / 2) * immediate.width + Math.floor(immediate.width / 2)) * 4;
+    expect(
+      Math.abs((immediate.data[middle] ?? 0) - BACKGROUND_RGB[0]) +
+        Math.abs((immediate.data[middle + 2] ?? 0) - BACKGROUND_RGB[2]),
+    ).toBeGreaterThan(12);
     await expectCompleteGlobe(page);
     const state = await page.evaluate(() => {
       const canvas = document.querySelector<HTMLCanvasElement>('#globe');

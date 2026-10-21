@@ -1,3 +1,4 @@
+import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { solveAnchor } from './anchor.js';
@@ -50,5 +51,24 @@ describe('solveAnchor', () => {
     expect(solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(500, 50))).toBe(true);
     const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
     expect(Math.hypot(x - 500, y - 50)).toBeLessThan(1);
+  });
+});
+
+describe('solveAnchor properties (F046)', () => {
+  test.prop([
+    fc.double({ min: -180, max: 180, noNaN: true }),
+    fc.oneof(fc.double({ min: -89.9, max: 89.9, noNaN: true }), fc.double({ min: 80, max: 89.9, noNaN: true })),
+    fc.double({ min: 2, max: 7, noNaN: true }).map((exponent) => 10 ** exponent),
+    fc.double({ min: 0, max: 360, noNaN: true }),
+    fc.tuple(fc.integer({ min: 50, max: 950 }), fc.integer({ min: 50, max: 750 })),
+    fc.tuple(fc.integer({ min: 50, max: 950 }), fc.integer({ min: 50, max: 750 })),
+  ])('never reports success without bringing the anchor to the pixel', (lon, lat, range, heading, from, to) => {
+    const c = camera(lon, lat, range, heading);
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    if (!c.pickEllipsoid(from[0], from[1], hit)) return;
+    const solved = solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(...to));
+    if (!solved) return;
+    const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
+    expect(Math.hypot(x - to[0], y - to[1])).toBeLessThan(0.5);
   });
 });

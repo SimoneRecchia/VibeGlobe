@@ -30,11 +30,12 @@ async function expectStableFrames(page: Page): Promise<void> {
 }
 
 /**
- * Lays two quads under the camera target, red above blue, separated by a few millionths of the eye's distance (about
- * 50 times the depth resolution there), the red one larger; then moves the camera by about a tenth of a pixel three
- * times. Any blue pixel means the depth test let the lower quad through: z-fighting at this distance.
+ * Lays two quads under the camera target, red above blue, `gapMeters` apart along their common normal, the red one
+ * larger, and counts blue pixels in the frame and after each of three camera moves of about a tenth of a pixel. The
+ * blue quad is drawn last, so where the two depths come out equal the lower quad wins: any blue pixel means the depth
+ * buffer could not keep them apart. Clears the quads and returns the counts.
  */
-async function expectNoZFighting(page: Page): Promise<void> {
+async function bluePixelsUnderRed(page: Page, gapMeters: number): Promise<number[]> {
   await waitForIdle(page);
   const camera = await page.evaluate(() => {
     const state = window.vibeglobePlayground?.globe.camera;
@@ -46,7 +47,6 @@ async function expectNoZFighting(page: Page): Promise<void> {
   });
   const metersPerDegree = 111320 * Math.cos((camera.latitudeDeg * Math.PI) / 180);
   const halfWidthMeters = camera.altitudeMeters / 4;
-  const gapMeters = Math.max(0.01, 3e-6 * camera.altitudeMeters);
   // The red quad's corners lie this high, so its center, a chord sag lower, stays above the ground with the blue one.
   const heightMeters =
     (2 * halfWidthMeters) ** 2 / (8 * 6371000) + gapMeters + Math.min(1, camera.altitudeMeters / 100);
@@ -62,8 +62,8 @@ async function expectNoZFighting(page: Page): Promise<void> {
   // The blue quad lies in the red quad's plane moved down along its normal by the gap, inset to 80%.
   const blue = parallelQuad(red, 0.8, gapMeters);
   await page.evaluate((shapes) => window.vibeglobePlayground?.globe.setDebugShapes(shapes), [
-    { corners: blue, colorRgb: [0, 0, 1] },
     { corners: red, colorRgb: [1, 0, 0] },
+    { corners: blue, colorRgb: [0, 0, 1] },
   ] satisfies DebugShape[]);
   const bluePixels = async (): Promise<number> => {
     const image = await canvasImage(page);
@@ -72,7 +72,7 @@ async function expectNoZFighting(page: Page): Promise<void> {
       if ((image.data[i + 2] ?? 0) > 200 && (image.data[i] ?? 0) < 40 && (image.data[i + 1] ?? 0) < 40) count++;
     return count;
   };
-  expect(await bluePixels(), `z-fighting at ${camera.altitudeMeters} m`).toBe(0);
+  const counts = [await bluePixels()];
   const target = { longitudeDeg: camera.longitudeDeg, latitudeDeg: camera.latitudeDeg };
   const baseScreen = await geoToScreen(page, target);
   const east = await geoToScreen(page, { ...target, longitudeDeg: target.longitudeDeg + 1 / metersPerDegree });
@@ -82,11 +82,30 @@ async function expectNoZFighting(page: Page): Promise<void> {
       longitudeDeg: camera.longitudeDeg + (step * stepMeters) / metersPerDegree,
       latitudeDeg: camera.latitudeDeg,
     });
-    expect(await bluePixels(), `z-fighting at ${camera.altitudeMeters} m after a sub-pixel move`).toBe(0);
+    counts.push(await bluePixels());
   }
   await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), target);
   await page.evaluate(() => window.vibeglobePlayground?.globe.setDebugShapes([]));
   await waitForIdle(page);
+  return counts;
+}
+
+/**
+ * No z-fighting at this distance: a quad pair a few millionths of the eye's distance apart (about 50 times the depth
+ * resolution there) shows no blue pixel, still or under sub-pixel moves.
+ */
+async function expectNoZFighting(page: Page): Promise<void> {
+  const altitude = await page.evaluate(() => window.vibeglobePlayground?.globe.camera.altitudeMeters ?? NaN);
+  const counts = await bluePixelsUnderRed(page, Math.max(0.01, 3e-6 * altitude));
+  expect(counts, `z-fighting at ${altitude} m (blue pixels, still and after three sub-pixel moves)`).toEqual([
+    0, 0, 0, 0,
+  ]);
+}
+
+/** The detector's own check (ADR 0012): the same quads with no gap show blue, so a depth failure would not go unseen. */
+async function expectZFightingDetected(page: Page): Promise<void> {
+  const counts = await bluePixelsUnderRed(page, 0);
+  expect(Math.min(...counts), 'blue pixels of a coplanar quad pair').toBeGreaterThan(0);
 }
 
 /** Drags from the canvas center and checks the grabbed point stays under the pointer, then drags back. */
@@ -208,6 +227,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       if (step % 20 === 0) {
         await expectStableFrames(page);
         await expectNoZFighting(page);
+        if (step === 20) await expectZFightingDetected(page);
         // Along the zoom, where large tiles make the low part of the eye offset matter (ADR 0004).
         await expectNoJitter(page);
         await expectAnchoredDrag(page, box);

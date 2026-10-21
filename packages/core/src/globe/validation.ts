@@ -6,7 +6,7 @@ const MAX_ZOOM = 28;
 
 function finite(value: unknown, name: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${String(value)}`);
+    throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
   }
   return value;
 }
@@ -31,7 +31,7 @@ export interface ValidView {
 /** Validates a camera target at the API boundary; missing fields come from `current`. Throws a typed GlobeError. */
 export function validateView(view: unknown, current: ValidView): ValidView {
   if (view === null || typeof view !== 'object') {
-    throw new GlobeError('invalid-coordinate', `A view must be an object, got ${String(view)}`);
+    throw new GlobeError('invalid-coordinate', `A view must be an object, got ${describeInput(view)}`);
   }
   const input = view as ViewInit;
   return {
@@ -48,7 +48,7 @@ export function validateView(view: unknown, current: ValidView): ValidView {
 /** Validates the options of createGlobe at the API boundary. Throws a typed GlobeError naming the bad option. */
 export function validateOptions(options: unknown): GlobeOptions {
   if (options === null || typeof options !== 'object') {
-    throw new GlobeError('invalid-option', `createGlobe options must be an object, got ${String(options)}`);
+    throw new GlobeError('invalid-option', `createGlobe options must be an object, got ${describeInput(options)}`);
   }
   const input = options as Partial<Record<keyof GlobeOptions, unknown>>;
   if (input.container === null || typeof input.container !== 'object') {
@@ -73,7 +73,7 @@ export function validateOptions(options: unknown): GlobeOptions {
       if (!(number >= min && number <= max)) {
         throw new GlobeError(
           'invalid-option',
-          `${name} must be a number between ${min} and ${max}, got ${String(value)}`,
+          `${name} must be a number between ${min} and ${max}, got ${describeInput(value)}`,
         );
       }
     }
@@ -85,7 +85,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   ) {
     throw new GlobeError(
       'invalid-option',
-      `minSurfaceLevel must be an integer between 2 and 8, got ${String(minLevel)}`,
+      `minSurfaceLevel must be an integer between 2 and 8, got ${describeInput(minLevel)}`,
     );
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
@@ -110,13 +110,13 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
 /** Throws a typed error unless `event` is a globe event and `handler` a function (KB-038). */
 export function validateHandler(event: unknown, handler: unknown): void {
   if (!EVENT_NAMES.has(event as keyof GlobeEvents)) {
-    throw new GlobeError('invalid-option', `Unknown event ${String(event)}`);
+    throw new GlobeError('invalid-option', `Unknown event ${describeInput(event)}`);
   }
   // A handler that is not a function would throw on every emit, from inside the frame loop.
   if (typeof handler !== 'function') {
     throw new GlobeError(
       'invalid-option',
-      `The handler for ${String(event)} must be a function, got ${String(handler)}`,
+      `The handler for ${describeInput(event)} must be a function, got ${describeInput(handler)}`,
     );
   }
 }
@@ -137,12 +137,16 @@ export function validatePosition(position: unknown): void {
     }
   }
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
-    throw new GlobeError('invalid-coordinate', `latitudeDeg must be between -90 and 90, got ${String(latitudeDeg)}`);
+    throw new GlobeError(
+      'invalid-coordinate',
+      `latitudeDeg must be between -90 and 90, got ${describeInput(latitudeDeg)}`,
+    );
   }
 }
 
 /** A short description of an invalid input for error messages. */
 export function describeInput(value: unknown): string {
+  // Neither may throw: an object without a prototype has no string conversion, and JSON has no bigint.
   try {
     return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
   } catch {

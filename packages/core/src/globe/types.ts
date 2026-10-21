@@ -161,8 +161,8 @@ export interface RendererBackend {
   setDebugMeshes(meshes: readonly DebugMeshData[]): void;
   /** Cumulative counters. */
   stats(): RendererStats;
-  /** Draws the listed surface tiles. */
-  render(view: FrameView, keys: readonly number[], count: number): void;
+  /** Draws the listed surface tiles; returns false when nothing was drawn (while recovering or after giving up). */
+  render(view: FrameView, keys: readonly number[], count: number): boolean;
   resize(widthPx: number, heightPx: number, pixelRatio: number): void;
   resourceCounts(): ResourceCounts;
   /** Test hook: forces a device or context loss. */

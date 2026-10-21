@@ -1,5 +1,6 @@
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { GlobeError } from './errors.js';
+import { describeInput } from './validation.js';
 import type { DebugMeshData, DebugShape } from './types.js';
 
 const RAD = Math.PI / 180;
@@ -11,7 +12,7 @@ export function validateDebugShapes(shapes: unknown): asserts shapes is readonly
   for (const shape of shapes as unknown[]) {
     const { corners, colorRgb, checkerMeters } = (shape ?? {}) as Partial<Record<keyof DebugShape, unknown>>;
     if (shape === null || typeof shape !== 'object') {
-      throw new GlobeError('invalid-option', `A debug shape must be an object, got ${String(shape)}`);
+      throw new GlobeError('invalid-option', `A debug shape must be an object, got ${describeInput(shape)}`);
     }
     if (!Array.isArray(corners) || corners.length !== 4 || corners.some((c) => c === null || typeof c !== 'object')) {
       throw new GlobeError('invalid-option', 'A debug shape needs four corner positions');
@@ -24,7 +25,10 @@ export function validateDebugShapes(shapes: unknown): asserts shapes is readonly
       throw new GlobeError('invalid-option', 'A debug shape color needs three channels between 0 and 1');
     }
     if (checkerMeters !== undefined && !(typeof checkerMeters === 'number' && checkerMeters > 0)) {
-      throw new GlobeError('invalid-option', `checkerMeters must be a positive number, got ${String(checkerMeters)}`);
+      throw new GlobeError(
+        'invalid-option',
+        `checkerMeters must be a positive number, got ${describeInput(checkerMeters)}`,
+      );
     }
   }
 }
@@ -35,7 +39,7 @@ export function buildDebugMesh(shape: DebugShape): DebugMeshData {
   for (const position of shape.corners) {
     const values = [position.longitudeDeg, position.latitudeDeg, position.heightMeters ?? 0];
     if (!values.every((v) => typeof v === 'number' && Number.isFinite(v)) || Math.abs(position.latitudeDeg) > 90) {
-      throw new GlobeError('invalid-coordinate', `Debug shape corner out of range: ${JSON.stringify(position)}`);
+      throw new GlobeError('invalid-coordinate', `Debug shape corner out of range: ${describeInput(position)}`);
     }
     geodeticToEcef(position.longitudeDeg * RAD, position.latitudeDeg * RAD, position.heightMeters ?? 0, corner);
     ecef.push(corner[0] ?? 0, corner[1] ?? 0, corner[2] ?? 0);

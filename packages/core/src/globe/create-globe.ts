@@ -22,6 +22,7 @@ import type {
   BackendName,
   CameraState,
   Controls,
+  DebugMeshData,
   DebugShape,
   FrameCapture,
   GeoPosition,
@@ -76,6 +77,8 @@ class GlobeEngine implements Globe {
   private frames = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
   private readonly idlePayload = { frameNumber: 0 };
+  /** The debug quads, kept for a renderer that does not exist yet. */
+  private debugMeshes: DebugMeshData[] = [];
   /** The camera-change payload, reused every frame (KB-037). */
   private readonly cameraPayload = newCameraState();
   private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL, minLevel: 2 };
@@ -188,6 +191,7 @@ class GlobeEngine implements Globe {
     }
     this.renderer = renderer;
     this.surface = new SurfaceCache(renderer);
+    if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(
       renderer.host.observeSize(() => {
@@ -272,13 +276,16 @@ class GlobeEngine implements Globe {
     this.clock.advance(this.frameTime);
     this.inFrame = true;
     renderer.host.checkSize?.();
-    this.controls?.update?.();
+    // Until the requested view has a viewport there is no camera to draw or report (KB-040).
+    if (!this.pendingView) this.controls?.update?.();
     this.inFrame = false;
     this.dirty = false;
+    if (this.pendingView) return;
     this.cam.update();
     const count = selectSurfaceTiles(this.cam, this.selection, this.tiles);
     surface.prepare(this.tiles, count, this.keys);
-    renderer.render(this.frameView, this.keys, count);
+    // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
+    if (!renderer.render(this.frameView, this.keys, count)) return;
     this.frames++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
@@ -305,7 +312,7 @@ class GlobeEngine implements Globe {
     if (typeof scale !== 'number' || !(scale >= 0.1 && scale <= 4)) {
       throw new GlobeError(
         'invalid-option',
-        `resolutionScale must be a number between 0.1 and 4, got ${String(scale)}`,
+        `resolutionScale must be a number between 0.1 and 4, got ${describeInput(scale)}`,
       );
     }
     this.resolutionScale = scale;
@@ -411,8 +418,9 @@ class GlobeEngine implements Globe {
   setDebugShapes(shapes: readonly DebugShape[]): void {
     this.assertAlive();
     validateDebugShapes(shapes);
-    const meshes = shapes.map((shape) => buildDebugMesh(shape));
-    this.renderer?.setDebugMeshes(meshes);
+    this.debugMeshes = shapes.map((shape) => buildDebugMesh(shape));
+    // Before the renderer exists they are kept and handed over when it starts (KB-042).
+    this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
   }
 

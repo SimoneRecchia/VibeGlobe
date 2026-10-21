@@ -200,10 +200,41 @@ for (const backend of ['webgl2', 'webgpu'] as const) {
       `leak suite ${backend}: before ${show(before)} after ${show(after)} grown ${JSON.stringify(grown.slice(0, 5))}`,
     );
     expect(grown.filter(([, growth]) => growth >= CYCLES / 2)).toEqual([]);
-    expect(after.contexts).toBe(before.contexts);
+    // A destroyed device reports its loss asynchronously: wait for the count to settle (a held one never would).
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { liveContexts: () => number }).liveContexts()), {
+        timeout: 10_000,
+      })
+      .toBe(before.contexts);
     expect(after.gpuObjects).toBe(before.gpuObjects);
     expect(after.nodes).toBeLessThanOrEqual(before.nodes);
     expect(after.listeners).toBeLessThanOrEqual(before.listeners);
     expect(after.heapBytes - before.heapBytes).toBeLessThan(HEAP_NOISE_BYTES);
   });
 }
+
+test('a destroyed globe that the host still references holds no renderer (KB-045)', async ({ page }) => {
+  await openGlobe(page, 'backend=webgl2&zoom=3');
+  const cdp = await page.context().newCDPSession(page);
+  const renderers = async (): Promise<number> => {
+    await page.waitForTimeout(500);
+    await cdp.send('HeapProfiler.collectGarbage');
+    return (await heapObjects(cdp)).instances.get('WebGPURenderer') ?? 0;
+  };
+  const before = await renderers();
+  // Frameworks keep component references after unmount: the destroyed globes stay reachable from the page.
+  await page.evaluate(async () => {
+    const hooks = window.vibeglobePlayground;
+    if (!hooks) throw new Error('no playground');
+    const kept: unknown[] = [];
+    (window as unknown as { kept: unknown[] }).kept = kept;
+    for (let i = 0; i < 5; i++) {
+      const mounted = hooks.mount();
+      await mounted.globe.ready;
+      mounted.unmount();
+      kept.push(mounted.globe);
+    }
+  });
+  // At most one more: three.js's module-level output node keeps a reference to the last renderer it served.
+  expect(await renderers()).toBeLessThanOrEqual(before + 1);
+});

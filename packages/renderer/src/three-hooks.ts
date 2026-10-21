@@ -60,3 +60,13 @@ export function createCanvas(document: Document, previous: HTMLCanvasElement | u
   canvas.tabIndex = 0;
   return canvas;
 }
+
+/**
+ * Reads back the GPU time of the frames rendered so far (timestamp queries resolve a few frames late) and passes the
+ * last frame's to `store`; allocates promises, so only for benchmarks. Devices without timestamp queries report nothing.
+ */
+export function readGpuTime(renderer: WebGPURenderer, store: (ms: number) => void): void {
+  void renderer.resolveTimestampsAsync('render').then((ms) => {
+    if (typeof ms === 'number' && ms > 0) store(ms);
+  });
+}

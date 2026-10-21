@@ -5,6 +5,9 @@ import { GlobeError } from './errors.js';
 import { fakeRenderer } from './test-renderer.js';
 import type { DebugShape, GeoPosition, GlobeOptions, NavigationApi, ScreenPoint } from './types.js';
 
+/** Any JavaScript value, including objects without a prototype, boxed values and bigints (KB-041). */
+const anyValue = fc.anything({ withNullPrototype: true, withBigInt: true, withBoxedValues: true });
+
 async function started(overrides: Partial<GlobeOptions> = {}) {
   const { renderer, factory } = fakeRenderer();
   const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'world.jpg', ...overrides });
@@ -105,6 +108,58 @@ describe('createGlobe', () => {
     renderer.flush();
     await expect(globe.ready).rejects.toMatchObject({ code: 'renderer-failed' });
     expect(events).toEqual(['renderer-failed']);
+  });
+
+  it('draws and reports nothing until the requested view has a viewport (KB-040)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg', view: { zoom: 4 } });
+    const zooms: number[] = [];
+    let ready = false;
+    globe.on('camera-change', (state) => zooms.push(state.zoom));
+    void globe.ready.then(() => (ready = true));
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await Promise.resolve();
+    expect(renderer.drawCount).toBe(0);
+    expect(ready).toBe(false);
+    expect(zooms).toEqual([]);
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    await globe.ready;
+    expect(zooms[0]).toBeCloseTo(4, 9);
+  });
+
+  it('resolves ready only on a frame the renderer drew (KB-040)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    renderer.drawing = false;
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg' });
+    let ready = false;
+    void globe.ready.then(() => (ready = true));
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await Promise.resolve();
+    expect(ready).toBe(false);
+    renderer.drawing = true;
+    globe.requestRender();
+    renderer.flush();
+    await globe.ready;
+    expect(ready).toBe(true);
+  });
+
+  it('keeps debug shapes set before the renderer exists (KB-042)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg' });
+    const corner = { longitudeDeg: 0, latitudeDeg: 0 };
+    globe.setDebugShapes([{ corners: [corner, corner, corner, corner], colorRgb: [1, 0, 0] }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    expect(renderer.debugMeshes).toBe(1);
   });
 
   it('keeps the requested view until the container has a size (KB-034)', async () => {
@@ -303,7 +358,46 @@ describe('input validation (F050)', () => {
     expect(code(() => on('no-such-event', () => undefined))).toBe('invalid-option');
   });
 
-  test.prop([fc.anything()])('never throws anything but a GlobeError for arbitrary options', (options) => {
+  it('describes values without a prototype or of type bigint in typed errors (KB-041)', async () => {
+    const { globe } = await started();
+    const { factory } = fakeRenderer();
+    const odd = Object.create(null) as unknown;
+    const code = (call: () => unknown): string => {
+      try {
+        call();
+        return 'no error';
+      } catch (error) {
+        return error instanceof GlobeError ? error.code : `untyped ${String(error)}`;
+      }
+    };
+    const loose = globe as unknown as Record<string, (...args: unknown[]) => unknown>;
+    const corner = { longitudeDeg: 0, latitudeDeg: 0 };
+    expect(code(() => loose['on']?.call(globe, 'frame', odd))).toBe('invalid-option');
+    expect(code(() => loose['on']?.call(globe, odd, () => undefined))).toBe('invalid-option');
+    expect(code(() => loose['jumpTo']?.call(globe, { zoom: odd }))).toBe('invalid-coordinate');
+    expect(code(() => loose['setResolutionScale']?.call(globe, odd))).toBe('invalid-option');
+    expect(
+      code(() =>
+        createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', resolutionScale: odd as number }),
+      ),
+    ).toBe('invalid-option');
+    expect(
+      code(() =>
+        loose['setDebugShapes']?.call(globe, [
+          { corners: [corner, corner, corner, corner], colorRgb: [1, 0, 0], checkerMeters: odd },
+        ]),
+      ),
+    ).toBe('invalid-option');
+    expect(
+      code(() =>
+        loose['setDebugShapes']?.call(globe, [
+          { corners: [corner, corner, corner, { longitudeDeg: 1n, latitudeDeg: 0 }], colorRgb: [1, 0, 0] },
+        ]),
+      ),
+    ).toBe('invalid-coordinate');
+  });
+
+  test.prop([anyValue])('never throws anything but a GlobeError for arbitrary options', (options) => {
     try {
       createGlobe(options as GlobeOptions).destroy();
     } catch (error) {
@@ -311,7 +405,7 @@ describe('input validation (F050)', () => {
     }
   });
 
-  test.prop([fc.anything()])('never throws anything but a GlobeError for arbitrary views', async (view) => {
+  test.prop([anyValue])('never throws anything but a GlobeError for arbitrary views', async (view) => {
     const { globe } = await started();
     try {
       globe.jumpTo(view as never);
@@ -332,7 +426,7 @@ describe('input validation (F050)', () => {
     expect(globe.camera).toEqual(before);
   });
 
-  test.prop([fc.anything(), fc.anything(), fc.anything()])(
+  test.prop([anyValue, anyValue, anyValue])(
     'ignores invalid input in the navigation calls, never throwing (KB-029)',
     async (first, second, delta) => {
       const { globe } = await started();
@@ -345,7 +439,27 @@ describe('input validation (F050)', () => {
     },
   );
 
-  test.prop([fc.anything(), fc.anything()])(
+  test.prop([anyValue, anyValue])(
+    'never throws anything but a GlobeError from on, setDebugShapes and setResolutionScale (KB-041)',
+    async (first, second) => {
+      const { globe } = await started();
+      const loose = globe as unknown as Record<string, (...args: unknown[]) => unknown>;
+      for (const call of [
+        () => loose['on']?.call(globe, first, second),
+        () => loose['setDebugShapes']?.call(globe, first),
+        () => loose['setDebugShapes']?.call(globe, [first]),
+        () => loose['setResolutionScale']?.call(globe, first),
+      ]) {
+        try {
+          call();
+        } catch (error) {
+          expect(error).toBeInstanceOf(GlobeError);
+        }
+      }
+    },
+  );
+
+  test.prop([anyValue, anyValue])(
     'never throws anything but a GlobeError from the coordinate queries',
     async (point, position) => {
       const { globe } = await started();

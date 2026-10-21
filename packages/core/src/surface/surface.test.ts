@@ -66,6 +66,19 @@ describe('selectSurfaceTiles', () => {
     expect(count).toBeLessThan(2000);
   });
 
+  it.each([
+    ['above the north pole at 1 m', 0, 90, 1, 0],
+    ['beside the north pole, tilted', 30, 89.99, 50, 60],
+    ['above the south pole at 10 m', -120, -90, 10, 0],
+  ])('keeps the tile count bounded %s (KB-043)', (_, lon, lat, range, tilt) => {
+    const count = selectSurfaceTiles(camera(lon, lat, range, tilt), { maxScreenErrorPx: 1, maxLevel: 25 }, out);
+    expect(count).toBeLessThan(1000);
+    // The tiles touching the pole still go all the way around it: no gap.
+    const pole = lat > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const ring = out.slice(0, count).filter((t) => Math.abs((lat > 0 ? t.northRad : t.southRad) - pole) < 1e-12);
+    expect(ring.reduce((sum, t) => sum + (t.eastRad - t.westRad), 0)).toBeCloseTo(2 * Math.PI, 9);
+  });
+
   it('culls the far side of the globe', () => {
     const count = selectSurfaceTiles(camera(0, 0, 1e6), { maxScreenErrorPx: 1, maxLevel: 26 }, out);
     expect(out.slice(0, count).every((t) => t.eastRad > -Math.PI / 2 && t.westRad < Math.PI / 2)).toBe(true);

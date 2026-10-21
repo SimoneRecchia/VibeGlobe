@@ -41,8 +41,11 @@ export function surfaceTileKey(level: number, x: number, y: number): number {
   return ((4 ** level - 1) * 2) / 3 + y * 2 ** (level + 1) + x;
 }
 
-/** Fills a tile's bounds from its level and indices. */
-export function surfaceTileBounds(level: number, x: number, y: number, out: SurfaceTile): SurfaceTile {
+/**
+ * Fills a tile's bounds from its level and indices; `span` is the number of level columns it covers from column `x`
+ * (more than 1 only near the poles, where tiles stop splitting in longitude).
+ */
+export function surfaceTileBounds(level: number, x: number, y: number, out: SurfaceTile, span = 1): SurfaceTile {
   const size = Math.PI / 2 ** level;
   // surfaceTileKey, written out: a key beyond 31 bits returned from a call would be boxed.
   out.key = ((4 ** level - 1) * 2) / 3 + y * 2 ** (level + 1) + x;
@@ -50,7 +53,7 @@ export function surfaceTileBounds(level: number, x: number, y: number, out: Surf
   out.x = x;
   out.y = y;
   out.westRad = -Math.PI + x * size;
-  out.eastRad = out.westRad + size;
+  out.eastRad = out.westRad + span * size;
   out.northRad = Math.PI / 2 - y * size;
   out.southRad = out.northRad - size;
   return out;
@@ -86,8 +89,8 @@ export function selectSurfaceTiles(camera: Camera, options: SurfaceSelectionOpti
   horizon[1] = (eye[1] ?? 0) / (A * A);
   horizon[2] = (eye[2] ?? 0) / (B * B);
   horizon[3] = Math.sqrt((horizon[0] ?? 0) ** 2 + (horizon[1] ?? 0) ** 2 + (horizon[2] ?? 0) ** 2);
-  visit(0, 0, 0);
-  visit(0, 1, 0);
+  visit(0, 0, 0, 1);
+  visit(0, 1, 0, 1);
   state.out = undefined;
   return state.count;
 }
@@ -101,7 +104,13 @@ const state: {
   pixelsPerRadian: number;
 } = { camera: undefined, options: { maxScreenErrorPx: 1, maxLevel: 1 }, out: undefined, count: 0, pixelsPerRadian: 1 };
 
-function visit(level: number, x: number, y: number): void {
+/**
+ * Visits a tile covering `span` columns of its level from column `x`. A tile splits into four while its east–west
+ * width at its equatorward edge is at least half its north–south height, else only in latitude, into two children of
+ * twice the span (ADR 0006's polar-cap rule): near a pole the tiles stay wedges at least about 29° wide, so the count
+ * stays bounded instead of doubling with every level along the polar row (KB-043).
+ */
+function visit(level: number, x: number, y: number, span: number): void {
   const { camera, options, out } = state;
   if (!camera || !out) return;
   const tile = (out[state.count] ??= {
@@ -114,7 +123,7 @@ function visit(level: number, x: number, y: number): void {
     eastRad: 0,
     northRad: 0,
   });
-  surfaceTileBounds(level, x, y, tile);
+  surfaceTileBounds(level, x, y, tile, span);
   measureTile(tile, camera.eyeEcef);
   const radius = measure[RADIUS] ?? 0;
   // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
@@ -129,7 +138,16 @@ function visit(level: number, x: number, y: number): void {
     state.count++;
     return;
   }
-  for (let child = 0; child < 4; child++) visit(level + 1, 2 * x + (child & 1), 2 * y + (child >> 1));
+  const north = tile.northRad;
+  const south = tile.southRad;
+  // Comparisons, not Math.min/abs, as above.
+  const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
+  if (Math.cos(equatorward) * (tile.eastRad - tile.westRad) >= (north - south) / 2) {
+    for (let child = 0; child < 4; child++) visit(level + 1, 2 * x + (child & 1) * span, 2 * y + (child >> 1), span);
+  } else {
+    visit(level + 1, 2 * x, 2 * y, 2 * span);
+    visit(level + 1, 2 * x, 2 * y + 1, 2 * span);
+  }
 }
 
 /**
@@ -165,9 +183,16 @@ function measureTile(tile: SurfaceTile, eye: Float64Array): void {
     const distanceSquared = dx * dx + dy * dy + dz * dz;
     if (distanceSquared > radiusSquared) radiusSquared = distanceSquared;
   }
-  // Maximum chord sag of the tile's grid below the ellipsoid, in meters: the geometric error of its mesh.
+  // Maximum chord sag of the tile's grid below the ellipsoid, in meters: the geometric error of its mesh, along a
+  // meridian or along the equatorward parallel (a circle of radius a·cos φ), whichever is larger.
   const step = (tile.northRad - tile.southRad) / TILE_SEGMENTS;
-  const sag = (A * step * step) / 8;
+  const lonStep = (tile.eastRad - tile.westRad) / TILE_SEGMENTS;
+  const north = tile.northRad;
+  const south = tile.southRad;
+  const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
+  const meridianSag = (A * step * step) / 8;
+  const parallelSag = (A * Math.cos(equatorward) * lonStep * lonStep) / 8;
+  const sag = meridianSag > parallelSag ? meridianSag : parallelSag;
   const radius = Math.sqrt(radiusSquared) + sag;
   offset[0] = (grid[12] ?? 0) - (eye[0] ?? 0);
   offset[1] = (grid[13] ?? 0) - (eye[1] ?? 0);

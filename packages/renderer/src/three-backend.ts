@@ -34,9 +34,16 @@ import { createSurfaceMaterial } from './surface-material.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
-import { countCalls, countMatrixUpdates, stopInternalLoop } from './three-hooks.js';
+import { countCalls, countMatrixUpdates, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { createWarmUpScene, webgpuSelfTest } from './warm-up.js';
-import { createFailureMessage, RecoveryLimiter, releaseDevice, releaseRenderer } from './recovery.js';
+import {
+  RecoveryLimiter,
+  createFailureMessage,
+  releaseDevice,
+  releaseRenderer,
+  watchLoss,
+  type LossWatch,
+} from './recovery.js';
 
 interface TileEntry {
   readonly data: TileMeshData;
@@ -78,6 +85,8 @@ export type DrawingSurface =
 export class ThreeBackend implements RendererBackend {
   capabilities!: RendererCapabilities;
   private renderer!: WebGPURenderer;
+  /** Vertex arrays three.js still held when the backend was destroyed (0 once released: KB-030). */
+  private vertexArraysLeft = 0;
   private readonly canvases: CanvasSlot;
   private readonly scene = new Scene();
   private readonly camera = new EngineCamera();
@@ -103,13 +112,15 @@ export class ThreeBackend implements RendererBackend {
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
   private recovering = false;
+  /** Set when the renderer a recovery just created is lost before the recovery finishes. */
+  private lostWhileRecovering = false;
   /** Set when recovery gave up: nothing is drawn any more. */
   private failed = false;
   private readonly recoveries = new RecoveryLimiter();
   /** The static message shown after recovery gave up. */
   private failureMessage: HTMLElement | undefined;
-  /** Whether the current device or context is still held. */
-  private contextHeld: () => boolean = () => false;
+  /** The current device or context: whether it is held, and its loss reporting. */
+  private lossWatch: LossWatch = { held: () => false, stop: () => undefined };
   /** The active depth path (ADR 0005 §4). */
   private depthPath: DepthPath = 'reversed-z';
 
@@ -192,7 +203,8 @@ export class ThreeBackend implements RendererBackend {
     // Every material is unlit. With lighting enabled three.js still rebuilds the lights node's cache key on every render
     // call, about 5 KB of garbage per frame (F064, ADR 0018).
     renderer.lighting.enabled = false;
-    this.watchLoss(renderer);
+    this.lossWatch.stop();
+    this.lossWatch = watchLoss(renderer, (reason) => this.handleLoss(renderer, reason));
     releaseVertexArraysWithBuffers(renderer.backend);
     // three.js falls back to WebGL2 silently when WebGPU fails to initialize: reported for 'auto', an error for 'webgpu'.
     const fellBack = !forceWebGL && (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true;
@@ -243,21 +255,6 @@ export class ThreeBackend implements RendererBackend {
     return { data, mesh };
   }
 
-  /** Recovers from this renderer's device or context loss, and tracks whether its device or context is held. */
-  private watchLoss(renderer: WebGPURenderer): void {
-    renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(renderer, info.message ?? 'device lost');
-    // three.js ignores losses with the reason 'destroyed', assuming it destroyed the device itself; any loss of a
-    // device this backend did not dispose must still recover.
-    const device = (renderer.backend as { device?: GPUDevice }).device;
-    const gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
-    let deviceLost = false;
-    void device?.lost.then((info) => {
-      deviceLost = true;
-      this.handleLoss(renderer, info.message || info.reason);
-    });
-    this.contextHeld = () => (device ? !deviceLost : gl ? !gl.isContextLost() : false);
-  }
-
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
     for (const entry of this.debugEntries) {
@@ -267,16 +264,6 @@ export class ThreeBackend implements RendererBackend {
     }
     this.debugEntries = meshes.map((data) => createDebugEntry(data, this.depthPath));
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
-  }
-
-  /**
-   * Reads back the GPU time of the frames rendered so far (timestamp queries resolve a few frames late); allocates
-   * promises, so only with the `gpuTiming` option. Unsupported devices leave it null.
-   */
-  private resolveGpuTime(renderer: WebGPURenderer): void {
-    void renderer.resolveTimestampsAsync('render').then((ms) => {
-      if (typeof ms === 'number' && ms > 0) this.gpuFrameMs = ms;
-    });
   }
 
   /** Cumulative counters (F052). */
@@ -352,9 +339,9 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004, ADR 0005). */
-  render(view: FrameView, keys: readonly number[], count: number): void {
+  render(view: FrameView, keys: readonly number[], count: number): boolean {
     // Nothing is drawn with a lost renderer: while recovering, or after recovery gave up.
-    if (this.destroyed || this.recovering || this.failed || !this.material) return;
+    if (this.destroyed || this.recovering || this.failed || !this.material) return false;
     // Hide only what the previous frame showed: the work and the memory stay proportional to the drawn tiles.
     for (let i = 0; i < this.shownCount; i++) {
       const mesh = this.shown[i];
@@ -375,10 +362,11 @@ export class ThreeBackend implements RendererBackend {
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.renderer.render(this.scene, this.camera);
-    if (this.settings.gpuTiming) this.resolveGpuTime(this.renderer);
+    if (this.settings.gpuTiming) readGpuTime(this.renderer, (ms) => (this.gpuFrameMs = ms));
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };
     this.lastDrawCalls = info.drawCalls ?? info.calls ?? 0;
     this.lastTriangles = info.triangles;
+    return true;
   }
 
   /** Sets the drawing-buffer size: CSS size times pixel ratio. */
@@ -399,8 +387,8 @@ export class ThreeBackend implements RendererBackend {
       meshes: this.tiles.size + this.debugEntries.length,
       textures: this.imageryTexture ? 1 : 0,
       gpuBytes: gpuBytes + textureBytes,
-      vertexArrays: countVertexArrays(this.renderer.backend),
-      contexts: this.contextHeld() ? 1 : 0,
+      vertexArrays: this.destroyed ? this.vertexArraysLeft : countVertexArrays(this.renderer.backend),
+      contexts: this.lossWatch.held() ? 1 : 0,
     };
   }
 
@@ -416,7 +404,12 @@ export class ThreeBackend implements RendererBackend {
 
   private handleLoss(lost: WebGPURenderer, reason: string): void {
     // Only the current renderer's loss counts: one replaced or disposed by this backend is expected to go away.
-    if (this.destroyed || this.failed || lost !== this.renderer || this.recovering) return;
+    if (this.destroyed || this.failed || lost !== this.renderer) return;
+    // The recovery's new renderer lost too: the recovery notices after its next wait and starts over (KB-044).
+    if (this.recovering) {
+      this.lostWhileRecovering = true;
+      return;
+    }
     this.recovering = true;
     this.events.deviceLost(reason);
     const pauseMs = this.recoveries.next(this.host.now());
@@ -444,6 +437,12 @@ export class ThreeBackend implements RendererBackend {
       await this.warmUpPipelines();
       if (this.destroyed) {
         releaseRenderer(this.renderer);
+        return;
+      }
+      if (this.lostWhileRecovering || !this.lossWatch.held()) {
+        this.lostWhileRecovering = false;
+        this.recovering = false;
+        this.handleLoss(this.renderer, 'lost again during recovery');
         return;
       }
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
@@ -487,6 +486,13 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture?.dispose();
     this.imageryTexture = undefined;
     releaseRenderer(this.renderer);
+    this.vertexArraysLeft = countVertexArrays(this.renderer.backend);
+    // A host may keep its reference to the globe after unmounting: nothing large stays reachable from it (KB-045).
+    // No method touches the renderer or the imagery after destroy.
+    (this as unknown as { renderer: WebGPURenderer | undefined }).renderer = undefined;
+    this.beginFrame = () => undefined;
+    this.lossWatch.stop();
+    this.imagery = undefined;
     this.canvases.remove();
     this.failureMessage?.remove();
   }

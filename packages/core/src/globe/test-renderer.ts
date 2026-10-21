@@ -6,6 +6,7 @@ import type {
   RendererCapabilities,
   RendererEvents,
   RendererFactory,
+  RendererStats,
   RenderHost,
 } from './types.js';
 
@@ -16,8 +17,12 @@ export interface FakeRenderer extends RendererBackend {
   inputElement: unknown;
   /** Frames drawn so far. */
   drawCount: number;
+  /** Whether `render` draws; false stands for a renderer that is recovering and skips frames. */
+  drawing: boolean;
   /** Tiles in the last drawn frame. */
   lastTiles: number;
+  /** Debug meshes last handed to the renderer. */
+  debugMeshes: number;
   events: RendererEvents | undefined;
   visibility: ((visible: boolean) => void) | undefined;
   resizeListener: (() => void) | undefined;
@@ -52,7 +57,9 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     inputElement: {},
     meshes: new Map(),
     drawCount: 0,
+    drawing: true,
     lastTiles: 0,
+    debugMeshes: 0,
     events: undefined,
     visibility: undefined,
     resizeListener: undefined,
@@ -64,21 +71,16 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     removeMesh: (key) => void renderer.meshes.delete(key),
     setBaseImagery: () => Promise.resolve(),
     render: (_view: FrameView, _keys: readonly number[], count: number) => {
+      if (!renderer.drawing) return false;
       renderer.drawCount++;
       renderer.lastTiles = count;
+      return true;
     },
     resize: (widthPx: number, heightPx: number) => {
       renderer.lastResize = { widthPx, heightPx };
     },
-    setDebugMeshes: () => undefined,
-    stats: () => ({
-      drawCalls: renderer.drawCount,
-      triangles: 0,
-      textureUploads: 1,
-      matrixUpdates: 0,
-      pipelineCompiles: 0,
-      gpuFrameMs: null,
-    }),
+    setDebugMeshes: (meshes) => void (renderer.debugMeshes = meshes.length),
+    stats: () => fakeStats(renderer),
     resourceCounts: () => ({
       meshes: renderer.meshes.size,
       textures: renderer.destroyed ? 0 : 1,
@@ -130,12 +132,19 @@ function fakeHost(pending: FrameQueue, renderer: () => FakeRenderer): RenderHost
   };
 }
 
+/**
+ * Frame timestamps as a browser hands them to animation-frame callbacks: fractional milliseconds, already heap numbers.
+ * The array holds tagged values (the leading null keeps it from storing raw doubles), so passing one allocates nothing.
+ */
+const STAMPS: unknown[] = [null, ...Array.from({ length: 4096 }, (_, i) => 1000.25 + i * (1000 / 60))];
+
 /** Pending frame callbacks in reused arrays (a Map's clear() allocates a new table), so the test double allocates nothing. */
 class FrameQueue {
   private readonly ids: number[] = [];
   private readonly callbacks: ((timeMs: number) => void)[] = [];
   private readonly running: ((timeMs: number) => void)[] = [];
   private count = 0;
+  private stamp = 1;
 
   /** Queues a callback under an id. */
   add(id: number, callback: (timeMs: number) => void): void {
@@ -164,7 +173,9 @@ class FrameQueue {
       if (callback) this.running[i] = callback;
     }
     this.count = 0;
-    for (let i = 0; i < count; i++) this.running[i]?.(0);
+    const timeMs = STAMPS[this.stamp] as number;
+    this.stamp = this.stamp + 1 < STAMPS.length ? this.stamp + 1 : 1;
+    for (let i = 0; i < count; i++) this.running[i]?.(timeMs);
     return count;
   }
 }
@@ -172,4 +183,16 @@ class FrameQueue {
 /** A transparent frame of the given size: the fake renderer draws nothing. */
 function blankFrame(size: { widthPx: number; heightPx: number }): FrameCapture {
   return { ...size, rgba: new Uint8ClampedArray(size.widthPx * size.heightPx * 4) };
+}
+
+/** The fake renderer's counters: one draw call per frame, nothing else measured. */
+function fakeStats(renderer: FakeRenderer): RendererStats {
+  return {
+    drawCalls: renderer.drawCount,
+    triangles: 0,
+    textureUploads: 1,
+    matrixUpdates: 0,
+    pipelineCompiles: 0,
+    gpuFrameMs: null,
+  };
 }

@@ -192,16 +192,19 @@ function slowRecoverySteps(): void {
 }
 
 for (const step of ['device request', 'pipeline warm-up'] as const) {
-  test(`destroy() during the recovery's ${step} leaves no canvas, message or controls behind (KB-035)`, async ({
+  test(`destroy() during the WebGPU recovery's ${step} leaves no canvas, message or controls behind (KB-035)`, async ({
     page,
   }) => {
     await page.addInitScript(slowRecoverySteps);
     await openGlobe(page, 'backend=webgpu&zoom=3');
     await page.evaluate(() => {
+      document.querySelector('#app canvas')?.setAttribute('data-original', '');
       (window as unknown as { slowRecovery?: boolean }).slowRecovery = true;
       window.vibeglobePlayground?.globe.simulateDeviceLoss();
     });
     await page.waitForFunction((name) => (window as unknown as { recoveryStep?: string }).recoveryStep === name, step);
+    // The page still shows the old canvas: the new one replaces it only after the warm-up (ADR 0010 §8).
+    expect(await page.locator('#app canvas').evaluate((canvas) => canvas.hasAttribute('data-original'))).toBe(true);
     await page.evaluate(() => window.vibeglobePlayground?.globe.destroy());
     await page.waitForTimeout(3000);
     const left = await page.evaluate(() => ({
@@ -216,6 +219,35 @@ for (const step of ['device request', 'pipeline warm-up'] as const) {
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts().contexts)).toBe(0);
   });
 }
+
+test('a WebGPU device lost again during the recovery warm-up is recovered too, not left blank (KB-044)', async ({
+  page,
+}) => {
+  await page.addInitScript(slowRecoverySteps);
+  await openGlobe(page, 'backend=webgpu&zoom=3');
+  await page.evaluate(() => {
+    (window as unknown as { slowRecovery?: boolean }).slowRecovery = true;
+    window.vibeglobePlayground?.globe.simulateDeviceLoss();
+  });
+  await page.waitForFunction(
+    () => (window as unknown as { recoveryStep?: string }).recoveryStep === 'pipeline warm-up',
+  );
+  await page.evaluate(() => window.vibeglobePlayground?.globe.simulateDeviceLoss());
+  // The second loss is handled as a loss: a new recovery that ends with a drawn globe, or a failure that says so.
+  await page.waitForFunction(
+    () => {
+      const events = window.vibeglobePlayground?.events.map((event) => event.type) ?? [];
+      return events.filter((type) => type === 'device-lost').length === 2 && events.at(-1) === 'device-restored';
+    },
+    null,
+    { timeout: 30_000 },
+  );
+  await page.evaluate(() => {
+    (window as unknown as { slowRecovery?: boolean }).slowRecovery = false;
+  });
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts().contexts)).toBe(1);
+  await expectCompleteGlobe(page);
+});
 
 test('replacing geometry does not leak WebGL2 vertex arrays (KB-021)', async ({ page }) => {
   await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=4');

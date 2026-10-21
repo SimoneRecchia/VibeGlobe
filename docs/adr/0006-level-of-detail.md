@@ -155,3 +155,7 @@ Stitching is not used. If the crack sweep shows visible walls, snapping odd edge
   - in M3: `τ_imagery`, T, the drawn-tile cap, the haze factor and the cap feather;
   - in M4: grid sizes, the skirt factor and rasterization error.
 - Measurements are recorded per the survey §8 list: tile counts, requests and bytes per canonical view at DPR 1 and 2, texel-size histogram, triangles and GPU time per view, popping and black-pixel detector results.
+
+## Update 2026-10-21 (polar refinement in M2)
+
+M2's geographic surface quadtree had no polar rule, and zooming in at a pole selected every tile of the polar row (KB-043). §1's cap rule now applies to it ahead of the M3 caps: a tile splits into four only while its east–west width at its equatorward edge is at least half its north–south height, and otherwise only in latitude, into two children of twice the width. Tiles therefore stay square-ish above 60° latitude and become wedges at least about 29° wide at the poles; the selection's geometric error takes the larger of the meridian and parallel chord sags. M3's Mercator quadtree with caps keeps the rule.

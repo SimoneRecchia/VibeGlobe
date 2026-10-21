@@ -35,18 +35,24 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
 - VibeGlobe is under PolyForm Noncommercial 1.0.0 (`LICENSE.md`); every package.json declares `PolyForm-Noncommercial-1.0.0` (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
 - The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys (`GOOGLE_MAPS_API_KEY` comes from the environment).
-- Milestone process (ADR 0021, ADR 0022): one complete fresh-context review per milestone, then one pass that checks only that round's fixes; no further complete rounds. Every fix starts with a regression test that fails before it.
-- End-to-end tests: during feature work run only the specs the change affects (`npx playwright test <specs>`, `-g <feature id>`). The full suite runs at the end of each milestone (manual CI run, four shards) and nightly. Machine-wide measurements (`--project=measurements --no-deps`) and the rendering probes run in their own CI job, never next to other tests, and never gate feature work; a red measurement is still a bug to fix before the milestone closes.
-- Subagents work in separate packages or files, create files and never commit; integrate each one when it finishes and run the tests it affects.
-- Time matters: avoid work that does not move a feature to passing; the earlier a correct result, the better. Commit and push after every completed feature.
 - Research: read only the parts of other engines that answer the current question; keep notes short.
-- A problem that resists three different approaches: record the options in `docs/open-questions.md`, choose the simplest that meets PLAN.md, and move on.
-- Tests: write them only for behaviors the plan or a fixed bug requires, roughly one focused test per stated behavior; scratch checks used while working are not committed. Do not re-run a test whose code and dependencies have not changed since it last passed; run only the tests your change affects (the full suite runs at the end of each milestone and in CI).
-- CI: re-run only failed jobs, never passing ones; re-run a flaky failure at most once, then investigate it.
-- Duplicate tests may be merged only if no behavior loses coverage, each merge recorded in `docs/test-changes.md`. Never delete or weaken a test just to make it pass.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
+
+## Working efficiently
+
+Owner's rules (2026-10-21, ADR 0022): most waste is extra tests, repeated runs and subagents, not the product work.
+
+- Scope: build what `PLAN.md` and `feature_list.json` require, completely. Anything else noticed (cleanups, extra checks, refactors, nice-to-haves) goes into `docs/follow-ups.md`, not into the code.
+- Tests prove the behaviors in `feature_list.json` and guard fixed bugs: roughly one focused test per stated behavior, sized like the neighboring test files. Scratch checks used while working are not committed. Testing features in the plan (fuzzing, scenarios, benchmarks) are deliverables, built once at the size their entry asks for.
+- Run only the tests a change affects (`npx vitest run <files>`, `npx playwright test <specs>`); never re-run tests whose code and dependencies have not changed since they last passed. The full unit and end-to-end suites run once at the end of each milestone, and in CI.
+- CI: pull requests run only the affected packages, with dependency, build and browser caches; the full matrix runs on `main` and nightly. Re-run only failed jobs, a flaky one at most once, then investigate. Keep working on the next feature while CI runs.
+- Never delete or weaken a test to make it pass. Duplicate tests may be merged only if no behavior loses coverage, each merge recorded in `docs/test-changes.md`.
+- Verification: no extra verification passes and no subagents to double-check own work. One review per milestone in a fresh context, reporting only correctness bugs and missing requirements, then one pass that checks only the fixes; no further rounds (ADR 0021, ADR 0022).
+- Subagents only for large, genuinely independent work (reading many files, a long suite whose full output is not needed); anything doable in a handful of tool calls is done directly. At most two at a time, each on separate files or packages; they create files and never commit, and each is integrated with its affected tests run.
+- Pace: the earlier a correct result, the better; avoid work that does not move a feature to passing. A problem that resists three different approaches: record the options in `docs/open-questions.md`, choose the simplest that meets `PLAN.md`, and move on. Commit and push after every completed feature.
+- At the end of each milestone, add to `progress.md`: features completed, hours spent, remaining features, estimated time to finish M15.
 
 ## Layout and gotchas
 

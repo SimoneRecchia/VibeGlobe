@@ -24,3 +24,7 @@ M2 closed after nine complete reviews and two incremental ones, with the whole b
 - The browser suite takes about a quarter of its wall-clock time in CI, and its timing-sensitive tests no longer share a machine with the measurements.
 - A regression in an end-to-end test that a change did not obviously touch can go unnoticed until the end of the milestone or the nightly run. It is still caught before the milestone closes, and its fix starts with a failing test as usual.
 - `CLAUDE.md` states these rules for every session.
+
+## Update 2026-10-21: working efficiently
+
+The owner added rules for the rest of the project (CLAUDE.md, "Working efficiently"): scope limited to `PLAN.md` and `feature_list.json`, everything else to `docs/follow-ups.md`; one focused test per stated behavior; only affected tests run during work, full suites once per milestone and in CI; no extra verification passes or double-checking subagents; at most two subagents (`.claude/settings.json`: `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=2`, `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), only for large independent work; `progress.md` records features, hours and an estimate to M15 at each milestone end. CI: pull requests run only the unit tests their changes reach (`vitest run --changed <base>`); every job restores the incremental build outputs and the Playwright browsers from the Actions cache; the full matrix stays on `main`, nightly and manual runs.

@@ -31,6 +31,15 @@ export async function openGlobe(page: Page, query = ''): Promise<void> {
   if (forced) expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe(forced);
 }
 
+/**
+ * Waits for the next display frame: the engine applies input recorded by its controls at the start of a frame (ADR
+ * 0009), so a camera query right after a mouse event needs it. The engine's frame callback, requested by the event,
+ * runs before this one.
+ */
+export async function nextFrame(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+}
+
 /** Waits until the engine has drawn every requested frame and gone idle. */
 export async function waitForIdle(page: Page): Promise<number> {
   return page.evaluate(

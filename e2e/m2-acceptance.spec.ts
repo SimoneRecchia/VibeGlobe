@@ -2,7 +2,15 @@
 // every frame for complete imagery and, along the way, frame stability, drag anchoring and finally sub-pixel jitter.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { canvasImage, expectCompleteGlobe, geoToScreen, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import {
+  canvasImage,
+  expectCompleteGlobe,
+  geoToScreen,
+  nextFrame,
+  openGlobe,
+  screenToGeo,
+  waitForIdle,
+} from './support/globe.ts';
 import { measureShift } from './support/image.ts';
 
 const MILAN = { longitudeDeg: 9.19, latitudeDeg: 45.46 };
@@ -28,6 +36,7 @@ async function expectAnchoredDrag(page: Page, box: { x: number; y: number; width
   await page.mouse.move(box.x + from.xPx, box.y + from.yPx);
   await page.mouse.down();
   await page.mouse.move(box.x + to.xPx, box.y + to.yPx, { steps: 4 });
+  await nextFrame(page);
   const shown = await geoToScreen(page, grabbed);
   expect(Math.hypot(shown.xPx - to.xPx, shown.yPx - to.yPx)).toBeLessThan(1);
   await page.mouse.move(box.x + from.xPx, box.y + from.yPx, { steps: 4 });

@@ -144,3 +144,11 @@ Option 3. Package placement follows architecture.md §1.
 ## Update 2026-10-20
 
 The owner confirmed the defaults ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 8 and 10): constant ground scale while panning in the flat 2D phase, and free rotation near the poles with no jump and never an automatic north-up. No change to this ADR's decisions.
+
+## Update 2026-10-21
+
+The first M2 controls did the camera math in the DOM handlers: every `pointermove` and `wheel` event ran a full anchor solve, against points 3 and 4 (M2 review). Now:
+
+- **Input capture.** The handlers only record: the pointer's latest position, a pending grab, and the wheel delta accumulated with its latest position (`packages/controls`). They ask the engine for a frame (`NavigationApi.requestUpdate`).
+- **Once per frame.** At the start of each frame (step 2), before the camera is updated, the engine calls the controls' `update()`, which turns the recorded input into at most one grab, one `dragTo` and one `zoomAt`. Several events between two frames cost one solve; the grab waits for the first move, so a click without motion costs no frame; a release applies the last position first. Intents made during the frame do not schedule another frame.
+- **Grazing horizon.** The blend toward a screen-center anchor (point 5, ill-conditioned cases) belongs with the solver's tilt and morph extension in M5, where tilted views and the flat phase make grazing rays common. In M2 a drag whose pixel leaves the globe keeps the last solvable camera, and the pole case uses the free rotation already implemented.

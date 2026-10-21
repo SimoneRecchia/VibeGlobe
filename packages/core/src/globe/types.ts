@@ -167,10 +167,18 @@ export interface NavigationApi {
   dragTo(anchor: GeoPosition, point: ScreenPoint): void;
   /** Zooms by `deltaZoom` levels keeping the position under `point` fixed. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void;
+  /** Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4). */
+  requestUpdate(): void;
 }
 
 /** An input plug-in instance. */
 export interface Controls {
+  /**
+   * Called at the start of every frame, before the camera is updated: turns the input recorded since the last frame
+   * into navigation intents, so DOM handlers do no camera math (ADR 0009 §3–4). Runs every frame, so it must not
+   * allocate when nothing is pending.
+   */
+  update?(): void;
   destroy(): void;
 }
 

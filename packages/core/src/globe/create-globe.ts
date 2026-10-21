@@ -94,6 +94,7 @@ class GlobeEngine implements Globe {
       grab: (point) => (this.validPoint(point) ? this.pick(point) : undefined),
       dragTo: (anchor, point) => this.dragTo(anchor, point),
       zoomAt: (point, deltaZoom) => this.zoomAt(point, deltaZoom),
+      requestUpdate: () => this.requestRender(),
     };
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
@@ -218,7 +219,7 @@ class GlobeEngine implements Globe {
     this.assertAlive();
     this.dirty = true;
     const renderer = this.renderer;
-    if (!renderer || this.frameId !== undefined || !this.visible || !this.imageryLoaded) return;
+    if (!renderer || this.inFrame || this.frameId !== undefined || !this.visible || !this.imageryLoaded) return;
     this.frameId = renderer.host.requestFrame(this.onFrame);
   }
 
@@ -227,8 +228,11 @@ class GlobeEngine implements Globe {
     const renderer = this.renderer;
     const surface = this.surface;
     if (this.destroyed || !renderer || !surface || !this.visible) return;
+    // Size checks and the input recorded since the last frame are handled here, inside the frame: what they change is
+    // drawn by this frame, not by another one.
     this.inFrame = true;
     renderer.host.checkSize?.();
+    this.controls?.update?.();
     this.inFrame = false;
     this.dirty = false;
     this.cam.update();

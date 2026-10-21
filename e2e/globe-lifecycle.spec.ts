@@ -5,6 +5,7 @@ import {
   canvasImage,
   expectCompleteGlobe,
   geoToScreen,
+  nextFrame,
   openGlobe,
   screenToGeo,
   waitForIdle,
@@ -121,6 +122,7 @@ for (const backend of BACKENDS) {
     await page.mouse.down();
     await page.mouse.move(box.x + to.xPx, box.y + to.yPx, { steps: 4 });
     await page.mouse.up();
+    await nextFrame(page);
     const shown = await geoToScreen(page, grabbed);
     expect(Math.hypot(shown.xPx - to.xPx, shown.yPx - to.yPx)).toBeLessThan(1);
   });

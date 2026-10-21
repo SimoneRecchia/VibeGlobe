@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createGlobe } from './create-globe.js';
 import { GlobeError } from './errors.js';
 import { fakeRenderer } from './test-renderer.js';
-import type { GlobeOptions } from './types.js';
+import type { GeoPosition, GlobeOptions, NavigationApi, ScreenPoint } from './types.js';
 
 async function started(overrides: Partial<GlobeOptions> = {}) {
   const { renderer, factory } = fakeRenderer();
@@ -171,6 +171,38 @@ describe('createGlobe', () => {
     expect(attached).toHaveLength(2);
     expect(attached[1]).toBe(replacement);
     expect(detached).toBe(1);
+  });
+
+  it('lets the controls turn recorded input into intents at the start of a frame, drawn by that frame (ADR 0009)', async () => {
+    let navigation: NavigationApi | undefined;
+    const input: { pending?: ScreenPoint | undefined; anchor?: GeoPosition | undefined } = {};
+    const { globe, renderer } = await started({
+      controls: (_element, api) => {
+        navigation = api;
+        return {
+          update: () => {
+            if (!input.pending || !input.anchor) return;
+            api.dragTo(input.anchor, input.pending);
+            input.pending = undefined;
+          },
+          destroy: () => undefined,
+        };
+      },
+    });
+    const anchor = navigation?.grab({ xPx: 400, yPx: 300 });
+    expect(anchor).toBeDefined();
+    input.anchor = anchor;
+    // A DOM handler records a position and asks for a frame; nothing moves until the frame runs.
+    input.pending = { xPx: 450, yPx: 320 };
+    const before = globe.camera.longitudeDeg;
+    navigation?.requestUpdate();
+    expect(globe.camera.longitudeDeg).toBe(before);
+    expect(renderer.flush()).toBe(1);
+    const shown = globe.geoToScreen(anchor as GeoPosition);
+    expect(shown?.xPx).toBeCloseTo(450, 2);
+    expect(shown?.yPx).toBeCloseTo(320, 2);
+    // The intent was drawn by the frame that applied it: no further frame is pending.
+    expect(renderer.flush()).toBe(0);
   });
 
   it('rejects ready with a typed error when the renderer cannot start (F055)', async () => {

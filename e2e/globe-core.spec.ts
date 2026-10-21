@@ -1,6 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
-import { canvasImage, expectCompleteGlobe, geoToScreen, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import {
+  canvasImage,
+  expectCompleteGlobe,
+  geoToScreen,
+  nextFrame,
+  openGlobe,
+  screenToGeo,
+  waitForIdle,
+} from './support/globe.ts';
 import { measureLargeShift } from './support/image.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
@@ -374,6 +382,7 @@ for (const backend of BACKENDS) {
           yPx: from.yPx + ((to.yPx - from.yPx) * step) / steps,
         };
         await page.mouse.move(box.x + point.xPx, box.y + point.yPx);
+        await nextFrame(page);
         const shown = await geoToScreen(page, grabbed);
         expect(Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx)).toBeLessThan(1);
         const next = await geoToScreen(page, companion);
@@ -399,6 +408,7 @@ for (const backend of BACKENDS) {
       const anchor = await screenToGeo(page, cursor);
       if (!anchor) throw new Error('cursor off the globe');
       await page.mouse.wheel(0, -100);
+      await nextFrame(page);
       const shown = await geoToScreen(page, anchor);
       expect(Math.hypot(shown.xPx - cursor.xPx, shown.yPx - cursor.yPx)).toBeLessThan(1);
     }

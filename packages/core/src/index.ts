@@ -105,3 +105,19 @@ export type {
   TimeoutsMs,
   TransportResult,
 } from './scheduler/types.js';
+export { serializeTaskError, WORKER_PROTOCOL_VERSION } from './scheduler/worker-protocol.js';
+export type {
+  SerializedTaskError,
+  TaskContext,
+  TaskFunction,
+  TaskOutput,
+  TaskTable,
+  WorkerCancelMessage,
+  WorkerEndpoint,
+  WorkerEndpointFactory,
+  WorkerMessage,
+  WorkerReadyMessage,
+  WorkerReply,
+  WorkerRequest,
+  WorkerRunMessage,
+} from './scheduler/worker-protocol.js';

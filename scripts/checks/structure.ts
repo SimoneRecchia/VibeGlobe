@@ -5,6 +5,7 @@ export const LIBRARY_PACKAGES = [
   'core',
   'renderer',
   'sources',
+  'worker',
   'layers',
   'controls',
   'offline',

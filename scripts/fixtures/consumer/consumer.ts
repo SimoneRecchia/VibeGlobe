@@ -9,6 +9,7 @@ import type {} from '@vibeglobe/tools';
 import { createDebugOverlay, type DebugOverlay } from '@vibeglobe/ui';
 import type {} from '@vibeglobe/vue';
 import type {} from '@vibeglobe/web-component';
+import type {} from '@vibeglobe/worker';
 
 const ellipsoid: Ellipsoid = WGS84;
 const stats = new FrameStats(60);

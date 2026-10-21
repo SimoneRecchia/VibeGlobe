@@ -70,6 +70,9 @@
     "sources": {
       "bundleGzipKB": 40
     },
+    "worker": {
+      "bundleGzipKB": 5
+    },
     "layers": {
       "bundleGzipKB": 40
     },

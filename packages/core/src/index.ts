@@ -94,3 +94,13 @@ export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } fr
 export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
+export { inCoverage } from './imagery/imagery-source.js';
+export type { ImagerySource } from './imagery/imagery-source.js';
+export type {
+  AbortHandle,
+  DecodedTile,
+  TileRequest,
+  TileTransport,
+  TimeoutsMs,
+  TransportResult,
+} from './scheduler/types.js';

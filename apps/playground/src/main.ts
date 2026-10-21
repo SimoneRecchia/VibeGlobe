@@ -2,6 +2,7 @@ import { createControls } from '@vibeglobe/controls';
 import { createGlobe, WGS84, type Globe, type ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
 import { startFrameLoop, type FrameLoop } from './frame-loop.js';
+import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { exposeTestHooks } from './test-hooks.js';
 
@@ -93,12 +94,22 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
   });
 }
 
-if (app && canvas) {
+const experiment = params.get('experiment') === 'offscreen' ? params.get('render') : null;
+
+if (app && canvas && experiment === 'worker') {
+  // F065: the engine renders in a worker (ADR 0011); the page keeps only the overlay and forwards input.
+  startWorkerRendering(app, canvas, {
+    backend,
+    view: viewFromUrl(),
+    imageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
+  });
+} else if (app && canvas) {
   const scenario = params.get('scenario');
   const globe = startGlobe(app, canvas, viewFromUrl());
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, canvas);
   runScenario(globe, scenario);
+  if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;
   };

@@ -36,7 +36,8 @@
     "verify": "npm run build && npm run lint && npm run format:check && npm run check && npm run check:features && npm run check:tests && npm run deadcode && npm run licenses && npm run notices -- --check && npm run coverage && npm run check:consumer && npm run size && npm run treeshake && npm run docs",
     "status": "node scripts/status.ts",
     "check:consumer": "node scripts/check-consumer.ts",
-    "geodtest": "node scripts/geodtest.ts"
+    "geodtest": "node scripts/geodtest.ts",
+    "bench:offscreen": "node benchmarks/offscreen.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

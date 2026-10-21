@@ -5,8 +5,8 @@ let patched = false;
  * predate the string form of that member reject it and the renderer crashes on its first texture. Dropping only the
  * identity value changes nothing on browsers that accept it and lets older ones run. Applied once, on first use.
  */
-export function patchIdentitySwizzle(view: Window): void {
-  const prototype = (view as Window & { GPUTexture?: { prototype: GPUTexture } }).GPUTexture?.prototype;
+export function patchIdentitySwizzle(scope: typeof globalThis): void {
+  const prototype = (scope as { GPUTexture?: { prototype: GPUTexture } }).GPUTexture?.prototype;
   if (patched || !prototype) return;
   patched = true;
   const createView = prototype.createView;

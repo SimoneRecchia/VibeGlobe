@@ -21,8 +21,9 @@ export function readCapabilities(renderer: WebGPURenderer): RendererCapabilities
     gl?: WebGL2RenderingContext;
     adapterInfo?: GPUAdapterInfo;
   };
-  const navigator = renderer.domElement.ownerDocument.defaultView?.navigator as
-    (Navigator & { deviceMemory?: number }) | undefined;
+  // An OffscreenCanvas has no document: its global scope (a worker's) has the navigator.
+  const navigator = ((renderer.domElement as HTMLCanvasElement).ownerDocument?.defaultView?.navigator ??
+    globalThis.navigator) as (Navigator & { deviceMemory?: number }) | undefined;
   const deviceMemoryGiB = navigator?.deviceMemory;
   const maxAnisotropy = renderer.getMaxAnisotropy();
   if (backend.device) {

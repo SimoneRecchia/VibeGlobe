@@ -43,6 +43,15 @@ interface TileEntry {
 export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
 
 /**
+ * Where the backend draws (ADR 0011): a canvas it manages inside a page container (an existing one, or one it
+ * creates), or an OffscreenCanvas it is given, for example in a worker. An OffscreenCanvas cannot be replaced, so a
+ * device or context loss there ends in the renderer's `failed` event instead of a rebuild.
+ */
+export type DrawingSurface =
+  | { readonly kind: 'element'; readonly container: HTMLElement; readonly canvas: HTMLCanvasElement | undefined }
+  | { readonly kind: 'offscreen'; readonly canvas: OffscreenCanvas };
+
+/**
  * The renderer behind the engine's RendererBackend interface, on three.js WebGPURenderer (ADR 0010). It keeps CPU
  * copies of every mesh and the base imagery, so after a device or context loss it rebuilds the renderer and its canvas
  * and restores everything without a page reload.
@@ -50,7 +59,7 @@ export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
 export class ThreeBackend implements RendererBackend {
   capabilities!: RendererCapabilities;
   private renderer!: WebGPURenderer;
-  private canvas: HTMLCanvasElement | undefined;
+  private canvas: HTMLCanvasElement | OffscreenCanvas | undefined;
   private readonly scene = new Scene();
   private readonly camera = new EngineCamera();
   /** Surface tiles by key (no Map: it boxes keys beyond 31 bits on every per-frame lookup, ADR 0018). */
@@ -66,17 +75,16 @@ export class ThreeBackend implements RendererBackend {
   private shownCount = 0;
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
-  private imagery: HTMLImageElement | undefined;
+  private imagery: HTMLImageElement | ImageBitmap | undefined;
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
   private recovering = false;
 
   private constructor(
-    private readonly container: HTMLElement,
+    private readonly surface: DrawingSurface,
     readonly host: RenderHost,
     private readonly choice: BackendChoice,
     private readonly events: RendererEvents,
-    private initialCanvas: HTMLCanvasElement | undefined,
   ) {
     this.camera.matrixAutoUpdate = false;
     this.camera.matrixWorldAutoUpdate = false;
@@ -85,37 +93,47 @@ export class ThreeBackend implements RendererBackend {
 
   /** Creates and initializes a backend; rejects with GlobeError 'unsupported-device' when nothing can render. */
   static async create(
-    container: HTMLElement,
+    surface: DrawingSurface,
     host: RenderHost,
     choice: BackendChoice,
     events: RendererEvents,
-    canvas?: HTMLCanvasElement,
   ): Promise<ThreeBackend> {
-    const backend = new ThreeBackend(container, host, choice, events, canvas);
+    const backend = new ThreeBackend(surface, host, choice, events);
     await backend.initRenderer();
     return backend;
   }
 
-  /** The canvas, which receives input. */
+  /** The canvas, which receives input; none for an OffscreenCanvas (its host forwards input). */
   get inputElement(): HTMLCanvasElement | undefined {
-    return this.canvas;
+    return this.surface.kind === 'element' ? (this.canvas as HTMLCanvasElement | undefined) : undefined;
+  }
+
+  /** The global scope the canvas lives in: the page's window, or the worker's global scope. */
+  private scope(): typeof globalThis {
+    return this.surface.kind === 'element'
+      ? ((this.surface.container.ownerDocument.defaultView ?? globalThis) as typeof globalThis)
+      : globalThis;
   }
 
   private async initRenderer(): Promise<void> {
-    const forceWebGL = this.choice === 'webgl2' || !(await webgpuUsable(this.container));
-    const view = this.container.ownerDocument.defaultView;
-    if (!forceWebGL && view) patchIdentitySwizzle(view);
+    const scope = this.scope();
+    const forceWebGL = this.choice === 'webgl2' || !(await webgpuUsable(scope));
+    if (!forceWebGL) patchIdentitySwizzle(scope);
     if (!forceWebGL && this.choice === 'auto') {
       // WebGPU is usable: three.js would still fall back silently if init failed, which we detect below.
-    } else if (!webgl2Usable(this.container)) {
+    } else if (!webgl2Usable(this.surface)) {
       throw new GlobeError(
         'unsupported-device',
         'This device supports neither WebGPU nor WebGL2, so the globe cannot render.',
       );
     }
-    const canvas = this.initialCanvas ?? this.newCanvas();
-    this.initialCanvas = undefined;
-    const renderer = new WebGPURenderer({ canvas, antialias: true, reversedDepthBuffer: true, forceWebGL });
+    const canvas = this.nextCanvas();
+    const renderer = new WebGPURenderer({
+      canvas: canvas as HTMLCanvasElement,
+      antialias: true,
+      reversedDepthBuffer: true,
+      forceWebGL,
+    });
     await renderer.init();
     this.stopInternalLoop(renderer);
     // Opaque tiles need no depth sorting; sorting would also compute bounds and distances for every object each frame.
@@ -143,8 +161,12 @@ export class ThreeBackend implements RendererBackend {
         return updateTexture(...args);
       };
     }
-    if (this.canvas !== undefined && this.canvas !== canvas) this.canvas.replaceWith(canvas);
-    else if (!canvas.isConnected) this.container.appendChild(canvas);
+    if (this.surface.kind === 'element') {
+      const element = canvas as HTMLCanvasElement;
+      const previous = this.canvas as HTMLCanvasElement | undefined;
+      if (previous !== undefined && previous !== element) previous.replaceWith(element);
+      else if (!element.isConnected) this.surface.container.appendChild(element);
+    }
     this.canvas = canvas;
     this.renderer = renderer;
     this.capabilities = readCapabilities(renderer);
@@ -152,11 +174,25 @@ export class ThreeBackend implements RendererBackend {
     renderer.setSize(this.size.widthPx, this.size.heightPx, false);
   }
 
+  /**
+   * The canvas for a new renderer: the given one first; after a loss, a fresh element in a page container (an
+   * OffscreenCanvas cannot be replaced, so recovery fails there).
+   */
+  private nextCanvas(): HTMLCanvasElement | OffscreenCanvas {
+    if (this.canvas === undefined) return this.surface.canvas ?? this.newCanvas();
+    if (this.surface.kind === 'offscreen') {
+      throw new GlobeError('renderer-failed', 'An OffscreenCanvas cannot be replaced after a device or context loss');
+    }
+    return this.newCanvas();
+  }
+
   /** A fresh canvas, carrying over the identity and accessibility attributes of the one it replaces. */
   private newCanvas(): HTMLCanvasElement {
-    const canvas = this.container.ownerDocument.createElement('canvas');
+    if (this.surface.kind !== 'element') throw new Error('newCanvas needs a page container');
+    const canvas = this.surface.container.ownerDocument.createElement('canvas');
+    const previous = this.canvas as HTMLCanvasElement | undefined;
     for (const name of ['id', 'class', 'aria-label', 'role']) {
-      const value = this.canvas?.getAttribute(name);
+      const value = previous?.getAttribute(name);
       if (value) canvas.setAttribute(name, value);
     }
     canvas.style.display = 'block';
@@ -245,11 +281,9 @@ export class ThreeBackend implements RendererBackend {
 
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
   async setBaseImagery(url: string): Promise<void> {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.src = url;
+    let image: HTMLImageElement | ImageBitmap;
     try {
-      await image.decode();
+      image = this.surface.kind === 'element' ? await decodeImage(url) : await decodeBitmap(url);
     } catch (error) {
       throw new GlobeError('resource-failed', `The base imagery could not be loaded from ${url}`, { cause: error });
     }
@@ -261,6 +295,8 @@ export class ThreeBackend implements RendererBackend {
   private createImageryResources(): void {
     if (!this.imagery) return;
     const texture = new Texture(this.imagery);
+    // A bitmap is flipped when it is decoded: WebGL2 ignores the flip flag for bitmaps.
+    if (this.surface.kind === 'offscreen') texture.flipY = false;
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = RepeatWrapping;
     texture.minFilter = LinearMipmapLinearFilter;
@@ -318,8 +354,7 @@ export class ThreeBackend implements RendererBackend {
     let gpuBytes = 0;
     this.tiles.forEach((entry) => (gpuBytes += entry.data.byteLength + entry.data.indices.byteLength));
     const image = this.imagery;
-    const textureBytes =
-      image && this.imageryTexture ? Math.round((image.naturalWidth * image.naturalHeight * 4 * 4) / 3) : 0;
+    const textureBytes = image && this.imageryTexture ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
     return { meshes: this.tiles.size, textures: this.imageryTexture ? 1 : 0, gpuBytes: gpuBytes + textureBytes };
   }
 
@@ -365,13 +400,13 @@ export class ThreeBackend implements RendererBackend {
     this.material?.dispose();
     this.imageryTexture?.dispose();
     this.renderer.dispose();
-    this.canvas?.remove();
+    if (this.surface.kind === 'element') (this.canvas as HTMLCanvasElement | undefined)?.remove();
   }
 }
 
 /** True when the browser offers a WebGPU adapter. */
-async function webgpuUsable(container: HTMLElement): Promise<boolean> {
-  const gpu = (container.ownerDocument.defaultView?.navigator as Navigator | undefined)?.gpu;
+async function webgpuUsable(scope: typeof globalThis): Promise<boolean> {
+  const gpu = (scope.navigator as Navigator | undefined)?.gpu;
   if (!gpu) return false;
   try {
     return (await gpu.requestAdapter()) !== null;
@@ -381,9 +416,26 @@ async function webgpuUsable(container: HTMLElement): Promise<boolean> {
 }
 
 /** True when a WebGL2 context can be created. */
-function webgl2Usable(container: HTMLElement): boolean {
-  const probe = container.ownerDocument.createElement('canvas');
+function webgl2Usable(surface: DrawingSurface): boolean {
+  const probe =
+    surface.kind === 'element' ? surface.container.ownerDocument.createElement('canvas') : new OffscreenCanvas(1, 1);
   const context = probe.getContext('webgl2');
   context?.getExtension('WEBGL_lose_context')?.loseContext();
   return context !== null;
+}
+
+/** Decodes an image in the page. */
+async function decodeImage(url: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
+/** Fetches and decodes an image where there is no DOM (ADR 0011), flipped at decode time like the page's images. */
+async function decodeBitmap(url: string): Promise<ImageBitmap> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
 }

@@ -1,12 +1,20 @@
-import type { RendererFactory } from '@vibeglobe/core';
+import { GlobeError, type RendererFactory, type RenderHost } from '@vibeglobe/core';
 import type { BackendChoice } from './three-backend.js';
 
 /** Options of {@link createRenderer}. */
 export interface RendererOptions {
   /** 'auto' (default) uses WebGPU and falls back to WebGL2; 'webgpu' or 'webgl2' force a backend. */
   readonly backend?: BackendChoice;
-  /** A canvas inside the container to draw into; by default the renderer creates one. */
-  readonly canvas?: HTMLCanvasElement;
+  /**
+   * The canvas to draw into: a canvas inside the container (by default the renderer creates one), or an OffscreenCanvas,
+   * for example in a worker (ADR 0011). An OffscreenCanvas needs `host`.
+   */
+  readonly canvas?: HTMLCanvasElement | OffscreenCanvas;
+  /**
+   * Frames, size, pixel ratio and visibility where there is no page to observe (with an OffscreenCanvas); in a page the
+   * renderer observes the container itself.
+   */
+  readonly host?: RenderHost;
 }
 
 /**
@@ -17,11 +25,23 @@ export interface RendererOptions {
 export function createRenderer(options: RendererOptions = {}): RendererFactory {
   const choice = options.backend ?? 'auto';
   return async (container, events) => {
-    const element = container as HTMLElement;
-    const [{ ThreeBackend }, { createBrowserHost }] = await Promise.all([
+    const canvas = options.canvas;
+    const offscreen = typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
+    const [{ ThreeBackend }, hostModule] = await Promise.all([
       import('./three-backend.js'),
-      import('./browser-host.js'),
+      offscreen ? undefined : import('./browser-host.js'),
     ]);
-    return ThreeBackend.create(element, createBrowserHost(element), choice, events, options.canvas);
+    if (offscreen) {
+      if (!options.host) throw new GlobeError('invalid-option', 'An OffscreenCanvas renderer needs a host');
+      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, choice, events);
+    }
+    const element = container as HTMLElement;
+    const { createBrowserHost } = hostModule ?? (await import('./browser-host.js'));
+    return ThreeBackend.create(
+      { kind: 'element', container: element, canvas: canvas as HTMLCanvasElement | undefined },
+      options.host ?? createBrowserHost(element),
+      choice,
+      events,
+    );
   };
 }

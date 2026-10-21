@@ -63,3 +63,32 @@ test('the frame loop keeps bounded CPU samples and piles up no performance entri
   await expect.poll(samples, { timeout: 5000 }).toBeGreaterThan(30);
   expect(await page.evaluate(() => performance.getEntriesByType('measure').length)).toBe(0);
 });
+
+test('continuous motion does not grow the recorded event log (KB-010)', async ({ page }) => {
+  await page.goto('/?lon=10&lat=45&zoom=3');
+  await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
+  await page.evaluate(async () => window.vibeglobePlayground?.globe.ready);
+  const counts = await page.evaluate(async () => {
+    const hooks = window.vibeglobePlayground;
+    if (!hooks) throw new Error('no hooks');
+    const { globe } = hooks;
+    const anchor = globe.navigation.grab({ xPx: 400, yPx: 300 });
+    if (!anchor) throw new Error('no anchor');
+    const before = hooks.events.length;
+    const framesBefore = globe.frameNumber;
+    // Drag from animation frames for two seconds, as a pointer would.
+    await new Promise<void>((done) => {
+      const start = performance.now();
+      const tick = (time: number): void => {
+        const angle = (time - start) / 200;
+        globe.navigation.dragTo(anchor, { xPx: 400 + 30 * Math.cos(angle), yPx: 300 + 30 * Math.sin(angle) });
+        if (time - start < 2000) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    return { added: hooks.events.length - before, frames: globe.frameNumber - framesBefore };
+  });
+  expect(counts.frames).toBeGreaterThan(10);
+  expect(counts.added).toBe(0);
+});

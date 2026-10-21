@@ -11,8 +11,14 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     pixelRatio: () => view.devicePixelRatio || 1,
     observeSize(callback) {
       const observer = new ResizeObserver(() => callback());
-      observer.observe(container);
-      // A pixel-ratio change (browser zoom, another monitor) fires the media query for the current ratio once.
+      // The device-pixel box changes with the CSS size and with the pixel ratio (browser zoom, another monitor).
+      // Browsers without it (Safari) observe the CSS box and rely on the media query below for ratio changes.
+      try {
+        observer.observe(container, { box: 'device-pixel-content-box' });
+      } catch {
+        observer.observe(container);
+      }
+      // A pixel-ratio change also fires the media query for the current ratio once.
       let query: MediaQueryList | undefined;
       const watchRatio = (): void => {
         query?.removeEventListener('change', onRatio);

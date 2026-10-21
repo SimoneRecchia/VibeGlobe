@@ -22,6 +22,7 @@ import {
   WebGPURenderer,
   type MeshBasicNodeMaterial,
 } from 'three/webgpu';
+import { WebGLRenderer } from 'three';
 import { readCapabilities } from './capabilities.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
@@ -90,6 +91,9 @@ export class ThreeBackend implements RendererBackend {
     this.camera.matrixWorldAutoUpdate = false;
     this.scene.matrixWorldAutoUpdate = false;
   }
+
+  /** Scratch: pulls the classic WebGLRenderer into the bundle to prove the size check fails (F546). */
+  static scratch = (): unknown => new WebGLRenderer();
 
   /** Creates and initializes a backend; rejects with GlobeError 'unsupported-device' when nothing can render. */
   static async create(

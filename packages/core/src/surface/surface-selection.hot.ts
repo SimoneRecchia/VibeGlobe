@@ -65,6 +65,8 @@ const measure = new Float64Array(3);
 const RADIUS = 0;
 const CLOSEST = 1;
 const SAG = 2;
+/** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
+const horizon = new Float64Array(4);
 
 /**
  * Chooses the surface tiles to draw for a camera: frustum and horizon culling, then refinement while the projected
@@ -77,6 +79,11 @@ export function selectSurfaceTiles(camera: Camera, options: SurfaceSelectionOpti
   state.out = out;
   state.count = 0;
   state.pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
+  const eye = camera.eyeEcef;
+  horizon[0] = (eye[0] ?? 0) / (A * A);
+  horizon[1] = (eye[1] ?? 0) / (A * A);
+  horizon[2] = (eye[2] ?? 0) / (B * B);
+  horizon[3] = Math.sqrt((horizon[0] ?? 0) ** 2 + (horizon[1] ?? 0) ** 2 + (horizon[2] ?? 0) ** 2);
   visit(0, 0, 0);
   visit(0, 1, 0);
   state.out = undefined;
@@ -111,7 +118,7 @@ function visit(level: number, x: number, y: number): void {
   // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
   const closest = measure[CLOSEST] ?? 0;
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
-  if (level >= MIN_LEVEL && (outsideFrustum(camera) || beyondHorizon(camera.eyeEcef))) return;
+  if (level >= MIN_LEVEL && (outsideFrustum(camera) || beyondHorizon())) return;
   const screenError = ((measure[SAG] ?? 0) / distance) * state.pixelsPerRadian;
   const refine =
     level < MIN_LEVEL ||
@@ -184,13 +191,16 @@ function outsideFrustum(camera: Camera): boolean {
 }
 
 /**
- * True when the whole tile lies beyond the horizon: every visible point of the ellipsoid is within the tangent length
- * √(|eye|² − b²) of the eye (exact for a sphere of radius b, conservative for the ellipsoid), so a bounding sphere
- * entirely farther than that cannot show anything.
+ * True when the whole tile lies beyond the horizon. A point P of the ellipsoid is visible from the eye E exactly when
+ * P · w ≥ 1, with w = (Ex/a², Ey/a², Ez/b²) (the eye is on the outer side of P's tangent plane), so a bounding sphere
+ * with center C and radius R whose every point has P · w < 1, that is C · w + R |w| < 1, shows nothing. Exact for the
+ * ellipsoid up to the bounding sphere, and valid with the eye inside the sphere (KB-012).
  */
-function beyondHorizon(eye: Float64Array): boolean {
-  const closest = measure[CLOSEST] ?? 0;
-  const eyeDistanceSquared = (eye[0] ?? 0) ** 2 + (eye[1] ?? 0) ** 2 + (eye[2] ?? 0) ** 2;
-  const tangentSquared = eyeDistanceSquared - B * B;
-  return tangentSquared > 0 && closest * closest > tangentSquared;
+function beyondHorizon(): boolean {
+  const reach =
+    (grid[12] ?? 0) * (horizon[0] ?? 0) +
+    (grid[13] ?? 0) * (horizon[1] ?? 0) +
+    (grid[14] ?? 0) * (horizon[2] ?? 0) +
+    (measure[RADIUS] ?? 0) * (horizon[3] ?? 0);
+  return reach < 1;
 }

@@ -1,3 +1,4 @@
+import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import { Camera } from '../camera/camera.js';
 import { buildTileMesh, tileIndices, TILE_SEGMENTS } from './surface-mesh.js';
@@ -80,5 +81,39 @@ describe('buildTileMesh', () => {
     expect(mesh.indices).toBe(tileIndices());
     expect(Math.max(...mesh.indices)).toBe(vertices - 1);
     expect(mesh.uvs.every((v) => v >= 0 && v <= 1)).toBe(true);
+  });
+});
+
+describe('surface coverage (KB-012)', () => {
+  const tiles: SurfaceTile[] = [];
+  const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+
+  test.prop([
+    fc.double({ min: -180, max: 180, noNaN: true }),
+    fc.double({ min: -85, max: 85, noNaN: true }),
+    // Ranges from 1 m to orbit, log-distributed.
+    fc.double({ min: 0, max: 7.3, noNaN: true }).map((exponent) => 10 ** exponent),
+    fc.double({ min: 0, max: 360, noNaN: true }),
+    fc.double({ min: 0, max: 70, noNaN: true }),
+  ])('every pixel that shows the ellipsoid lies in a selected tile', (lon, lat, range, heading, tilt) => {
+    const c = camera(lon, lat, range, tilt);
+    c.pose.headingRad = heading * DEG;
+    c.update();
+    const count = selectSurfaceTiles(c, { maxScreenErrorPx: 1, maxLevel: 25 }, tiles);
+    for (let y = 0; y <= c.heightPx; y += c.heightPx / 8) {
+      for (let x = 0; x <= c.widthPx; x += c.widthPx / 8) {
+        if (!c.pickEllipsoid(x, y, hit)) continue;
+        const covered = tiles
+          .slice(0, count)
+          .some(
+            (t) =>
+              t.westRad <= hit.longitudeRad + 1e-12 &&
+              t.eastRad >= hit.longitudeRad - 1e-12 &&
+              t.southRad <= hit.latitudeRad + 1e-12 &&
+              t.northRad >= hit.latitudeRad - 1e-12,
+          );
+        expect(covered, `pixel (${x}, ${y}) at ${hit.longitudeRad / DEG}°, ${hit.latitudeRad / DEG}°`).toBe(true);
+      }
+    }
   });
 });

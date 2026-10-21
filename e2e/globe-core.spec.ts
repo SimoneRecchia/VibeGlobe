@@ -154,6 +154,29 @@ for (const backend of BACKENDS) {
     }
   });
 
+  test(`the imagery is complete at low altitude all over the world on ${backend} (F059, KB-012)`, async ({ page }) => {
+    test.setTimeout(180_000);
+    await openGlobe(page, `backend=${backend}&zoom=2`);
+    for (const [lon, lat] of [
+      [12.5, 41.9],
+      [-74, 40.7],
+      [151.2, -33.9],
+      [25, 60],
+      [-40, 80],
+      [100, -80],
+      [0, 7.1],
+    ] as const) {
+      for (const zoom of [8, 14, 20]) {
+        await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
+          longitudeDeg: lon,
+          latitudeDeg: lat,
+          zoom,
+        });
+        await expectCompleteGlobe(page);
+      }
+    }
+  });
+
   test(`dragging keeps the grabbed point under the cursor, also near the edge and over a pole, on ${backend} (F060)`, async ({
     page,
   }) => {

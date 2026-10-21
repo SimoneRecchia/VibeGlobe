@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { canvasImage, emptyPixelsInside, openGlobe, silhouetteRadiusPx, waitForIdle } from './support/globe.js';
 
@@ -210,3 +211,38 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     });
   });
 }
+
+test('image decoding runs off the main thread while imagery streams, with no long decode task there (F099)', async ({
+  page,
+  browser,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const session = await fixtureSession(page);
+  const tracePath = testInfo.outputPath('trace.json');
+  await browser.startTracing(page, {
+    path: tracePath,
+    categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', '__metadata'],
+  });
+  await openGlobe(page, `imagery=levels&session=${session}&lon=${ROME.lon}&lat=${ROME.lat}&zoom=7`);
+  await waitForImagery(page);
+  await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 9 }));
+  await waitForImagery(page);
+  await browser.stopTracing();
+  const tiles = (await requestLog(page, session)).length;
+  const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
+    traceEvents: { name: string; pid: number; tid: number; dur?: number; args?: { name?: string } }[];
+  };
+  const threads = new Map<string, string>();
+  for (const event of trace.traceEvents)
+    if (event.name === 'thread_name') threads.set(`${event.pid}:${event.tid}`, event.args?.name ?? '');
+  const thread = (event: { pid: number; tid: number }): string => threads.get(`${event.pid}:${event.tid}`) ?? '';
+  const decodes = trace.traceEvents.filter((event) => event.name === 'Decode Image');
+  // Every tile was decoded somewhere off the main thread, and the decode tasks were run by the engine's worker.
+  expect(decodes.filter((event) => thread(event) !== 'CrRendererMain').length).toBeGreaterThanOrEqual(tiles);
+  const workerCalls = trace.traceEvents.filter(
+    (event) => event.name === 'FunctionCall' && thread(event).startsWith('DedicatedWorker'),
+  );
+  expect(workerCalls.length).toBeGreaterThanOrEqual(tiles);
+  // Nothing decodes on the main thread, the world base image included.
+  expect(decodes.filter((event) => thread(event) === 'CrRendererMain').map((event) => event.dur)).toEqual([]);
+});

@@ -1363,7 +1363,7 @@
         "Confirm image decoding happens in worker threads",
         "Confirm no main-thread task longer than the per-frame budget is caused by decoding"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F100",

@@ -22,7 +22,7 @@ import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import { chooseWebGPU, decodeBitmap, decodeImage } from './environment.js';
+import { chooseWebGPU, decodeBitmap } from './environment.js';
 import { applyDraw, attachSurfaceDraw, createSurfaceMaterial, type SurfaceDraw } from './surface-material.js';
 import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
@@ -105,7 +105,7 @@ export class ThreeBackend implements RendererBackend {
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
   private readonly tileTextures = new TileTextures(() => this.capabilities.maxAnisotropy);
-  private imagery: HTMLImageElement | ImageBitmap | undefined;
+  private imagery: ImageBitmap | undefined;
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
   private recovering = false;
@@ -298,9 +298,9 @@ export class ThreeBackend implements RendererBackend {
 
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
   async setBaseImagery(url: string): Promise<void> {
-    let image: HTMLImageElement | ImageBitmap;
+    let image: ImageBitmap;
     try {
-      image = this.surface.kind === 'element' ? await decodeImage(url) : await decodeBitmap(url);
+      image = await decodeBitmap(url);
     } catch (error) {
       throw new GlobeError('resource-failed', `The base imagery could not be loaded from ${url}`, { cause: error });
     }
@@ -492,6 +492,7 @@ export class ThreeBackend implements RendererBackend {
     releaseRenderer(this.renderer);
     this.vertexArraysLeft = countVertexArrays(this.renderer.backend);
     this.forgetRenderer();
+    this.imagery?.close();
     this.imagery = undefined;
     this.canvases.remove();
     this.failureMessage?.remove();

@@ -22,16 +22,10 @@ function webgl2Usable(surface: DrawingSurface): boolean {
   return context !== null;
 }
 
-/** Decodes an image in the page. */
-export async function decodeImage(url: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.crossOrigin = 'anonymous';
-  image.src = url;
-  await image.decode();
-  return image;
-}
-
-/** Fetches and decodes an image where there is no DOM (ADR 0011), top row first like the page's images. */
+/**
+ * Fetches and decodes an image, top row first. `createImageBitmap` decodes on a background thread; an image element
+ * would be decoded on the main thread when uploaded, a single long task for a large base image (KB-066, F099).
+ */
 export async function decodeBitmap(url: string): Promise<ImageBitmap> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);

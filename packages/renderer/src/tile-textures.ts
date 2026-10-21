@@ -116,7 +116,7 @@ export class TileTextures {
  * The texture of the equirectangular world base image: top row first like every imagery tile (v grows southward,
  * ADR 0010 §6), repeating across the antimeridian.
  */
-export function createBaseTexture(image: HTMLImageElement | ImageBitmap, anisotropy: number): Texture {
+export function createBaseTexture(image: ImageBitmap, anisotropy: number): Texture {
   const texture = new Texture(image);
   texture.flipY = false;
   texture.colorSpace = SRGBColorSpace;

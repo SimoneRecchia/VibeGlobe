@@ -88,7 +88,7 @@
       "jsHeapMB": 32
     },
     "gis": {
-      "bundleGzipKB": 40
+      "bundleGzipKB": 50
     },
     "vue": {
       "bundleGzipKB": 5

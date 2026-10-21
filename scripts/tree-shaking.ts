@@ -6,7 +6,29 @@ import { ROOT_DIR } from './workspace.ts';
 const CASES = [
   { importName: 'WGS84', from: '@vibeglobe/core', needs: ['packages/core/dist/geodesy/wgs84.js'] },
   { importName: 'FrameStats', from: '@vibeglobe/core', needs: ['packages/core/dist/diagnostics/frame-stats.js'] },
-  { importName: 'createDebugOverlay', from: '@vibeglobe/ui', needs: ['packages/ui/dist/debug/debug-overlay.js'] },
+  {
+    importName: 'createDebugOverlay',
+    from: '@vibeglobe/ui',
+    // The panel is styled by the ui stylesheet's theme variables (F429), which it installs.
+    needs: [
+      'packages/ui/dist/debug/debug-overlay.js',
+      'packages/ui/dist/theme/install.js',
+      'packages/ui/dist/theme/styles.js',
+    ],
+  },
+  // The UI layer pulls in no control the application does not add.
+  {
+    importName: 'createUi',
+    from: '@vibeglobe/ui',
+    needs: [
+      'packages/ui/dist/ui.js',
+      'packages/ui/dist/i18n/translator.js',
+      'packages/ui/dist/i18n/en.js',
+      'packages/ui/dist/i18n/it.js',
+      'packages/ui/dist/theme/install.js',
+      'packages/ui/dist/theme/styles.js',
+    ],
+  },
 ];
 
 let failed = false;

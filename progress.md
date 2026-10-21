@@ -2,9 +2,9 @@
 
 ## Current state
 
-- **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F074, F076, F077.
+- **M2 Globe core complete** (F078 passing, 2026-10-21: the full CI suite green on 9679fe0, reviews closed by ADR 0021, no open bug). Passing in M2: F042–F064, F066–F074, F076–F078; pending owner steps: F065, F075.
 - Also passing: F546 (initial-JavaScript budgets, start-up median 456 ms), F547 (lazy loading, `apps/lazy-host`). Pending owner steps: F065 (OffscreenCanvas measured and not adopted, ADR 0019; other browsers on real GPUs) and F075 (hardware procedure, `docs/guides/hardware-testing.md`).
-- Remaining in M2: F078 (acceptance), F545 (needs the merge into `main` and a nightly run). The repository is public since 2026-10-21, so the long suites run on GitHub's runners.
+- **M3 Imagery streaming in progress** (docs/plan/m3-imagery-streaming.md). Done: increments 1–3b (Mercator quadtree with caps, fixture tile server, imagery sources and XYZ adapter, fetch transport, scheduler heap, failure policy, network pool, worker pool and `@vibeglobe/worker`, residency, upload queue, RAM tier, per-tile draw list and textures, the streaming loader with ancestor fallback, `?imagery=` in the playground). Next: the end-to-end proofs of F081–F088, F099, F100, then increments 4–9. F545 waits for the merge of SimoneRecchia/VibeGlobe#3 into `main` and a run there.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
 ## Session log (newest first)

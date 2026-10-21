@@ -25,6 +25,8 @@ export interface SurfaceSelectionOptions {
   maxScreenErrorPx: number;
   /** Deepest level. */
   maxLevel: number;
+  /** Coarsest level drawn (default and minimum 2): every visible tile is refined at least to it. */
+  minLevel?: number;
 }
 
 const MIN_LEVEL = 2;
@@ -121,7 +123,7 @@ function visit(level: number, x: number, y: number): void {
   if (level >= MIN_LEVEL && (outsideFrustum(camera) || beyondHorizon())) return;
   const screenError = ((measure[SAG] ?? 0) / distance) * state.pixelsPerRadian;
   const refine =
-    level < MIN_LEVEL ||
+    level < (options.minLevel ?? MIN_LEVEL) ||
     (level < options.maxLevel && (screenError > options.maxScreenErrorPx || radius > RADIUS_TO_DISTANCE * distance));
   if (!refine) {
     state.count++;

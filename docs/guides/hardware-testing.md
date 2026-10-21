@@ -22,7 +22,7 @@ The command sets `VIBEGLOBE_HARDWARE_GPU=1`, so every browser uses the machine's
 
 1. `npm run build`.
 2. The visual, globe-core and precision end-to-end suites on WebGPU and on forced WebGL2. Comparisons between the two backends are strict. Comparisons with the CI baselines are advisory here (recorded, not failed), because the baselines come from CI's software GPU.
-3. `npm run bench`: the scenario benchmarks with the frame-time budgets of `quality/budgets.json`, which are binding on real GPUs.
+3. `npm run bench`: the scenario benchmarks with the frame-time budgets of `quality/budgets.json`, which are binding on real GPUs. The `drag-200/400/800-<backend>` scenarios decide ADR 0010's batching rule 7: on the reference desktop, a WebGL2 CPU p95 above 3 ms in `drag-200-webgl2` or `drag-400-webgl2` switches imagery to texture pages; record the decision in ADR 0010. The run also measures 10 cold starts and checks their p90 against the 1 s target.
 4. `npm run bench:offscreen` once per browser: main-thread against worker rendering (ADR 0019).
 
 It takes 10 to 20 minutes and prints where each step's log went.

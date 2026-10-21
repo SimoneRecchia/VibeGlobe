@@ -58,7 +58,7 @@ class GlobeEngine implements Globe {
   private frames = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
   private readonly idlePayload = { frameNumber: 0 };
-  private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL };
+  private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL, minLevel: 2 };
   /**
    * Bound once, so scheduling a frame allocates no closure; a bound method rather than an arrow function, so no wrapper
    * function has to wait for the optimizing compiler (it is called only once per frame).
@@ -87,6 +87,7 @@ class GlobeEngine implements Globe {
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
     this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
+    this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.

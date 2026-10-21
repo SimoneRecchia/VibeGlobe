@@ -14,6 +14,36 @@
       "scenario": "debug-overlay",
       "frameTimeP95Ms": 17.2,
       "cpuFrameP95Ms": 2
+    },
+    "drag-200-webgl2": {
+      "scenario": "drag-200-webgl2",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
+    },
+    "drag-400-webgl2": {
+      "scenario": "drag-400-webgl2",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
+    },
+    "drag-800-webgl2": {
+      "scenario": "drag-800-webgl2",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
+    },
+    "drag-200-webgpu": {
+      "scenario": "drag-200-webgpu",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
+    },
+    "drag-400-webgpu": {
+      "scenario": "drag-400-webgpu",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
+    },
+    "drag-800-webgpu": {
+      "scenario": "drag-800-webgpu",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
     }
   },
   "packages": {
@@ -54,6 +84,7 @@
   },
   "startup": {
     "scenario": "frame-loop",
-    "firstFrameMedianMs": 1000
+    "firstFrameMedianMs": 1000,
+    "firstFrameP90Ms": 1000
   }
 }

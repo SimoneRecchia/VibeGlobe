@@ -86,4 +86,27 @@ describe('findBudgetViolations', () => {
       'startup: scenario "s" recorded no time to the first frame',
     ]);
   });
+
+  it('checks the p90 of the cold starts (ADR 0012)', () => {
+    const withP90: Budgets = {
+      features: {},
+      packages: {},
+      startup: { scenario: 's', firstFrameMedianMs: 1000, firstFrameP90Ms: 1000 },
+    };
+    const summaries = { s: summarizeScenario([summarizeRun([16], [1], 0, 500)]) };
+    const cold = [500, 520, 540, 560, 580, 600, 620, 640, 660, 1500];
+    expect(findBudgetViolations(withP90, summaries, cold)).toEqual([]);
+    expect(findBudgetViolations(withP90, summaries, [...cold.slice(0, 8), 1100, 1500])).toEqual([
+      'startup: p90 time to the first complete frame over 10 cold runs 1100 ms > 1000 ms',
+    ]);
+    expect(findBudgetViolations(withP90, summaries)).toEqual([
+      'startup: no cold run recorded a time to the first frame',
+    ]);
+  });
+
+  it('records the median draw calls of a scenario', () => {
+    const runs = [208, 210, 207].map((draws) => summarizeRun([16], [1], 0, null, draws));
+    expect(summarizeScenario(runs).drawCalls).toBe(208);
+    expect(summarizeScenario([summarizeRun([16], [1], 0)]).drawCalls).toBeNull();
+  });
 });

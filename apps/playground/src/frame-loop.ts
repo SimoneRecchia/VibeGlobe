@@ -1,4 +1,4 @@
-import { FrameStats } from '@vibeglobe/core';
+import { FrameStats, type GeoPosition, type Globe } from '@vibeglobe/core';
 
 /** Called once per frame with the frame statistics after the frame was recorded. */
 export type FrameListener = (stats: FrameStats, timestampMs: number) => void;
@@ -46,6 +46,64 @@ export function startFrameLoop(onFrame: FrameListener): FrameLoop {
     },
     stop() {
       cancelAnimationFrame(handle);
+    },
+  };
+}
+
+/**
+ * Drives continuous circular drag motion through the navigation API and records the engine's CPU time per frame: a
+ * marker callback registered before each drag step runs first in the next animation frame, and the engine's `frame`
+ * event ends the measurement, so the sample covers the engine's whole frame (benchmark scenarios `drag-*`).
+ */
+export function startDragLoop(globe: Globe): FrameLoop {
+  const cpuMs = new Float64Array(CPU_SAMPLE_CAPACITY);
+  let cpuCount = 0;
+  let frameStartMs = -1;
+  let handle = 0;
+  let angle = 0;
+  const center = { xPx: 0, yPx: 0 };
+  const point = { xPx: 0, yPx: 0 };
+  let anchor: GeoPosition | undefined;
+  const markStart = (): void => {
+    frameStartMs = performance.now();
+  };
+  const unsubscribe = globe.on('frame', () => {
+    if (frameStartMs < 0) return;
+    cpuMs[cpuCount % CPU_SAMPLE_CAPACITY] = performance.now() - frameStartMs;
+    cpuCount++;
+    frameStartMs = -1;
+  });
+  const tick = (): void => {
+    anchor ??= globe.navigation.grab(center);
+    if (anchor) {
+      angle += 0.05;
+      point.xPx = center.xPx + 30 * Math.cos(angle);
+      point.yPx = center.yPx + 30 * Math.sin(angle);
+      requestAnimationFrame(markStart);
+      globe.navigation.dragTo(anchor, point);
+    }
+    handle = requestAnimationFrame(tick);
+  };
+  void globe.ready.then(() => {
+    const canvas = document.querySelector('#globe');
+    center.xPx = (canvas?.clientWidth ?? 0) / 2;
+    center.yPx = (canvas?.clientHeight ?? 0) / 2;
+    handle = requestAnimationFrame(tick);
+  });
+  return {
+    cpuFrameTimesMs() {
+      const count = Math.min(cpuCount, CPU_SAMPLE_CAPACITY);
+      return Array.from(
+        { length: count },
+        (_, index) => cpuMs[(cpuCount - count + index) % CPU_SAMPLE_CAPACITY] as number,
+      );
+    },
+    resetCpuSamples() {
+      cpuCount = 0;
+    },
+    stop() {
+      cancelAnimationFrame(handle);
+      unsubscribe();
     },
   };
 }

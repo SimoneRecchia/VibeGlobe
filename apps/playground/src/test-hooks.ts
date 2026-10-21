@@ -22,6 +22,8 @@ interface PlaygroundTestHooks {
   resetCpuSamples(): void;
   /** Milliseconds from navigation start to the first complete frame, once drawn (F546). */
   firstFrameMs: number | undefined;
+  /** Mounts another engine instance in a new element; `unmount` destroys it and removes the element. */
+  mount(): { globe: Globe; unmount(): void };
 }
 
 declare global {
@@ -43,6 +45,7 @@ export function exposeTestHooks(
   globes: readonly Globe[],
   loop: FrameLoop | undefined,
   firstFrame: Promise<number | undefined>,
+  mount: PlaygroundTestHooks['mount'],
 ): void {
   const globe = globes[0];
   if (!globe) return;
@@ -55,6 +58,7 @@ export function exposeTestHooks(
     cpuFrameTimesMs: () => loop?.cpuFrameTimesMs() ?? [],
     resetCpuSamples: () => loop?.resetCpuSamples(),
     firstFrameMs: undefined,
+    mount,
   };
   void firstFrame.then((timeMs) => (hooks.firstFrameMs = timeMs));
   window.vibeglobePlayground = hooks;

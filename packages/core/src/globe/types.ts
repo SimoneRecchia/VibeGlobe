@@ -223,6 +223,11 @@ export interface GlobeOptions {
   readonly resolutionScale?: number;
   /** Largest projected geometric error, in CSS pixels (default 1). */
   readonly maxScreenErrorPx?: number;
+  /**
+   * Coarsest surface level drawn, an integer from 2 (the default) to 8: every visible surface tile is at least this
+   * fine. Raising it costs draws and buys nothing visible in M2; benchmarks use it to set the tile count.
+   */
+  readonly minSurfaceLevel?: number;
 }
 
 /** Events and their payloads. */

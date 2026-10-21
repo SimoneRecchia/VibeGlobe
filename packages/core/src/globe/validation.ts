@@ -77,6 +77,16 @@ export function validateOptions(options: unknown): GlobeOptions {
       }
     }
   }
+  const minLevel = input.minSurfaceLevel;
+  if (
+    minLevel !== undefined &&
+    !(Number.isInteger(minLevel) && (minLevel as number) >= 2 && (minLevel as number) <= 8)
+  ) {
+    throw new GlobeError(
+      'invalid-option',
+      `minSurfaceLevel must be an integer between 2 and 8, got ${String(minLevel)}`,
+    );
+  }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
   return options as GlobeOptions;
 }

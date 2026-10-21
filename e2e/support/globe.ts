@@ -12,6 +12,7 @@ declare global {
       readonly events: { readonly type: string; readonly payload: unknown }[];
       cpuFrameTimesMs(): number[];
       resetCpuSamples(): void;
+      mount(): { globe: Globe; unmount(): void };
     };
   }
 }

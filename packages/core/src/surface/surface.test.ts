@@ -70,6 +70,13 @@ describe('selectSurfaceTiles', () => {
     const count = selectSurfaceTiles(camera(0, 0, 1e6), { maxScreenErrorPx: 1, maxLevel: 26 }, out);
     expect(out.slice(0, count).every((t) => t.eastRad > -Math.PI / 2 && t.westRad < Math.PI / 2)).toBe(true);
   });
+
+  it('refines every visible tile at least to the minimum level', () => {
+    const coarse = selectSurfaceTiles(camera(0, 0, 2e7), { maxScreenErrorPx: 1, maxLevel: 26 }, out);
+    const count = selectSurfaceTiles(camera(0, 0, 2e7), { maxScreenErrorPx: 1, maxLevel: 26, minLevel: 5 }, out);
+    expect(out.slice(0, count).every((t) => t.level >= 5)).toBe(true);
+    expect(count).toBeGreaterThan(coarse * 4);
+  });
 });
 
 describe('buildTileMesh', () => {

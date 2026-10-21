@@ -1,7 +1,7 @@
 import { createControls } from '@vibeglobe/controls';
 import { createGlobe, WGS84, type Globe, type ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
-import { startFrameLoop, type FrameLoop } from './frame-loop.js';
+import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { exposeTestHooks } from './test-hooks.js';
@@ -42,6 +42,8 @@ function startGlobe(container: HTMLElement, target: HTMLCanvasElement, view: Vie
     controls: createControls(),
     baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
     view,
+    // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
+    ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });
 }
 
@@ -59,6 +61,26 @@ function showCursorReadout(globe: Globe, container: HTMLElement): void {
       ? `${position.latitudeDeg.toFixed(6)}°, ${position.longitudeDeg.toFixed(6)}°`
       : 'Off the globe';
   });
+}
+
+/**
+ * Mounts another engine instance in a new element and returns it with a function that destroys it and removes the
+ * element, as a single-page app does on navigation (leak suite, ADR 0010).
+ */
+function mountGlobe(): { globe: Globe; unmount(): void } {
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:0;top:0;width:320px;height:240px';
+  const target = document.createElement('canvas');
+  host.append(target);
+  document.body.append(host);
+  const globe = startGlobe(host, target, viewFromUrl());
+  return {
+    globe,
+    unmount() {
+      globe.destroy();
+      host.remove();
+    },
+  };
 }
 
 /** The second globe of the two-instance scenario (F069), sharing the page with the first. */
@@ -141,5 +163,6 @@ if (app && canvas && experiment === 'worker') {
   let loop: FrameLoop | undefined;
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
-  exposeTestHooks(globes, loop, firstFrame);
+  else if (scenario === 'drag') loop = startDragLoop(globe);
+  exposeTestHooks(globes, loop, firstFrame, mountGlobe);
 }

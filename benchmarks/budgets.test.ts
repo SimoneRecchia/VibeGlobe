@@ -70,4 +70,56 @@ describe('findBudgetViolations', () => {
       'core: scenario "s" did not run',
     ]);
   });
+
+  it('checks the median time to the first complete frame (F546)', () => {
+    const withStartup: Budgets = { features: {}, packages: {}, startup: { scenario: 's', firstFrameMedianMs: 1000 } };
+    const runs = [900, 1200, 950].map((startupMs) => summarizeRun([16], [1], 0, startupMs));
+    expect(summarizeScenario(runs).startupMs).toBe(950);
+    expect(findBudgetViolations(withStartup, { s: summarizeScenario(runs) })).toEqual([]);
+    const slow = [1100, 1200, 950].map((startupMs) => summarizeRun([16], [1], 0, startupMs));
+    expect(findBudgetViolations(withStartup, { s: summarizeScenario(slow) })).toEqual([
+      'startup: median time to the first complete frame 1100 ms > 1000 ms',
+    ]);
+    const unrecorded = summarizeScenario([summarizeRun([16], [1], 0)]);
+    expect(unrecorded.startupMs).toBeNull();
+    expect(findBudgetViolations(withStartup, { s: unrecorded })).toEqual([
+      'startup: scenario "s" recorded no time to the first frame',
+    ]);
+  });
+
+  it('checks the p90 of the cold starts (ADR 0012)', () => {
+    const withP90: Budgets = {
+      features: {},
+      packages: {},
+      startup: { scenario: 's', firstFrameMedianMs: 1000, firstFrameP90Ms: 1000 },
+    };
+    const summaries = { s: summarizeScenario([summarizeRun([16], [1], 0, 500)]) };
+    const cold = [500, 520, 540, 560, 580, 600, 620, 640, 660, 1500];
+    expect(findBudgetViolations(withP90, summaries, cold)).toEqual([]);
+    expect(findBudgetViolations(withP90, summaries, [...cold.slice(0, 8), 1100, 1500])).toEqual([
+      'startup: p90 time to the first complete frame over 10 cold runs 1100 ms > 1000 ms',
+    ]);
+    expect(findBudgetViolations(withP90, summaries)).toEqual([
+      'startup: no cold run recorded a time to the first frame',
+    ]);
+  });
+
+  it('checks the GPU budget only where the GPU time was measured', () => {
+    const withGpu: Budgets = {
+      features: { drag: { scenario: 's', frameTimeP95Ms: 18, cpuFrameP95Ms: 6, gpuFrameP95Ms: 10 } },
+      packages: {},
+    };
+    const measured = summarizeScenario([summarizeRun([16], [1], 0, null, 400, [8, 9, 12])]);
+    expect(measured.gpuFrameP95Ms).toBe(12);
+    expect(findBudgetViolations(withGpu, { s: measured })).toEqual(['drag: median gpu p95 12.000 ms > 10 ms']);
+    const unmeasured = summarizeScenario([summarizeRun([16], [1], 0, null, 400)]);
+    expect(unmeasured.gpuFrameP95Ms).toBeNull();
+    expect(findBudgetViolations(withGpu, { s: unmeasured })).toEqual([]);
+  });
+
+  it('records the median draw calls of a scenario', () => {
+    const runs = [208, 210, 207].map((draws) => summarizeRun([16], [1], 0, null, draws));
+    expect(summarizeScenario(runs).drawCalls).toBe(208);
+    expect(summarizeScenario([summarizeRun([16], [1], 0)]).drawCalls).toBeNull();
+  });
 });

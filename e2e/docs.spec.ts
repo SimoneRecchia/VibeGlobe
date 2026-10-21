@@ -16,7 +16,7 @@ const PACKAGES = [
 
 test('documentation site serves the guides and the API reference of every package', async ({ page }) => {
   await page.goto(`${DOCS_URL}/modules.html`);
-  await expect(page).toHaveTitle(/VibeGlobeEngine/);
+  await expect(page).toHaveTitle(/VibeGlobe/);
   for (const name of PACKAGES) {
     await expect(page.getByRole('link', { name: `@vibeglobe/${name}`, exact: true }).first()).toBeVisible();
   }

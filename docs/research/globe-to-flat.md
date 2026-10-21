@@ -131,7 +131,7 @@ Mapbox GL JS v2 and later is excluded by license and was not consulted.
   - Golden-image tests (`globe-mvt`) run on SwiftShader in CI, which #10804 shows is unrepresentative for GPU trigonometry.
 - **OpenGlobus.** Vitest unit tests use a mocked WebGL context (for example `SegmentLonLat.test.js`). There are no rendering tests; users found the pole defects.
 
-What the field lacks, and what VibeGlobeEngine must add:
+What the field lacks, and what VibeGlobe must add:
 
 - frame-sequence tests through the whole transition
 - per-frame anchor-drift checks
@@ -160,7 +160,7 @@ What the field lacks, and what VibeGlobeEngine must add:
 
 **WebGPU and WebGL2.** The chosen morph is plain vertex-shader arithmetic (two multiply-adds per component, plus one `exp` pair when relief is nonzero). It compiles from one TSL source to WGSL and GLSL, and uses real depth on both backends (reversed-Z or logarithmic). MapLibre's custom clip-space z is not needed because geometry is never blended after projection. Avoiding `mix` and trigonometry removes the vendor variance seen in Cesium's `mix` note, MapLibre#7419 and deck.gl#10804. Per-tile offsets travel as uniforms on WebGL2 and as dynamic-offset uniforms or storage buffers on WebGPU, as for relative-to-center rendering.
 
-## Chosen approach for VibeGlobeEngine
+## Chosen approach for VibeGlobe
 
 Full rationale and alternatives: [ADR 0008](../adr/0008-globe-to-flat-morph.md).
 
@@ -234,6 +234,8 @@ Full rationale and alternatives: [ADR 0008](../adr/0008-globe-to-flat-morph.md).
 | Curves                 | Fine zoom sampling: continuity, monotonicity, bounded derivative (F149)                                                                                 | Phase ranges match the `PLAN.md` table                                                  |
 
 ## Open questions
+
+Update 2026-10-20: the owner settled question 1 (constant ground scale while panning) and confirmed the phase table: a 0° 2D band, tilt rising only at neighborhood scale ([ADR 0015](../adr/0015-owner-decisions-2026-10-20.md)).
 
 1. **Pan scale in the 2D phase.** Because curves follow ground zoom, the camera-control ADR should keep ground scale constant while panning, as MapLibre does on its globe, so a pan never changes morph, tilt or relief. In the 2D phase, Mercator zoom then drifts by about 0.023 per 100 km of north–south pan at 45°, unlike Google Maps. The owner should confirm. The alternative (constant Mercator zoom when m = 1) is a local change to the pan handler, at the cost of pans nudging the curves near band edges.
 2. **Tilt overlap.** `PLAN.md` says "tilt starts as the map finishes flattening", but its phase table puts a tilt-0 2D band (region, city) between flattening and 3D. The defaults follow the table; the overlap rule is enforced only when a configuration makes the bands adjacent.

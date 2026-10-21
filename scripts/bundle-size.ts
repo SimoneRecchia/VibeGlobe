@@ -1,5 +1,7 @@
 // Fails when a published package's minified and gzipped bundle exceeds its budget in quality/budgets.json.
 // Each package is measured on its built `dist` with the other engine packages and `bundleExternal` left out.
+// Then the initial JavaScript of a minimal globe (everything loaded before its first frame, dynamic imports included)
+// is checked against `initialJs`: three.js's share after tree-shaking, and the total (F546, ADR 0010).
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { bundle } from './bundle.ts';
@@ -7,8 +9,15 @@ import { ROOT_DIR, readWorkspace } from './workspace.ts';
 
 interface Budgets {
   bundleExternal: string[];
+  initialJs: { threeGzipKB: number; totalGzipKB: number };
   packages: Record<string, { bundleGzipKB?: number }>;
 }
+
+/** A minimal host page's globe: the engine packages a first frame needs. */
+const MINIMAL_GLOBE = `import { createGlobe } from '@vibeglobe/core';
+import { createRenderer } from '@vibeglobe/renderer';
+import { createControls } from '@vibeglobe/controls';
+createGlobe({ container: document.body, renderer: createRenderer(), controls: createControls(), baseImageryUrl: 'a.jpg' });`;
 
 const budgets = JSON.parse(readFileSync(join(ROOT_DIR, 'quality/budgets.json'), 'utf8')) as Budgets;
 const published = readWorkspace().filter((pkg) => pkg.dir.startsWith('packages/') && !pkg.manifest.private);
@@ -37,6 +46,19 @@ for (const pkg of published) {
   failed ||= over;
   console.log(
     `${over ? 'OVER' : 'ok  '}  ${name.padEnd(26)} ${sizeKB.toFixed(2).padStart(8)} KB gzip  (budget ${budgetKB} KB)`,
+  );
+}
+const isThree = (id: string): boolean => id === 'three' || id.startsWith('three/');
+const total = (await bundle(MINIMAL_GLOBE)).gzipBytes / 1024;
+const three = total - (await bundle(MINIMAL_GLOBE, isThree)).gzipBytes / 1024;
+for (const [label, sizeKB, budgetKB] of [
+  ['initial JavaScript, three.js share', three, budgets.initialJs.threeGzipKB],
+  ['initial JavaScript, total', total, budgets.initialJs.totalGzipKB],
+] as const) {
+  const over = sizeKB > budgetKB;
+  failed ||= over;
+  console.log(
+    `${over ? 'OVER' : 'ok  '}  ${label.padEnd(36)} ${sizeKB.toFixed(2).padStart(8)} KB gzip  (budget ${budgetKB} KB)`,
   );
 }
 if (failed) process.exit(1);

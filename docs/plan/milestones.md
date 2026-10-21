@@ -18,6 +18,7 @@ Research first: precision, depth, terrain and imagery levels of detail, tile sch
 6. Benchmark harness with budgets (frame CPU/GPU, memory, bundle size per package) that fails on breach.
 7. Documentation site scaffold; ADR and progress-log conventions (already started in session 1).
 8. Playground shell with a scenario hook and the debug overlay skeleton (backend selection arrives with the renderer in M2).
+9. Owner decisions of 2026-10-20 (ADR 0015): rename to VibeGlobe, PolyForm Noncommercial license with the contributor documents, CI split into a fast job on every push and the full suite on `main` and nightly (F542–F545).
 
 ## M2 Globe core
 
@@ -34,6 +35,7 @@ Prerequisites: precision, depth, GPU and camera surveys; ADRs for precision, dep
 7. Render on demand, background throttling, zero-allocation frame loop, resize and pixel-density handling, device/context loss recovery, `destroy()` and multiple instances.
 8. Visual regression harness of canonical views on both backends; CI runs WebGL2 and WebGPU through SwiftShader (ADR 0012); documented local procedure for real GPUs; OffscreenCanvas evaluation ADR.
 9. The ADR 0012 probes on Playwright's pinned Chromium in CI, start-up measurement (navigation to `ready`) and steady-state allocation sampling in the benchmark harness (ADR 0013).
+10. Initial-JavaScript budget (ADR 0015, decision 12): measure three.js after tree-shaking, set the byte budget from it with a blocking CI size check, time to first frame as the binding target, and lazy loading of the engine through a dynamic import (F546, F547).
 
 ## M3 Imagery streaming
 
@@ -71,7 +73,7 @@ Prerequisite: globe-to-flat survey.
 
 1. Flat map projection and the GPU morph between ellipsoid and plane.
 2. Anchor-preserving morph (cursor or screen center fixed).
-3. Zoom-driven tilt and relief curves with overlap; relief scaled by the projection scale factor on the flat plane.
+3. Zoom-driven tilt and relief curves that ease in and out at their ends, with a 0° 2D band and tilt rising only at neighborhood scale (ADR 0015, decision 9); relief scaled by the projection scale factor on the flat plane.
 4. View modes (Auto, 2D locked, manual) and chosen vs applied tilt and heading.
 5. Long flights passing through the phases.
 
@@ -98,6 +100,7 @@ Prerequisite: sources, formats and reprojection survey; ADRs reading Google's an
 3. Vector adapters (GeoJSON, KML, GPX, MVT decoding) and 3D adapters (glTF; 3D Tiles in M13).
 4. Layer stack, source chains, color harmonization.
 5. Provider profiles and enforcement (Google, OpenStreetMap public and self-hosted, custom), live attribution, CORS and authentication.
+6. Live Google tests through a separate command with the `GOOGLE_MAPS_API_KEY` key, EEA terms, within the free monthly caps, stopping on a quota error (ADR 0015, decision 5; F549).
 
 ## M8 Offline and adaptive loading
 
@@ -110,6 +113,7 @@ Prerequisite: offline, storage and network adaptation survey.
 3. Offline package format, LAN-server mode, device mode, package management API, package builder.
 4. Connectivity monitor and bandwidth estimator; flight preloading; motion-aware detail.
 5. Network simulation scenarios; every combination of mode and switch.
+6. Docker-based static LAN server script for offline mode 1, used by its tests (ADR 0015, decision 3; F550).
 
 ## M9 Data pipeline and default datasets
 
@@ -117,9 +121,10 @@ Done when: the default datasets rebuild reproducibly from configuration.
 
 Prerequisite: data pipeline tooling survey.
 
-1. CLI framework in `tools`, versioned configuration files, size estimates, resumable steps, license records.
+1. CLI framework in `tools`, versioned configuration files, size and cost estimates with confirmation before any download, resumable steps, license records.
 2. Copernicus DEM GLO-30 to terrain tiles; Sentinel-2 cloudless 2016 to imagery pyramids; Natural Earth fallback; OpenStreetMap extracts to vector tiles.
-3. World low-detail and Italy high-detail builds; offline packages and static tile folders; licenses re-verified.
+3. Ready-to-run world low-detail and Italy high-detail configurations, verified on small sample areas (consumers run the full builds on their own AWS account; ADR 0015, decision 4); offline packages and static tile folders; licenses re-verified.
+4. Hosting guide for consumers: tiles, packages and engine assets on their own backend and frontend (F553).
 
 ## M10 Data layers
 
@@ -163,11 +168,12 @@ Prerequisite: vector tiles, buildings and 3D Tiles survey.
 
 Done when: the Nuxt example builds with SSR and runs every feature on the client, and the Web Component works in a plain HTML page.
 
-1. Vue 3 adapter; Web Component; Nuxt example with SSR and hydration tests; integration guide.
+1. Vue 3 adapter; Web Component; Nuxt example with SSR and hydration tests; integration guide (npm installation, licensing, lazy loading, asset hosting).
 
 ## M15 Hardening and release
 
 Done when: every item in the Definition of done is ticked.
 
 1. Reference-device performance pass, hardware/OS and browser matrices, soak and chaos tests, aggregate fuzzing, lifecycle edge cases.
-2. Complete documentation and examples, API review, release automation, 1.0.0 published to the private registry.
+2. Complete documentation and examples, API review, release automation, 1.0.0 published to npm under `@vibeglobe` with the owner's approval; the repository made public by the first release (F561).
+3. Before M15 starts, ask the owner again about a cloud device service (ADR 0015, decision 2).

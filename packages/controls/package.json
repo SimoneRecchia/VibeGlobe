@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/controls",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine controls: input handling, gestures and navigation logic.",
+  "description": "VibeGlobe controls: input handling, gestures and navigation logic.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -14,5 +15,8 @@
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0"
+  }
 }

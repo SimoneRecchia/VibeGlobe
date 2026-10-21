@@ -3,7 +3,7 @@ import type { WorkspacePackage } from '../workspace.ts';
 import { importSpecifiers, packageNameOf } from '../workspace.ts';
 import { findDependencyViolations } from './dependencies.ts';
 import { findHotPathViolations } from './hot-paths.ts';
-import { LIBRARY_PACKAGES, findStructureViolations } from './structure.ts';
+import { LIBRARY_PACKAGES, PROJECT_LICENSE, findLicenseViolation, findStructureViolations } from './structure.ts';
 
 function pkg(
   dir: string,
@@ -14,7 +14,7 @@ function pkg(
   const files = [`${dir}/package.json`, `${dir}/CLAUDE.md`, `${dir}/src/index.ts`, ...Object.keys(sources)];
   return {
     dir,
-    manifest: { name: `@vibeglobe/${folder}`, type: 'module', sideEffects: false },
+    manifest: { name: `@vibeglobe/${folder}`, license: PROJECT_LICENSE, type: 'module', sideEffects: false },
     tsconfig: { compilerOptions: { outDir: 'dist', tsBuildInfoFile: 'dist/tsconfig.tsbuildinfo' } },
     files,
     sources: Object.entries(sources).map(([path, content]) => ({ path, content })),
@@ -57,7 +57,7 @@ describe('findStructureViolations', () => {
     const ui = find(workspace, 'packages/ui');
     ui.files = ui.files.filter((file) => !file.endsWith('CLAUDE.md')).concat('packages/ui/test/ui.test.ts');
     const core = find(workspace, 'packages/core');
-    core.manifest = { name: '@vibeglobe/Core', sideEffects: ['./src/polyfill.ts'] };
+    core.manifest = { name: '@vibeglobe/Core', license: PROJECT_LICENSE, sideEffects: ['./src/polyfill.ts'] };
     expect(findStructureViolations(workspace)).toEqual([
       'packages/tools: missing package',
       'packages/core: package name must be "@vibeglobe/core"',
@@ -79,6 +79,20 @@ describe('findStructureViolations', () => {
       'packages/ui: tsconfig.json must set "tsBuildInfoFile" inside its "outDir"',
       'packages/vue: tsconfig.json must set "tsBuildInfoFile" inside its "outDir"',
     ]);
+  });
+
+  it('reports a package or the root manifest without the project license (ADR 0015)', () => {
+    const workspace = validWorkspace();
+    delete find(workspace, 'packages/core').manifest.license;
+    find(workspace, 'apps/playground').manifest.license = 'MIT';
+    expect(findStructureViolations(workspace)).toEqual([
+      'packages/core: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
+      'apps/playground: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
+    ]);
+    expect(findLicenseViolation('.', undefined)).toEqual([
+      '.: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
+    ]);
+    expect(findLicenseViolation('.', PROJECT_LICENSE)).toEqual([]);
   });
 
   it('reports a renamed package folder', () => {

@@ -1,0 +1,26 @@
+{
+  "name": "@vibeglobe/worker",
+  "version": "0.0.0",
+  "description": "VibeGlobe worker program: the single module worker that runs decoding tasks for the shared worker pool.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./vibeglobe-worker.js": {
+      "source": "./src/vibeglobe-worker.ts",
+      "default": "./dist/vibeglobe-worker.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0"
+  }
+}

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Demo app that exercises every engine feature; also the bed for visual and scenario tests.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +12,10 @@
   },
   "dependencies": {
     "@vibeglobe/core": "*",
-    "@vibeglobe/ui": "*"
+    "@vibeglobe/ui": "*",
+    "@vibeglobe/controls": "*",
+    "@vibeglobe/renderer": "*",
+    "@vibeglobe/sources": "*",
+    "@vibeglobe/worker": "*"
   }
 }

@@ -1,0 +1,359 @@
+/**
+ * @hotpath Runs every frame over every visited tile; doubles never cross a call boundary here, because V8 boxes doubles
+ * passed to or returned from a call it does not inline (ADR 0018).
+ * @benchmark benchmarks/run.ts
+ */
+import type { Camera } from '../camera/camera.js';
+import { WGS84 } from '../geodesy/wgs84.js';
+import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
+import { MAX_TILE_LEVEL } from '../tiling/tile-key.js';
+
+/** ADR 0006 §1: the surface is one Web Mercator quadtree plus two geographic polar caps. This is the Mercator root. */
+export const MERCATOR_ROOT = 0;
+/** The geographic cap from the Web Mercator limit (85.0511°N) to the north pole. */
+export const NORTH_CAP = 1;
+/** The geographic cap from the south pole to the Web Mercator limit (85.0511°S). */
+export const SOUTH_CAP = 2;
+
+/** Grid segments per tile edge, as M2's surface (ADR 0013): the mesh and its geometric error agree on it. */
+export const QUADTREE_SEGMENTS = 16;
+
+/**
+ * A surface tile of the three-root quadtree. Mercator tiles are XYZ tiles (rows from the north); cap tiles are
+ * geographic, rows from the cap's northern edge, and may cover `span` columns of their level near the pole.
+ */
+export interface QuadtreeTile {
+  key: number;
+  root: 0 | 1 | 2;
+  level: number;
+  x: number;
+  y: number;
+  span: number;
+  westRad: number;
+  southRad: number;
+  eastRad: number;
+  northRad: number;
+}
+
+/** Selection settings. */
+export interface QuadtreeSelectionOptions {
+  /** Largest allowed geometric error on screen, in pixels. */
+  maxScreenErrorPx: number;
+  /** Deepest level, at most {@link MAX_TILE_LEVEL}. */
+  maxLevel: number;
+  /** Coarsest level drawn (default and minimum 2): every visible tile is refined at least to it. */
+  minLevel?: number;
+  /**
+   * Texels along a tile edge of the finest imagery layer (tile size × pixel ratio), or 0 without imagery. A tile is
+   * refined while one of its texels covers more than {@link QuadtreeSelectionOptions.maxTexelErrorPx} screen pixels,
+   * up to {@link QuadtreeSelectionOptions.imageryMaxLevel} (F081, ADR 0006 §2).
+   */
+  imageryTexelsPerTile?: number;
+  /** The finest level the imagery layers serve; texels do not refine beyond it. */
+  imageryMaxLevel?: number;
+  /** Largest texel size on screen, in pixels (ADR 0006's τ_imagery); default 1.5. */
+  maxTexelErrorPx?: number;
+  /** Written by each selection: tiles skipped as outside the view frustum (F086) and beyond the horizon (F087). */
+  culledByFrustum?: number;
+  culledByHorizon?: number;
+}
+
+const MIN_LEVEL = 2;
+/** ADR 0004: a chunk's radius stays below this multiple of its distance from the eye, so float32 offsets stay exact. */
+const RADIUS_TO_DISTANCE = 1000;
+const A = WGS84.semiMajorAxisMeters;
+const B = WGS84.semiMinorAxisMeters;
+const E2 = WGS84.firstEccentricitySquared;
+const MAX_LAT = WEB_MERCATOR_MAX_LATITUDE_RAD;
+const CAP_HEIGHT = Math.PI / 2 - MAX_LAT;
+
+/** A tile key unique across the three roots: `packTileKey` written out, since a key above 31 bits would be boxed. */
+export function quadtreeTileKey(root: number, level: number, x: number, y: number): number {
+  return (((4 ** level - 1) / 3 + y * 2 ** level + x) * 3 + root) as number;
+}
+
+/** The latitude of a Web Mercator row edge, `row` of `rows` rows from the north (rows may be fractional). */
+function mercatorRowLatitudeRad(row: number, rows: number): number {
+  if (row <= 0) return MAX_LAT;
+  if (row >= rows) return -MAX_LAT;
+  return Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / rows)));
+}
+
+/**
+ * The latitude of mesh row `row` (0 to {@link QUADTREE_SEGMENTS}, north to south) of a tile: Mercator tiles space
+ * their rows evenly in Mercator y, so Mercator imagery maps linearly onto each triangle; cap tiles in latitude.
+ */
+export function quadtreeRowLatitudeRad(tile: QuadtreeTile, row: number): number {
+  if (tile.root === MERCATOR_ROOT) {
+    const rows = 2 ** tile.level;
+    return mercatorRowLatitudeRad(tile.y + row / QUADTREE_SEGMENTS, rows);
+  }
+  return tile.northRad + ((tile.southRad - tile.northRad) * row) / QUADTREE_SEGMENTS;
+}
+
+/** Fills a tile's key and bounds from its root, level, first column, row and column span; returns `out`. */
+export function quadtreeTileBounds(
+  root: 0 | 1 | 2,
+  level: number,
+  x: number,
+  y: number,
+  span: number,
+  out: QuadtreeTile,
+): QuadtreeTile {
+  const n = 2 ** level;
+  out.key = (((4 ** level - 1) / 3 + y * n + x) * 3 + root) as number;
+  out.root = root;
+  out.level = level;
+  out.x = x;
+  out.y = y;
+  out.span = span;
+  out.westRad = -Math.PI + (2 * Math.PI * x) / n;
+  out.eastRad = x + span === n ? Math.PI : -Math.PI + (2 * Math.PI * (x + span)) / n;
+  if (root === MERCATOR_ROOT) {
+    // mercatorRowLatitudeRad written out: a double returned from a call is boxed (ADR 0018).
+    out.northRad = y === 0 ? MAX_LAT : Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+    out.southRad = y + 1 === n ? -MAX_LAT : Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+  } else {
+    const top = root === NORTH_CAP ? Math.PI / 2 : -MAX_LAT;
+    out.northRad = y === 0 ? top : top - (CAP_HEIGHT * y) / n;
+    out.southRad = y + 1 === n ? top - CAP_HEIGHT : top - (CAP_HEIGHT * (y + 1)) / n;
+  }
+  return out;
+}
+
+/** The 3 × 3 grid of tile corners, edge midpoints and center on the ellipsoid, ECEF: the center is point 4. */
+const grid = new Float64Array(27);
+const lonSin = new Float64Array(3);
+const lonCos = new Float64Array(3);
+/** The tile center relative to the eye. */
+const offset = new Float64Array(3);
+/** Per-tile measures written by measureTile. */
+const measure = new Float64Array(4);
+const RADIUS = 0;
+const CLOSEST = 1;
+const SAG = 2;
+/** Ground size of one imagery texel on the tile, meters (0 without imagery). */
+const TEXEL = 3;
+/** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
+const horizon = new Float64Array(4);
+
+/** Traversal state, module-level so the recursion allocates nothing. */
+const state: {
+  camera: Camera | undefined;
+  options: QuadtreeSelectionOptions;
+  out: QuadtreeTile[] | undefined;
+  count: number;
+  pixelsPerRadian: number;
+} = { camera: undefined, options: { maxScreenErrorPx: 1, maxLevel: 1 }, out: undefined, count: 0, pixelsPerRadian: 1 };
+
+/**
+ * Chooses the surface tiles to draw for a camera over the three roots (ADR 0006 §1): frustum and horizon culling,
+ * then refinement while the projected geometric error exceeds the limit or the tile is too large for its distance
+ * (ADR 0004). Fills `out` and returns the count; reuses the records in `out`, so steady-state selection allocates
+ * nothing.
+ */
+export function selectQuadtreeTiles(camera: Camera, options: QuadtreeSelectionOptions, out: QuadtreeTile[]): number {
+  state.camera = camera;
+  state.options = options;
+  state.out = out;
+  state.count = 0;
+  options.culledByFrustum = 0;
+  options.culledByHorizon = 0;
+  state.pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
+  const eye = camera.eyeEcef;
+  horizon[0] = (eye[0] ?? 0) / (A * A);
+  horizon[1] = (eye[1] ?? 0) / (A * A);
+  horizon[2] = (eye[2] ?? 0) / (B * B);
+  horizon[3] = Math.sqrt((horizon[0] ?? 0) ** 2 + (horizon[1] ?? 0) ** 2 + (horizon[2] ?? 0) ** 2);
+  visit(MERCATOR_ROOT, 0, 0, 0, 1);
+  visit(NORTH_CAP, 0, 0, 0, 1);
+  visit(SOUTH_CAP, 0, 0, 0, 1);
+  state.out = undefined;
+  return state.count;
+}
+
+/**
+ * Visits a tile. Mercator tiles always split into four. Cap tiles follow ADR 0006's cap rule (KB-043): four children
+ * while the tile's east–west width at its equatorward edge is at least half its north–south height, else two children
+ * in latitude only, each covering twice the columns, so tiles near a pole stay wedges and their count stays bounded.
+ */
+function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: number): void {
+  const { camera, options, out } = state;
+  if (!camera || !out) return;
+  const tile = (out[state.count] ??= {
+    key: 0,
+    root: 0,
+    level: 0,
+    x: 0,
+    y: 0,
+    span: 1,
+    westRad: 0,
+    southRad: 0,
+    eastRad: 0,
+    northRad: 0,
+  });
+  quadtreeTileBounds(root, level, x, y, span, tile);
+  measureTile(tile, camera.eyeEcef);
+  const radius = measure[RADIUS] ?? 0;
+  // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
+  const closest = measure[CLOSEST] ?? 0;
+  const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
+  if (level >= MIN_LEVEL) {
+    if (outsideFrustum(camera)) {
+      options.culledByFrustum = (options.culledByFrustum ?? 0) + 1;
+      return;
+    }
+    if (beyondHorizon()) {
+      options.culledByHorizon = (options.culledByHorizon ?? 0) + 1;
+      return;
+    }
+  }
+  const screenError = ((measure[SAG] ?? 0) / distance) * state.pixelsPerRadian;
+  const maxLevel = options.maxLevel < MAX_TILE_LEVEL ? options.maxLevel : MAX_TILE_LEVEL;
+  const refine =
+    level < (options.minLevel ?? MIN_LEVEL) ||
+    (level < maxLevel &&
+      (screenError > options.maxScreenErrorPx ||
+        radius > RADIUS_TO_DISTANCE * distance ||
+        (level < (options.imageryMaxLevel ?? 0) &&
+          ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5))));
+  if (!refine) {
+    state.count++;
+    return;
+  }
+  if (root === MERCATOR_ROOT || splitsInFour(tile)) {
+    for (let child = 0; child < 4; child++) {
+      visit(root, level + 1, 2 * x + (child & 1) * span, 2 * y + (child >> 1), span);
+    }
+  } else {
+    visit(root, level + 1, 2 * x, 2 * y, 2 * span);
+    visit(root, level + 1, 2 * x, 2 * y + 1, 2 * span);
+  }
+}
+
+/**
+ * The two refinement errors of a tile as the selection measures them, in screen pixels: `out[0]` the geometric (chord
+ * sag) error, `out[1]` the size of one imagery texel (0 without imagery). For diagnostics; not used per frame.
+ */
+export function quadtreeTileErrorsPx(
+  camera: Camera,
+  tile: QuadtreeTile,
+  options: QuadtreeSelectionOptions,
+  out: Float64Array,
+): Float64Array {
+  const previous = state.options;
+  state.options = options;
+  measureTile(tile, camera.eyeEcef);
+  state.options = previous;
+  const closest = measure[CLOSEST] ?? 0;
+  const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
+  const pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
+  out[0] = ((measure[SAG] ?? 0) / distance) * pixelsPerRadian;
+  out[1] = ((measure[TEXEL] ?? 0) / distance) * pixelsPerRadian;
+  return out;
+}
+
+/** ADR 0006's cap rule for a cap tile: four children while its equatorward width is at least half its height. */
+function splitsInFour(tile: QuadtreeTile): boolean {
+  const north = tile.northRad;
+  const south = tile.southRad;
+  // Comparisons, not Math.min/abs, as above.
+  const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
+  return Math.cos(equatorward) * (tile.eastRad - tile.westRad) >= (north - south) / 2;
+}
+
+/**
+ * Measures a tile against the eye into `measure`: the radius of a sphere around it, the distance from the eye to that
+ * sphere and the chord sag of its mesh; writes the center relative to the eye into `offset`.
+ */
+function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
+  const midLon = (tile.westRad + tile.eastRad) / 2;
+  for (let column = 0; column < 3; column++) {
+    const lon = column === 0 ? tile.westRad : column === 1 ? midLon : tile.eastRad;
+    lonSin[column] = Math.sin(lon);
+    lonCos[column] = Math.cos(lon);
+  }
+  for (let row = 0; row < 3; row++) {
+    const lat = row === 0 ? tile.northRad : row === 1 ? (tile.southRad + tile.northRad) / 2 : tile.southRad;
+    const sinLat = Math.sin(lat);
+    const primeVerticalRadius = A / Math.sqrt(1 - E2 * sinLat * sinLat);
+    const r = primeVerticalRadius * Math.cos(lat);
+    const z = primeVerticalRadius * (1 - E2) * sinLat;
+    for (let column = 0; column < 3; column++) {
+      const point = (row * 3 + column) * 3;
+      grid[point] = r * (lonCos[column] ?? 0);
+      grid[point + 1] = r * (lonSin[column] ?? 0);
+      grid[point + 2] = z;
+    }
+  }
+  let radiusSquared = 0;
+  for (let point = 0; point < 27; point += 3) {
+    const dx = (grid[point] ?? 0) - (grid[12] ?? 0);
+    const dy = (grid[point + 1] ?? 0) - (grid[13] ?? 0);
+    const dz = (grid[point + 2] ?? 0) - (grid[14] ?? 0);
+    const distanceSquared = dx * dx + dy * dy + dz * dz;
+    if (distanceSquared > radiusSquared) radiusSquared = distanceSquared;
+  }
+  const north = tile.northRad;
+  const south = tile.southRad;
+  const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
+  // The largest mesh row step: a Mercator tile's rows are densest toward the pole, so its widest step is the one at
+  // its equatorward edge; a cap tile's rows are evenly spaced.
+  let step = (north - south) / QUADTREE_SEGMENTS;
+  if (tile.root === MERCATOR_ROOT) {
+    const rows = 2 ** tile.level;
+    const edgeRow = south >= 0 ? tile.y + 1 : tile.y;
+    const nextRow = south >= 0 ? edgeRow - 1 / QUADTREE_SEGMENTS : edgeRow + 1 / QUADTREE_SEGMENTS;
+    const edgeLat =
+      edgeRow <= 0 ? MAX_LAT : edgeRow >= rows ? -MAX_LAT : Math.atan(Math.sinh(Math.PI * (1 - (2 * edgeRow) / rows)));
+    const nextLat = Math.atan(Math.sinh(Math.PI * (1 - (2 * nextRow) / rows)));
+    const mercatorStep = edgeLat > nextLat ? edgeLat - nextLat : nextLat - edgeLat;
+    if (mercatorStep > step) step = mercatorStep;
+  }
+  const lonStep = (tile.eastRad - tile.westRad) / QUADTREE_SEGMENTS;
+  // Chord sag of the grid below the ellipsoid along a meridian or along the equatorward parallel, whichever is larger.
+  const meridianSag = (A * step * step) / 8;
+  const parallelSag = (A * Math.cos(equatorward) * lonStep * lonStep) / 8;
+  const sag = meridianSag > parallelSag ? meridianSag : parallelSag;
+  const radius = Math.sqrt(radiusSquared) + sag;
+  offset[0] = (grid[12] ?? 0) - (eye[0] ?? 0);
+  offset[1] = (grid[13] ?? 0) - (eye[1] ?? 0);
+  offset[2] = (grid[14] ?? 0) - (eye[2] ?? 0);
+  measure[RADIUS] = radius;
+  measure[CLOSEST] = Math.sqrt((offset[0] ?? 0) ** 2 + (offset[1] ?? 0) ** 2 + (offset[2] ?? 0) ** 2) - radius;
+  measure[SAG] = sag;
+  const texels = state.options?.imageryTexelsPerTile ?? 0;
+  const midLat = (north + south) / 2;
+  const widthMeters = A * Math.cos(midLat) * (tile.eastRad - tile.westRad);
+  const heightMeters = A * (north - south);
+  measure[TEXEL] = texels > 0 ? (widthMeters > heightMeters ? widthMeters : heightMeters) / texels : 0;
+}
+
+/** True when the tile's bounding sphere is entirely outside one of the frustum planes (F086). */
+function outsideFrustum(camera: Camera): boolean {
+  const planes = camera.frustumPlanes;
+  const radius = measure[RADIUS] ?? 0;
+  for (let plane = 0; plane < 5; plane++) {
+    const signedDistance =
+      (planes[plane * 4] ?? 0) * (offset[0] ?? 0) +
+      (planes[plane * 4 + 1] ?? 0) * (offset[1] ?? 0) +
+      (planes[plane * 4 + 2] ?? 0) * (offset[2] ?? 0) +
+      (planes[plane * 4 + 3] ?? 0);
+    if (signedDistance < -radius) return true;
+  }
+  return false;
+}
+
+/**
+ * True when the whole tile lies beyond the horizon (F087): a point P of the ellipsoid is visible from the eye exactly
+ * when P · w ≥ 1, with w = (Ex/a², Ey/a², Ez/b²), so a bounding sphere with center C and radius R shows nothing when
+ * C · w + R |w| < 1 (KB-012).
+ */
+function beyondHorizon(): boolean {
+  const reach =
+    (grid[12] ?? 0) * (horizon[0] ?? 0) +
+    (grid[13] ?? 0) * (horizon[1] ?? 0) +
+    (grid[14] ?? 0) * (horizon[2] ?? 0) +
+    (measure[RADIUS] ?? 0) * (horizon[3] ?? 0);
+  return reach < 1;
+}

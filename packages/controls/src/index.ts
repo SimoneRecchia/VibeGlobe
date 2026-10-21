@@ -3,4 +3,4 @@
  * Input handling, gestures and navigation logic.
  * @module @vibeglobe/controls
  */
-export {};
+export { createControls } from './create-controls.js';

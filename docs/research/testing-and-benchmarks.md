@@ -4,7 +4,7 @@ Research survey for `PLAN.md` (Research survey: "how they test rendering, visual
 
 ## Scope and requirements served
 
-How VibeGlobeEngine proves its visual and performance targets: render and visual-regression tests, image comparison and tolerances across GPUs and backends, scenario tests with frame capture, frame-time benchmarks, GPU-less CI with software rendering, WebGPU in headless browsers, and the property-based testing and fuzzing libraries.
+How VibeGlobe proves its visual and performance targets: render and visual-regression tests, image comparison and tolerances across GPUs and backends, scenario tests with frame capture, frame-time benchmarks, GPU-less CI with software rendering, WebGPU in headless browsers, and the property-based testing and fuzzing libraries.
 
 - `PLAN.md` Testing and verification: visual regression of canonical views on both backends; scenario tests that record frames and detect black pixels, holes and popping; temporal glitch detection (flicker, z-fighting shimmer, seams); benchmarks tracked over time; CI without a GPU runs visual tests on software-rendered WebGL2, WebGPU and performance run on real hardware with a documented procedure; property-based tests with reproducible seeds; fuzzing of every decoder; soak and chaos tests.
 - `PLAN.md` Performance and quality targets and the budgets in [quality.md](../plan/quality.md): p95 frame time ≤ 16.7 ms, main-thread CPU ≤ 6 ms p95, GPU ≤ 10 ms p95, zero steady-state allocations, first complete frame ≤ 1 s, zero black pixels, no popping, backend consistency within the visual-test tolerance.
@@ -99,7 +99,7 @@ How VibeGlobeEngine proves its visual and performance targets: render and visual
 | deck.gl        | Canvas-region screenshot             | pixelmatch, anti-aliasing ignored | 0.1                 | 1%                       | Shared by both backends, overrides per OS and device    | SwiftShader WebGL2 and WebGPU      |
 | Filament       | Application read-back                | Absolute per channel              | 5/255               | 0.1%                     | Per platform and backend, pinned browser, separate repo | Mesa and SwiftShader               |
 
-None of the six gates frame-time budgets automatically, and none measures frame-time distributions along scripted camera paths: VibeGlobeEngine's requirement is stricter than all of them.
+None of the six gates frame-time budgets automatically, and none measures frame-time distributions along scripted camera paths: VibeGlobe's requirement is stricter than all of them.
 
 ### Measurements in this environment
 
@@ -127,7 +127,7 @@ The `PLAN.md` references contain no testing papers. The methods here rest on: Ko
 - **Performance.** Micro-benchmarks (MapLibre, deck.gl) catch hot-path regressions but not frame pacing; load-time milestones (MapLibre) cover start-up only; interleaved A/B with statistics (Babylon.js) is the only method robust to machine drift; frame intervals on a vsync-locked display quantize to 16.7 ms and hide regressions until a budget breaks, so regression detection must compare CPU and GPU work time per frame, not intervals.
 - **WebGPU versus WebGL2.** WebGPU timestamps are quantized to 100 µs unless Chrome's WebGPU developer features are enabled; WebGL2 timer queries are not universally exposed; device loss on WebGPU is an event to assert, never a reason to skip (three.js#33559).
 
-## Chosen approach for VibeGlobeEngine
+## Chosen approach for VibeGlobe
 
 Recorded in [ADR 0012](../adr/0012-test-tooling.md):
 
@@ -146,6 +146,8 @@ Recorded in [ADR 0012](../adr/0012-test-tooling.md):
 - **M3–M4:** fuzz throughput per decoder, to size the CI and nightly input budgets.
 
 ## Open questions
+
+Update 2026-10-20: the owner kept GPU-less CI with no paid GPU runners or cloud device service for now (to be asked again before M15) and split CI into a fast job on every push and the full suite on `main` and nightly ([ADR 0015](../adr/0015-owner-decisions-2026-10-20.md)).
 
 - Baseline storage: plain PNG in git until about 50 MB in total, then Git LFS or a separate assets repository (Filament's model); decision in M2.
 - Cloud sessions use Chromium 141 while baselines come from Chromium 156: can sessions install the pinned browser (`npx playwright install chromium`), or must baseline updates always run in CI? Comparisons on other browsers are advisory, as in Filament.

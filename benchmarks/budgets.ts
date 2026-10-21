@@ -1,8 +1,14 @@
 // Benchmark statistics and budget comparison (ADR 0012), kept free of browser and file access for unit tests.
 
 export interface Budgets {
-  features: Record<string, { scenario: string; frameTimeP95Ms: number; cpuFrameP95Ms: number }>;
+  /** `gpuFrameP95Ms` is checked only where the GPU time was measured (timestamp queries; not on SwiftShader). */
+  features: Record<string, { scenario: string; frameTimeP95Ms: number; cpuFrameP95Ms: number; gpuFrameP95Ms?: number }>;
   packages: Record<string, { memoryScenario?: string; jsHeapMB?: number }>;
+  /**
+   * Time from navigation to the first complete frame, served from a local server (F546): the median over the
+   * scenario's runs, and the p90 over the cold runs (fresh context, cache disabled; ADR 0012).
+   */
+  startup?: { scenario: string; firstFrameMedianMs: number; firstFrameP90Ms?: number };
 }
 
 export interface Distribution {
@@ -23,6 +29,8 @@ export interface RunResult {
   gpuMemoryMB: number | null;
   startupMs: number | null;
   steadyStateAllocations: number | null;
+  /** Draw calls of the last frame sampled, which the `drag-*` scenarios are named after; null when not read. */
+  drawCalls: number | null;
 }
 
 // rAF intervals carry vsync and timestamp-coarsening jitter, so a frame counts as late only beyond it (ADR 0014): an
@@ -35,6 +43,12 @@ export interface ScenarioSummary {
   frameTimeP95Ms: number;
   cpuFrameP95Ms: number;
   jsHeapMB: number;
+  /** Median time to the first complete frame, or null when a run did not record it. */
+  startupMs: number | null;
+  /** Median of the runs' draw calls, or null when a run did not record them. */
+  drawCalls: number | null;
+  /** Median of the per-run GPU frame p95, or null when a run measured no GPU time. */
+  gpuFrameP95Ms: number | null;
 }
 
 /** The value below which `fraction` of the samples fall (nearest-rank method); 0 for no samples. */
@@ -61,6 +75,9 @@ export function summarizeRun(
   frameTimesMs: readonly number[],
   cpuFrameMs: readonly number[],
   jsHeapBytes: number,
+  startupMs: number | null = null,
+  drawCalls: number | null = null,
+  gpuFrameMs: readonly number[] = [],
 ): RunResult {
   return {
     frames: frameTimesMs.length,
@@ -71,10 +88,11 @@ export function summarizeRun(
     },
     cpuFrameMs: distribution(cpuFrameMs),
     jsHeapMB: jsHeapBytes / (1024 * 1024),
-    gpuFrameMs: null,
+    gpuFrameMs: gpuFrameMs.length > 0 ? distribution(gpuFrameMs) : null,
     gpuMemoryMB: null,
-    startupMs: null,
+    startupMs,
     steadyStateAllocations: null,
+    drawCalls,
   };
 }
 
@@ -84,10 +102,23 @@ export function summarizeScenario(runs: RunResult[]): ScenarioSummary {
     frameTimeP95Ms: median(runs.map((run) => run.frameTimeMs.p95)),
     cpuFrameP95Ms: median(runs.map((run) => run.cpuFrameMs.p95)),
     jsHeapMB: median(runs.map((run) => run.jsHeapMB)),
+    startupMs: runs.every((run) => run.startupMs !== null) ? median(runs.map((run) => run.startupMs ?? 0)) : null,
+    drawCalls: runs.every((run) => run.drawCalls !== null) ? median(runs.map((run) => run.drawCalls ?? 0)) : null,
+    gpuFrameP95Ms: runs.every((run) => run.gpuFrameMs !== null)
+      ? median(runs.map((run) => run.gpuFrameMs?.p95 ?? 0))
+      : null,
   };
 }
 
-export function findBudgetViolations(budgets: Budgets, summaries: Record<string, ScenarioSummary>): string[] {
+/**
+ * Lists every broken budget. `coldStartsMs` holds the times to the first complete frame of the cold runs, checked
+ * against `startup.firstFrameP90Ms` when that budget is set.
+ */
+export function findBudgetViolations(
+  budgets: Budgets,
+  summaries: Record<string, ScenarioSummary>,
+  coldStartsMs: readonly number[] = [],
+): string[] {
   const violations: string[] = [];
   for (const [feature, budget] of Object.entries(budgets.features)) {
     const summary = summaries[budget.scenario];
@@ -101,6 +132,9 @@ export function findBudgetViolations(budgets: Budgets, summaries: Record<string,
         violations.push(
           `${feature}: median cpu p95 ${summary.cpuFrameP95Ms.toFixed(3)} ms > ${budget.cpuFrameP95Ms} ms`,
         );
+      const gpu = summary.gpuFrameP95Ms;
+      if (budget.gpuFrameP95Ms !== undefined && gpu !== null && gpu > budget.gpuFrameP95Ms)
+        violations.push(`${feature}: median gpu p95 ${gpu.toFixed(3)} ms > ${budget.gpuFrameP95Ms} ms`);
     }
   }
   for (const [pkg, budget] of Object.entries(budgets.packages)) {
@@ -109,6 +143,25 @@ export function findBudgetViolations(budgets: Budgets, summaries: Record<string,
     if (!summary) violations.push(`${pkg}: scenario "${budget.memoryScenario}" did not run`);
     else if (summary.jsHeapMB > budget.jsHeapMB)
       violations.push(`${pkg}: median JS heap ${summary.jsHeapMB.toFixed(1)} MB > ${budget.jsHeapMB} MB`);
+  }
+  if (budgets.startup) {
+    const { scenario, firstFrameMedianMs } = budgets.startup;
+    const startupMs = summaries[scenario]?.startupMs;
+    if (startupMs === undefined) violations.push(`startup: scenario "${scenario}" did not run`);
+    else if (startupMs === null) violations.push(`startup: scenario "${scenario}" recorded no time to the first frame`);
+    else if (startupMs > firstFrameMedianMs)
+      violations.push(
+        `startup: median time to the first complete frame ${startupMs.toFixed(0)} ms > ${firstFrameMedianMs} ms`,
+      );
+    const { firstFrameP90Ms } = budgets.startup;
+    if (firstFrameP90Ms !== undefined) {
+      const p90 = percentile(coldStartsMs, 0.9);
+      if (coldStartsMs.length === 0) violations.push('startup: no cold run recorded a time to the first frame');
+      else if (p90 > firstFrameP90Ms)
+        violations.push(
+          `startup: p90 time to the first complete frame over ${coldStartsMs.length} cold runs ${p90.toFixed(0)} ms > ${firstFrameP90Ms} ms`,
+        );
+    }
   }
   return violations;
 }

@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/web-component",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine web-component: framework-neutral <vibe-globe> custom element.",
+  "description": "VibeGlobe web-component: framework-neutral <vibe-globe> custom element.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

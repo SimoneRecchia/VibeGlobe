@@ -1,6 +1,6 @@
 # 0010. Renderer base: three.js WebGPURenderer pinned to 0.186.1
 
-- Status: Accepted (partly superseded by 0013)
+- Status: Accepted (partly superseded by 0013 and 0015)
 - Date: 2026-10-20
 - Milestone: M2
 
@@ -257,3 +257,40 @@ This ADR confirms the proposal, with five changes:
 | Chaos suite   | Injected `GPUDevice.destroy()` and `WEBGL_lose_context`; recovery without reloading the page |
 | Leak suite    | Heap, `info.memory` and GL object counts flat over 100 mount/unmount cycles                  |
 | Debug overlay | Zero pipeline compiles after warm-up                                                         |
+
+## Update 2026-10-20
+
+Point 5 is settled by the owner ([ADR 0015](0015-owner-decisions-2026-10-20.md), decision 12): no separate lightweight first-frame path. M2 measures three.js after tree-shaking, time to first frame (at most 1 s from a LAN server) is the binding target, the initial-JavaScript byte budget is set from the measurement with a CI size check that blocks regressions (F546), and host apps can load the engine through a dynamic import (F547). The 300 KB proposal is withdrawn.
+
+## Update 2026-10-21
+
+M2's measurements (F546, F547):
+
+- **three.js 0.186.1 after tree-shaking**, as a minimal globe uses it (`WebGPURenderer` with its WebGL2 fallback and node materials): 233.1 KB gzip. The engine adds 12.8 KB, so the whole initial JavaScript of a minimal globe (core, renderer and controls, dynamic imports included) is 245.9 KB gzip (902 KB minified).
+- **Budgets** (`quality/budgets.json`, `initialJs`): 236 KB for three.js's share, about 1% above the measurement, so pulling in any further three.js module fails. 351 KB in total: the three.js budget plus the core, renderer and controls package budgets. `npm run size` checks both in the fast CI job. A scratch commit that pulled in the classic `WebGLRenderer` (three.js's share 316 KB) failed only that step ([CI run 39522798647](https://github.com/SimoneRecchia/VibeGlobe/actions/runs/39522798647)) and was reverted.
+- **Time to the first complete frame:** from navigation to the first frame with every tile and the base imagery drawn, served by a local server (`vite preview`). Median 456 ms over five fresh page loads in the cloud container with the software GPU. `npm run bench` checks the median against the 1 s budget (`quality/budgets.json`, `startup`).
+- **Lazy loading:** a host can import the engine with a dynamic import after a user action. Nothing of the engine or three.js is downloaded before it (`apps/lazy-host`, `e2e/lazy-host.spec.ts`).
+
+## Update 2026-10-21
+
+The start-up self-test of §2 and the warm-up of §4 were missing from the first M2 renderer (M2 review). Now:
+
+- **Self-test** (`warm-up.ts`). On WebGPU, right after `init()`, the renderer uploads a 4 × 4 mipmapped probe texture and draws the surface shader with it into a 4 × 4 render target inside `validation`, `out-of-memory` and `internal` error scopes, then waits for the queue. A thrown error, a scope error or a device loss disposes the renderer, destroys its device and starts WebGL2 on a new canvas, with `backend-fallback` naming the self-test and the reason; a forced `webgpu` backend fails with `unsupported-device` instead. An OffscreenCanvas cannot be replaced, so there the fallback ends in `renderer-failed`. End-to-end tests break every texture view (an impossible mip level count) and check both outcomes.
+- **Warm-up.** Before the first frame, and again after a recovery, `compileAsync` compiles a scene with one triangle per material variant laid out like a tile (in M2 the surface material of the active depth path), then one empty frame compiles three.js's output pass. `RendererStats.pipelineCompiles` counts pipelines created afterwards and the debug overlay shows it; an end-to-end test drags and zooms on both backends and requires 0.
+- **Giving up.** After the third recovery within a minute, besides the `renderer-failed` error, a static message (`role="alert"`, class `vibeglobe-renderer-failed`) replaces the canvas, as §8 requires (second M2 review). Its wording is English until the localization milestone.
+- **Releasing.** Destroying the renderer deletes every vertex array three.js still caches, its output-pass quad's included (KB-030).
+
+## Update 2026-10-21 (benchmarks and leak suite)
+
+The second M2 review found the tile-draw benchmarks and the leak suite of the follow-up list missing. Now:
+
+- **Tile-draw benchmarks.** `npm run bench` runs `drag-200`, `drag-400` and `drag-800` on each backend: continuous circular dragging through the navigation API (`?scenario=drag`) at views whose tile counts are set by the coarsest surface level (`GlobeOptions.minSurfaceLevel`, playground `?level=`): 208, 426 and 833 draws per frame at 1280 × 720. Each run records its draw count. The CPU sample covers the engine's whole frame, from the animation-frame callback to the engine's `frame` event. Budgets are the targets of `docs/plan/quality.md` (frame p95 17.2 ms, CPU p95 6 ms), binding on real GPUs. In the cloud container on SwiftShader, which rasterizes on the same CPU, the CPU p95 is 4.8, 9.0 and 16.3 ms on WebGL2 and 8.2, 9.8 and 20.9 ms on WebGPU; those numbers say nothing about the reference desktop, so the rule 7 decision waits for the hardware run (F075, `docs/guides/hardware-testing.md`).
+- **Cold starts.** The same command measures 10 cold starts (a fresh browser context with the HTTP cache disabled through the DevTools protocol) and checks their p90 against the 1 s target (`startup.firstFrameP90Ms`), as ADR 0012 specifies; the median over the scenario runs is still checked. Container: p90 724 ms.
+- **Leak suite** (`e2e/globe-leaks.spec.ts`). After 10 warm-up cycles, 100 mount/unmount cycles per backend, each mounting a globe in a new element, waiting for its first frame and destroying it. Before and after: the JS objects of a heap snapshot after a full collection (V8's compiled code and native records excluded: JIT tiering keeps compiling code long after the warm-up), instances per constructor, DOM nodes and event listeners (DevTools counters), and live GPU objects (WebGL2 objects not deleted in contexts not lost; WebGPU devices not destroyed with their buffers and textures). Every count must return to its value, and the heap may move by at most 64 KB. Measured: −1.1 KB (WebGL2) and −1.4 KB (WebGPU), no constructor grew by more than 7 instances. A globe kept alive after `destroy()` on purpose fails the suite with 2000 arrays and 600 matrices retained after 20 cycles.
+- **GPU time.** With `gpuTiming` (timestamp queries, which SwiftShader offers on both backends) the container's GPU p95 is 664, 961 and 1274 ms on WebGL2 and 969, 1204 and 1580 ms on WebGPU for 208, 426 and 833 draws: software rasterization at 1280 × 720, recorded as a trend only. The budget of 10 ms p95 (`gpuFrameP95Ms`) binds on real GPUs.
+
+## Update 2026-10-21 (recovery order and last good frame)
+
+The third M2 review found recovery showing the new canvas before its warm-up, contrary to §8 step 5, and leaving a canvas or the failure message behind when the globe was destroyed during recovery (KB-035). Now the backend keeps the shown canvas and the drawing canvas apart (`canvas-slot.ts`): a new renderer draws into a canvas that replaces the shown one only after its imagery and pipelines are ready, and a recovery that finds the backend destroyed after any of its waits releases the new renderer without touching the page. `e2e/globe-lifecycle.spec.ts` destroys the globe inside the slowed device request and inside the slowed warm-up and requires no canvas, no message and no `device-restored` or `error` event.
+
+**Last good frame** (point 4 above), measured in Chromium on SwiftShader by sampling the page every 50–200 ms after `simulateDeviceLoss()` at zoom 3: on WebGPU the old canvas keeps its last frame for the whole recovery (about 0.95 s) and is replaced with a complete frame; on WebGL2 the browser clears the lost context's canvas at once, so the page shows the background for about 1.3 s until the new canvas is swapped in. Keeping a WebGL2 picture would need a copy taken before every loss (the context is gone when the loss is reported), which costs a readback per frame; that is not done.

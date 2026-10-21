@@ -1,6 +1,6 @@
 # 0012. Test tooling, image tolerances and benchmark method
 
-- Status: Accepted (partly superseded by 0013)
+- Status: Accepted (partly superseded by 0013 and 0015)
 - Date: 2026-10-20
 - Milestone: M1–M3 (benchmark harness in M1; visual regression, renderer GPU tests and property-based tests in M2; scenario capture and fuzzing in M3)
 
@@ -45,7 +45,7 @@ Evidence is in the survey [Rendering tests and benchmarks](../research/testing-a
 **Browsers and flags.** Playwright projects:
 
 - `ci-webgl2` and `ci-webgpu` (CI and any machine, headless): `channel: 'chromium'` (Chromium's new headless mode in Playwright's pinned Chrome for Testing build, 156.0.8078.4 for 1.64.1; the old headless shell is not used). WebGL2: `--use-angle=swiftshader --enable-unsafe-swiftshader`. WebGPU: the same plus `--enable-unsafe-webgpu --enable-features=Vulkan --use-vulkan=swiftshader --use-webgpu-adapter=swiftshader`. Both add `--disable-lcd-text --hide-scrollbars --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --deterministic-mode`. Viewport 960×540 at device pixel ratio 1 (set through Playwright's `deviceScaleFactor`), plus a `ci-webgl2-hidpi` subset at ratio 2.
-- `hw-webgpu` and `hw-webgl2` (local hardware, headed, opt-in with `VGE_HW=1`): no SwiftShader flags and no blocklist override; `--enable-webgpu-developer-features` (unquantized timestamp queries) and `--enable-precise-memory-info`; on Linux also `--enable-unsafe-webgpu --enable-features=Vulkan`.
+- `hw-webgpu` and `hw-webgl2` (local hardware, headed, opt-in with `VIBEGLOBE_HW=1`): no SwiftShader flags and no blocklist override; `--enable-webgpu-developer-features` (unquantized timestamp queries) and `--enable-precise-memory-info`; on Linux also `--enable-unsafe-webgpu --enable-features=Vulkan`.
 - Startup assertions in every visual, scenario and benchmark test: on CI projects the browser version equals the pinned one, the WebGL2 `UNMASKED_RENDERER_WEBGL` contains "SwiftShader", and the WebGPU adapter is `google`/`swiftshader`; on every project the engine's active backend equals the project's backend. A mismatch fails the test; it is never a skip ([three.js#33559](https://github.com/mrdoob/three.js/issues/33559)). Runs on another browser build (the cloud container ships Chromium 141) are advisory and cannot update baselines.
 
 **Capture.** Tests read pixels from the engine through a test hook, never from page screenshots (page screenshots remain for DOM controls in M12): WebGL2 reads right after the frame's draw; WebGPU copies the canvas texture (configured with `COPY_SRC` in test mode) to a buffer, handling 256-byte rows and BGRA. Images are PNG, never JPEG.
@@ -69,13 +69,13 @@ A per-view override needs a linked issue and a reason in the test, and never exc
 **Benchmark method.**
 
 - Micro-benchmarks: `*.bench.ts` next to hot-path code with Vitest's `bench` fixture; `bench.compare` and `writeResult` files for before/after evidence in ADRs; referenced from `*.hot.ts` headers; not gated in CI.
-- Scenario benchmarks (budgets): on hardware projects, headed, display at native refresh, machine on mains power. One warm-up run discarded, then 5 runs in fresh pages; in each run the first 2 s are discarded. Per frame: rAF interval, main-thread CPU work (the `vge:frame` measure), GPU time (WebGPU `timestamp-query`; WebGL2 `EXT_disjoint_timer_query_webgl2` where exposed, otherwise recorded as unavailable), upload time and bytes, tiles, requests. Per run: p50, p95, p99, max, frames over 16.7 ms and 33.3 ms. A budget in `quality/budgets.json` is checked against the median of the per-run p95 values; a breach fails the command. Start-up: navigation start to the engine's `ready`, 10 cold runs with the cache disabled; the p90 must meet the 1 s target.
+- Scenario benchmarks (budgets): on hardware projects, headed, display at native refresh, machine on mains power. One warm-up run discarded, then 5 runs in fresh pages; in each run the first 2 s are discarded. Per frame: rAF interval, main-thread CPU work (the `vibeglobe:frame` measure), GPU time (WebGPU `timestamp-query`; WebGL2 `EXT_disjoint_timer_query_webgl2` where exposed, otherwise recorded as unavailable), upload time and bytes, tiles, requests. Per run: p50, p95, p99, max, frames over 16.7 ms and 33.3 ms. A budget in `quality/budgets.json` is checked against the median of the per-run p95 values; a breach fails the command. Start-up: navigation start to the engine's `ready`, 10 cold runs with the cache disabled; the p90 must meet the 1 s target.
 - Memory: JS heap through the Chrome DevTools Protocol after a forced collection; steady-state allocations through `HeapProfiler` sampling and garbage-collection trace events over 10 s of motion (must be zero); GPU memory from the engine's residency accounting.
 - Regression between commits: interleaved A/B on one machine (Babylon.js): baseline and candidate builds alternate for 10 rounds with alternating order after one warm-up round; compare CPU and GPU work time per frame, not vsync-quantized intervals; drop each side's highest and lowest round; a regression is a one-sided paired t-test on log times with p < 0.05 and a median ratio above 1.05; a coefficient of variation above 10% is reported as inconclusive and re-run, never counted as a pass for a release.
 - CI (SwiftShader): runs the same scenarios and stores all values as a trend, but gates only deterministic counters: zero duplicate downloads, request and tile counts, zero steady-state allocations, heap growth over 100 mount and unmount cycles, GPU resource counters at zero after `destroy()`, bundle sizes.
 - Results are JSON with a schema version, commit, date and device (name, OS, browser and version, GPU adapter or renderer string, pixel ratio, resolution), recorded under `benchmarks/results/<device>/` as `quality.md` states.
 
-**Property-based tests.** `test.prop` from `@fast-check/vitest`. CI uses a seed derived from the commit hash, printed in the log; locally the seed is random unless `VGE_FC_SEED` is set; `VGE_FC_RUNS` raises the default of 200 runs per property for long runs. A failure prints the seed, the replay path and the shrunk counterexample (verified), and every counterexample becomes an explicit regression case. State machines (scheduler, cache, tile states) use `fc.commands`.
+**Property-based tests.** `test.prop` from `@fast-check/vitest`. CI uses a seed derived from the commit hash, printed in the log; locally the seed is random unless `VIBEGLOBE_FC_SEED` is set; `VIBEGLOBE_FC_RUNS` raises the default of 200 runs per property for long runs. A failure prints the seed, the replay path and the shrunk counterexample (verified), and every counterexample becomes an explicit regression case. State machines (scheduler, cache, tile states) use `fc.commands`.
 
 **Fuzzing.** Per decoder: random bytes and mutated fixtures (bit flips, boundary bytes, truncation, duplication, corrupted length fields, splices between fixtures) generated by fast-check; the oracle accepts a decoded result or a typed decode error only. `@fast-check/worker` runs inputs in worker threads and fails any input over a time limit (default 100 ms); heap after a forced collection at the end must stay within 5% of the start. Budgets: 2,000 inputs per decoder in CI, 200,000 in the long run before a release; crashing inputs are committed as fixtures. Decoders that depend on browser APIs (`createImageBitmap`) are fuzzed in a Playwright page with the same arbitraries.
 
@@ -88,3 +88,35 @@ A per-view override needs a linked issue and a reason in the test, and never exc
 - Engine requirements this creates (M2–M3): a test mode with frame read-back, an injectable clock with manual stepping, `ready` and `idle` events, per-frame statistics (CPU, GPU, uploads, tiles, requests), the active backend and adapter information, the screen regions of fading tiles, a configurable clear color, GPU resource counters, and forced device or context loss.
 - Follow-up: M1 benchmark harness uses this method; M2 adds the capture helper, the CI projects and the hardware procedure (F072, F074, F075) and calibrates the hardware tolerance; M3 adds the scenario detectors and decoder fuzzing (F114, F122, F123).
 - Verification: the probes listed in the survey are repeated on Playwright's pinned Chromium in M1; F072 must fail on a changed shader color and on a 1-pixel geometry shift; each scenario detector must catch its injected defect (missing tile, fade bypass, seam, z-fighting pair) and pass the clean run; a tolerance changes only through a new ADR with the measurements behind it.
+
+## Update 2026-10-20
+
+The owner kept GPU-less CI and rejected paid cloud GPUs and GPU runners for now ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 2 and 6). To save minutes, every push and fork pull request runs one fast job with every non-browser check, while the browser jobs (end-to-end, and from M2 the visual and scenario tests, then the recorded benchmarks) run on pushes to `main`, nightly and on manual runs. The environment variables named here now use the `VIBEGLOBE_` prefix. Real-endpoint provider tests run through a separate live command only when their key is set (decision 5).
+
+## Update 2026-10-21
+
+The probes ADR 0013 #6 moved to M2 are `npm run bench:probes` (`benchmarks/probes.ts`), run in CI's end-to-end job on Playwright's pinned Chromium, with results in the `probes` artifact. On the container's Chromium 141 (SwiftShader, canonical view `europe`, 640 × 360):
+
+- **Determinism:** two browser launches give bit-identical canvases on both backends.
+- **Backend consistency:** 572 of 230,400 pixels (0.25%) differ between WebGPU and WebGL2, by at most 22 per channel; pixelmatch at threshold 0.1 reports 0 differing pixels, also when anti-aliased pixels count.
+- **Capture cost:** a canvas screenshot with PNG decoding takes a median of 169 ms (WebGPU) and 177 ms (WebGL2).
+- **Pacing:** `--deterministic-mode` leaves `requestAnimationFrame` at 16.7 ms (p50 and p95 16.7–16.8 ms).
+
+The 0.01% same-backend tolerance stays: the determinism probe shows no run-to-run variation on the same backend. CI's Chromium 156 results are added to `progress.md` from the first run that has them.
+
+## Update 2026-10-21 (Firefox and WebKit in CI)
+
+The Firefox and WebKit job (main, nightly and manual runs) runs the globe suites on WebGL2. CI run 39557234245 with a diagnostic of five views per engine:
+
+- **Firefox** gets no WebGL context in headless mode on the runner, even with `webgl.force-enabled`, Mesa's EGL and `LIBGL_ALWAYS_SOFTWARE` ("Exhausted GL driver options"), so every globe test fails at start-up with `unsupported-device`, as the engine must.
+- **WebKit** renders (capabilities, draw calls and tile counts as in Chromium, `EXT_clip_control` present) and passes 17 of 25 tests, the orbit completeness and pipeline tests among them. It fails the georeferencing comparison (a 41 px shift), completeness at low altitude and after recovery or an invalid position (most of the disk empty in the screenshot), the edge-drag anchor check (1.15 px against 1 px), the immediate frame after a resize, and the street-level jitter measurement (no trackable pattern). The resize-observer count of F068 was a test error (`docs/test-changes.md`).
+
+Decided by the agent (owner may revisit, `docs/open-questions.md`): the job stays in CI as a record (`continue-on-error`) and becomes binding with F504 (M15), whose scope is the full suite in Firefox and Safari. Its first step there is a renderer that WebKit captures and Firefox can create on CI (headed under Xvfb, or a GPU runner), then each remaining WebKit difference is diagnosed as an engine bug or a capture artifact. The diagnostic is `npm run diagnose:browser -- --browser webkit|firefox|chromium` (`scripts/browser/diagnose.ts`, with the playground served on :5173).
+
+## Update 2026-10-21 (capture hook, start-up assertions, clock)
+
+The third M2 review found that the end-to-end tests still read pixels from page screenshots and asserted only the backend. Now:
+
+- **Capture.** `Globe.captureFrame()` (a test hook, like `simulateDeviceLoss`) draws a frame and reads the canvas in the same task through `createImageBitmap`, which snapshots a WebGL drawing buffer or a WebGPU canvas texture before the browser presents it, then unpacks it through a 2D canvas: unpremultiplied RGBA, top row first, transparent where nothing was drawn. This is simpler than the per-backend read-backs described above (a WebGL `readPixels`, a WebGPU texture copy with 256-byte rows) and returns the same pixels the canvas shows. The test helper (`canvasImage` in `e2e/support/globe.ts`) composites the frame over the page background, so no page overlay is captured and no overlay-hiding style is needed. Page screenshots remain only where the test is about what the browser composites: the resize test's first frame after a resize (KB-013) and the lazy-loading host. Visual baselines are recorded again with the new capture.
+- **Start-up assertions.** `openGlobe` checks, after the backend, that Chromium on the software GPU reports a SwiftShader adapter and, in CI, that the browser is the pinned build (156.0.8078.4 for Playwright 1.64.1). A mismatch fails the test. Firefox and WebKit, and runs with `VIBEGLOBE_HARDWARE_GPU=1`, skip these two checks.
+- **Clock.** The engine's clock exists (`engine-clock.ts`, `Globe.timeMs`): display steps clamped to 100 ms, and `GlobeOptions.manualClockStepMs` for a fixed step per drawn frame. Nothing animates in M2; fades (M3) and animations (M6) run on it.

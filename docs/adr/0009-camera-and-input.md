@@ -1,6 +1,6 @@
 # 0009. Camera and input
 
-- Status: Accepted
+- Status: Accepted (open points settled by 0015)
 - Date: 2026-10-20
 - Milestone: M2, M5, M6 (terrain collision in M4)
 
@@ -140,3 +140,20 @@ Option 3. Package placement follows architecture.md §1.
     - **Flights:** `flyTo` endpoints are exact, the path is continuous, and Milan→Tokyo reaches the globe phase.
     - **Touch:** recognizer timelines cover tilt vs pinch vs twist and finger add/remove.
     - **Performance:** controls cost ≤ 0.2 ms CPU per frame with zero allocations, a CPU pick ≤ 0.1 ms, and input-to-frame latency measured on WebGPU and WebGL2.
+
+## Update 2026-10-20
+
+The owner confirmed the defaults ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 8 and 10): constant ground scale while panning in the flat 2D phase, and free rotation near the poles with no jump and never an automatic north-up. No change to this ADR's decisions.
+
+## Update 2026-10-21
+
+The first M2 controls did the camera math in the DOM handlers: every `pointermove` and `wheel` event ran a full anchor solve, against points 3 and 4 (M2 review). Now:
+
+- **Input capture.** The handlers only record: the pointer's latest position, a pending grab, and the wheel delta accumulated with its latest position (`packages/controls`). They ask the engine for a frame (`NavigationApi.requestUpdate`).
+- **Once per frame.** At the start of each frame (step 2), before the camera is updated, the engine calls the controls' `update()`, which turns the recorded input into at most one grab, one `dragTo` and one `zoomAt`. Several events between two frames cost one solve; the grab waits for the first move, so a click without motion costs no frame; a release applies the last position first. Intents made during the frame do not schedule another frame.
+- **Grazing horizon.** The blend toward a screen-center anchor (point 5, ill-conditioned cases) belongs with the solver's tilt and morph extension in M5, where tilted views and the flat phase make grazing rays common. In M2 a drag whose pixel leaves the globe keeps the last solvable camera, and the pole case uses the free rotation already implemented.
+- **Anchor accuracy.** The solver iterates to 0.001 px and succeeds only within 0.01 px, the drift point 5 allows; the rigid fallback near the poles repeats its rotation up to four times, since each is exact only for a sphere. Property tests check pan and zoom-at steps with tilt up to 60°, near both poles and across the antimeridian, and that at least 99% of realistic drag steps solve (`anchor.test.ts`, second M2 review).
+
+## Update 2026-10-21 (engine clock)
+
+The engine clock of the M2 follow-ups is built (`packages/core/src/globe/engine-clock.ts`): engine time advances by the display frame's timestamp step, clamped to 100 ms, kept in a typed array so the frame loop does not box it (ADR 0018), and `GlobeOptions.manualClockStepMs` fixes the step per drawn frame for tests (ADR 0012). `Globe.timeMs` exposes it. Inertia and animations (M6) are functions of this time.

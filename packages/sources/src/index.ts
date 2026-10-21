@@ -3,4 +3,6 @@
  * Source adapters for imagery, terrain, vector and 3D data, with provider profiles.
  * @module @vibeglobe/sources
  */
-export {};
+export { fetchTransport, retryAfterMs } from './fetch-transport.js';
+export { xyzImagery } from './xyz-imagery.js';
+export type { XyzImageryOptions } from './xyz-imagery.js';

@@ -26,6 +26,12 @@
       "path": "./packages/sources/tsconfig.test.json"
     },
     {
+      "path": "./packages/worker"
+    },
+    {
+      "path": "./packages/worker/tsconfig.test.json"
+    },
+    {
       "path": "./packages/layers"
     },
     {
@@ -69,6 +75,9 @@
     },
     {
       "path": "./apps/playground"
+    },
+    {
+      "path": "./apps/lazy-host"
     },
     {
       "path": "./tsconfig.tools.json"

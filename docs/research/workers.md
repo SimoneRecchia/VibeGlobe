@@ -212,7 +212,7 @@ Worker startup cost grows with script size. Cloning an object graph blocks the s
   - Rendering tests compare screenshots.
 - **three.js:** no automated worker tests; examples only.
 
-Overall, nobody benchmarks the main-thread cost of streaming with workers active, worker startup, or the effect of worker count on frame time. VibeGlobeEngine adds these as tracked benchmarks (section 9).
+Overall, nobody benchmarks the main-thread cost of streaming with workers active, worker startup, or the effect of worker count on frame time. VibeGlobe adds these as tracked benchmarks (section 9).
 
 ## 7. Literature
 

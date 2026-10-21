@@ -1,29 +1,27 @@
 name: CI
 
+# Saves minutes (ADR 0015): every push, and pull requests from forks, run one job with every fast check; pushes to
+# main, the nightly schedule and manual runs add the browser jobs: the end-to-end suite in four shards, the isolated
+# measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 jobs:
-  typecheck:
-    name: Type check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run typecheck
-
-  lint:
-    name: Lint, format and repository checks
+  fast:
+    name: Fast checks
+    # A pull request from this repository is already checked by the push of its head commit.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -31,10 +29,16 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run check
-      - run: npm run deadcode
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Repository checks
+        run: npm run check
+      - name: Dead code
+        run: npm run deadcode
       - name: Feature list and test guards against the previous state
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
@@ -43,54 +47,33 @@ jobs:
           fi
           npm run check:features -- --base "$base"
           npm run check:tests -- --base "$base"
-
-  test:
-    name: Unit tests with coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run coverage
-
-  docs:
-    name: API documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run docs
-
-  licenses:
-    name: License audit and notices
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run licenses
-      - run: npm run notices -- --check
-
-  bundle:
-    name: Bundle size and tree shaking
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version-file: .nvmrc, cache: npm }
-      - run: npm ci
-      - run: npm run build
-      - run: npm run check:consumer
-      - run: npm run size
-      - run: npm run treeshake
+      - name: Unit tests with coverage
+        run: npm run coverage
+      - name: License audit
+        run: npm run licenses
+      - name: Third-party notices up to date
+        run: npm run notices -- --check
+      - name: API documentation
+        run: npm run docs
+      - name: Build
+        run: npm run build
+      - name: Consumer check
+        run: npm run check:consumer
+      - name: Bundle size
+        run: npm run size
+      - name: Tree shaking
+        run: npm run treeshake
 
   e2e:
-    name: End-to-end tests (Chromium)
+    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/4)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    # ADR 0022: the functional suite is split across four runners by test file; the machine-wide measurements run in
+    # their own job below, so no shard waits for them and none of them shares a machine with a test.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
       CI: true
     steps:
@@ -100,20 +83,99 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npm run test:e2e
+      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
+      - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
+        if: matrix.shard == 1
+        run: npm run geodtest
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
 
+  measurements:
+    name: Isolated measurements (allocation, rendering probes)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
+    # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
+    # a bug that must be fixed before the milestone closes.
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test --project=measurements --no-deps
+      # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
+      - name: Rendering probes (recorded)
+        if: always()
+        timeout-minutes: 15
+        env:
+          VIBEGLOBE_DEVICE: ci-swiftshader
+        run: npm run bench:probes
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: measurements-report
+          path: |
+            playwright-report/
+            test-results/
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: probes
+          path: benchmarks/results/ci-swiftshader/
+
+  cross-browser:
+    name: Firefox and WebKit (WebGL2, informational until F504)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
+    # suites; both are inputs to F504 (M15), which makes this job binding (ADR 0012, update 2026-10-21).
+    continue-on-error: true
+    env:
+      CI: true
+      VIBEGLOBE_CROSS_BROWSER: '1'
+      VIBEGLOBE_DEVICE: ci-software
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps firefox webkit
+      # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner.
+      - run: sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2
+      - run: npm run build
+      # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
+      - run: npx playwright test --project=firefox --project=webkit
+      # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).
+      - name: OffscreenCanvas measurement
+        if: always()
+        timeout-minutes: 20
+        run: |
+          npm run bench:offscreen -- --browser firefox
+          npm run bench:offscreen -- --browser webkit
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cross-browser
+          path: |
+            playwright-report/
+            test-results/
+            benchmarks/results/ci-software/
+
   benchmarks:
     name: Benchmarks (recorded, not gated)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
-      VGE_DEVICE: ci-swiftshader
+      VIBEGLOBE_DEVICE: ci-swiftshader
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -123,6 +185,7 @@ jobs:
       - run: npm run build
       # Timings on SwiftShader are not meaningful (ADR 0012): record them as a trend, gate only deterministic counters.
       - run: npm run bench -- --report-only
+      - run: npm run bench:micro -- --report-only
       - if: always()
         uses: actions/upload-artifact@v7
         with:

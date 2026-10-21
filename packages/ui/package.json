@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/ui",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine ui: optional ready-made UI controls, theming and translations.",
+  "description": "VibeGlobe ui: optional ready-made UI controls, theming and translations.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

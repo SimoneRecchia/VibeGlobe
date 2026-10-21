@@ -1,0 +1,153 @@
+import { geodeticToEcef } from '../geodesy/ecef.js';
+import { quadtreeRowLatitudeRad, QUADTREE_SEGMENTS, type QuadtreeTile } from './surface-quadtree.hot.js';
+
+/** Geometry of one surface tile for the renderer: float32 offsets from a float64 origin (ADR 0004). */
+export interface TileMeshData {
+  /** Tile key, unique per tile. */
+  readonly key: number;
+  /** Tile origin, ECEF meters (float64). */
+  readonly originEcef: Float64Array;
+  /** Vertex offsets from the origin, xyz per vertex, meters. */
+  readonly positions: Float32Array;
+  /**
+   * Tile-local texture coordinates, three per vertex (M3 plan §2.4): u east and v south across the tile, 0 to 1, with
+   * v once in the tile's own rows (Mercator y for a Mercator tile) and once linear in latitude. Draws map them into an
+   * imagery texture through a per-draw transform.
+   */
+  readonly uvs: Float32Array;
+  /** Triangle indices, shared by every tile with the same grid size. */
+  readonly indices: Uint16Array;
+  /** Approximate bytes of vertex data, for memory accounting. */
+  readonly byteLength: number;
+}
+
+/** Grid segments per tile edge; 16 keeps the chord sag of a root tile under the refinement threshold quickly. */
+export const TILE_SEGMENTS = QUADTREE_SEGMENTS;
+const GRID = TILE_SEGMENTS + 1;
+const SURFACE_VERTICES = GRID * GRID;
+const SKIRT_VERTICES = 4 * GRID;
+
+let sharedIndices: Uint16Array | undefined;
+
+/** Indices of the tile grid plus its four skirts, built once and shared by every tile. */
+export function tileIndices(): Uint16Array {
+  if (sharedIndices) return sharedIndices;
+  const quads = TILE_SEGMENTS * TILE_SEGMENTS + 4 * TILE_SEGMENTS;
+  const indices = new Uint16Array(quads * 6);
+  let n = 0;
+  const quad = (a: number, b: number, c: number, d: number): void => {
+    indices.set([a, c, b, b, c, d], n);
+    n += 6;
+  };
+  for (let row = 0; row < TILE_SEGMENTS; row++) {
+    for (let col = 0; col < TILE_SEGMENTS; col++) {
+      const a = row * GRID + col;
+      quad(a, a + 1, a + GRID, a + GRID + 1);
+    }
+  }
+  const edges = skirtEdges();
+  for (let side = 0; side < 4; side++) {
+    const edge = edges[side] ?? [];
+    for (let i = 0; i < TILE_SEGMENTS; i++) {
+      const top0 = edge[i] ?? 0;
+      const top1 = edge[i + 1] ?? 0;
+      const skirt0 = SURFACE_VERTICES + side * GRID + i;
+      quad(top0, top1, skirt0, skirt0 + 1);
+    }
+  }
+  sharedIndices = indices;
+  return indices;
+}
+
+/** Surface vertex indices along the north, east, south and west edges, in the order their skirts are stored. */
+function skirtEdges(): number[][] {
+  const north: number[] = [];
+  const east: number[] = [];
+  const south: number[] = [];
+  const west: number[] = [];
+  for (let i = 0; i < GRID; i++) {
+    north.push(i);
+    east.push(i * GRID + TILE_SEGMENTS);
+    south.push(TILE_SEGMENTS * GRID + (TILE_SEGMENTS - i));
+    west.push((TILE_SEGMENTS - i) * GRID);
+  }
+  return [north, east, south, west];
+}
+
+const vertex = new Float64Array(3);
+
+function writeUvs(uvs: Float32Array, index: number, u: number, vOwn: number, vGeographic: number): void {
+  uvs[index * 3] = u;
+  uvs[index * 3 + 1] = vOwn;
+  uvs[index * 3 + 2] = vGeographic;
+}
+
+/** Calls `write` for every skirt vertex with the row and column of the edge vertex it hangs from. */
+function writeSkirts(write: (index: number, row: number, col: number) => void): void {
+  const edges = skirtEdges();
+  for (let side = 0; side < 4; side++) {
+    const edge = edges[side] ?? [];
+    for (let i = 0; i < GRID; i++) {
+      const source = edge[i] ?? 0;
+      write(SURFACE_VERTICES + side * GRID + i, Math.floor(source / GRID), source % GRID);
+    }
+  }
+}
+
+/**
+ * Builds the mesh of a geographic tile spanning [west, east] × [south, north] (radians) on the ellipsoid, with skirts
+ * of `skirtDepthMeters` that hide cracks between neighbors of different levels.
+ */
+export function buildTileMesh(
+  key: number,
+  westRad: number,
+  southRad: number,
+  eastRad: number,
+  northRad: number,
+  skirtDepthMeters: number,
+): TileMeshData {
+  const originEcef = new Float64Array(3);
+  geodeticToEcef((westRad + eastRad) / 2, (southRad + northRad) / 2, 0, originEcef);
+  const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const write = (index: number, row: number, col: number, heightMeters: number): void => {
+    const latRad = northRad + ((southRad - northRad) * row) / TILE_SEGMENTS;
+    geodeticToEcef(westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS, latRad, heightMeters, vertex);
+    for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
+    // Rows are linear in latitude: both v are the row fraction.
+    writeUvs(uvs, index, col / TILE_SEGMENTS, row / TILE_SEGMENTS, row / TILE_SEGMENTS);
+  };
+  for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
+  writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
+  const indices = tileIndices();
+  return { key, originEcef, positions, uvs, indices, byteLength: positions.byteLength + uvs.byteLength };
+}
+
+/**
+ * Builds the mesh of a surface-quadtree tile (ADR 0006 §1): rows at {@link quadtreeRowLatitudeRad}, so a Mercator
+ * tile's rows are evenly spaced in Mercator y, with skirts of `skirtDepthMeters`. Texture coordinates still address the
+ * equirectangular base imagery until imagery tiles arrive (M3 plan, increment 1).
+ */
+export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: number): TileMeshData {
+  const { westRad, eastRad } = tile;
+  const originEcef = new Float64Array(3);
+  geodeticToEcef((westRad + eastRad) / 2, quadtreeRowLatitudeRad(tile, TILE_SEGMENTS / 2), 0, originEcef);
+  const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const rowLatitudes = Array.from({ length: GRID }, (_, row) => quadtreeRowLatitudeRad(tile, row));
+  const northRad = rowLatitudes[0] ?? 0;
+  const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
+  const write = (index: number, row: number, col: number, heightMeters: number): void => {
+    const lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
+    const latRad = rowLatitudes[row] ?? 0;
+    geodeticToEcef(lonRad, latRad, heightMeters, vertex);
+    for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
+    // Rows are uniform in the tile's own scheme (Mercator y for the Mercator root, latitude for the caps).
+    const vGeographic = row === 0 ? 0 : row === TILE_SEGMENTS ? 1 : (northRad - latRad) / heightRad;
+    writeUvs(uvs, index, col / TILE_SEGMENTS, row / TILE_SEGMENTS, vGeographic);
+  };
+  for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
+  writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
+  const indices = tileIndices();
+  return { key: tile.key, originEcef, positions, uvs, indices, byteLength: positions.byteLength + uvs.byteLength };
+}

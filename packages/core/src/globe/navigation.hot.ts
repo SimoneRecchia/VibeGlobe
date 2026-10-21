@@ -1,0 +1,83 @@
+/**
+ * @hotpath Runs every frame of a drag or wheel zoom; doubles travel in preallocated arrays, never as call arguments or
+ * return values, which V8 boxes (ADR 0018).
+ * @benchmark packages/core/src/globe/frame-allocation.test.ts
+ */
+import { solveAnchor } from '../camera/anchor.js';
+import type { Camera } from '../camera/camera.js';
+import type { GeodeticRad } from '../geodesy/ecef.js';
+import { wrapLongitudeRad } from '../projections/longitude.js';
+import { clampPoseRange } from './camera-state.js';
+import type { GeoPosition, ScreenPoint } from './types.js';
+
+const RAD = Math.PI / 180;
+
+const anchor = new Float64Array(3);
+const pixel = new Float64Array(2);
+const start = new Float64Array(3);
+const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+
+/**
+ * Writes a screen point to `pixel` and returns whether it is one: an object with finite `xPx` and `yPx`. Finiteness is
+ * tested as x − x === 0 (NaN for NaN and ±Infinity), not with Number.isFinite, which V8's mid-tier compiler calls with
+ * a boxed argument. Navigation ignores invalid input instead of throwing (KB-029).
+ */
+function readPixel(point: unknown): boolean {
+  if (point === null || typeof point !== 'object') return false;
+  const x = (point as ScreenPoint).xPx;
+  const y = (point as ScreenPoint).yPx;
+  if (typeof x !== 'number' || typeof y !== 'number' || !(x - x === 0 && y - y === 0)) return false;
+  pixel[0] = x;
+  pixel[1] = y;
+  return true;
+}
+
+/** Moves the camera so the point in `anchor` shows at `pixel`, or leaves it where it was when that is impossible. */
+function solveDrag(camera: Camera): void {
+  const pose = camera.pose;
+  start[0] = pose.targetLongitudeRad;
+  start[1] = pose.targetLatitudeRad;
+  start[2] = pose.headingRad;
+  if (!solveAnchor(camera, anchor, pixel)) {
+    pose.targetLongitudeRad = start[0] ?? 0;
+    pose.targetLatitudeRad = start[1] ?? 0;
+    pose.headingRad = start[2] ?? 0;
+  }
+  const targetLon = pose.targetLongitudeRad;
+  if (!(targetLon >= -Math.PI && targetLon < Math.PI)) pose.targetLongitudeRad = wrapLongitudeRad(targetLon);
+  camera.update();
+}
+
+/** Moves the camera so a WGS84 position shows at a screen point; returns false for invalid input (nothing changes). */
+export function dragCamera(camera: Camera, position: unknown, point: unknown): boolean {
+  if (position === null || typeof position !== 'object' || !readPixel(point)) return false;
+  const lon = (position as GeoPosition).longitudeDeg;
+  const lat = (position as GeoPosition).latitudeDeg;
+  const height = (position as GeoPosition).heightMeters ?? 0;
+  if (typeof lon !== 'number' || typeof lat !== 'number' || typeof height !== 'number') return false;
+  if (!(lon - lon === 0 && lat - lat === 0 && height - height === 0)) return false;
+  if (!(lat >= -90 && lat <= 90)) return false;
+  anchor[0] = lon * RAD;
+  anchor[1] = lat * RAD;
+  anchor[2] = height;
+  solveDrag(camera);
+  return true;
+}
+
+/**
+ * Zooms by `deltaZoom` levels keeping the position under a screen point there, or about the target when the point is
+ * off the globe; returns false for invalid input (nothing changes).
+ */
+export function zoomCamera(camera: Camera, point: unknown, deltaZoom: unknown): boolean {
+  if (typeof deltaZoom !== 'number' || !(deltaZoom - deltaZoom === 0) || !readPixel(point)) return false;
+  camera.update();
+  const anchored = camera.pickEllipsoidAt(pixel, pick);
+  anchor[0] = pick.longitudeRad;
+  anchor[1] = pick.latitudeRad;
+  anchor[2] = 0;
+  camera.pose.rangeMeters *= 2 ** -deltaZoom;
+  clampPoseRange(camera);
+  camera.update();
+  if (anchored) solveDrag(camera);
+  return true;
+}

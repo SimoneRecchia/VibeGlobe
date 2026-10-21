@@ -1,0 +1,23 @@
+/**
+ * Entry of the worker program (ADR 0011 rule 5): one module worker that runs every built-in task for the page-wide
+ * pool. It installs the message handler and posts the `ready` handshake as soon as the module has evaluated.
+ *
+ * Only the pool loads this module, as a worker; nothing imports it on the main thread (the inline executor imports
+ * `tasks.js` instead), so touching the global scope here never affects the page.
+ */
+import { createTaskHost } from './task-host.js';
+import { TASKS } from './tasks.js';
+
+/**
+ * The part of the dedicated worker global scope this module uses. The package compiles against the DOM library for
+ * its main-thread entry, and the `WebWorker` library cannot be combined with it, so the scope is typed here.
+ */
+interface WorkerScope {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+  postMessage(message: unknown, transfer: Transferable[]): void;
+}
+
+const scope = globalThis as unknown as WorkerScope;
+const host = createTaskHost(TASKS, (message, transfer) => scope.postMessage(message, transfer));
+scope.onmessage = (event) => host.receive(event.data);
+host.announce();

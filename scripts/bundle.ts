@@ -3,7 +3,7 @@ import { gzipSync } from 'node:zlib';
 import { build, type Rolldown } from 'vite';
 import { ROOT_DIR } from './workspace.ts';
 
-const ENTRY_ID = '\0vge-bundle-entry';
+const ENTRY_ID = '\0vibeglobe-bundle-entry';
 
 export interface BundleResult {
   code: string;
@@ -23,7 +23,7 @@ export async function bundle(
     logLevel: 'silent',
     plugins: [
       {
-        name: 'vge-bundle-entry',
+        name: 'vibeglobe-bundle-entry',
         resolveId: (id) => (id === ENTRY_ID ? id : undefined),
         load: (id) => (id === ENTRY_ID ? entryCode : undefined),
       },

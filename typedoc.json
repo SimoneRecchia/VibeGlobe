@@ -1,6 +1,6 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "name": "VibeGlobeEngine",
+  "name": "VibeGlobe",
   "entryPoints": ["packages/*/src/index.ts"],
   "tsconfig": "tsconfig.docs.json",
   "out": "docs-site",

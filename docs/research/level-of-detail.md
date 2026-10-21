@@ -175,7 +175,7 @@ Takeaway: the best practice is a pure, frame-steppable selection function with s
 
 On WebGPU and WebGL2: sampling heights in the vertex shader is core in both. WebGL2 guarantees 16 vertex texture units, and R32F can be read with `texelFetch`; WebGPU uses `textureLoad` on `r32float`. Texture arrays exist in both (at least 256 layers). Clamp-to-edge works per layer, so slices in an array do not bleed into each other. Mixing two textures in one fragment needs explicit gradients (`textureGrad` / `textureSampleGrad`) when the texture changes inside a triangle, or mip selection spikes into a seam. A dithered fade needs alpha-to-coverage under MSAA, while a mix inside one draw behaves identically on both backends.
 
-## 8. Chosen approach for VibeGlobeEngine
+## 8. Chosen approach for VibeGlobe
 
 Full decision and options: [ADR 0006](../adr/0006-level-of-detail.md).
 

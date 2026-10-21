@@ -115,3 +115,24 @@ Option 6. The rules:
 - **Reassociation canary.** Its result is recorded per device in the hardware matrix.
 - **Scenario `street-level-jitter`.** 1 m altitude at about eight worldwide locations, residual ≤ 0.1 px on both backends (F057, F078). Morph sweep: m = 1 frames match the flat-only pipeline.
 - **Benchmark.** The per-frame offset update for 5,000 draws takes ≤ 0.1 ms on the reference desktop, with zero allocations. The GPU frame-time difference of the split is within noise on the reference tablet.
+
+## Update 2026-10-21
+
+The M2 implementation first sent T as the translation of the float64 model-view matrix, which three.js rounds to float32 once at upload: T_lo was lost (KB-025). The renderer now follows point 3 as written:
+
+- each frame `placeEyeRelative` splits T with `splitEyeOffset` and writes T_hi into the translation of the mesh's world matrix and T_lo into its bottom row, which an affine matrix leaves unused; both are float32 values, so three.js's float32 upload of the matrix keeps them exactly, and array stores allocate nothing (fields of an object such as `Vector3` box every double, ADR 0018);
+- the shared vertex node (`eye-relative.ts`) reads them from the world matrix and evaluates `projection · view · ((offset + T_hi) + T_lo)`; the rest of the matrix stays the identity.
+
+Verification done in M2: the property test of the Vitest bullet (`eye-offset.test.ts`, ≤ 0.01 px with the split and ≤ 0.4 px with T_lo dropped, plus a fixed case where dropping T_lo costs 0.13 px), and the street-level jitter scenario on both backends (F057). The GPU readback test and the reassociation canary are not built yet: their results matter per device, so they are listed in `docs/follow-ups.md` to join the hardware matrix run ([hardware testing](../guides/hardware-testing.md)).
+
+## Update 2026-10-21 (GPU readback and canary)
+
+The GPU readback test and the reassociation canary are built (`runGpuProbes` in `@vibeglobe/renderer`, `gpu-probes.ts`; playground `?experiment=gpu-probes`; `e2e/globe-gpu-probes.spec.ts`), on a renderer set up like the engine's and with the engine's vertex node, offset split and camera:
+
+- **Readback.** 256 tracked vertices (the property test's distribution, generated deterministically, plus the KB-025 case) each write their clip position from `(offset + T_hi) + T_lo` to their own pixel of an `rgba32float` target, with flat interpolation; the read-back positions are compared with the float64 projection on a 4K screen. A second pass zeroes T_lo.
+- **Canary.** The vertex node's sum with offset 0.5, T_hi = 2^24 and T_lo = −2^24, read back: 0 in float32 order, 0.5 if the compiler reassociated.
+- **Results** on Chromium's SwiftShader, WebGPU and WebGL2 (both depth paths): maximum error 0.0004 px (limit 0.01), 0.15 px with T_lo dropped (limit 0.4) and 0.12 px on the KB-025 case (so the probe sees a lost T_lo), the canary in order. The end-to-end test prints the result, so the hardware run (`docs/guides/hardware-testing.md`) records it per device.
+
+## Update 2026-10-21 (offset benchmark)
+
+The benchmark of the verification list exists: `packages/renderer/src/eye-relative.test.ts` updates the split offsets of 5,000 draws per frame and requires zero allocations (a deliberately allocating change fails it), and `npm run bench:micro` times it against `quality/budgets.json` (`micro`, 0.1 ms median). On the cloud container's idle vCPU the median is 0.108 ms (p95 0.23–0.27 ms over three runs); the budget is for the reference desktop and is checked there by the hardware run (F075). Real frames update only the drawn tiles (about 20–800 in the M2 scenarios).

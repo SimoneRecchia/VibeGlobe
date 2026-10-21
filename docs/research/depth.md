@@ -161,7 +161,7 @@ Findings:
 - **osgEarth:** no automated rendering tests; manual examples with `--nologdepth` and `--logdepth2` switches.
 - **iTowns:** Puppeteer functional tests compare depth-buffer picking with ray-cast range within 2 ‰. The test is currently disabled (`xit`, [misc_clamp_ground.js L54](https://github.com/iTowns/itowns/blob/v2.46.0/test/functional/misc_clamp_ground.js#L54)). Other tests pick from depth in the 2.5D view.
 
-None of them tests temporal z-fighting (pixels alternating across frames). None checks precision analytically against a budget, and none runs a no-clip-control WebGL path in CI. VibeGlobeEngine's tests fill those gaps (§10).
+None of them tests temporal z-fighting (pixels alternating across frames). None checks precision analytically against a budget, and none runs a no-clip-control WebGL path in CI. VibeGlobe's tests fill those gaps (§10).
 
 ## 8. Literature
 

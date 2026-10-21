@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/sources",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine sources: source adapters for imagery, terrain, vector and 3D data, with provider profiles.",
+  "description": "VibeGlobe sources: source adapters for imagery, terrain, vector and 3D data, with provider profiles.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -14,5 +15,8 @@
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0"
+  }
 }

@@ -1,5 +1,6 @@
-# The owner's brief and the frozen feature list keep their exact formatting.
+# The owner's brief, the license text and the frozen feature list keep their exact formatting.
 PLAN.md
+LICENSE.md
 feature_list.json
 package-lock.json
 THIRD_PARTY_NOTICES.md

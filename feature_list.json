@@ -520,7 +520,7 @@
         "Run the dependency-rule check and confirm no package depends on or refers to Cube",
         "Search the source tree and confirm it contains no Cube code (PLAN.md and docs may name Cube as the first consumer)"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F039",
@@ -549,6 +549,60 @@
       "status": "passing"
     },
     {
+      "id": "F542",
+      "milestone": 1,
+      "section": "Fixed constraints",
+      "description": "The repository is SimoneRecchia/VibeGlobe on GitHub, under the owner's personal account and fully separate from Vireox Cube, and the project is named VibeGlobe everywhere: package metadata, documentation, code identifiers, the `<vibe-globe>` Web Component tag and the VIBEGLOBE_ environment-variable prefix.",
+      "steps": [
+        "Query the repository through the GitHub API and confirm its full name is SimoneRecchia/VibeGlobe (case-insensitive) and the git remote of the working copy points to it",
+        "Search the tracked files case-insensitively for VibeGlobeEngine and for vge used as a prefix (VGE_, vge-, vge:, vgePlayground) and confirm the only matches are frozen feature-list text and the documents that record the rename (ADR 0015, ADR 0016, docs/feature-changes.md, docs/open-questions.md, docs/test-changes.md, progress.md)",
+        "Confirm the root package is named vibeglobe, every library uses the @vibeglobe/ scope, the Web Component tag is <vibe-globe>, and init.sh, the Playwright configuration, the benchmark runner and CI read VIBEGLOBE_ variables",
+        "Confirm the repository has no git submodule referring to Cube and the dependency-rule check finds no package depending on or referring to Cube",
+        "Run ./init.sh from a fresh clone and confirm it passes"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F543",
+      "milestone": 1,
+      "section": "Fixed constraints",
+      "description": "VibeGlobe is licensed under the PolyForm Noncommercial License 1.0.0: LICENSE.md holds the official text with the owner's required notice, every package.json declares PolyForm-Noncommercial-1.0.0, the README explains free noncommercial use and how to request a commercial license, and every shipped dependency's license allows distribution under these terms.",
+      "steps": [
+        "Compare LICENSE.md with the official PolyForm Noncommercial 1.0.0 text from the PolyForm Project and confirm it is identical apart from the leading Required Notice line naming the owner",
+        "Run npm run check and confirm it requires the SPDX identifier PolyForm-Noncommercial-1.0.0 in the root, library and app package.json files; remove the field from one package in a scratch branch and confirm the check fails",
+        "Open the README licensing section and confirm it states that noncommercial use is free, that any commercial use including resale needs a commercial license from the owner, and how to request one",
+        "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0015 explains why each allowlisted license permits distribution inside a PolyForm Noncommercial project"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F544",
+      "milestone": 1,
+      "section": "Documentation and distribution",
+      "description": "The repository has a contributing guide, a contributor license agreement that lets the owner offer external contributions under both the noncommercial and the commercial licenses, a security policy, a code of conduct, issue templates and a pull request template that asks for the agreement.",
+      "steps": [
+        "Open CONTRIBUTING.md and confirm it requires external contributors to accept CLA.md and states the repository rules (feature list, tests, bugs, licenses, ADRs) and how to submit",
+        "Open CLA.md and confirm contributors keep their copyright and grant copyright and patent licenses that allow distribution under PolyForm Noncommercial 1.0.0 and under commercial licenses, and that it explains how to accept",
+        "Open SECURITY.md and CODE_OF_CONDUCT.md and confirm supported versions, a private reporting channel, a response time and the enforcement contact",
+        "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature, question and commercial-license templates, a security link instead of blank issues, and the CLA acceptance line",
+        "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F545",
+      "milestone": 1,
+      "section": "Testing and verification",
+      "description": "CI saves minutes on GitHub-hosted runners without a GPU: every push and every pull request from a fork runs one fast job with the type check, lint, format check, repository checks and guards, unit tests with coverage, license audit, API documentation build and bundle-size checks, while pushes to main, a nightly schedule and manual runs add the end-to-end tests and the recorded benchmarks.",
+      "steps": [
+        "Open the CI workflow and confirm its triggers and the conditions of each job match the description",
+        "Push a branch and confirm its run contains only the fast job, every listed check runs, and a newer push cancels the older run",
+        "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
+        "Confirm the latest run on main and the latest nightly run contain the fast, end-to-end and benchmark jobs and are green"
+      ],
+      "status": "failing"
+    },
+    {
       "id": "F041",
       "milestone": 1,
       "section": "Milestones (all must be completed)",
@@ -573,7 +627,7 @@
         "Run property-based tests with random positions, heights from -12 km to +40,000 km and latitudes up to exactly ±90°, and confirm round trips stay within 1 mm",
         "Confirm the WGS84 constants (semi-major axis 6378137 m, flattening 1/298.257223563) are the only ellipsoid used"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F043",
@@ -585,7 +639,7 @@
         "In the playground, read the camera position in the globe phase and confirm it is WGS84 degrees and meters",
         "Run the API unit tests that pass positions in and out and confirm no projected coordinates leak through the public API"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F044",
@@ -597,7 +651,7 @@
         "Confirm the axes are orthonormal and point east, north and up against reference values",
         "Run property-based tests for round trips and continuity at the poles and across the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F045",
@@ -610,7 +664,7 @@
         "Confirm longitudes either side of ±180° map to adjacent projected positions with correct wrapping",
         "Confirm latitudes beyond the Web Mercator limit are clamped without NaN or infinity"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F046",
@@ -623,7 +677,7 @@
         "Confirm a failure prints the seed and the shrunk counterexample, and re-running with that seed reproduces it",
         "Confirm CI runs the suites"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F047",
@@ -635,7 +689,7 @@
         "Place the camera at known positions (orbit, 1 km, 1 m above ground) with known heading and tilt and confirm the matrices against reference values",
         "Confirm the camera state API exposes position, heading, tilt and roll with units in their names"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F048",
@@ -647,7 +701,7 @@
         "In the playground, move the pointer over known features of the pinned imagery and confirm the reported coordinates within one pixel's ground size",
         "Move the pointer over empty space beside the globe and confirm no position is reported and no error occurs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F049",
@@ -660,7 +714,7 @@
         "Confirm asynchronous operations return promises",
         "Confirm the public API is generated into the API reference with TSDoc"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F050",
@@ -672,7 +726,7 @@
         "Run a fuzz test over the configuration parser with random inputs and confirm it never throws an untyped error or hangs",
         "In the playground, apply an invalid camera position at runtime and confirm the view stays rendered and an error event is emitted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F051",
@@ -685,7 +739,7 @@
         "Confirm all globe logic (tiles, levels of detail, precision, camera) lives outside the renderer package",
         "Add an import of the rendering library to the core package in a scratch branch and confirm the check fails"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F052",
@@ -697,7 +751,7 @@
         "Instrument the renderer in the playground and confirm per-frame matrix updates are not performed for unchanged tiles",
         "Confirm textures upload only when the engine's upload scheduler releases them, by counting uploads per frame in a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F053",
@@ -709,7 +763,7 @@
         "Confirm the engine reports webgpu as the active backend in its API and the debug overlay",
         "Capture a screenshot and confirm the globe is rendered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F054",
@@ -722,7 +776,7 @@
         "Confirm the active backend is webgl2 and the globe renders",
         "Open http://localhost:5173/?backend=webgl2 and confirm the backend can also be forced"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F055",
@@ -734,7 +788,7 @@
         "Confirm the engine emits a typed unsupported-device error with a human-readable message",
         "Confirm the page does not crash and no unhandled exception is logged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F056",
@@ -746,7 +800,7 @@
         "Confirm the overlay shows the active backend, key GPU limits (maximum texture size, maximum anisotropy, compressed texture formats) and memory hints",
         "Read the same values through the public capabilities API in a Playwright test"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F057",
@@ -759,7 +813,7 @@
         "Confirm the residual screen-space motion not explained by camera movement stays below 0.1 px",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F058",
@@ -772,7 +826,7 @@
         "Confirm surfaces at a few centimeters of separation resolve in the correct order across the depth range",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F059",
@@ -785,7 +839,7 @@
         "Rotate the globe through all longitudes and over both poles (the pinned base is geographic imagery that covers the poles) and confirm no black or empty pixels appear",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F060",
@@ -797,7 +851,7 @@
         "Confirm after each move that the point under the cursor is the grabbed point, within one pixel",
         "Confirm dragging near the globe edge and over a pole causes no jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F061",
@@ -810,7 +864,7 @@
         "Continue until the camera is about 1 m above the ground and confirm the camera never goes below the ellipsoid surface",
         "Zoom back out to orbit and confirm the globe is complete"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F062",
@@ -823,7 +877,7 @@
         "Drag the globe and confirm frames render during the movement and stop shortly after it ends",
         "Change a setting that alters the image (for example layer opacity) and confirm rendering starts on the next frame and stops within a few frames after the last visible change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F063",
@@ -835,7 +889,7 @@
         "Hide the page (visibility hidden) with Playwright and confirm no frames are drawn",
         "Show the page again and confirm rendering resumes on the next frame with no stale or blank frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F064",
@@ -847,7 +901,7 @@
         "Sample heap allocations during the steady state and confirm the frame loop allocates zero bytes per frame",
         "Confirm no garbage-collection pause appears in the recorded trace during the steady state"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F065",
@@ -859,7 +913,7 @@
         "Confirm it records frame-time and input-latency measurements for main-thread and worker rendering in the supported browsers",
         "Confirm it states the decision and, if adopted, which browsers use it and how the fallback works"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F066",
@@ -872,7 +926,7 @@
         "Confirm the engine emits a device-lost event, recreates the device and its GPU resources, and renders a complete view again",
         "Confirm the camera, layers and settings are preserved"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F067",
@@ -885,7 +939,7 @@
         "Confirm the engine emits context-lost and restored events and renders a complete view again",
         "Confirm the camera, layers and settings are preserved"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F068",
@@ -898,7 +952,7 @@
         "Confirm all workers are terminated and all DOM and window event listeners are removed",
         "Confirm calling API methods after destroy() throws a typed error instead of crashing"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F069",
@@ -911,7 +965,7 @@
         "Destroy one and confirm the other keeps rendering correctly",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F070",
@@ -923,7 +977,7 @@
         "Record frames and confirm none is stretched, blank or black",
         "Confirm the globe stays centered on the same geographic point with the correct aspect ratio"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F071",
@@ -935,7 +989,7 @@
         "Confirm the canvas backing size follows the pixel ratio times the resolution scale",
         "Compare screenshots against baselines at each ratio and confirm crisp output without blur"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F072",
@@ -948,7 +1002,7 @@
         "Change a shader color in a scratch branch and confirm the suite fails with a diff image",
         "Confirm the baseline update procedure is documented"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F073",
@@ -960,7 +1014,7 @@
         "Compare the two screenshots pixel by pixel",
         "Confirm the difference is within the documented tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F074",
@@ -972,7 +1026,7 @@
         "Push a commit and confirm the job renders the canonical views and passes",
         "Confirm screenshots and diffs are uploaded as CI artifacts on failure"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F075",
@@ -984,7 +1038,7 @@
         "Follow it on a machine with a GPU and confirm the WebGPU visual tests and the benchmarks run",
         "Confirm results are saved in the documented location with the device, OS, browser and GPU recorded"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F076",
@@ -996,7 +1050,7 @@
         "Verify distances match within 0.1 mm and azimuths within 1e-9 degrees, including nearly antipodal points, the poles and the antimeridian",
         "Run property-based tests for symmetry (distance A-B equals B-A) and consistency of the direct and inverse problems"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F077",
@@ -1008,7 +1062,33 @@
         "Verify results match GeographicLib reference values within 1 mm and 1 square meter respectively",
         "Run property-based tests verifying area is invariant to vertex order rotation and sign follows orientation"
       ],
-      "status": "failing"
+      "status": "passing"
+    },
+    {
+      "id": "F546",
+      "milestone": 2,
+      "section": "Engineering standards: optimization, correctness, compatibility",
+      "description": "The renderer's three.js cost is measured after tree-shaking, the initial-JavaScript byte budget is set from that measurement in quality/budgets.json, and the CI size check fails on any regression beyond it; time to first frame (at most 1 s from a LAN server) is the binding target, with no separate lightweight first-frame path.",
+      "steps": [
+        "Build the renderer and a minimal globe entry and record in the renderer ADR the gzip size of three.js after tree-shaking and of the whole initial JavaScript",
+        "Confirm quality/budgets.json holds the initial-JavaScript budget derived from that measurement and the size check reports it",
+        "Add enough reachable code to the minimal entry to exceed the budget in a scratch branch and confirm the size check fails in the fast CI job",
+        "Run the start-up benchmark from a local server and confirm the time to the first complete frame is recorded and its median is at most 1 s"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F547",
+      "milestone": 2,
+      "section": "Engineering standards: optimization, correctness, compatibility",
+      "description": "Host apps can load the engine lazily with a dynamic import: no engine code is in the host's initial bundle until the import runs, and the globe then starts normally.",
+      "steps": [
+        "Build a fixture host app that renders its own page and loads the engine with a dynamic import only after a user action",
+        "Confirm from the build output and the network log that no engine or three.js code loads before the action",
+        "Trigger the action and confirm the globe renders on both backends with no console error",
+        "Confirm the SSR import test passes for every package, so a static import is also safe"
+      ],
+      "status": "passing"
     },
     {
       "id": "F078",
@@ -1023,7 +1103,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F079",
@@ -1037,7 +1117,7 @@
         "Verify it summarizes how those projects test and benchmark compression",
         "Verify it states the chosen approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F080",
@@ -1049,7 +1129,7 @@
         "Confirm tile bounds, parent and child keys, and position-to-tile lookups against reference values",
         "Run property-based tests confirming children exactly cover their parent with no gap or overlap, including at the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F081",
@@ -1061,7 +1141,7 @@
         "Open http://localhost:5173/?debug=1 and confirm each drawn tile's screen-space error is at or below the configured threshold",
         "Tilt the view and confirm tiles near the camera are finer than tiles near the horizon"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F082",
@@ -1074,7 +1154,7 @@
         "Confirm the parent remains drawn over the area until all its needed children are ready, with no hole in any frame",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F083",
@@ -1087,7 +1167,7 @@
         "Confirm the area shows the upsampled best available ancestor and zero black or background pixels",
         "Confirm the debug overlay marks the area as drawn from an ancestor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F084",
@@ -1099,7 +1179,7 @@
         "Set a very small memory budget and navigate widely until eviction occurs",
         "Confirm pinned tiles are never evicted and zooming out to the globe immediately shows complete imagery with no new request for pinned tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F085",
@@ -1111,7 +1191,7 @@
         "Record frames and the requested tile levels over time",
         "Confirm the view first shows the base, then intermediate levels, then the target level, and every frame is complete"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F086",
@@ -1123,7 +1203,7 @@
         "In the playground, confirm through the debug overlay that no tile outside the view is selected or drawn",
         "Rotate quickly and confirm no visible tile is wrongly culled (zero empty pixels at the screen edges)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F087",
@@ -1135,7 +1215,7 @@
         "In the playground at a low oblique view, confirm tiles beyond the horizon are not selected or requested",
         "Confirm no tile visible near the horizon is wrongly culled (zero empty pixels below the horizon line)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F088",
@@ -1147,7 +1227,7 @@
         "In the playground, record the order of tile requests after a jump to a new view",
         "Confirm center tiles precede edge tiles, coarser levels precede finer ones, and visible tiles precede prefetch tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F089",
@@ -1257,7 +1337,7 @@
         "Confirm the returning tiles are served from the RAM cache with no new request",
         "Confirm the debug overlay counts cache hits for them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F098",
@@ -1271,7 +1351,7 @@
         "Confirm memory use never exceeds the budgets",
         "Confirm the evicted tiles are the least recently used and no tile on screen is ever evicted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F099",
@@ -1283,7 +1363,7 @@
         "Confirm image decoding happens in worker threads",
         "Confirm no main-thread task longer than the per-frame budget is caused by decoding"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F100",
@@ -1296,7 +1376,7 @@
         "Configure a different asset base URL and confirm workers and assets load from it",
         "Search the built bundles and confirm no eval, new Function or blob-generated code"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F101",
@@ -1309,7 +1389,7 @@
         "Confirm no frame exceeds the per-frame upload budget and the total frame budget defined in docs/plan",
         "Confirm all uploads complete within a bounded number of frames"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F102",
@@ -1321,7 +1401,7 @@
         "Confirm each resident tile is uploaded exactly once",
         "Confirm re-showing a cached tile triggers no upload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F103",
@@ -1912,6 +1992,19 @@
       "steps": [
         "Unit test the curves: sample zoom finely across the full range and assert each curve is continuous, monotonic where specified, and has a bounded derivative",
         "Assert the morph reaches its flat end before tilt exceeds a small epsilon, within the configured overlap",
+        "Assert the default phase ranges match the numeric zoom or altitude ranges set in docs/plan for globe (world, continents), flattening (country), 2D map (region, city) and 3D view (neighborhood, street)",
+        "Open `?scenario=zoom-globe-to-street` and assert the morph factor, tilt and relief reported per frame follow the curves"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F548",
+      "milestone": 5,
+      "section": "Map experience: globe, 2D and 3D",
+      "description": "In Auto mode the morph factor, tilt and terrain relief are smooth, continuous functions of zoom (easing curves, never thresholds) that ease in and out at their ends; tilt stays at exactly 0° through the 2D map band (region, city) and rises only at neighborhood scale.",
+      "steps": [
+        "Unit test the curves: sample zoom finely across the full range and assert each curve is continuous, monotonic where specified, has a bounded derivative and a zero derivative at both ends of its transition",
+        "Assert tilt is exactly 0° from the globe through the end of the 2D map band and starts rising only at the neighborhood-scale zoom set in docs/plan, after the morph has reached the flat plane",
         "Assert the default phase ranges match the numeric zoom or altitude ranges set in docs/plan for globe (world, continents), flattening (country), 2D map (region, city) and 3D view (neighborhood, street)",
         "Open `?scenario=zoom-globe-to-street` and assert the morph factor, tilt and relief reported per frame follow the curves"
       ],
@@ -3353,6 +3446,20 @@
       "status": "failing"
     },
     {
+      "id": "F549",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "Live Google Maps Platform tests read a restricted API key only from the GOOGLE_MAPS_API_KEY environment variable or CI secret, never committed; they apply the EEA terms of the owner's billing region, stay within the free monthly usage caps, stop at the first quota error, and do not run when no key is set.",
+      "steps": [
+        "Search the repository and its history for API key patterns and confirm no key is committed, and that the live tests read the key only from GOOGLE_MAPS_API_KEY",
+        "Run the live suite without the variable and confirm it reports that it did not run, while the fixture conformance suites still run and pass",
+        "Confirm the requests per live run, times the scheduled runs per month, stay below the free monthly cap of each Map Tiles API product recorded in the Google terms ADR",
+        "Make the fixture server answer with a quota error and confirm the live suite stops at once with a clear message",
+        "With the owner's key, run the live suite once and confirm it passes under the EEA terms"
+      ],
+      "status": "failing"
+    },
+    {
       "id": "F263",
       "milestone": 7,
       "section": "Map sources: map-agnostic design",
@@ -4164,6 +4271,19 @@
       "status": "failing"
     },
     {
+      "id": "F550",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "A Docker-based static LAN server script lets any machine play the offline local-network role: one command serves the playground build, engine assets and offline packages over HTTP on the local network with the headers the engine needs, and the offline mode 1 tests use it.",
+      "steps": [
+        "Run the LAN server script on a machine with only Docker and confirm it serves the playground, the engine assets and a fixture package on the configured port",
+        "Confirm the responses carry correct MIME types, CORS and caching headers and support HTTP range requests for PMTiles",
+        "From another machine or container on the same network with no internet route, open the playground and confirm offline navigation with zero black pixels",
+        "Confirm the offline mode 1 end-to-end tests start the same server image"
+      ],
+      "status": "failing"
+    },
+    {
       "id": "F329",
       "milestone": 8,
       "section": "Milestones (all must be completed)",
@@ -4239,6 +4359,19 @@
         "Verify the output lists tile counts and estimated bytes per dataset, region and zoom level, plus totals",
         "Verify tile counts grow by about 4x per added zoom level for a fixed area",
         "Build a small region and verify the actual output size is within 30% of the estimate"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F552",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "Before downloading anything, the pipeline prints the estimated download size, output size and cost (including AWS requester-pays transfer) of the build and asks for confirmation; it proceeds only after an explicit yes, or an explicit confirmation flag in non-interactive runs.",
+      "steps": [
+        "Run a sample-area build interactively and confirm the estimate is printed before any request to a data source and the build waits for confirmation",
+        "Answer no and confirm nothing is downloaded or written",
+        "Run the same build non-interactively without the confirmation flag and confirm it stops before any download",
+        "Confirm the cost estimate uses per-GB prices recorded in the pipeline configuration with their reading date, and the actual transfer of the sample build is within 30% of the estimate"
       ],
       "status": "failing"
     },
@@ -4345,6 +4478,20 @@
         "Load the imagery and terrain outputs in the playground as source chains, zoom into Italy and across its borders, and verify high detail inside Italy with seamless fallback outside (zero black pixels, no visible seam); check the OpenStreetMap vector-tile outputs with the MVT conformance suite",
         "Add a new test region with only a new configuration file and verify it builds without code changes"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F551",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "Builds are region-based and defined only by configuration: the repository ships ready-to-run configurations for the world at low detail and for Italy at high detail, verified on small sample areas, which consumers run in full on their own infrastructure and AWS account.",
+      "steps": [
+        "Open the world low-detail and Italy high-detail configurations and confirm they cover every default dataset with their extents, zoom ranges and outputs",
+        "Run each configuration restricted to its documented sample area and confirm the outputs stop at the configured zooms and cover the sample area",
+        "Load the sample outputs in the playground as source chains, zoom across the high-detail boundary and confirm high detail inside with seamless fallback outside (zero black pixels, no visible seam); check the OpenStreetMap vector-tile outputs with the MVT conformance suite",
+        "Run the estimate command on both full configurations and confirm it completes without downloading anything",
+        "Add a new test region with only a new configuration file and confirm it builds without code changes"
+      ],
       "status": "failing"
     },
     {
@@ -4397,6 +4544,18 @@
       "status": "failing"
     },
     {
+      "id": "F553",
+      "milestone": 9,
+      "section": "Fixed constraints",
+      "description": "A hosting guide shows consumers how to serve tiles, offline packages and engine assets from their own backend and frontend (a static HTTP server, object storage behind a CDN, or a LAN server), since the project runs no servers.",
+      "steps": [
+        "Open the hosting guide in the documentation site and confirm it covers static folders, PMTiles and MBTiles packages, engine assets served from the app's own origin with a configurable base path, MIME types, CORS, HTTP range requests, caching and compression headers, and attribution",
+        "Follow the guide to host the sample outputs and engine assets with a plain static server and confirm the playground runs from them",
+        "Confirm the guide and the default configuration reference no server run by the project"
+      ],
+      "status": "failing"
+    },
+    {
       "id": "F347",
       "milestone": 9,
       "section": "Milestones (all must be completed)",
@@ -4406,6 +4565,22 @@
         "Verify the outputs are identical by checksum to a previous build of the same configuration",
         "Load the imagery and terrain outputs in the playground both as static folders and as offline packages and run a globe-to-street scenario over Italy: zero black pixels on WebGPU and forced WebGL2; check the vector-tile outputs with the MVT conformance suite",
         "Verify license and attribution metadata accompany every output and match the data licenses document",
+        "Confirm no known bug remains open for this milestone",
+        "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F554",
+      "milestone": 9,
+      "section": "Milestones (all must be completed)",
+      "description": "Milestone 9 acceptance: the default datasets rebuild reproducibly from configuration on the sample areas, and the world and Italy configurations are ready to run.",
+      "steps": [
+        "From a clean checkout, run the world low-detail and Italy high-detail configurations of every default dataset on their documented sample areas",
+        "Verify the outputs are identical by checksum to a previous build of the same configuration",
+        "Load the imagery and terrain outputs in the playground both as static folders and as offline packages and run a globe-to-street scenario over the Italian sample area: zero black pixels on WebGPU and forced WebGL2; check the vector-tile outputs with the MVT conformance suite",
+        "Verify license and attribution metadata accompany every output and match the data licenses document",
+        "Run the estimate for both full configurations and confirm size and cost are printed with no download",
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
@@ -6213,6 +6388,19 @@
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
         "Assert the guide never names Cube-specific code or configuration as a requirement"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F555",
+      "milestone": 14,
+      "section": "Documentation and distribution",
+      "description": "An integration guide for consumers such as Cube explains installation from the public npm registry (@vibeglobe), licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "steps": [
+        "Open the integration guide in the documentation site",
+        "Check it covers npm installation, licensing, Vue and Nuxt setup with SSR, lazy loading, asset hosting and base path, CSP, network modes and offline packages, provider keys and attribution",
+        "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
+        "Assert the guide never names Cube-specific code or configuration as a requirement"
+      ],
       "status": "failing"
     },
     {
@@ -6604,6 +6792,18 @@
         "Copy the minimal example into a new project and assert the globe renders",
         "Assert every link in the README resolves"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F556",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The README explains what VibeGlobe is, how to install it from the public npm registry (@vibeglobe), the licensing (free noncommercial use, commercial licenses on request), a minimal usage example, and links to every guide.",
+      "steps": [
+        "Open README.md and confirm the npm installation and licensing sections",
+        "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
+        "Assert every link in the README resolves"
+      ],
       "status": "failing"
     },
     {
@@ -6674,6 +6874,18 @@
       "steps": [
         "Build the documentation site",
         "Assert each listed document is present and reachable from the navigation",
+        "Run a link checker over the built site and assert zero broken links"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F557",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The documentation site also contains the licensing section with the commercial-license contact, the contributing guide with the contributor license agreement, the security policy and the code of conduct, with no broken links.",
+      "steps": [
+        "Build the documentation site",
+        "Assert the licensing section, contributing guide, contributor license agreement, security policy and code of conduct are reachable from the navigation",
         "Run a link checker over the built site and assert zero broken links"
       ],
       "status": "failing"
@@ -6761,6 +6973,19 @@
         "Assert publishing happens only from CI with credentials stored as CI secrets",
         "Assert the workflow publishes to the private registry only after the owner has approved the release"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F558",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "Release automation generates the changelog, creates version tags and publishes the packages from CI to the public npm registry under the @vibeglobe organization, only after the owner's approval.",
+      "steps": [
+        "Run the release workflow for a pre-release version as a dry run",
+        "Assert the changelog is updated, a version tag is created and every package would be published to the public npm registry under @vibeglobe with public access and matching versions",
+        "Assert publishing happens only from CI with the npm token stored as a CI secret",
+        "Assert the workflow publishes only after the owner has approved the release"
+      ],
       "status": "failing"
     },
     {
@@ -6782,6 +7007,18 @@
       "description": "A separate consumer project installs the packages from the private registry like any other dependency, and nothing in the engine refers to Cube.",
       "steps": [
         "Install the published packages from the private registry into a fresh project with only registry credentials configured",
+        "Assert the globe renders",
+        "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F559",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "A separate consumer project installs the packages from the public npm registry like any other dependency, with no registry credentials, and nothing in the engine refers to Cube.",
+      "steps": [
+        "Install the published packages from npm into a fresh project with no registry configuration or credentials",
         "Assert the globe renders",
         "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
       ],
@@ -6822,6 +7059,19 @@
         "Assert every package is available at version 1.0.0 in the private registry",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F560",
+      "milestone": 15,
+      "section": "Milestones (all must be completed)",
+      "description": "Version 1.0.0 of every package is published to npm under @vibeglobe.",
+      "steps": [
+        "Obtain the owner's approval to publish 1.0.0, as PLAN.md requires for externally visible actions",
+        "Run the release workflow for 1.0.0",
+        "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the PolyForm-Noncommercial-1.0.0 license",
+        "Install 1.0.0 into a fresh consumer project and assert the globe renders"
+      ],
       "status": "failing"
     },
     {
@@ -6833,6 +7083,18 @@
         "List every recommendation in PLAN.md (for example three.js as rendering base, the precision and depth techniques, KTX2/Basis, IndexedDB or OPFS, PMTiles or MBTiles, signed distance field labels, Karney geodesics, the default datasets)",
         "For each, confirm it was followed or that an ADR explains why another option was chosen",
         "A fresh-context reviewer confirms no undocumented deviation remains"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F561",
+      "milestone": 15,
+      "section": "Fixed constraints",
+      "description": "By the first release the repository is public, as a source-available project under the PolyForm Noncommercial License 1.0.0.",
+      "steps": [
+        "Obtain the owner's approval to make the repository public, as PLAN.md requires for repository settings",
+        "Query the repository through the GitHub API and confirm it is public",
+        "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
       "status": "failing"
     },

@@ -1,0 +1,93 @@
+/**
+ * The `decode-image` task (ADR 0011 rule 4, ADR 0010 §6): encoded image bytes in, a transferable `ImageBitmap` out,
+ * decoded with fixed options so neither renderer backend converts anything at upload.
+ */
+import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
+
+/** Input of `decode-image`: encoded bytes (transferred to the worker) and their declared content type. */
+export interface DecodeImageInput {
+  readonly bytes: ArrayBuffer;
+  /** MIME type from the response, for example `image/png`; may be empty when the server sent none. */
+  readonly contentType: string;
+}
+
+/** Output of `decode-image`; its shape is core's `DecodedTile`, with the bitmap transferred. */
+export interface DecodedImage {
+  readonly image: ImageBitmap;
+  readonly widthPx: number;
+  readonly heightPx: number;
+  /** Bytes of the texture on the GPU as RGBA8 with a full mip chain, from {@link rgba8MipChainBytes}. */
+  readonly gpuBytes: number;
+}
+
+/**
+ * No orientation change beyond the file's own, no premultiplication and no color-space conversion: textures use
+ * `flipY = false`, `premultiplyAlpha = false` and declare sRGB themselves (ADR 0010 §6).
+ */
+const DECODE_OPTIONS: ImageBitmapOptions = {
+  imageOrientation: 'from-image',
+  premultiplyAlpha: 'none',
+  colorSpaceConversion: 'none',
+};
+
+const BYTES_PER_TEXEL_RGBA8 = 4;
+
+/**
+ * Exact bytes of an RGBA8 texture of `widthPx` × `heightPx` with every mip level down to 1 × 1: the sum of the level
+ * sizes, each level halving both dimensions (rounded down, at least 1).
+ */
+export function rgba8MipChainBytes(widthPx: number, heightPx: number): number {
+  let width = Math.max(1, Math.floor(widthPx));
+  let height = Math.max(1, Math.floor(heightPx));
+  let total = width * height * BYTES_PER_TEXEL_RGBA8;
+  while (width > 1 || height > 1) {
+    width = width > 1 ? Math.floor(width / 2) : 1;
+    height = height > 1 ? Math.floor(height / 2) : 1;
+    total += width * height * BYTES_PER_TEXEL_RGBA8;
+  }
+  return total;
+}
+
+function parseInput(input: unknown): DecodeImageInput {
+  if (typeof input !== 'object' || input === null) throw new TaskError('invalid-input', 'decode-image needs an object');
+  const { bytes, contentType } = input as Partial<Record<keyof DecodeImageInput, unknown>>;
+  if (!(bytes instanceof ArrayBuffer)) throw new TaskError('invalid-input', 'decode-image needs `bytes` (ArrayBuffer)');
+  if (typeof contentType !== 'string')
+    throw new TaskError('invalid-input', 'decode-image needs `contentType` (string)');
+  return { bytes, contentType };
+}
+
+function cancelledError(): TaskError {
+  return new TaskError('cancelled', 'decode-image was cancelled');
+}
+
+/**
+ * Decodes encoded image bytes into an `ImageBitmap`. Fails with `invalid-input` for a malformed input, `unsupported`
+ * where `createImageBitmap` does not exist, `undecodable` for bytes the browser cannot decode, and `cancelled` when
+ * cancelled before or right after decoding (the bitmap is then closed).
+ */
+export async function decodeImage(input: unknown, context: TaskContext): Promise<TaskOutput> {
+  const { bytes, contentType } = parseInput(input);
+  if (typeof createImageBitmap !== 'function')
+    throw new TaskError('unsupported', 'createImageBitmap is not available in this context');
+  if (context.isCancelled()) throw cancelledError();
+  let image: ImageBitmap;
+  try {
+    image = await createImageBitmap(new Blob([bytes], { type: contentType }), DECODE_OPTIONS);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const type = contentType === '' ? 'no content type' : contentType;
+    throw new TaskError('undecodable', `${bytes.byteLength} bytes (${type}) could not be decoded: ${reason}`);
+  }
+  if (context.isCancelled()) {
+    image.close();
+    throw cancelledError();
+  }
+  const output: DecodedImage = {
+    image,
+    widthPx: image.width,
+    heightPx: image.height,
+    gpuBytes: rgba8MipChainBytes(image.width, image.height),
+  };
+  return { output, transfer: [image] };
+}

@@ -18,5 +18,5 @@
     "apps/*/vite.config.ts",
     "eslint.config.ts"
   ],
-  "exclude": ["scripts/fixtures"]
+  "exclude": ["scripts/fixtures/consumer"]
 }

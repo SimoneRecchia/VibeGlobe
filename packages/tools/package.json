@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/tools",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine tools: command-line tools: data pipeline and offline package builder.",
+  "description": "VibeGlobe tools: command-line tools: data pipeline and offline package builder.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/core",
   "version": "0.0.0",
-  "description": "VibeGlobeEngine core: math, geodesy, camera, tiling, scheduling, cache and events.",
+  "description": "VibeGlobe core: math, geodesy, camera, tiling, scheduling, cache and events.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

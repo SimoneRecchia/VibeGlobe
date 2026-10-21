@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "commit": "c39b6bfc7f453e18411c72b32f1c87ceb0e929b0",
+  "date": "2026-10-21T00:28:26.450Z",
+  "device": {
+    "name": "cloud-container-swiftshader",
+    "os": "linux 6.18.44-fc-v139",
+    "browser": "chromium 141.0.7390.37",
+    "gpu": "software (SwiftShader)"
+  },
+  "method": {
+    "viewport": {
+      "width": 480,
+      "height": 360
+    },
+    "warmUpMs": 5000,
+    "driveMs": 10000,
+    "load": "30 ms task every 100 ms"
+  },
+  "results": [
+    {
+      "backend": "webgpu",
+      "mode": "main",
+      "load": false,
+      "frames": 181,
+      "frameIntervalP50Ms": 54.4,
+      "frameIntervalP95Ms": 107.4,
+      "inputs": 184,
+      "inputLatencyP50Ms": 48.8,
+      "inputLatencyP95Ms": 101.1
+    },
+    {
+      "backend": "webgpu",
+      "mode": "main",
+      "load": true,
+      "frames": 176,
+      "frameIntervalP50Ms": 56,
+      "frameIntervalP95Ms": 103.6,
+      "inputs": 179,
+      "inputLatencyP50Ms": 49.7,
+      "inputLatencyP95Ms": 97.6
+    },
+    {
+      "backend": "webgpu",
+      "mode": "main",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 0.5,
+      "misalignmentMaxPx": 0.81
+    },
+    {
+      "backend": "webgpu",
+      "mode": "worker",
+      "load": false,
+      "frames": 183,
+      "frameIntervalP50Ms": 50.3,
+      "frameIntervalP95Ms": 104.6,
+      "inputs": 187,
+      "inputLatencyP50Ms": 58.6,
+      "inputLatencyP95Ms": 111
+    },
+    {
+      "backend": "webgpu",
+      "mode": "worker",
+      "load": true,
+      "frames": 170,
+      "frameIntervalP50Ms": 56.1,
+      "frameIntervalP95Ms": 116.9,
+      "inputs": 175,
+      "inputLatencyP50Ms": 61.5,
+      "inputLatencyP95Ms": 127.9
+    },
+    {
+      "backend": "webgpu",
+      "mode": "worker",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 2.12,
+      "misalignmentMaxPx": 4.05
+    },
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": false,
+      "frames": 191,
+      "frameIntervalP50Ms": 51,
+      "frameIntervalP95Ms": 63.8,
+      "inputs": 194,
+      "inputLatencyP50Ms": 46.9,
+      "inputLatencyP95Ms": 60.3
+    },
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": true,
+      "frames": 184,
+      "frameIntervalP50Ms": 55.3,
+      "frameIntervalP95Ms": 79.5,
+      "inputs": 187,
+      "inputLatencyP50Ms": 49.7,
+      "inputLatencyP95Ms": 75
+    },
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 0.5,
+      "misalignmentMaxPx": 0.71
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": false,
+      "frames": 185,
+      "frameIntervalP50Ms": 50.7,
+      "frameIntervalP95Ms": 95.1,
+      "inputs": 188,
+      "inputLatencyP50Ms": 56.4,
+      "inputLatencyP95Ms": 98.1
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": true,
+      "frames": 174,
+      "frameIntervalP50Ms": 54.2,
+      "frameIntervalP95Ms": 100.1,
+      "inputs": 177,
+      "inputLatencyP50Ms": 59.8,
+      "inputLatencyP95Ms": 112.1
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 1.89,
+      "misalignmentMaxPx": 2.55
+    }
+  ]
+}

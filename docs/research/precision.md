@@ -213,7 +213,7 @@ OpenGlobus started with Cesium-style RTE and added RTC per terrain segment in 20
 - **3DTilesRendererJS:** Jest unit tests on the CPU (ellipsoid, tiling, scheduler). No render or precision tests.
 - **osgEarth:** Catch2 unit tests (`osgearth_tests`: spatial references, extents). Example applications (`osgearth_transform`, `osgearth_eci`) for manual checks, and `osgearth_benchmarks`.
 
-**Gap:** no project has an automated test that measures street-level jitter. deck.gl's comparison of GPU and CPU projections is the closest model, and VibeGlobeEngine must build its own (F057).
+**Gap:** no project has an automated test that measures street-level jitter. deck.gl's comparison of GPU and CPU projections is the closest model, and VibeGlobe must build its own (F057).
 
 ## 6. Literature
 
@@ -259,7 +259,7 @@ The morph needs a globe position and a flat position for every vertex. The studi
 
 - **Cesium:** blends absolute 2D and 3D world positions (RTE each, or no RTC for tiles). That is imprecise mid-morph and broke at t = 1 when `mix` or branches were rewritten (#12879).
 - **MapLibre:** blends clip-space results of two independent precise paths. That avoids a shared frame but makes the intermediate shape non-metric (z is special-cased).
-- **VibeGlobeEngine needs a true 3D morph surface** (tilt, terrain, depth testing).
+- **VibeGlobe needs a true 3D morph surface** (tilt, terrain, depth testing).
 
 The precise form follows from linearity. Let G be the globe position, F the flat position placed in the morph frame, and E the eye. Then:
 
@@ -276,7 +276,7 @@ The precise form follows from linearity. Let G be the globe position, F the flat
 - **Picking and unprojection must be float64** with eye-relative rays (osgEarth#181).
 - **Shaders that need the Earth** (atmosphere, horizon) should receive the Earth center relative to the eye. Its 0.4 m float32 error is irrelevant at atmospheric scale.
 
-## 8. Chosen approach for VibeGlobeEngine
+## 8. Chosen approach for VibeGlobe
 
 Decided in [ADR 0004](../adr/0004-precision-strategy.md): **camera-relative rendering with float64 chunk origins and a split per-draw offset.**
 

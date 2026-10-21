@@ -1,4 +1,4 @@
-# VibeGlobeEngine
+# VibeGlobe
 
 Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 fallback). `PLAN.md` is the owner's master brief; `docs/plan/` is the technical plan.
 
@@ -27,22 +27,34 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 
 ## Rules that differ from defaults
 
-- `feature_list.json`: only the `status` field ever changes. Never delete, reorder or reword entries (ADR 0003; `npm run check:features`).
+- `feature_list.json`: only the `status` field ever changes. Never delete, reorder or reword entries (ADR 0003; `npm run check:features`). An entry an owner decision made impossible becomes `superseded`, recorded with its replacements in `docs/feature-changes.md` (ADR 0016). An entry whose only remaining steps need the owner (devices, real keys, money, publishing, making the repository public, legal sign-off) becomes `pending`, listed in `docs/open-questions.md` (ADR 0017).
 - Never remove, skip or weaken a test, and never loosen `quality/*.json`. A genuinely wrong test or gate is fixed with the reason logged in `docs/test-changes.md` (`npm run check:tests`).
 - Bugs: list them in `docs/known-bugs.md`; every fix starts with a failing regression test; no known bug may stay open at the end of a milestone.
 - English everywhere (code, comments, docs, commit messages). TypeScript strict, ESM, no `any`, TSDoc on public APIs, units in names (`Meters`, `Deg`, `Rad`, `Px`, `Ms`).
 - Hot paths: performance-critical modules are named `*.hot.ts` and open with a TSDoc header `@hotpath <reason>` and `@benchmark <path>`; they are exempt from the function and module length limits (`npm run check`).
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
-- Permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
+- VibeGlobe is under PolyForm Noncommercial 1.0.0 (`LICENSE.md`); every package.json declares `PolyForm-Noncommercial-1.0.0` (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
+- The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys (`GOOGLE_MAPS_API_KEY` comes from the environment).
+- Milestone process (ADR 0021, ADR 0022): one complete fresh-context review per milestone, then one pass that checks only that round's fixes; no further complete rounds. Every fix starts with a regression test that fails before it.
+- End-to-end tests: during feature work run only the specs the change affects (`npx playwright test <specs>`, `-g <feature id>`). The full suite runs at the end of each milestone (manual CI run, four shards) and nightly. Machine-wide measurements (`--project=measurements --no-deps`) and the rendering probes run in their own CI job, never next to other tests, and never gate feature work; a red measurement is still a bug to fix before the milestone closes.
+- Subagents work in separate packages or files, create files and never commit; integrate each one when it finishes and run the tests it affects.
+- Time matters: avoid work that does not move a feature to passing; the earlier a correct result, the better. Commit and push after every completed feature.
+- Research: read only the parts of other engines that answer the current question; keep notes short.
+- A problem that resists three different approaches: record the options in `docs/open-questions.md`, choose the simplest that meets PLAN.md, and move on.
+- Tests: write them only for behaviors the plan or a fixed bug requires, roughly one focused test per stated behavior; scratch checks used while working are not committed. Do not re-run a test whose code and dependencies have not changed since it last passed; run only the tests your change affects (the full suite runs at the end of each milestone and in CI).
+- CI: re-run only failed jobs, never passing ones; re-run a flaky failure at most once, then investigate it.
+- Duplicate tests may be merged only if no behavior loses coverage, each merge recorded in `docs/test-changes.md`. Never delete or weaken a test just to make it pass.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
 
 ## Layout and gotchas
 
-- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`), the playground in `apps/playground`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
+- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`), the playground in `apps/playground`, a fixture host that loads the engine lazily in `apps/lazy-host`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
 - Workspace packages export a `source` condition: the playground and Vitest run on TypeScript sources without building; bundle-size and tree-shaking checks use `dist/`.
 - Relative imports in libraries use `.js` extensions (NodeNext); tooling scripts import `.ts` and run directly with Node ≥ 22.18.
 - TypeScript is pinned to 6.0.x (typescript-eslint and TypeDoc do not support 7.x yet); eslint-plugin-jsdoc to 63.x (64+ needs Node 22.22.2).
 - A PostToolUse hook (`.claude/hooks/check-edited-file.sh`) formats, lints and type-checks every file Claude edits.
-- Cloud containers: Playwright uses the preinstalled Chromium via `VGE_CHROMIUM_PATH=/opt/pw-browsers/chromium` (`init.sh` sets it).
+- CI (ADR 0015, ADR 0022): every push runs one fast job with every non-browser check; the sharded end-to-end suite, the isolated measurements, cross-browser runs and benchmarks run only on `main`, nightly and manual runs (`workflow_dispatch`), so run the affected end-to-end specs locally before pushing.
+- The repository (`SimoneRecchia/VibeGlobe`) is public since 2026-10-21: everything pushed is published, so never commit secrets, personal data or third-party material whose license does not allow it.
+- Cloud containers: Playwright uses the preinstalled Chromium via `VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium` (`init.sh` sets it).

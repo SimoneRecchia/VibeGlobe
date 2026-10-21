@@ -16,6 +16,18 @@
     },
     {
       "path": "../../packages/ui"
+    },
+    {
+      "path": "../../packages/renderer"
+    },
+    {
+      "path": "../../packages/controls"
+    },
+    {
+      "path": "../../packages/sources"
+    },
+    {
+      "path": "../../packages/worker"
     }
   ]
 }

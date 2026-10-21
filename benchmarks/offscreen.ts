@@ -164,6 +164,8 @@ const hardware = process.argv.includes('--hardware') || hardwareGpu();
 const executablePath = engineName === 'chromium' && !channel ? process.env['VIBEGLOBE_CHROMIUM_PATH'] : undefined;
 const browser = await engine.launch({
   ...(engineName === 'chromium' ? { args: gpuArgs(hardware) } : {}),
+  // Firefox disables WebGL on software-only Linux machines unless forced.
+  ...(engineName === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true } } : {}),
   ...(channel ? { channel } : {}),
   ...(executablePath ? { executablePath } : {}),
 });

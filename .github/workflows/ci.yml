@@ -113,6 +113,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps firefox webkit
       - run: npm run build
+      # Temporary: what each engine shows at several views, printed to the log.
+      - name: Diagnose engines
+        run: |
+          (npm run dev > dev.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://localhost:5173/ > /dev/null && break; sleep 1; done
+          node scripts/browser/diagnose.ts --browser webkit || true
+          node scripts/browser/diagnose.ts --browser firefox || true
       # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
       - run: npx playwright test --project=firefox --project=webkit
       # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).

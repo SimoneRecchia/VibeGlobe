@@ -18,7 +18,11 @@ const crossBrowserProjects =
     ? (['Desktop Firefox', 'Desktop Safari'] as const).map((device) => ({
         name: device === 'Desktop Firefox' ? 'firefox' : 'webkit',
         // The Chromium flags and executable do not apply.
-        use: { ...devices[device], launchOptions: {} },
+        use: {
+          ...devices[device],
+          // Firefox disables WebGL on software-only Linux machines unless forced.
+          launchOptions: device === 'Desktop Firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true } } : {},
+        },
         testMatch: CROSS_BROWSER_SPECS,
         grepInvert: WEBGPU_TESTS,
       }))

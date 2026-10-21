@@ -150,3 +150,7 @@ The first M2 renderer used three.js's default scene depth, which is 24-bit (KB-0
 - **Analytic test.** `depth.test.ts` emulates both paths in float32 (steps of 3e-7·d and 5e-7·d resolve from 1 mm to 4e7 m) and shows the fixed-function [−1, 1] mapping does not, which is why the fragment write exists.
 
 The depth-readback reconstruction and the GPU timing comparison of the two paths are not built yet: the timing needs the reference devices, so both are listed in `docs/follow-ups.md` to join the hardware matrix run ([hardware testing](../guides/hardware-testing.md)).
+
+## Update 2026-10-21 (depth readback)
+
+The depth-readback reconstruction is built (`runGpuProbes`, `e2e/globe-gpu-probes.spec.ts`): 64 planes facing the camera at log-spaced view distances from 0.12 m to 4e7 m, drawn with the engine's material into a target with a 32-bit float depth texture, whose depth a second pass copies into an `rgba32float` target. Every plane's d = near / z is within 1.5e-7·d on WebGPU and WebGL2 with clip control and within 2.3e-7·d on the fragment path (limit 1e-6·d), on Chromium's SwiftShader. The GPU timing comparison of the two paths needs timestamp queries on the reference devices: `npm run bench` records the GPU frame time where the browser offers it, with a `drag-400-webgl2-fragment` scenario next to `drag-400-webgl2` for the 1.25× rule.

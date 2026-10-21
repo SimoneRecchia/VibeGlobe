@@ -124,3 +124,11 @@ The M2 implementation first sent T as the translation of the float64 model-view 
 - the shared vertex node (`eye-relative.ts`) reads them from the world matrix and evaluates `projection · view · ((offset + T_hi) + T_lo)`; the rest of the matrix stays the identity.
 
 Verification done in M2: the property test of the Vitest bullet (`eye-offset.test.ts`, ≤ 0.01 px with the split and ≤ 0.4 px with T_lo dropped, plus a fixed case where dropping T_lo costs 0.13 px), and the street-level jitter scenario on both backends (F057). The GPU readback test and the reassociation canary are not built yet: their results matter per device, so they are listed in `docs/follow-ups.md` to join the hardware matrix run ([hardware testing](../guides/hardware-testing.md)).
+
+## Update 2026-10-21 (GPU readback and canary)
+
+The GPU readback test and the reassociation canary are built (`runGpuProbes` in `@vibeglobe/renderer`, `gpu-probes.ts`; playground `?experiment=gpu-probes`; `e2e/globe-gpu-probes.spec.ts`), on a renderer set up like the engine's and with the engine's vertex node, offset split and camera:
+
+- **Readback.** 256 tracked vertices (the property test's distribution, generated deterministically, plus the KB-025 case) each write their clip position from `(offset + T_hi) + T_lo` to their own pixel of an `rgba32float` target, with flat interpolation; the read-back positions are compared with the float64 projection on a 4K screen. A second pass zeroes T_lo.
+- **Canary.** The vertex node's sum with offset 0.5, T_hi = 2^24 and T_lo = −2^24, read back: 0 in float32 order, 0.5 if the compiler reassociated.
+- **Results** on Chromium's SwiftShader, WebGPU and WebGL2 (both depth paths): maximum error 0.0004 px (limit 0.01), 0.15 px with T_lo dropped (limit 0.4) and 0.12 px on the KB-025 case (so the probe sees a lost T_lo), the canary in order. The end-to-end test prints the result, so the hardware run (`docs/guides/hardware-testing.md`) records it per device.

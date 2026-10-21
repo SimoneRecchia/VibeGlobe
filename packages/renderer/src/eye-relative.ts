@@ -9,7 +9,7 @@ import {
   varying,
   vec4,
 } from 'three/tsl';
-import { GreaterEqualDepth, type NodeMaterial, type Object3D } from 'three/webgpu';
+import { GreaterEqualDepth, type Node, type NodeMaterial, type Object3D } from 'three/webgpu';
 import { splitEyeOffset } from './eye-offset.js';
 
 const high = new Float32Array(3);
@@ -43,13 +43,23 @@ export function placeEyeRelative(mesh: Object3D, origin: Float64Array, eye: Floa
  * greater-equal test: the same stored value as the hardware reversed-Z path.
  */
 export function makeEyeRelative(material: NodeMaterial, depthPath: DepthPath): void {
-  // The translation column, and the bottom row (the translation column of the transpose).
-  const eyeHigh = modelWorldMatrix.mul(vec4(0, 0, 0, 1)).xyz;
-  const eyeLow = transpose(modelWorldMatrix).mul(vec4(0, 0, 0, 1)).xyz;
-  const viewPosition = cameraViewMatrix.mul(vec4(positionGeometry.add(eyeHigh).add(eyeLow), 1));
+  const viewPosition = eyeRelativeViewPosition(positionGeometry);
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
   if (depthPath === 'fragment') {
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
   }
+}
+
+/** A vertex offset from the mesh's origin, relative to the eye: (offset + T_hi) + T_lo, each sum in float32. */
+export function eyeRelativePosition(offset: Node<'vec3'>): Node<'vec3'> {
+  // The translation column, and the bottom row (the translation column of the transpose).
+  const eyeHigh = modelWorldMatrix.mul(vec4(0, 0, 0, 1)).xyz;
+  const eyeLow = transpose(modelWorldMatrix).mul(vec4(0, 0, 0, 1)).xyz;
+  return offset.add(eyeHigh).add(eyeLow);
+}
+
+/** The view-space position of a vertex offset from the mesh's origin: the rotation-only view of the eye-relative one. */
+export function eyeRelativeViewPosition(offset: Node<'vec3'>): Node<'vec4'> {
+  return cameraViewMatrix.mul(vec4(eyeRelativePosition(offset), 1));
 }

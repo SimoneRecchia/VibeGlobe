@@ -372,21 +372,7 @@ export class ThreeBackend implements RendererBackend {
       const entry = this.debugEntries[i];
       if (entry) placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
     }
-    this.camera.matrixWorldInverse.fromArray(view.view);
-    this.camera.matrixWorld.copy(this.camera.matrixWorldInverse).invert();
-    this.camera.projectionMatrix.fromArray(view.projection);
-    if (this.depthPath === 'fragment') {
-      // The engine's projection clips z to [0, w] with z = near (ADR 0005 §2), near being its element 14. WebGL2 clips
-      // z to [−w, w]: z = 2·near − d clips at d = near and nowhere else; the depth comes from the shader, which reads
-      // near from the camera. It is stored only when it changes, since three.js reads it as a number uniform and a new
-      // value is a new heap number (ADR 0018); near stays 0.1 m except within 20 cm of the ground (ADR 0005 §5).
-      const near = view.projection[14] ?? 0;
-      if (near !== this.camera.near) this.camera.near = near;
-      const projection = this.camera.projectionMatrix.elements;
-      projection[10] = 1;
-      projection[14] = 2 * near;
-    }
-    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+    this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.renderer.render(this.scene, this.camera);
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };

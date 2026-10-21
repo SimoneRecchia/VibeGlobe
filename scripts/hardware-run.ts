@@ -55,6 +55,7 @@ outcomes['e2e'] = step(
     'e2e/visual.spec.ts',
     'e2e/globe-core.spec.ts',
     'e2e/globe-precision.spec.ts',
+    'e2e/globe-gpu-probes.spec.ts',
     '--reporter=line,json',
   ],
   { PLAYWRIGHT_JSON_OUTPUT_NAME: join(outDir, 'e2e.json') },

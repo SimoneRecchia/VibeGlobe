@@ -131,7 +131,11 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
 
 const experiment = params.get('experiment') === 'offscreen' ? params.get('render') : null;
 
-if (app && canvas && experiment === 'worker') {
+if (params.get('experiment') === 'gpu-probes') {
+  // ADR 0004 and 0005's GPU readback probes, loaded on demand (`e2e/globe-gpu-probes.spec.ts`).
+  const { runGpuProbesPage } = await import('./gpu-probes.js');
+  await runGpuProbesPage(params, status);
+} else if (app && canvas && experiment === 'worker') {
   // F065: the engine renders in a worker (ADR 0011); the page keeps only the overlay and forwards input.
   startWorkerRendering(app, canvas, {
     backend,

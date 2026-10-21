@@ -82,6 +82,7 @@ jobs:
       # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
       - name: Rendering probes (recorded)
         if: always()
+        timeout-minutes: 15
         env:
           VIBEGLOBE_DEVICE: ci-swiftshader
         run: npm run bench:probes
@@ -115,6 +116,7 @@ jobs:
       - run: npm run build
       # Temporary: what each engine shows at several views, printed to the log.
       - name: Diagnose engines
+        timeout-minutes: 10
         run: |
           (npm run dev > dev.log 2>&1 &)
           for i in $(seq 1 60); do curl -sf http://localhost:5173/ > /dev/null && break; sleep 1; done
@@ -125,6 +127,7 @@ jobs:
       # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).
       - name: OffscreenCanvas measurement
         if: always()
+        timeout-minutes: 20
         run: |
           npm run bench:offscreen -- --browser firefox
           npm run bench:offscreen -- --browser webkit

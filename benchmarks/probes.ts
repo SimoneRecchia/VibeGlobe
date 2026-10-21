@@ -40,6 +40,7 @@ async function launch(extraArgs: string[] = []): Promise<Browser> {
 /** Opens the canonical view and waits until the engine is idle with every tile drawn. */
 async function openView(browser: Browser, baseUrl: string, backend: string): Promise<Page> {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(60_000);
   await page.goto(`${baseUrl}?backend=${backend}&${VIEW}`);
   await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
   await page.evaluate(async () => window.vibeglobePlayground?.globe.ready);
@@ -49,9 +50,11 @@ async function openView(browser: Browser, baseUrl: string, backend: string): Pro
       new Promise<void>((resolve) => {
         const globe = window.vibeglobePlayground?.globe;
         let last = -1;
+        // At most 20 s: a browser whose frames never stop is reported by the probes, not waited for.
+        const deadline = performance.now() + 20_000;
         const check = (): void => {
           const now = globe?.frameNumber ?? 0;
-          if (now === last) resolve();
+          if (now === last || performance.now() > deadline) resolve();
           else {
             last = now;
             setTimeout(check, 300);
@@ -162,10 +165,16 @@ async function pacing(baseUrl: string): Promise<Record<string, { p50Ms: number; 
         (durationMs) =>
           new Promise<number[]>((resolve) => {
             const times: number[] = [];
+            const done = (): void => resolve(times.slice(1).map((t, i) => t - (times[i] ?? t)));
+            // Also ends by the clock, in case the browser stops producing frames.
+            const timer = setTimeout(done, durationMs * 2);
             const tick = (time: number): void => {
               times.push(time);
               if (time - (times[0] ?? time) < durationMs) requestAnimationFrame(tick);
-              else resolve(times.slice(1).map((t, i) => t - (times[i] ?? t)));
+              else {
+                clearTimeout(timer);
+                done();
+              }
             };
             requestAnimationFrame(tick);
           }),
@@ -179,10 +188,16 @@ async function pacing(baseUrl: string): Promise<Record<string, { p50Ms: number; 
   return out;
 }
 
+async function step<T>(name: string, work: Promise<T>): Promise<T> {
+  console.log(`${name}…`);
+  return work;
+}
+
 const server = await preview({ root: join(ROOT_DIR, 'apps/playground'), logLevel: 'silent', preview: { port: 4175 } });
 const baseUrl = server.resolvedUrls?.local[0] ?? 'http://localhost:4175/';
 let report: Record<string, unknown>;
 try {
+  console.log('determinism…');
   const first = await fingerprints(baseUrl);
   const second = await fingerprints(baseUrl);
   const versionBrowser = await launch();
@@ -203,9 +218,9 @@ try {
       first,
       second,
     },
-    backendConsistency: await backendConsistency(baseUrl),
-    captureCost: await captureCost(baseUrl),
-    pacing: await pacing(baseUrl),
+    backendConsistency: await step('backend consistency', backendConsistency(baseUrl)),
+    captureCost: await step('capture cost', captureCost(baseUrl)),
+    pacing: await step('pacing', pacing(baseUrl)),
   };
 } finally {
   await server.close();

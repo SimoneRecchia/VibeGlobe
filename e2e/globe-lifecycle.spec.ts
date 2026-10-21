@@ -276,6 +276,8 @@ for (const backend of BACKENDS) {
 
 test('resizing renders at the new size, centered, never stretched or blank (F070)', async ({ page }) => {
   await openGlobe(page, 'lon=20&lat=10&zoom=1');
+  // The page's text overlays lie over the canvas; with wider fonts they reached the measured center column.
+  await page.addStyleTag({ content: '#status, #cursor { visibility: hidden !important; }' });
   for (const [width, height] of [
     [900, 700],
     [1300, 500],

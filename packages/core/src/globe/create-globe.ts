@@ -404,7 +404,7 @@ class GlobeEngine implements Globe {
   }
 
   surfaceTiles(): SurfaceTileInfo[] {
-    return this.surfaceFrame.describe();
+    return this.surfaceFrame.describe(this.cam);
   }
 
   surfaceStats(): SurfaceStats {

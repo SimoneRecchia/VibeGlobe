@@ -119,7 +119,7 @@ async function expectTestEnvironment(page: Page): Promise<void> {
 }
 
 /** Counts background-colored (or black) pixels inside a circle around the image center. */
-function emptyPixelsInside(image: PNG, radiusPx: number): number {
+export function emptyPixelsInside(image: PNG, radiusPx: number): number {
   let empty = 0;
   const cx = image.width / 2;
   const cy = image.height / 2;
@@ -142,7 +142,7 @@ function emptyPixelsInside(image: PNG, radiusPx: number): number {
  * The radius in CSS pixels inside which a straight-down view must show the globe: the projected silhouette of the
  * ellipsoid's polar-radius sphere, which the ellipsoid always contains, shrunk by 1.5 px for anti-aliasing.
  */
-async function silhouetteRadiusPx(page: Page, index = 0, selector = '#globe'): Promise<number> {
+export async function silhouetteRadiusPx(page: Page, index = 0, selector = '#globe'): Promise<number> {
   const { rangeMeters, heightPx } = await page.evaluate(
     ([i, s]) => ({
       rangeMeters: window.vibeglobePlayground?.globes[i]?.camera.rangeMeters ?? NaN,

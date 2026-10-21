@@ -57,6 +57,7 @@ export function drawImagery(
       drawn = true;
       list.textures[index] = handle;
       list.geographic[index] = entry.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
+      list.imageryLevels[index] = mapping[MAPPING_LEVEL] ?? -1;
       const at = index * 4;
       list.uvTransforms[at] = mapping[MAPPING_SCALE_U] ?? 1;
       list.uvTransforms[at + 1] = mapping[MAPPING_SCALE_V] ?? 1;

@@ -155,7 +155,11 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const compiles = info.length > 0 ? globe.rendererStats().pipelineCompiles : -1;
     // The surface selection: drawn tiles and what culling skipped (F086, F087).
     const selection = globe.surfaceStats();
-    const surface = `tiles ${selection.tiles} · level ≤ ${selection.maxLevel} · culled: frustum ${selection.culledByFrustum}, horizon ${selection.culledByHorizon}`;
+    const surface =
+      `tiles ${selection.tiles} · level ≤ ${selection.maxLevel} · culled: frustum ${selection.culledByFrustum}, ` +
+      `horizon ${selection.culledByHorizon} · imagery from ancestor ${selection.fromAncestor}, base ${selection.onBaseImage}` +
+      // The largest projected texel of any drawn tile, which the selection keeps at or below 1.5 px (F081).
+      ` · texel ≤ ${Math.max(0, ...globe.surfaceTiles().map((tile) => tile.texelErrorPx)).toFixed(2)} px`;
     if (compiles === pipelineCompiles && surface === surfaceInfo) return;
     pipelineCompiles = compiles;
     surfaceInfo = surface;

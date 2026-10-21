@@ -14,12 +14,15 @@ export class DrawList implements TileDrawList {
   textures: Int32Array;
   uvTransforms: Float32Array;
   geographic: Uint8Array;
+  /** The imagery level each draw shows, -1 for the world base image (diagnostics, F083). */
+  imageryLevels: Int8Array;
 
   constructor(capacity = 256) {
     this.meshKeys = new Float64Array(capacity);
     this.textures = new Int32Array(capacity);
     this.uvTransforms = new Float32Array(capacity * 4);
     this.geographic = new Uint8Array(capacity);
+    this.imageryLevels = new Int8Array(capacity);
   }
 
   /** Makes room for `count` draws, keeping none of the current ones (called before a frame fills the list). */
@@ -35,6 +38,7 @@ export class DrawList implements TileDrawList {
     this.textures = new Int32Array(capacity);
     this.uvTransforms = new Float32Array(capacity * 4);
     this.geographic = new Uint8Array(capacity);
+    this.imageryLevels = new Int8Array(capacity);
   }
 }
 
@@ -50,6 +54,7 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     if (!tile) continue;
     list.textures[index] = BASE_TEXTURE;
     list.geographic[index] = 1;
+    list.imageryLevels[index] = -1;
     const at = index * 4;
     list.uvTransforms[at] = (tile.eastRad - tile.westRad) / (2 * Math.PI);
     list.uvTransforms[at + 1] = (tile.northRad - tile.southRad) / Math.PI;

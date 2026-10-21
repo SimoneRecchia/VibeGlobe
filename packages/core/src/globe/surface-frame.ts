@@ -17,8 +17,6 @@ const MAX_LEVEL = 25;
 export class SurfaceFrame {
   private readonly tiles: QuadtreeTile[] = [];
   private readonly draws = new DrawList();
-  /** Tiles the last drawn frame selected. */
-  private drawnCount = 0;
   private readonly selection = {
     maxScreenErrorPx: 1,
     maxLevel: MAX_LEVEL,
@@ -69,17 +67,16 @@ export class SurfaceFrame {
 
   /** Records that the prepared frame was drawn; returns its tile count. */
   drawn(): number {
-    this.drawnCount = this.draws.count;
-    return this.drawnCount;
+    return this.draws.count;
   }
 
   /** The tiles of the last drawn frame (`Globe.surfaceTiles`). */
-  describe(): SurfaceTileInfo[] {
-    return describeSurfaceTiles(this.tiles, this.drawnCount);
+  describe(camera: Camera): SurfaceTileInfo[] {
+    return describeSurfaceTiles(this.tiles, this.draws, camera, this.selection);
   }
 
   /** Selection counters of the last drawn frame (`Globe.surfaceStats`). */
   stats(): SurfaceStats {
-    return surfaceStats(this.tiles, this.drawnCount, this.selection);
+    return surfaceStats(this.tiles, this.draws, this.selection);
   }
 }

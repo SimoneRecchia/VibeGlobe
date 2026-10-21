@@ -1117,7 +1117,7 @@
         "Verify it summarizes how those projects test and benchmark compression",
         "Verify it states the chosen approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F080",
@@ -1129,7 +1129,7 @@
         "Confirm tile bounds, parent and child keys, and position-to-tile lookups against reference values",
         "Run property-based tests confirming children exactly cover their parent with no gap or overlap, including at the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F081",
@@ -1141,7 +1141,7 @@
         "Open http://localhost:5173/?debug=1 and confirm each drawn tile's screen-space error is at or below the configured threshold",
         "Tilt the view and confirm tiles near the camera are finer than tiles near the horizon"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F082",
@@ -1154,7 +1154,7 @@
         "Confirm the parent remains drawn over the area until all its needed children are ready, with no hole in any frame",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F083",
@@ -1167,7 +1167,7 @@
         "Confirm the area shows the upsampled best available ancestor and zero black or background pixels",
         "Confirm the debug overlay marks the area as drawn from an ancestor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F084",
@@ -1191,7 +1191,7 @@
         "Record frames and the requested tile levels over time",
         "Confirm the view first shows the base, then intermediate levels, then the target level, and every frame is complete"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F086",
@@ -1203,7 +1203,7 @@
         "In the playground, confirm through the debug overlay that no tile outside the view is selected or drawn",
         "Rotate quickly and confirm no visible tile is wrongly culled (zero empty pixels at the screen edges)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F087",
@@ -1215,7 +1215,7 @@
         "In the playground at a low oblique view, confirm tiles beyond the horizon are not selected or requested",
         "Confirm no tile visible near the horizon is wrongly culled (zero empty pixels below the horizon line)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F088",
@@ -1227,7 +1227,7 @@
         "In the playground, record the order of tile requests after a jump to a new view",
         "Confirm center tiles precede edge tiles, coarser levels precede finer ones, and visible tiles precede prefetch tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F089",

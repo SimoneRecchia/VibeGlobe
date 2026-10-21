@@ -319,6 +319,12 @@ export interface SurfaceTileInfo {
   readonly southDeg: number;
   readonly eastDeg: number;
   readonly northDeg: number;
+  /** The projected chord sag of the tile's mesh, in CSS pixels, for the current camera. */
+  readonly geometricErrorPx: number;
+  /** The projected size of one texel of the finest imagery layer, in CSS pixels (0 without imagery, F081). */
+  readonly texelErrorPx: number;
+  /** The imagery level the tile shows, an ancestor's while its own is not loaded (F083); null for the base image. */
+  readonly imageryLevel: number | null;
 }
 
 /** Counters of a frame's surface selection. */
@@ -331,6 +337,10 @@ export interface SurfaceStats {
   readonly culledByFrustum: number;
   /** Tiles skipped as beyond the horizon (F087). */
   readonly culledByHorizon: number;
+  /** Tiles showing an ancestor's imagery while their own tile loads or has failed (F083). */
+  readonly fromAncestor: number;
+  /** Tiles showing the world base image: no imagery layer has a tile for them yet. */
+  readonly onBaseImage: number;
 }
 
 /** A globe engine instance. */

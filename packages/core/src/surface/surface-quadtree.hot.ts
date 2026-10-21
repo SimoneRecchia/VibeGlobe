@@ -231,6 +231,28 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   }
 }
 
+/**
+ * The two refinement errors of a tile as the selection measures them, in screen pixels: `out[0]` the geometric (chord
+ * sag) error, `out[1]` the size of one imagery texel (0 without imagery). For diagnostics; not used per frame.
+ */
+export function quadtreeTileErrorsPx(
+  camera: Camera,
+  tile: QuadtreeTile,
+  options: QuadtreeSelectionOptions,
+  out: Float64Array,
+): Float64Array {
+  const previous = state.options;
+  state.options = options;
+  measureTile(tile, camera.eyeEcef);
+  state.options = previous;
+  const closest = measure[CLOSEST] ?? 0;
+  const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
+  const pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
+  out[0] = ((measure[SAG] ?? 0) / distance) * pixelsPerRadian;
+  out[1] = ((measure[TEXEL] ?? 0) / distance) * pixelsPerRadian;
+  return out;
+}
+
 /** ADR 0006's cap rule for a cap tile: four children while its equatorward width is at least half its height. */
 function splitsInFour(tile: QuadtreeTile): boolean {
   const north = tile.northRad;

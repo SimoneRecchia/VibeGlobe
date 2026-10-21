@@ -1,36 +1,68 @@
-import type { QuadtreeSelectionOptions, QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import type { Camera } from '../camera/camera.js';
+import type { DrawList } from '../imagery/draw-list.js';
+import {
+  quadtreeTileErrorsPx,
+  type QuadtreeSelectionOptions,
+  type QuadtreeTile,
+} from '../surface/surface-quadtree.hot.js';
 import type { RendererStats, SurfaceStats, SurfaceTileInfo } from './types.js';
 
 const DEG = 180 / Math.PI;
 const ROOTS = ['mercator', 'north-cap', 'south-cap'] as const;
 
-/** The selected tiles of a frame in degrees (diagnostics; allocates, never called by the frame loop). */
-export function describeSurfaceTiles(tiles: readonly QuadtreeTile[], count: number): SurfaceTileInfo[] {
-  return tiles.slice(0, count).map((tile) => ({
-    root: ROOTS[tile.root],
-    level: tile.level,
-    x: tile.x,
-    y: tile.y,
-    westDeg: tile.westRad * DEG,
-    southDeg: tile.southRad * DEG,
-    eastDeg: tile.eastRad * DEG,
-    northDeg: tile.northRad * DEG,
-  }));
+/**
+ * The selected tiles of a frame in degrees, with their refinement errors for the current camera and the imagery level
+ * each shows (diagnostics; allocates, never called by the frame loop).
+ */
+export function describeSurfaceTiles(
+  tiles: readonly QuadtreeTile[],
+  draws: DrawList,
+  camera: Camera,
+  selection: QuadtreeSelectionOptions,
+): SurfaceTileInfo[] {
+  const errors = new Float64Array(2);
+  return tiles.slice(0, draws.count).map((tile, index) => {
+    quadtreeTileErrorsPx(camera, tile, selection, errors);
+    const imageryLevel = draws.imageryLevels[index] ?? -1;
+    return {
+      root: ROOTS[tile.root],
+      level: tile.level,
+      x: tile.x,
+      y: tile.y,
+      westDeg: tile.westRad * DEG,
+      southDeg: tile.southRad * DEG,
+      eastDeg: tile.eastRad * DEG,
+      northDeg: tile.northRad * DEG,
+      geometricErrorPx: errors[0] ?? 0,
+      texelErrorPx: errors[1] ?? 0,
+      imageryLevel: imageryLevel >= 0 ? imageryLevel : null,
+    };
+  });
 }
 
 /** A frame's selection counters. */
 export function surfaceStats(
   tiles: readonly QuadtreeTile[],
-  count: number,
+  draws: DrawList,
   selection: QuadtreeSelectionOptions,
 ): SurfaceStats {
   let maxLevel = 0;
-  for (let i = 0; i < count; i++) maxLevel = Math.max(maxLevel, tiles[i]?.level ?? 0);
+  let fromAncestor = 0;
+  let onBaseImage = 0;
+  for (let i = 0; i < draws.count; i++) {
+    const level = tiles[i]?.level ?? 0;
+    const imageryLevel = draws.imageryLevels[i] ?? -1;
+    maxLevel = Math.max(maxLevel, level);
+    if (imageryLevel < 0) onBaseImage++;
+    else if (imageryLevel < level) fromAncestor++;
+  }
   return {
-    tiles: count,
+    tiles: draws.count,
     maxLevel,
     culledByFrustum: selection.culledByFrustum ?? 0,
     culledByHorizon: selection.culledByHorizon ?? 0,
+    fromAncestor,
+    onBaseImage,
   };
 }
 

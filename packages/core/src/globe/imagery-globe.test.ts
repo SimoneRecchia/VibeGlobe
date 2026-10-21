@@ -86,6 +86,11 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
     const textured = Array.from(draws?.textures.subarray(0, draws.count) ?? []).filter((handle) => handle >= 0);
     expect(textured.length).toBe(draws?.count);
     expect(renderer.textures.size).toBeGreaterThan(0);
+    // Diagnostics: every tile shows imagery of its own level, its texels within 1.5 px (F081, F083).
+    for (const tile of globe.surfaceTiles()) {
+      expect(tile.imageryLevel).toBe(tile.level);
+      expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
+    }
     // Every URL is requested once.
     expect(new Set(urls).size).toBe(urls.length);
     globe.destroy();

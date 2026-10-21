@@ -9,12 +9,15 @@ import type {
   RendererFactory,
   RendererStats,
   RenderHost,
+  ResourceCounts,
   TileDrawList,
 } from './types.js';
 
 /** A renderer and host for unit tests: frames run when `flush` is called. It allocates nothing per frame itself. */
 export interface FakeRenderer extends RendererBackend {
   readonly meshes: Map<number, TileMeshData>;
+  /** The host's clock and timers, advanced by the test. */
+  readonly timers: FakeTimers;
   /** Uploaded imagery textures by handle. */
   readonly textures: Map<number, DecodedTile>;
   /** The draw list of the last drawn frame (the engine's own, reused every frame). */
@@ -62,6 +65,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     host,
     inputElement: {},
     meshes: new Map(),
+    timers: new FakeTimers(),
     textures: new Map(),
     lastDraws: undefined,
     drawCount: 0,
@@ -92,13 +96,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     },
     setDebugMeshes: (meshes) => void (renderer.debugMeshes = meshes.length),
     stats: () => fakeStats(renderer),
-    resourceCounts: () => ({
-      meshes: renderer.meshes.size,
-      textures: renderer.destroyed ? 0 : 1,
-      gpuBytes: 0,
-      vertexArrays: 0,
-      contexts: renderer.destroyed ? 0 : 1,
-    }),
+    resourceCounts: () => fakeCounts(renderer),
     simulateDeviceLoss: () => renderer.events?.deviceLost('simulated'),
     capture: () => Promise.resolve(blankFrame(renderer.size)),
     destroy: () => {
@@ -124,7 +122,9 @@ function fakeHost(pending: FrameQueue, renderer: () => FakeRenderer): RenderHost
       return nextId++;
     },
     cancelFrame: (id) => pending.cancel(id),
-    now: () => 0,
+    now: () => renderer().timers.nowMs,
+    setTimer: (callback, delayMs) => renderer().timers.set(callback, delayMs),
+    clearTimer: (handle) => renderer().timers.clear(handle),
     observeSize: (callback) => {
       renderer().resizeListener = callback;
       return () => (renderer().resizeListener = undefined);
@@ -206,4 +206,50 @@ function fakeStats(renderer: FakeRenderer): RendererStats {
     pipelineCompiles: 0,
     gpuFrameMs: null,
   };
+}
+
+/** Resource counts of the fake renderer: its meshes and textures, the base image and one context until destroyed. */
+function fakeCounts(renderer: FakeRenderer): ResourceCounts {
+  const held = renderer.destroyed ? 0 : 1;
+  return {
+    meshes: renderer.meshes.size,
+    textures: held + renderer.textures.size,
+    gpuBytes: 0,
+    vertexArrays: 0,
+    contexts: held,
+  };
+}
+
+/** A manual clock with timers: `advance` moves time and runs the timers that came due, in order. */
+export class FakeTimers {
+  nowMs = 0;
+  private readonly pending = new Map<number, { atMs: number; callback: () => void }>();
+  private nextId = 1;
+
+  /** Calls `callback` once after `delayMs`. */
+  set(callback: () => void, delayMs: number): number {
+    const id = this.nextId++;
+    this.pending.set(id, { atMs: this.nowMs + Math.max(0, delayMs), callback });
+    return id;
+  }
+
+  /** Cancels a timer. */
+  clear(handle: unknown): void {
+    this.pending.delete(handle as number);
+  }
+
+  /** Moves the clock forward by `ms`, running every timer that comes due. */
+  advance(ms: number): void {
+    const end = this.nowMs + ms;
+    for (;;) {
+      let next: [number, { atMs: number; callback: () => void }] | undefined;
+      for (const entry of this.pending)
+        if (entry[1].atMs <= end && (!next || entry[1].atMs < next[1].atMs)) next = entry;
+      if (!next) break;
+      this.pending.delete(next[0]);
+      this.nowMs = next[1].atMs;
+      next[1].callback();
+    }
+    this.nowMs = end;
+  }
 }

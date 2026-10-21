@@ -24,6 +24,8 @@ const host: RenderHost = {
   requestFrame: (callback) => scope.requestAnimationFrame(callback),
   cancelFrame: (id) => scope.cancelAnimationFrame(id),
   now: () => performance.now(),
+  setTimer: (callback, delayMs) => setTimeout(callback, delayMs),
+  clearTimer: (handle) => clearTimeout(handle as number),
   observeSize(callback) {
     notifySize = callback;
     return () => (notifySize = undefined);

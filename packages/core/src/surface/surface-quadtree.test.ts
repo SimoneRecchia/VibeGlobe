@@ -167,6 +167,46 @@ describe('selectQuadtreeTiles', () => {
     expect(count).toBeLessThan(2000);
   });
 
+  describe('refinement by imagery texel size (F081, ADR 0006 §2)', () => {
+    const imagery = { maxScreenErrorPx: 1, maxLevel: 25, imageryTexelsPerTile: 256, imageryMaxLevel: 18 };
+    const pixelsPerRadian = 540 / (2 * Math.tan(Math.PI / 8));
+    const texelPx = (t: QuadtreeTile, distance: number): number =>
+      ((6378137 * Math.cos((t.northRad + t.southRad) / 2) * (t.eastRad - t.westRad)) / 256 / distance) *
+      pixelsPerRadian;
+
+    it('refines the tile under a nadir view until a texel covers at most 1.5 pixels, and no further', () => {
+      const range = 2e5;
+      const count = selectQuadtreeTiles(camera(12.5, 41.9, range), imagery, out);
+      const under = out.slice(0, count).find((t) => contains(t, 12.5 * DEG, 41.9 * DEG));
+      expect(under).toBeDefined();
+      if (!under) return;
+      expect(texelPx(under, range)).toBeLessThanOrEqual(1.5);
+      // Its parent's texels were too coarse: the tile is not finer than the threshold needs.
+      expect(texelPx(under, range) * 2).toBeGreaterThan(1.5 * 0.6);
+      // Geometry alone stops much coarser (the next selection reuses the records, so the level is read first).
+      const level = under.level;
+      const geometric = selectQuadtreeTiles(camera(12.5, 41.9, range), { maxScreenErrorPx: 1, maxLevel: 25 }, out);
+      const coarse = out.slice(0, geometric).find((t) => contains(t, 12.5 * DEG, 41.9 * DEG));
+      expect(coarse?.level ?? 99).toBeLessThan(level);
+    });
+
+    it('draws finer tiles near the camera than toward the horizon in a tilted view', () => {
+      const count = selectQuadtreeTiles(camera(12.5, 41.9, 2e4, 70), imagery, out);
+      const drawn = out.slice(0, count);
+      const near = drawn.find((t) => contains(t, 12.5 * DEG, 41.9 * DEG));
+      const coarsest = Math.min(...drawn.map((t) => t.level));
+      expect(near?.level ?? 0).toBeGreaterThan(coarsest + 2);
+    });
+
+    it('stops refining for texels at the finest level of the source', () => {
+      const count = selectQuadtreeTiles(camera(12.5, 41.9, 2e3), { ...imagery, imageryMaxLevel: 9 }, out);
+      const level = out.slice(0, count).find((t) => contains(t, 12.5 * DEG, 41.9 * DEG))?.level;
+      const geometric = selectQuadtreeTiles(camera(12.5, 41.9, 2e3), { maxScreenErrorPx: 1, maxLevel: 25 }, out);
+      const coarse = out.slice(0, geometric).find((t) => contains(t, 12.5 * DEG, 41.9 * DEG));
+      expect(level).toBe(Math.max(9, coarse?.level ?? 0));
+    });
+  });
+
   it('culls the far side of the globe', () => {
     const count = selectQuadtreeTiles(camera(0, 0, 1e6), { maxScreenErrorPx: 1, maxLevel: 25 }, out);
     expect(out.slice(0, count).every((t) => t.eastRad > -Math.PI / 2 && t.westRad < Math.PI / 2)).toBe(true);

@@ -18,18 +18,26 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
   return object?.userData['surfaceDraw'] as SurfaceDraw | undefined;
 }
 
-/** Attaches a draw state to a new surface mesh. */
+/**
+ * Attaches a draw state to a new surface mesh. Its texture reaches the shared texture node just before the mesh is
+ * drawn: three.js resets a texture node's update type when it builds the shader, so a per-object update on the node
+ * itself never runs; the bindings read the node's value right after `onBeforeRender`.
+ */
 export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
   const draw: SurfaceDraw = { texture: undefined, transform: new Vector4(1, 1, 0, 0), geographic: 1 };
   object.userData['surfaceDraw'] = draw;
+  object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
+    const node = material.userData['surfaceTexture'] as { value: Texture } | undefined;
+    if (node && draw.texture) node.value = draw.texture;
+  };
   return draw;
 }
 
 /**
  * The surface material shared by every tile: one shader and one pipeline for the whole surface (ADR 0010 §4, §7).
- * The texture, its UV transform and the choice of v are object-scope uniforms read from each mesh's
- * {@link SurfaceDraw}, so tiles drawing different imagery tiles still share the material. `placeholder` only fixes the
- * texture binding's type.
+ * The UV transform and the choice of v are object-scope uniforms read from each mesh's {@link SurfaceDraw}, and the
+ * texture is set per mesh before it draws (see {@link attachSurfaceDraw}), so tiles drawing different imagery tiles
+ * still share the material. `placeholder` only fixes the texture binding's type.
  */
 export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
   const tileUv = attribute('tileUv', 'vec3');
@@ -38,7 +46,9 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   const v = mix(tileUv.y, tileUv.z, geographic);
   const uv = vec2(tileUv.x.mul(transform.x).add(transform.z), v.mul(transform.y).add(transform.w));
   const material = new MeshBasicNodeMaterial();
-  material.colorNode = texture(placeholder, uv).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.texture);
+  const map = texture(placeholder, uv);
+  material.userData['surfaceTexture'] = map;
+  material.colorNode = map;
   makeEyeRelative(material, depthPath);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;

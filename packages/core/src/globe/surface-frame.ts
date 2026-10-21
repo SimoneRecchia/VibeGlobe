@@ -3,7 +3,8 @@ import type { SurfaceCache } from '../surface/surface-cache.js';
 import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
-import type { SurfaceStats, SurfaceTileInfo, TileDrawList } from './types.js';
+import { ImageryRuntime } from './imagery-runtime.js';
+import type { GlobeOptions, RendererBackend, SurfaceStats, SurfaceTileInfo, TileDrawList } from './types.js';
 
 /** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
@@ -18,11 +19,31 @@ export class SurfaceFrame {
   private readonly draws = new DrawList();
   /** Tiles the last drawn frame selected. */
   private drawnCount = 0;
-  private readonly selection = { maxScreenErrorPx: 1, maxLevel: MAX_LEVEL, minLevel: 2 };
+  private readonly selection = {
+    maxScreenErrorPx: 1,
+    maxLevel: MAX_LEVEL,
+    minLevel: 2,
+    imageryTexelsPerTile: 0,
+    imageryMaxLevel: 0,
+  };
+  private imagery: ImageryRuntime | undefined;
 
   constructor(maxScreenErrorPx: number, minLevel: number) {
     this.selection.maxScreenErrorPx = maxScreenErrorPx;
     this.selection.minLevel = minLevel;
+  }
+
+  /**
+   * Starts the options' tiled imagery, if any: from now on tiles refine until their texels are small enough (F081) and
+   * are textured with the layers' tiles.
+   */
+  startImagery(options: GlobeOptions, renderer: RendererBackend, requestFrame: () => void): void {
+    const { imagery: sources, workers } = options;
+    if (!sources || sources.length === 0 || !workers) return;
+    const imagery = new ImageryRuntime(sources, workers, renderer, requestFrame);
+    this.imagery = imagery;
+    this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
+    this.selection.imageryMaxLevel = imagery.maxLevel;
   }
 
   /** Selects this frame's tiles and returns their draws. */
@@ -31,7 +52,19 @@ export class SurfaceFrame {
     this.draws.reserve(count);
     cache.prepare(this.tiles, count, this.draws.meshKeys);
     drawOnBaseImage(this.draws, this.tiles, count);
+    this.imagery?.draw(this.draws, this.tiles, count, camera);
     return this.draws;
+  }
+
+  /** True while imagery the view wants is still loading. */
+  get loading(): boolean {
+    return this.imagery?.busy ?? false;
+  }
+
+  /** Stops loading imagery. */
+  destroy(): void {
+    this.imagery?.destroy();
+    this.imagery = undefined;
   }
 
   /** Records that the prepared frame was drawn; returns its tile count. */

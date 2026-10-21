@@ -43,6 +43,16 @@ export interface QuadtreeSelectionOptions {
   maxLevel: number;
   /** Coarsest level drawn (default and minimum 2): every visible tile is refined at least to it. */
   minLevel?: number;
+  /**
+   * Texels along a tile edge of the finest imagery layer (tile size × pixel ratio), or 0 without imagery. A tile is
+   * refined while one of its texels covers more than {@link QuadtreeSelectionOptions.maxTexelErrorPx} screen pixels,
+   * up to {@link QuadtreeSelectionOptions.imageryMaxLevel} (F081, ADR 0006 §2).
+   */
+  imageryTexelsPerTile?: number;
+  /** The finest level the imagery layers serve; texels do not refine beyond it. */
+  imageryMaxLevel?: number;
+  /** Largest texel size on screen, in pixels (ADR 0006's τ_imagery); default 1.5. */
+  maxTexelErrorPx?: number;
   /** Written by each selection: tiles skipped as outside the view frustum (F086) and beyond the horizon (F087). */
   culledByFrustum?: number;
   culledByHorizon?: number;
@@ -118,10 +128,12 @@ const lonCos = new Float64Array(3);
 /** The tile center relative to the eye. */
 const offset = new Float64Array(3);
 /** Per-tile measures written by measureTile. */
-const measure = new Float64Array(3);
+const measure = new Float64Array(4);
 const RADIUS = 0;
 const CLOSEST = 1;
 const SAG = 2;
+/** Ground size of one imagery texel on the tile, meters (0 without imagery). */
+const TEXEL = 3;
 /** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
 const horizon = new Float64Array(4);
 
@@ -200,7 +212,11 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   const maxLevel = options.maxLevel < MAX_TILE_LEVEL ? options.maxLevel : MAX_TILE_LEVEL;
   const refine =
     level < (options.minLevel ?? MIN_LEVEL) ||
-    (level < maxLevel && (screenError > options.maxScreenErrorPx || radius > RADIUS_TO_DISTANCE * distance));
+    (level < maxLevel &&
+      (screenError > options.maxScreenErrorPx ||
+        radius > RADIUS_TO_DISTANCE * distance ||
+        (level < (options.imageryMaxLevel ?? 0) &&
+          ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5))));
   if (!refine) {
     state.count++;
     return;
@@ -284,6 +300,11 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
   measure[RADIUS] = radius;
   measure[CLOSEST] = Math.sqrt((offset[0] ?? 0) ** 2 + (offset[1] ?? 0) ** 2 + (offset[2] ?? 0) ** 2) - radius;
   measure[SAG] = sag;
+  const texels = state.options?.imageryTexelsPerTile ?? 0;
+  const midLat = (north + south) / 2;
+  const widthMeters = A * Math.cos(midLat) * (tile.eastRad - tile.westRad);
+  const heightMeters = A * (north - south);
+  measure[TEXEL] = texels > 0 ? (widthMeters > heightMeters ? widthMeters : heightMeters) / texels : 0;
 }
 
 /** True when the tile's bounding sphere is entirely outside one of the frustum planes (F086). */

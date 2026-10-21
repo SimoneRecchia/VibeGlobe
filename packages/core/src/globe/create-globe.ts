@@ -196,6 +196,8 @@ class GlobeEngine implements Globe {
     }
     this.renderer = renderer;
     this.surface = new SurfaceCache(renderer);
+    // Loads finishing after destroy ask for nothing.
+    this.surfaceFrame.startImagery(this.options, renderer, () => this.destroyed || this.requestRender());
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(
@@ -313,7 +315,7 @@ class GlobeEngine implements Globe {
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
     }
     if (this.dirty) this.requestRender();
-    else if (this.emitter.has('idle')) {
+    else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
       this.idlePayload.frameNumber = this.frames;
       this.emitter.emit('idle', this.idlePayload);
     }
@@ -456,6 +458,7 @@ class GlobeEngine implements Globe {
     // The canvas holds its GPU context, whose device holds the renderer (KB-053).
     this.controlsElement = undefined;
     for (const cleanup of this.cleanups) cleanup();
+    this.surfaceFrame.destroy();
     this.surface?.clear();
     this.renderer?.destroy();
     this.captureWaits.end(new GlobeError('destroyed', 'The globe was destroyed'));

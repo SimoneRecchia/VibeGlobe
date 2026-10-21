@@ -1,5 +1,7 @@
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, WGS84, type Globe, type ViewInit } from '@vibeglobe/core';
+import { createGlobe, WGS84, type Globe, type GlobeOptions, type ViewInit } from '@vibeglobe/core';
+import { xyzImagery } from '@vibeglobe/sources';
+import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
@@ -34,6 +36,18 @@ const backendParam = params.get('backend');
 const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'webgl2' ? backendParam : 'auto';
 const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
+/**
+ * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
+ * fixture tile server (M3 plan §4.1); `&session=` names the server session that holds fault rules and the request log.
+ */
+function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers'> {
+  const pattern = params.get('imagery');
+  if (!pattern) return {};
+  const session = params.get('session') ?? 'playground';
+  const url = `${import.meta.env.BASE_URL}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
+  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers: createWorkers() };
+}
+
 /** Creates one engine instance in a container with its own canvas. */
 function startGlobe(
   container: HTMLElement,
@@ -48,6 +62,7 @@ function startGlobe(
     controls: createControls(),
     baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
     view,
+    ...fixtureImagery(),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });

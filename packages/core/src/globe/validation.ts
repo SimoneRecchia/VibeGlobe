@@ -89,7 +89,41 @@ export function validateOptions(options: unknown): GlobeOptions {
     );
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
+  validateImagery(input.imagery, input.workers);
   return options as GlobeOptions;
+}
+
+/** Imagery sources need the worker pool that decodes their tiles: a missing one is an error, never a silent fallback. */
+function validateImagery(imagery: unknown, workers: unknown): void {
+  if (imagery === undefined) return;
+  if (!Array.isArray(imagery)) throw new GlobeError('invalid-option', 'imagery must be an array of imagery sources');
+  const ids = new Set<string>();
+  for (const source of imagery as unknown[]) {
+    const candidate = source as Partial<Record<string, unknown>> | null;
+    if (
+      candidate === null ||
+      typeof candidate !== 'object' ||
+      typeof candidate['id'] !== 'string' ||
+      typeof candidate['request'] !== 'function' ||
+      typeof candidate['transport'] !== 'object' ||
+      typeof candidate['tiling'] !== 'object'
+    ) {
+      throw new GlobeError('invalid-option', `imagery entries must be imagery sources, got ${describeInput(source)}`);
+    }
+    if (ids.has(candidate['id']))
+      throw new GlobeError('invalid-option', `imagery ids must be unique: ${candidate['id']}`);
+    ids.add(candidate['id']);
+  }
+  const factory = workers as Partial<Record<string, unknown>> | null | undefined;
+  if (
+    imagery.length > 0 &&
+    (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function')
+  ) {
+    throw new GlobeError(
+      'invalid-option',
+      'workers is required when imagery is set: pass createWorkers() from @vibeglobe/worker',
+    );
+  }
 }
 
 /** The view when none is given: the whole globe centered on 0°, 20°N. */

@@ -22,6 +22,12 @@
     },
     {
       "path": "../../packages/controls"
+    },
+    {
+      "path": "../../packages/sources"
+    },
+    {
+      "path": "../../packages/worker"
     }
   ]
 }

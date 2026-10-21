@@ -10,6 +10,8 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     requestFrame: (callback) => view.requestAnimationFrame(callback),
     cancelFrame: (id) => view.cancelAnimationFrame(id),
     now: () => view.performance.now(),
+    setTimer: (callback, delayMs) => view.setTimeout(callback, delayMs),
+    clearTimer: (handle) => view.clearTimeout(handle as number),
     // The content box, which the canvas fills: clientWidth and clientHeight include the padding (KB-048).
     containerSize: () => {
       const style = view.getComputedStyle(container);

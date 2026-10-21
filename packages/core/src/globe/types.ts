@@ -1,4 +1,6 @@
+import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { DecodedTile } from '../scheduler/types.js';
+import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
 
@@ -124,6 +126,9 @@ export interface RenderHost {
   cancelFrame(id: number): void;
   /** Monotonic milliseconds. */
   now(): number;
+  /** Calls `callback` once after `delayMs` (`setTimeout`); returns a handle for {@link RenderHost.clearTimer}. */
+  setTimer(callback: () => void, delayMs: number): unknown;
+  clearTimer(handle: unknown): void;
   /** Calls `callback` when the container's CSS size or the device pixel ratio changes; returns an unsubscribe. */
   observeSize(callback: () => void): () => void;
   /**
@@ -274,6 +279,13 @@ export interface GlobeOptions {
    * 100 ms).
    */
   readonly manualClockStepMs?: number;
+  /**
+   * Tiled imagery layers, bottom first (M3): each surface tile shows the topmost layer that has a tile for it, else the
+   * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
+   */
+  readonly imagery?: readonly ImagerySource[];
+  /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required when `imagery` is set. */
+  readonly workers?: WorkerEndpointFactory;
 }
 
 /** Events and their payloads. */

@@ -5,4 +5,4 @@
  */
 export { createRenderer } from './create-renderer.js';
 export type { RendererOptions } from './create-renderer.js';
-export type { BackendChoice } from './three-backend.js';
+export type { BackendChoice, DepthChoice } from './three-backend.js';

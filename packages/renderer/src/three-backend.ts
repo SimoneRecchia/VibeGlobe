@@ -2,6 +2,7 @@ import {
   GlobeError,
   IntegerKeyMap,
   type DebugMeshData,
+  type DepthPath,
   type FrameView,
   type RendererBackend,
   type RendererCapabilities,
@@ -12,7 +13,6 @@ import {
   type TileMeshData,
 } from '@vibeglobe/core';
 import {
-  Camera,
   LinearMipmapLinearFilter,
   Mesh,
   RepeatWrapping,
@@ -25,16 +25,15 @@ import {
 import { readCapabilities } from './capabilities.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
-import { countVertexArrays, releaseVertexArraysWithBuffers } from './webgl-compat.js';
+import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
 import { decodeBitmap, decodeImage, webgl2Usable, webgpuUsable } from './environment.js';
-import { createSurfaceMaterial, placeEyeRelative } from './surface-material.js';
-
-/** A camera whose matrices the engine writes every frame; three.js must not recompute them. */
-class EngineCamera extends Camera {
-  /** Intentionally empty: the engine supplies the reversed-Z infinite projection (ADR 0005). */
-  updateProjectionMatrix(): void {}
-}
+import { createSurfaceMaterial } from './surface-material.js';
+import { depthPathOf, useFloatSceneDepth } from './depth.js';
+import { placeEyeRelative } from './eye-relative.js';
+import { EngineCamera } from './engine-camera.js';
+import { countCalls, countMatrixUpdates, createCanvas, stopInternalLoop } from './three-hooks.js';
+import { createWarmUpScene, webgpuSelfTest } from './warm-up.js';
 
 interface TileEntry {
   readonly data: TileMeshData;
@@ -43,6 +42,13 @@ interface TileEntry {
 
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
 export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
+
+/**
+ * Which depth path to use on WebGL2 (ADR 0005 §4): 'auto' uses hardware reversed-Z where `EXT_clip_control` exists
+ * and the fragment-written path elsewhere; 'fragment' forces the latter, for tests and diagnostics. WebGPU always
+ * uses hardware reversed-Z.
+ */
+export type DepthChoice = 'auto' | 'fragment';
 
 /**
  * Where the backend draws (ADR 0011): a canvas it manages inside a page container (an existing one, or one it
@@ -69,6 +75,9 @@ export class ThreeBackend implements RendererBackend {
   private debugEntries: DebugEntry[] = [];
   private textureUploads = 0;
   private matrixUpdates = 0;
+  private pipelineCompiles = 0;
+  /** Why WebGPU failed its start-up self-test, after which this backend uses WebGL2 (ADR 0010 §2). */
+  private webgpuFailure: string | undefined;
   private lastDrawCalls = 0;
   private lastTriangles = 0;
   private beginFrame: () => void = () => undefined;
@@ -87,12 +96,15 @@ export class ThreeBackend implements RendererBackend {
   private readonly lossTimesMs: number[] = [];
   /** Whether the current device or context is still held. */
   private contextHeld: () => boolean = () => false;
+  /** The active depth path (ADR 0005 §4). */
+  private depthPath: DepthPath = 'reversed-z';
 
   private constructor(
     private readonly surface: DrawingSurface,
     readonly host: RenderHost,
     private readonly choice: BackendChoice,
     private readonly events: RendererEvents,
+    private readonly depth: DepthChoice,
   ) {
     this.camera.matrixAutoUpdate = false;
     this.camera.matrixWorldAutoUpdate = false;
@@ -105,8 +117,9 @@ export class ThreeBackend implements RendererBackend {
     host: RenderHost,
     choice: BackendChoice,
     events: RendererEvents,
+    depth: DepthChoice = 'auto',
   ): Promise<ThreeBackend> {
-    const backend = new ThreeBackend(surface, host, choice, events);
+    const backend = new ThreeBackend(surface, host, choice, events, depth);
     await backend.initRenderer();
     return backend;
   }
@@ -125,7 +138,7 @@ export class ThreeBackend implements RendererBackend {
 
   private async initRenderer(): Promise<void> {
     const scope = this.scope();
-    const webgpu = this.choice !== 'webgl2' && (await webgpuUsable(scope));
+    const webgpu = this.choice !== 'webgl2' && this.webgpuFailure === undefined && (await webgpuUsable(scope));
     // A forced backend never falls back (ADR 0010 §2).
     if (this.choice === 'webgpu' && !webgpu) {
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but this browser offers no WebGPU adapter.');
@@ -142,11 +155,23 @@ export class ThreeBackend implements RendererBackend {
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
       antialias: true,
-      reversedDepthBuffer: true,
+      // three.js turns this off on WebGL2 without EXT_clip_control; the engine then writes depth itself.
+      reversedDepthBuffer: webgpu || this.depth === 'auto',
       forceWebGL,
     });
     await renderer.init();
-    this.stopInternalLoop(renderer);
+    this.depthPath = depthPathOf(renderer);
+    // Every path stores near / d, cleared to 0, nearest kept by greater-equal (ADR 0005 §1). With reversed depth three.js
+    // inverts the clear value and the compare itself.
+    if (this.depthPath === 'fragment') renderer.setClearDepth(0);
+    useFloatMultisampledDepth(renderer.backend);
+    const sceneDepth = useFloatSceneDepth(renderer);
+    this.beginFrame = stopInternalLoop(renderer);
+    const failure = await webgpuSelfTest(renderer, this.depthPath);
+    if (failure !== undefined) {
+      await this.fallBackFromSelfTest(renderer, canvas, failure);
+      return;
+    }
     // Opaque tiles need no depth sorting; sorting would also compute bounds and distances for every object each frame.
     renderer.sortObjects = false;
     // Every material is unlit. With lighting enabled three.js still rebuilds the lights node's cache key on every render
@@ -161,25 +186,42 @@ export class ThreeBackend implements RendererBackend {
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but it failed to initialize.');
     }
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
-    const backend = renderer.backend as { updateTexture?: (...args: unknown[]) => unknown };
-    const updateTexture = backend.updateTexture?.bind(backend);
-    if (updateTexture) {
-      backend.updateTexture = (...args: unknown[]) => {
-        this.textureUploads++;
-        return updateTexture(...args);
-      };
-    }
+    countCalls(renderer.backend, 'updateTexture', () => this.textureUploads++);
+    countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
     if (this.surface.kind === 'element') {
       const element = canvas as HTMLCanvasElement;
       const previous = this.canvas as HTMLCanvasElement | undefined;
-      if (previous !== undefined && previous !== element) previous.replaceWith(element);
+      if (previous?.isConnected && previous !== element) previous.replaceWith(element);
       else if (!element.isConnected) this.surface.container.appendChild(element);
     }
     this.canvas = canvas;
     this.renderer = renderer;
-    this.capabilities = readCapabilities(renderer);
+    this.capabilities = readCapabilities(renderer, sceneDepth);
     renderer.setPixelRatio(this.size.pixelRatio);
     renderer.setSize(this.size.widthPx, this.size.heightPx, false);
+  }
+
+  /**
+   * Replaces a WebGPU renderer that failed its start-up self-test with WebGL2, on a new canvas (the old one holds a
+   * WebGPU context); a forced WebGPU backend fails instead (ADR 0010 §2).
+   */
+  private async fallBackFromSelfTest(
+    renderer: WebGPURenderer,
+    canvas: HTMLCanvasElement | OffscreenCanvas,
+    reason: string,
+  ): Promise<void> {
+    renderer.dispose();
+    (renderer.backend as { device?: GPUDevice }).device?.destroy();
+    if (this.choice === 'webgpu') {
+      throw new GlobeError(
+        'unsupported-device',
+        `WebGPU was requested, but it failed its start-up self-test: ${reason}`,
+      );
+    }
+    this.webgpuFailure = reason;
+    this.canvas = canvas;
+    await this.initRenderer();
+    this.events.backendFallback(`WebGPU failed its start-up self-test (${reason}); using WebGL2`);
   }
 
   /**
@@ -187,46 +229,16 @@ export class ThreeBackend implements RendererBackend {
    * OffscreenCanvas cannot be replaced, so recovery fails there).
    */
   private nextCanvas(): HTMLCanvasElement | OffscreenCanvas {
-    if (this.canvas === undefined) return this.surface.canvas ?? this.newCanvas();
+    if (this.canvas === undefined) return this.surface.canvas ?? this.replacementCanvas();
     if (this.surface.kind === 'offscreen') {
       throw new GlobeError('renderer-failed', 'An OffscreenCanvas cannot be replaced after a device or context loss');
     }
-    return this.newCanvas();
+    return this.replacementCanvas();
   }
 
-  /** A fresh canvas, carrying over the identity and accessibility attributes of the one it replaces. */
-  private newCanvas(): HTMLCanvasElement {
-    if (this.surface.kind !== 'element') throw new Error('newCanvas needs a page container');
-    const canvas = this.surface.container.ownerDocument.createElement('canvas');
-    const previous = this.canvas as HTMLCanvasElement | undefined;
-    for (const name of ['id', 'class', 'aria-label', 'role']) {
-      const value = previous?.getAttribute(name);
-      if (value) canvas.setAttribute(name, value);
-    }
-    canvas.style.display = 'block';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.touchAction = 'none';
-    canvas.tabIndex = 0;
-    return canvas;
-  }
-
-  /**
-   * three.js 0.186 starts its own requestAnimationFrame loop in init() and keeps it running forever, which defeats
-   * render on demand and allocates every display frame. The engine owns the frame loop, so the internal loop is
-   * stopped and its bookkeeping (counter reset, node-frame clock) runs at the start of each engine render instead.
-   * These are private members of the pinned version (ADR 0010).
-   */
-  private stopInternalLoop(renderer: WebGPURenderer): void {
-    const internals = renderer as unknown as {
-      _animation?: { stop(): void };
-      _nodes?: { nodeFrame: { update(): void } };
-    };
-    internals._animation?.stop();
-    this.beginFrame = () => {
-      if (renderer.info.autoReset) renderer.info.reset();
-      internals._nodes?.nodeFrame.update();
-    };
+  private replacementCanvas(): HTMLCanvasElement {
+    if (this.surface.kind !== 'element') throw new Error('A replacement canvas needs a page container');
+    return createCanvas(this.surface.container.ownerDocument, this.canvas as HTMLCanvasElement | undefined);
   }
 
   /** Creates the GPU mesh of a surface tile and keeps its CPU copy for loss recovery. */
@@ -236,7 +248,7 @@ export class ThreeBackend implements RendererBackend {
 
   private entryFor(data: TileMeshData): TileEntry {
     const mesh = createTileMesh(data, this.material);
-    this.countMatrixUpdates(mesh);
+    countMatrixUpdates(mesh, () => this.matrixUpdates++);
     this.scene.add(mesh);
     return { data, mesh };
   }
@@ -256,20 +268,6 @@ export class ThreeBackend implements RendererBackend {
     this.contextHeld = () => (device ? !deviceLost : gl ? !gl.isContextLost() : false);
   }
 
-  /** Counts any automatic matrix update three.js performs on a tile mesh; the engine expects none (F052). */
-  private countMatrixUpdates(mesh: Mesh): void {
-    const updateMatrix = mesh.updateMatrix.bind(mesh);
-    const updateMatrixWorld = mesh.updateMatrixWorld.bind(mesh);
-    mesh.updateMatrix = () => {
-      this.matrixUpdates++;
-      updateMatrix();
-    };
-    mesh.updateMatrixWorld = (force?: boolean) => {
-      this.matrixUpdates++;
-      updateMatrixWorld(force);
-    };
-  }
-
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
     for (const entry of this.debugEntries) {
@@ -277,7 +275,7 @@ export class ThreeBackend implements RendererBackend {
       entry.mesh.geometry.dispose();
       (entry.mesh.material as MeshBasicNodeMaterial).dispose();
     }
-    this.debugEntries = meshes.map((data) => createDebugEntry(data));
+    this.debugEntries = meshes.map((data) => createDebugEntry(data, this.depthPath));
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
   }
 
@@ -288,6 +286,7 @@ export class ThreeBackend implements RendererBackend {
       triangles: this.lastTriangles,
       textureUploads: this.textureUploads,
       matrixUpdates: this.matrixUpdates,
+      pipelineCompiles: this.pipelineCompiles,
     };
   }
 
@@ -313,6 +312,24 @@ export class ThreeBackend implements RendererBackend {
     if (this.destroyed) return;
     this.imagery = image;
     this.createImageryResources();
+    await this.warmUpPipelines();
+  }
+
+  /**
+   * Compiles every material variant before the frames that draw it (ADR 0010 §4), so no frame waits for a pipeline;
+   * `pipelineCompiles` counts from here. Drawing an empty scene once also compiles three.js's output pass, which copies
+   * the scene into the canvas; the canvas shows a cleared frame until the first frame.
+   */
+  private async warmUpPipelines(): Promise<void> {
+    if (!this.material) return;
+    const warmUp = createWarmUpScene([this.material]);
+    try {
+      await this.renderer.compileAsync(warmUp.scene, warmUp.camera);
+      this.renderer.render(new Scene(), warmUp.camera);
+    } finally {
+      warmUp.dispose();
+    }
+    this.pipelineCompiles = 0;
   }
 
   private createImageryResources(): void {
@@ -328,12 +345,12 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture?.dispose();
     this.imageryTexture = texture;
     this.material?.dispose();
-    this.material = createSurfaceMaterial(texture);
+    this.material = createSurfaceMaterial(texture, this.depthPath);
     const material = this.material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
 
-  /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004). */
+  /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004, ADR 0005). */
   render(view: FrameView, keys: readonly number[], count: number): void {
     // Nothing is drawn with a lost renderer: while recovering, or after recovery gave up.
     if (this.destroyed || this.recovering || this.failed || !this.material) return;
@@ -357,6 +374,17 @@ export class ThreeBackend implements RendererBackend {
     this.camera.matrixWorldInverse.fromArray(view.view);
     this.camera.matrixWorld.copy(this.camera.matrixWorldInverse).invert();
     this.camera.projectionMatrix.fromArray(view.projection);
+    if (this.depthPath === 'fragment') {
+      // The engine's projection clips z to [0, w] with z = near (ADR 0005 §2), near being its element 14. WebGL2 clips
+      // z to [−w, w]: z = 2·near − d clips at d = near and nowhere else; the depth comes from the shader, which reads
+      // near from the camera. It is stored only when it changes, since three.js reads it as a number uniform and a new
+      // value is a new heap number (ADR 0018); near stays 0.1 m except within 20 cm of the ground (ADR 0005 §5).
+      const near = view.projection[14] ?? 0;
+      if (near !== this.camera.near) this.camera.near = near;
+      const projection = this.camera.projectionMatrix.elements;
+      projection[10] = 1;
+      projection[14] = 2 * near;
+    }
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
     this.beginFrame();
     this.renderer.render(this.scene, this.camera);
@@ -432,6 +460,7 @@ export class ThreeBackend implements RendererBackend {
         return;
       }
       this.createImageryResources();
+      await this.warmUpPipelines();
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
       this.recovering = false;
       this.events.deviceRestored();

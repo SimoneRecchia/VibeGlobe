@@ -7,6 +7,22 @@ const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 /** Tests whose results depend on having the machine to themselves. */
 const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts/;
+/**
+ * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
+ * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
+ */
+const CROSS_BROWSER_SPECS = /globe-(core|precision|lifecycle)\.spec\.ts/;
+const WEBGPU_TESTS = /webgpu|WebGPU/;
+const crossBrowserProjects =
+  process.env['VIBEGLOBE_CROSS_BROWSER'] === '1'
+    ? (['Desktop Firefox', 'Desktop Safari'] as const).map((device) => ({
+        name: device === 'Desktop Firefox' ? 'firefox' : 'webkit',
+        // The Chromium flags and executable do not apply.
+        use: { ...devices[device], launchOptions: {} },
+        testMatch: CROSS_BROWSER_SPECS,
+        grepInvert: WEBGPU_TESTS,
+      }))
+    : [];
 
 export default defineConfig({
   testDir: 'e2e',
@@ -31,6 +47,7 @@ export default defineConfig({
       testMatch: MEASURES_THE_MACHINE,
       dependencies: ['chromium'],
     },
+    ...crossBrowserProjects,
   ],
   webServer: [
     { command: 'npm run dev', url: `http://localhost:${port}`, reuseExistingServer: true },

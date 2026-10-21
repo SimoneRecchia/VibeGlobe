@@ -23,6 +23,7 @@ export { GlobeError } from './globe/errors.js';
 export type { GlobeErrorCode } from './globe/errors.js';
 export type {
   BackendName,
+  DepthPath,
   CameraState,
   Controls,
   DebugMeshData,

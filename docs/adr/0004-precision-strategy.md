@@ -115,3 +115,12 @@ Option 6. The rules:
 - **Reassociation canary.** Its result is recorded per device in the hardware matrix.
 - **Scenario `street-level-jitter`.** 1 m altitude at about eight worldwide locations, residual ≤ 0.1 px on both backends (F057, F078). Morph sweep: m = 1 frames match the flat-only pipeline.
 - **Benchmark.** The per-frame offset update for 5,000 draws takes ≤ 0.1 ms on the reference desktop, with zero allocations. The GPU frame-time difference of the split is within noise on the reference tablet.
+
+## Update 2026-10-21
+
+The M2 implementation first sent T as the translation of the float64 model-view matrix, which three.js rounds to float32 once at upload: T_lo was lost (KB-025). The renderer now follows point 3 as written:
+
+- each frame `placeEyeRelative` splits T with `splitEyeOffset` and writes T_hi into the translation of the mesh's world matrix and T_lo into its bottom row, which an affine matrix leaves unused; both are float32 values, so three.js's float32 upload of the matrix keeps them exactly, and array stores allocate nothing (fields of an object such as `Vector3` box every double, ADR 0018);
+- the shared vertex node (`eye-relative.ts`) reads them from the world matrix and evaluates `projection · view · ((offset + T_hi) + T_lo)`; the rest of the matrix stays the identity.
+
+Verification done in M2: the property test of the Vitest bullet (`eye-offset.test.ts`, ≤ 0.01 px with the split and ≤ 0.4 px with T_lo dropped, plus a fixed case where dropping T_lo costs 0.13 px), and the street-level jitter scenario on both backends (F057). The GPU readback test and the reassociation canary are not built yet: their results matter per device, so they are listed in `docs/follow-ups.md` to join the hardware matrix run ([hardware testing](../guides/hardware-testing.md)).

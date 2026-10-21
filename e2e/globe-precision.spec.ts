@@ -5,6 +5,16 @@ import { measureShift } from './support/image.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
+/**
+ * Every depth path (ADR 0005): hardware reversed-Z on WebGPU and on WebGL2 with `EXT_clip_control`, and WebGL2's
+ * fragment-written fallback (forced here; automatic where the extension is missing, as in Firefox).
+ */
+const DEPTH_PATHS = [
+  { name: 'webgpu', query: 'backend=webgpu', depthPath: 'reversed-z' },
+  { name: 'webgl2', query: 'backend=webgl2', depthPath: 'auto' },
+  { name: 'webgl2 with fragment depth', query: 'backend=webgl2&depth=fragment', depthPath: 'fragment' },
+] as const;
+
 /** The Mercator zoom that puts a straight-down camera about 0.94 m above the ground at a latitude (zoom 25.5 at 45.46°). */
 function zoomForOneMeter(latitudeDeg: number): number {
   const cos = (deg: number): number => Math.cos((deg * Math.PI) / 180);
@@ -78,11 +88,24 @@ for (const backend of BACKENDS) {
       }
     }
   });
+}
 
-  test(`near and far geometry show no z-fighting toward the horizon from 1 m on ${backend} (F058)`, async ({
+for (const path of DEPTH_PATHS) {
+  test(`the scene depth is 32-bit float on ${path.name} (ADR 0005, KB-024)`, async ({ page }) => {
+    await openGlobe(page, path.query);
+    const capabilities = await page.evaluate(() => window.vibeglobePlayground?.globe.capabilities);
+    const clipControl = await page.evaluate(
+      () => document.createElement('canvas').getContext('webgl2')?.getExtension('EXT_clip_control') != null,
+    );
+    const expected = path.depthPath === 'auto' ? (clipControl ? 'reversed-z' : 'fragment') : path.depthPath;
+    expect(capabilities?.depthPath).toBe(expected);
+    expect(capabilities?.depthFormat).toBe('depth32float');
+  });
+
+  test(`near and far geometry show no z-fighting toward the horizon from 1 m on ${path.name} (F058)`, async ({
     page,
   }) => {
-    await openGlobe(page, `backend=${backend}&scenario=depth-range&lon=9.19&lat=45.46&zoom=24.9&tilt=80`);
+    await openGlobe(page, `${path.query}&scenario=depth-range&lon=9.19&lat=45.46&zoom=24.9&tilt=80`);
     await page.waitForFunction(() => (window.vibeglobePlayground?.globe.rendererStats().drawCalls ?? 0) > 100);
     await waitForIdle(page);
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.altitudeMeters)).toBeCloseTo(1, 0);

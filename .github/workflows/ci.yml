@@ -79,6 +79,12 @@ jobs:
       - run: npm run test:e2e
       - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
         run: npm run geodtest
+      # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
+      - name: Rendering probes (recorded)
+        if: always()
+        env:
+          VIBEGLOBE_DEVICE: ci-swiftshader
+        run: npm run bench:probes
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -86,6 +92,43 @@ jobs:
           path: |
             playwright-report/
             test-results/
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: probes
+          path: benchmarks/results/ci-swiftshader/
+
+  cross-browser:
+    name: Firefox and WebKit (WebGL2)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      VIBEGLOBE_CROSS_BROWSER: '1'
+      VIBEGLOBE_DEVICE: ci-software
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps firefox webkit
+      - run: npm run build
+      # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
+      - run: npx playwright test --project=firefox --project=webkit
+      # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).
+      - name: OffscreenCanvas measurement
+        if: always()
+        run: |
+          npm run bench:offscreen -- --browser firefox
+          npm run bench:offscreen -- --browser webkit
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cross-browser
+          path: |
+            playwright-report/
+            test-results/
+            benchmarks/results/ci-software/
 
   benchmarks:
     name: Benchmarks (recorded, not gated)

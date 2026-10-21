@@ -3,7 +3,7 @@ import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webg
 
 /**
  * Creates the three.js mesh of a surface tile. The engine owns placement and culling (ADR 0004, ADR 0010): the mesh
- * keeps an identity matrix that three.js never recomputes, is never frustum-culled by three.js, and starts hidden until
+ * is placed eye-relative by its material and keeps an identity matrix that three.js never recomputes, is never frustum-culled by three.js, and starts hidden until
  * a frame selects it.
  */
 export function createTileMesh(data: TileMeshData, material: Material | undefined): Mesh {

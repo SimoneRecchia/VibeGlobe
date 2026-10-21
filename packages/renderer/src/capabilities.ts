@@ -1,5 +1,6 @@
 import type { RendererCapabilities } from '@vibeglobe/core';
 import type { WebGPURenderer } from 'three/webgpu';
+import { depthFormatOf, depthPathOf, type SceneDepth } from './depth.js';
 
 const COMPRESSED_FEATURES: readonly [string, string][] = [
   ['texture-compression-bc', 'bc'],
@@ -15,7 +16,7 @@ const COMPRESSED_EXTENSIONS: readonly [string, string][] = [
 ];
 
 /** Reads the active backend, GPU limits and memory hints from an initialized renderer (F056). */
-export function readCapabilities(renderer: WebGPURenderer): RendererCapabilities {
+export function readCapabilities(renderer: WebGPURenderer, sceneDepth: SceneDepth): RendererCapabilities {
   const backend = renderer.backend as {
     device?: GPUDevice;
     gl?: WebGL2RenderingContext;
@@ -26,6 +27,7 @@ export function readCapabilities(renderer: WebGPURenderer): RendererCapabilities
     globalThis.navigator) as (Navigator & { deviceMemory?: number }) | undefined;
   const deviceMemoryGiB = navigator?.deviceMemory;
   const maxAnisotropy = renderer.getMaxAnisotropy();
+  const depth = { depthPath: depthPathOf(renderer), depthFormat: depthFormatOf(renderer, sceneDepth) };
   if (backend.device) {
     const formats = new Set<string>();
     for (const [feature, family] of COMPRESSED_FEATURES) {
@@ -39,6 +41,7 @@ export function readCapabilities(renderer: WebGPURenderer): RendererCapabilities
       compressedTextureFormats: [...formats],
       deviceMemoryGiB,
       adapter: info ? [info.vendor, info.architecture, info.description].filter(Boolean).join(' ') : 'unknown',
+      ...depth,
     };
   }
   const gl = backend.gl;
@@ -52,5 +55,6 @@ export function readCapabilities(renderer: WebGPURenderer): RendererCapabilities
     compressedTextureFormats: [...formats],
     deviceMemoryGiB,
     adapter: gl && debugInfo ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)) : 'unknown',
+    ...depth,
   };
 }

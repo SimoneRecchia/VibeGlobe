@@ -20,6 +20,12 @@ export interface ScreenPoint {
 /** Graphics backend names. */
 export type BackendName = 'webgpu' | 'webgl2';
 
+/**
+ * How the renderer stores depth (ADR 0005): 'reversed-z' maps depth to [0, 1] in hardware (WebGPU, and WebGL2 with
+ * `EXT_clip_control`); 'fragment' writes the same value from the fragment shader (WebGL2 without the extension).
+ */
+export type DepthPath = 'reversed-z' | 'fragment';
+
 /** What the active graphics device offers (F056). */
 export interface RendererCapabilities {
   readonly backend: BackendName;
@@ -33,6 +39,10 @@ export interface RendererCapabilities {
   readonly deviceMemoryGiB: number | undefined;
   /** Adapter or renderer description for diagnostics. */
   readonly adapter: string;
+  /** The active depth path. */
+  readonly depthPath: DepthPath;
+  /** The scene depth format, named as in WebGPU ('depth32float' on every path, ADR 0005). */
+  readonly depthFormat: string;
 }
 
 /** The view the renderer draws, in eye-relative ECEF (ADR 0004): float64, rounded to float32 at upload. */
@@ -67,6 +77,11 @@ export interface RendererStats {
   readonly textureUploads: number;
   /** Automatic object matrix updates since the renderer started (tiles must cause none). */
   readonly matrixUpdates: number;
+  /**
+   * Render pipelines compiled since the warm-up before the first frame (ADR 0010 §4): 0 while only the warmed-up
+   * material variants draw. Debug shapes have their own materials and count.
+   */
+  readonly pipelineCompiles: number;
 }
 
 /** A flat test quad drawn with the surface's precision path, for scenario tests of jitter and depth (F057, F058). */
@@ -257,7 +272,7 @@ export interface Globe {
   requestRender(): void;
   /** GPU resource counters. */
   resourceCounts(): ResourceCounts;
-  /** Renderer counters: draw calls, triangles, texture uploads and automatic matrix updates. */
+  /** Renderer counters: draw calls, triangles, texture uploads, automatic matrix updates and pipeline compiles. */
   rendererStats(): RendererStats;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;

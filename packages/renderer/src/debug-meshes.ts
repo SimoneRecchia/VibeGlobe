@@ -1,6 +1,7 @@
-import type { DebugMeshData } from '@vibeglobe/core';
+import type { DebugMeshData, DepthPath } from '@vibeglobe/core';
 import { positionLocal, sin, vec3 } from 'three/tsl';
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
+import { makeEyeRelative } from './eye-relative.js';
 
 /** A drawn debug quad. */
 export interface DebugEntry {
@@ -14,7 +15,7 @@ export interface DebugEntry {
  * position, so it is fixed to the ground and moves only if the geometry does. A sum of sines (period twice the cell
  * size) keeps sub-pixel motion measurable, which hard checker edges inside a triangle (never anti-aliased) are not.
  */
-export function createDebugEntry(data: DebugMeshData): DebugEntry {
+export function createDebugEntry(data: DebugMeshData, depthPath: DepthPath): DebugEntry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
@@ -27,6 +28,7 @@ export function createDebugEntry(data: DebugMeshData): DebugEntry {
   } else {
     material.colorNode = color;
   }
+  makeEyeRelative(material, depthPath);
   material.side = DoubleSide;
   const mesh = new Mesh(geometry, material);
   mesh.matrixAutoUpdate = false;

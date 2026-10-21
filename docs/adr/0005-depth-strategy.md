@@ -139,3 +139,14 @@ Option 2 on WebGPU and on WebGL2 with `EXT_clip_control`. Option 6 on WebGL2 wit
     - Use timestamp queries in a tilted high-overdraw terrain view at 1080p, on the reference desktop and tablet.
     - The fallback path may cost at most 1.25× the clip-control path on the same device.
     - If it costs more, the measurement goes into a new ADR, which evaluates a two-frustum split for that path only.
+
+## Update 2026-10-21
+
+The first M2 renderer used three.js's default scene depth, which is 24-bit (KB-024), and had no fragment path. Now:
+
+- **Attachments.** The renderer's framebuffer target gets a `DepthTexture` of `FloatType` (`depth.ts`). three.js 0.186 still allocates the multisampled WebGL2 depth renderbuffer as `DEPTH_COMPONENT24` for a float depth texture (it compares `FloatType` with `gl.FLOAT`), which also breaks the resolve blit; `useFloatMultisampledDepth` (`webgl-compat.ts`) allocates `DEPTH_COMPONENT32F` instead. `RendererCapabilities.depthFormat` reports the format actually allocated (the renderbuffer's on WebGL2), and the end-to-end tests require `depth32float` on every path.
+- **Fragment path.** When `renderer.reversedDepthBuffer` is false after `init()`, the shared vertex node also sets `depthNode = near / d` (d interpolated as a varying) and `depthFunc = GreaterEqualDepth`, the clear depth is 0 and the projection's elements 10 and 14 become 1 and 2·near. The renderer option `depth: 'fragment'` (playground `?depth=fragment`) forces it on WebGL2; WebGPU always uses hardware reversed-Z. F058 runs on all three paths.
+- **Diagnostics.** `RendererCapabilities.depthPath` is `'reversed-z'` or `'fragment'`; the debug overlay shows the path and the format.
+- **Analytic test.** `depth.test.ts` emulates both paths in float32 (steps of 3e-7·d and 5e-7·d resolve from 1 mm to 4e7 m) and shows the fixed-function [−1, 1] mapping does not, which is why the fragment write exists.
+
+The depth-readback reconstruction and the GPU timing comparison of the two paths are not built yet: the timing needs the reference devices, so both are listed in `docs/follow-ups.md` to join the hardware matrix run ([hardware testing](../guides/hardware-testing.md)).

@@ -146,3 +146,48 @@ describe('geodetic ⇄ ECEF round trip', () => {
     expect(Math.abs(geodetic.latitudeRad - lat) * 6378137).toBeLessThan(MM);
   });
 });
+
+describe('geodetic → ECEF symmetry and continuity', () => {
+  const longitude = fc.double({ min: -Math.PI, max: Math.PI, noNaN: true });
+  const latitude = fc.double({ min: -Math.PI / 2, max: Math.PI / 2, noNaN: true });
+  const height = fc.double({ min: -12000, max: 40000000, noNaN: true });
+  const mirror = new Float64Array(3);
+
+  test.prop([longitude, latitude, height])(
+    'mirrors across the equator and the prime meridian, and is periodic in longitude',
+    (lon, lat, h) => {
+      geodeticToEcef(lon, lat, h, ecef);
+      const [x, y, z] = xyz();
+      const tolerance = 1e-9 * Math.hypot(x, y, z) + 1e-9;
+      geodeticToEcef(lon, -lat, h, mirror);
+      expect(Math.abs((mirror[0] ?? 0) - x)).toBeLessThan(tolerance);
+      expect(Math.abs((mirror[1] ?? 0) - y)).toBeLessThan(tolerance);
+      expect(Math.abs((mirror[2] ?? 0) + z)).toBeLessThan(tolerance);
+      geodeticToEcef(-lon, lat, h, mirror);
+      expect(Math.abs((mirror[0] ?? 0) - x)).toBeLessThan(tolerance);
+      expect(Math.abs((mirror[1] ?? 0) + y)).toBeLessThan(tolerance);
+      expect(Math.abs((mirror[2] ?? 0) - z)).toBeLessThan(tolerance);
+      geodeticToEcef(lon + 2 * Math.PI, lat, h, mirror);
+      expect(Math.hypot((mirror[0] ?? 0) - x, (mirror[1] ?? 0) - y, (mirror[2] ?? 0) - z)).toBeLessThan(tolerance);
+    },
+  );
+
+  // Away from the poles, where longitude is undefined.
+  const midLatitude = fc.double({ min: -1.5, max: 1.5, noNaN: true });
+
+  test.prop([midLatitude, fc.double({ min: 1e-9, max: 1e-6, noNaN: true })])(
+    'moves continuously across the antimeridian, both ways',
+    (lat, stepRad) => {
+      // Points just east and just west of ±180° are as close as their angular separation says: the parallel's radius
+      // is N·cos(latitude), with N at most a / √(1 − e²) ≈ 6399594 m.
+      geodeticToEcef(Math.PI - stepRad, lat, 0, ecef);
+      const [x, y, z] = xyz();
+      geodeticToEcef(-Math.PI + stepRad, lat, 0, mirror);
+      const distance = Math.hypot((mirror[0] ?? 0) - x, (mirror[1] ?? 0) - y, (mirror[2] ?? 0) - z);
+      expect(distance).toBeLessThanOrEqual(2 * stepRad * 6399594 * Math.cos(lat) + MM);
+      ecefToGeodetic(mirror[0] ?? 0, mirror[1] ?? 0, mirror[2] ?? 0, geodetic);
+      // The inverse comes back on the same side of the antimeridian, within float precision of ±π.
+      expect(geodetic.longitudeRad).toBeLessThan(0);
+    },
+  );
+});

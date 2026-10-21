@@ -1,6 +1,6 @@
 import { createControls } from '@vibeglobe/controls';
 import { createGlobe, WGS84, type Globe, type ViewInit } from '@vibeglobe/core';
-import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
+import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
@@ -32,12 +32,13 @@ function viewFromUrl(): ViewInit {
 
 const backendParam = params.get('backend');
 const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'webgl2' ? backendParam : 'auto';
+const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
 /** Creates one engine instance in a container with its own canvas. */
 function startGlobe(container: HTMLElement, target: HTMLCanvasElement, view: ViewInit): Globe {
   return createGlobe({
     container,
-    renderer: createRenderer({ backend, canvas: target }),
+    renderer: createRenderer({ backend, depth, canvas: target }),
     controls: createControls(),
     baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
     view,
@@ -74,23 +75,31 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
   // Loaded on demand so the overlay code is not part of the default page.
   const { createDebugOverlay } = await import('@vibeglobe/ui');
   const overlay = createDebugOverlay(host);
+  let info: (readonly [string, string])[] = [];
+  let pipelineCompiles = -1;
   void globe.ready.then(() => {
     const caps = globe.capabilities;
     if (!caps) return;
-    overlay.setInfo([
+    info = [
       ['backend', `backend ${caps.backend}`],
       ['max-texture-size', `max texture ${caps.maxTextureSize}`],
       ['max-anisotropy', `anisotropy ${caps.maxAnisotropy}`],
       ['compressed-formats', `compressed ${caps.compressedTextureFormats.join(', ') || 'none'}`],
       ['device-memory', `memory ${caps.deviceMemoryGiB === undefined ? 'unknown' : `${caps.deviceMemoryGiB} GiB`}`],
       ['adapter', `adapter ${caps.adapter}`],
-    ]);
+      ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
+    ];
   });
   let lastRefreshMs = -Infinity;
   return startFrameLoop((stats, timestampMs) => {
     if (timestampMs - lastRefreshMs < OVERLAY_REFRESH_MS) return;
     lastRefreshMs = timestampMs;
     overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
+    // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
+    const compiles = info.length > 0 ? globe.rendererStats().pipelineCompiles : -1;
+    if (compiles === pipelineCompiles) return;
+    pipelineCompiles = compiles;
+    overlay.setInfo([...info, ['pipeline-compiles', `pipelines after warm-up ${compiles}`]]);
   });
 }
 

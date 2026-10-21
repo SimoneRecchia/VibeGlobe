@@ -92,3 +92,14 @@ A per-view override needs a linked issue and a reason in the test, and never exc
 ## Update 2026-10-20
 
 The owner kept GPU-less CI and rejected paid cloud GPUs and GPU runners for now ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 2 and 6). To save minutes, every push and fork pull request runs one fast job with every non-browser check, while the browser jobs (end-to-end, and from M2 the visual and scenario tests, then the recorded benchmarks) run on pushes to `main`, nightly and on manual runs. The environment variables named here now use the `VIBEGLOBE_` prefix. Real-endpoint provider tests run through a separate live command only when their key is set (decision 5).
+
+## Update 2026-10-21
+
+The probes ADR 0013 #6 moved to M2 are `npm run bench:probes` (`benchmarks/probes.ts`), run in CI's end-to-end job on Playwright's pinned Chromium, with results in the `probes` artifact. On the container's Chromium 141 (SwiftShader, canonical view `europe`, 640 × 360):
+
+- **Determinism:** two browser launches give bit-identical canvases on both backends.
+- **Backend consistency:** 572 of 230,400 pixels (0.25%) differ between WebGPU and WebGL2, by at most 22 per channel; pixelmatch at threshold 0.1 reports 0 differing pixels, also when anti-aliased pixels count.
+- **Capture cost:** a canvas screenshot with PNG decoding takes a median of 169 ms (WebGPU) and 177 ms (WebGL2).
+- **Pacing:** `--deterministic-mode` leaves `requestAnimationFrame` at 16.7 ms (p50 and p95 16.7–16.8 ms).
+
+The 0.01% same-backend tolerance stays: the determinism probe shows no run-to-run variation on the same backend. CI's Chromium 156 results are added to `progress.md` from the first run that has them.

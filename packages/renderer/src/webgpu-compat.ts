@@ -11,11 +11,10 @@ export function patchIdentitySwizzle(scope: typeof globalThis): void {
   patched = true;
   const createView = prototype.createView;
   prototype.createView = function (this: GPUTexture, descriptor?: GPUTextureViewDescriptor): GPUTextureView {
-    if (descriptor && (descriptor as { swizzle?: unknown }).swizzle === 'rgba') {
-      const rest: GPUTextureViewDescriptor & { swizzle?: unknown } = { ...descriptor };
-      delete rest.swizzle;
-      return createView.call(this, rest);
-    }
+    // three.js builds a new descriptor for every call, the canvas view included (once per frame), so the member is
+    // cleared in place: a copy would allocate every frame (KB-026, ADR 0018). WebIDL treats undefined as absent.
+    const members = descriptor as { swizzle?: unknown } | undefined;
+    if (members?.swizzle === 'rgba') members.swizzle = undefined;
     return createView.call(this, descriptor);
   };
 }

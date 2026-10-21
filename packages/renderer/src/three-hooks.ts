@@ -1,0 +1,62 @@
+import type { Mesh, WebGPURenderer } from 'three/webgpu';
+
+/**
+ * three.js 0.186 starts its own requestAnimationFrame loop in init() and keeps it running forever, which defeats
+ * render on demand and allocates every display frame. The engine owns the frame loop, so this stops the internal loop
+ * and returns its bookkeeping, to run at the start of each engine render: the counter reset, and the node frame's id,
+ * which nodes updated once per frame key on. The node frame's clock (`time`, `deltaTime`) is not advanced: no engine
+ * material reads it, and updating it stores three doubles, three heap numbers per frame (ADR 0018). These are private
+ * members of the pinned version (ADR 0010).
+ */
+export function stopInternalLoop(renderer: WebGPURenderer): () => void {
+  const internals = renderer as unknown as {
+    _animation?: { stop(): void };
+    _nodes?: { nodeFrame: { frameId: number } };
+  };
+  internals._animation?.stop();
+  return () => {
+    if (renderer.info.autoReset) renderer.info.reset();
+    const nodeFrame = internals._nodes?.nodeFrame;
+    if (nodeFrame) nodeFrame.frameId++;
+  };
+}
+
+/** Counts any automatic matrix update three.js performs on a mesh; the engine expects none (F052). */
+export function countMatrixUpdates(mesh: Mesh, onUpdate: () => void): void {
+  const updateMatrix = mesh.updateMatrix.bind(mesh);
+  const updateMatrixWorld = mesh.updateMatrixWorld.bind(mesh);
+  mesh.updateMatrix = () => {
+    onUpdate();
+    updateMatrix();
+  };
+  mesh.updateMatrixWorld = (force?: boolean) => {
+    onUpdate();
+    updateMatrixWorld(force);
+  };
+}
+
+/** Counts the calls of an object's method, if it has one. */
+export function countCalls(object: unknown, name: string, onCall: () => void): void {
+  const target = object as Record<string, unknown>;
+  const method = target[name];
+  if (typeof method !== 'function') return;
+  target[name] = (...args: unknown[]): unknown => {
+    onCall();
+    return (method as (...args: unknown[]) => unknown).apply(object, args);
+  };
+}
+
+/** A fresh canvas filling its container, carrying over the identity and accessibility attributes of `previous`. */
+export function createCanvas(document: Document, previous: HTMLCanvasElement | undefined): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  for (const name of ['id', 'class', 'aria-label', 'role']) {
+    const value = previous?.getAttribute(name);
+    if (value) canvas.setAttribute(name, value);
+  }
+  canvas.style.display = 'block';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.touchAction = 'none';
+  canvas.tabIndex = 0;
+  return canvas;
+}

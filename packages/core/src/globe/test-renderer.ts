@@ -1,5 +1,12 @@
 import type { TileMeshData } from '../surface/surface-mesh.js';
-import type { FrameView, RendererBackend, RendererEvents, RendererFactory, RenderHost } from './types.js';
+import type {
+  FrameView,
+  RendererBackend,
+  RendererCapabilities,
+  RendererEvents,
+  RendererFactory,
+  RenderHost,
+} from './types.js';
 
 /** A renderer and host for unit tests: frames run when `flush` is called. It allocates nothing per frame itself. */
 export interface FakeRenderer extends RendererBackend {
@@ -23,19 +30,23 @@ export interface FakeRenderer extends RendererBackend {
   flush(): number;
 }
 
+const FAKE_CAPABILITIES: RendererCapabilities = {
+  backend: 'webgl2',
+  maxTextureSize: 4096,
+  maxAnisotropy: 1,
+  compressedTextureFormats: [],
+  deviceMemoryGiB: undefined,
+  adapter: 'fake',
+  depthPath: 'reversed-z',
+  depthFormat: 'depth32float',
+};
+
 /** Creates a fake renderer and the factory that hands it to createGlobe. */
 export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFactory } {
   const pending = new FrameQueue();
   const host = fakeHost(pending, () => renderer);
   const renderer: FakeRenderer = {
-    capabilities: {
-      backend: 'webgl2',
-      maxTextureSize: 4096,
-      maxAnisotropy: 1,
-      compressedTextureFormats: [],
-      deviceMemoryGiB: undefined,
-      adapter: 'fake',
-    },
+    capabilities: FAKE_CAPABILITIES,
     host,
     inputElement: {},
     meshes: new Map(),
@@ -59,7 +70,13 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       renderer.lastResize = { widthPx, heightPx };
     },
     setDebugMeshes: () => undefined,
-    stats: () => ({ drawCalls: renderer.drawCount, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
+    stats: () => ({
+      drawCalls: renderer.drawCount,
+      triangles: 0,
+      textureUploads: 1,
+      matrixUpdates: 0,
+      pipelineCompiles: 0,
+    }),
     resourceCounts: () => ({
       meshes: renderer.meshes.size,
       textures: renderer.destroyed ? 0 : 1,

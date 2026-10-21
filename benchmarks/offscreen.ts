@@ -167,9 +167,21 @@ const browser = await engine.launch({
   ...(channel ? { channel } : {}),
   ...(executablePath ? { executablePath } : {}),
 });
+/** The backends this browser offers: WebGPU only where it has an adapter (not Firefox or WebKit on Linux, for example). */
+async function availableBackends(): Promise<(typeof BACKENDS)[number][]> {
+  const page = await browser.newPage();
+  try {
+    await page.goto(baseUrl);
+    const webgpu = await page.evaluate(async () => (await navigator.gpu?.requestAdapter()) != null);
+    return BACKENDS.filter((backend) => backend !== 'webgpu' || webgpu);
+  } finally {
+    await page.close();
+  }
+}
+
 const results: Record<string, unknown>[] = [];
 try {
-  for (const backend of BACKENDS) {
+  for (const backend of await availableBackends()) {
     for (const mode of MODES) {
       for (const load of [false, true]) {
         const timing = await measureTiming(browser, baseUrl, mode, backend, load);

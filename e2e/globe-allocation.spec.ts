@@ -2,20 +2,44 @@ import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { openGlobe } from './support/globe.ts';
 
 interface SamplingNode {
+  id: number;
   callFrame: { url: string; functionName: string; lineNumber: number };
   selfSize: number;
   children: SamplingNode[];
 }
+
+interface SamplingProfile {
+  head: SamplingNode;
+  samples: { size: number; nodeId: number }[];
+}
+
+const SAMPLING_INTERVAL_BYTES = 64;
+/**
+ * The engine's frame callback, which the browser calls. V8 sometimes counts objects allocated deep inside three.js
+ * against it (strings and buffers of 72 bytes to several kilobytes in the measurements, never a boxed number), so its
+ * samples above this size count as the library's. Its own code allocates nothing: it is the core's frame function,
+ * measured exactly in Node by `packages/core/src/globe/frame-allocation.test.ts`.
+ */
+const FRAME_CALLBACK = /\/packages\/core\/src\/globe\/create-globe\.ts:frame:/;
+const FRAME_CALLBACK_MAX_OWN_BYTES = 32;
 
 interface TraceEvent {
   name: string;
   dur?: number;
 }
 
-/** Engine source files: core, renderer and controls (served from their TypeScript sources by the playground). */
-const ENGINE_SOURCE = /\/packages\/(core|renderer|controls)\/src\//;
-/** The rendering library's bundle. */
-const LIBRARY_SOURCE = /\/three\.webgpu[^/]*\.js/;
+/**
+ * Engine source files: core, renderer and controls (served from their TypeScript sources by the playground), except the
+ * createView shim counted with the library below.
+ */
+const ENGINE_SOURCE = /\/packages\/(core|controls)\/src\/|\/packages\/renderer\/src\/(?!webgpu-compat\.ts:)/;
+/**
+ * The rendering library's bundle, and the engine's shim around `GPUTexture.createView` (`webgpu-compat.ts`): three.js
+ * creates a view of the canvas texture every frame through it, and V8 counts the native view object against the
+ * innermost JavaScript function, which is the shim whenever it is not inlined into three.js. The shim itself allocates
+ * nothing (`webgpu-compat.test.ts`).
+ */
+const LIBRARY_SOURCE = /\/three\.webgpu[^/]*\.js|\/packages\/renderer\/src\/webgpu-compat\.ts:/;
 /**
  * three.js 0.186 rebuilds cache keys and uniform update ranges on every render, about 6 KB per frame for the M2 scene
  * once its unused lighting system is off (ADR 0018). This budget only stops that from growing; the engine's own code
@@ -55,13 +79,25 @@ async function startDragMotion(page: Page): Promise<void> {
   });
 }
 
-/** Sums sampled allocation bytes per allocation site. */
-function allocationSites(node: SamplingNode, out: Map<string, number>): Map<string, number> {
-  if (node.selfSize > 0) {
-    const site = `${node.callFrame.url}:${node.callFrame.functionName}:${node.callFrame.lineNumber}`;
-    out.set(site, (out.get(site) ?? 0) + node.selfSize);
+/**
+ * Sums sampled allocation bytes per allocation site, each sample scaled as V8 scales them (a sample stands for
+ * size / (1 − e^(−size / interval)) bytes). Large samples counted against the frame callback go to a library site.
+ */
+function allocationSites(profile: SamplingProfile): Map<string, number> {
+  const sites = new Map<number, string>();
+  const visit = (node: SamplingNode): void => {
+    sites.set(node.id, `${node.callFrame.url}:${node.callFrame.functionName}:${node.callFrame.lineNumber}`);
+    for (const child of node.children) visit(child);
+  };
+  visit(profile.head);
+  const out = new Map<string, number>();
+  for (const sample of profile.samples) {
+    let site = sites.get(sample.nodeId) ?? '(unknown)';
+    if (FRAME_CALLBACK.test(site) && sample.size > FRAME_CALLBACK_MAX_OWN_BYTES)
+      site = '/three.webgpu.js (counted against the frame callback)';
+    const bytes = sample.size / (1 - Math.exp(-sample.size / SAMPLING_INTERVAL_BYTES));
+    out.set(site, (out.get(site) ?? 0) + bytes);
   }
-  for (const child of node.children) allocationSites(child, out);
   return out;
 }
 
@@ -78,14 +114,14 @@ async function sampleAllocations(page: Page, session: CDPSession, durationMs: nu
   await session.send('HeapProfiler.enable');
   const first = await frameNumber(page);
   await session.send('HeapProfiler.startSampling', {
-    samplingInterval: 64,
+    samplingInterval: SAMPLING_INTERVAL_BYTES,
     includeObjectsCollectedByMajorGC: true,
     includeObjectsCollectedByMinorGC: true,
   });
   await page.waitForTimeout(durationMs);
-  const { profile } = (await session.send('HeapProfiler.stopSampling')) as { profile: { head: SamplingNode } };
+  const { profile } = (await session.send('HeapProfiler.stopSampling')) as { profile: SamplingProfile };
   await session.send('HeapProfiler.disable');
-  return { frames: (await frameNumber(page)) - first, sites: allocationSites(profile.head, new Map()) };
+  return { frames: (await frameNumber(page)) - first, sites: allocationSites(profile) };
 }
 
 async function traceGc(page: Page, session: CDPSession, durationMs: number) {

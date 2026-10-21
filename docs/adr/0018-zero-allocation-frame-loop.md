@@ -42,3 +42,13 @@ How F064's steps are verified:
 - `IntegerKeyMap` replaces `Map` wherever tile keys are looked up per frame, in the renderer as well.
 - The remaining garbage belongs to three.js. Removing it (patched cache-key paths of the pinned version, or an engine-owned renderer) is a follow-up, measured by the same test.
 - The Chromium test takes about four minutes and runs in the full suite (main and nightly), not on pull requests (ADR 0015).
+
+## Update 2026-10-21
+
+The precision and depth work of the M2 review (ADR 0004 and 0005 updates) added per-frame work in the renderer, measured with the method above:
+
+- **Split offsets.** Writing T_hi and T_lo into `Vector3` fields boxed every double (three.js's vector fields hold any value); a class of the engine's own with double fields still allocated now and then. They now go into the mesh's world-matrix array, which three.js uploads per object anyway.
+- **Near plane.** The camera's `near`, read by three.js as a number uniform, is written only on the fragment depth path and only when it changes.
+- **Node-frame clock.** Each frame the renderer advances only three.js's node-frame id; advancing its clock stored three doubles (three heap numbers per frame) for `time` and `deltaTime`, which no engine material reads.
+- **Texture-view shim.** It cleared the identity swizzle by copying the descriptor on every call, one object per frame (KB-026).
+- **Measurement.** Repeated runs of unchanged code showed the browser measurement is unstable: V8 sometimes counts three.js strings and buffers (72 bytes to several kilobytes) against the outermost JavaScript function, the engine's frame callback, which made it read 7 to 22.5 bytes per frame. The test now sums samples individually and gives that function's samples over 32 bytes, and the shim's samples (the native view object three.js requests), to the library. Boxed numbers and small objects still count against the engine (`docs/test-changes.md`).

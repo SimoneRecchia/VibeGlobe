@@ -382,7 +382,9 @@ class GlobeEngine implements Globe {
   }
 
   rendererStats(): RendererStats {
-    return this.renderer?.stats() ?? { drawCalls: 0, triangles: 0, textureUploads: 0, matrixUpdates: 0 };
+    return (
+      this.renderer?.stats() ?? { drawCalls: 0, triangles: 0, textureUploads: 0, matrixUpdates: 0, pipelineCompiles: 0 }
+    );
   }
 
   setDebugShapes(shapes: readonly DebugShape[]): void {

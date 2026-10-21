@@ -1,7 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
-import { expectCompleteGlobe, geoToScreen, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import { PNG } from 'pngjs';
+import { canvasImage, expectCompleteGlobe, geoToScreen, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import { measureLargeShift } from './support/image.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
+
+/** An init script that makes every WebGPU texture view invalid (a mip level count no texture has). */
+function breakTextureViews(): void {
+  const prototype = (globalThis as { GPUTexture?: { prototype: GPUTexture } }).GPUTexture?.prototype;
+  if (!prototype) return;
+  const createView = prototype.createView;
+  prototype.createView = function (this: GPUTexture, descriptor?: GPUTextureViewDescriptor): GPUTextureView {
+    return createView.call(this, { ...descriptor, mipLevelCount: 99 });
+  };
+}
 
 /** Collects uncaught page errors and console errors, which every test asserts are absent. */
 function trackErrors(page: Page): string[] {
@@ -51,6 +63,87 @@ test('the cursor readout reports the WGS84 position under the pointer and nothin
   expect(errors).toEqual([]);
 });
 
+/**
+ * The image the globe should show: the pinned equirectangular imagery, decoded by the browser's 2D canvas and sampled
+ * (bilinearly, in linear light) at the WGS84 position `screenToGeo` reports for each pixel center.
+ */
+async function expectedImagery(page: Page, width: number, height: number): Promise<PNG> {
+  const data = await page.evaluate(
+    async ({ widthPx, heightPx }) => {
+      const image = new Image();
+      image.src = '/imagery/natural-earth-4096.jpg';
+      await image.decode();
+      const source = document.createElement('canvas');
+      source.width = image.width;
+      source.height = image.height;
+      const context = source.getContext('2d');
+      if (!context) throw new Error('no 2D context');
+      context.drawImage(image, 0, 0);
+      const texels = context.getImageData(0, 0, image.width, image.height).data;
+      const toLinear = (c: number): number => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      const toSrgb = (c: number): number => 255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+      const texel = (u: number, v: number, channel: number): number => {
+        const x = ((u % image.width) + image.width) % image.width;
+        const y = Math.min(Math.max(v, 0), image.height - 1);
+        return toLinear(texels[(y * image.width + x) * 4 + channel] ?? 0);
+      };
+      const globe = window.vibeglobePlayground?.globe;
+      const canvas = document.querySelector('#globe');
+      if (!globe || !canvas) throw new Error('no globe');
+      const cssPerPx = canvas.clientWidth / widthPx;
+      const out: number[] = new Array<number>(widthPx * heightPx * 4).fill(0);
+      for (let y = 0; y < heightPx; y++) {
+        for (let x = 0; x < widthPx; x++) {
+          const position = globe.screenToGeo({ xPx: (x + 0.5) * cssPerPx, yPx: (y + 0.5) * cssPerPx });
+          if (!position) continue;
+          const u = ((position.longitudeDeg + 180) / 360) * image.width - 0.5;
+          const v = ((90 - position.latitudeDeg) / 180) * image.height - 0.5;
+          const u0 = Math.floor(u);
+          const v0 = Math.floor(v);
+          const fu = u - u0;
+          const fv = v - v0;
+          for (let channel = 0; channel < 3; channel++) {
+            const top = texel(u0, v0, channel) * (1 - fu) + texel(u0 + 1, v0, channel) * fu;
+            const bottom = texel(u0, v0 + 1, channel) * (1 - fu) + texel(u0 + 1, v0 + 1, channel) * fu;
+            out[(y * widthPx + x) * 4 + channel] = toSrgb(top * (1 - fv) + bottom * fv);
+          }
+          out[(y * widthPx + x) * 4 + 3] = 255;
+        }
+      }
+      return out;
+    },
+    { widthPx: width, heightPx: height },
+  );
+  const png = new PNG({ width, height });
+  for (let i = 0; i < data.length; i++) png.data[i] = Math.round(data[i] ?? 0);
+  return png;
+}
+
+for (const backend of BACKENDS) {
+  test(`the imagery is georeferenced: features show where screenToGeo places them on ${backend} (F048)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 480, height: 360 });
+    // Coastlines of Italy, Gibraltar, Japan and Chile, at a zoom where a screen pixel is smaller than an image texel.
+    for (const [lon, lat] of [
+      [15, 40],
+      [-5, 37],
+      [140, 36],
+      [-70, -33],
+    ] as const) {
+      await openGlobe(page, `backend=${backend}&lon=${lon}&lat=${lat}&zoom=6`);
+      await page.addStyleTag({ content: '#status, #cursor { visibility: hidden !important; }' });
+      await waitForIdle(page);
+      const rendered = await canvasImage(page);
+      const expected = await expectedImagery(page, rendered.width, rendered.height);
+      const shift = measureLargeShift(expected, rendered, 6);
+      // One image texel is about four screen pixels here; a half-texel error would show as a 2 px shift.
+      expect(Math.hypot(shift.dx, shift.dy)).toBeLessThan(0.5);
+    }
+  });
+}
+
 test('renders with WebGPU by default where WebGPU is available (F053)', async ({ page }) => {
   await openGlobe(page, 'debug=1');
   expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgpu');
@@ -78,6 +171,18 @@ test.describe('falls back to WebGL2 when WebGPU is unavailable (F054)', () => {
     await expectCompleteGlobe(page);
   });
 
+  test('when WebGPU fails its start-up self-test (ADR 0010 §2)', async ({ page }) => {
+    // Every texture view WebGPU creates is invalid: init() succeeds, the first draw does not.
+    await page.addInitScript(breakTextureViews);
+    await openGlobe(page);
+    expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgl2');
+    const fallback = await page.evaluate(() =>
+      window.vibeglobePlayground?.events.find((event) => event.type === 'backend-fallback'),
+    );
+    expect(JSON.stringify(fallback?.payload)).toContain('self-test');
+    await expectCompleteGlobe(page);
+  });
+
   test('when forced with ?backend=webgl2', async ({ page }) => {
     await openGlobe(page, 'backend=webgl2');
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgl2');
@@ -102,6 +207,23 @@ test('a forced WebGPU backend reports unsupported-device instead of falling back
     }
   });
   expect(outcome).toBe('unsupported-device');
+});
+
+test('a forced WebGPU backend that fails its start-up self-test reports unsupported-device (ADR 0010 §2)', async ({
+  page,
+}) => {
+  await page.addInitScript(breakTextureViews);
+  await page.goto('/?backend=webgpu');
+  await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
+  const outcome = await page.evaluate(async () => {
+    try {
+      await window.vibeglobePlayground?.globe.ready;
+      return `started on ${String(window.vibeglobePlayground?.globe.backend)}`;
+    } catch (error) {
+      return `${String((error as { code?: string }).code)}: ${(error as Error).message}`;
+    }
+  });
+  expect(outcome).toMatch(/^unsupported-device: .*self-test/);
 });
 
 test('reports a typed unsupported-device error when neither WebGPU nor WebGL2 exists, and the page survives (F055)', async ({
@@ -149,6 +271,22 @@ for (const backend of BACKENDS) {
     await expect(overlay.locator('[data-metric="max-anisotropy"]')).toHaveText(`anisotropy ${caps?.maxAnisotropy}`);
     await expect(overlay.locator('[data-metric="compressed-formats"]')).toContainText('compressed');
     await expect(overlay.locator('[data-metric="device-memory"]')).toContainText('memory');
+  });
+
+  test(`navigation compiles no pipeline after the start-up warm-up on ${backend} (ADR 0010 §4)`, async ({ page }) => {
+    await openGlobe(page, `backend=${backend}&debug=1&zoom=3`);
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 200, box.y + box.height / 2 + 80, { steps: 10 });
+    await page.mouse.up();
+    for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -300);
+    await waitForIdle(page);
+    expect(await page.evaluate(() => window.vibeglobePlayground?.globe.rendererStats().pipelineCompiles)).toBe(0);
+    await expect(page.locator('.vibeglobe-debug-overlay [data-metric="pipeline-compiles"]')).toHaveText(
+      'pipelines after warm-up 0',
+    );
   });
 
   test(`the globe is complete from orbit at every longitude and over both poles on ${backend} (F059)`, async ({
@@ -202,29 +340,45 @@ for (const backend of BACKENDS) {
     await openGlobe(page, `backend=${backend}&lon=10&lat=60&zoom=2`);
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
+    const center = { xPx: box.width / 2, yPx: box.height / 2 };
+    // The globe's screen radius below the center: the last pixel that still shows the ellipsoid.
+    let radiusPx = 0;
+    while (
+      center.yPx + radiusPx + 1 < box.height &&
+      (await screenToGeo(page, { ...center, yPx: center.yPx + radiusPx + 1 }))
+    )
+      radiusPx++;
+    expect(radiusPx).toBeGreaterThan(100);
     for (const [from, to] of [
+      [center, { xPx: center.xPx + 150, yPx: center.yPx + 60 }],
+      // From 95% of the way to the globe's edge, then a long vertical drag that carries the north pole under the
+      // cursor.
       [
-        { xPx: box.width / 2, yPx: box.height / 2 },
-        { xPx: box.width / 2 + 150, yPx: box.height / 2 + 60 },
-      ],
-      // From just inside the globe's edge, then a long vertical drag that carries the north pole under the cursor.
-      [
-        { xPx: box.width / 2, yPx: box.height / 2 + 150 },
-        { xPx: box.width / 2, yPx: box.height / 2 - 120 },
+        { xPx: center.xPx, yPx: center.yPx + radiusPx * 0.95 },
+        { xPx: center.xPx, yPx: center.yPx - 120 },
       ],
     ] as const) {
       const grabbed = await screenToGeo(page, from);
-      if (!grabbed) throw new Error('grab point off the globe');
+      // A second point 60 px to the side shows whether the view turns or jumps (ADR 0015 #10: no heading jump at the
+      // pole): in a drag it moves along with the cursor.
+      const companion = await screenToGeo(page, { xPx: from.xPx + 60, yPx: from.yPx });
+      if (!grabbed || !companion) throw new Error('grab point off the globe');
+      let companionShown = await geoToScreen(page, companion);
       await page.mouse.move(box.x + from.xPx, box.y + from.yPx);
       await page.mouse.down();
-      for (let step = 1; step <= 8; step++) {
+      const steps = 16;
+      const stepPx = Math.hypot(to.xPx - from.xPx, to.yPx - from.yPx) / steps;
+      for (let step = 1; step <= steps; step++) {
         const point = {
-          xPx: from.xPx + ((to.xPx - from.xPx) * step) / 8,
-          yPx: from.yPx + ((to.yPx - from.yPx) * step) / 8,
+          xPx: from.xPx + ((to.xPx - from.xPx) * step) / steps,
+          yPx: from.yPx + ((to.yPx - from.yPx) * step) / steps,
         };
         await page.mouse.move(box.x + point.xPx, box.y + point.yPx);
         const shown = await geoToScreen(page, grabbed);
         expect(Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx)).toBeLessThan(1);
+        const next = await geoToScreen(page, companion);
+        expect(Math.hypot(next.xPx - companionShown.xPx, next.yPx - companionShown.yPx)).toBeLessThan(3 * stepPx);
+        companionShown = next;
       }
       await page.mouse.up();
     }

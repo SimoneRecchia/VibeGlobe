@@ -1,10 +1,15 @@
 import { GlobeError, type RendererFactory, type RenderHost } from '@vibeglobe/core';
-import type { BackendChoice } from './three-backend.js';
+import type { BackendChoice, DepthChoice } from './three-backend.js';
 
 /** Options of {@link createRenderer}. */
 export interface RendererOptions {
   /** 'auto' (default) uses WebGPU and falls back to WebGL2; 'webgpu' or 'webgl2' force a backend. */
   readonly backend?: BackendChoice;
+  /**
+   * 'auto' (default) uses hardware reversed-Z wherever it exists; 'fragment' forces the depth path of WebGL2 without
+   * `EXT_clip_control` (ADR 0005), for tests and diagnostics. WebGPU ignores it.
+   */
+  readonly depth?: DepthChoice;
   /**
    * The canvas to draw into: a canvas inside the container (by default the renderer creates one), or an OffscreenCanvas,
    * for example in a worker (ADR 0011). An OffscreenCanvas needs `host`.
@@ -24,6 +29,7 @@ export interface RendererOptions {
  */
 export function createRenderer(options: RendererOptions = {}): RendererFactory {
   const choice = options.backend ?? 'auto';
+  const depth = options.depth ?? 'auto';
   return async (container, events) => {
     const canvas = options.canvas;
     const offscreen = typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
@@ -33,7 +39,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     ]);
     if (offscreen) {
       if (!options.host) throw new GlobeError('invalid-option', 'An OffscreenCanvas renderer needs a host');
-      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, choice, events);
+      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, choice, events, depth);
     }
     const element = container as HTMLElement;
     const { createBrowserHost } = hostModule ?? (await import('./browser-host.js'));
@@ -42,6 +48,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
       options.host ?? createBrowserHost(element),
       choice,
       events,
+      depth,
     );
   };
 }

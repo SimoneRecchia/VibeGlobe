@@ -38,6 +38,7 @@
     "check:consumer": "node scripts/check-consumer.ts",
     "geodtest": "node scripts/geodtest.ts",
     "bench:offscreen": "node benchmarks/offscreen.ts",
+    "bench:probes": "node benchmarks/probes.ts",
     "test:hardware": "node scripts/hardware-run.ts"
   },
   "devDependencies": {

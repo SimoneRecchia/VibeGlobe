@@ -1413,7 +1413,7 @@
         "Record draw calls and pipeline or state changes per frame",
         "Confirm both stay within the budgets defined in docs/plan and do not grow linearly with the number of visible tiles beyond the documented batching factor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F104",

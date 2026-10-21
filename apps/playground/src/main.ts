@@ -185,7 +185,10 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     lastRefreshMs = timestampMs;
     overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
     // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
-    const compiles = info.length > 0 ? globe.rendererStats().pipelineCompiles : -1;
+    const rendererStats = globe.rendererStats();
+    const compiles = info.length > 0 ? rendererStats.pipelineCompiles : -1;
+    // Draw calls and pipeline changes of the last frame (F103).
+    const draws = `draw calls ${rendererStats.drawCalls} · pipeline switches ${rendererStats.pipelineSwitches}`;
     // The surface selection: drawn tiles and what culling skipped (F086, F087).
     const selection = globe.surfaceStats();
     const surface =
@@ -200,12 +203,13 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
       ? `RAM hits ${imagery.ramHits} · GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
         `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
       : '';
-    if (compiles === pipelineCompiles && surface + cache === surfaceInfo) return;
+    if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
     pipelineCompiles = compiles;
-    surfaceInfo = surface + cache;
+    surfaceInfo = surface + cache + draws;
     overlay.setInfo([
       ...info,
       ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
+      ['draws', draws],
       ['surface', surface],
       ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
     ]);

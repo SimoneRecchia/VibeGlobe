@@ -153,6 +153,11 @@ export class ImageryLoader implements NetworkPoolClient {
    */
   want(level: number, x: number, y: number, priority: number): number {
     const record = this.table.recordFor(level, x, y);
+    // The pinned base keeps its class-0 key (its level) when visible tiles also want it, and a tile wanted twice in a
+    // frame keeps the lower key: otherwise a visible tile could sit above a pinned one that has to load first (KB-067).
+    const previous = this.table.priorities[record.slot] ?? Infinity;
+    if (record.pinned) priority = level;
+    else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
     record.wantedFrame = this.frame;
     const state = record.state;
     const handle = this.options.handleBase + record.slot;

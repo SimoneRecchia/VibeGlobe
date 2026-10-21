@@ -28,7 +28,7 @@ import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
-import { countCalls, countMatrixUpdates, readGpuTime, stopInternalLoop } from './three-hooks.js';
+import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import {
   RecoveryLimiter,
@@ -92,6 +92,7 @@ export class ThreeBackend implements RendererBackend {
   private textureUploads = 0;
   private matrixUpdates = 0;
   private pipelineCompiles = 0;
+  private pipelineSwitches: PipelineSwitches | undefined;
   /** Why WebGPU failed its start-up self-test, after which this backend uses WebGL2 (ADR 0010 §2). */
   private webgpuFailure: string | undefined;
   private lastDrawCalls = 0;
@@ -211,6 +212,7 @@ export class ThreeBackend implements RendererBackend {
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
     countCalls(renderer.backend, 'updateTexture', () => this.textureUploads++);
     countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
+    this.pipelineSwitches = new PipelineSwitches(renderer.backend);
     this.renderer = renderer;
     this.capabilities = readCapabilities(renderer, sceneDepth);
     renderer.setPixelRatio(this.size.pixelRatio);
@@ -270,6 +272,7 @@ export class ThreeBackend implements RendererBackend {
       textureUploads: this.textureUploads,
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
+      pipelineSwitches: this.pipelineSwitches?.count ?? 0,
       gpuFrameMs: this.gpuFrameMs,
     };
   }
@@ -351,6 +354,7 @@ export class ThreeBackend implements RendererBackend {
     }
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
+    this.pipelineSwitches?.begin();
     this.renderer.render(this.scene, this.camera);
     if (this.settings.gpuTiming) readGpuTime(this.renderer, (ms) => (this.gpuFrameMs = ms));
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };

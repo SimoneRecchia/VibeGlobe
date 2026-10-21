@@ -370,4 +370,19 @@ describe('ImageryLoader', () => {
     expect(transport.started).toEqual([url(6, 3, 3)]);
     expect(uploaded).toEqual([0, 1000]);
   });
+
+  it('loads the whole pinned base even when its tiles are also wanted as visible ancestors (KB-067)', () => {
+    const { transport, loader, residency, ok } = setUp(2, { pinnedLevel: 1 });
+    for (let frame = 1; frame <= 6 && !loader.pinnedComplete; frame++) {
+      residency.startFrame(frame);
+      loader.beginFrame();
+      // A pinned level-1 tile wanted as the ancestor of an edge tile gets a larger key (1024 + 1 + 2 · distance) than
+      // a visible tile at the center (1024 + 6).
+      loader.want(1, 1, 1, 1027);
+      loader.want(6, 30, 20, 1030 - 4);
+      loader.endFrame();
+      for (const u of [...transport.open.keys()]) transport.answer(u, ok);
+    }
+    expect(loader.pinnedComplete).toBe(true);
+  });
 });

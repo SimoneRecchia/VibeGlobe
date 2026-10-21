@@ -94,6 +94,8 @@ export interface RendererStats {
    * material variants draw. Debug shapes have their own materials and count.
    */
   readonly pipelineCompiles: number;
+  /** Times the render pipeline changed between draws in the last frame, the output pass included (F103). */
+  readonly pipelineSwitches: number;
   /**
    * GPU time of the last frame measured, in milliseconds: null unless the renderer was asked to measure it and the
    * device offers timestamp queries (benchmarks).

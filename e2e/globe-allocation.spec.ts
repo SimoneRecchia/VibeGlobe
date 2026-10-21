@@ -17,10 +17,10 @@ const SAMPLING_INTERVAL_BYTES = 64;
 /**
  * The engine's frame callback, which the browser calls. V8 sometimes counts objects allocated deep inside three.js
  * against it (strings and buffers of 72 bytes to several kilobytes in the measurements, never a boxed number), so its
- * samples above this size count as the library's. Its own code allocates nothing: it is the core's frame function,
- * measured exactly in Node by `packages/core/src/globe/frame-allocation.test.ts`.
+ * samples above this size count as the library's. Its own code allocates nothing: it is the core's `onFrame`, which runs
+ * the frame function, measured exactly in Node by `packages/core/src/globe/frame-allocation.test.ts`.
  */
-const FRAME_CALLBACK = /\/packages\/core\/src\/globe\/create-globe\.ts:frame:/;
+const FRAME_CALLBACK = /\/packages\/core\/src\/globe\/create-globe\.ts(\?t=\d+)?:onFrame:/;
 const FRAME_CALLBACK_MAX_OWN_BYTES = 32;
 
 interface TraceEvent {
@@ -121,7 +121,19 @@ async function sampleAllocations(page: Page, session: CDPSession, durationMs: nu
   await page.waitForTimeout(durationMs);
   const { profile } = (await session.send('HeapProfiler.stopSampling')) as { profile: SamplingProfile };
   await session.send('HeapProfiler.disable');
-  return { frames: (await frameNumber(page)) - first, sites: allocationSites(profile) };
+  return {
+    frames: (await frameNumber(page)) - first,
+    sites: allocationSites(profile),
+    frameCallbackSeen: containsFunction(profile.head, FRAME_CALLBACK),
+  };
+}
+
+/** True when a function whose site matches `site` is on the profile's call tree. */
+function containsFunction(node: SamplingNode, site: RegExp): boolean {
+  const { url, functionName, lineNumber } = node.callFrame;
+  return (
+    site.test(`${url}:${functionName}:${lineNumber}`) || node.children.some((child) => containsFunction(child, site))
+  );
 }
 
 async function traceGc(page: Page, session: CDPSession, durationMs: number) {
@@ -174,6 +186,8 @@ test('the frame loop allocates nothing in steady-state motion and no GC pause ca
   };
   await test.info().attach('allocations', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
   expect(allocations.frames).toBeGreaterThan(300);
+  // The rule above follows the callback's name: a renamed callback must fail here, not count the library as the engine.
+  expect(allocations.frameCallbackSeen, 'FRAME_CALLBACK must name the engine frame callback').toBe(true);
   expect(gc.frames).toBeGreaterThan(600);
   // The engine's own code, beyond the timestamp every frame callback receives: less than one boxed number per frame on
   // average means no frame allocates.

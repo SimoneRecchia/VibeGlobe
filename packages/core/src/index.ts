@@ -90,3 +90,7 @@ export { geodesicDirect } from './geodesy/geodesic-direct.js';
 export type { GeodesicDirectResult } from './geodesy/geodesic-direct.js';
 export { geodesicPathLengthMeters, geodesicPolygonArea } from './geodesy/geodesic-polygon.js';
 export type { GeodesicPoint, GeodesicPolygonArea } from './geodesy/geodesic-polygon.js';
+export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } from './tiling/tile-key.js';
+export type { TileCoord, TileKey } from './tiling/tile-key.js';
+export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
+export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';

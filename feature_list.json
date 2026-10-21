@@ -5316,7 +5316,7 @@
         "Run property-based tests verifying that parsing each formatted string returns the original coordinate within the format's precision",
         "Verify the readout control and the search box use these functions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F406",
@@ -5479,7 +5479,7 @@
         "Add controls individually and remove them and verify each mounts and unmounts cleanly",
         "Replace one built-in control with a custom control built on the public control API and extend another, and verify both work"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F419",
@@ -5492,7 +5492,7 @@
         "Verify buttons are disabled at the minimum and maximum zoom",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F420",
@@ -5505,7 +5505,7 @@
         "Using only the keyboard, reset north, rotate and orient to N, E, S and W",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F421",
@@ -5596,7 +5596,7 @@
         "Emulate a browser without the Fullscreen API and verify the control is hidden",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F428",
@@ -5608,7 +5608,7 @@
         "Verify the debug overlay and performance HUD appear and disappear",
         "Verify the toggle is absent unless enabled in the configuration"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F429",

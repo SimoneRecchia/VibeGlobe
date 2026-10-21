@@ -15,5 +15,9 @@
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/gis": "0.0.0"
+  }
 }

@@ -1,3 +1,5 @@
+import { installStyles, uninstallStyles } from '../theme/install.js';
+
 /** Values shown by the debug overlay; `undefined` renders as a dash. */
 export interface DebugOverlayValues {
   frameTimeMs: number | undefined;
@@ -18,15 +20,20 @@ function format(value: number | undefined, unit: string): string {
   return value === undefined ? `– ${unit}` : `${value.toFixed(1)} ${unit}`;
 }
 
-/** Adds the debug overlay to `container`, which should be the positioned element that holds the map. */
-export function createDebugOverlay(container: HTMLElement): DebugOverlay {
+/**
+ * Adds the debug overlay to `container`, which should be the positioned element that holds the map; inside a corner of
+ * the ui layer it takes its place in the corner's flow instead.
+ *
+ * @param container - Where the panel goes.
+ * @param label - Its accessible name (default 'Engine diagnostics').
+ */
+export function createDebugOverlay(container: HTMLElement, label = 'Engine diagnostics'): DebugOverlay {
   const panel = document.createElement('div');
+  // Styled by the ui stylesheet's theme variables (F429), installed while a panel exists.
+  installStyles();
   panel.className = 'vibeglobe-debug-overlay';
   panel.setAttribute('role', 'status');
-  panel.setAttribute('aria-label', 'Engine diagnostics');
-  panel.style.cssText =
-    'position:absolute;top:8px;left:8px;padding:4px 8px;border-radius:4px;font:12px/1.4 ui-monospace,monospace;' +
-    'color:#fff;background:rgba(0,0,0,0.65);pointer-events:none;white-space:pre';
+  panel.setAttribute('aria-label', label);
   const frameTime = document.createElement('div');
   const frameRate = document.createElement('div');
   frameTime.dataset['metric'] = 'frame-time';
@@ -35,6 +42,7 @@ export function createDebugOverlay(container: HTMLElement): DebugOverlay {
   panel.append(frameTime, frameRate, info);
   container.append(panel);
 
+  let removed = false;
   const overlay: DebugOverlay = {
     update(values) {
       frameTime.textContent = `frame ${format(values.frameTimeMs, 'ms')}`;
@@ -51,7 +59,10 @@ export function createDebugOverlay(container: HTMLElement): DebugOverlay {
       );
     },
     destroy() {
+      if (removed) return;
+      removed = true;
       panel.remove();
+      uninstallStyles();
     },
   };
   overlay.update({ frameTimeMs: undefined, framesPerSecond: undefined });

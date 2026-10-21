@@ -151,9 +151,26 @@ describe('createGlobe', () => {
     globe.destroy();
     expect(renderer.destroyed).toBe(true);
     expect(renderer.meshes.size).toBe(0);
-    expect(globe.resourceCounts()).toEqual({ meshes: 0, textures: 0, gpuBytes: 0 });
+    expect(globe.resourceCounts()).toEqual({ meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 });
     expect(() => globe.jumpTo({ zoom: 2 })).toThrow(GlobeError);
     expect(() => globe.requestRender()).toThrowError(/destroyed/);
+  });
+
+  it('moves the controls to the new canvas after a recovery (KB-020)', async () => {
+    const attached: unknown[] = [];
+    let detached = 0;
+    const { renderer } = await started({
+      controls: (element) => {
+        attached.push(element);
+        return { destroy: () => detached++ };
+      },
+    });
+    const replacement = { canvas: 'new' };
+    renderer.inputElement = replacement;
+    renderer.events?.deviceRestored();
+    expect(attached).toHaveLength(2);
+    expect(attached[1]).toBe(replacement);
+    expect(detached).toBe(1);
   });
 
   it('rejects ready with a typed error when the renderer cannot start (F055)', async () => {

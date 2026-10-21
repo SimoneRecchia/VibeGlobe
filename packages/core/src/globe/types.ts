@@ -47,9 +47,14 @@ export interface FrameView {
 
 /** GPU resource counters, all zero after destroy (F068). */
 export interface ResourceCounts {
+  /** Surface and debug meshes held on the GPU. */
   readonly meshes: number;
   readonly textures: number;
   readonly gpuBytes: number;
+  /** WebGL2 vertex array objects held (0 on WebGPU), which must follow the meshes (KB-021). */
+  readonly vertexArrays: number;
+  /** GPU devices or contexts held: 1 while the globe runs, 0 once released. */
+  readonly contexts: number;
 }
 
 /** Cumulative renderer counters for diagnostics and tests (F052). */

@@ -4,6 +4,8 @@ import type { FrameView, RendererBackend, RendererEvents, RendererFactory, Rende
 /** A renderer and host for unit tests: frames run when `flush` is called. It allocates nothing per frame itself. */
 export interface FakeRenderer extends RendererBackend {
   readonly meshes: Map<number, TileMeshData>;
+  /** The element the controls attach to; a recovery may replace it. */
+  inputElement: unknown;
   /** Frames drawn so far. */
   drawCount: number;
   /** Tiles in the last drawn frame. */
@@ -59,9 +61,11 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     setDebugMeshes: () => undefined,
     stats: () => ({ drawCalls: renderer.drawCount, triangles: 0, textureUploads: 1, matrixUpdates: 0 }),
     resourceCounts: () => ({
-      meshes: renderer.destroyed ? 0 : renderer.meshes.size,
+      meshes: renderer.meshes.size,
       textures: renderer.destroyed ? 0 : 1,
       gpuBytes: 0,
+      vertexArrays: 0,
+      contexts: renderer.destroyed ? 0 : 1,
     }),
     simulateDeviceLoss: () => renderer.events?.deviceLost('simulated'),
     destroy: () => {

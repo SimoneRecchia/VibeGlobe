@@ -53,6 +53,7 @@ class GlobeEngine implements Globe {
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
   private controls: Controls | undefined;
+  private controlsElement: unknown;
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
   private frames = 0;
@@ -142,6 +143,7 @@ class GlobeEngine implements Globe {
     const events: RendererEvents = {
       deviceLost: (reason) => this.emitter.emit('device-lost', { reason }),
       deviceRestored: () => {
+        this.attachControls();
         this.emitter.emit('device-restored', {});
         this.requestRender();
       },
@@ -170,11 +172,21 @@ class GlobeEngine implements Globe {
         if (visible) this.requestRender();
       }),
     );
-    if (this.options.controls) this.controls = this.options.controls(renderer.inputElement, this.navigation);
+    this.attachControls();
     await renderer.setBaseImagery(this.options.baseImageryUrl);
     if (this.destroyed) return;
     this.imageryLoaded = true;
     this.requestRender();
+  }
+
+  /** Attaches the controls to the renderer's input element, again when a recovery replaced it (KB-020). */
+  private attachControls(): void {
+    const factory = this.options.controls;
+    const element = this.renderer?.inputElement;
+    if (!factory || (this.controls && element === this.controlsElement)) return;
+    this.controls?.destroy();
+    this.controlsElement = element;
+    this.controls = factory(element, this.navigation);
   }
 
   private syncSize(): void {
@@ -366,7 +378,7 @@ class GlobeEngine implements Globe {
   }
 
   resourceCounts(): ResourceCounts {
-    return this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0 };
+    return this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 };
   }
 
   rendererStats(): RendererStats {

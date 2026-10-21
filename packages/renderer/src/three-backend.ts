@@ -25,7 +25,9 @@ import {
 import { readCapabilities } from './capabilities.js';
 import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
+import { countVertexArrays, releaseVertexArraysWithBuffers } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
+import { decodeBitmap, decodeImage, webgl2Usable, webgpuUsable } from './environment.js';
 import { createSurfaceMaterial, placeEyeRelative } from './surface-material.js';
 
 /** A camera whose matrices the engine writes every frame; three.js must not recompute them. */
@@ -79,6 +81,12 @@ export class ThreeBackend implements RendererBackend {
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
   private recovering = false;
+  /** Set when recovery gave up: nothing is drawn any more. */
+  private failed = false;
+  /** When the recent losses happened (host milliseconds), for the recovery limit. */
+  private readonly lossTimesMs: number[] = [];
+  /** Whether the current device or context is still held. */
+  private contextHeld: () => boolean = () => false;
 
   private constructor(
     private readonly surface: DrawingSurface,
@@ -144,11 +152,8 @@ export class ThreeBackend implements RendererBackend {
     // Every material is unlit. With lighting enabled three.js still rebuilds the lights node's cache key on every render
     // call, about 5 KB of garbage per frame (F064, ADR 0018).
     renderer.lighting.enabled = false;
-    renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(renderer, info.message ?? 'device lost');
-    // three.js ignores losses with the reason 'destroyed', assuming it destroyed the device itself; any loss of a
-    // device this backend did not dispose must still recover.
-    const device = (renderer.backend as { device?: GPUDevice }).device;
-    void device?.lost.then((info) => this.handleLoss(renderer, info.message || info.reason));
+    this.watchLoss(renderer);
+    releaseVertexArraysWithBuffers(renderer.backend);
     // three.js falls back to WebGL2 silently when WebGPU fails to initialize: reported for 'auto', an error for 'webgpu'.
     const fellBack = !forceWebGL && (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend === true;
     if (fellBack && this.choice === 'webgpu') {
@@ -236,6 +241,21 @@ export class ThreeBackend implements RendererBackend {
     return { data, mesh };
   }
 
+  /** Recovers from this renderer's device or context loss, and tracks whether its device or context is held. */
+  private watchLoss(renderer: WebGPURenderer): void {
+    renderer.onDeviceLost = (info: { message?: string }) => this.handleLoss(renderer, info.message ?? 'device lost');
+    // three.js ignores losses with the reason 'destroyed', assuming it destroyed the device itself; any loss of a
+    // device this backend did not dispose must still recover.
+    const device = (renderer.backend as { device?: GPUDevice }).device;
+    const gl = (renderer.backend as { gl?: WebGL2RenderingContext }).gl;
+    let deviceLost = false;
+    void device?.lost.then((info) => {
+      deviceLost = true;
+      this.handleLoss(renderer, info.message || info.reason);
+    });
+    this.contextHeld = () => (device ? !deviceLost : gl ? !gl.isContextLost() : false);
+  }
+
   /** Counts any automatic matrix update three.js performs on a tile mesh; the engine expects none (F052). */
   private countMatrixUpdates(mesh: Mesh): void {
     const updateMatrix = mesh.updateMatrix.bind(mesh);
@@ -315,7 +335,8 @@ export class ThreeBackend implements RendererBackend {
 
   /** Draws the listed tiles with eye-relative offsets for this frame (ADR 0004). */
   render(view: FrameView, keys: readonly number[], count: number): void {
-    if (this.destroyed || !this.material) return;
+    // Nothing is drawn with a lost renderer: while recovering, or after recovery gave up.
+    if (this.destroyed || this.recovering || this.failed || !this.material) return;
     // Hide only what the previous frame showed: the work and the memory stay proportional to the drawn tiles.
     for (let i = 0; i < this.shownCount; i++) {
       const mesh = this.shown[i];
@@ -351,14 +372,20 @@ export class ThreeBackend implements RendererBackend {
     this.renderer.setSize(widthPx, heightPx, false);
   }
 
-  /** GPU resource counters; all zero after destroy. */
+  /** GPU resource counters, counted from what is actually held (after destroy too, so a leak shows). */
   resourceCounts(): ResourceCounts {
-    if (this.destroyed) return { meshes: 0, textures: 0, gpuBytes: 0 };
     let gpuBytes = 0;
     this.tiles.forEach((entry) => (gpuBytes += entry.data.byteLength + entry.data.indices.byteLength));
+    for (const entry of this.debugEntries) gpuBytes += entry.data.positions.byteLength;
     const image = this.imagery;
     const textureBytes = image && this.imageryTexture ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
-    return { meshes: this.tiles.size, textures: this.imageryTexture ? 1 : 0, gpuBytes: gpuBytes + textureBytes };
+    return {
+      meshes: this.tiles.size + this.debugEntries.length,
+      textures: this.imageryTexture ? 1 : 0,
+      gpuBytes: gpuBytes + textureBytes,
+      vertexArrays: countVertexArrays(this.renderer.backend),
+      contexts: this.contextHeld() ? 1 : 0,
+    };
   }
 
   /** Test hook: destroys the WebGPU device or loses the WebGL2 context. */
@@ -370,17 +397,40 @@ export class ThreeBackend implements RendererBackend {
 
   private handleLoss(lost: WebGPURenderer, reason: string): void {
     // Only the current renderer's loss counts: one replaced or disposed by this backend is expected to go away.
-    if (this.destroyed || lost !== this.renderer || this.recovering) return;
+    if (this.destroyed || this.failed || lost !== this.renderer || this.recovering) return;
     this.recovering = true;
     this.events.deviceLost(reason);
-    void this.recover();
+    // At most 3 recoveries in 60 s, each after a longer pause (ADR 0010 §8, ADR 0013 #4).
+    const nowMs = this.host.now();
+    while (this.lossTimesMs.length > 0 && nowMs - (this.lossTimesMs[0] ?? 0) > RECOVERY_WINDOW_MS)
+      this.lossTimesMs.shift();
+    this.lossTimesMs.push(nowMs);
+    if (this.lossTimesMs.length > MAX_RECOVERIES) {
+      this.failed = true;
+      this.recovering = false;
+      this.events.failed(
+        new GlobeError(
+          'renderer-failed',
+          `The GPU was lost ${this.lossTimesMs.length} times within a minute; giving up`,
+        ),
+      );
+      return;
+    }
+    void this.recover(RECOVERY_BACKOFF_MS * 2 ** (this.lossTimesMs.length - 1));
   }
 
-  private async recover(): Promise<void> {
+  private async recover(delayMs: number): Promise<void> {
     try {
       this.renderer.dispose();
       this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (this.destroyed) return;
       await this.initRenderer();
+      if (this.destroyed) {
+        // Destroyed while the new renderer started: release it too.
+        this.releaseRenderer();
+        return;
+      }
       this.createImageryResources();
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
       this.recovering = false;
@@ -401,44 +451,22 @@ export class ThreeBackend implements RendererBackend {
     for (const key of keys) this.removeMesh(key);
     this.setDebugMeshes([]);
     this.material?.dispose();
+    this.material = undefined;
     this.imageryTexture?.dispose();
-    this.renderer.dispose();
+    this.imageryTexture = undefined;
+    this.releaseRenderer();
     if (this.surface.kind === 'element') (this.canvas as HTMLCanvasElement | undefined)?.remove();
   }
-}
 
-/** True when the browser offers a WebGPU adapter. */
-async function webgpuUsable(scope: typeof globalThis): Promise<boolean> {
-  const gpu = (scope.navigator as Navigator | undefined)?.gpu;
-  if (!gpu) return false;
-  try {
-    return (await gpu.requestAdapter()) !== null;
-  } catch {
-    return false;
+  /** Disposes the renderer and releases its device or context at once instead of waiting for collection. */
+  private releaseRenderer(): void {
+    const backend = this.renderer.backend as { device?: GPUDevice; gl?: WebGL2RenderingContext };
+    this.renderer.dispose();
+    if (backend.device) backend.device.destroy();
+    else backend.gl?.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }
 
-/** True when a WebGL2 context can be created. */
-function webgl2Usable(surface: DrawingSurface): boolean {
-  const probe =
-    surface.kind === 'element' ? surface.container.ownerDocument.createElement('canvas') : new OffscreenCanvas(1, 1);
-  const context = probe.getContext('webgl2');
-  context?.getExtension('WEBGL_lose_context')?.loseContext();
-  return context !== null;
-}
-
-/** Decodes an image in the page. */
-async function decodeImage(url: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.crossOrigin = 'anonymous';
-  image.src = url;
-  await image.decode();
-  return image;
-}
-
-/** Fetches and decodes an image where there is no DOM (ADR 0011), flipped at decode time like the page's images. */
-async function decodeBitmap(url: string): Promise<ImageBitmap> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
-}
+const MAX_RECOVERIES = 3;
+const RECOVERY_WINDOW_MS = 60_000;
+const RECOVERY_BACKOFF_MS = 250;

@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { canvasImage, expectCompleteGlobe, openGlobe, waitForIdle, BACKGROUND_RGB } from './support/globe.ts';
+import type { GeoPosition } from '@vibeglobe/core';
+import {
+  BACKGROUND_RGB,
+  canvasImage,
+  expectCompleteGlobe,
+  geoToScreen,
+  openGlobe,
+  screenToGeo,
+  waitForIdle,
+} from './support/globe.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
@@ -101,8 +110,71 @@ for (const backend of BACKENDS) {
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera)).toEqual(before);
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe(backend);
     await expectCompleteGlobe(page);
+    // Input still drives the globe on the new canvas (KB-020).
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    const from = { xPx: box.width / 2, yPx: box.height / 2 };
+    const to = { xPx: from.xPx + 80, yPx: from.yPx + 30 };
+    const grabbed = await screenToGeo(page, from);
+    if (!grabbed) throw new Error('center off the globe');
+    await page.mouse.move(box.x + from.xPx, box.y + from.yPx);
+    await page.mouse.down();
+    await page.mouse.move(box.x + to.xPx, box.y + to.yPx, { steps: 4 });
+    await page.mouse.up();
+    const shown = await geoToScreen(page, grabbed);
+    expect(Math.hypot(shown.xPx - to.xPx, shown.yPx - to.yPx)).toBeLessThan(1);
+  });
+
+  test(`gives up with a typed error after three losses within a minute on ${backend} (KB-022)`, async ({ page }) => {
+    await openGlobe(page, `backend=${backend}&zoom=2`);
+    for (let loss = 1; loss <= 3; loss++) {
+      await page.evaluate(() => window.vibeglobePlayground?.globe.simulateDeviceLoss());
+      await page.waitForFunction(
+        (n) => window.vibeglobePlayground?.events.filter((event) => event.type === 'device-restored').length === n,
+        loss,
+      );
+    }
+    await page.evaluate(() => window.vibeglobePlayground?.globe.simulateDeviceLoss());
+    await page.waitForFunction(() => window.vibeglobePlayground?.events.some((event) => event.type === 'error'));
+    // Read in the page: an Error crossing into the test keeps only its message.
+    const code = await page.evaluate(
+      () =>
+        (window.vibeglobePlayground?.events.find((event) => event.type === 'error')?.payload as { code?: string }).code,
+    );
+    expect(code).toBe('renderer-failed');
   });
 }
+
+test('replacing geometry does not leak WebGL2 vertex arrays (KB-021)', async ({ page }) => {
+  await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=4');
+  const counts = (): Promise<{ meshes: number; vertexArrays: number } | undefined> =>
+    page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts());
+  const before = await counts();
+  // Twenty rounds of ten new debug quads each: every round creates and disposes ten geometries.
+  for (let round = 0; round < 20; round++) {
+    await page.evaluate((r) => {
+      const shapes = Array.from({ length: 10 }, (_, i) => {
+        const lon = 5 + i + r * 0.01;
+        return {
+          corners: [
+            { longitudeDeg: lon, latitudeDeg: 44 },
+            { longitudeDeg: lon + 0.5, latitudeDeg: 44 },
+            { longitudeDeg: lon + 0.5, latitudeDeg: 44.5 },
+            { longitudeDeg: lon, latitudeDeg: 44.5 },
+          ] as [GeoPosition, GeoPosition, GeoPosition, GeoPosition],
+          colorRgb: [1, 0, 0] as [number, number, number],
+        };
+      });
+      window.vibeglobePlayground?.globe.setDebugShapes(shapes);
+    }, round);
+    await waitForIdle(page);
+  }
+  const after = await counts();
+  // One vertex array per mesh drawn, plus the backend's own: never one per geometry ever created.
+  expect((after?.vertexArrays ?? 0) - (after?.meshes ?? 0)).toBeLessThanOrEqual(
+    (before?.vertexArrays ?? 0) - (before?.meshes ?? 0) + 2,
+  );
+});
 
 test('destroy() frees GPU resources, listeners and frames, and later calls throw a typed error (F068)', async ({
   page,
@@ -153,11 +225,16 @@ test('destroy() frees GPU resources, listeners and frames, and later calls throw
   expect(before).toBeGreaterThan(0);
   const counts = await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts());
   expect(counts?.meshes).toBeGreaterThan(0);
+  expect(counts?.contexts).toBe(1);
   await page.evaluate(() => window.vibeglobePlayground?.globe.destroy());
+  // Counted from what the renderer still holds; the device or context is released (KB-023).
+  await page.waitForFunction(() => window.vibeglobePlayground?.globe.resourceCounts().contexts === 0);
   expect(await page.evaluate(() => window.vibeglobePlayground?.globe.resourceCounts())).toEqual({
     meshes: 0,
     textures: 0,
     gpuBytes: 0,
+    vertexArrays: 0,
+    contexts: 0,
   });
   expect(await listeners()).toEqual([0, 0]);
   await expect(page.locator('#globe')).toHaveCount(0);

@@ -169,7 +169,9 @@ class GlobeEngine implements Globe {
   /** Reports that nothing will be drawn: the error event, waiting captures, and `ready` if no frame was drawn. */
   private failStart(error: GlobeError): void {
     this.failure = error;
-    this.diag.logger.log('error', error.message);
+    // A warning, not an error: the host receives the failure itself (the error event and `ready`) and decides how bad
+    // it is; the engine puts no error in the console of a page that handles it (F055).
+    this.diag.logger.log('warn', error.message);
     this.captureWaits.end(error);
     this.emitter.emit('error', error);
     const reject = this.rejectReady;

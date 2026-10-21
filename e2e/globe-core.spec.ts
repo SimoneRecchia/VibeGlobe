@@ -349,13 +349,15 @@ for (const backend of BACKENDS) {
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
     const center = { xPx: box.width / 2, yPx: box.height / 2 };
-    // The globe's screen radius below the center: the last pixel that still shows the ellipsoid.
+    // The globe's screen radius below the center: the last pixel that still shows the ellipsoid (a binary search, so
+    // the test spends its time on the drags).
     let radiusPx = 0;
-    while (
-      center.yPx + radiusPx + 1 < box.height &&
-      (await screenToGeo(page, { ...center, yPx: center.yPx + radiusPx + 1 }))
-    )
-      radiusPx++;
+    let outsidePx = Math.floor(box.height - center.yPx);
+    while (outsidePx - radiusPx > 1) {
+      const middle = Math.floor((radiusPx + outsidePx) / 2);
+      if (await screenToGeo(page, { ...center, yPx: center.yPx + middle })) radiusPx = middle;
+      else outsidePx = middle;
+    }
     expect(radiusPx).toBeGreaterThan(100);
     for (const [from, to] of [
       [center, { xPx: center.xPx + 150, yPx: center.yPx + 60 }],

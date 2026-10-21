@@ -1,6 +1,6 @@
 import type { DepthPath, TileDrawList } from '@vibeglobe/core';
-import { attribute, mix, texture, uniform, vec2 } from 'three/tsl';
-import { DoubleSide, MeshBasicNodeMaterial, Vector4, type Object3D, type Texture } from 'three/webgpu';
+import { attribute, Fn, If, mix, texture, uniform, vec2 } from 'three/tsl';
+import { DataTexture, DoubleSide, MeshBasicNodeMaterial, Vector4, type Object3D, type Texture } from 'three/webgpu';
 import { makeEyeRelative } from './eye-relative.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
@@ -73,13 +73,31 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   );
   const material = new MeshBasicNodeMaterial();
   const map = texture(placeholder, uv);
-  // A texture object of its own: bindings are shared between nodes of the same texture.
-  const fromMap = texture(placeholder.clone(), fromUv);
+  // A texture object of its own, as bindings are shared between nodes made from the same texture: one texel, so the
+  // binding costs no copy of the placeholder's image on the GPU. Every draw points it at a real texture.
+  const fromPlaceholder = new DataTexture(new Uint8Array(4), 1, 1);
+  // Same sampling as the placeholder: on WebGPU the sampler set up with the binding stays when the texture changes.
+  fromPlaceholder.colorSpace = placeholder.colorSpace;
+  fromPlaceholder.minFilter = placeholder.minFilter;
+  fromPlaceholder.magFilter = placeholder.magFilter;
+  fromPlaceholder.wrapS = placeholder.wrapS;
+  fromPlaceholder.wrapT = placeholder.wrapT;
+  fromPlaceholder.anisotropy = placeholder.anisotropy;
+  fromPlaceholder.needsUpdate = true;
+  const fromMap = texture(fromPlaceholder, fromUv);
   material.userData['surfaceTexture'] = map;
   material.userData['fromTexture'] = fromMap;
   // A cross-fade mixes the two imageries in one draw, never two overlapping draws (ADR 0006), and in a perceptual
   // space (gamma 2, close to sRGB): a linear-light mix would change dark pixels several times faster than bright ones.
-  material.colorNode = mix(fromMap.sqrt(), map.sqrt(), fade).pow2();
+  // Only fading draws sample the second texture (fade is uniform per draw, so the branch is too): on a software
+  // rasterizer the extra fetch costs about half a frame.
+  material.colorNode = Fn(() => {
+    const color = map.toVar();
+    If(fade.lessThan(1), () => {
+      color.assign(mix(fromMap.sqrt(), color.sqrt(), fade).pow2());
+    });
+    return color;
+  })();
   makeEyeRelative(material, depthPath);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;

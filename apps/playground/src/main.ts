@@ -107,7 +107,11 @@ if (app && canvas && experiment === 'worker') {
   const scenario = params.get('scenario');
   const globe = startGlobe(app, canvas, viewFromUrl());
   // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
-  const firstFrame = globe.ready.then(() => performance.now());
+  // A failed start records no time (the error reaches the status line and the error event, not a rejection here).
+  const firstFrame = globe.ready.then(
+    () => performance.now(),
+    () => undefined,
+  );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, canvas);
   runScenario(globe, scenario);

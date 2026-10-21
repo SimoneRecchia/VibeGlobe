@@ -5,6 +5,8 @@ const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
+/** Tests whose results depend on having the machine to themselves. */
+const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts/;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -20,7 +22,16 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
     launchOptions: { args: gpuArgs(), ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: MEASURES_THE_MACHINE },
+    // Measurements of the whole machine (heap sampling, GC traces) run after every other test, alone (F064).
+    {
+      name: 'measurements',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: MEASURES_THE_MACHINE,
+      dependencies: ['chromium'],
+    },
+  ],
   webServer: [
     { command: 'npm run dev', url: `http://localhost:${port}`, reuseExistingServer: true },
     // The lazy-loading fixture host (F547) is served from its production build (npm run build first).

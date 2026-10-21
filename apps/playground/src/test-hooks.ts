@@ -42,7 +42,7 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
 export function exposeTestHooks(
   globes: readonly Globe[],
   loop: FrameLoop | undefined,
-  firstFrame: Promise<number>,
+  firstFrame: Promise<number | undefined>,
 ): void {
   const globe = globes[0];
   if (!globe) return;

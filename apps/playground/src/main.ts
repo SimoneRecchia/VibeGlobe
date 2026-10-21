@@ -33,6 +33,7 @@ function viewFromUrl(): ViewInit {
 }
 
 const backendParam = params.get('backend');
+const assets = params.get('assets');
 const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'webgl2' ? backendParam : 'auto';
 const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
@@ -45,7 +46,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers'> {
   if (!pattern) return {};
   const session = params.get('session') ?? 'playground';
   const url = `${import.meta.env.BASE_URL}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
-  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers: createWorkers() };
+  // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
+  const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers };
 }
 
 /** Creates one engine instance in a container with its own canvas. */
@@ -60,7 +63,7 @@ function startGlobe(
     // `?gpuTiming=1` measures GPU time per frame where timestamp queries exist (benchmark scenarios `drag-*`).
     renderer: createRenderer({ backend: choice, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
     controls: createControls(),
-    baseImageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
+    baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
     ...fixtureImagery(),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).

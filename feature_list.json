@@ -1376,7 +1376,7 @@
         "Configure a different asset base URL and confirm workers and assets load from it",
         "Search the built bundles and confirm no eval, new Function or blob-generated code"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F101",

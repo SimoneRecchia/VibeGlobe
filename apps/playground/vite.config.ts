@@ -21,4 +21,9 @@ export default defineConfig({
     port: Number(process.env['PLAYGROUND_PORT'] ?? 5173),
     strictPort: true,
   },
+  // The production build, for tests of what consumers ship (F100's strict Content Security Policy).
+  preview: {
+    port: Number(process.env['PLAYGROUND_PREVIEW_PORT'] ?? 5176),
+    strictPort: true,
+  },
 });

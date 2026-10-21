@@ -61,6 +61,12 @@ export default defineConfig({
       url: `http://localhost:${process.env['LAZY_HOST_PORT'] ?? 5175}`,
       reuseExistingServer: true,
     },
+    // The playground's production build (npm run build first), for tests of shipped bundles (F100).
+    {
+      command: 'npm run preview -w @vibeglobe/playground',
+      url: `http://localhost:${process.env['PLAYGROUND_PREVIEW_PORT'] ?? 5176}`,
+      reuseExistingServer: true,
+    },
     {
       command: `npm run docs && npm run docs:serve -- --port ${docsPort}`,
       url: `http://localhost:${docsPort}`,

@@ -38,6 +38,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
+- Parallel tracks (`docs/parallel-tracks.md`): a second session owns `packages/tools` (M9 and the offline package builder CLI); this session does not edit it and reviews that session's pull requests instead.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
 
 ## Working efficiently

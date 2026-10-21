@@ -1,10 +1,18 @@
 // The fixture tile server (M3 plan §4.1) as a Node middleware: the playground's Vite plugin and the standalone
-// servers mount it. Tiles: GET /fixture-tiles/{session}/{source}/{scheme}/{z}/{x}/{y}.png with source one of the
-// patterns. Per-session fault rules: POST /_fixture/{session}/rules; request log: GET /_fixture/{session}/log;
+// servers mount it. Tiles: GET /fixture-tiles/{session}/{source}/{scheme}/{z}/{x}/{y}.{png,etc1s.ktx2,uastc.ktx2}
+// with source one of the patterns (KTX2 tiles have a full mip chain, ADR 0020). Per-session fault rules: POST /_fixture/{session}/rules; request log: GET /_fixture/{session}/log;
 // DELETE /_fixture/{session} resets both. A session id per test keeps tests independent.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
-import { encodeTilePng, tileExists, type FixturePattern, type FixtureScheme, type FixtureTile } from './generate.ts';
+import { encodeKtx2 } from './ktx2.ts';
+import {
+  encodeTilePng,
+  renderTile,
+  tileExists,
+  type FixturePattern,
+  type FixtureScheme,
+  type FixtureTile,
+} from './generate.ts';
 
 /** A fault applied to the tiles it matches (all given conditions must hold); the first matching rule applies. */
 export interface FaultRule {
@@ -63,7 +71,7 @@ interface Session {
 
 const PATTERNS: readonly string[] = ['world', 'levels', 'border'];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
-const TILE_PATH = /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.png$/;
+const TILE_PATH = /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2)$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log))?$/;
 
 function matches(rule: FaultRule, source: string, tile: FixtureTile): boolean {
@@ -146,7 +154,7 @@ export class FixtureServer {
   }
 
   private tile(path: string, match: RegExpExecArray, req: IncomingMessage, res: ServerResponse): void {
-    const [, id = '', source = '', scheme = '', z = '0', x = '0', y = '0'] = match;
+    const [, id = '', source = '', scheme = '', z = '0', x = '0', y = '0', extension = 'png'] = match;
     const entry = this.session(id);
     const tile: FixtureTile = {
       pattern: source as FixturePattern,
@@ -178,7 +186,7 @@ export class FixtureServer {
     }
     const ruleIndex = entry.rules.findIndex((rule) => matches(rule, source, tile));
     const rule = entry.rules[ruleIndex];
-    const respond = (): void => {
+    const respond = async (): Promise<void> => {
       if (res.destroyed || rule?.hang) return;
       const hits = (entry.hits[ruleIndex] ?? 0) + 1;
       if (rule) entry.hits[ruleIndex] = hits;
@@ -188,22 +196,28 @@ export class FixtureServer {
         this.finish(record, res, rule.status, headers, Buffer.alloc(0));
         return;
       }
-      headers['Content-Type'] = rule?.contentType ?? 'image/png';
-      let body = this.body(tile, rule);
+      headers['Content-Type'] = rule?.contentType ?? (extension === 'png' ? 'image/png' : 'image/ktx2');
+      let body = await this.body(tile, extension, rule);
       if (rule?.gzip) {
         body = gzipSync(body);
         headers['Content-Encoding'] = 'gzip';
       }
       this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
     };
-    if (rule?.latencyMs) setTimeout(respond, rule.latencyMs);
-    else respond();
+    if (rule?.latencyMs) setTimeout(() => void respond(), rule.latencyMs);
+    else void respond();
   }
 
-  private body(tile: FixtureTile, rule: FaultRule | undefined): Buffer {
-    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}`;
+  private async body(tile: FixtureTile, extension: string, rule: FaultRule | undefined): Promise<Buffer> {
+    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}`;
     let body = this.cache.get(key);
-    if (!body) this.cache.set(key, (body = encodeTilePng(tile)));
+    if (!body) {
+      body =
+        extension === 'png'
+          ? encodeTilePng(tile)
+          : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
+      this.cache.set(key, body);
+    }
     if (rule?.randomBytes !== undefined) {
       body = Buffer.from(Array.from({ length: rule.randomBytes }, (_, i) => Math.imul(i + 1, 2654435761) >>> 24));
     }

@@ -96,6 +96,8 @@ export interface RendererStats {
   readonly pipelineCompiles: number;
   /** Times the render pipeline changed between draws in the last frame, the output pass included (F103). */
   readonly pipelineSwitches: number;
+  /** Imagery tile textures held in a block-compressed format (KTX2 sources, ADR 0020). */
+  readonly compressedTextures: number;
   /**
    * GPU time of the last frame measured, in milliseconds: null unless the renderer was asked to measure it and the
    * device offers timestamp queries (benchmarks).
@@ -356,13 +358,19 @@ export interface GlobeEvents {
   error: GlobeError;
 }
 
-/** A tile that failed for good: `corrupt` bytes that do not decode, or `failed` after its retries ran out. */
+/**
+ * Why a tile failed for good: `corrupt` bytes that do not decode, `failed` after its retries ran out, or
+ * `unsupported` data the engine or device cannot use (for example KTX2 without a usable transcoder, ADR 0020).
+ */
+export type TileErrorReason = 'corrupt' | 'failed' | 'unsupported';
+
+/** A tile that failed for good. */
 export interface TileErrorEvent {
   readonly sourceId: string;
   readonly level: number;
   readonly x: number;
   readonly y: number;
-  readonly reason: 'corrupt' | 'failed';
+  readonly reason: TileErrorReason;
 }
 
 /** A surface tile of the last drawn frame, for diagnostics (ADR 0006 §1: a Web Mercator root and two polar caps). */

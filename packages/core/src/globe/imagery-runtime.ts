@@ -134,6 +134,7 @@ export class ImageryRuntime {
         memory: shared,
         handleBase: index * HANDLES_PER_LAYER,
         pinnedLevel: pinned[index] ?? -1,
+        compressedFormats: renderer.capabilities.compressedTextureFormats,
         uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
         releaseTexture: (handle) => renderer.releaseTexture(handle),
         requestFrame: () => callbacks.requestFrame(),

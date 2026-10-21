@@ -191,3 +191,13 @@ jobs:
         with:
           name: benchmark-results
           path: benchmarks/results/ci-swiftshader/
+
+  transcoder:
+    name: Transcoder rebuild matches the committed file (ADR 0020)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Pinned wasi-sdk (checked by hash) and Basis Universal commit; the same pins give the same bytes.
+      - run: scripts/wasm-basis.sh "$RUNNER_TEMP/wasm-basis"
+      - run: git diff --exit-code -- packages/worker/wasm/vibeglobe-basis.wasm

@@ -15,8 +15,24 @@ const COMPRESSED_EXTENSIONS: readonly [string, string][] = [
   ['WEBGL_compressed_texture_astc', 'astc'],
 ];
 
-/** Reads the active backend, GPU limits and memory hints from an initialized renderer (F056). */
-export function readCapabilities(renderer: WebGPURenderer, sceneDepth: SceneDepth): RendererCapabilities {
+/**
+ * Reads the active backend, GPU limits and memory hints from an initialized renderer (F056). `allowedCompressed`
+ * limits the compressed families reported to those listed (`RendererOptions.compressedTextures`).
+ */
+export function readCapabilities(
+  renderer: WebGPURenderer,
+  sceneDepth: SceneDepth,
+  allowedCompressed?: readonly string[],
+): RendererCapabilities {
+  const capabilities = readDeviceCapabilities(renderer, sceneDepth);
+  if (!allowedCompressed) return capabilities;
+  const compressedTextureFormats = capabilities.compressedTextureFormats.filter((family) =>
+    allowedCompressed.includes(family),
+  );
+  return { ...capabilities, compressedTextureFormats };
+}
+
+function readDeviceCapabilities(renderer: WebGPURenderer, sceneDepth: SceneDepth): RendererCapabilities {
   const backend = renderer.backend as {
     device?: GPUDevice;
     gl?: WebGL2RenderingContext;

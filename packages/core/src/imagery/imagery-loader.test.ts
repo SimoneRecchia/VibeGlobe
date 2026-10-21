@@ -32,15 +32,21 @@ class ManualTransport implements TileTransport {
   }
 }
 
-/** A worker pool that decodes at once into a fake tile. */
-function fakeWorkers(): WorkerPool {
+/** A worker pool that decodes at once into a fake tile; `tasks` records each task name and input. */
+function fakeWorkers(tasks: { task: string; input: unknown }[] = []): WorkerPool {
   let id = 0;
   return {
     url: 'fake',
     run: (request, done: WorkerTaskDone) => {
-      // One byte stands for a payload that does not decode.
-      if ((request.input as { bytes: ArrayBuffer }).bytes.byteLength === 1) {
+      tasks.push({ task: request.task, input: request.input });
+      // One byte stands for a payload that does not decode, two for data the device cannot use.
+      const length = (request.input as { bytes: ArrayBuffer }).bytes.byteLength;
+      if (length === 1) {
         done({ ok: false, error: new WorkerTaskError('task-failed', 'not an image', 'undecodable') });
+        return ++id;
+      }
+      if (length === 2) {
+        done({ ok: false, error: new WorkerTaskError('task-failed', 'no transcoder', 'format-unsupported') });
         return ++id;
       }
       const tile: DecodedTile = { widthPx: 256, heightPx: 256, gpuBytes: 349_524, image: request.input };
@@ -54,7 +60,11 @@ function fakeWorkers(): WorkerPool {
   };
 }
 
-function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number; pinnedLevel?: number } = {}) {
+function setUp(
+  maxInFlight = 32,
+  memory: { gpuBytes?: number; ramBytes?: number; pinnedLevel?: number; decoder?: 'image' | 'ktx2' } = {},
+) {
+  const tasks: { task: string; input: unknown }[] = [];
   const timers = new FakeTimers();
   const transport = new ManualTransport();
   const source: ImagerySource = {
@@ -65,7 +75,7 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
     tileSizePx: 256,
     pixelRatio: 1,
     transport,
-    decoder: 'image',
+    decoder: memory.decoder ?? 'image',
     request: (coord, out) => {
       if (coord.level === 9) return 'noData';
       out.url = `https://tiles.test/${coord.level}/${coord.x}/${coord.y}.png`;
@@ -95,10 +105,11 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
   loader = new ImageryLoader({
     source,
     network,
-    workers: fakeWorkers(),
+    workers: fakeWorkers(tasks),
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
+    compressedFormats: ['bc'],
     uploadTexture: (handle) => uploaded.push(handle),
     releaseTexture: (handle) => released.push(handle),
     tileError: (_source, level, x, y, reason) => errors.push(`${reason} ${level}/${x}/${y}`),
@@ -119,7 +130,20 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
     residency.trim(frame, 64);
     return handles;
   };
-  return { timers, transport, loader, uploaded, released, errors, residency, ram, ok, runFrame, frames: () => frames };
+  return {
+    timers,
+    transport,
+    loader,
+    uploaded,
+    released,
+    errors,
+    residency,
+    ram,
+    ok,
+    runFrame,
+    tasks,
+    frames: () => frames,
+  };
 }
 
 const url = (level: number, x: number, y: number): string => `https://tiles.test/${level}/${x}/${y}.png`;
@@ -303,6 +327,28 @@ describe('ImageryLoader', () => {
     expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
   });
 
+  it('transcodes KTX2 sources for the device formats and reports data it cannot use once (F104)', () => {
+    const { transport, errors, timers, runFrame, tasks, uploaded } = setUp(32, { decoder: 'ktx2' });
+    runFrame([
+      [4, 1, 1],
+      [3, 0, 0],
+    ]);
+    transport.answer(url(3, 0, 0), { kind: 'ok', bytes: new ArrayBuffer(8), contentType: 'image/ktx2' });
+    transport.answer(url(4, 1, 1), { kind: 'ok', bytes: new ArrayBuffer(2), contentType: 'image/ktx2' });
+    for (let frame = 0; frame < 4; frame++) {
+      timers.advance(5000);
+      runFrame([
+        [4, 1, 1],
+        [3, 0, 0],
+      ]);
+    }
+    expect(tasks.map((task) => task.task)).toEqual(['transcode-ktx2', 'transcode-ktx2']);
+    expect((tasks[0]?.input as { formats: string[] }).formats).toEqual(['bc']);
+    expect(uploaded).toHaveLength(1);
+    expect(errors).toEqual(['unsupported 4/1/1']);
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+  });
+
   it('gives up after the last retry and reports the tile as failed (F091)', () => {
     const { transport, errors, timers, runFrame } = setUp();
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -347,6 +393,7 @@ describe('ImageryLoader', () => {
         memory: { residency, ram: new RamTier({ budgetBytes: 1e9 }), frame: () => 1 },
         handleBase,
         pinnedLevel: -1,
+        compressedFormats: [],
         uploadTexture: (handle) => uploaded.push(handle),
         releaseTexture: () => undefined,
         requestFrame: () => undefined,

@@ -1426,7 +1426,7 @@
         "On a device or backend without support, confirm tiles transcode to a supported format and render correctly",
         "Record the memory and upload-time measurements in the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F105",

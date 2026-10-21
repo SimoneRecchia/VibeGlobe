@@ -62,6 +62,8 @@ export interface BackendSettings {
   readonly depth: DepthChoice;
   /** Measures each frame's GPU time with timestamp queries where the device offers them (benchmarks only). */
   readonly gpuTiming: boolean;
+  /** The compressed families KTX2 imagery may use, among the device's; undefined for all of them. */
+  readonly compressedTextures: readonly string[] | undefined;
 }
 
 /**
@@ -214,7 +216,7 @@ export class ThreeBackend implements RendererBackend {
     countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
     this.pipelineSwitches = new PipelineSwitches(renderer.backend);
     this.renderer = renderer;
-    this.capabilities = readCapabilities(renderer, sceneDepth);
+    this.capabilities = readCapabilities(renderer, sceneDepth, this.settings.compressedTextures);
     renderer.setPixelRatio(this.size.pixelRatio);
     renderer.setSize(this.size.widthPx, this.size.heightPx, false);
   }
@@ -273,6 +275,7 @@ export class ThreeBackend implements RendererBackend {
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
       pipelineSwitches: this.pipelineSwitches?.count ?? 0,
+      compressedTextures: this.tileTextures.compressedCount,
       gpuFrameMs: this.gpuFrameMs,
     };
   }
@@ -290,8 +293,7 @@ export class ThreeBackend implements RendererBackend {
 
   /** Creates the texture of an imagery tile and uploads it now (M3 plan §3). */
   uploadTexture(handle: number, tile: DecodedTile): void {
-    if (this.destroyed) return;
-    this.tileTextures.upload(this.renderer, handle, tile);
+    if (!this.destroyed) this.tileTextures.upload(this.renderer, handle, tile);
   }
 
   /** Releases an imagery tile texture and its image. */

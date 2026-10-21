@@ -10,6 +10,7 @@ import {
 import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } from '../scheduler/network-pool.js';
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
+import type { TileErrorReason } from '../globe/types.js';
 import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import type { ImagerySource } from './imagery-source.js';
 import {
@@ -58,12 +59,14 @@ export interface ImageryLoaderOptions {
   readonly handleBase: number;
   /** Tiles at this level and coarser form the pinned base (-1: none): loaded first, never evicted (F084). */
   readonly pinnedLevel: number;
+  /** Compressed texture families the device decodes, for KTX2 sources (`RendererCapabilities`, ADR 0020). */
+  readonly compressedFormats: readonly string[];
   uploadTexture(handle: number, tile: DecodedTile): void;
   releaseTexture(handle: number): void;
   /** Asks for a frame: something arrived that changes the picture or the queue. */
   requestFrame(): void;
   /** A tile failed for good: its bytes were corrupt, or its retries ran out (F112). Its ancestors stay drawn. */
-  tileError(source: ImagerySource, level: number, x: number, y: number, reason: 'corrupt' | 'failed'): void;
+  tileError(source: ImagerySource, level: number, x: number, y: number, reason: TileErrorReason): void;
   now(): number;
   setTimer(callback: () => void, delayMs: number): unknown;
   random(): number;
@@ -364,7 +367,7 @@ export class ImageryLoader implements NetworkPoolClient {
     this.options.requestFrame();
   }
 
-  private reportError(record: TileRecord, reason: 'corrupt' | 'failed'): void {
+  private reportError(record: TileRecord, reason: TileErrorReason): void {
     const { level, x, y } = record.coord;
     this.options.tileError(this.options.source, level, x, y, reason);
   }
@@ -373,8 +376,9 @@ export class ImageryLoader implements NetworkPoolClient {
     record.state = DECODING;
     record.task = this.options.workers.run(
       {
-        task: 'decode-image',
-        input: { bytes, contentType },
+        ...(this.options.source.decoder === 'ktx2'
+          ? { task: 'transcode-ktx2', input: { bytes, formats: this.options.compressedFormats } }
+          : { task: 'decode-image', input: { bytes, contentType } }),
         transfer: [bytes],
         priority: this.table.priorities[record.slot] ?? 0,
       },
@@ -395,6 +399,11 @@ export class ImageryLoader implements NetworkPoolClient {
         record.state = UNLOADED;
       } else if (code === 'task-failed' && outcome.error.taskCode === 'unsupported') {
         record.state = NO_DATA;
+      } else if (code === 'task-failed' && outcome.error.taskCode === 'format-unsupported') {
+        // Valid data the engine or device cannot use: reported once, never retried (ADR 0020 rule 4).
+        record.state = DEAD;
+        this.options.memory.ram.delete(this.options.handleBase + record.slot);
+        this.reportError(record, 'unsupported');
       } else if (code === 'task-failed') {
         // Bytes of a declared format that do not decode: quarantined, reported once, never retried (M3 plan risk 9).
         record.state = DEAD;

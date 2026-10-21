@@ -205,6 +205,7 @@ function fakeStats(renderer: FakeRenderer): RendererStats {
     matrixUpdates: 0,
     pipelineCompiles: 0,
     pipelineSwitches: 0,
+    compressedTextures: 0,
     gpuFrameMs: null,
   };
 }

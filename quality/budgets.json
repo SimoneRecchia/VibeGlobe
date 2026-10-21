@@ -106,5 +106,11 @@
     "eye-relative-5000-draws": {
       "medianMs": 0.1
     }
+  },
+  "wasm": {
+    "vibeglobe-basis": {
+      "file": "packages/worker/wasm/vibeglobe-basis.wasm",
+      "gzipKB": 210
+    }
   }
 }

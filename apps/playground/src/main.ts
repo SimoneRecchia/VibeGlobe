@@ -52,7 +52,10 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `?tileBase=` serves the tiles from another fixture server (for example `http://{s}:5177/` with
   // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
   const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
-  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
+  // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
+  const ktx2 = params.get('ktx2');
+  const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
+  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -68,6 +71,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
+    ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
   });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
@@ -91,7 +95,16 @@ function startGlobe(
   return createGlobe({
     container,
     // `?gpuTiming=1` measures GPU time per frame where timestamp queries exist (benchmark scenarios `drag-*`).
-    renderer: createRenderer({ backend: choice, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
+    renderer: createRenderer({
+      backend: choice,
+      depth,
+      canvas: target,
+      gpuTiming: params.has('gpuTiming'),
+      // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
+      ...(params.has('compressed')
+        ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }
+        : {}),
+    }),
     controls: createControls(),
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,

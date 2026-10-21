@@ -18,7 +18,10 @@
   },
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "!dist/tsconfig.tsbuildinfo",
+    "wasm/vibeglobe-basis.wasm",
+    "wasm/licenses",
+    "wasm/third-party.json"
   ],
   "dependencies": {
     "@vibeglobe/core": "0.0.0"

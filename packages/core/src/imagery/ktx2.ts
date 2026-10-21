@@ -67,8 +67,11 @@ export class Ktx2Error extends Error {
 const IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
 const HEADER_BYTES = 80;
 const LEVEL_INDEX_ENTRY_BYTES = 24;
-/** Largest tile edge accepted, so a hostile header cannot make a worker allocate gigabytes. */
-const MAX_EDGE_PX = 4096;
+/**
+ * Largest tile edge accepted (imagery tiles are 256 or 512 px), so a hostile header cannot make the transcoder's
+ * memory, which never shrinks, grow beyond 16 MB for one level.
+ */
+const MAX_EDGE_PX = 2048;
 const SUPERCOMPRESSION_NONE = 0;
 const SUPERCOMPRESSION_BASIS_LZ = 1;
 const SUPERCOMPRESSION_ZSTD = 2;
@@ -168,9 +171,35 @@ function kindOf(vkFormat: number, scheme: number, model: number): Ktx2Kind {
 }
 
 /**
+ * Checks each level's uncompressed size, which the transcoder allocates before decompressing: a hostile value would
+ * otherwise grow its memory, which never shrinks, by up to 4 GB. BasisLZ levels declare 0, UASTC levels 16 bytes per
+ * 4 × 4 block, raw levels their stored length.
+ */
+function checkUncompressedSizes(
+  view: DataView,
+  kind: Ktx2Kind,
+  widthPx: number,
+  heightPx: number,
+  levels: number,
+): void {
+  for (let level = 0; level < levels; level++) {
+    const entry = HEADER_BYTES + level * LEVEL_INDEX_ENTRY_BYTES;
+    const [width, height] = ktx2LevelSize(widthPx, heightPx, level);
+    const expected =
+      kind === 'etc1s'
+        ? 0
+        : kind === 'uastc'
+          ? Math.ceil(width / 4) * Math.ceil(height / 4) * 16
+          : u64(view, entry + 8);
+    const declared = u64(view, entry + 16);
+    if (declared !== expected) throw invalid(`level ${level} declares ${declared} uncompressed bytes, not ${expected}`);
+  }
+}
+
+/**
  * Reads and validates a KTX2 file: identifier, header, level index and data format descriptor. Throws a
  * {@link Ktx2Error}: `invalid` for a malformed or truncated file, `unsupported` for a valid one the engine does not
- * handle (3D, arrays, cube maps, HDR, unknown formats or edges above 4096 px).
+ * handle (3D, arrays, cube maps, HDR, unknown formats or edges above 2048 px).
  */
 export function readKtx2(bytes: Uint8Array): Ktx2Info {
   if (!isKtx2(bytes)) throw invalid('the KTX2 identifier is missing');
@@ -202,6 +231,8 @@ export function readKtx2(bytes: Uint8Array): Ktx2Info {
   checkRange(dfdOffset, dfdLength, bytes.length, 'the data format descriptor');
   const descriptor = readDescriptor(view, dfdOffset, dfdLength);
   const kind = kindOf(vkFormat, scheme, descriptor.model);
+  checkRange(u64(view, 64), u64(view, 72), bytes.length, 'the supercompression global data');
+  checkUncompressedSizes(view, kind, widthPx, heightPx, levelCount);
   const raw = kind === 'raw' ? RAW_FORMATS.get(vkFormat) : undefined;
   const fullChain = levelCount === fullMipLevelCount(widthPx, heightPx);
   return {

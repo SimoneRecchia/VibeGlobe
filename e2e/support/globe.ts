@@ -21,6 +21,7 @@ declare global {
         canvas?: HTMLCanvasElement,
         backend?: 'auto' | 'webgpu' | 'webgl2',
       ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
+      workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };

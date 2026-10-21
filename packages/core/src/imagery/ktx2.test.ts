@@ -41,6 +41,10 @@ function ktx2File(spec: FileSpec = {}): Uint8Array {
   for (let level = 0; level < levels; level++) {
     view.setUint32(80 + level * 24, offset, true);
     view.setUint32(80 + level * 24 + 8, levelBytes[level] ?? 0, true);
+    // Uncompressed sizes: 0 for BasisLZ, 16 bytes per 4 × 4 block for UASTC, the stored length for raw levels.
+    const blocks = Math.ceil(Math.max(1, widthPx >> level) / 4) * Math.ceil(Math.max(1, heightPx >> level) / 4);
+    const uncompressed = vkFormat !== 0 ? (levelBytes[level] ?? 0) : model === 166 ? blocks * 16 : 0;
+    view.setUint32(80 + level * 24 + 16, uncompressed, true);
     offset += levelBytes[level] ?? 0;
   }
   view.setUint32(dfdOffset, dfdBytes, true);
@@ -86,11 +90,15 @@ describe('readKtx2 (ADR 0020 rule 4)', () => {
     expect(refusal(ktx2File({ widthPx: 0 }))).toBe('invalid');
     expect(refusal(ktx2File({ levels: 10 }))).toBe('invalid');
     expect(refusal(ktx2File({ faces: 6 }))).toBe('unsupported');
-    expect(refusal(ktx2File({ widthPx: 8192, heightPx: 8192, levels: 1 }))).toBe('unsupported');
+    expect(refusal(ktx2File({ widthPx: 4096, heightPx: 4096, levels: 1 }))).toBe('unsupported');
     expect(refusal(ktx2File({ vkFormat: 97, scheme: 0 }))).toBe('unsupported');
     const huge = ktx2File();
     new DataView(huge.buffer).setUint32(80 + 4, 1, true);
     expect(refusal(huge)).toBe('invalid');
+    // KB-068: a level that would make the transcoder allocate more than its blocks need.
+    const inflated = ktx2File({ scheme: 2, model: 166 });
+    new DataView(inflated.buffer).setUint32(80 + 16, 256 * 1024 * 1024, true);
+    expect(refusal(inflated)).toBe('invalid');
   });
 
   it('passes raw blocks through only to devices that decode them', () => {

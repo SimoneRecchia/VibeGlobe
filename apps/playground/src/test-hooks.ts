@@ -1,4 +1,5 @@
-import type { Globe, GlobeEvents } from '@vibeglobe/core';
+import type { Globe, GlobeEvents, WorkerEndpoint, WorkerMessage } from '@vibeglobe/core';
+import { createWorkers } from '@vibeglobe/worker';
 import type { FrameLoop } from './frame-loop.js';
 
 /** An engine event as tests read it back. */
@@ -32,6 +33,11 @@ interface PlaygroundTestHooks {
     canvas?: HTMLCanvasElement,
     backend?: 'auto' | 'webgpu' | 'webgl2',
   ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
+  /**
+   * Runs one task of the worker program on a worker of its own, started on the first call (decoder fuzzing, F114).
+   * Resolves with the task's error code, or 'ok' (an output bitmap is closed at once).
+   */
+  workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
 }
 
 declare global {
@@ -48,6 +54,30 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
   'tile-error',
   'error',
 ];
+
+/** A worker of the worker program outside the engine's pool, so tests can feed its tasks any input. */
+function taskRunner(): PlaygroundTestHooks['workerTask'] {
+  let endpoint: WorkerEndpoint | undefined;
+  let next = 0;
+  const pending = new Map<number, (outcome: string) => void>();
+  const receive = (data: unknown): void => {
+    const message = data as WorkerMessage;
+    if (message.kind !== 'reply') return;
+    if (message.ok) (message.output as { image?: { close?: () => void } } | undefined)?.image?.close?.();
+    pending.get(message.id)?.(message.ok ? 'ok' : message.error.code);
+    pending.delete(message.id);
+  };
+  return (task, input, transfer) => {
+    endpoint ??= createWorkers().create(receive, (reason) => {
+      for (const resolve of pending.values()) resolve(`worker-error: ${reason}`);
+      pending.clear();
+    });
+    const id = ++next;
+    const reply = new Promise<string>((resolve) => pending.set(id, resolve));
+    endpoint.post({ kind: 'run', id, task, input }, transfer);
+    return reply;
+  };
+}
 
 /** Exposes the engine and a frame loop's samples to tests and benchmarks. */
 export function exposeTestHooks(
@@ -69,6 +99,7 @@ export function exposeTestHooks(
     gpuFrameTimesMs: () => loop?.gpuFrameTimesMs?.() ?? [],
     firstFrameMs: undefined,
     mount,
+    workerTask: taskRunner(),
   };
   void firstFrame.then((timeMs) => (hooks.firstFrameMs = timeMs));
   window.vibeglobePlayground = hooks;

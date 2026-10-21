@@ -1549,7 +1549,7 @@
         "Confirm every input yields either a decoded tile or a typed error, never an uncaught exception or hang",
         "Confirm worker memory stays flat across the run"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F115",

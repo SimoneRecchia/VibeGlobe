@@ -189,3 +189,11 @@ export function findBudgetViolations(
   }
   return violations;
 }
+
+/**
+ * True for a violation of a deterministic counter (the streaming scenario's failed tiles, F564): it does not depend on
+ * the machine's speed, so it fails the run even with `--report-only`, which only waives the timing budgets.
+ */
+export function isDeterministicViolation(violation: string): boolean {
+  return violation.startsWith('streaming:');
+}

@@ -13,6 +13,7 @@ import { gpuArgs } from '../scripts/browser/gpu-args.ts';
 import { ROOT_DIR } from '../scripts/workspace.ts';
 import {
   findBudgetViolations,
+  isDeterministicViolation,
   percentile,
   summarizeRun,
   summarizeScenario,
@@ -246,4 +247,4 @@ if (coldStartsMs.length > 0)
   );
 for (const violation of violations) console.error(`BUDGET  ${violation}`);
 console.log(`Results: ${outFile}`);
-if (violations.length > 0 && !reportOnly) process.exit(1);
+if (violations.some((v) => !reportOnly || isDeterministicViolation(v))) process.exit(1);

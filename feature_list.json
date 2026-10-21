@@ -1708,7 +1708,7 @@
         "Confirm results include frame-time percentiles, time to first frame, tile and request counts, and memory",
         "Confirm results are kept as CI artifacts and the deterministic counters are gated by quality/budgets.json"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F125",

@@ -5632,7 +5632,7 @@
         "Capture screenshots of every control in both themes and compare against baselines within tolerance",
         "Verify the switch applies to every control without reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F431",

@@ -13,7 +13,7 @@
 
 Branch `claude/m12-ui-gis-utilities-yd90i2`, SimoneRecchia/VibeGlobe#7. New package `@vibeglobe/gis` (coordinate formats and parsing, CRS transforms through proj4js, geodesic measurement on core's geodesics, view-state serialization); `@vibeglobe/ui` gained the control API, six controls, theming, English and Italian, keyboard access and contrast. Browser tests mount the ui package on the playground through the Vite dev server (`e2e/support/ui-layer.ts`).
 
-Passing: F404, F405, F418, F428, F429, F431–F433, F435. Pending the reference tablet: F419, F420, F427. F430: baselines recorded in CI; marked once a CI run compares them. Waiting for engine features: F406–F417, F421–F426, F434, F436, F437 (`docs/parallel-tracks.md`).
+Passing: F404, F405, F418, F428–F433, F435 (F430's baselines recorded by the Visual baselines workflow and compared in CI run 39687581609, all Chromium shards green). Pending the reference tablet: F419, F420, F427. Waiting for engine features: F406–F417, F421–F426, F434, F436, F437 (`docs/parallel-tracks.md`).
 
 Notes for the next session of this track:
 

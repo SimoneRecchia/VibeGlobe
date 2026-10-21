@@ -132,7 +132,7 @@ export interface RenderHost {
   checkSize?(): void;
   /** Calls `callback` with false when the page is hidden and true when it is shown again; returns an unsubscribe. */
   observeVisibility(callback: (visible: boolean) => void): () => void;
-  /** The container's CSS size. */
+  /** The size of the container's content box (without padding) in CSS pixels: the area the canvas fills. */
   containerSize(): { widthPx: number; heightPx: number };
   /** Device pixel ratio. */
   pixelRatio(): number;
@@ -282,8 +282,9 @@ export interface Globe {
   /** Device capabilities, available after `ready`. */
   readonly capabilities: RendererCapabilities | undefined;
   /**
-   * Current camera, applied values. Before the viewport has a size (until the renderer starts), the requested view, with
-   * `rangeMeters` and `altitudeMeters` NaN.
+   * Current camera, applied values. While the viewport has no size (until the renderer starts, and while the container
+   * is hidden or collapsed), the requested view, with `rangeMeters` and `altitudeMeters` NaN; the view is applied when
+   * the viewport has a size again.
    */
   readonly camera: CameraState;
   /** Engine time in milliseconds, which animations and fades run on (ADR 0009): display steps clamped to 100 ms. */

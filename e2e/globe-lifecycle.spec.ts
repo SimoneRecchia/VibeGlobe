@@ -220,6 +220,26 @@ for (const step of ['device request', 'pipeline warm-up'] as const) {
   });
 }
 
+test('a recovery that finds WebGPU gone switches to WebGL2 and reports backend-fallback (KB-049)', async ({ page }) => {
+  await openGlobe(page, 'zoom=3');
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgpu');
+  await page.evaluate(() => {
+    // As after a GPU-process crash that leaves WebGPU blocked: the recovery's adapter request finds none.
+    const gpu = navigator.gpu as GPU | undefined;
+    if (gpu) gpu.requestAdapter = () => Promise.resolve(null);
+    window.vibeglobePlayground?.globe.simulateDeviceLoss();
+  });
+  await page.waitForFunction(() =>
+    window.vibeglobePlayground?.events.some((event) => event.type === 'device-restored'),
+  );
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.backend)).toBe('webgl2');
+  const types = await page.evaluate(() => window.vibeglobePlayground?.events.map((event) => event.type));
+  expect(types).toContain('backend-fallback');
+  expect(types?.indexOf('backend-fallback')).toBeGreaterThan(types?.indexOf('device-lost') ?? Infinity);
+  await waitForIdle(page);
+  await expectCompleteGlobe(page);
+});
+
 test('a WebGPU device lost again during the recovery warm-up is recovered too, not left blank (KB-044)', async ({
   page,
 }) => {
@@ -436,6 +456,50 @@ test('resizing renders at the new size, centered, never stretched or blank (F070
     ).toBeLessThanOrEqual(2);
   }
 });
+
+for (const backend of BACKENDS) {
+  test(`a padded container renders and picks in the canvas's own box on ${backend} (KB-048)`, async ({ page }) => {
+    await openGlobe(page, `backend=${backend}&lon=20&lat=10&zoom=1`);
+    // The canvas fills the container's content box; padding is not part of it.
+    await page.addStyleTag({ content: '#app { box-sizing: border-box; padding: 20px 40px; }' });
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#globe');
+      return canvas !== null && canvas.width === Math.round(canvas.clientWidth * devicePixelRatio);
+    });
+    await waitForIdle(page);
+    const state = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#globe');
+      const globe = window.vibeglobePlayground?.globe;
+      const width = canvas?.clientWidth ?? 0;
+      const height = canvas?.clientHeight ?? 0;
+      return {
+        backing: [canvas?.width, canvas?.height],
+        css: [width, height],
+        ratio: devicePixelRatio,
+        center: globe?.screenToGeo({ xPx: width / 2, yPx: height / 2 }),
+        projected: globe?.geoToScreen({ longitudeDeg: 20, latitudeDeg: 10 }),
+      };
+    });
+    expect(state.backing).toEqual(state.css.map((size) => Math.round(size * state.ratio)));
+    expect(state.center?.longitudeDeg).toBeCloseTo(20, 6);
+    expect(state.center?.latitudeDeg).toBeCloseTo(10, 6);
+    expect(state.projected?.xPx).toBeCloseTo((state.css[0] ?? 0) / 2, 3);
+    expect(state.projected?.yPx).toBeCloseTo((state.css[1] ?? 0) / 2, 3);
+    // Not stretched: the globe's horizontal and vertical diameters through the center agree within 2 px.
+    const image = await canvasImage(page);
+    const isGlobe = (x: number, y: number): boolean => {
+      const k = (y * image.width + x) * 4;
+      return (
+        Math.abs((image.data[k] ?? 0) - BACKGROUND_RGB[0]) + Math.abs((image.data[k + 2] ?? 0) - BACKGROUND_RGB[2]) > 12
+      );
+    };
+    let horizontal = 0;
+    let vertical = 0;
+    for (let x = 0; x < image.width; x++) if (isGlobe(x, Math.floor(image.height / 2))) horizontal++;
+    for (let y = 0; y < image.height; y++) if (isGlobe(Math.floor(image.width / 2), y)) vertical++;
+    expect(Math.abs(horizontal - vertical), JSON.stringify({ horizontal, vertical, state })).toBeLessThanOrEqual(2);
+  });
+}
 
 test('destroy() leaves no WebGL2 resource behind, the output pass included (KB-030)', async ({ page }) => {
   await openGlobe(page, 'backend=webgl2&zoom=3');

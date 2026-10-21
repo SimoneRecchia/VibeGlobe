@@ -227,6 +227,9 @@ class GlobeEngine implements Globe {
     if (!renderer) return;
     const { widthPx, heightPx } = renderer.host.containerSize();
     const pixelRatio = renderer.host.pixelRatio() * this.resolutionScale;
+    // A container without a size (hidden, collapsed) has no zoom: the view waits for a size again, read while the
+    // camera still has its last one (KB-046).
+    if (!this.pendingView && (widthPx <= 0 || heightPx <= 0)) this.pendingView = currentView(this.cam);
     this.cam.widthPx = Math.max(1, widthPx);
     this.cam.heightPx = Math.max(1, heightPx);
     this.frameView.widthPx = this.cam.widthPx;
@@ -238,6 +241,8 @@ class GlobeEngine implements Globe {
     if (this.pendingView && widthPx > 0 && heightPx > 0) {
       applyView(this.cam, this.pendingView);
       this.pendingView = undefined;
+      // The eye is known from now on, before any frame (KB-047).
+      this.cam.update();
     }
   }
 
@@ -384,7 +389,7 @@ class GlobeEngine implements Globe {
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.assertAlive();
-    if (dragCamera(this.cam, anchor, point)) this.requestRender();
+    if (!this.pendingView && dragCamera(this.cam, anchor, point)) this.requestRender();
   }
 
   private zoomAt(point: ScreenPoint, deltaZoom: number): void {

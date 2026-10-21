@@ -176,6 +176,58 @@ describe('createGlobe', () => {
     expect(globe.camera.altitudeMeters).toBeGreaterThan(1e6);
   });
 
+  it('keeps the view while the container has no size after start (KB-046)', async () => {
+    const { globe, renderer } = await started({ view: { zoom: 2 } });
+    const events: string[] = [];
+    globe.on('frame', () => events.push('frame'));
+    globe.on('camera-change', () => events.push('camera-change'));
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    globe.jumpTo({ longitudeDeg: 10, latitudeDeg: 45, zoom: 4 });
+    renderer.flush();
+    expect(globe.camera.zoom).toBeCloseTo(4, 9);
+    globe.navigation.zoomAt({ xPx: 0, yPx: 0 }, 1);
+    renderer.flush();
+    expect(events).toEqual([]);
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    expect(globe.camera.longitudeDeg).toBeCloseTo(10, 9);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(45, 9);
+    expect(globe.camera.zoom).toBeCloseTo(4, 9);
+    expect(events).toContain('camera-change');
+  });
+
+  it('keeps the view of a container that collapses and returns with the same size (KB-046)', async () => {
+    const { globe, renderer } = await started({ view: { longitudeDeg: 30, latitudeDeg: -20, zoom: 5, tiltDeg: 40 } });
+    const before = globe.camera;
+    renderer.size = { widthPx: 0, heightPx: 0 };
+    renderer.resizeListener?.();
+    renderer.size = { widthPx: 800, heightPx: 600 };
+    renderer.resizeListener?.();
+    renderer.flush();
+    const after = globe.camera;
+    for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg', 'rangeMeters'] as const) {
+      expect(after[key]).toBeCloseTo(before[key], 6);
+    }
+  });
+
+  it('reports the altitude as soon as the viewport has a size, before the first frame (KB-047)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    let loaded: (() => void) | undefined;
+    renderer.setBaseImagery = () => new Promise<void>((resolve) => (loaded = resolve));
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w.jpg', view: { zoom: 2 } });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    expect(globe.frameNumber).toBe(0);
+    const camera = globe.camera;
+    expect(camera.rangeMeters).toBeGreaterThan(1e6);
+    expect(camera.altitudeMeters).toBeCloseTo(camera.rangeMeters, 0);
+    loaded?.();
+  });
+
   it('keeps the eye at least 0.5 m above the ground at the steepest tilt (KB-015)', async () => {
     const { globe } = await started({ view: { latitudeDeg: 45, zoom: 2 } });
     globe.jumpTo({ tiltDeg: 89, zoom: 28 });

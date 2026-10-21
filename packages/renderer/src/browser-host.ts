@@ -10,7 +10,15 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     requestFrame: (callback) => view.requestAnimationFrame(callback),
     cancelFrame: (id) => view.cancelAnimationFrame(id),
     now: () => view.performance.now(),
-    containerSize: () => ({ widthPx: container.clientWidth, heightPx: container.clientHeight }),
+    // The content box, which the canvas fills: clientWidth and clientHeight include the padding (KB-048).
+    containerSize: () => {
+      const style = view.getComputedStyle(container);
+      const padding = (a: string, b: string): number => (parseFloat(a) || 0) + (parseFloat(b) || 0);
+      return {
+        widthPx: Math.max(0, container.clientWidth - padding(style.paddingLeft, style.paddingRight)),
+        heightPx: Math.max(0, container.clientHeight - padding(style.paddingTop, style.paddingBottom)),
+      };
+    },
     pixelRatio: () => view.devicePixelRatio || 1,
     observeSize(callback) {
       const observer = new ResizeObserver(() => callback());

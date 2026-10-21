@@ -1,8 +1,9 @@
 // Probes of what the browser offers, and image decoding with and without a DOM.
-import type { DrawingSurface } from './three-backend.js';
+import { GlobeError } from '@vibeglobe/core';
+import type { BackendChoice, DrawingSurface } from './three-backend.js';
 
 /** True when the browser offers a WebGPU adapter. */
-export async function webgpuUsable(scope: typeof globalThis): Promise<boolean> {
+async function webgpuUsable(scope: typeof globalThis): Promise<boolean> {
   const gpu = (scope.navigator as Navigator | undefined)?.gpu;
   if (!gpu) return false;
   try {
@@ -13,7 +14,7 @@ export async function webgpuUsable(scope: typeof globalThis): Promise<boolean> {
 }
 
 /** True when a WebGL2 context can be created. */
-export function webgl2Usable(surface: DrawingSurface): boolean {
+function webgl2Usable(surface: DrawingSurface): boolean {
   const probe =
     surface.kind === 'element' ? surface.container.ownerDocument.createElement('canvas') : new OffscreenCanvas(1, 1);
   const context = probe.getContext('webgl2') as WebGL2RenderingContext | null;
@@ -35,4 +36,26 @@ export async function decodeBitmap(url: string): Promise<ImageBitmap> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
+}
+
+/**
+ * Whether to start WebGPU for a backend choice: 'auto' takes it when an adapter exists. Throws `unsupported-device` when
+ * the choice cannot be met; a forced backend never falls back (ADR 0010 §2).
+ */
+export async function chooseWebGPU(
+  scope: typeof globalThis,
+  surface: DrawingSurface,
+  choice: BackendChoice,
+): Promise<boolean> {
+  const webgpu = choice !== 'webgl2' && (await webgpuUsable(scope));
+  if (choice === 'webgpu' && !webgpu) {
+    throw new GlobeError('unsupported-device', 'WebGPU was requested, but this browser offers no WebGPU adapter.');
+  }
+  if (!webgpu && !webgl2Usable(surface)) {
+    throw new GlobeError(
+      'unsupported-device',
+      'This device supports neither WebGPU nor WebGL2, so the globe cannot render.',
+    );
+  }
+  return webgpu;
 }

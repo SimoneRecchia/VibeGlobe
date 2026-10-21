@@ -29,7 +29,7 @@ import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import { decodeBitmap, decodeImage, webgl2Usable, webgpuUsable } from './environment.js';
+import { chooseWebGPU, decodeBitmap, decodeImage } from './environment.js';
 import { createSurfaceMaterial } from './surface-material.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
@@ -163,18 +163,16 @@ export class ThreeBackend implements RendererBackend {
 
   private async initRenderer(): Promise<void> {
     const scope = this.scope();
-    const webgpu = this.settings.choice !== 'webgl2' && this.webgpuFailure === undefined && (await webgpuUsable(scope));
-    // A forced backend never falls back (ADR 0010 §2).
-    if (this.settings.choice === 'webgpu' && !webgpu) {
-      throw new GlobeError('unsupported-device', 'WebGPU was requested, but this browser offers no WebGPU adapter.');
-    }
-    if (!webgpu && !webgl2Usable(this.surface)) {
-      throw new GlobeError(
-        'unsupported-device',
-        'This device supports neither WebGPU nor WebGL2, so the globe cannot render.',
-      );
-    }
+    const webgpu = await chooseWebGPU(
+      scope,
+      this.surface,
+      this.webgpuFailure === undefined ? this.settings.choice : 'webgl2',
+    );
     const forceWebGL = !webgpu;
+    // A recovery may find WebGPU gone, blocked after a GPU-process crash: WebGL2 takes over, reported (KB-049).
+    if (forceWebGL && (this.capabilities as RendererCapabilities | undefined)?.backend === 'webgpu') {
+      this.events.backendFallback('WebGPU is no longer available after a device loss; using WebGL2');
+    }
     if (webgpu) patchIdentitySwizzle(scope);
     const canvas = this.canvases.next();
     const renderer = new WebGPURenderer({

@@ -104,9 +104,11 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
   const overlay = createDebugOverlay(host);
   let info: (readonly [string, string])[] = [];
   let pipelineCompiles = -1;
-  void globe.ready.then(() => {
+  // Read at start and again after a recovery, which may have switched the backend (KB-049).
+  const readInfo = (): void => {
     const caps = globe.capabilities;
     if (!caps) return;
+    pipelineCompiles = Number.NaN;
     info = [
       ['backend', `backend ${caps.backend}`],
       ['max-texture-size', `max texture ${caps.maxTextureSize}`],
@@ -116,7 +118,9 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
       ['adapter', `adapter ${caps.adapter}`],
       ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
     ];
-  });
+  };
+  void globe.ready.then(readInfo);
+  globe.on('device-restored', readInfo);
   let lastRefreshMs = -Infinity;
   return startFrameLoop((stats, timestampMs) => {
     if (timestampMs - lastRefreshMs < OVERLAY_REFRESH_MS) return;
@@ -160,10 +164,11 @@ if (params.get('experiment') === 'gpu-probes') {
     if (status) status.textContent = text;
   };
   setStatus(`Starting… Reference ellipsoid: WGS84, a = ${WGS84.semiMajorAxisMeters} m.`);
-  globe.ready.then(
-    () => setStatus(`${globe.backend ?? ''} · WGS84, a = ${WGS84.semiMajorAxisMeters} m · Made with Natural Earth`),
-    (error: unknown) =>
-      setStatus(`The globe could not start: ${error instanceof Error ? error.message : String(error)}`),
+  const showBackend = (): void =>
+    setStatus(`${globe.backend ?? ''} · WGS84, a = ${WGS84.semiMajorAxisMeters} m · Made with Natural Earth`);
+  globe.on('device-restored', showBackend);
+  globe.ready.then(showBackend, (error: unknown) =>
+    setStatus(`The globe could not start: ${error instanceof Error ? error.message : String(error)}`),
   );
   let loop: FrameLoop | undefined;
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);

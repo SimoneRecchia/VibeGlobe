@@ -4,7 +4,7 @@
 
 - **M2 Globe core in progress** on branch `claude/happy-galileo-b07j98` (pull request SimoneRecchia/VibeGlobe#3 open). Passing: F042–F064 (F064, the zero-allocation frame loop, through ADR 0018), F066–F074, F076, F077.
 - Also passing: F546 (initial-JavaScript budgets, start-up median 456 ms), F547 (lazy loading, `apps/lazy-host`). Pending owner steps: F065 (OffscreenCanvas measured and not adopted, ADR 0019; other browsers on real GPUs) and F075 (hardware procedure, `docs/guides/hardware-testing.md`).
-- Remaining in M2: F078 (acceptance; a fifth fresh-context review is running), F545 (needs the merge into `main` and a nightly run).
+- Remaining in M2: F078 (acceptance), F545 (needs the merge into `main` and a nightly run). GitHub Actions starts no jobs since 2026-10-21 11:25 UTC (open question 20): checks run locally until it does.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
 ## Session log (newest first)
@@ -20,6 +20,8 @@ Second M2 review (fresh context) found 11 issues; all are fixed: KB-027 to KB-03
 Third M2 review (fresh context) found 11 issues; all are fixed: KB-034 to KB-038 (a view set before the container has a size, `ready` never settling after a start-up failure, the reused camera-change payload, invalid handlers), `Globe.captureFrame()` so tests read the engine's frame instead of a page screenshot (new baselines), start-up assertions of the test environment (SwiftShader, pinned Chromium in CI), the engine clock (`Globe.timeMs`, `manualClockStepMs`), the eye-offset micro-benchmark (`npm run bench:micro`, 0.108 ms median for 5,000 draws on an idle container), the heading test, F078's z-fighting check with parallel quads, and the order in which a recovered canvas is shown.
 
 Fourth M2 review (fresh context) found 8 issues; all are fixed: KB-039 (EngineClock mixed small integers and doubles in one field, boxing every frame in CI), KB-040 (a frame the renderer skipped still counted and emitted), KB-041 to KB-043 (debug meshes added before start, polar tiles split into slivers: ADR 0006's cap rule now splits in latitude only), KB-044 (a device loss during recovery), KB-045 (destroyed globes kept their renderer through the loss callback and the frame hook), F078's draw order and a self-test that the z-fighting check detects z-fighting, and KB-035's assertion on the original canvas. The leak suite now waits for exactly the playground's own context.
+
+Fifth M2 review (fresh context) found 4 issues; all are fixed: KB-046 (a container that loses its size after start turns the camera back into a requested view instead of a 1 px viewport), KB-047 (the altitude before the first frame), KB-048 (the viewport is the container's content box, without padding) and KB-049 (a recovery that finds WebGPU gone reports `backend-fallback`).
 
 Also decided: texture and geometry compression (ADR 0020, `docs/research/compression.md`), ahead of M3 (F079 is marked when M3 starts).
 

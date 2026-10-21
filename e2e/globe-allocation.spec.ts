@@ -21,6 +21,13 @@ const SAMPLING_INTERVAL_BYTES = 64;
  * the frame function, measured exactly in Node by `packages/core/src/globe/frame-allocation.test.ts`.
  */
 const FRAME_CALLBACK = /\/packages\/core\/src\/globe\/create-globe\.ts(\?t=\d+)?:onFrame:/;
+/**
+ * The renderer's frame function, which calls into three.js: V8 counts native WebGPU wrappers three.js creates while
+ * encoding (80-byte objects, like the texture views counted against the createView shim below) against it, also with
+ * inlining switched off, so its large samples count as the library's too. Its own code allocates nothing: it only
+ * loops over typed arrays and the meshes it keeps, and ADR 0018's Node tests cover the eye-relative placement it calls.
+ */
+const RENDER_BOUNDARY = /\/packages\/renderer\/src\/three-backend\.ts(\?t=\d+)?:render:/;
 const FRAME_CALLBACK_MAX_OWN_BYTES = 32;
 
 interface TraceEvent {
@@ -93,8 +100,8 @@ function allocationSites(profile: SamplingProfile): Map<string, number> {
   const out = new Map<string, number>();
   for (const sample of profile.samples) {
     let site = sites.get(sample.nodeId) ?? '(unknown)';
-    if (FRAME_CALLBACK.test(site) && sample.size > FRAME_CALLBACK_MAX_OWN_BYTES)
-      site = '/three.webgpu.js (counted against the frame callback)';
+    if ((FRAME_CALLBACK.test(site) || RENDER_BOUNDARY.test(site)) && sample.size > FRAME_CALLBACK_MAX_OWN_BYTES)
+      site = '/three.webgpu.js (counted against an engine function that calls it)';
     const bytes = sample.size / (1 - Math.exp(-sample.size / SAMPLING_INTERVAL_BYTES));
     out.set(site, (out.get(site) ?? 0) + bytes);
   }
@@ -124,7 +131,8 @@ async function sampleAllocations(page: Page, session: CDPSession, durationMs: nu
   return {
     frames: (await frameNumber(page)) - first,
     sites: allocationSites(profile),
-    frameCallbackSeen: containsFunction(profile.head, FRAME_CALLBACK),
+    frameCallbackSeen:
+      containsFunction(profile.head, FRAME_CALLBACK) && containsFunction(profile.head, RENDER_BOUNDARY),
   };
 }
 
@@ -187,7 +195,7 @@ test('the frame loop allocates nothing in steady-state motion and no GC pause ca
   await test.info().attach('allocations', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
   expect(allocations.frames).toBeGreaterThan(300);
   // The rule above follows the callback's name: a renamed callback must fail here, not count the library as the engine.
-  expect(allocations.frameCallbackSeen, 'FRAME_CALLBACK must name the engine frame callback').toBe(true);
+  expect(allocations.frameCallbackSeen, 'FRAME_CALLBACK and RENDER_BOUNDARY must name engine functions').toBe(true);
   expect(gc.frames).toBeGreaterThan(600);
   // The engine's own code, beyond the timestamp every frame callback receives: less than one boxed number per frame on
   // average means no frame allocates.

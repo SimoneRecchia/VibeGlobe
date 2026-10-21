@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { canvasImage, geoToScreen, nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
+import { canvasImage, geoToScreen, openGlobe, waitForIdle } from './support/globe.ts';
 import { measureShift } from './support/image.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
@@ -129,10 +129,9 @@ for (const path of DEPTH_PATHS) {
     // Each red quad covers its blue one at every distance (1, 2 and 5 cm apart), and the lanes fill part of the view.
     expect(colors(first).blue).toBe(0);
     expect(colors(first).red).toBeGreaterThan(first.width * first.height * 0.2);
-    // 120 static frames: identical, so no pixel alternates between surfaces (ADR 0005).
+    // 120 static frames: identical, so no pixel alternates between surfaces (ADR 0005). Each capture draws its own
+    // frame (Globe.captureFrame), so no frame needs to be requested before it.
     for (let i = 0; i < 120; i++) {
-      await page.evaluate(() => window.vibeglobePlayground?.globe.requestRender());
-      await nextFrame(page);
       expect(Buffer.compare((await canvasImage(page)).data, first.data), `static frame ${i}`).toBe(0);
     }
     // 120 frames of sub-pixel camera motion (0.1 mm steps east and back): the order holds in every one.
@@ -142,7 +141,6 @@ for (const path of DEPTH_PATHS) {
         longitudeDeg: start.longitudeDeg + ((i % 2) * 0.0001) / metersPerDegree,
         latitudeDeg: start.latitudeDeg,
       });
-      await nextFrame(page);
       expect(colors(await canvasImage(page)).blue, `moving frame ${i}`).toBe(0);
     }
   });

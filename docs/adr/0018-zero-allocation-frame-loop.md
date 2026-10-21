@@ -56,3 +56,7 @@ The precision and depth work of the M2 review (ADR 0004 and 0005 updates) added 
 ## Update 2026-10-21 (cold paths)
 
 V8 tiers a function up once it has executed about as much bytecode as it holds. A hot function that also holds a rarely taken path (an error fallback, a retry loop) therefore stays in the interpreter or baseline code much longer than its callees, and that code boxes every double it touches. Under coverage instrumentation, where V8 skips its mid-tier compiler, the anchor solver ran interpreted for about 7000 drag frames (KB-033). Rule: in per-frame code, rarely taken paths go into functions of their own, so the hot function's bytecode is the path it runs.
+
+## Update 2026-10-21: the renderer's frame function is a boundary too
+
+The browser test counts samples above 32 bytes that V8 attributes to the engine's frame callback as the library's (`onFrame`, renamed from `frame` in M2). M3's surface quadtree showed the same effect one level down: V8 counts 80-byte native WebGPU wrappers (command encoders, texture views; three.js creates them while encoding every frame) against `ThreeBackend.render`, the function that calls `WebGPURenderer.render`, also with inlining switched off. The rule now covers both boundary functions; samples of 32 bytes or less (a boxed number, a small object) still count as engine bytes, and the test fails if either function is missing from the profile (`docs/test-changes.md`).

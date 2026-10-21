@@ -7,3 +7,4 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-21T00:57:56Z: frame-start pixel-ratio check
 - 2026-10-21T01:04:06Z: the workflow rebases its commit before pushing
 - 2026-10-21T07:20:00Z: depth-range scenario with three lanes to the horizon (ADR 0005, second M2 review)
+- 2026-10-21T09:40:01Z: frames read through Globe.captureFrame() in device pixels instead of page screenshots (ADR 0012, third M2 review)

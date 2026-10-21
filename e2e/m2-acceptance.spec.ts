@@ -2,6 +2,7 @@
 // every frame for complete imagery and, along the way, frame stability, sub-pixel jitter and drag anchoring.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import type { DebugShape } from '@vibeglobe/core';
 import {
   canvasImage,
   expectCompleteGlobe,
@@ -11,6 +12,7 @@ import {
   screenToGeo,
   waitForIdle,
 } from './support/globe.ts';
+import { parallelQuad, type Quad } from './support/geodesy.ts';
 import { measureShift } from './support/image.ts';
 
 const MILAN = { longitudeDeg: 9.19, latitudeDeg: 45.46 };
@@ -25,6 +27,66 @@ async function expectStableFrames(page: Page): Promise<void> {
     await waitForIdle(page);
     expect(Buffer.compare((await canvasImage(page)).data, first.data)).toBe(0);
   }
+}
+
+/**
+ * Lays two quads under the camera target, red above blue, separated by a few millionths of the eye's distance (about
+ * 50 times the depth resolution there), the red one larger; then moves the camera by about a tenth of a pixel three
+ * times. Any blue pixel means the depth test let the lower quad through: z-fighting at this distance.
+ */
+async function expectNoZFighting(page: Page): Promise<void> {
+  await waitForIdle(page);
+  const camera = await page.evaluate(() => {
+    const state = window.vibeglobePlayground?.globe.camera;
+    return {
+      longitudeDeg: state?.longitudeDeg ?? NaN,
+      latitudeDeg: state?.latitudeDeg ?? NaN,
+      altitudeMeters: state?.altitudeMeters ?? NaN,
+    };
+  });
+  const metersPerDegree = 111320 * Math.cos((camera.latitudeDeg * Math.PI) / 180);
+  const halfWidthMeters = camera.altitudeMeters / 4;
+  const gapMeters = Math.max(0.01, 3e-6 * camera.altitudeMeters);
+  // The red quad's corners lie this high, so its center, a chord sag lower, stays above the ground with the blue one.
+  const heightMeters =
+    (2 * halfWidthMeters) ** 2 / (8 * 6371000) + gapMeters + Math.min(1, camera.altitudeMeters / 100);
+  const dLat = halfWidthMeters / 111320;
+  const dLon = halfWidthMeters / metersPerDegree;
+  const { longitudeDeg: lon, latitudeDeg: lat } = camera;
+  const red: Quad = [
+    { longitudeDeg: lon - dLon, latitudeDeg: lat - dLat, heightMeters },
+    { longitudeDeg: lon + dLon, latitudeDeg: lat - dLat, heightMeters },
+    { longitudeDeg: lon + dLon, latitudeDeg: lat + dLat, heightMeters },
+    { longitudeDeg: lon - dLon, latitudeDeg: lat + dLat, heightMeters },
+  ];
+  // The blue quad lies in the red quad's plane moved down along its normal by the gap, inset to 80%.
+  const blue = parallelQuad(red, 0.8, gapMeters);
+  await page.evaluate((shapes) => window.vibeglobePlayground?.globe.setDebugShapes(shapes), [
+    { corners: blue, colorRgb: [0, 0, 1] },
+    { corners: red, colorRgb: [1, 0, 0] },
+  ] satisfies DebugShape[]);
+  const bluePixels = async (): Promise<number> => {
+    const image = await canvasImage(page);
+    let count = 0;
+    for (let i = 0; i < image.data.length; i += 4)
+      if ((image.data[i + 2] ?? 0) > 200 && (image.data[i] ?? 0) < 40 && (image.data[i + 1] ?? 0) < 40) count++;
+    return count;
+  };
+  expect(await bluePixels(), `z-fighting at ${camera.altitudeMeters} m`).toBe(0);
+  const target = { longitudeDeg: camera.longitudeDeg, latitudeDeg: camera.latitudeDeg };
+  const baseScreen = await geoToScreen(page, target);
+  const east = await geoToScreen(page, { ...target, longitudeDeg: target.longitudeDeg + 1 / metersPerDegree });
+  const stepMeters = 0.1 / Math.hypot(east.xPx - baseScreen.xPx, east.yPx - baseScreen.yPx);
+  for (let step = 1; step <= 3; step++) {
+    await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), {
+      longitudeDeg: camera.longitudeDeg + (step * stepMeters) / metersPerDegree,
+      latitudeDeg: camera.latitudeDeg,
+    });
+    expect(await bluePixels(), `z-fighting at ${camera.altitudeMeters} m after a sub-pixel move`).toBe(0);
+  }
+  await page.evaluate((view) => window.vibeglobePlayground?.globe.jumpTo(view), target);
+  await page.evaluate(() => window.vibeglobePlayground?.globe.setDebugShapes([]));
+  await waitForIdle(page);
 }
 
 /** Drags from the canvas center and checks the grabbed point stays under the pointer, then drags back. */
@@ -145,6 +207,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       await expectCompleteGlobe(page);
       if (step % 20 === 0) {
         await expectStableFrames(page);
+        await expectNoZFighting(page);
         // Along the zoom, where large tiles make the low part of the eye offset matter (ADR 0004).
         await expectNoJitter(page);
         await expectAnchoredDrag(page, box);
@@ -155,6 +218,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     expect(altitude).toBeGreaterThanOrEqual(0.5);
     expect(altitude).toBeLessThan(1.5);
     await expectStableFrames(page);
+    await expectNoZFighting(page);
     // Sub-millimeter moves at about 1 m, over the checkered quad: the image follows within 0.1 px.
     await expectNoJitter(page);
   });

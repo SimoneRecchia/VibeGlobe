@@ -80,8 +80,8 @@ test('draws nothing while the tab is hidden and resumes on the next frame when s
     let heading = 0;
     setInterval(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: (heading += 1) }), 16);
   });
-  await page.waitForTimeout(300);
-  expect(await frameNumber(page)).toBeGreaterThan(1);
+  // Frames follow the animation (on a loaded software GPU a frame can take hundreds of milliseconds).
+  await page.waitForFunction(() => (window.vibeglobePlayground?.globe.frameNumber ?? 0) > 1);
   await page.evaluate(() => (window as unknown as { setVisibility: (s: string) => void }).setVisibility('hidden'));
   await page.waitForTimeout(100);
   const hidden = await frameNumber(page);

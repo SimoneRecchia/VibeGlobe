@@ -132,3 +132,7 @@ The GPU readback test and the reassociation canary are built (`runGpuProbes` in 
 - **Readback.** 256 tracked vertices (the property test's distribution, generated deterministically, plus the KB-025 case) each write their clip position from `(offset + T_hi) + T_lo` to their own pixel of an `rgba32float` target, with flat interpolation; the read-back positions are compared with the float64 projection on a 4K screen. A second pass zeroes T_lo.
 - **Canary.** The vertex node's sum with offset 0.5, T_hi = 2^24 and T_lo = −2^24, read back: 0 in float32 order, 0.5 if the compiler reassociated.
 - **Results** on Chromium's SwiftShader, WebGPU and WebGL2 (both depth paths): maximum error 0.0004 px (limit 0.01), 0.15 px with T_lo dropped (limit 0.4) and 0.12 px on the KB-025 case (so the probe sees a lost T_lo), the canary in order. The end-to-end test prints the result, so the hardware run (`docs/guides/hardware-testing.md`) records it per device.
+
+## Update 2026-10-21 (offset benchmark)
+
+The benchmark of the verification list exists: `packages/renderer/src/eye-relative.test.ts` updates the split offsets of 5,000 draws per frame and requires zero allocations (a deliberately allocating change fails it), and `npm run bench:micro` times it against `quality/budgets.json` (`micro`, 0.1 ms median). On the cloud container's idle vCPU the median is 0.108 ms (p95 0.23–0.27 ms over three runs); the budget is for the reference desktop and is checked there by the hardware run (F075). Real frames update only the drawn tiles (about 20–800 in the M2 scenarios).

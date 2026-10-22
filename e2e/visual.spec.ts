@@ -9,7 +9,15 @@ const BACKENDS = ['webgpu', 'webgl2'] as const;
  * Canonical views (ADR 0012): the globe, a region, a pole, the antimeridian, both street-level scenarios, minified
  * imagery and terrain.
  */
-const VIEWS: readonly { name: string; query: string; drawCalls?: number; imagery?: boolean; crossBackend?: false }[] = [
+const VIEWS: readonly {
+  name: string;
+  query: string;
+  drawCalls?: number;
+  imagery?: boolean;
+  crossBackend?: false;
+  /** Streams for longer than the default 60 s on the software GPU (docs/test-changes.md). */
+  slow?: true;
+}[] = [
   { name: 'orbit', query: 'lon=-30&lat=20&zoom=1.5' },
   { name: 'europe', query: 'lon=12&lat=45&zoom=4' },
   { name: 'north-pole', query: 'lon=0&lat=85&zoom=2' },
@@ -35,6 +43,7 @@ const VIEWS: readonly { name: string; query: string; drawCalls?: number; imagery
     query: 'scenario=terrain-quantized-mesh&session=visual',
     imagery: true,
     crossBackend: false,
+    slow: true,
   },
   { name: 'terrain-smooth', query: 'scenario=terrain-terrarium&imagery=smooth&session=visual', imagery: true },
 ];
@@ -45,7 +54,7 @@ for (const backend of BACKENDS) {
   for (const view of VIEWS) {
     test(`canonical view ${view.name} matches its baseline on ${backend} (F072, F074)`, async ({ page }, testInfo) => {
       // Tiled imagery streams about 120 tiles before the capture, beyond 30 s on CI's software WebGPU.
-      if (view.imagery) test.setTimeout(90_000);
+      if (view.imagery) test.setTimeout(view.slow ? 180_000 : 90_000);
       await openGlobe(page, `backend=${backend}&${view.query}`);
       if (view.drawCalls !== undefined) {
         await page.waitForFunction(
@@ -54,7 +63,7 @@ for (const backend of BACKENDS) {
         );
       }
       // Tiled imagery streams in after the first idle frame: capture only once every tile shows its own level.
-      if (view.imagery) await waitForImagery(page);
+      if (view.imagery) await waitForImagery(page, view.slow ? 150_000 : 60_000);
       await waitForIdle(page);
       await expectMatchesBaseline(page, testInfo, viewName(backend, view.name), await captureCanvas(page));
     });

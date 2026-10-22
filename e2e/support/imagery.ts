@@ -38,7 +38,7 @@ export async function requestLog(page: Page, session: string, server = ''): Prom
  * Waits until every Mercator tile of the view shows imagery of its own level (the polar caps keep the base image),
  * then for the engine to go idle.
  */
-export async function waitForImagery(page: Page): Promise<void> {
+export async function waitForImagery(page: Page, timeoutMs = 60_000): Promise<void> {
   await expect
     .poll(
       () =>
@@ -47,7 +47,7 @@ export async function waitForImagery(page: Page): Promise<void> {
           const tiles = globe?.surfaceTiles() ?? [];
           return tiles.length > 0 && tiles.every((t) => t.root !== 'mercator' || t.imageryLevel === t.level);
         }),
-      { timeout: 60_000 },
+      { timeout: timeoutMs },
     )
     .toBe(true);
   await waitForIdle(page);

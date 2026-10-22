@@ -56,3 +56,25 @@ describe('layer stack', () => {
     expect(stack.resolvePick(packPickId(200, 0))).toBeUndefined();
   });
 });
+
+describe('layer stack and failing layers', () => {
+  it('leaves no trace of a layer whose attach throws, and takes it again later (PT-11)', () => {
+    let fail = true;
+    class Fragile extends DataLayer {
+      override attach(context: Parameters<DataLayer['attach']>[0]): void {
+        super.attach(context);
+        if (fail) throw new Error('no pick slot left');
+      }
+    }
+    const target = new RecordingRenderTarget();
+    const stack = new LayerStack(target);
+    stack.add(layer('a'));
+    const fragile = new Fragile('point', { id: 'f', data: [point('f-a', 1, 2)] });
+    expect(() => stack.add(fragile)).toThrow(/pick slot/);
+    expect(stack.order).toEqual(['a']);
+    expect(target.liveBatches).toBe(1);
+    fail = false;
+    stack.add(fragile);
+    expect(stack.order).toEqual(['a', 'f']);
+  });
+});

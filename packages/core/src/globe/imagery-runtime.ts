@@ -19,7 +19,7 @@ import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import { drawTerrain, type TerrainLayer } from '../terrain/terrain-draws.js';
+import { drawTerrain, gridErrorsByLevel, ShownLevels, type TerrainLayer } from '../terrain/terrain-draws.js';
 import type { HeightGrid } from '../terrain/heightmap.js';
 import { toEllipsoidal } from '../terrain/vertical-datum.js';
 import type { DecodedTile } from '../scheduler/types.js';
@@ -276,6 +276,8 @@ export class ImageryRuntime {
     const renderer = this.renderer;
     return {
       source,
+      shown: new ShownLevels(),
+      gridErrorMeters: gridErrorsByLevel(source),
       loader: new ImageryLoader({
         ...base,
         pinnedLevel: Math.min(base.pinnedLevel, source.maxLevel),

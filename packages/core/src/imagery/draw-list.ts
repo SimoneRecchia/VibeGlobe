@@ -15,6 +15,8 @@ export class DrawLayer implements TileDrawLayer {
   fromUvTransforms: Float32Array;
   fromGeographic: Uint8Array;
   fades: Float32Array;
+  /** 1 when the draw's `from` fields were seeded for a tile drawn for the first time (terrain morphs, F138). */
+  seeded: Uint8Array;
 
   constructor(capacity: number) {
     this.textures = new Int32Array(capacity);
@@ -25,6 +27,7 @@ export class DrawLayer implements TileDrawLayer {
     this.fromUvTransforms = new Float32Array(capacity * 4);
     this.fromGeographic = new Uint8Array(capacity);
     this.fades = new Float32Array(capacity);
+    this.seeded = new Uint8Array(capacity);
   }
 
   /** Draw `index` shows `texture` (with no fade yet) through the transform in `transform[0..3]`. */
@@ -35,6 +38,7 @@ export class DrawLayer implements TileDrawLayer {
     this.fromTextures[index] = texture;
     this.fromGeographic[index] = geographic;
     this.fades[index] = 1;
+    this.seeded[index] = 0;
     const at = index * 4;
     for (let c = 0; c < 4; c++) {
       const value = transform[c] ?? 0;

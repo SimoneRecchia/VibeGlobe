@@ -16,14 +16,40 @@ import {
   mapMercator,
 } from '../imagery/imagery-mapping.hot.js';
 import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
-import { MERCATOR_ROOT, NORTH_CAP, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
+import { MERCATOR_ROOT, NORTH_CAP, quadtreeTileKey, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { TerrainHeights } from './terrain-heights.js';
 import type { TerrainSource } from './terrain-source.js';
 
-/** The terrain of one engine instance: its source and the loader of its height grids. */
+/** The terrain of one engine instance: its source, the loader of its height grids and the levels its tiles showed. */
 export interface TerrainLayer {
   readonly source: TerrainSource;
   readonly loader: ImageryLoader;
+  readonly shown: ShownLevels;
+  /** The error of each terrain level's grid, meters, by level: what finer levels may add to its heights. */
+  readonly gridErrorMeters: Float64Array;
+}
+
+/** {@link TerrainLayer.gridErrorMeters} of a source: computed once, so per-tile code reads an array. */
+export function gridErrorsByLevel(source: TerrainSource): Float64Array {
+  const errors = new Float64Array(source.maxLevel + 1);
+  for (let level = 0; level <= source.maxLevel; level++)
+    errors[level] = GRID_ERROR_FACTOR * source.geometricErrorMeters(level);
+  return errors;
+}
+
+/** The terrain level each drawn tile showed in the last frame and in this one, by surface tile key. */
+export class ShownLevels {
+  previous = new IntegerKeyMap<number>(1024);
+  current = new IntegerKeyMap<number>(1024);
+
+  /** Ends a frame: this frame's levels become the previous ones. */
+  swap(): void {
+    const previous = this.previous;
+    this.previous = this.current;
+    this.current = previous;
+    this.current.clear();
+  }
 }
 
 /** Height-grid cells per side of the finest grid a terrain tile decodes to (ADR 0006 §5). */
@@ -52,6 +78,7 @@ export function terrainErrorsBySurfaceLevel(source: TerrainSource, maxLevel: num
 const VISIBLE_CLASS = 1024;
 
 const mapping = new Float64Array(7);
+const seedMapping = new Float64Array(7);
 const transform = new Float64Array(4);
 
 /** The terrain level a surface tile of `surfaceLevel` wants, within the source's levels. */
@@ -80,15 +107,70 @@ export function drawTerrain(
     if (handle < 0) {
       list.terrain.textures[index] = NO_TERRAIN;
       list.terrain.levels[index] = -1;
+      list.terrain.seeded[index] = 0;
       continue;
     }
     layer.loader.markDrawn(handle);
-    transform[0] = mapping[MAPPING_SCALE_U] ?? 1;
-    transform[1] = mapping[MAPPING_SCALE_V] ?? 1;
-    transform[2] = mapping[MAPPING_OFFSET_U] ?? 0;
-    transform[3] = mapping[MAPPING_OFFSET_V] ?? 0;
-    list.terrain.set(index, handle, mapping[MAPPING_LEVEL] ?? -1, geographic, transform);
+    writeTransform(mapping);
+    const level = mapping[MAPPING_LEVEL] ?? -1;
+    list.terrain.set(index, handle, level, geographic, transform);
+    layer.shown.current.set(tile.key, level);
+    if (tile.root === MERCATOR_ROOT && !layer.shown.previous.has(tile.key)) seedMorph(list, index, tile, level, layer);
   }
+  layer.shown.swap();
+}
+
+/** Copies a mapping's scale and offset into {@link transform}. */
+function writeTransform(from: Float64Array): void {
+  transform[0] = from[MAPPING_SCALE_U] ?? 1;
+  transform[1] = from[MAPPING_SCALE_V] ?? 1;
+  transform[2] = from[MAPPING_OFFSET_U] ?? 0;
+  transform[3] = from[MAPPING_OFFSET_V] ?? 0;
+}
+
+/**
+ * The terrain level shown last frame where a Mercator tile drawn for the first time lies (F138): its parent's when it
+ * appears by refinement, else the finest of its children's when it appears by coarsening; -1 when neither was drawn.
+ */
+function previousLevel(tile: QuadtreeTile, previous: IntegerKeyMap<number>): number {
+  if (tile.level > 0) {
+    const parent = previous.get(quadtreeTileKey(MERCATOR_ROOT, tile.level - 1, tile.x >> 1, tile.y >> 1));
+    if (parent !== undefined) return parent;
+  }
+  let finest = -1;
+  for (let child = 0; child < 4; child++) {
+    const key = quadtreeTileKey(MERCATOR_ROOT, tile.level + 1, 2 * tile.x + (child & 1), 2 * tile.y + (child >> 1));
+    const level = previous.get(key);
+    if (level !== undefined && level > finest) finest = level;
+  }
+  return finest;
+}
+
+/**
+ * Starts a tile drawn for the first time from the terrain shown there last frame (F138, ADR 0006 §4): the parent's on
+ * refinement, the children's on coarsening (the two-level offset makes four children share one terrain tile, which
+ * covers their parent). The draw's `from` grid is that terrain when resident and different, flagged `seeded`, so the
+ * fades morph from it instead of jumping.
+ */
+function seedMorph(list: DrawList, index: number, tile: QuadtreeTile, level: number, layer: TerrainLayer): void {
+  const before = previousLevel(tile, layer.shown.previous);
+  if (before < 0 || before === level) return;
+  const source = layer.source;
+  const mapped =
+    source.tiling.crs === 'EPSG:3857'
+      ? mapMercator(tile, before, seedMapping, 0)
+      : mapGeographic(tile, before, seedMapping, 0);
+  if (!mapped) return;
+  const seedLevel = seedMapping[MAPPING_LEVEL] ?? -1;
+  if (seedLevel === level) return;
+  const handle = layer.loader.readyHandle(seedLevel, seedMapping[MAPPING_X] ?? 0, seedMapping[MAPPING_Y] ?? 0);
+  if (handle < 0) return;
+  writeTransform(seedMapping);
+  const terrain = list.terrain;
+  terrain.fromTextures[index] = handle;
+  terrain.fromGeographic[index] = source.tiling.crs === 'EPSG:3857' ? 0 : 1;
+  for (let c = 0; c < 4; c++) terrain.fromUvTransforms[index * 4 + c] = transform[c] ?? 0;
+  terrain.seeded[index] = 1;
 }
 
 /**
@@ -170,7 +252,7 @@ export function terrainHeightRange(
     if (grid) {
       out[0] = grid.minMeters;
       out[1] = grid.maxMeters;
-      out[2] = GRID_ERROR_FACTOR * source.geometricErrorMeters(current);
+      out[2] = layer.gridErrorMeters[current] ?? 0;
       return true;
     }
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);

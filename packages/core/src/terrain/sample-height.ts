@@ -11,6 +11,22 @@ import type { HeightGrid } from './heightmap.js';
  * (1); positions outside the tile are clamped to its edges.
  */
 export function sampleHeight(grid: HeightGrid, u: number, v: number): number {
+  uvh[0] = u;
+  uvh[1] = v;
+  sampleHeightInto(grid, uvh, 0);
+  return uvh[2] ?? 0;
+}
+
+const uvh = new Float64Array(3);
+
+/**
+ * {@link sampleHeight} through an array, for per-query and per-frame code: reads u and v from `at[offset]` and
+ * `at[offset + 1]` and writes the height to `at[offset + 2]`, so no double crosses a call boundary, which V8 boxes
+ * (ADR 0018).
+ */
+export function sampleHeightInto(grid: HeightGrid, at: Float64Array, offset: number): void {
+  const u = at[offset] ?? 0;
+  const v = at[offset + 1] ?? 0;
   const cells = grid.cells;
   const side = cells + 1;
   const x = (u < 0 ? 0 : u > 1 ? 1 : u) * cells;
@@ -25,5 +41,5 @@ export function sampleHeight(grid: HeightGrid, u: number, v: number): number {
   const sw = h[(row + 1) * side + col] ?? 0;
   const se = h[(row + 1) * side + col + 1] ?? 0;
   // The diagonal from north-west to south-east: above it (fx > fy) the north-east triangle, below it the south-west.
-  return fx >= fy ? nw + (ne - nw) * fx + (se - ne) * fy : nw + (se - sw) * fx + (sw - nw) * fy;
+  at[offset + 2] = fx >= fy ? nw + (ne - nw) * fx + (se - ne) * fy : nw + (se - sw) * fx + (sw - nw) * fy;
 }

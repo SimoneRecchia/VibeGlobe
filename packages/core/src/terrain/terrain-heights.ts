@@ -1,5 +1,5 @@
 import type { HeightGrid } from './heightmap.js';
-import { sampleHeight } from './sample-height.js';
+import { sampleHeightInto } from './sample-height.js';
 import type { TerrainLayer } from './terrain-draws.js';
 
 /** An elevation query's answer (F144, F145). */
@@ -17,11 +17,20 @@ const FINEST_RESIDENT = -1;
 /** {@link TerrainHeights.wantFinest}: the finest tile failed for good. */
 export const FINEST_FAILED = -2;
 
-/** Where a position falls in a tiling at a level: column, row, and u, v across the tile (v from the north). */
-const located = new Float64Array(4);
+/**
+ * Where a position falls in a tiling at a level: column, row, u, v across the tile (v from the north), then the height
+ * sampled there.
+ */
+const located = new Float64Array(5);
+/** A position in radians for {@link TerrainHeights.sample} and {@link TerrainHeights.wantFinest}. */
+const position = new Float64Array(2);
 
-/** Writes the tile and in-tile position of a geodetic position at `level` into {@link located}. */
-function locate(mercator: boolean, lonRad: number, latRad: number, level: number): void {
+/**
+ * Writes the tile and in-tile position at `level` of the geodetic position `at[0..1]` (radians) into {@link located}.
+ */
+function locate(mercator: boolean, at: Float64Array, level: number): void {
+  const lonRad = at[0] ?? 0;
+  const latRad = at[1] ?? 0;
   const n = 2 ** level;
   let fx: number;
   let fy: number;
@@ -74,17 +83,27 @@ export class TerrainHeights {
 
   /**
    * The height at a position from the deepest resident terrain tile that contains it, written into `out` (F144).
-   * Allocates nothing.
    */
   sample(lonRad: number, latRad: number, out: ElevationSample): ElevationSample {
+    position[0] = lonRad;
+    position[1] = latRad;
+    return this.sampleAt(position, out);
+  }
+
+  /**
+   * {@link TerrainHeights.sample} at the position `at[0..1]` (radians): synchronous queries pass it in an array, so
+   * no double crosses a call boundary, which V8 boxes (ADR 0018). Allocates nothing.
+   */
+  sampleAt(at: Float64Array, out: ElevationSample): ElevationSample {
     const { source, loader } = this.layer;
     const mercator = source.tiling.crs === 'EPSG:3857';
     for (let level = source.maxLevel; level >= source.minLevel; level--) {
-      locate(mercator, lonRad, latRad, level);
+      locate(mercator, at, level);
       const handle = loader.peekHandle(level, located[0] ?? 0, located[1] ?? 0);
       const grid = handle >= 0 ? this.grids.get(handle) : undefined;
       if (!grid) continue;
-      out.heightMeters = sampleHeight(grid, located[2] ?? 0, located[3] ?? 0);
+      sampleHeightInto(grid, located, 2);
+      out.heightMeters = located[4] ?? 0;
       out.level = level;
       out.noData = false;
       return out;
@@ -103,8 +122,10 @@ export class TerrainHeights {
   wantFinest(lonRad: number, latRad: number, priority: number): number {
     const { source, loader } = this.layer;
     const mercator = source.tiling.crs === 'EPSG:3857';
+    position[0] = lonRad;
+    position[1] = latRad;
     for (let level = source.maxLevel; level >= source.minLevel; level--) {
-      locate(mercator, lonRad, latRad, level);
+      locate(mercator, position, level);
       const x = located[0] ?? 0;
       const y = located[1] ?? 0;
       if (loader.peekHandle(level, x, y) >= 0) return FINEST_RESIDENT;

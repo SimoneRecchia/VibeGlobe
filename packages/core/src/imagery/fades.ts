@@ -53,6 +53,13 @@ export class ImageryFades {
         slot = this.allocate(key);
         this.store(slot, layer, i);
         this.startMs[slot] = -Infinity;
+        if (layer.seeded[i] === 1) {
+          // A new tile whose draw names what was shown there before (terrain, F138): it morphs from that.
+          this.fromTexture[slot] = layer.fromTextures[i] ?? 0;
+          this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
+          for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
+          this.startMs[slot] = nowMs;
+        }
       } else if (this.toTexture[slot] !== texture || this.toLevel[slot] !== level) {
         if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
           // A fade is under way: it finishes first, so what the tile shows never jumps; the new imagery fades in next.

@@ -64,6 +64,8 @@ export class SurfaceFrame {
   private readonly clearanceMeters: number;
   /** The camera of the last traced move. */
   private lastCamera = '';
+  /** A synchronous elevation query's position in radians, in an array so passing it boxes nothing (ADR 0018). */
+  private readonly queryRad = new Float64Array(2);
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
   private readonly nowMs = new Float64Array(1);
 
@@ -191,7 +193,11 @@ export class SurfaceFrame {
   elevationAt(position: GeoPosition, out: ElevationSample): ElevationSample {
     validatePosition(position);
     const heights = this.imagery?.heights;
-    if (heights) return heights.sample(position.longitudeDeg * DEG_TO_RAD, position.latitudeDeg * DEG_TO_RAD, out);
+    if (heights) {
+      this.queryRad[0] = position.longitudeDeg * DEG_TO_RAD;
+      this.queryRad[1] = position.latitudeDeg * DEG_TO_RAD;
+      return heights.sampleAt(this.queryRad, out);
+    }
     out.heightMeters = 0;
     out.level = -1;
     out.noData = true;

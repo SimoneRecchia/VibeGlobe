@@ -211,6 +211,31 @@ describe('terrain in a globe (M4)', () => {
     expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.1));
   });
 
+  it('morphs the relief of tiles that appear when the selection changes, ending on the target terrain exactly (F138)', async () => {
+    const { globe, renderer, run } = await terrainGlobe(terrain([]), 40, terrainWorkers(), {
+      longitudeDeg: 7,
+      latitudeDeg: 46,
+      zoom: 10,
+      tiltDeg: 30,
+    });
+    // Back to zoom 9: parents replace their children, whose finer terrain was shown until now.
+    globe.jumpTo({ zoom: 9 });
+    renderer.timers.advance(16);
+    renderer.flush();
+    const first = renderer.lastDraws;
+    const morphing = Array.from(first?.terrain.fades.subarray(0, first.count) ?? []).filter((fade) => fade < 1);
+    expect(morphing.length).toBeGreaterThan(0);
+    // Each morph runs from the terrain shown before to the tile's own; once over, only the target terrain is drawn.
+    await run(30);
+    const last = renderer.lastDraws;
+    if (!last) throw new Error('no draws');
+    for (let i = 0; i < last.count; i++) {
+      expect(last.terrain.fades[i]).toBe(1);
+      expect(last.terrain.fromTextures[i]).toBe(last.terrain.textures[i]);
+    }
+    globe.destroy();
+  });
+
   it('answers elevation queries from the terrain in memory with the level they came from (F144)', async () => {
     const { globe } = await terrainGlobe(terrain([]));
     const out = { heightMeters: 0, level: 0, noData: true };

@@ -3594,7 +3594,7 @@
         "Confirm it lists known failure modes from issue trackers (quota errors, browser eviction, captive portals, stale caches) and how the chosen design avoids each",
         "Confirm it states the chosen approach and why and links the ADRs that record it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F271",
@@ -3632,7 +3632,7 @@
         "Assert writes and reads happen off the main thread and frame times stay within budget during heavy cache writes",
         "Repeat in Chromium, Firefox and WebKit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F274",
@@ -3644,7 +3644,7 @@
         "Inject QuotaExceededError on writes and assert the engine logs one warning, keeps rendering with zero black pixels, and keeps working from memory and network",
         "Assert storage use reported by the API matches the stored data within 5%"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F275",
@@ -3656,7 +3656,7 @@
         "Navigate and assert the engine falls back to network or lower-detail tiers with zero black pixels after the base is available",
         "Assert an eviction event reports which packages or caches were lost"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F276",
@@ -3668,7 +3668,7 @@
         "Assert it calls navigator.storage.persist() and reports the browser's answer and the current persisted state",
         "Assert the call is safe where the Storage API is missing and reports 'unsupported'"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F277",
@@ -3681,7 +3681,7 @@
         "Assert fresh tiles are reused without requests, expired tiles are revalidated, and no-store tiles are absent from browser storage",
         "Assert per-source policy overrides in configuration can only shorten what the headers and profile allow"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F278",
@@ -3693,7 +3693,7 @@
         "Navigate again and assert revalidation requests carry If-None-Match",
         "Assert unchanged tiles get 304 and are reused, and changed tiles are downloaded and replace the stored ones without a visible flash"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F279",
@@ -3705,7 +3705,7 @@
         "Install version 2 with some changed tiles and navigate again",
         "Assert every tile shown comes from version 2 and no stale version-1 tile remains in memory or browser storage"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F280",
@@ -3717,7 +3717,7 @@
         "Assert through storage inspection that no tile was written and through request interception that revisited tiles are downloaded again",
         "Switch it off for one source only and assert the other sources still persist"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F281",
@@ -3827,7 +3827,7 @@
         "Assert the package contains only the other source's tiles and the build report states why the first one was excluded",
         "Switch it off globally and assert package builds are refused with a descriptive error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F290",
@@ -3851,7 +3851,7 @@
         "Navigate the package's area and assert no tile is read from the package (per-tier counters) and all come from the network or caches",
         "Block the network and assert the engine reports that it is offline, keeps the pinned base visible and does not read the package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F292",
@@ -3927,7 +3927,7 @@
         "Simulate a single dead endpoint while others work and assert only that endpoint is marked unreachable",
         "Assert health checks back off while offline and never exceed one request per endpoint per configured interval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F298",
@@ -3953,7 +3953,7 @@
         "Record frames and assert refinement cross-fades with no popping and no black pixels",
         "Assert a connectivity event reports the change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F300",
@@ -4013,7 +4013,7 @@
         "Assert the output is a valid PMTiles archive containing exactly the tiles of that area and zoom range",
         "Load the package in the playground in offline-only mode and assert full navigation of the area with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F305",
@@ -4025,7 +4025,7 @@
         "Assert the package contains every tile intersecting the polygon and no tile entirely outside it",
         "Load the package in the playground in offline-only mode and assert navigation within the polygon with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F306",
@@ -4061,7 +4061,7 @@
         "Resume each and assert already completed tiles are not requested again",
         "Assert the final package is identical to an uninterrupted build"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F309",
@@ -4073,7 +4073,7 @@
         "Install and read each and assert corruption is detected with a descriptive error",
         "Assert corrupted tiles are treated as missing, with parent fallback and zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F310",
@@ -4085,7 +4085,7 @@
         "Navigate them in offline-only mode and record frames",
         "Assert available tiles are shown, gaps are covered by the best ancestor or the next source in the chain, and no frame is blank or frozen"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F311",
@@ -4097,7 +4097,7 @@
         "Assert progress events are emitted and the list API returns both with name, version, area, zoom range, sources, licenses and size",
         "Reload the page and assert the list is unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F312",
@@ -4108,7 +4108,7 @@
         "Update an installed fixture package to a new version and assert the list shows the new version and only its tiles are used",
         "Remove a package and assert it disappears from the list, its storage is freed, and the view falls back to other tiers without black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F313",
@@ -4119,7 +4119,7 @@
         "Install packages and fill the cache in the playground",
         "Call the storage-use API and assert per-package, cache and total sizes match the stored data within 5% and the quota is reported when the browser provides it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F314",
@@ -4170,7 +4170,7 @@
         "Run the guide's code examples as tests and assert they pass",
         "Follow the LAN server setup in the guide on a clean machine and confirm the playground runs offline from it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F318",
@@ -4183,7 +4183,7 @@
         "Inspect browser storage through Playwright and assert no tile of that source was written",
         "Assert tiles of the other sources in the same view were written"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F319",
@@ -4195,7 +4195,7 @@
         "Assert the build stops before any download with an error naming the source and the rule",
         "Assert the same package without that source builds normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F320",
@@ -4292,7 +4292,7 @@
         "Run the cache-store and network-policy contract tests against the built-in implementations and the custom ones and assert all pass",
         "Attach the custom store and policy in the playground and assert tiles are stored and requests decided through them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F328",
@@ -4318,7 +4318,7 @@
         "From another machine or container on the same network with no internet route, open the playground and confirm offline navigation with zero black pixels",
         "Confirm the offline mode 1 end-to-end tests start the same server image"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F329",
@@ -4436,7 +4436,7 @@
         "Load the package through the PMTiles or MBTiles adapter and verify a sample of tiles is byte-identical to the static folder",
         "Verify the package passes the offline package integrity check"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F337",

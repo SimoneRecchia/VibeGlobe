@@ -10,10 +10,25 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./cache-worker.js": {
+      "source": "./src/cache-worker.ts",
+      "default": "./dist/cache-worker.js"
     }
   },
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "devDependencies": {
+    "@types/sql.js": "1.4.11",
+    "fake-indexeddb": "6.2.6",
+    "pmtiles": "4.5.0",
+    "sql.js": "1.15.1"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.3.0",
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/sources": "0.0.0"
+  }
 }

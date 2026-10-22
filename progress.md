@@ -25,6 +25,26 @@ Branch `claude/festive-cori-5030me`; status, stubs, hook requests and waiting en
 - **2026-10-22 (later):** merged `main` with the M7 source adapters (SimoneRecchia/VibeGlobe#11) and the M14 framework adapters (SimoneRecchia/VibeGlobe#13). The GeoJSON stub is replaced by `geojsonFormat`, `kmlFormat` and `gpxFormat` on the M7 parsers; their issues become error events. No entry newly passes: F371 still needs parsing in the worker pool and drawing.
 - Notes: the style engine's fallback path (a property the style reads is missing) is about 20 times slower than a normal evaluation; cluster diffs and label passes still run on the calling thread (`docs/follow-ups.md`).
 
+## Offline engine track (sixth session, `packages/offline`)
+
+Branch `claude/gifted-mayer-p0kexd`; status, stubs and waiting entries in `docs/parallel-tracks.md`.
+
+- **2026-10-22:** `@vibeglobe/offline` (ADR 0033): tiers in a transport wrapper (persistent cache, packages, network),
+  IndexedDB cache in a dedicated worker with LRU eviction and quota handling, HTTP cache policy and ETag revalidation,
+  eviction detection, persistence requests, health-check connectivity with captive-portal detection and backoff,
+  network modes and switches with provider rules, the package manager (URL, local files and in-browser builds;
+  integrity per chunk; versions; resumable installs), contracts for cache stores and network policies, the Docker LAN
+  server, the offline guide, and the research survey. Browser specs `e2e/offline-*.spec.ts` on a harness page of the
+  playground's dev server (the playground itself is the main track's).
+- **2026-10-22 (after the M7 and M14 merges):** the typed stub of the PMTiles and MBTiles adapters is gone; packages
+  load through `pmtilesImagery` and `mbtilesImagery`. Passing: F304 and F305 (CLI packages navigated offline-only,
+  `e2e/offline-cli-packages.spec.ts`) and F336 (the build's packages pass the integrity check,
+  `scripts/integration/package-outputs.test.ts`). F337, F339, F551 and F554 still wait on F254/F255, F129 and
+  F247/F248.
+- Notes for the next session of this track: the fixture tile server sends `no-store`, so specs rewrite cache headers
+  with `tileHeaders()`; Docker's daemon is not running in a fresh container (`dockerd &`); `Globe.ready` stays pending
+  in a start with the network down and no data for the pinned levels (ADR 0033, hook request 3).
+
 ## Source adapters track (fourth session, `packages/sources`)
 
 Branch `claude/m7-source-adapters-0gkrjg`; status, contract workarounds and what each remaining entry waits for in `docs/parallel-tracks.md`.

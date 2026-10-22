@@ -52,8 +52,8 @@ export interface ScenarioReport {
    */
   maxChangedShare: number;
   maxChangedFrame: number;
-  /** With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode and phase. */
-  samples: [number, number, number, number, string, string][];
+  /** With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase and heading. */
+  samples: [number, number, number, number, string, string, number][];
 }
 
 /** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
@@ -410,8 +410,8 @@ function measureMotion(
   }
   if (!scenario.samples) return;
   const camera = globe.camera;
-  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase } = camera;
-  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase]);
+  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg } = camera;
+  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg]);
 }
 
 /**

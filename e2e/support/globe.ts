@@ -24,8 +24,8 @@ export interface ScenarioReport {
   minReliefAboveHorizonPx: number;
   maxChangedShare: number;
   maxChangedFrame: number;
-  /** Per frame: zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase. */
-  samples: [number, number, number, number, string, string][];
+  /** Per frame: zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase, heading (degrees). */
+  samples: [number, number, number, number, string, string, number][];
 }
 
 declare global {

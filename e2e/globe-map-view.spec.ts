@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { canvasImage, geoToScreen, nextFrame, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import { hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import type { ScenarioReport } from './support/globe.ts';
 
 /**
@@ -312,3 +313,51 @@ test('changing the curves at runtime moves the view to them without a jump (F150
   expect(morphs.every((value, i) => i === 0 || Math.abs(value - (morphs[i - 1] ?? 0)) < 0.3)).toBe(true);
   expect(morphs.filter((value, i) => i > 0 && value !== morphs[i - 1]).length).toBeGreaterThan(4);
 });
+
+/** The largest change of a sampled value between consecutive frames. */
+function largestStep(values: number[]): number {
+  let largest = 0;
+  for (let i = 1; i < values.length; i++)
+    largest = Math.max(largest, Math.abs((values[i] ?? 0) - (values[i - 1] ?? 0)));
+  return largest;
+}
+
+for (const backend of BACKENDS) {
+  for (const [mode, query] of [
+    ['Auto', ''],
+    ['2D-locked', '&viewMode=2d'],
+    ['manual-tilt', '&tilt=45&heading=30'],
+  ] as const) {
+    test(`M5 acceptance: the zoom from the globe to the street is continuous and glitch-free in ${mode} mode on ${backend} (F167)`, async ({
+      page,
+    }) => {
+      test.setTimeout(240_000);
+      await openGlobe(page, `${CLOCK}&backend=${backend}${query}`);
+      await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());
+      const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('zoom-globe-to-street'));
+      if (!report) throw new Error('no report');
+      const times = await page.evaluate(() => window.vibeglobePlayground?.cpuFrameTimesMs() ?? []);
+      const zooms = report.samples.map((sample) => sample[0]);
+      const tilts = report.samples.map((sample) => sample[3]);
+      const headings = report.samples.map((sample) => sample[6]);
+      // Per-frame continuity: the scenario steps 0.1 zoom levels per frame; the morph and relief curves rise by at most
+      // 0.075 and 0.04 per step (smootherstep's slope of 1.875 over 2.5 and 5 levels), the tilt eases (F162, F166).
+      expect(largestStep(zooms)).toBeLessThan(0.11);
+      expect(largestStep(report.samples.map((sample) => sample[1]))).toBeLessThan(0.1);
+      expect(largestStep(report.samples.map((sample) => sample[2]))).toBeLessThan(0.1);
+      expect(largestStep(tilts)).toBeLessThan(5);
+      expect(largestStep(headings)).toBe(0);
+      if (mode === '2D-locked') expect(Math.max(...tilts)).toBe(0);
+      if (mode === 'manual-tilt') expect(tilts.at(-1)).toBeCloseTo(45, 6);
+      // The temporal glitch detector: no holes, no pops, no frame-to-frame jump of the picture.
+      expect([report.holes, report.dark, report.pops]).toEqual([0, 0, 0]);
+      console.log(
+        `F167 ${mode} ${backend}: largest changed share ${report.maxChangedShare.toFixed(3)} at frame ${report.maxChangedFrame}`,
+      );
+      expect(report.maxChangedShare).toBeLessThan(0.25);
+      // The frame-time budget holds on the reference desktop's GPU only (ADR 0012; F167's device steps are the owner's).
+      const sorted = [...times].sort((a, b) => a - b);
+      if (hardwareGpu()) expect(sorted[Math.floor(sorted.length * 0.95)] ?? 0).toBeLessThanOrEqual(16.7);
+    });
+  }
+}

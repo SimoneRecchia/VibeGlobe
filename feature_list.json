@@ -3656,7 +3656,7 @@
         "Navigate and assert the engine falls back to network or lower-detail tiers with zero black pixels after the base is available",
         "Assert an eviction event reports which packages or caches were lost"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F276",

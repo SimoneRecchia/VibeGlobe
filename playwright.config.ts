@@ -11,7 +11,7 @@ const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts|imagery-timing\.spec\.t
  * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
  * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
  */
-const CROSS_BROWSER_SPECS = /globe-(core|precision|lifecycle)\.spec\.ts/;
+const CROSS_BROWSER_SPECS = /globe-(core|precision|lifecycle)\.spec\.ts|offline-browsers\.spec\.ts/;
 const WEBGPU_TESTS = /webgpu|WebGPU/;
 const crossBrowserProjects =
   process.env['VIBEGLOBE_CROSS_BROWSER'] === '1'

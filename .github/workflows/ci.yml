@@ -2,7 +2,7 @@ name: CI
 
 # Saves minutes (ADR 0015): every push, and pull requests from forks, run one job with every fast check (pull requests
 # run only the unit tests their changes reach; builds and browsers are cached); pushes to main, the nightly schedule
-# and manual runs add the browser jobs: the end-to-end suite in four shards, the isolated
+# and manual runs add the browser jobs: the end-to-end suite in eight shards, the isolated
 # measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
 on:
   push:
@@ -84,15 +84,16 @@ jobs:
         run: npm run treeshake
 
   e2e:
-    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/4)
+    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/8)
     if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    # ADR 0022: the functional suite is split across four runners by test file; the machine-wide measurements run in
-    # their own job below, so no shard waits for them and none of them shares a machine with a test.
+    # ADR 0022: the functional suite is split across eight runners by test file, one test at a time on each: two tests
+    # rendering at once on the software GPU slowed each other's frames past their time limits. The machine-wide
+    # measurements run in their own job below, so no shard waits for them and none of them shares a machine with a test.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
       CI: true
     steps:
@@ -120,7 +121,7 @@ jobs:
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npm run build
-      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
+      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/8 --workers=1
       - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
         if: matrix.shard == 1
         run: npm run geodtest

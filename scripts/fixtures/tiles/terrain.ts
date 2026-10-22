@@ -110,7 +110,7 @@ function meshGrid(
  * A quantized-mesh-1.0 tile triangulating a regular (n + 1)² grid of vertices from edge to edge, cells split along the
  * north-west to south-east diagonal, with edge lists and no extensions.
  */
-function quantizedMesh(tile: FixtureTile, cells: number): Buffer {
+function quantizedMesh(tile: FixtureTile, cells: number, extensions: QuantizedMeshExtensions = {}): Buffer {
   const side = cells + 1;
   const n = side * side;
   const { columns, triangles, min, max } = meshGrid(tile, cells);
@@ -159,12 +159,48 @@ function quantizedMesh(tile: FixtureTile, cells: number): Buffer {
       o += 2;
     }
   }
-  return out.subarray(0, o);
+  return Buffer.concat([out.subarray(0, o), extensionBytes(extensions, side * side)]);
+}
+
+/** The extensions a quantized-mesh fixture tile carries (what the request's Accept header asked for). */
+export interface QuantizedMeshExtensions {
+  /** Oct-encoded normals, all pointing up (128, 128). */
+  normals?: boolean;
+  /** A one-byte water mask: all land. */
+  waterMask?: boolean;
+  /** The metadata extension's JSON (for example `{ available }` of the levels below the tile, F128). */
+  metadata?: unknown;
+}
+
+/** The extension blocks of a tile: id, 32-bit length and body each, in the order the format lists them. */
+function extensionBytes(extensions: QuantizedMeshExtensions, vertexCount: number): Buffer {
+  const blocks: Buffer[] = [];
+  const block = (id: number, body: Buffer): void => {
+    const header = Buffer.alloc(5);
+    header.writeUInt8(id, 0);
+    header.writeUInt32LE(body.length, 1);
+    blocks.push(header, body);
+  };
+  if (extensions.normals) block(1, Buffer.alloc(vertexCount * 2, 128));
+  if (extensions.waterMask) block(2, Buffer.of(0));
+  if (extensions.metadata !== undefined) {
+    const json = Buffer.from(JSON.stringify(extensions.metadata), 'utf8');
+    const length = Buffer.alloc(4);
+    length.writeUInt32LE(json.length, 0);
+    block(4, Buffer.concat([length, json]));
+  }
+  return Buffer.concat(blocks);
 }
 
 /** A terrain tile in an encoding; heightmaps are `sizePx`² samples (256 or 512), meshes `cells`² cells. */
-export function terrainTile(tile: FixtureTile, encoding: TerrainEncoding, sizePx = 256, cells = 32): Buffer {
-  if (encoding === 'quantized-mesh') return quantizedMesh(tile, cells);
+export function terrainTile(
+  tile: FixtureTile,
+  encoding: TerrainEncoding,
+  sizePx = 256,
+  cells = 32,
+  extensions: QuantizedMeshExtensions = {},
+): Buffer {
+  if (encoding === 'quantized-mesh') return quantizedMesh(tile, cells, extensions);
   const heights = samples(tile, sizePx);
   return encoding === 'float32' ? float32Tile(heights) : heightPng(heights, sizePx, encoding);
 }

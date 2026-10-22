@@ -11,9 +11,13 @@ export function retryAfterMs(header: string | null, nowMs: number): number | und
 
 /**
  * A tile transport over `fetch` with `AbortController`: a request ends with its bytes, an HTTP status, a network
- * error, a timeout (first byte or whole body, F092) or an abort (F090). `fetchImpl` is injectable for tests.
+ * error, a timeout (first byte or whole body, F092) or an abort (F090). `fetchImpl` is injectable for tests;
+ * `headers` are sent with every request (a quantized-mesh `Accept` header naming its extensions, F128).
  */
-export function fetchTransport(fetchImpl: typeof fetch = (input, init) => fetch(input, init)): TileTransport {
+export function fetchTransport(
+  fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+  headers?: Readonly<Record<string, string>>,
+): TileTransport {
   return {
     start(request: TileRequest, timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
       const controller = new AbortController();
@@ -32,7 +36,12 @@ export function fetchTransport(fetchImpl: typeof fetch = (input, init) => fetch(
       };
       const firstByte = setTimeout(expire, timeouts.firstByteMs);
       const total = setTimeout(expire, timeouts.totalMs);
-      fetchImpl(request.url, { signal: controller.signal, mode: 'cors', credentials: 'omit' })
+      fetchImpl(request.url, {
+        signal: controller.signal,
+        mode: 'cors',
+        credentials: 'omit',
+        ...(headers ? { headers } : {}),
+      })
         .then(async (response) => {
           clearTimeout(firstByte);
           if (!response.ok) {

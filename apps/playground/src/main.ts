@@ -1,6 +1,14 @@
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, WGS84, type Globe, type GlobeOptions, type LogEntry, type ViewInit } from '@vibeglobe/core';
-import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
+import {
+  createGlobe,
+  WGS84,
+  type Globe,
+  type GlobeOptions,
+  type LogEntry,
+  type ViewInit,
+  type WorkerEndpointFactory,
+} from '@vibeglobe/core';
+import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
@@ -93,6 +101,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
  */
 function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
   const encoding = params.get('terrain');
+  const workers = (): WorkerEndpointFactory =>
+    assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  if (quantizedMesh) return { terrain: quantizedMesh, workers: workers() };
   if (encoding !== 'terrarium' && encoding !== 'terrain-rgb') return {};
   const session = params.get('session') ?? 'playground';
   const scheme = params.get('terrainTiling') === 'geographic' ? 'geographic' : 'mercator';
@@ -103,9 +114,22 @@ function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
     tiling: scheme,
     maxLevel: params.has('terrainMax') ? Number(params.get('terrainMax')) : 14,
   });
-  const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
-  return { terrain, workers };
+  return { terrain, workers: workers() };
 }
+
+/**
+ * `?terrain=quantized-mesh` reads the fixture server's `layer.json` for the session (geographic by default,
+ * `&terrainTiling=mercator`) before the globe starts (F127, F128).
+ */
+const quantizedMesh =
+  params.get('terrain') === 'quantized-mesh'
+    ? await quantizedMeshTerrain({
+        id: 'fixture-terrain-quantized-mesh',
+        url: `${import.meta.env.BASE_URL}fixture-tiles/${params.get('session') ?? 'playground'}/terrain/${
+          params.get('terrainTiling') === 'mercator' ? 'mercator' : 'geographic'
+        }/layer.json`,
+      })
+    : undefined;
 
 /** The fixture imagery and terrain of the URL, sharing one worker pool. */
 function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {

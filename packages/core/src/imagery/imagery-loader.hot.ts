@@ -19,6 +19,7 @@ import type { TileErrorReason } from '../globe/types.js';
 import type { Observability } from '../diagnostics/observability.js';
 import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import type { TileSource } from './imagery-source.js';
+import type { TileCoord } from '../tiling/tile-key.js';
 import {
   DEAD,
   DECODED,
@@ -74,6 +75,8 @@ export interface ImageryLoaderOptions {
     contentType: string,
     level: number,
   ): { readonly task: string; readonly input: unknown };
+  /** Receives every decoded tile with its coordinates before it queues for upload (terrain metadata, F128). */
+  onDecoded?(coord: TileCoord, tile: DecodedTile): void;
   readonly network: NetworkPool;
   readonly workers: WorkerPool;
   readonly memory: TileMemory;
@@ -342,7 +345,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /**
    * Starts the best queued request: 1 when started, 0 when it must wait (no free slot, or the pinned base is still
-   * loading and the tile is not part of it), -1 when the tile had no data.
+   * loading and the tile is not part of it), -1 when the tile had no data or its availability is not known yet.
    */
   private dispatchOne(): number {
     if (this.destroyed) return 0;
@@ -359,6 +362,13 @@ export class ImageryLoader implements NetworkPoolClient {
         this.heap.pop();
         record.state = NO_DATA;
         this.settlePinned(record);
+        result = -1;
+        break;
+      }
+      if (request === 'unknown') {
+        // Not known yet (availability that comes with an ancestor's metadata, F128): asked again when wanted again.
+        this.heap.pop();
+        record.state = UNLOADED;
         result = -1;
         break;
       }
@@ -510,6 +520,7 @@ export class ImageryLoader implements NetworkPoolClient {
       return;
     }
     const tile = outcome.output as PendingUpload;
+    this.options.onDecoded?.(record.coord, tile);
     tile.slot = record.slot;
     record.state = DECODED;
     // The pinned base uploads first (class 0 keys are the lowest).

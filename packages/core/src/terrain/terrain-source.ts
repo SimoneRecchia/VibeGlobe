@@ -31,6 +31,11 @@ export interface TerrainSource extends TileSource {
    * Selection refines a tile while this error exceeds τ_terrain pixels on screen (ADR 0006 §2, F126).
    */
   geometricErrorMeters(level: number): number;
+  /**
+   * Receives the metadata a decoded tile carries (quantized-mesh's metadata extension), for example the availability
+   * of the levels below it (F128).
+   */
+  tileMetadata?(coord: TileCoord, metadata: unknown): void;
 }
 
 /**

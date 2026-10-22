@@ -25,7 +25,7 @@ interface DecodeTerrainInput {
 }
 
 /** Output of `decode-terrain`: a {@link HeightGrid} whose heights are transferred. */
-type DecodedTerrain = HeightGrid & { readonly errorMeters: number };
+type DecodedTerrain = HeightGrid & { readonly errorMeters: number; readonly metadata?: unknown };
 
 const DECODE_OPTIONS: ImageBitmapOptions = { premultiplyAlpha: 'none', colorSpaceConversion: 'none' };
 
@@ -86,7 +86,12 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
     if (encoding === 'quantized-mesh') {
       let raw: Uint8Array<ArrayBuffer> = new Uint8Array(bytes);
       if (isGzip(raw)) raw = await gunzip(raw);
-      grid = { ...rasterizeQuantizedMesh(decodeQuantizedMesh(raw), meshCells), errorMeters: 0 };
+      const mesh = decodeQuantizedMesh(raw);
+      grid = {
+        ...rasterizeQuantizedMesh(mesh, meshCells),
+        errorMeters: 0,
+        ...(mesh.metadata === undefined ? {} : { metadata: mesh.metadata }),
+      };
     } else {
       const { rgba, sizePx } = await imagePixels(bytes);
       const pixels = decodeHeightmap(rgba, sizePx, encoding);

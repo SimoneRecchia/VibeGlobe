@@ -16,7 +16,7 @@ import {
   mapMercator,
 } from '../imagery/imagery-mapping.hot.js';
 import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
-import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { MERCATOR_ROOT, NORTH_CAP, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { TerrainSource } from './terrain-source.js';
 
 /** The terrain of one engine instance: its source and the loader of its height grids. */
@@ -61,7 +61,7 @@ function terrainLevelOf(surfaceLevel: number, source: TerrainSource): number {
 
 /**
  * Writes the terrain each drawn tile shows (ADR 0006 §3): it wants the terrain tile at its terrain level and every
- * second ancestor, coarse first, and draws the deepest one resident; a tile with none, or outside the source's tiling,
+ * ancestor, coarse first, and draws the deepest one resident; a tile with none, or outside the source's tiling,
  * stays on the ellipsoid. Allocates nothing.
  */
 export function drawTerrain(
@@ -89,12 +89,39 @@ export function drawTerrain(
   }
 }
 
+/**
+ * Maps a polar cap tile onto the edge row of the Mercator terrain (ADR 0006 §7: Mercator-only terrain continues its
+ * 85.0511° heights into the caps): the deepest Mercator tile at or above `level` whose column contains the cap tile's
+ * longitudes, sampled along its north (or south) edge only, so heights meet the Mercator root without a step (F143).
+ */
+function mapCapToMercatorEdge(tile: QuadtreeTile, level: number): boolean {
+  const width = tile.eastRad - tile.westRad;
+  for (let current = level; current >= 0; current--) {
+    const n = 2 ** current;
+    const step = (2 * Math.PI) / n;
+    const x = Math.floor((tile.westRad + width * 1e-9 + Math.PI) / step);
+    if (Math.floor((tile.eastRad - width * 1e-9 + Math.PI) / step) !== x) continue;
+    const north = tile.root === NORTH_CAP;
+    mapping[MAPPING_LEVEL] = current;
+    mapping[MAPPING_X] = x;
+    mapping[MAPPING_Y] = north ? 0 : n - 1;
+    mapping[MAPPING_SCALE_U] = width / step;
+    mapping[MAPPING_SCALE_V] = 0;
+    mapping[MAPPING_OFFSET_U] = (tile.westRad + Math.PI - x * step) / step;
+    mapping[MAPPING_OFFSET_V] = north ? 0 : 1;
+    return true;
+  }
+  return false;
+}
+
 /** Wants a surface tile's terrain and returns the deepest resident handle, its mapping left in `mapping`; else -1. */
 function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number): number {
   const source = layer.source;
   const level = terrainLevelOf(tile.level, source);
   if (source.tiling.crs === 'EPSG:3857') {
-    if (!mapMercator(tile, level, mapping, 0)) return -1;
+    const mapped =
+      tile.root === MERCATOR_ROOT ? mapMercator(tile, level, mapping, 0) : mapCapToMercatorEdge(tile, level);
+    if (!mapped) return -1;
   } else if (!mapGeographic(tile, level, mapping, 0)) {
     return -1;
   }
@@ -103,10 +130,11 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number):
   for (let current = wanted; current >= source.minLevel; current--) {
     const x = mapping[MAPPING_X] ?? 0;
     const y = mapping[MAPPING_Y] ?? 0;
-    const handle =
-      !arriving && (wanted - current) % 2 === 0
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
-        : layer.loader.readyHandle(current, x, y);
+    // Every ancestor is wanted, not every second as imagery's (ADR 0006 §3): terrain tiles are small, and the tile
+    // whose metadata declares the availability of the deeper levels must load (F128).
+    const handle = !arriving
+      ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
+      : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) return handle;
     if (handle === ARRIVING) arriving = true;
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);

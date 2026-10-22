@@ -24,9 +24,11 @@ export interface TileSource {
   readonly timeoutsMs?: TimeoutsMs;
   /**
    * Writes the URL and host of a tile into `out` and returns it, or returns 'noData' for a tile the source has no
-   * data for (outside its levels or coverage), which the engine then never requests (F093, F094).
+   * data for (outside its levels or coverage), which the engine then never requests (F093, F094), or 'unknown' while
+   * the source cannot tell yet (availability declared by an ancestor tile not loaded yet, F128): the engine asks
+   * again when it wants the tile again.
    */
-  request(coord: TileCoord, out: TileRequest): TileRequest | 'noData';
+  request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown';
 }
 
 /**

@@ -263,6 +263,10 @@ export class ImageryRuntime {
           this.heights?.remove(handle);
         },
         decodeTask: terrainDecodeTask(source),
+        onDecoded: (coord, tile) => {
+          const metadata = (tile.image as { metadata?: unknown }).metadata;
+          if (metadata !== undefined) source.tileMetadata?.(coord, metadata);
+        },
       }),
     };
   }

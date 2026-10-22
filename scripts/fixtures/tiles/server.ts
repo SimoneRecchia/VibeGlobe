@@ -8,7 +8,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
-import { terrainTile, type TerrainEncoding } from './terrain.ts';
+import { terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
 import {
   encodeTilePng,
   renderTile,
@@ -46,6 +46,8 @@ export interface FaultRule {
   bandwidthBytesPerS?: number;
   /** Send the body gzip-compressed with `Content-Encoding: gzip`. */
   gzip?: boolean;
+  /** Send the body gzip-compressed without `Content-Encoding`, as `.terrain` files often are (F127). */
+  gzipBody?: boolean;
 }
 
 /** One request as the server saw it. */
@@ -269,10 +271,12 @@ export class FixtureServer {
         return;
       }
       headers['Content-Type'] = rule?.contentType ?? CONTENT_TYPES[extension] ?? 'image/ktx2';
-      let body = await this.body(tile, extension, rule);
+      let body = await this.body(tile, extension, rule, this.meshExtensions(entry, tile, req.headers.accept));
       if (rule?.gzip) {
         body = gzipSync(body);
         headers['Content-Encoding'] = 'gzip';
+      } else if (rule?.gzipBody) {
+        body = gzipSync(body);
       }
       this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
     };
@@ -280,14 +284,36 @@ export class FixtureServer {
     else void respond();
   }
 
-  private async body(tile: FixtureTile, extension: string, rule: FaultRule | undefined): Promise<Buffer> {
-    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}`;
+  /**
+   * The quantized-mesh extensions a request gets: those its Accept header names, as a server does; the metadata only
+   * where the session's layer.json lists some for the tile under `x-fixtureMetadata` (keyed `z/x/y`, TMS rows).
+   */
+  private meshExtensions(entry: Session, tile: FixtureTile, accept: string | undefined): QuantizedMeshExtensions {
+    const names = /extensions=([\w-]+)/.exec(accept ?? '')?.[1]?.split('-') ?? [];
+    const layer = entry.layer as { 'x-fixtureMetadata'?: Record<string, unknown> } | undefined;
+    const tms = 2 ** tile.level - 1 - tile.y;
+    const metadata = layer?.['x-fixtureMetadata']?.[`${tile.level}/${tile.x}/${tms}`];
+    return {
+      ...(names.includes('octvertexnormals') ? { normals: true } : {}),
+      ...(names.includes('watermask') ? { waterMask: true } : {}),
+      ...(names.includes('metadata') && metadata !== undefined ? { metadata } : {}),
+    };
+  }
+
+  private async body(
+    tile: FixtureTile,
+    extension: string,
+    rule: FaultRule | undefined,
+    meshExtensions: QuantizedMeshExtensions = {},
+  ): Promise<Buffer> {
+    const variant = JSON.stringify(meshExtensions);
+    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}${variant}`;
     let body = this.cache.get(key);
     if (!body) {
       const encoding = TERRAIN[extension];
       body =
         tile.pattern === ('terrain' as FixturePattern) && encoding
-          ? terrainTile(tile, encoding)
+          ? terrainTile(tile, encoding, 256, 32, meshExtensions)
           : extension === 'png'
             ? encodeTilePng(tile)
             : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');

@@ -117,7 +117,7 @@ export {
   rasterizeQuantizedMesh,
 } from './terrain/quantized-mesh.js';
 export type { QuantizedMesh } from './terrain/quantized-mesh.js';
-export { readLayerJson, TerrainAvailability } from './terrain/layer-json.js';
+export { readLayerJson, readRanges, TerrainAvailability } from './terrain/layer-json.js';
 export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
 export { sampleHeight } from './terrain/sample-height.js';
 export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';

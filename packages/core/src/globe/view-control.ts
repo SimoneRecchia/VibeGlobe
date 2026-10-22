@@ -63,7 +63,7 @@ export class ViewControl {
     this.host.requestRender();
   }
 
-  /** A view given with a tilt chooses it: manual mode (ADR 0029). */
+  /** A view given with a tilt chooses it: manual mode (ADR 0034). */
   chooseTilt(tiltDeg: number): void {
     const view = this.host.view;
     const manual = view.mode === 'manual';

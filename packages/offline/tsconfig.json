@@ -12,5 +12,13 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/__fixtures__"],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../sources"
+    }
+  ]
 }

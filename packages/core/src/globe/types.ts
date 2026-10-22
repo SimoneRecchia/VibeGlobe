@@ -312,7 +312,7 @@ export interface CameraState {
   readonly phase: ViewPhase;
 }
 
-/** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0029). */
+/** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0034). */
 export interface ViewInit {
   readonly longitudeDeg?: number;
   readonly latitudeDeg?: number;

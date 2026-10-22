@@ -16,7 +16,8 @@
     "vitest.config.ts",
     "playwright.config.ts",
     "apps/*/vite.config.ts",
-    "eslint.config.ts"
+    "eslint.config.ts",
+    "packages/sources/src/__fixtures__"
   ],
   "exclude": ["scripts/fixtures/consumer"]
 }

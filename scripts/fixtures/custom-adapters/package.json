@@ -1,0 +1,11 @@
+{
+  "name": "custom-adapters-fixture",
+  "private": true,
+  "description": "A consumer's own adapter package for F223 and F219: it uses only the public API of @vibeglobe/core and @vibeglobe/sources.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/sources": "0.0.0"
+  }
+}

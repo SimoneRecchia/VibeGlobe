@@ -8,7 +8,7 @@ const MAX_TILT_RAD = (89 * Math.PI) / 180;
 const STEPS = 30;
 
 /**
- * Inputs and outputs of the tilt limits (ADR 0029), in one array so no double crosses a call (ADR 0018): the camera's
+ * Inputs and outputs of the tilt limits (ADR 0034), in one array so no double crosses a call (ADR 0018): the camera's
  * range, its target's height, its vertical field of view, the morph factor, the height of the surface under the eye
  * and the clearance; then the two limits the functions write.
  */

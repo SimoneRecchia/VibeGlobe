@@ -10,6 +10,8 @@ export default defineConfig(
   {
     ignores: [
       '**/dist/**',
+      '**/.output/**',
+      '**/.nuxt/**',
       '**/coverage/**',
       'docs-site/**',
       'test-results/**',

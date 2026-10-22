@@ -13,7 +13,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b && npm run build -w @vibeglobe/playground && npm run build -w @vibeglobe/lazy-host",
+    "build": "tsc -b && npm run build:browser -w @vibeglobe/web-component && npm run build -w @vibeglobe/playground && npm run build -w @vibeglobe/lazy-host && npm run build -w @vibeglobe/adapter-examples && npm run build -w @vibeglobe/nuxt-example",
     "typecheck": "tsc -b",
     "dev": "npm run dev -w @vibeglobe/playground",
     "test": "vitest run",
@@ -41,7 +41,8 @@
     "diagnose:browser": "node scripts/browser/diagnose.ts",
     "bench:micro": "node benchmarks/micro.ts",
     "bench:probes": "node benchmarks/probes.ts",
-    "test:hardware": "node scripts/hardware-run.ts"
+    "test:hardware": "node scripts/hardware-run.ts",
+    "test:live-sources": "node scripts/sources-live.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -55,6 +56,7 @@
     "eslint": "10.13.0",
     "eslint-plugin-jsdoc": "63.3.3",
     "eslint-plugin-playwright": "2.12.1",
+    "fake-indexeddb": "6.2.6",
     "fast-check": "4.10.2",
     "happy-dom": "21.0.3",
     "knip": "6.42.1",

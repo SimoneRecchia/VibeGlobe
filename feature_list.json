@@ -2991,7 +2991,7 @@
         "Run the opt-in live-endpoint job and confirm it targets only endpoints whose terms allow automated testing, and that it records which endpoints were skipped and why",
         "Import the suite from a custom adapter package and assert it runs there unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F224",
@@ -3083,7 +3083,7 @@
         "Assert KVP and RESTful requests are built correctly and tiles land at the correct positions in the playground on both backends",
         "Fuzz capabilities documents and assert malformed input produces a descriptive error and never crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F231",
@@ -3096,7 +3096,7 @@
         "Show a fixture layer with labels crossing tile edges in the playground and assert no label is cut and no seam is visible at tile edges on both backends",
         "Fuzz GetCapabilities and service exception responses and assert they never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F232",
@@ -3109,7 +3109,7 @@
         "Load the same archive from a local file (File or Blob) and assert identical tiles",
         "Fuzz archive headers and directories and assert corrupted archives never crash the engine or blank the view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F233",
@@ -3122,7 +3122,7 @@
         "Load the same package from a local file and from a fixture HTTP server and assert identical tiles in the playground",
         "Fuzz package files and assert corrupted databases produce a descriptive error and never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F234",
@@ -3160,7 +3160,7 @@
         "Assert invalid documents (wrong nesting, NaN coordinates, unclosed rings) are reported per feature without dropping valid features",
         "Fuzz the parser and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F237",
@@ -3173,7 +3173,7 @@
         "Assert a KMZ archive with embedded icons and a ground overlay image parses into the expected engine data structures, with the icons and the overlay image extracted with their placement",
         "Fuzz KML and KMZ input and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F238",
@@ -3185,7 +3185,7 @@
         "Assert waypoints, routes, track segments, elevations and timestamps map to the expected engine data structures",
         "Fuzz GPX input and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F239",
@@ -3198,7 +3198,7 @@
         "Assert decoding happens off the main thread",
         "Fuzz tile payloads and assert malformed tiles are treated as no data and never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F240",
@@ -3418,7 +3418,7 @@
         "Confirm every rule that affects caching, prefetch, offline packaging, display-only use, logo and attribution placement and session tokens is mapped to a profile setting",
         "Confirm the profile's code references the ADR and the conformance suite checks each mapped setting"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F257",
@@ -3431,7 +3431,7 @@
         "Make the fixture expire the session and assert a new session is created transparently with zero black pixels",
         "With the owner's API key, run the opt-in live test for roadmap, satellite and terrain and capture screenshots; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F258",
@@ -3480,7 +3480,7 @@
         "Assert the effective profile settings match the respective rules recorded in the Google terms ADR",
         "Assert a missing billing region produces a configuration error rather than a silent default"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F262",
@@ -3493,7 +3493,7 @@
         "Assert the attribution and logo rules of the Google profile apply wherever the tiles are displayed",
         "With the owner's API key, run the opt-in live test; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F549",
@@ -3507,7 +3507,7 @@
         "Make the fixture server answer with a quota error and confirm the live suite stops at once with a clear message",
         "With the owner's key, run the live suite once and confirm it passes under the EEA terms"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F263",
@@ -3519,7 +3519,7 @@
         "Confirm every rule on bulk download, offline use, concurrency, application identification, caching headers and attribution is mapped to a profile setting",
         "Confirm the profile's code references the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F264",
@@ -3544,7 +3544,7 @@
         "Log open connections per host and assert they never exceed the profile's limit",
         "Assert the view keeps showing parent-tile fallback with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F266",
@@ -3556,7 +3556,7 @@
         "Configure it with an identifier and assert every request carries a valid Referer identifying the application (the referrer policy never strips it)",
         "Assert the identification method matches the one recorded in the OpenStreetMap terms ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F267",
@@ -3567,7 +3567,7 @@
         "Open the sources guide and confirm it states that the public OpenStreetMap servers are unsuitable for production and points to the self-hosted alternative",
         "Use the profile in the playground and assert exactly one console warning is logged per engine instance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F268",
@@ -3607,7 +3607,7 @@
         "Confirm it lists known failure modes from issue trackers (quota errors, browser eviction, captive portals, stale caches) and how the chosen design avoids each",
         "Confirm it states the chosen approach and why and links the ADRs that record it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F271",
@@ -3645,7 +3645,7 @@
         "Assert writes and reads happen off the main thread and frame times stay within budget during heavy cache writes",
         "Repeat in Chromium, Firefox and WebKit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F274",
@@ -3657,7 +3657,7 @@
         "Inject QuotaExceededError on writes and assert the engine logs one warning, keeps rendering with zero black pixels, and keeps working from memory and network",
         "Assert storage use reported by the API matches the stored data within 5%"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F275",
@@ -3669,7 +3669,7 @@
         "Navigate and assert the engine falls back to network or lower-detail tiers with zero black pixels after the base is available",
         "Assert an eviction event reports which packages or caches were lost"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F276",
@@ -3681,7 +3681,7 @@
         "Assert it calls navigator.storage.persist() and reports the browser's answer and the current persisted state",
         "Assert the call is safe where the Storage API is missing and reports 'unsupported'"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F277",
@@ -3694,7 +3694,7 @@
         "Assert fresh tiles are reused without requests, expired tiles are revalidated, and no-store tiles are absent from browser storage",
         "Assert per-source policy overrides in configuration can only shorten what the headers and profile allow"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F278",
@@ -3706,7 +3706,7 @@
         "Navigate again and assert revalidation requests carry If-None-Match",
         "Assert unchanged tiles get 304 and are reused, and changed tiles are downloaded and replace the stored ones without a visible flash"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F279",
@@ -3718,7 +3718,7 @@
         "Install version 2 with some changed tiles and navigate again",
         "Assert every tile shown comes from version 2 and no stale version-1 tile remains in memory or browser storage"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F280",
@@ -3730,7 +3730,7 @@
         "Assert through storage inspection that no tile was written and through request interception that revisited tiles are downloaded again",
         "Switch it off for one source only and assert the other sources still persist"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F281",
@@ -3840,7 +3840,7 @@
         "Assert the package contains only the other source's tiles and the build report states why the first one was excluded",
         "Switch it off globally and assert package builds are refused with a descriptive error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F290",
@@ -3864,7 +3864,7 @@
         "Navigate the package's area and assert no tile is read from the package (per-tier counters) and all come from the network or caches",
         "Block the network and assert the engine reports that it is offline, keeps the pinned base visible and does not read the package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F292",
@@ -3940,7 +3940,7 @@
         "Simulate a single dead endpoint while others work and assert only that endpoint is marked unreachable",
         "Assert health checks back off while offline and never exceed one request per endpoint per configured interval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F298",
@@ -3966,7 +3966,7 @@
         "Record frames and assert refinement cross-fades with no popping and no black pixels",
         "Assert a connectivity event reports the change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F300",
@@ -4026,7 +4026,7 @@
         "Assert the output is a valid PMTiles archive containing exactly the tiles of that area and zoom range",
         "Load the package in the playground in offline-only mode and assert full navigation of the area with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F305",
@@ -4038,7 +4038,7 @@
         "Assert the package contains every tile intersecting the polygon and no tile entirely outside it",
         "Load the package in the playground in offline-only mode and assert navigation within the polygon with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F306",
@@ -4074,7 +4074,7 @@
         "Resume each and assert already completed tiles are not requested again",
         "Assert the final package is identical to an uninterrupted build"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F309",
@@ -4086,7 +4086,7 @@
         "Install and read each and assert corruption is detected with a descriptive error",
         "Assert corrupted tiles are treated as missing, with parent fallback and zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F310",
@@ -4098,7 +4098,7 @@
         "Navigate them in offline-only mode and record frames",
         "Assert available tiles are shown, gaps are covered by the best ancestor or the next source in the chain, and no frame is blank or frozen"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F311",
@@ -4110,7 +4110,7 @@
         "Assert progress events are emitted and the list API returns both with name, version, area, zoom range, sources, licenses and size",
         "Reload the page and assert the list is unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F312",
@@ -4121,7 +4121,7 @@
         "Update an installed fixture package to a new version and assert the list shows the new version and only its tiles are used",
         "Remove a package and assert it disappears from the list, its storage is freed, and the view falls back to other tiers without black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F313",
@@ -4132,7 +4132,7 @@
         "Install packages and fill the cache in the playground",
         "Call the storage-use API and assert per-package, cache and total sizes match the stored data within 5% and the quota is reported when the browser provides it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F314",
@@ -4183,7 +4183,7 @@
         "Run the guide's code examples as tests and assert they pass",
         "Follow the LAN server setup in the guide on a clean machine and confirm the playground runs offline from it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F318",
@@ -4196,7 +4196,7 @@
         "Inspect browser storage through Playwright and assert no tile of that source was written",
         "Assert tiles of the other sources in the same view were written"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F319",
@@ -4208,7 +4208,7 @@
         "Assert the build stops before any download with an error naming the source and the rule",
         "Assert the same package without that source builds normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F320",
@@ -4305,7 +4305,7 @@
         "Run the cache-store and network-policy contract tests against the built-in implementations and the custom ones and assert all pass",
         "Attach the custom store and policy in the playground and assert tiles are stored and requests decided through them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F328",
@@ -4331,7 +4331,7 @@
         "From another machine or container on the same network with no internet route, open the playground and confirm offline navigation with zero black pixels",
         "Confirm the offline mode 1 end-to-end tests start the same server image"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F329",
@@ -4449,7 +4449,7 @@
         "Load the package through the PMTiles or MBTiles adapter and verify a sample of tiles is byte-identical to the static folder",
         "Verify the package passes the offline package integrity check"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F337",
@@ -4515,7 +4515,7 @@
         "Verify road, place and building layers exist, with building height and level attributes preserved where present",
         "Verify the output attribution credits OpenStreetMap contributors under the ODbL"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F342",
@@ -4647,7 +4647,7 @@
         "Verify it lists known failure modes with issue references (for example missed picks on terrain, precision at street level, picking cost per frame, picking during motion)",
         "Verify it states the chosen approach, why it matches or beats the studied engines, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F349",
@@ -4660,7 +4660,7 @@
         "Verify it lists known failure modes with issue references (for example blurry text, flicker during motion, collision jitter, missing glyphs, cost of re-placement)",
         "Verify it states the chosen approach, why, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F350",
@@ -4674,7 +4674,7 @@
         "Verify it summarizes how those projects test and benchmark data layers",
         "Verify it states the chosen approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F351",
@@ -6236,7 +6236,7 @@
         "Type-check the example with vue-tsc and assert a wrongly typed prop is rejected",
         "Interact with the globe and assert camera, click and load events reach the component's listeners with typed payloads"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F474",
@@ -6287,7 +6287,7 @@
         "Server-render the globe component with Vue's server renderer and assert the HTML contains the placeholder and no engine is created",
         "Hydrate on the client and assert the engine starts after mount"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F478",
@@ -6300,7 +6300,7 @@
         "Assert none of them grows beyond the documented tolerance",
         "Assert no console errors or warnings occur during the cycles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F479",
@@ -6312,7 +6312,7 @@
         "Navigate each and assert the other's camera and tiles do not change",
         "Unmount one and assert the other keeps rendering correctly"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F480",
@@ -6324,7 +6324,7 @@
         "Run the dependency-rule check in CI and assert it passes",
         "Run vue-tsc in strict mode on the example and assert no errors"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F481",
@@ -6337,7 +6337,7 @@
         "Navigate with mouse and touch emulation and assert the globe responds",
         "Assert no console errors"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F482",
@@ -6350,7 +6350,7 @@
         "Add DOM event listeners and assert camera, click and load events arrive with typed detail payloads",
         "Assert the element exposes the engine instance for the full API"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F483",
@@ -6362,7 +6362,7 @@
         "Register the element under a custom tag name and assert it renders",
         "Use the element in a minimal React app and a minimal Vue app and assert it renders and emits events in both"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F484",
@@ -6375,7 +6375,7 @@
         "Assert no growth beyond the documented tolerance and no console errors",
         "Move the element to another parent and assert it keeps working"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F485",
@@ -6400,7 +6400,7 @@
         "Assert status 200, the server HTML contains the globe placeholder, and the server log has no errors or warnings",
         "Assert the job runs in CI"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F487",
@@ -6413,7 +6413,7 @@
         "Navigate between pages with and without the globe 20 times and assert no errors and no resource growth",
         "Assert the job runs in CI"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F488",

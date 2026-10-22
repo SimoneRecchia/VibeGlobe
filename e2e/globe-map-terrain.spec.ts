@@ -3,7 +3,7 @@ import type { PNG } from 'pngjs';
 import { BACKGROUND_RGB, canvasImage, nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
 
 /**
- * M5 with relief and the wrapping flat map (ADR 0008, ADR 0029) on both backends: the vertical scale of the plane at
+ * M5 with relief and the wrapping flat map (ADR 0008, ADR 0034) on both backends: the vertical scale of the plane at
  * every latitude (F157), the antimeridian on the flat map (F159) and the terrain tilt clamp (F165). A 320 × 240 canvas
  * (CLAUDE.md, Working efficiently).
  */

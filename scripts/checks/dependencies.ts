@@ -6,6 +6,8 @@ const CONSUMER_PACKAGE = /cube|vireox/i;
 const ALLOWED_FRAMEWORKS: Record<string, string[]> = {
   'packages/vue': ['vue', '@vue/*'],
   'apps/nuxt-example': ['vue', '@vue/*', 'nuxt', '@nuxt/*'],
+  // The adapters' example pages: a Vue 3 app, and React and Vue hosts of the Web Component (F473, F483).
+  'apps/adapter-examples': ['vue', '@vue/*', 'react', 'react-dom'],
 };
 const RENDERING_LIBRARY = 'three';
 const RENDERER_DIR = 'packages/renderer';

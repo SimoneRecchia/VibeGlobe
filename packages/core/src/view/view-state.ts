@@ -5,7 +5,7 @@ import { CURVE_MORPH, CURVE_RELIEF, evaluateViewCurves, smootherstepInto, type V
 import { MorphFrame } from './morph.js';
 import { skyTiltLimitRad, terrainTiltLimitRad } from './tilt-limits.js';
 
-/** Applied tilt over which relief reaches full height whatever the zoom (ADR 0029), radians: 0° to 30°. */
+/** Applied tilt over which relief reaches full height whatever the zoom (ADR 0034), radians: 0° to 30°. */
 const RELIEF_TILT_RAD = (30 * Math.PI) / 180;
 /** The equator's length over 512 px: ground meters per pixel at ground zoom 0 (`groundZoomForRange`). */
 const METERS_PER_PIXEL_AT_ZERO = (2 * Math.PI * WGS84.semiMajorAxisMeters) / 512;
@@ -56,7 +56,7 @@ const LOW_TILT = 8;
 const HIGH_TILT = 9;
 
 /**
- * The zoom-driven state of one frame (ADR 0008, ADR 0029): the ground zoom at the screen center, the Auto curves'
+ * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
  * values there, the view mode with the user's chosen tilt, and the morph frame anchored at the camera target. Relief
  * follows its zoom curve, or the applied tilt when that asks for more (a view tilted by hand shows its relief at every
  * zoom). Allocates nothing per frame.
@@ -125,7 +125,7 @@ export class ViewState {
     this.easeTiltFromApplied();
   }
 
-  /** A tilt chosen by the user or a view (radians): manual mode, applied at once (ADR 0029). */
+  /** A tilt chosen by the user or a view (radians): manual mode, applied at once (ADR 0034). */
   chooseTilt(tiltRad: number): void {
     this.mode = 'manual';
     this.chosen[0] = tiltRad;

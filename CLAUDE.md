@@ -38,7 +38,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
-- Parallel tracks (`docs/parallel-tracks.md`): other sessions own `packages/tools` (M9 and the offline package builder CLI), `packages/ui` and the GIS utilities package (M12), the M7 source adapters in `packages/sources`, `packages/vue`, `packages/web-component` and the Nuxt example (M14), `packages/offline` (the engine side of M8), and the M10 layer model, styling, clustering, labels, picking IDs and update APIs in `packages/layers` (M10 here builds only the renderer side); this session edits none of them and reviews their pull requests instead. At the end of each feature group, check the file's "Hook requests" table and add small hooks promptly.
+- Parallel tracks (`docs/parallel-tracks.md`): every track is merged into `main` and its session closed (2026-10-22); this is the only session and edits every package. Each track's waiting list is the to-do of its milestone (M7, M8, M9, M10, M12, M14): review the track's code in that milestone's review, wire the engine features it waits for, replace its stubs, and answer every open row of the "Hook requests" table.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
 
 ## Working efficiently

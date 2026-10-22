@@ -3,7 +3,7 @@ import { canvasImage, geoToScreen, nextFrame, openGlobe, screenToGeo, waitForIdl
 import type { ScenarioReport } from './support/globe.ts';
 
 /**
- * M5: the globe-to-flat morph, the zoom curves and the view modes (ADR 0008, ADR 0029) on both backends. Frame-stepped
+ * M5: the globe-to-flat morph, the zoom curves and the view modes (ADR 0008, ADR 0034) on both backends. Frame-stepped
  * scenarios run on a manual clock and a 320 × 240 canvas (CLAUDE.md, Working efficiently).
  */
 const BACKENDS = ['webgpu', 'webgl2'] as const;

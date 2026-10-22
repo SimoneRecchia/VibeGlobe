@@ -1,4 +1,4 @@
-# 0029. The globe-to-flat morph in the engine, relief with tilt, and view modes
+# 0034. The globe-to-flat morph in the engine, relief with tilt, and view modes
 
 - Status: Accepted (decided by agent; owner may revisit)
 - Date: 2026-10-22

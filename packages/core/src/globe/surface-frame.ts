@@ -199,7 +199,7 @@ export class SurfaceFrame {
     timer.end(PHASE_UPDATE);
     if (tracer.enabled) this.traceCamera(camera);
     this.clock.timeInto(this.nowMs);
-    // The applied tilt, then the zoom curves and the morph of this frame (ADR 0008, ADR 0029): selection, draws and
+    // The applied tilt, then the zoom curves and the morph of this frame (ADR 0008, ADR 0034): selection, draws and
     // the renderer all use them.
     this.view.applyTilt(camera, this.imagery?.heights ? this.clearanceMeters : 0, this);
     this.view.update(camera);

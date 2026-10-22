@@ -367,7 +367,7 @@ class GlobeEngine implements Globe {
       if (error instanceof GlobeError) this.emitter.emit('error', error);
       throw error;
     }
-    // A view given with a tilt chooses it (manual mode, ADR 0029).
+    // A view given with a tilt chooses it (manual mode, ADR 0034).
     if (target.tiltDeg !== undefined) this.viewControl.chooseTilt(view.tiltDeg);
     if (pending) {
       // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.

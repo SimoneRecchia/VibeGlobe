@@ -29,3 +29,11 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Multipolygon buildings:** OSM relations (multipolygon buildings and building parts) are not read yet; only closed ways become buildings.
 - **Smaller Terrarium tiles:** tiles keep the 1/256 m step even though the DEM's accuracy is metres; quantizing to 1/16 m before encoding would shrink them considerably without visible relief change.
 - **Bordered terrain tiles (258 px):** decide after M4's crack sweep (ADR 0024, survey open question 1).
+
+## Data layers track (`packages/layers`)
+
+- **Cluster diffs in the worker, applied in slices:** a zoom change that adds about 70,000 cluster items takes about 0.7 s on the calling thread in Node (ADR 0029). Move the per-zoom diff into the worker-pool task and apply it over several frames before F375 and F389 are measured.
+- **Time-sliced label placement:** a 10,000-label pass takes 20–30 ms warm in Node; split passes across frames under the per-frame budget when F359 is measured in the browser.
+- **Composite style expressions on the GPU:** zoom-and-feature expressions are re-evaluated per feature on every zoom change; MapLibre evaluates both bracketing stops and interpolates in the shader. Worth it if F370's frame times show the cost on large layers.
+- **Incremental cluster updates for live feeds:** supercluster cannot update in place; a clustered live layer rebuilds its index (throttled) through `setData`.
+- **Cluster bounds across the antimeridian:** `boundsOf` returns west–east in degrees without wrapping, so a cluster straddling ±180° reports bounds spanning the world.

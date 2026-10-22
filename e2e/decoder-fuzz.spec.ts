@@ -21,14 +21,16 @@ interface WorkerHeap {
 /** Reads the heap of the page's only worker through the DevTools protocol, after a garbage collection. */
 async function workerHeap(browser: Browser): Promise<number> {
   const cdp = await browser.newBrowserCDPSession();
+  let sessionId: string | undefined;
   try {
     const { targetInfos } = await cdp.send('Target.getTargets');
     const workers = targetInfos.filter((target) => target.type === 'worker');
     expect(workers).toHaveLength(1);
-    const { sessionId } = await cdp.send('Target.attachToTarget', {
+    ({ sessionId } = await cdp.send('Target.attachToTarget', {
       targetId: workers[0]?.targetId ?? '',
       flatten: false,
-    });
+    }));
+    const attached = sessionId;
     const replies = new Map<number, (result: unknown) => void>();
     cdp.on('Target.receivedMessageFromTarget', (event) => {
       const message = JSON.parse(event.message) as { id: number; result: unknown };
@@ -38,12 +40,15 @@ async function workerHeap(browser: Browser): Promise<number> {
     const send = (method: string): Promise<unknown> =>
       new Promise((resolve) => {
         replies.set(++id, resolve);
-        void cdp.send('Target.sendMessageToTarget', { sessionId, message: JSON.stringify({ id, method }) });
+        void cdp.send('Target.sendMessageToTarget', { sessionId: attached, message: JSON.stringify({ id, method }) });
       });
     await send('HeapProfiler.collectGarbage');
     const heap = (await send('Runtime.getHeapUsage')) as WorkerHeap;
     return heap.usedSize + heap.embedderHeapUsedSize + heap.backingStorageSize;
   } finally {
+    // The attachment to the worker belongs to the browser, not to this session: left open, it outlives the test and
+    // later contexts of the same browser fail to start ("Failed to find browser context").
+    if (sessionId) await cdp.send('Target.detachFromTarget', { sessionId }).catch(() => undefined);
     await cdp.detach();
   }
 }

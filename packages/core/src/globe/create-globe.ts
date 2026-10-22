@@ -376,6 +376,7 @@ class GlobeEngine implements Globe {
   readonly tour: Globe['tour'] = (waypoints, options) => this.movements.tour(waypoints, options);
   readonly orbit: Globe['orbit'] = (options) => this.movements.orbit(options);
   readonly rotateTo: Globe['rotateTo'] = (heading, options) => this.movements.rotateTo(heading, options);
+  readonly tiltTo: Globe['tiltTo'] = (tilt, options) => this.movements.start('ease', { tiltDeg: tilt }, options);
   readonly setConstraints: Globe['setConstraints'] = (constraints) => {
     this.constraints.set(validateConstraints(constraints));
     this.surfaceFrame.view.setMaxTilt(this.constraints.maxTiltRad);

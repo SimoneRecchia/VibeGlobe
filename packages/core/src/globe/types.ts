@@ -658,6 +658,11 @@ export interface Globe {
   tour(waypoints: readonly TourWaypoint[], options?: { readonly signal?: AbortSignalLike }): CameraMovement;
   /** Turns the view to `headingDeg` along the shorter arc, keeping center and tilt (F191: 0 north, 90 east…). */
   rotateTo(headingDeg: number, options?: MovementOptions): CameraMovement;
+  /**
+   * The tilt control (F188): eases the view to `tiltDeg`, keeping center, zoom and heading. The tilt becomes the chosen
+   * one (manual mode, also from 2D or Auto, as tilting by hand does: ADR 0034) and never exceeds the maximum tilt.
+   */
+  tiltTo(tiltDeg: number, options?: MovementOptions): CameraMovement;
   /** Replaces the camera constraints (F209–F211); invalid ones throw a GlobeError and change nothing. */
   setConstraints(constraints: CameraConstraints): void;
   /** Flies out to the whole globe centered on the current location (F193). */

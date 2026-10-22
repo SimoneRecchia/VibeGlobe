@@ -349,4 +349,29 @@ describe('camera constraints (F209–F211)', () => {
     expect(longitudes.some((lon) => lon > 20 && lon < 130)).toBe(true);
     globe.destroy();
   });
+
+  it('tilts with the tilt control to a chosen tilt, from 2D too, never past the maximum tilt (F188)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 15 });
+    globe.setViewMode('2d');
+    ticks(120);
+    const tilts: number[] = [];
+    globe.on('move', () => tilts.push(globe.camera.tiltDeg));
+    const movement = globe.tiltTo(40, { durationMs: 500 });
+    ticks(60);
+    expect(await movement).toBe('completed');
+    expect(globe.camera.tiltDeg).toBeCloseTo(40, 6);
+    expect(globe.camera.chosenTiltDeg).toBeCloseTo(40, 6);
+    expect(globe.viewMode).toBe('manual');
+    // Animated: rising through the frames, never in one step.
+    expect(tilts.length).toBeGreaterThan(10);
+    for (let i = 1; i < tilts.length; i++) expect((tilts[i] ?? 0) - (tilts[i - 1] ?? 0)).toBeLessThan(10);
+    globe.setConstraints({ maxTiltDeg: 30 });
+    const capped = globe.tiltTo(60, { durationMs: 300 });
+    ticks(40);
+    expect(await capped).toBe('completed');
+    expect(globe.camera.tiltDeg).toBeLessThanOrEqual(30 + 1e-9);
+    expect(globe.camera.chosenTiltDeg).toBeLessThanOrEqual(30 + 1e-9);
+    await expect(globe.tiltTo(Number.NaN)).rejects.toMatchObject({ code: 'invalid-coordinate' });
+    globe.destroy();
+  });
 });

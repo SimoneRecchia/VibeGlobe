@@ -11,6 +11,7 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
+import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
@@ -441,6 +442,7 @@ if (params.get('experiment') === 'gpu-probes') {
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
   showViewModeControls(globe, app, params.get('viewMode'));
+  showCameraControls(globe, app);
   runScenario(globe, scenario);
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {

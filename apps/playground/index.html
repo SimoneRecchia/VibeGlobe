@@ -43,7 +43,29 @@
         display: flex;
         gap: 2px;
       }
-      /* A ui layer brings its own controls to that corner (M12): the playground's toggle steps aside. */
+      /* The camera commands (M6): tilt, orientation, reset to the globe and home. */
+      #camera-controls {
+        position: absolute;
+        top: 40px;
+        right: 8px;
+        display: flex;
+        gap: 2px;
+        align-items: center;
+      }
+      #camera-controls button {
+        font: inherit;
+        font-size: 12px;
+        padding: 3px 6px;
+        border: 1px solid #5a6680;
+        background: #1b2236;
+        color: #e8ecf5;
+        cursor: pointer;
+      }
+      #camera-controls input {
+        width: 80px;
+      }
+      /* A ui layer brings its own controls to that corner (M12): the playground's toggles step aside. */
+      #app:has(.vg-ui) #camera-controls,
       #app:has(.vg-ui) #view-modes {
         display: none;
       }

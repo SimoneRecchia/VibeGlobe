@@ -1,6 +1,6 @@
 name: CI
 
-# Saves minutes (ADR 0015): every push, and pull requests from forks, run one job with every fast check (pull requests
+# Saves minutes (ADR 0015): every push and every pull request run one job with every fast check (pull requests
 # run only the unit tests their changes reach; builds and browsers are cached); pushes to main, the nightly schedule
 # and manual runs add the browser jobs: the end-to-end suite in eight shards, the isolated
 # measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
@@ -22,9 +22,9 @@ permissions:
 
 jobs:
   fast:
+    # Every pull request runs this job, whatever its source: its check run, "Fast checks", is the status check the
+    # branch ruleset requires, so its name stays fixed (no matrix, no expressions).
     name: Fast checks
-    # A pull request from this repository is already checked by the push of its head commit.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

@@ -15,7 +15,7 @@ export interface ManifestInput {
 }
 
 /**
- * Writes the manifest of a package from its files: sizes, SHA-256 of each file and of each chunk (ADR 0029). Runs in
+ * Writes the manifest of a package from its files: sizes, SHA-256 of each file and of each chunk (ADR 0033). Runs in
  * browsers and in Node; the files are hashed in memory, one file at a time.
  */
 export async function createManifest(input: ManifestInput): Promise<PackageManifest> {

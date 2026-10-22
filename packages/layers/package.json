@@ -15,5 +15,15 @@
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.4",
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/sources": "0.0.0",
+    "rbush": "4.0.1",
+    "supercluster": "9.1.0"
+  },
+  "devDependencies": {
+    "@types/rbush": "4.0.0"
+  }
 }

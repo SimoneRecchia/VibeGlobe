@@ -32,7 +32,7 @@ export interface PackageFileEntry {
   readonly chunkSha256?: readonly string[];
 }
 
-/** The manifest of an offline package: what it holds, under which licenses, with checksums (ADR 0029). */
+/** The manifest of an offline package: what it holds, under which licenses, with checksums (ADR 0033). */
 export interface PackageManifest {
   readonly id: string;
   readonly version: string;

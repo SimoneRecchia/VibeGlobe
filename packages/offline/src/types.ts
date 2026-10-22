@@ -1,5 +1,5 @@
 /**
- * Public types of the offline engine (docs/plan/api.md, "Loading policy and caches" and "Offline packages"; ADR 0029).
+ * Public types of the offline engine (docs/plan/api.md, "Loading policy and caches" and "Offline packages"; ADR 0033).
  */
 
 /** Where tiles may come from: online only, offline only (never the network), or both (the default). */

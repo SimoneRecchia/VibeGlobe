@@ -123,7 +123,7 @@ function writeFlag(value: string): void {
 
 const zeroCounters = (): TierCounters => ({ persistent: 0, revalidated: 0, package: 0, network: 0, offlineMisses: 0 });
 
-/** Creates an offline engine (ADR 0029). Its sources plug into the engine through the frozen source contract. */
+/** Creates an offline engine (ADR 0033). Its sources plug into the engine through the frozen source contract. */
 export function createOffline(options: OfflineOptions = {}): Offline {
   return new OfflineEngine(options);
 }

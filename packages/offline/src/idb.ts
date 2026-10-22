@@ -1,4 +1,4 @@
-/** Promise wrappers over IndexedDB and the database layout of the offline engine (ADR 0029). */
+/** Promise wrappers over IndexedDB and the database layout of the offline engine (ADR 0033). */
 
 /** Name of the database every engine instance on the origin shares. */
 export const DEFAULT_DATABASE = 'vibeglobe-offline';

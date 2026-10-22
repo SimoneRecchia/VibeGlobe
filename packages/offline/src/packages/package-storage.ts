@@ -37,7 +37,7 @@ export function versionKey(manifest: Pick<PackageManifest, 'id' | 'version'>): s
   return `${manifest.id}@${manifest.version}/`;
 }
 
-/** Package records, file chunks and built-package tiles in IndexedDB (ADR 0029). */
+/** Package records, file chunks and built-package tiles in IndexedDB (ADR 0033). */
 export class PackageStorage {
   private db: Promise<IDBDatabase> | undefined;
 

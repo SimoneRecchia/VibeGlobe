@@ -1,4 +1,4 @@
-# 0029. Offline storage, packages and network modes
+# 0033. Offline storage, packages and network modes
 
 - Status: Accepted
 - Date: 2026-10-22

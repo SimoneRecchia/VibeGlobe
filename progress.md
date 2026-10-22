@@ -17,11 +17,19 @@ Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlo
 - Passing: F330–F335, F338, F340, F343–F346, F552, F553, F307. F553's check: the playground's production build ran from a plain static server (`http-server` with CORS and ranges, Docker Hub being rate-limited for nginx), with the worker and base image under `/static/vibeglobe/` and the sample tiles; every request answered 200 and the zoom-5 frame had no empty pixel. Following the guide also showed that the unbundled worker cannot be served as is; the guide now says to serve the bundled one. Waiting on main-track engine capabilities (adapters, attribution, source chains, offline mode): F336, F337, F339, F341, F304, F305, F551, F554.
 - Notes: Docker Hub rate-limits this container's pulls intermittently, and GHCR blobs are blocked, so the configurations pin `docker.io/osgeo/gdal:ubuntu-small-3.6.3` by digest. Raster tiling runs at about 0.1 s per 256-px tile on one core, and the OSM reader holds the needed nodes in memory: both are noted in `docs/follow-ups.md` for full builds.
 
+## Data layers track (seventh session, `packages/layers`)
+
+Branch `claude/festive-cori-5030me`; status, stubs, hook requests and waiting entries in `docs/parallel-tracks.md` ("Data layers track: status").
+
+- **2026-10-22:** M10 surveys (picking, labels, data layers; F348–F350 passing) and ADR 0029. `packages/layers`: `LayerRenderTarget` (the draw interface) with `RecordingRenderTarget`, structure-of-arrays `FeatureStore` with dirty-run uploads, MapLibre-expression styles (`@maplibre/maplibre-gl-style-spec`), `LayerStack` with pick slots, `DataLayer`, `LabelLayer` (rbush collision, 300 ms passes and fades), `ClusterLayer` (supercluster, animated splits and merges), `InteractionController`, `GeoJsonLayer` on a stub of the M7 format adapters. 31 unit tests in Node. Every other M10 entry waits on the renderer, terrain (M4), the phases (M5) or flights (M6), listed with what each needs.
+- **2026-10-22 (later):** merged `main` with the M7 source adapters (SimoneRecchia/VibeGlobe#11) and the M14 framework adapters (SimoneRecchia/VibeGlobe#13). The GeoJSON stub is replaced by `geojsonFormat`, `kmlFormat` and `gpxFormat` on the M7 parsers; their issues become error events. No entry newly passes: F371 still needs parsing in the worker pool and drawing.
+- Notes: the style engine's fallback path (a property the style reads is missing) is about 20 times slower than a normal evaluation; cluster diffs and label passes still run on the calling thread (`docs/follow-ups.md`).
+
 ## Offline engine track (sixth session, `packages/offline`)
 
 Branch `claude/gifted-mayer-p0kexd`; status, stubs and waiting entries in `docs/parallel-tracks.md`.
 
-- **2026-10-22:** `@vibeglobe/offline` (ADR 0029): tiers in a transport wrapper (persistent cache, packages, network),
+- **2026-10-22:** `@vibeglobe/offline` (ADR 0033): tiers in a transport wrapper (persistent cache, packages, network),
   IndexedDB cache in a dedicated worker with LRU eviction and quota handling, HTTP cache policy and ETag revalidation,
   eviction detection, persistence requests, health-check connectivity with captive-portal detection and backoff,
   network modes and switches with provider rules, the package manager (URL, local files and in-browser builds;
@@ -35,7 +43,7 @@ Branch `claude/gifted-mayer-p0kexd`; status, stubs and waiting entries in `docs/
   F247/F248.
 - Notes for the next session of this track: the fixture tile server sends `no-store`, so specs rewrite cache headers
   with `tileHeaders()`; Docker's daemon is not running in a fresh container (`dockerd &`); `Globe.ready` stays pending
-  in a start with the network down and no data for the pinned levels (ADR 0029, hook request 3).
+  in a start with the network down and no data for the pinned levels (ADR 0033, hook request 3).
 
 ## Source adapters track (fourth session, `packages/sources`)
 

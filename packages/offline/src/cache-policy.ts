@@ -26,7 +26,7 @@ export interface Freshness {
   readonly freshUntilMs: number;
 }
 
-/** Reuse time of responses without any freshness header (ADR 0029). */
+/** Reuse time of responses without any freshness header (ADR 0033). */
 export const DEFAULT_HEURISTIC_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function directives(cacheControl: string | null): Map<string, string> {

@@ -6,7 +6,7 @@ title: Offline packages
 
 `@vibeglobe/offline` keeps tiles in browser storage, reads offline packages, and decides per tile whether the network
 may be used. This guide covers network modes, loading switches, both offline setups, building packages, the package
-management API, storage quotas and persistence. The design is recorded in ADR 0029.
+management API, storage quotas and persistence. The design is recorded in ADR 0033.
 
 Every `ts` example below runs as an end-to-end test (`e2e/offline-guide.spec.ts`), against the hosts named in it.
 

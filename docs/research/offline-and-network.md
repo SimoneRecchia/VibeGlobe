@@ -1,6 +1,6 @@
 # Offline, persistent storage and network adaptation
 
-Survey written in M8, before the `offline` package is built on top of the RAM and GPU tiers from M3 ([`scheduling-and-caching.md`](scheduling-and-caching.md)). Decision: [ADR 0029](../adr/0029-offline-storage-and-network-modes.md).
+Survey written in M8, before the `offline` package is built on top of the RAM and GPU tiers from M3 ([`scheduling-and-caching.md`](scheduling-and-caching.md)). Decision: [ADR 0033](../adr/0033-offline-storage-and-network-modes.md).
 
 ## Scope and the requirements it serves
 
@@ -91,7 +91,7 @@ Nobody tests browser eviction, quota exhaustion in a real browser, or captive po
 
 ## Chosen approach for VibeGlobe
 
-Full specification and defaults in [ADR 0029](../adr/0029-offline-storage-and-network-modes.md). In short:
+Full specification and defaults in [ADR 0033](../adr/0033-offline-storage-and-network-modes.md). In short:
 
 1. **Tiers in order:** GPU → RAM (built in M3) → persistent cache → offline packages → network. Each tier is filled on the way back, as MapLibre Native's file-source chain does. Online-only mode skips packages; offline-only mode skips the network.
 2. **Persistent cache in IndexedDB, owned by a dedicated worker,** so transactions and structured cloning stay off the main thread (the lesson of cesium#2459). Each record holds source id, tile coordinate, bytes (ArrayBuffer), content type, stored and expiry times, ETag and Last-Modified, and last access. An `accessed` index and a stored byte total give LRU eviction down to the configured limit (MapLibre Native's ambient cache, without the start-up scan of #1815).

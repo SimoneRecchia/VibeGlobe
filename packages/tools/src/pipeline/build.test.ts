@@ -94,7 +94,8 @@ function outputChecksums(out: string): Record<string, string> {
   return sums;
 }
 
-describe('runBuild', () => {
+// Each test runs whole builds (tile rendering, encoding, packages); CI's coverage run shares the machine with heavy suites.
+describe('runBuild', { timeout: 30_000 }, () => {
   it.each([
     [
       'Sentinel-2 cloudless 2018',

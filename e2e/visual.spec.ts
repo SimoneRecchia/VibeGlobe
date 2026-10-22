@@ -50,12 +50,20 @@ const VIEWS: readonly {
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
 
+/** One log line per view stage with the seconds since the view started, so a slow or stuck stage shows in CI logs. */
+function stageLog(view: string): (stage: string) => void {
+  const start = Date.now();
+  return (stage) => console.log(`[visual] ${view}: ${stage} after ${((Date.now() - start) / 1000).toFixed(1)} s`);
+}
+
 for (const backend of BACKENDS) {
   for (const view of VIEWS) {
     test(`canonical view ${view.name} matches its baseline on ${backend} (F072, F074)`, async ({ page }, testInfo) => {
       // Tiled imagery streams about 120 tiles before the capture, beyond 30 s on CI's software WebGPU.
       if (view.imagery) test.setTimeout(view.slow ? 180_000 : 90_000);
+      const stages = stageLog(`${backend} ${view.name}`);
       await openGlobe(page, `backend=${backend}&${view.query}`);
+      stages('opened');
       if (view.drawCalls !== undefined) {
         await page.waitForFunction(
           (min) => (window.vibeglobePlayground?.globe.rendererStats().drawCalls ?? 0) >= min,
@@ -64,8 +72,12 @@ for (const backend of BACKENDS) {
       }
       // Tiled imagery streams in after the first idle frame: capture only once every tile shows its own level.
       if (view.imagery) await waitForImagery(page, view.slow ? 150_000 : 60_000);
+      stages('imagery');
       await waitForIdle(page);
-      await expectMatchesBaseline(page, testInfo, viewName(backend, view.name), await captureCanvas(page));
+      stages('idle');
+      const capture = await captureCanvas(page);
+      stages('captured');
+      await expectMatchesBaseline(page, testInfo, viewName(backend, view.name), capture);
     });
   }
 }

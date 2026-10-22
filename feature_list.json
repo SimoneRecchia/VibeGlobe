@@ -5165,7 +5165,7 @@
         "Verify it lists known failure modes with issue references (for example banding, precision artifacts near the horizon, discontinuities at altitude changes, cost on tablets)",
         "Verify it states the chosen approach, why, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F391",

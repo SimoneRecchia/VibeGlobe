@@ -45,6 +45,32 @@ The `'unknown'` answer arrives on `main` with the M4 merge, from branch `claude/
 contract is on `main` already. Terrain sources (`TerrainSource`, `packages/core/src/terrain/terrain-source.ts`, with
 their `tileMetadata` hook) belong to M4 and are not part of the fourth session's work.
 
+## Atmosphere hook (atmosphere track, 2026-10-22)
+
+The atmosphere track (M11, F390–F396; ADR 0034) built the sky, haze, fog and sun lighting as `Atmosphere` in
+`packages/renderer/src/atmosphere/` (`atmosphere.ts`, `atmosphere-model.ts`, `sun-position.ts`; `harness.ts` is test code for the harness page, never exported). It edits no other file; the main session wires it in:
+
+1. **Export.** `packages/renderer/src/index.ts`: export what applications set (`AtmosphereOptions`, `ATMOSPHERE_QUALITY`,
+   `subsolarPoint`), and the globe options that reach `Atmosphere.setOptions` (sun lighting on/off, the date and time,
+   haze, the quality preset; F396, F399).
+2. **Scene.** `ThreeBackend`: create `new Atmosphere(depthPath)` with the renderer (again after a device-loss recovery,
+   with the new depth path), `scene.add(atmosphere.sky)`, and `atmosphere.dispose()` in `destroy`. The sky is a
+   full-screen triangle at depth 0 with the greater-equal test: it fills only pixels no surface wrote, so its place in
+   the scene order does not matter. Warm its pipeline with the surface's (`warmUpPipelines`).
+3. **Surface material.** In `createSurfaceMaterial`, after `material.colorNode` is set:
+   `atmosphere.applyToSurface(material, eyeRelativePosition(positionGeometry))` (haze and sun lighting, F394, F396). The
+   uniforms live in the `Atmosphere`, so the material must be rebuilt with the atmosphere it belongs to.
+4. **Every frame.** Before `renderer.render`: `atmosphere.update(view)` on the globe; during the morph (M5),
+   `atmosphere.update(view, morphFrame(flatness, eyeHeightM, upWorld, frame))` with the morph's flatness (0 globe,
+   1 flat), the eye's height above the morphed surface and that surface's up direction under the eye in world axes
+   (F393). `update` allocates nothing.
+5. **Fog-aware detail (F395).** In core's screen-space error test, multiply a tile's error by
+   `ecefVisibility(eyeEcef, nearestPointEcef, haze)` (`atmosphere.ts`; it allocates nothing). It and
+   `surfaceVisibility` are pure TypeScript with no renderer dependency: move them into core, or pass the function to
+   core as a hook. F395's scenario then compares tile requests with the haze on and off.
+6. **Tests.** The checks of `e2e/atmosphere.spec.ts` run on the harness page `e2e/support/atmosphere.html`; once the
+   engine draws the atmosphere, point them at the playground (its views and `?backend=`) and record the baselines.
+
 ## Hook requests
 
 Hooks a track needs in a package it does not own. The requesting session adds a row; the main session answers in the
@@ -61,6 +87,7 @@ last column (landed on `main`, or why not) and announces any change to the sourc
 | 2026-10-22 | Source adapters     | `packages/core`: read `attribution` and `profile` from sources that carry them (`DescribedImagerySource`), for the credits list and profile enforcement (F254, F255, F258, F259, F264)                                                                                                                                                                                                                                                                                                                |        |
 | 2026-10-22 | Source adapters     | `packages/core` transport contract: carry the response's `Cache-Control` and `Expires` in an `ok` result, so the RAM tier can reuse Google tiles only while their headers allow it (F260)                                                                                                                                                                                                                                                                                                             |        |
 | 2026-10-22 | Source adapters     | `packages/core` imagery decoder description: an optional crop rectangle, so WMS gutters are cropped in the decode task instead of re-encoded in the adapter's transport (F231 works meanwhile)                                                                                                                                                                                                                                                                                                        |        |
+| 2026-10-22 | Atmosphere (M11)    | `renderer` and `core`: wire `Atmosphere` into the backend, the surface material, the frame loop, the morph and the screen-space error test, as "Atmosphere hook" above describes (F391–F396)                                                                                                                                                                                                                                                                                                          |        |
 | 2026-10-22 | Data layers (M10)   | `renderer`: implement `LayerRenderTarget` (`packages/layers/src/render-target.ts`): batches per primitive kind with the listed attributes (float64 positions made camera-relative per ADR 0004), text and icon channels, line and polygon geometry, per-batch uniforms, draw order, visibility and `growBatch`; partial uploads of the ranges `writeRange` names. Needed for every drawing entry (F351–F360, F362, F366–F370, F372–F378, F384, F385, F388)                                            |        |
 | 2026-10-22 | Data layers (M10)   | `renderer`: an id-buffer pass that draws each batch's `pickId` attribute (RGBA8, depth-tested, cleared to 0) and an asynchronous read of a small region around a screen point, exposed as `pick(point): Promise<number>` for `InteractionController` (`packages/layers/src/interaction.ts`); the id format is in `packages/layers/src/picking.ts` (F379–F382, F384)                                                                                                                                   |        |
 | 2026-10-22 | Data layers (M10)   | `renderer`: SDF glyph rendering of the `text` channel with a glyph atlas built in workers, a `TextMeasurer` with the real glyph metrics for collision boxes, an icon atlas for the `icon` channel with an `addImage(name, image)` API (F352, F357–F360)                                                                                                                                                                                                                                               |        |
@@ -290,3 +317,19 @@ Passing: F473, F477–F484, F486, F487.
 | F488  | Every engine feature group of PLAN.md (Map experience through Security): the Nuxt example gains a page per group as each lands.                                                                                             |
 | F555  | Network modes and offline packages (F271, F292, M8) and attribution (F254) for the guide's sections, and publishing to npm (owner question 17 in `docs/open-questions.md`) for "installation from the public npm registry". |
 | F490  | The entries above; M14's acceptance belongs to the main session.                                                                                                                                                            |
+
+## Atmosphere track: status
+
+2026-10-22, branch `claude/blissful-carson-kpbqia`. Survey `docs/research/atmosphere.md`, ADR 0034, code in
+`packages/renderer/src/atmosphere/`, unit tests next to it, browser checks in `e2e/atmosphere.spec.ts` on the harness
+page `e2e/support/atmosphere.html` (WebGPU and forced WebGL2, all passing).
+
+| Entry | Status  | Verified on this branch                                                                                                                                                                   | Remaining step and blocker                                                                                                      |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| F390  | passing | Survey with the projects, papers, failure modes with issue links, chosen approach and tests                                                                                               | —                                                                                                                               |
+| F391  | failing | Sky from orbit and tilted views at three altitudes, no dark pixels inside the atmosphere, same image on both backends (harness)                                                           | The engine draws no sky until the main session wires the hook (steps 2–4 above); then the playground's baselines                |
+| F392  | failing | Flight from orbit to the ground with temporal glitch detection; dithering halves the longest flat run (harness, both backends)                                                            | Same wiring; the flight then runs in the playground                                                                             |
+| F393  | failing | Tilt 0–85° and morph 0–1 without a frame jump (harness, both backends; the morph blends the atmosphere's curvature)                                                                       | The engine's morph (M5, main session) and the wiring (step 4)                                                                   |
+| F394  | failing | Maximum tilt: haze brings a 35% tile step below 3 levels toward the horizon, keeps it near the camera, blends into the sky color (harness)                                                | Terrain at the maximum tilt needs M4's terrain and the wiring (step 3)                                                          |
+| F395  | failing | `surfaceVisibility` falls from above 0.9 near the camera to below 0.1 at 150 km (unit and harness)                                                                                        | Core's screen-space error must use it (step 5, main session); then the tilted-flight request comparison and its ADR measurement |
+| F396  | failing | Ephemeris within 0.02° of Astronomy Engine at equinoxes, solstices and other dates; terminator on screen within 3° on both backends; off by default; time change without reload (harness) | Terrain shading direction needs M4's terrain normals; the wiring (steps 1–3)                                                    |

@@ -61,6 +61,11 @@ Branch `claude/m14-framework-adapters-y3ky8k`; status, stubs and blockers in `do
 - Passing: F473, F477–F484, F486, F487. Waiting for engine features: F474–F476, F485, F488, F490, F555. Leak checks: 100 cycles of each adapter on both backends leave GPU objects, DOM nodes and listeners flat and the heap within 2 KB.
 - About 2.5 hours of agent time. Remaining in M14 for this track: 7 entries, all waiting on M5–M8, M10 and M12 engine features.
 
+## Atmosphere track (eighth session, `packages/renderer/src/atmosphere/`)
+
+- 2026-10-22, branch `claude/blissful-carson-kpbqia`: M11 entries F390–F396. F390 passes (survey `docs/research/atmosphere.md`, ADR 0034). Sky, limb glow, haze and sun lighting are built as `Atmosphere` (single scattering ray-marched per pixel with analytic light paths, one model for sky and haze, dithering, morph blending, fog-aware `ecefVisibility`, Meeus sun position within 0.02°), unit-tested and verified on both backends on the harness page (`e2e/atmosphere.spec.ts`, 13 checks).
+- F391–F396 stay failing until the main session wires the atmosphere into the engine (`docs/parallel-tracks.md`, "Atmosphere hook"); F393 also needs the M5 morph, F394 and F396's terrain shading M4's terrain. Hardening steps: `docs/hardening-backlog.md`.
+
 ## Session log (newest first)
 
 ### UI and GIS utilities track (third session) — 2026-10-21 (M12)

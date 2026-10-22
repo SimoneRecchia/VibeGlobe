@@ -41,3 +41,4 @@ Conventions:
 | [0031](0031-google-maps-platform-terms.md)        | Google Maps Platform terms and the Google profile                                                           | Accepted                                                          |
 | [0032](0032-openstreetmap-tile-usage-policy.md)   | OpenStreetMap tile usage policy and the OpenStreetMap public-servers profile                                | Accepted                                                          |
 | [0033](0033-offline-storage-and-network-modes.md) | Offline storage, packages and network modes                                                                 | Accepted                                                          |
+| [0034](0034-atmosphere.md)                        | Atmosphere: one single-scattering model for sky and haze, analytic light paths, fog-aware detail            | Accepted                                                          |

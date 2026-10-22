@@ -3405,7 +3405,7 @@
         "Confirm every rule that affects caching, prefetch, offline packaging, display-only use, logo and attribution placement and session tokens is mapped to a profile setting",
         "Confirm the profile's code references the ADR and the conformance suite checks each mapped setting"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F257",
@@ -3418,7 +3418,7 @@
         "Make the fixture expire the session and assert a new session is created transparently with zero black pixels",
         "With the owner's API key, run the opt-in live test for roadmap, satellite and terrain and capture screenshots; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F258",
@@ -3467,7 +3467,7 @@
         "Assert the effective profile settings match the respective rules recorded in the Google terms ADR",
         "Assert a missing billing region produces a configuration error rather than a silent default"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F262",
@@ -3480,7 +3480,7 @@
         "Assert the attribution and logo rules of the Google profile apply wherever the tiles are displayed",
         "With the owner's API key, run the opt-in live test; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F549",
@@ -3494,7 +3494,7 @@
         "Make the fixture server answer with a quota error and confirm the live suite stops at once with a clear message",
         "With the owner's key, run the live suite once and confirm it passes under the EEA terms"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F263",
@@ -3506,7 +3506,7 @@
         "Confirm every rule on bulk download, offline use, concurrency, application identification, caching headers and attribution is mapped to a profile setting",
         "Confirm the profile's code references the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F264",
@@ -3531,7 +3531,7 @@
         "Log open connections per host and assert they never exceed the profile's limit",
         "Assert the view keeps showing parent-tile fallback with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F266",
@@ -3543,7 +3543,7 @@
         "Configure it with an identifier and assert every request carries a valid Referer identifying the application (the referrer policy never strips it)",
         "Assert the identification method matches the one recorded in the OpenStreetMap terms ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F267",
@@ -3554,7 +3554,7 @@
         "Open the sources guide and confirm it states that the public OpenStreetMap servers are unsuitable for production and points to the self-hosted alternative",
         "Use the profile in the playground and assert exactly one console warning is logged per engine instance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F268",

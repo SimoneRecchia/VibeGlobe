@@ -116,7 +116,7 @@ async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void>
 }
 
 /** The mounted globe's current frame, composited over the page background. */
-async function sourceFrame(page: Page): Promise<PNG> {
+export async function sourceFrame(page: Page): Promise<PNG> {
   const frame = await page.evaluate(async () => {
     const capture = await window.vibeglobeSources?.globe?.captureFrame();
     if (!capture) throw new Error('no source globe');

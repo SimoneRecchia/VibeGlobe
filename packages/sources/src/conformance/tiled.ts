@@ -235,7 +235,9 @@ async function profileChecks(subject: TiledConformanceSubject): Promise<CheckRes
   };
   const source = (await subject.create(recording)) as DescribedImagerySource;
   for (const tile of subject.tiles) await fetchTile(source, tile.coord);
-  const profile = source.profile;
+  const profile = source.profile as DescribedImagerySource['profile'] | undefined;
+  // A source without a profile already failed the metadata check.
+  if (!profile) return [];
   const out: CheckResult[] = [];
   if (profile.maxConcurrentRequests !== undefined) {
     const perHost = source.maxRequestsPerHost;
@@ -248,7 +250,7 @@ async function profileChecks(subject: TiledConformanceSubject): Promise<CheckRes
       check(
         'provider profile',
         'shows the attribution the profile requires',
-        source.attribution.some((a) => a.text.includes(required)),
+        (source.attribution ?? []).some((a) => a.text.includes(required)),
       ),
     );
   }

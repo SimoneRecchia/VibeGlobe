@@ -47,7 +47,7 @@ const DIAGONAL = 1e30;
  * beside {@link placeEyeRelative}'s: the high part in elements 1, 2 and 4, the low part in elements 6, 8 and 9 (the
  * rotation part, which the engine's vertex node does not use as a rotation), with {@link DIAGONAL} on its diagonal.
  */
-export function placePlaneEyeRelative(mesh: Object3D, planeCenter: Float64Array, eye: Float64Array): void {
+function placePlaneEyeRelative(mesh: Object3D, planeCenter: Float64Array, eye: Float64Array): void {
   splitEyeOffset(planeCenter, eye, high, low);
   const elements = mesh.matrixWorld.elements;
   elements[0] = DIAGONAL;

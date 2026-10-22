@@ -211,6 +211,7 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'backend-fallback',
   'tile-error',
   'error',
+  'view-mode-change',
 ]);
 
 /** Throws a typed error unless `event` is a globe event and `handler` a function (KB-038). */

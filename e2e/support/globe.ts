@@ -22,6 +22,10 @@ export interface ScenarioReport {
   terrainDrops: number;
   firstTerrainDropFrame: number;
   minReliefAboveHorizonPx: number;
+  maxChangedShare: number;
+  maxChangedFrame: number;
+  /** Per frame: zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase. */
+  samples: [number, number, number, number, string, string][];
 }
 
 declare global {

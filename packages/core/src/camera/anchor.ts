@@ -55,11 +55,17 @@ const start = new Float64Array(2);
  * appears at the pixel `pixel[0..1]`, holding range, heading and tilt (ADR 0009 anchor solver): Gauss–Newton on the
  * target longitude and latitude with a finite-difference Jacobian. When it cannot converge (the heading-held system is
  * singular near the poles) it falls back to rotating the whole camera rigidly about the Earth's center, which changes
- * the heading. Returns false only if neither reaches the pixel. Inputs come in arrays: the solver runs every frame of
+ * the heading; a `guess` is tried first, a second start for Gauss–Newton. Returns false only if none reaches the pixel. Inputs come in arrays: the solver runs every frame of
  * a drag and V8 boxes doubles passed as arguments (ADR 0018). With a `morph`, the anchor is placed on the morphed
  * surface for each trial target (ADR 0008), and the morph is left anchored at the solved target.
  */
-export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64Array, morph?: MorphFrame): boolean {
+export function solveAnchor(
+  camera: Camera,
+  anchor: Float64Array,
+  pixel: Float64Array,
+  morph?: MorphFrame,
+  guess?: Float64Array,
+): boolean {
   geodeticArrayToEcef(anchor, anchorEcef);
   anchorGeodetic[0] = anchor[0] ?? 0;
   anchorGeodetic[1] = anchor[1] ?? 0;
@@ -70,7 +76,18 @@ export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
-  return gaussNewton(camera) || rotateToPixel(camera);
+  return gaussNewton(camera) || (guess !== undefined && retryFrom(camera, guess)) || rotateToPixel(camera);
+}
+
+/**
+ * Gauss–Newton again from a second start (`guess[0..1]`: target longitude and latitude, radians), such as a zoom's
+ * target scaled toward the point: a large step can leave the anchor behind the eye from the first (KB-094). Kept out
+ * of {@link solveAnchor} as a cold path (KB-033).
+ */
+function retryFrom(camera: Camera, guess: Float64Array): boolean {
+  camera.pose.targetLongitudeRad = guess[0] ?? 0;
+  camera.pose.targetLatitudeRad = guess[1] ?? 0;
+  return gaussNewton(camera);
 }
 
 /**

@@ -18,7 +18,7 @@ import {
 import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
-import { createDebugEntry, placeDebugEntries, type DebugEntry } from './debug-meshes.js';
+import { createDebugEntry, disposeDebugEntries, placeDebugEntries, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
@@ -92,6 +92,7 @@ export class ThreeBackend implements RendererBackend {
   private readonly tiles = new IntegerKeyMap<TileEntry>(1024);
   private debugEntries: DebugEntry[] = [];
   private textureUploads = 0;
+  private meshUploads = 0;
   private matrixUpdates = 0;
   private pipelineCompiles = 0;
   private pipelineSwitches: PipelineSwitches | undefined;
@@ -252,16 +253,13 @@ export class ThreeBackend implements RendererBackend {
     const mesh = createTileMesh(data, this.material);
     countMatrixUpdates(mesh, () => this.matrixUpdates++);
     this.scene.add(mesh);
+    this.meshUploads++;
     return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
-    for (const entry of this.debugEntries) {
-      this.scene.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      (entry.mesh.material as MeshBasicNodeMaterial).dispose();
-    }
+    disposeDebugEntries(this.scene, this.debugEntries);
     this.debugEntries = meshes.map((data) => createDebugEntry(data, this.depthPath));
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
   }
@@ -272,6 +270,7 @@ export class ThreeBackend implements RendererBackend {
       drawCalls: this.lastDrawCalls,
       triangles: this.lastTriangles,
       textureUploads: this.textureUploads,
+      meshUploads: this.meshUploads,
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
       pipelineSwitches: this.pipelineSwitches?.count ?? 0,

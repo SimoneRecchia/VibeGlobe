@@ -67,6 +67,21 @@ describe('globe-to-flat morph (ADR 0008)', () => {
     }
   });
 
+  it('interpolates the vertical scale continuously from the ellipsoid to the plane during the morph (F157)', () => {
+    // A 1,000 m column at 70° seen from an anchor at 45°: 1,000 m on the globe, σ·k(70°) × 1,000 m on the plane.
+    const k = (latDeg: number): number =>
+      Math.sqrt(1 - 0.00669437999014 * Math.sin(latDeg * DEG) ** 2) / Math.cos(latDeg * DEG);
+    const planeScale = k(70) / k(45);
+    let previous = 1;
+    for (let step = 0; step <= 100; step++) {
+      const frame = frameAt(10, 45, step / 100);
+      const scale = distance(morphed(frame, 10, 70, 1000), morphed(frame, 10, 70)) / 1000;
+      expect(Math.abs(scale - previous)).toBeLessThan(0.02 * (planeScale - 1));
+      previous = scale;
+    }
+    expect(previous).toBeCloseTo(planeScale, 6);
+  });
+
   it('places points across the antimeridian at the world copy next to the anchor', () => {
     const flat = frameAt(179, 0, 1);
     const across = morphed(flat, -179, 0);

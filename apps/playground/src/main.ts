@@ -6,10 +6,12 @@ import {
   type Globe,
   type GlobeOptions,
   type LogEntry,
+  type ViewCurvesInit,
   type ViewInit,
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
+import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
@@ -94,6 +96,19 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     lat: '44.5',
     zoom: '17',
     tilt: '45',
+  },
+  // M5: the fixture cones at 100° E seen from the south, tilted, at ground zoom 14.2 (F157); the URL sets the latitude.
+  'terrain-cones': { terrain: 'terrarium', imagery: 'smooth', lon: '100', lat: '0', zoom: '14.2', tilt: '83' },
+  // The flat map in 2D just west of the antimeridian, for drags across it (F159).
+  'map-2d-antimeridian': { imagery: 'smooth', lon: '179.2', lat: '20', zoom: '6.6', viewMode: '2d' },
+  // A chosen 70° tilt looking north 4.5 km south of the fixture ridge (F165).
+  'tilt-clamp-terrain': {
+    terrain: 'terrarium',
+    imagery: 'smooth',
+    lon: '8.5',
+    lat: '46.4595',
+    zoom: '12.5',
+    tilt: '70',
   },
 };
 for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
@@ -270,6 +285,8 @@ function startGlobe(
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
     // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
     ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
+    // `?curves=` sets the Auto mode's zoom curves as JSON (F150).
+    ...(params.has('curves') ? { viewCurves: JSON.parse(params.get('curves') ?? '{}') as ViewCurvesInit } : {}),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });
@@ -419,6 +436,7 @@ if (params.get('experiment') === 'gpu-probes') {
   );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
+  showViewModeControls(globe, app, params.get('viewMode'));
   runScenario(globe, scenario);
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {

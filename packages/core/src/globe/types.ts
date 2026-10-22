@@ -96,6 +96,8 @@ export interface RendererStats {
   readonly triangles: number;
   /** Texture uploads since the renderer started. */
   readonly textureUploads: number;
+  /** Surface tile meshes uploaded since the renderer started: a tile's geometry is uploaded once (F152). */
+  readonly meshUploads: number;
   /** Automatic object matrix updates since the renderer started (tiles must cause none). */
   readonly matrixUpdates: number;
   /**

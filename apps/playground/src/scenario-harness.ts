@@ -12,6 +12,8 @@ interface FrameScenario {
   view(frame: number): ViewInit | undefined;
   /** Measure, in every frame, how far the terrain rises above the ellipsoid's horizon (F142). */
   readonly relief?: boolean;
+  /** Record the camera state of every frame: zoom, morph and relief factors, applied tilt (M5). */
+  readonly samples?: boolean;
 }
 
 /** The globe element's size in CSS pixels, which `screenToGeo` and `geoToScreen` use. */
@@ -44,6 +46,14 @@ export interface ScenarioReport {
    * (F142); -1 when the scenario does not measure it.
    */
   minReliefAboveHorizonPx: number;
+  /**
+   * During motion, the largest share of pixels that changed by more than {@link JUMP_DELTA} in one frame, and that
+   * frame: a jump of the view shows as a spike (M5, F152). 0 and -1 when nothing moved.
+   */
+  maxChangedShare: number;
+  maxChangedFrame: number;
+  /** With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode and phase. */
+  samples: [number, number, number, number, string, string][];
 }
 
 /** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
@@ -59,10 +69,11 @@ function segments(views: readonly ViewInit[], motion: number, hold: number): Fra
       if (!from || !to || into >= motion) return frame === 0 ? views[0] : undefined;
       const t = (into + 1) / motion;
       const mixed: Record<string, number> = {};
+      // Only the fields both views give: a view without a tilt leaves the view mode's tilt (M5).
       for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
-        const a = (from as Record<string, number | undefined>)[key] ?? 0;
-        const b = (to as Record<string, number | undefined>)[key] ?? 0;
-        mixed[key] = a + (b - a) * t;
+        const a = (from as Record<string, number | undefined>)[key];
+        const b = (to as Record<string, number | undefined>)[key];
+        if (a !== undefined && b !== undefined) mixed[key] = a + (b - a) * t;
       }
       return mixed as ViewInit;
     },
@@ -193,6 +204,41 @@ const SCENARIOS: Record<string, FrameScenario> = {
     ),
     relief: true,
   },
+  // M5. A continuous zoom from the globe to an oblique street view in Auto: every phase, 0.1 zoom per frame (F548,
+  // F161, F167).
+  'zoom-globe-to-street': {
+    ...segments(
+      [
+        { ...ROME, zoom: 1 },
+        { ...ROME, zoom: 18 },
+      ],
+      170,
+      2,
+    ),
+    samples: true,
+  },
+  // The morph from the globe to the flat map and back, through the flattening band (F152).
+  'morph-sweep': {
+    ...segments(
+      [3, 8, 3].map((zoom) => ({ ...ROME, zoom })),
+      50,
+      2,
+    ),
+    samples: true,
+  },
+  // Through the morph near both poles, flat and tilted (F160).
+  'morph-poles': segments(
+    [80, -80].flatMap((latitudeDeg) =>
+      [
+        [3, 0],
+        [8, 0],
+        [8, 40],
+        [3, 40],
+      ].map(([zoom = 0, tiltDeg = 0]) => ({ longitudeDeg: 30, latitudeDeg, zoom, tiltDeg, headingDeg: 0 })),
+    ),
+    12,
+    2,
+  ),
   // Fiji, across ±180° (F143).
   'terrain-antimeridian': segments(orbit({ longitudeDeg: 180, latitudeDeg: -17.5 }, [7, 10], 50, [0, 180]), 6, 4),
   // Svalbard, the Antarctic coast and both polar cap boundaries at ±85.05° (F143).
@@ -305,7 +351,27 @@ export function emptyReport(frames = 1): ScenarioReport {
     terrainDrops: 0,
     firstTerrainDropFrame: -1,
     minReliefAboveHorizonPx: -1,
+    maxChangedShare: 0,
+    maxChangedFrame: -1,
+    samples: [],
   };
+}
+
+/** A per-channel change that counts toward {@link ScenarioReport.maxChangedShare}. */
+const JUMP_DELTA = 64;
+
+/** The share of pixels whose color changed by more than {@link JUMP_DELTA} in some channel between two frames. */
+function changedShare(previous: Pick<FrameCapture, 'rgba'>, capture: Pick<FrameCapture, 'rgba'>): number {
+  let changed = 0;
+  for (let i = 0; i < capture.rgba.length; i += 4) {
+    for (let c = 0; c < 4; c++) {
+      if (Math.abs((capture.rgba[i + c] ?? 0) - (previous.rgba[i + c] ?? 0)) > JUMP_DELTA) {
+        changed++;
+        break;
+      }
+    }
+  }
+  return changed / (capture.rgba.length / 4);
 }
 
 /** The terrain level each drawn tile shows, by tile. */
@@ -321,6 +387,31 @@ function countDrops(previous: Map<string, number>, current: Map<string, number>)
   let drops = 0;
   for (const [key, level] of current) if (level < (previous.get(key) ?? -1)) drops++;
   return drops;
+}
+
+/**
+ * The motion measures of a frame (M5): with the frame before it while the camera moved, the share of pixels that
+ * jumped; with `samples`, the camera state.
+ */
+function measureMotion(
+  globe: Globe,
+  scenario: FrameScenario,
+  report: ScenarioReport,
+  frame: number,
+  moving: FrameCapture | false | undefined,
+  capture: FrameCapture,
+): void {
+  if (moving) {
+    const share = changedShare(moving, capture);
+    if (share > report.maxChangedShare) {
+      report.maxChangedShare = share;
+      report.maxChangedFrame = frame;
+    }
+  }
+  if (!scenario.samples) return;
+  const camera = globe.camera;
+  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase } = camera;
+  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase]);
 }
 
 /**
@@ -380,6 +471,7 @@ export async function recordScenario(
         report.pops += pops;
         if (pops > 0 && report.firstPopFrame < 0) report.firstPopFrame = frame;
       }
+      measureMotion(globe, scenario, report, frame, next && previous, capture);
       if (terrain) {
         const levels = terrainLevels(globe);
         if (!next && frame > stillSince) {

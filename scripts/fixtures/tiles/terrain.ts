@@ -20,10 +20,34 @@ const RIDGE = {
 };
 
 /**
+ * Identical cones at 100° E and latitudes 0°, 45° and 70° (F157): 500 m high, 1 km in base radius in ground meters,
+ * each on flat ground at 0 m out to 15 km, so their proportions on the flat map can be compared across latitudes.
+ */
+const CONES = { lonRad: 100 * DEG, latitudesRad: [0, 45 * DEG, 70 * DEG], heightMeters: 500, radiusMeters: 1000 };
+const CONE_FLAT_METERS = 15_000;
+const A = 6378137;
+const E2 = 0.00669437999014;
+
+/** The cone height at a position near one of {@link CONES}, or undefined away from them. */
+function coneHeightMeters(lonRad: number, latRad: number): number | undefined {
+  for (const coneLat of CONES.latitudesRad) {
+    const w = Math.sqrt(1 - E2 * Math.sin(coneLat) ** 2);
+    // Ground meters east (prime vertical radius) and north (meridian radius) of the cone's center.
+    const east = (A / w) * Math.cos(coneLat) * (lonRad - CONES.lonRad);
+    const north = ((A * (1 - E2)) / w ** 3) * (latRad - coneLat);
+    const d = Math.hypot(east, north);
+    if (d < CONE_FLAT_METERS) return d < CONES.radiusMeters ? CONES.heightMeters * (1 - d / CONES.radiusMeters) : 0;
+  }
+  return undefined;
+}
+
+/**
  * The fixture height in meters at a position: rolling hills everywhere (±300 m), a 4,000 m peak and a sharp ridge
- * in the Alps, and −200 m depressions so negative heights are covered too.
+ * in the Alps, the cones at 100° E, and −200 m depressions so negative heights are covered too.
  */
 export function fixtureHeightMeters(lonRad: number, latRad: number): number {
+  const cone = coneHeightMeters(lonRad, latRad);
+  if (cone !== undefined) return cone;
   let h = 300 * Math.sin(3 * lonRad) * Math.cos(5 * latRad) - 50;
   const d = Math.hypot((lonRad - PEAK.lonRad) * Math.cos(latRad), latRad - PEAK.latRad);
   h += PEAK.heightMeters * Math.exp(-((d / PEAK.radiusRad) ** 2));

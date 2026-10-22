@@ -77,6 +77,8 @@ export class SurfaceFrame {
   private lastCamera = '';
   /** A synchronous elevation query's position in radians, in an array so passing it boxes nothing (ADR 0018). */
   private readonly queryRad = new Float64Array(2);
+  /** The finest resident terrain under the eye at the drawn scale, from {@link probeGround}. */
+  private readonly probed = new Float64Array(1);
   /** The finest resident terrain under the eye, each frame. */
   private readonly eyeGround: ElevationSample = { heightMeters: 0, level: -1, noData: true };
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
@@ -138,6 +140,34 @@ export class SurfaceFrame {
   }
 
   /**
+   * Sets `camera.groundHeightMeters` to the surface this frame draws under the eye, as drawn (times the relief factor,
+   * and σ·k(φ) on the flat map, ADR 0008), and returns the finest resident terrain there at the same scale: where
+   * nothing resident is drawn under the eye it stands in for the shown surface (KB-081). Writes it to `probed[0]`: a
+   * double returned from a call is boxed (ADR 0018). The tilt limit probes at each candidate tilt (KB-096). Allocates
+   * nothing; without terrain, sets 0.
+   */
+  probeGround(camera: Camera): void {
+    const heights = this.imagery?.heights;
+    if (!heights) {
+      camera.groundHeightMeters = 0;
+      this.probed[0] = 0;
+      return;
+    }
+    const eye = camera.eyeGeodetic;
+    const drawn = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
+    this.queryRad[0] = eye.longitudeRad;
+    this.queryRad[1] = eye.latitudeRad;
+    const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;
+    this.queryRad[0] = eye.latitudeRad;
+    mercatorScaleInto(this.queryRad);
+    const factors = this.view.morph.factors;
+    const m = factors[0] ?? 0;
+    const scale = (factors[1] ?? 1) * (1 - m + m * (factors[2] ?? 1) * (this.queryRad[1] ?? 1));
+    camera.groundHeightMeters = (drawn === drawn ? drawn : finest) * scale;
+    this.probed[0] = finest * scale;
+  }
+
+  /**
    * Keeps the eye at least the clearance above the surface as this frame shows it (F146, F147): the camera's target is
    * raised along its normal by what the eye lacks, and lowered back to the ellipsoid when nothing is in the way.
    * Returns true when the pose changed (the camera is updated). Allocates nothing.
@@ -150,21 +180,10 @@ export class SurfaceFrame {
     const pose = camera.pose;
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
-    const drawn = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
-    // Where nothing resident is drawn under the eye, the finest resident terrain stands in for the shown surface
-    // (KB-081); `liftMeters` keeps the clearance above both (F146, F147, ADR 0028).
-    this.queryRad[0] = eye.longitudeRad;
-    this.queryRad[1] = eye.latitudeRad;
-    const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;
-    // Heights as the frame draws them: times the relief factor, and σ·k(φ) on the flat map (ADR 0008).
-    this.queryRad[0] = eye.latitudeRad;
-    mercatorScaleInto(this.queryRad);
-    const factors = this.view.morph.factors;
-    const m = factors[0] ?? 0;
-    const scale = (factors[1] ?? 1) * (1 - m + m * (factors[2] ?? 1) * (this.queryRad[1] ?? 1));
-    const surface = (drawn === drawn ? drawn : finest) * scale;
-    camera.groundHeightMeters = surface;
-    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest * scale, this.clearanceMeters);
+    this.probeGround(camera);
+    const finest = this.probed[0] ?? 0;
+    const surface = camera.groundHeightMeters;
+    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
     imagery.chargeTerrainMs(imagery.now() - start);
     // Under a millimeter the lift has settled: rounding alone would keep moving the eye, and drawing, forever.
     const change = next - lift;
@@ -182,7 +201,7 @@ export class SurfaceFrame {
     this.clock.timeInto(this.nowMs);
     // The applied tilt, then the zoom curves and the morph of this frame (ADR 0008, ADR 0029): selection, draws and
     // the renderer all use them.
-    this.view.applyTilt(camera, this.imagery?.heights ? this.clearanceMeters : 0);
+    this.view.applyTilt(camera, this.imagery?.heights ? this.clearanceMeters : 0, this);
     this.view.update(camera);
     if (this.imagery) {
       this.selection.terrainMinMeters = this.imagery.terrainMinMeters;

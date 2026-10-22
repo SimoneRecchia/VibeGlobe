@@ -32,6 +32,29 @@
         margin: 0;
         font-size: 13px;
         font-variant-numeric: tabular-nums;
+        /* Readouts only: wheel and drag input at the corners reaches the globe (F155). */
+        pointer-events: none;
+      }
+      /* The 2D / 3D / Auto toggle (F163). */
+      #view-modes {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 2px;
+      }
+      #view-modes button {
+        font: inherit;
+        font-size: 13px;
+        padding: 4px 10px;
+        border: 1px solid #5a6680;
+        background: #1b2236;
+        color: #e8ecf5;
+        cursor: pointer;
+      }
+      #view-modes button[aria-pressed='true'] {
+        background: #3d6ef0;
+        border-color: #3d6ef0;
       }
       #status {
         position: absolute;
@@ -39,6 +62,7 @@
         left: 8px;
         margin: 0;
         font-size: 13px;
+        pointer-events: none;
       }
       /* Debug tile view (F116) and performance HUD (F119). */
       .tile-view {

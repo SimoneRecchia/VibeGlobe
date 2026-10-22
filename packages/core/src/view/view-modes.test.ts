@@ -9,7 +9,9 @@ import { ViewState } from './view-state.js';
 const DEG = Math.PI / 180;
 
 /** A started globe and a function that draws `count` frames. */
-async function started(view: ViewInit): Promise<{ globe: Globe; frames: (count: number) => void }> {
+async function started(
+  view: ViewInit,
+): Promise<{ globe: Globe; frames: (count: number) => void; ticks: (count: number) => void }> {
   const { renderer, factory } = fakeRenderer();
   const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', view });
   await Promise.resolve();
@@ -23,7 +25,14 @@ async function started(view: ViewInit): Promise<{ globe: Globe; frames: (count: 
       renderer.flush();
     }
   };
-  return { globe, frames };
+  // Display ticks that draw only the frames the engine itself requested.
+  const ticks = (count: number): void => {
+    for (let i = 0; i < count; i++) {
+      renderer.timers.advance(16);
+      renderer.flush();
+    }
+  };
+  return { globe, frames, ticks };
 }
 
 describe('view modes (F161–F164)', () => {
@@ -61,6 +70,11 @@ describe('view modes (F161–F164)', () => {
     globe.setViewMode('auto');
     frames(40);
     expect(globe.camera.tiltDeg).toBe(0);
+    // KB-093: the mode event can be subscribed to.
+    const modes: string[] = [];
+    globe.on('view-mode-change', ({ mode }) => modes.push(mode));
+    globe.setViewMode('2d');
+    expect(modes).toEqual(['2d']);
     expect(() => globe.setViewMode('globe' as '2d')).toThrow(expect.objectContaining({ code: 'invalid-option' }));
     globe.destroy();
   });
@@ -81,6 +95,72 @@ describe('view modes (F161–F164)', () => {
       expect(globe.camera.chosenTiltDeg).toBeCloseTo(30, 9);
       expect(globe.camera.tiltDeg).toBeCloseTo(30, 6);
       expect(globe.camera.chosenHeadingDeg).toBeCloseTo(40, 9);
+    }
+    globe.destroy();
+  });
+});
+
+describe('view transitions keep the frame loop running (KB-095)', () => {
+  it('finishes a mode change, a released clamp and new curves without outside render requests', async () => {
+    const { globe, frames, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 18 });
+    frames(40);
+    globe.setViewMode('2d');
+    ticks(60);
+    expect(globe.camera.tiltDeg).toBe(0);
+    globe.jumpTo({ zoom: 2.4 });
+    frames(1);
+    globe.setViewCurves({ morph: { startGroundZoom: 2, endGroundZoom: 3 } });
+    ticks(60);
+    // Ground zoom 2.9 (zoom 2.4 at 45°): smootherstep(2, 3, 2.9).
+    expect(globe.camera.morphFactor).toBeCloseTo(0.99144, 4);
+    globe.setViewCurves({});
+    ticks(60);
+    expect(globe.camera.morphFactor).toBe(0);
+    globe.destroy();
+  });
+});
+
+describe('chosen and applied tilt and heading (F164)', () => {
+  it('changes the chosen values only on explicit tilt and heading input, over random zooms, pans and curve changes', async () => {
+    const { globe, frames } = await started({
+      longitudeDeg: 9,
+      latitudeDeg: 45,
+      zoom: 15,
+      tiltDeg: 60,
+      headingDeg: 20,
+    });
+    let expectedTiltDeg = 60;
+    let expectedHeadingDeg = 20;
+    // A seeded generator (mulberry32): the sequence is the same on every run.
+    let seed = 0x5eed;
+    const random = (): number => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let step = 0; step < 300; step++) {
+      const kind = Math.floor(random() * 5);
+      if (kind === 0) globe.jumpTo({ zoom: 1 + random() * 18 });
+      else if (kind === 1) globe.jumpTo({ longitudeDeg: -180 + random() * 360, latitudeDeg: -80 + random() * 160 });
+      else if (kind === 2) {
+        const start = 2 + random() * 8;
+        globe.setViewCurves({ morph: { startGroundZoom: start, endGroundZoom: start + 0.5 + random() * 3 } });
+      } else if (kind === 3) globe.navigation.zoomAt({ xPx: random() * 800, yPx: random() * 600 }, random() * 4 - 2);
+      else {
+        // Explicit input: the only steps that may change the choice.
+        expectedTiltDeg = Math.round(random() * 85);
+        // The public heading wraps into [−180°, 180°).
+        expectedHeadingDeg = Math.round(random() * 359) - 180;
+        globe.jumpTo({ tiltDeg: expectedTiltDeg, headingDeg: expectedHeadingDeg });
+      }
+      frames(1 + Math.floor(random() * 3));
+      const camera = globe.camera;
+      expect(camera.viewMode).toBe('manual');
+      expect(camera.chosenTiltDeg).toBeCloseTo(expectedTiltDeg, 6);
+      expect(camera.chosenHeadingDeg).toBeCloseTo(expectedHeadingDeg, 6);
+      // The applied tilt is the public one, at most the choice (clamps only lower it).
+      expect(camera.tiltDeg).toBeLessThanOrEqual(expectedTiltDeg + 1e-6);
     }
     globe.destroy();
   });
@@ -127,5 +207,26 @@ describe('temporary tilt clamps (F165, F166)', () => {
     view.applyTilt(camera, 10);
     expect(camera.pose.tiltRad).toBeGreaterThan(clamped);
     expect(camera.pose.tiltRad).toBeLessThan(80 * DEG);
+  });
+
+  it('lowers the tilt only as far as the surface probed under the eye requires (KB-096)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.chooseTilt(80 * DEG);
+    const camera = new Camera();
+    camera.widthPx = 800;
+    camera.heightPx = 600;
+    camera.pose.rangeMeters = 2000;
+    camera.update();
+    // A 1,900 m wall from 1,500 m behind the target: the eye must stay in front of it, not climb above it.
+    const wall = {
+      probeGround: (c: Camera): void => {
+        c.groundHeightMeters = Math.sin(c.pose.tiltRad) * c.pose.rangeMeters > 1500 ? 1900 : 0;
+      },
+    };
+    view.applyTilt(camera, 10, wall);
+    const limitDeg = Math.asin(1500 / 2000) / DEG;
+    expect(camera.pose.tiltRad / DEG).toBeLessThanOrEqual(limitDeg);
+    expect(camera.pose.tiltRad / DEG).toBeGreaterThan(limitDeg - 0.05);
+    expect(view.chosenTiltRad).toBeCloseTo(80 * DEG, 12);
   });
 });

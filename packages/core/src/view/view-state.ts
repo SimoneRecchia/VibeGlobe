@@ -17,6 +17,14 @@ const factors = new Float64Array(2);
 const tiltStep = new Float64Array(4);
 const limits = new Float64Array(8);
 
+/** Probes the surface under the camera's eye: sets `camera.groundHeightMeters` to the height the frame draws there. */
+export interface GroundProbe {
+  probeGround(camera: Camera): void;
+}
+
+/** Bisection steps of the probed terrain limit: 14 halvings of 89° leave about 0.005°. */
+const PROBE_STEPS = 14;
+
 /** The view modes (`PLAN.md`, Map experience): the zoom curves drive the tilt, it stays 0°, or the user chose it. */
 export type ViewMode = 'auto' | '2d' | 'manual';
 
@@ -41,6 +49,11 @@ const MORPH_OFFSET = 4;
 const RELIEF_OFFSET = 5;
 /** The tilt each mode aims at this frame, before limits. */
 const TARGET_TILT = 6;
+/** The target with its offset, within 0° and the sky limit: what the terrain limit may lower. */
+const WANTED_TILT = 7;
+/** The bracket of the probed terrain limit (KB-096). */
+const LOW_TILT = 8;
+const HIGH_TILT = 9;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0029): the ground zoom at the screen center, the Auto curves'
@@ -51,9 +64,11 @@ const TARGET_TILT = 6;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = new Float64Array(7);
+  private readonly values = new Float64Array(10);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
+  /** True when a limit lowered the last applied tilt below what the mode wanted. */
+  private clamped = false;
   /** True when the next frame applies the target tilt at once (a camera cut), not eased. */
   private snap = true;
   /** The current mode; `manual` holds the chosen tilt at every zoom. */
@@ -74,6 +89,18 @@ export class ViewState {
   /** The tilt the user chose, radians: what manual mode shows wherever no clamp applies. */
   get chosenTiltRad(): number {
     return this.chosen[0] ?? 0;
+  }
+
+  /**
+   * True while a tilt, morph or relief transition is still easing: the frame loop must keep drawing (KB-095). A tilt
+   * held down by a limit is not easing: it changes only when the camera or the surface does.
+   */
+  get easing(): boolean {
+    return (
+      ((this.values[TILT_OFFSET] ?? 0) !== 0 && !this.clamped) ||
+      (this.values[MORPH_OFFSET] ?? 0) !== 0 ||
+      (this.values[RELIEF_OFFSET] ?? 0) !== 0
+    );
   }
 
   /** The phase the last frame showed: from the morph factor, then the tilt band of the curves. */
@@ -125,10 +152,11 @@ export class ViewState {
    * Sets the camera's applied tilt for this frame (F161–F166): the mode's target (the Auto curve, 0° in 2D, the chosen
    * tilt in manual mode) plus the decaying offset of a recent change, clamped where the camera would enter the terrain
    * (`clearanceMeters` above the surface under the eye; 0 without terrain) or where empty sky would fill more than the
-   * top third of the screen. A limit applies at once; a released one eases back. Updates the camera. Call once per
-   * frame; allocates nothing.
+   * top third of the screen. A limit applies at once; a released one eases back. With a `ground` probe the terrain
+   * limit reads the surface under the eye at each candidate tilt (KB-096). Updates the camera. Call once per frame;
+   * allocates nothing.
    */
-  applyTilt(camera: Camera, clearanceMeters: number): void {
+  applyTilt(camera: Camera, clearanceMeters: number, ground?: GroundProbe): void {
     this.computeCurves(camera);
     const values = this.values;
     this.computeTarget();
@@ -142,23 +170,44 @@ export class ViewState {
     limits[1] = camera.pose.targetHeightMeters;
     limits[2] = camera.fovYRad;
     limits[3] = this.morph.factors[0] ?? 0;
-    limits[4] = camera.groundHeightMeters;
     limits[5] = clearanceMeters;
     skyTiltLimitRad(limits);
-    if (clearanceMeters > 0) {
+    // The tilt the mode wants, at least 0° and at most the sky limit.
+    values[WANTED_TILT] = target + (values[TILT_OFFSET] ?? 0);
+    if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
+    if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
+    values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
+    if (clearanceMeters > 0 && ground) this.probeTerrainLimit(camera, ground);
+    else if (clearanceMeters > 0) {
+      limits[4] = camera.groundHeightMeters;
       terrainTiltLimitRad(limits);
-      if ((limits[7] ?? 0) < (limits[6] ?? 0)) limits[6] = limits[7] ?? 0;
+      if ((values[APPLIED_TILT] ?? 0) > (limits[7] ?? 0)) values[APPLIED_TILT] = limits[7] ?? 0;
     }
-    const allowed = limits[6] ?? 0;
-    // The applied tilt: the target and its offset, below the limit; a limit leaves an offset that eases back.
-    values[APPLIED_TILT] = target + (values[TILT_OFFSET] ?? 0);
-    if ((values[APPLIED_TILT] ?? 0) < 0) values[APPLIED_TILT] = 0;
-    if ((values[APPLIED_TILT] ?? 0) > allowed) {
-      values[APPLIED_TILT] = allowed;
-      values[TILT_OFFSET] = allowed - target;
-    }
+    // A limit leaves an offset that eases back; while it holds, the tilt is not easing (KB-095).
+    this.clamped = (values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0);
+    if ((values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0))
+      values[TILT_OFFSET] = (values[APPLIED_TILT] ?? 0) - target;
     camera.pose.tiltRad = values[APPLIED_TILT] ?? 0;
     camera.update();
+  }
+
+  /**
+   * The terrain limit with the surface probed under the eye (KB-096): the ground there moves with the tilt, so the
+   * wanted tilt stands when its eye clears the surface; otherwise a bisection finds the steepest tilt below it whose
+   * eye does, probing at each step. Writes `values[APPLIED_TILT]`; leaves the camera's ground probed at the result.
+   */
+  private probeTerrainLimit(camera: Camera, ground: GroundProbe): void {
+    const values = this.values;
+    if (clears(camera, values, WANTED_TILT, ground)) return;
+    values[LOW_TILT] = 0;
+    values[HIGH_TILT] = values[WANTED_TILT] ?? 0;
+    for (let step = 0; step < PROBE_STEPS; step++) {
+      values[APPLIED_TILT] = ((values[LOW_TILT] ?? 0) + (values[HIGH_TILT] ?? 0)) / 2;
+      if (clears(camera, values, APPLIED_TILT, ground)) values[LOW_TILT] = values[APPLIED_TILT] ?? 0;
+      else values[HIGH_TILT] = values[APPLIED_TILT] ?? 0;
+    }
+    values[APPLIED_TILT] = values[LOW_TILT] ?? 0;
+    clears(camera, values, APPLIED_TILT, ground);
   }
 
   /** Recomputes the state from the camera's pose and viewport (after {@link Camera.update}). */
@@ -205,6 +254,17 @@ export class ViewState {
     this.values[AUTO_TILT] = curveValues[2] ?? 0;
     this.morph.factors[0] = (curveValues[CURVE_MORPH] ?? 0) + (this.values[MORPH_OFFSET] ?? 0);
   }
+}
+
+/**
+ * True when, at the tilt in `values[slot]` (radians), the eye stands at least the clearance (`limits[5]`) above the
+ * surface probed under it; leaves the camera at that tilt with its ground probed. Doubles stay in arrays (ADR 0018).
+ */
+function clears(camera: Camera, values: Float64Array, slot: number, ground: GroundProbe): boolean {
+  camera.pose.tiltRad = values[slot] ?? 0;
+  camera.update();
+  ground.probeGround(camera);
+  return camera.eyeGeodetic.heightMeters - camera.groundHeightMeters >= (limits[5] ?? 0);
 }
 
 /** Shrinks the offset in `values[slot]` by one frame's share, ending it below `floor`. */

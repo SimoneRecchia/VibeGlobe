@@ -60,6 +60,7 @@ export { buildTileMesh } from './surface/surface-mesh.js';
 export { MorphFrame } from './view/morph.js';
 export { AUTO_TILT_RANGE_DEG, DEFAULT_VIEW_CURVES, validateViewCurves } from './view/curves.js';
 export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.js';
+export type { ViewMode, ViewPhase } from './view/view-state.js';
 export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
 export {

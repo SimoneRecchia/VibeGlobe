@@ -75,6 +75,7 @@ export const NO_RENDERER_STATS: RendererStats = Object.freeze({
   drawCalls: 0,
   triangles: 0,
   textureUploads: 0,
+  meshUploads: 0,
   matrixUpdates: 0,
   pipelineCompiles: 0,
   pipelineSwitches: 0,

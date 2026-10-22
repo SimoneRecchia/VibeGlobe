@@ -339,7 +339,7 @@ class GlobeEngine implements Globe {
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
       this.diag.logger.log('info', `started on ${renderer.capabilities.backend}`);
     }
-    if (this.dirty || this.surfaceFrame.fading) this.requestRender();
+    if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing) this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
       this.idlePayload.frameNumber = this.frames;
       this.emitter.emit('idle', this.idlePayload);

@@ -8,9 +8,9 @@ ADR 0008 places the plane endpoint in the anchor's east-north-up frame A. The en
 
 - Anchor a: the camera target on the ellipsoid; frame A its east, north, up axes in ECEF (rows of R_A).
 - Globe endpoint of a vertex at (φ, λ, h): G = E(φ, λ, r·h).
-- Plane endpoint: P = E(a) + R_Aᵀ·σ·(wrap(x − x_a), y* − y*_a, r·h·k(φ)), with x, y* EPSG:3857 meters (capped Mercator beyond ±85.0511°: y* continues linearly with the slope at the limit), k(φ) the Mercator scale factor clamped at the limit, σ = 1 / k(φ_a).
+- Plane endpoint: P = E(a) + R_Aᵀ·σ·(wrap(x − x_a), y* − y*\_a, r·h·k(φ)), with x, y* EPSG:3857 meters (capped Mercator beyond ±85.0511°: y* continues linearly with the slope at the limit), k(φ) the Mercator scale factor clamped at the limit, σ = 1 / k(φ_a).
 - Morphed position: M = (1 − m)·G + m·P. At m = 0 it is the globe exactly; the plane touches the globe at the anchor, so the camera pose (target, range, heading, tilt) needs no change with m and the screen center stays anchored (F156).
-- Per tile, the CPU computes in float64 both tile-center offsets from the eye: the globe center (as today) and the plane center E(a) + R_Aᵀ·σ·(wrap(x_c − x_a), y*_c − y*_a, 0) − eye, each split into float32 high and low parts. Per vertex, the mesh carries its globe offset (as today), its normal, and its plane offset from the tile's plane center in Mercator meters plus its scale factor k (anchor-independent, so meshes are built once). The shader forms both endpoints with R_Aᵀ, σ, r and m as per-frame uniforms and mixes them explicitly.
+- Per tile, the CPU computes in float64 both tile-center offsets from the eye: the globe center (as today) and the plane center E(a) + R_Aᵀ·σ·(wrap(x_c − x_a), y*\_c − y*_a, 0) − eye, each split into float32 high and low parts. Per vertex, the mesh carries its globe offset (as today), its normal, and its plane offset from the tile's plane center in Mercator meters plus its scale factor k (anchor-independent, so meshes are built once). The shader forms both endpoints with R_Aᵀ, σ, r and m as per-frame uniforms and mixes them explicitly.
 - A float64 TypeScript reference of the same function serves picking, culling, collision, anchoring and tests.
 
 ## 2. Scope and order of work

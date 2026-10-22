@@ -1,0 +1,314 @@
+import { expect, test, type Page } from '@playwright/test';
+import { canvasImage, geoToScreen, nextFrame, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
+import type { ScenarioReport } from './support/globe.ts';
+
+/**
+ * M5: the globe-to-flat morph, the zoom curves and the view modes (ADR 0008, ADR 0029) on both backends. Frame-stepped
+ * scenarios run on a manual clock and a 320 × 240 canvas (CLAUDE.md, Working efficiently).
+ */
+const BACKENDS = ['webgpu', 'webgl2'] as const;
+const CLOCK = 'clockStepMs=16.666666666666668';
+const DEG = Math.PI / 180;
+
+test.use({ viewport: { width: 320, height: 240 } });
+
+/** The Auto curves' defaults (docs/plan/m5-globe-map-3d.md, ADR 0008), re-derived here, not read from the engine. */
+function smootherstep(start: number, end: number, x: number): number {
+  const t = x <= start ? 0 : x >= end ? 1 : (x - start) / (end - start);
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/** Ground zoom of a Web Mercator zoom at a latitude: the zoom the curves read. */
+function groundZoom(zoom: number, latitudeDeg: number): number {
+  return zoom - Math.log2(Math.cos(latitudeDeg * DEG));
+}
+
+/** Plays a frame-stepped scenario of the playground and returns its report. */
+async function record(page: Page, query: string, scenario: string): Promise<ScenarioReport> {
+  await openGlobe(page, `${CLOCK}&${query}`);
+  const report = await page.evaluate((name) => window.vibeglobePlayground?.recordScenario(name), scenario);
+  if (!report) throw new Error('no report');
+  return report;
+}
+
+/** The camera's tilt and mode, read after the next frame. */
+async function cameraAfterFrame(page: Page): Promise<{ tiltDeg: number; chosenTiltDeg: number; viewMode: string }> {
+  await nextFrame(page);
+  return page.evaluate(() => {
+    const camera = window.vibeglobePlayground?.globe.camera;
+    if (!camera) throw new Error('no globe');
+    return { tiltDeg: camera.tiltDeg, chosenTiltDeg: camera.chosenTiltDeg, viewMode: camera.viewMode };
+  });
+}
+
+for (const backend of BACKENDS) {
+  test.describe(backend, () => {
+    test(`a continuous zoom from the globe to the street follows the Auto curves, phase by phase, without a jump on ${backend} (F548, F151, F153, F154, F161)`, async ({
+      page,
+    }) => {
+      test.setTimeout(240_000);
+      const report = await record(page, `backend=${backend}`, 'zoom-globe-to-street');
+      // Every frame: the reported morph, relief and tilt are the curves' values at its ground zoom (Rome, 41.9° N).
+      for (const [zoom, morph, relief, tiltDeg, mode, phase] of report.samples) {
+        const z = groundZoom(zoom, 41.9);
+        expect(mode).toBe('auto');
+        expect(morph).toBeCloseTo(smootherstep(4, 6.5, z), 9);
+        expect(tiltDeg).toBeCloseTo(50 * smootherstep(14, 16.5, z), 6);
+        expect(relief).toBeCloseTo(Math.max(smootherstep(10, 15, z), smootherstep(0, 30, tiltDeg)), 6);
+        // The phases of the plan's table.
+        const expected = morph <= 0 ? 'globe' : morph < 1 ? 'flattening' : z < 14 ? '2d' : '3d';
+        expect(phase).toBe(expected);
+        if (phase === 'globe') expect([tiltDeg, relief]).toEqual([0, 0]);
+        if (phase === '2d') expect([morph, tiltDeg]).toEqual([1, 0]);
+      }
+      const phases = new Set(report.samples.map((sample) => sample[5]));
+      expect([...phases]).toEqual(['globe', 'flattening', '2d', '3d']);
+      // The tilt rises only in the 3D phase, monotonically, to the automatic tilt; relief reaches full height.
+      const tilts = report.samples.map((sample) => sample[3]);
+      expect(tilts.every((tilt, i) => i === 0 || tilt >= (tilts[i - 1] ?? 0) - 1e-9)).toBe(true);
+      expect(tilts.at(-1)).toBeCloseTo(50, 6);
+      expect(report.samples.at(-1)?.[2]).toBe(1);
+      expect(report.holes).toBe(0);
+      // No frame jumps: in 0.1-zoom steps, few pixels change by more than a quarter of their range.
+      console.log(
+        `zoom-globe-to-street ${backend}: largest changed share ${report.maxChangedShare.toFixed(3)} at frame ${report.maxChangedFrame}`,
+      );
+      expect(report.maxChangedShare).toBeLessThan(0.25);
+    });
+
+    test(`the morph sweeps from the globe to the flat map and back with no geometry upload and no jump on ${backend} (F152)`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await openGlobe(page, `${CLOCK}&backend=${backend}&lon=12.5&lat=41.9&zoom=3`);
+      // A first sweep loads every tile the sweep shows; the second must upload no geometry: the morph moves vertices
+      // on the GPU.
+      await page.evaluate(() => window.vibeglobePlayground?.recordScenario('morph-sweep'));
+      const before = await page.evaluate(() => window.vibeglobePlayground?.globe.rendererStats().meshUploads ?? -1);
+      const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('morph-sweep'));
+      if (!report) throw new Error('no report');
+      const after = await page.evaluate(() => window.vibeglobePlayground?.globe.rendererStats().meshUploads ?? -1);
+      expect(after - before).toBe(0);
+      const morphs = report.samples.map((sample) => sample[1]);
+      expect(Math.min(...morphs)).toBe(0);
+      expect(Math.max(...morphs)).toBe(1);
+      expect(report.holes).toBe(0);
+      console.log(
+        `morph-sweep ${backend}: largest changed share ${report.maxChangedShare.toFixed(3)} at frame ${report.maxChangedFrame}`,
+      );
+      expect(report.maxChangedShare).toBeLessThan(0.25);
+    });
+
+    test(`polar caps stay covered through the morph and the tilt near both poles on ${backend} (F160)`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      const report = await record(page, `backend=${backend}&lon=30&lat=80&zoom=3`, 'morph-poles');
+      expect([report.holes, report.firstHoleFrame]).toEqual([0, -1]);
+    });
+
+    test(`wheel zoom keeps the point under the cursor through the flattening band, at the center, the corners and near the limb, turned on ${backend} (F155)`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      for (const [x, y] of [
+        [160, 120],
+        [20, 20],
+        [300, 220],
+        [160, 20],
+      ] as const) {
+        await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=3.6&heading=30`);
+        const box = await page.locator('#globe').boundingBox();
+        if (!box) throw new Error('no canvas');
+        const grabbed = await screenToGeo(page, { xPx: x, yPx: y });
+        if (!grabbed) throw new Error(`(${x}, ${y}) is off the globe`);
+        await page.mouse.move(box.x + x, box.y + y);
+        // Through the whole flattening band (ground zoom 4 to 6.5 at 41.9° N: zoom 3.6 to 6.2).
+        for (let step = 0; step < 14; step++) {
+          await page.mouse.wheel(0, -100);
+          await nextFrame(page);
+          await nextFrame(page);
+          const shown = await geoToScreen(page, grabbed);
+          expect(Math.hypot(shown.xPx - x, shown.yPx - y), `step ${step} at (${x}, ${y})`).toBeLessThan(1);
+        }
+        const morph = await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1);
+        expect(morph).toBe(1);
+      }
+    });
+
+    test(`an API zoom through the morph keeps the screen center's point at the center on ${backend} (F156)`, async ({
+      page,
+    }) => {
+      await openGlobe(page, `backend=${backend}&lon=-70&lat=-20&zoom=3`);
+      const center = await screenToGeo(page, { xPx: 160, yPx: 120 });
+      if (!center) throw new Error('no center');
+      for (let zoom = 3; zoom <= 7.5; zoom += 0.25) {
+        await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+        await nextFrame(page);
+        const shown = await geoToScreen(page, center);
+        expect(Math.hypot(shown.xPx - 160, shown.yPx - 120), `zoom ${zoom}`).toBeLessThan(1);
+      }
+    });
+
+    test(`picked positions and their distances are the same in every phase on ${backend} (F158)`, async ({ page }) => {
+      const points = [
+        { longitudeDeg: 12.49, latitudeDeg: 41.89 },
+        { longitudeDeg: 12.51, latitudeDeg: 41.9 },
+      ];
+      for (const view of ['zoom=3', 'zoom=5', 'zoom=9', 'zoom=12&tilt=50']) {
+        await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&${view}`);
+        for (const point of points) {
+          const shown = await geoToScreen(page, point);
+          const picked = await screenToGeo(page, shown);
+          if (!picked) throw new Error(`${JSON.stringify(point)} not picked back in ${view}`);
+          expect(Object.keys(picked).sort()).toEqual(['heightMeters', 'latitudeDeg', 'longitudeDeg']);
+          // Within a hundredth of a pixel's ground size in every phase: the pick inverts the drawn morph.
+          expect(Math.abs(picked.longitudeDeg - point.longitudeDeg)).toBeLessThan(1e-7);
+          expect(Math.abs(picked.latitudeDeg - point.latitudeDeg)).toBeLessThan(1e-7);
+        }
+      }
+    });
+
+    test(`2D locks the tilt at 0° at every zoom while the morph follows the zoom, and keeps the heading on ${backend} (F162)`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=17`);
+      expect((await cameraAfterFrame(page)).tiltDeg).toBeGreaterThan(40);
+      // The tilt animates to 0°: every drawn frame lower, none by more than a third of the way (recorded per frame in
+      // the page: several frames can pass between two round trips on a slow GPU).
+      const tilts = await page.evaluate(
+        () =>
+          new Promise<number[]>((resolve) => {
+            const globe = window.vibeglobePlayground?.globe;
+            if (!globe) throw new Error('no globe');
+            const recorded = [globe.camera.tiltDeg];
+            const off = globe.on('camera-change', ({ tiltDeg }) => {
+              recorded.push(tiltDeg);
+              if (tiltDeg === 0 || recorded.length > 60) {
+                off();
+                resolve(recorded);
+              }
+            });
+            globe.setViewMode('2d');
+          }),
+      );
+      let previous = tilts[0] ?? NaN;
+      for (const tilt of tilts.slice(1)) {
+        expect(tilt).toBeLessThanOrEqual(previous);
+        expect(previous - tilt).toBeLessThan(15);
+        previous = tilt;
+      }
+      expect(previous).toBe(0);
+      await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: 35 }));
+      for (const zoom of [14, 10, 6, 4, 2, 4, 8, 17]) {
+        await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+        await nextFrame(page);
+        const camera = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
+        expect(camera?.tiltDeg).toBe(0);
+        expect(camera?.headingDeg).toBeCloseTo(35, 6);
+        expect(camera?.morphFactor).toBeCloseTo(smootherstep(4, 6.5, groundZoom(zoom, 41.9)), 9);
+      }
+    });
+
+    test(`the 2D, 3D and Auto buttons and the API set the mode and tilt, animating, with mode events on ${backend} (F163)`, async ({
+      page,
+    }) => {
+      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=12`);
+      const buttons = page.locator('#view-modes button');
+      await expect(buttons).toHaveText(['2D', '3D', 'Auto']);
+      await expect(page.locator('#view-modes button[data-mode="auto"]')).toBeVisible();
+      await expect(page.locator('#view-modes button[aria-pressed="true"]')).toHaveText('Auto');
+      await page.evaluate(() => {
+        const events: string[] = [];
+        window.vibeglobePlayground?.globe.on('view-mode-change', ({ mode }) => events.push(mode));
+        (window as unknown as { modeEvents: string[] }).modeEvents = events;
+      });
+      for (const [label, mode, tilt] of [
+        ['3D', 'manual', 50],
+        ['2D', '2d', 0],
+        ['Auto', 'auto', 0],
+      ] as const) {
+        await page.locator('#view-modes button', { hasText: label }).click();
+        let previous = (await cameraAfterFrame(page)).tiltDeg;
+        for (let i = 0; i < 40; i++) {
+          const camera = await cameraAfterFrame(page);
+          expect(Math.abs(camera.tiltDeg - previous)).toBeLessThan(15);
+          previous = camera.tiltDeg;
+        }
+        const camera = await cameraAfterFrame(page);
+        expect([camera.viewMode, camera.tiltDeg]).toEqual([mode, tilt]);
+        if (label === '3D') expect(camera.chosenTiltDeg).toBeCloseTo(50, 9);
+        await expect(page.locator('#view-modes button[aria-pressed="true"]')).toHaveText(label);
+      }
+      // The API gives the same results and the same events.
+      await page.evaluate(() => window.vibeglobePlayground?.globe.setViewMode('3d'));
+      expect(await page.evaluate(() => window.vibeglobePlayground?.globe.viewMode)).toBe('manual');
+      expect(await page.evaluate(() => (window as unknown as { modeEvents: string[] }).modeEvents)).toEqual([
+        'manual',
+        '2d',
+        'auto',
+        'manual',
+      ]);
+    });
+
+    test(`a tilt chosen at street level is lowered while empty sky would fill the screen and comes back without a jump on ${backend} (F166)`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=16&tilt=60`);
+      const tilts: number[] = [];
+      for (let zoom = 16; zoom >= 1; zoom -= 0.5) {
+        await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+        const camera = await cameraAfterFrame(page);
+        expect(camera.chosenTiltDeg).toBeCloseTo(60, 9);
+        tilts.push(camera.tiltDeg);
+        // The empty sky: transparent rows at the top of the frame, at most the top third (and a row of rounding).
+        const image = await canvasImage(page);
+        let skyRows = 0;
+        while (skyRows < image.height && isBackgroundRow(image, skyRows)) skyRows++;
+        expect(skyRows, `zoom ${zoom}`).toBeLessThanOrEqual(Math.ceil(image.height / 3) + 1);
+      }
+      // Lowered gradually, never raised, while zooming out.
+      expect(tilts.every((tilt, i) => i === 0 || tilt <= (tilts[i - 1] ?? 0) + 1e-9)).toBe(true);
+      expect(tilts.at(-1)).toBeLessThan(30);
+      // Back in: the chosen 60° returns over frames, never by a jump.
+      await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 16 }));
+      let previous = (await cameraAfterFrame(page)).tiltDeg;
+      for (let i = 0; i < 40; i++) {
+        const tilt = (await cameraAfterFrame(page)).tiltDeg;
+        expect(tilt - previous).toBeLessThan(15);
+        previous = tilt;
+      }
+      expect(previous).toBeCloseTo(60, 6);
+    });
+  });
+}
+
+/** True when every pixel of a row shows the page background: nothing was drawn there. */
+function isBackgroundRow(image: { width: number; data: Buffer }, row: number): boolean {
+  for (let x = 0; x < image.width; x++) {
+    const i = (row * image.width + x) * 4;
+    if (image.data[i] !== 11 || image.data[i + 1] !== 16 || image.data[i + 2] !== 32) return false;
+  }
+  return true;
+}
+
+test('changing the curves at runtime moves the view to them without a jump (F150)', async ({ page }) => {
+  const curves = { morph: { startGroundZoom: 2, endGroundZoom: 3 }, relief: { startGroundZoom: 4, endGroundZoom: 5 } };
+  // Configured in the playground: the reported morph follows the custom curves.
+  await openGlobe(page, `${CLOCK}&lon=12.5&lat=41.9&zoom=2.4&curves=${encodeURIComponent(JSON.stringify(curves))}`);
+  await waitForIdle(page);
+  const morph = await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1);
+  expect(morph).toBeCloseTo(smootherstep(2, 3, groundZoom(2.4, 41.9)), 9);
+  // Back to the default curves at runtime: the morph eases to the default value over frames.
+  await page.evaluate(() => window.vibeglobePlayground?.globe.setViewCurves({}));
+  const morphs: number[] = [];
+  for (let i = 0; i < 60; i++) {
+    await nextFrame(page);
+    morphs.push(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1));
+  }
+  expect(morphs.at(-1)).toBe(0);
+  expect(morphs.every((value, i) => i === 0 || Math.abs(value - (morphs[i - 1] ?? 0)) < 0.3)).toBe(true);
+  expect(morphs.filter((value, i) => i > 0 && value !== morphs[i - 1]).length).toBeGreaterThan(4);
+});

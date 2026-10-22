@@ -202,6 +202,7 @@ function fakeStats(renderer: FakeRenderer): RendererStats {
     drawCalls: renderer.drawCount,
     triangles: 0,
     textureUploads: 1,
+    meshUploads: 1,
     matrixUpdates: 0,
     pipelineCompiles: 0,
     pipelineSwitches: 0,

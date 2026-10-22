@@ -1,6 +1,14 @@
 import type { DepthPath, TileDrawList } from '@vibeglobe/core';
 import { attribute, Fn, If, mix, texture, uniform, vec2 } from 'three/tsl';
-import { DataTexture, DoubleSide, MeshBasicNodeMaterial, Vector4, type Object3D, type Texture } from 'three/webgpu';
+import {
+  DataTexture,
+  DoubleSide,
+  MeshBasicNodeMaterial,
+  Vector3,
+  Vector4,
+  type Object3D,
+  type Texture,
+} from 'three/webgpu';
 import { makeEyeRelative } from './eye-relative.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
@@ -9,14 +17,15 @@ export interface SurfaceDraw {
   texture: Texture | undefined;
   /** Scale u, scale v, offset u, offset v from tile coordinates into the texture's (TileDrawList). */
   readonly transform: Vector4;
-  /** 1 when the texture's rows are linear in latitude, 0 when they follow the tile's own rows. */
-  geographic: number;
-  /** The imagery the tile cross-fades from (F105): its texture, transform and choice of v. */
+  /** The imagery the tile cross-fades from (F105): its texture and transform. */
   fromTexture: Texture | undefined;
   readonly fromTransform: Vector4;
-  fromGeographic: number;
-  /** Fade progress: 0 shows only the `from` imagery, 1 only the tile's own. */
-  fade: number;
+  /**
+   * One uniform for three numbers, as three.js rebuilds every object uniform's update range each frame (F064): x and
+   * y are 1 when the texture's (x) and the `from` texture's (y) rows are linear in latitude, 0 when they follow the
+   * tile's own rows; z is the fade progress, 0 showing only the `from` imagery and 1 only the tile's own.
+   */
+  readonly params: Vector3;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -33,11 +42,9 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
   const draw: SurfaceDraw = {
     texture: undefined,
     transform: new Vector4(1, 1, 0, 0),
-    geographic: 1,
     fromTexture: undefined,
     fromTransform: new Vector4(1, 1, 0, 0),
-    fromGeographic: 1,
-    fade: 1,
+    params: new Vector3(1, 1, 1),
   };
   object.userData['surfaceDraw'] = draw;
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
@@ -58,12 +65,13 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
 export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
   const tileUv = attribute('tileUv', 'vec3');
   const transform = uniform(new Vector4(1, 1, 0, 0)).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.transform);
-  const geographic = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.geographic);
   const fromTransform = uniform(new Vector4(1, 1, 0, 0)).onObjectUpdate(
     ({ object }) => surfaceDrawOf(object)?.fromTransform,
   );
-  const fromGeographic = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.fromGeographic);
-  const fade = uniform(1).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.fade);
+  const params = uniform(new Vector3(1, 1, 1)).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.params);
+  const geographic = params.x;
+  const fromGeographic = params.y;
+  const fade = params.z;
   const v = mix(tileUv.y, tileUv.z, geographic);
   const uv = vec2(tileUv.x.mul(transform.x).add(transform.z), v.mul(transform.y).add(transform.w));
   const fromV = mix(tileUv.y, tileUv.z, fromGeographic);
@@ -122,10 +130,8 @@ export function applyDraw(
   base: Texture,
 ): void {
   draw.texture = textures.get(draws.textures[i] ?? -1) ?? base;
-  draw.geographic = draws.geographic[i] ?? 1;
   draw.fromTexture = textures.get(draws.fromTextures[i] ?? -1) ?? base;
-  draw.fromGeographic = draws.fromGeographic[i] ?? 1;
-  draw.fade = draws.fades[i] ?? 1;
+  draw.params.set(draws.geographic[i] ?? 1, draws.fromGeographic[i] ?? 1, draws.fades[i] ?? 1);
   const at = i * 4;
   const u = draws.uvTransforms;
   draw.transform.set(u[at] ?? 1, u[at + 1] ?? 1, u[at + 2] ?? 0, u[at + 3] ?? 0);

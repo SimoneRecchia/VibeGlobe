@@ -176,7 +176,7 @@ test('the frame loop allocates nothing in steady-state motion and no GC pause ca
   await page.waitForTimeout(120_000);
   const session = await page.context().newCDPSession(page);
 
-  const allocations = await sampleAllocations(page, session, 30_000);
+  const allocations = await sampleAllocations(page, session, 40_000);
   // Without the heap sampler, which allocates and collects on its own.
   const gc = await traceGc(page, session, 60_000);
 

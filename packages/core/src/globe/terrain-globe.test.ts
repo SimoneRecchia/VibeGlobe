@@ -194,6 +194,21 @@ describe('terrain in a globe (M4)', () => {
     await expect(pending).rejects.toMatchObject({ code: 'destroyed' });
   });
 
+  it('keeps the eye the clearance above the displayed terrain, and lowers it back over the ellipsoid (F146)', async () => {
+    const { globe, run } = await terrainGlobe(terrain([]));
+    // The fixture terrain is about 1,300 m high here; a jump to street level would put the eye inside it.
+    globe.jumpTo({ longitudeDeg: 7, latitudeDeg: 46, zoom: 22, tiltDeg: 60 });
+    await run(20);
+    const camera = globe.camera;
+    const ground = globe.elevationAt({ longitudeDeg: camera.longitudeDeg, latitudeDeg: camera.latitudeDeg });
+    expect(ground.noData).toBe(false);
+    expect(camera.altitudeMeters).toBeGreaterThan(1000);
+    // The eye's own position: its height above the terrain under it is at least the default 10 m (within the
+    // interpolation of the displayed mesh).
+    expect(camera.altitudeMeters - ground.heightMeters).toBeGreaterThanOrEqual(9.9);
+    globe.destroy();
+  });
+
   it('rejects a terrain source with an unknown vertical datum, naming the source (F133)', () => {
     const { factory } = fakeRenderer();
     const source = { ...terrain([]), datum: { kind: 'navd88' } } as unknown as TerrainSource;

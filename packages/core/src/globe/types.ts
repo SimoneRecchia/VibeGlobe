@@ -330,6 +330,12 @@ export interface GlobeOptions {
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0024).
    */
   readonly terrain?: TerrainSource;
+  /**
+   * How far above the displayed terrain the eye always stays, meters (F146; default 10): zooming, panning, tilting or
+   * finer terrain arriving never takes the camera into the surface. Finer terrain lifts it as the surface morphs
+   * (F147).
+   */
+  readonly terrainClearanceMeters?: number;
   /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required with `imagery` or `terrain`. */
   readonly workers?: WorkerEndpointFactory;
   /** Memory budgets of the imagery caches (ADR 0007). */

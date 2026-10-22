@@ -62,6 +62,11 @@ export class TerrainHeights {
     this.grids.set(handle, grid);
   }
 
+  /** The grid of a resident tile by handle. */
+  grid(handle: number): HeightGrid | undefined {
+    return this.grids.get(handle);
+  }
+
   /** Forgets a released tile's grid. */
   remove(handle: number): void {
     this.grids.delete(handle);

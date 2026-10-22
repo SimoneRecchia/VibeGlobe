@@ -51,6 +51,7 @@ const NUMBER_OPTIONS = [
   ['maxScreenErrorPx', 0.1, 64],
   ['manualClockStepMs', 0.001, 1000],
   ['imageryFadeMs', 0, 5000],
+  ['terrainClearanceMeters', 0, 10_000],
 ] as const;
 
 /** Validates the logging options (F120). */

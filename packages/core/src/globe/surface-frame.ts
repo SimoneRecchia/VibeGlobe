@@ -14,6 +14,7 @@ import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
+import { displayedHeightMeters } from '../terrain/displayed-height.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel } from '../terrain/terrain-draws.js';
 import type {
   GeoPosition,
@@ -26,6 +27,8 @@ import type {
 } from './types.js';
 
 const DEG_TO_RAD = Math.PI / 180;
+/** The eye's default clearance above the displayed terrain (F146). */
+const DEFAULT_CLEARANCE_METERS = 10;
 
 /** ADR 0006's τ_imagery: the largest an imagery texel may look, in render-target pixels. */
 const MAX_TEXEL_ERROR_PX = 1.5;
@@ -56,6 +59,7 @@ export class SurfaceFrame {
   private imagery: ImageryRuntime | undefined;
 
   private readonly fadeMs: number;
+  private readonly clearanceMeters: number;
   /** The camera of the last traced move. */
   private lastCamera = '';
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
@@ -69,6 +73,7 @@ export class SurfaceFrame {
     this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
     this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.fadeMs = options.imageryFadeMs ?? DEFAULT_FADE_MS;
+    this.clearanceMeters = options.terrainClearanceMeters ?? DEFAULT_CLEARANCE_METERS;
   }
 
   /**
@@ -106,6 +111,25 @@ export class SurfaceFrame {
   /** The error of the terrain each surface level shows, once terrain is started (skirt depths, ADR 0006 §6). */
   get terrainErrorMeters(): Float64Array | undefined {
     return this.selection.terrainErrorMeters;
+  }
+
+  /**
+   * Keeps the eye at least the clearance above the surface as this frame shows it (F146, F147): the camera's target is
+   * raised along its normal by what the eye lacks, and lowered back to the ellipsoid when nothing is in the way.
+   * Returns true when the pose changed (the camera needs an update). Allocates nothing.
+   */
+  keepAboveTerrain(camera: Camera): boolean {
+    const heights = this.imagery?.heights;
+    if (!heights) return false;
+    const pose = camera.pose;
+    const eye = camera.eyeGeodetic;
+    const lift = pose.targetHeightMeters;
+    const surface = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
+    const needed = surface + this.clearanceMeters - (eye.heightMeters - lift);
+    const next = needed > 0 ? needed : 0;
+    if (next === lift) return false;
+    pose.targetHeightMeters = next;
+    return true;
   }
 
   /** Selects this frame's tiles and returns their draws, fades at the clock's time included. */

@@ -3668,7 +3668,7 @@
         "Assert it calls navigator.storage.persist() and reports the browser's answer and the current persisted state",
         "Assert the call is safe where the Storage API is missing and reports 'unsupported'"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F277",

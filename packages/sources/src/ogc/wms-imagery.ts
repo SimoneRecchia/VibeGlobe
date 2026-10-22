@@ -15,7 +15,7 @@ import {
   SourceConfigError,
 } from '../metadata.js';
 import { coverageOf, inLevelsAndCoverage } from '../tiling.js';
-import { MERCATOR_HALF_WORLD_M, tilingOfCrs } from './crs.js';
+import { MERCATOR_HALF_WORLD_M, normalizeCrs, tilingOfCrs } from './crs.js';
 import { loadCapabilities } from './load.js';
 import { parseWmsCapabilities, type WmsCapabilities } from './wms-capabilities.js';
 import { type CropImage, cropInBrowser, wmsTransport } from './wms-transport.js';
@@ -75,6 +75,21 @@ function chooseCrs(options: WmsImageryOptions, capabilities: WmsCapabilities | u
         'they need client-side reprojection',
     );
   return chosen;
+}
+
+/**
+ * The code to send for `crs`: the one the layers advertise when they write it differently (`EPSG:900913` for Web
+ * Mercator), so a server that knows only its own alias accepts the request.
+ */
+function requestCode(crs: string, options: WmsImageryOptions, capabilities: WmsCapabilities | undefined): string {
+  const lists = options.layers.map(
+    (name) =>
+      capabilities?.layers.find((l) => l.name === name)?.advertisedCrs.filter((code) => normalizeCrs(code) === crs) ??
+      [],
+  );
+  const shared = (lists[0] ?? []).filter((code) => lists.every((list) => list.includes(code)));
+  if (shared.length === 0 || shared.includes(crs)) return crs;
+  return shared[0] ?? crs;
 }
 
 function checkLayers(options: WmsImageryOptions, capabilities: WmsCapabilities | undefined): void {
@@ -137,7 +152,7 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
     `${url}${separator}SERVICE=WMS&REQUEST=GetMap&VERSION=${version}&LAYERS=${options.layers.map(encodeURIComponent).join(',')}` +
     `&STYLES=${(options.styles ?? options.layers.map(() => '')).map(encodeURIComponent).join(',')}` +
     `&FORMAT=${encodeURIComponent(options.format ?? 'image/png')}&TRANSPARENT=${options.transparent === false ? 'FALSE' : 'TRUE'}` +
-    `&${version === '1.3.0' ? 'CRS' : 'SRS'}=${encodeURIComponent(crs === 'CRS:84' ? 'CRS:84' : crs)}` +
+    `&${version === '1.3.0' ? 'CRS' : 'SRS'}=${encodeURIComponent(requestCode(crs, options, capabilities))}` +
     `&WIDTH=${sizePx + 2 * gutterPx}&HEIGHT=${sizePx + 2 * gutterPx}${extra.join('')}&BBOX=`;
   const bbox = bboxWriter(crs, version, gutterPx / sizePx);
   const bounds = options.layers

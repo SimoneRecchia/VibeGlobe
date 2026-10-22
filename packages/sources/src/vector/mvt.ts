@@ -138,6 +138,16 @@ function readFeature(pbf: PbfReader): RawFeature {
   return raw;
 }
 
+/** Decodes a geometry; an UNKNOWN feature's geometry cannot be checked, so its errors drop the feature only. */
+function decodeUnchecked(commands: readonly number[], type: MvtFeature['type']): [number, number][][] {
+  try {
+    return decodeGeometry(commands, type);
+  } catch (error) {
+    if (type === 'Unknown' && error instanceof FatalError) throw new FeatureError(error.message);
+    throw error;
+  }
+}
+
 function buildFeature(raw: RawFeature, keys: readonly string[], values: readonly MvtValue[]): MvtFeature {
   const tags = raw.tags ?? [];
   if (tags.length % 2 !== 0) throw new FeatureError('odd number of tags');
@@ -152,7 +162,7 @@ function buildFeature(raw: RawFeature, keys: readonly string[], values: readonly
   const type = TYPES[raw.type ?? 0];
   if (!type) throw new FeatureError(`unknown geometry type ${raw.type}`);
   if (!raw.geometry || raw.geometries !== 1) throw new FeatureError('feature without exactly one geometry');
-  const geometry = decodeGeometry(raw.geometry, type);
+  const geometry = decodeUnchecked(raw.geometry, type);
   return { ...(raw.id === undefined ? {} : { id: raw.id }), type, geometry, properties };
 }
 

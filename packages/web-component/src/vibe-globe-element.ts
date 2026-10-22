@@ -202,12 +202,28 @@ function startEngine(
 }
 
 /** The element class, made only when it is registered, so importing the package touches no DOM global. */
+/**
+ * Removes the reflected properties a script set on the element before it was defined (own data properties that would
+ * hide the accessors) and returns them, to be set again once the element is connected.
+ */
+function takeEarlyProperties(element: HTMLElement): [property: string, value: unknown][] {
+  const early: [string, unknown][] = [];
+  for (const property of Object.keys(REFLECTED)) {
+    if (!Object.hasOwn(element, property)) continue;
+    early.push([property, Reflect.get(element, property)]);
+    Reflect.deleteProperty(element, property);
+  }
+  return early;
+}
+
 function makeElementClass(): new () => VibeGlobeElement {
   const element = class extends HTMLElement {
     static readonly observedAttributes = VIEW_ATTRIBUTES;
-    imagery: readonly ImagerySource[] = [];
+    // Before the upgrade, a property set by a script is an own data property: keep its value.
+    imagery: readonly ImagerySource[] = (Reflect.get(this, 'imagery') as readonly ImagerySource[] | undefined) ?? [];
     #engine: { globe: Globe; stop: () => void } | undefined;
     readonly #container: HTMLDivElement;
+    readonly #early = takeEarlyProperties(this);
 
     constructor() {
       super();
@@ -228,6 +244,7 @@ function makeElementClass(): new () => VibeGlobeElement {
     }
 
     connectedCallback(): void {
+      for (const [property, value] of this.#early.splice(0)) Reflect.set(this, property, value);
       // Moving the element to another parent disconnects and reconnects it: the engine keeps running.
       this.#engine ??= startEngine(this, this.#container, readOptions(this, this.#container, this.imagery));
     }

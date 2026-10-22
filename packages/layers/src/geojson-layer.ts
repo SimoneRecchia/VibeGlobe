@@ -35,6 +35,10 @@ export class GeoJsonLayer implements Layer {
   readonly #parts: Readonly<Record<GeometryFamily, DataLayer>>;
   #loading: Promise<void> | undefined;
   #attached = false;
+  /** Whether the features are in the parts' stores, which keep them across a remove and a re-add. */
+  #added = false;
+  /** Counts attaches, so a load started before a detach never adds its features. */
+  #generation = 0;
 
   constructor(options: GeoJsonLayerOptions) {
     this.id = options.id ?? `geojson-layer-${++generated}`;
@@ -96,7 +100,8 @@ export class GeoJsonLayer implements Layer {
   attach(context: LayerContext): void {
     for (const family of FAMILIES) this.#parts[family].attach(context);
     this.#attached = true;
-    this.#loading = this.#load();
+    this.#generation++;
+    if (!this.#added) this.#loading = this.#load(this.#generation);
   }
 
   /** Detaches the batches; a load still running is ignored when it ends. */
@@ -121,7 +126,7 @@ export class GeoJsonLayer implements Layer {
     for (const family of FAMILIES) this.#parts[family].frame(frame);
   }
 
-  async #load(): Promise<void> {
+  async #load(generation: number): Promise<void> {
     const data = this.#options.data;
     try {
       const format = this.#options.format ?? geojsonFormat;
@@ -129,7 +134,8 @@ export class GeoJsonLayer implements Layer {
         typeof data === 'object' && data !== null && (data as Partial<FeatureCollection>).type === 'FeatureCollection'
           ? await geojsonFormat.parse(data)
           : await loadVectorData(data, format, this.#options.fetch);
-      if (!this.#attached) return;
+      if (!this.#attached || generation !== this.#generation) return;
+      this.#added = true;
       for (const issue of collection.issues) {
         const where = issue.index < 0 ? '' : `feature ${issue.index}: `;
         this.#events.emit('error', { message: `${format.format}: ${where}${issue.message}` });
@@ -141,7 +147,7 @@ export class GeoJsonLayer implements Layer {
       for (const family of FAMILIES) this.#parts[family].addFeatures(byFamily[family]);
       this.#events.emit('data', { added: collection.features.length, total: collection.features.length });
     } catch (cause) {
-      if (this.#attached)
+      if (this.#attached && generation === this.#generation)
         this.#events.emit('error', { message: cause instanceof Error ? cause.message : String(cause), cause });
     }
   }

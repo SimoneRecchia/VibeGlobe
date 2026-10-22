@@ -39,3 +39,11 @@ describe('license gate', () => {
     ).toBeUndefined();
   });
 });
+
+describe('license gate and EOX layer URLs', () => {
+  it('refuses a 2018-or-later s2cloudless layer named in a URL, whatever the profile (PT-23)', () => {
+    const url = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg';
+    expect(checkSource('d', 's2cloudless-2016', xyz(url))?.profile).toBe('s2cloudless-2018-or-later');
+    expect(checkSource('d', 's2cloudless-2016', xyz(url.replace('s2cloudless-2020', 's2cloudless')))).toBeUndefined();
+  });
+});

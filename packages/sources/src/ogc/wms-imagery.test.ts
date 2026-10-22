@@ -199,3 +199,16 @@ describe('wmsImagery (F231, F227)', () => {
     expect(failures(results)).toEqual([]);
   });
 });
+
+describe('wmsImagery reference-system codes', () => {
+  it('sends the Web Mercator code the server advertises, such as EPSG:900913 (PT-06)', async () => {
+    const capabilities = `<WMT_MS_Capabilities version="1.1.1"><Capability>
+      <Request><GetMap><Format>image/png</Format><DCPType><HTTP><Get>
+        <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://wms.example/?"/>
+      </Get></HTTP></DCPType></GetMap></Request>
+      <Layer><Title>Root</Title><SRS>EPSG:900913</SRS><Layer><Name>roads</Name><Title>Roads</Title></Layer></Layer>
+    </Capability></WMT_MS_Capabilities>`;
+    const params = await urlOf({ id: 'g', capabilities, layers: ['roads'] }, coord(1, 0, 0));
+    expect(params.get('SRS')).toBe('EPSG:900913');
+  });
+});

@@ -30,6 +30,10 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Smaller Terrarium tiles:** tiles keep the 1/256 m step even though the DEM's accuracy is metres; quantizing to 1/16 m before encoding would shrink them considerably without visible relief change.
 - **Bordered terrain tiles (258 px):** decide after M4's crack sweep (ADR 0024, survey open question 1).
 
+## Parallel-track review
+
+- **`vibeglobe-data pack` writes the package manifest (PT-24).** Packages built by the CLI get their integrity checks from `createManifest`, which the publisher runs on the built file (`docs/guides/offline.md`, "Building packages"). Writing `<name>.json` next to the archive in the CLI (id, version, area, source entry, file and chunk SHA-256) would save that step and keep a consumer from hashing bytes it already received. From the parallel-track review.
+
 ## Data layers track (`packages/layers`)
 
 - **Cluster diffs in the worker, applied in slices:** a zoom change that adds about 70,000 cluster items takes about 0.7 s on the calling thread in Node (ADR 0029). Move the per-zoom diff into the worker-pool task and apply it over several frames before F375 and F389 are measured.

@@ -7,6 +7,8 @@ export interface WmsLayer {
   readonly title: string;
   /** Normalized reference systems (`normalizeCrs`), inherited ones included. */
   readonly crs: readonly string[];
+  /** The reference-system codes as the service writes them (for example `EPSG:900913`), inherited ones included. */
+  readonly advertisedCrs: readonly string[];
   readonly styles: readonly string[];
   /** Longitude and latitude bounds in degrees: west, south, east, north. */
   readonly bounds?: readonly [number, number, number, number];
@@ -26,6 +28,7 @@ export interface WmsCapabilities {
 
 interface Inherited {
   crs: string[];
+  advertisedCrs: string[];
   bounds: [number, number, number, number] | undefined;
   attribution: WmsLayer['attribution'];
 }
@@ -53,12 +56,12 @@ function attributionOf(node: XmlElement): WmsLayer['attribution'] {
 function collectLayers(node: XmlElement, parent: Inherited, out: WmsLayer[], depth: number): void {
   if (depth > 32) return;
   // 1.1.1 may list several SRS in one element, separated by spaces.
-  const own = [...elements(node, 'CRS'), ...elements(node, 'SRS')]
+  const advertised = [...elements(node, 'CRS'), ...elements(node, 'SRS')]
     .flatMap((c) => text(c).split(/\s+/))
-    .filter(Boolean)
-    .map(normalizeCrs);
+    .filter(Boolean);
   const inherited: Inherited = {
-    crs: [...new Set([...parent.crs, ...own])],
+    crs: [...new Set([...parent.crs, ...advertised.map(normalizeCrs)])],
+    advertisedCrs: [...new Set([...parent.advertisedCrs, ...advertised])],
     bounds: boundsOf(node) ?? parent.bounds,
     attribution: attributionOf(node) ?? parent.attribution,
   };
@@ -68,6 +71,7 @@ function collectLayers(node: XmlElement, parent: Inherited, out: WmsLayer[], dep
       name,
       title: childText(node, 'Title'),
       crs: inherited.crs,
+      advertisedCrs: inherited.advertisedCrs,
       styles: elements(node, 'Style').map((s) => childText(s, 'Name')),
       ...(inherited.bounds ? { bounds: inherited.bounds } : {}),
       ...(inherited.attribution ? { attribution: inherited.attribution } : {}),
@@ -88,7 +92,7 @@ export function parseWmsCapabilities(xml: string): WmsCapabilities {
   const getMapUrl = attribute(path(getMap, 'DCPType', 'HTTP', 'Get', 'OnlineResource'), 'href');
   const layers: WmsLayer[] = [];
   for (const top of elements(capability, 'Layer'))
-    collectLayers(top, { crs: [], bounds: undefined, attribution: undefined }, layers, 0);
+    collectLayers(top, { crs: [], advertisedCrs: [], bounds: undefined, attribution: undefined }, layers, 0);
   return {
     version,
     title: childText(element(root, 'Service'), 'Title'),

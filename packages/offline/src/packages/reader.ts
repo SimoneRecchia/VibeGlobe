@@ -117,7 +117,13 @@ export class PackageTileReader implements PackageReader {
     const key = this.fileKey(pkg, file);
     let opened = this.opened.get(key);
     if (!opened) {
-      opened = this.openArchive(pkg, file).catch((error: unknown) => {
+      const reads = { failed: false };
+      opened = this.openArchive(pkg, file, reads).catch((error: unknown) => {
+        // A server that did not answer is not a corrupted package: the next read opens it again.
+        if (reads.failed) {
+          this.opened.delete(key);
+          return undefined;
+        }
         this.onCorrupt(
           pkg.manifest.id,
           `${file.path} cannot be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -129,7 +135,12 @@ export class PackageTileReader implements PackageReader {
     return opened;
   }
 
-  private async openArchive(pkg: ActivePackage, file: PackageFileEntry): Promise<ImagerySource> {
+  /** Opens a package file; `reads.failed` tells when a chunk read failed for another reason than its integrity. */
+  private async openArchive(
+    pkg: ActivePackage,
+    file: PackageFileEntry,
+    reads: { failed: boolean },
+  ): Promise<ImagerySource> {
     if (!this.adapters) throw new Error('no PMTiles or MBTiles adapter was given to the package manager');
     const prefix = versionKey(pkg.manifest);
     const loader: ChunkLoader =
@@ -140,7 +151,12 @@ export class PackageTileReader implements PackageReader {
             return chunk.arrayBuffer();
           }
         : httpChunkLoader(this.fetchImpl, new URL(file.path, pkg.origin.baseUrl).href, file);
-    const fetchImpl = verifyingFetch(file, loader, (error) => this.onCorrupt(pkg.manifest.id, error.message));
+    const watched: ChunkLoader = (index, signal) =>
+      loader(index, signal).catch((error: unknown) => {
+        if (!(error instanceof IntegrityError)) reads.failed = true;
+        throw error;
+      });
+    const fetchImpl = verifyingFetch(file, watched, (error) => this.onCorrupt(pkg.manifest.id, error.message));
     const id = `package:${prefix}${file.path}`;
     const url = `https://vibeglobe.package/${encodeURIComponent(prefix)}${encodeURIComponent(file.path)}`;
     return file.format === 'pmtiles'

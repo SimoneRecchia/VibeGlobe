@@ -143,3 +143,51 @@ describe('vector data layer', () => {
     }
   });
 });
+
+describe('vector data layer in and out of the stack', () => {
+  it('keeps its features once when removed and added again, also during the first load (PT-08)', async () => {
+    const stack = new LayerStack(new RecordingRenderTarget());
+    const errors: string[] = [];
+    const layer = new GeoJsonLayer({ data: collection });
+    stack.add(layer);
+    await layer.loaded;
+    stack.remove(layer);
+    stack.add(layer);
+    layer.on('error', (e) => errors.push(e.message));
+    await layer.loaded;
+    expect(layer.featureCounts).toEqual({ point: 1, line: 1, polygon: 1 });
+    const slow = new GeoJsonLayer({ data: JSON.stringify(collection) });
+    stack.add(slow);
+    stack.remove(slow);
+    stack.add(slow);
+    slow.on('error', (e) => errors.push(e.message));
+    await slow.loaded;
+    expect(slow.featureCounts).toEqual({ point: 1, line: 1, polygon: 1 });
+    expect(errors).toEqual([]);
+  });
+});
+
+describe('vector data layer with multi-points', () => {
+  it('draws every point of a MultiPoint (PT-09)', async () => {
+    const { layer } = await load({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'm',
+          properties: {},
+          geometry: {
+            type: 'MultiPoint',
+            coordinates: [
+              [1, 1],
+              [2, 2],
+              [3, 3],
+            ],
+          },
+        },
+        { type: 'Feature', id: 'p', properties: {}, geometry: { type: 'Point', coordinates: [4, 4] } },
+      ],
+    });
+    expect(layer.featureCounts.point).toBe(4);
+  });
+});

@@ -20,6 +20,8 @@ export interface TierContext {
     put(key: string, tile: CachedTile): void;
   };
   readPackage(sourceId: string, coord: TileCoord, signal: AbortSignal): Promise<PackageTile | undefined>;
+  /** Makes an endpoint known to the health checks, with a tile URL it serves (a source may spread tiles over hosts). */
+  addEndpoint(endpoint: string, probeUrl: string): void;
   /** False while the endpoint is known to be unreachable. */
   reachable(endpoint: string): boolean;
   reportSuccess(endpoint: string): void;
@@ -155,6 +157,7 @@ class TileLoader {
       }
     }
     const endpoint = endpointOf(url);
+    if (decision.useNetwork) this.context.addEndpoint(endpoint, url);
     if (decision.useNetwork && this.context.reachable(endpoint)) {
       const outcome = await fetchTile(
         this.context.fetch,

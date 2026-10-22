@@ -91,18 +91,26 @@ export async function downloadFile(file: SourceFile, context: DownloadContext): 
   }
   if (file.window) return downloadWindow(file, file.window, target, context);
   const partial = `${target}.download`;
-  const offset = existsSync(partial) ? statSync(partial).size : 0;
-  const response = await request(file, context, offset);
+  let offset = existsSync(partial) ? statSync(partial).size : 0;
+  let response = await request(file, context, offset);
+  // 416: the partial file already holds every byte (the run stopped before recording it). With a lock checksum it is
+  // verified below; without one it cannot be trusted, so the download starts over.
+  const complete = response.status === 416 && offset > 0 && context.lock[file.key] !== undefined;
+  if (response.status === 416 && offset > 0 && !complete) {
+    rmSync(partial, { force: true });
+    offset = 0;
+    response = await request(file, context, 0);
+  }
   if (response.status === 404 && file.mayBeMissing) {
     context.log.record(STEP, file.key, MISSING);
     context.report(`missing ${file.key} (no data there)`);
     return { key: file.key, status: 'missing', transferred: 0 };
   }
-  if (!response.ok) throw new Error(`${file.url}: HTTP ${response.status}`);
+  if (!response.ok && !complete) throw new Error(`${file.url}: HTTP ${response.status}`);
   mkdirSync(dirname(partial), { recursive: true });
   // A server that ignores the range answers 200 with the whole file: start over.
-  if (response.status !== 206) rmSync(partial, { force: true });
-  const transferred = await streamTo(response, partial);
+  if (response.status !== 206 && !complete) rmSync(partial, { force: true });
+  const transferred = complete ? 0 : await streamTo(response, partial);
   const bytes = readFileSync(partial);
   const checksum = sha256(bytes);
   const expected = context.lock[file.key];

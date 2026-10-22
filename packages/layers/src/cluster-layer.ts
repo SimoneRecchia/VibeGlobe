@@ -91,6 +91,8 @@ export class ClusterLayer extends DataLayer {
   #points: readonly Feature[] = [];
   #lonLat = new Float64Array(0);
   #loaded: Promise<void> = Promise.resolve();
+  /** Whether a detach freed the index, which the next attach rebuilds. */
+  #freed = false;
   #generation = 0;
   #requestedZoom: number | undefined;
   #shownZoom: number | undefined;
@@ -174,12 +176,17 @@ export class ClusterLayer extends DataLayer {
     this.#generation++;
     super.detach();
     this.#engine.destroy();
+    this.#freed = true;
   }
 
-  /** Starts showing the clusters of the current zoom once attached. */
+  /** Starts showing the clusters of the current zoom once attached, rebuilding an index a detach freed. */
   override attach(context: LayerContext): void {
     super.attach(context);
     this.#requestedZoom = undefined;
+    if (this.#freed) {
+      this.#freed = false;
+      this.setData(this.#points);
+    }
   }
 
   /** Single points are reported as the original feature, clusters with their cluster properties. */

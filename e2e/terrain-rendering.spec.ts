@@ -187,13 +187,14 @@ for (const backend of BACKENDS) {
         changed = Math.max(changed, differingPixels(first, await canvasImage(page), 8));
       }
       expect(changed).toBe(0);
-      // A slow orbit: the view turns by the same amount each frame, so consecutive frames shift alike.
+      // A slow orbit: the view turns by the same amount each frame, so consecutive frames shift alike. Around a target
+      // a few meters away, 0.2° per frame moves the 320 px frame by about a quarter of a pixel.
       const shifts: { dx: number; dy: number }[] = [];
       let previous = first;
       for (let frame = 0; frame < 12; frame++) {
         await page.evaluate(() => {
           const globe = window.vibeglobePlayground?.globe;
-          if (globe) globe.jumpTo({ headingDeg: globe.camera.headingDeg + 0.02 });
+          if (globe) globe.jumpTo({ headingDeg: globe.camera.headingDeg + 0.2 });
         });
         const next = await canvasImage(page);
         shifts.push(measureShift(previous, next));

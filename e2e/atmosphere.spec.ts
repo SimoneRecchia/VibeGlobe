@@ -129,7 +129,7 @@ for (const backend of BACKENDS) {
     test(`F392: the glow changes continuously from orbit to the ground, without banding (${backend})`, async ({
       page,
     }) => {
-      const steps = await frameSteps(page, flight(90), SKY);
+      const steps = await frameSteps(page, flight(60), SKY);
       expect(largestJump(steps)).toBeLessThan(JUMP_LEVELS);
       // Banding: the same smooth sky gradient quantized without and with dithering.
       // The sky just above the horizon seen from the ground, where its gradient is gentlest.
@@ -148,17 +148,20 @@ for (const backend of BACKENDS) {
     });
 
     test(`F393: sky and haze stay continuous through the tilt and the morph to flat (${backend})`, async ({ page }) => {
-      // The tilt into the 3D view at 20 km, by 1° steps.
+      // The tilt into the 3D view at 20 km, by 2° steps.
       const tilts: HarnessPose[] = [];
-      for (let tilt = 0; tilt <= 85; tilt += 1) tilts.push({ lonDeg: 8, latDeg: 46, rangeM: 20_000, tiltDeg: tilt });
+      for (let tilt = 0; tilt <= 84; tilt += 2) tilts.push({ lonDeg: 8, latDeg: 46, rangeM: 20_000, tiltDeg: tilt });
       expect(largestJump(await frameSteps(page, tilts, SKY))).toBeLessThan(JUMP_LEVELS);
-      // The morph from globe to flat (flatness 0 → 1 in 2% steps), in a tilted view where sky and haze both show.
+      // The morph from globe to flat (flatness 0 → 1 in 4% steps), in a tilted view where sky and haze both show.
       const morph: number[] = [];
       let previous: PNG | undefined;
-      for (let i = 0; i <= 50; i++) {
-        await setFlatness(page, i / 50);
+      for (let i = 0; i <= 25; i++) {
+        await setFlatness(page, i / 25);
         const image = await renderFrame(page, VIEWS['tilted-100km'] ?? { lonDeg: 0, latDeg: 0, rangeM: 1e5 });
         if (previous) morph.push(meanDifference(previous, image, FULL));
+        test
+          .info()
+          .annotations.push({ type: 'measure', description: `morph step ${i}: ${morph.at(-1)?.toFixed(2) ?? '-'}` });
         previous = image;
       }
       await setFlatness(page, 0);

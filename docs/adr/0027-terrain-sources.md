@@ -1,4 +1,4 @@
-# 0026. Terrain sources: decoders, custom adapters and vertical datums
+# 0027. Terrain sources: decoders, custom adapters and vertical datums
 
 - Status: Accepted
 - Date: 2026-10-22

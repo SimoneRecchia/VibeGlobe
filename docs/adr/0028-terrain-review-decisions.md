@@ -1,4 +1,4 @@
-# 0027. Terrain collision, morph limits, grid sizes and fallback skirts (M4 review)
+# 0028. Terrain collision, morph limits, grid sizes and fallback skirts (M4 review)
 
 - Status: Accepted (decided by agent; owner may revisit)
 - Date: 2026-10-22
@@ -7,7 +7,7 @@
 ## Context
 
 The M4 milestone review found places where two feature entries pull against each other, or where the M4 design
-(ADR 0006, ADR 0026) left a gap:
+(ADR 0006, ADR 0027) left a gap:
 
 - **Collision (F146, F147).** F146 wants the eye at least the clearance above "the terrain at the camera position
   (finest loaded level)" in every frame; F147 wants the eye lifted smoothly, over several frames, when finer terrain

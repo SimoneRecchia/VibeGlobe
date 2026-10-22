@@ -144,7 +144,7 @@ export class SurfaceFrame {
     const lift = pose.targetHeightMeters;
     const drawn = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
     // Where nothing resident is drawn under the eye, the finest resident terrain stands in for the shown surface
-    // (KB-081); `liftMeters` keeps the clearance above both (F146, F147, ADR 0027).
+    // (KB-081); `liftMeters` keeps the clearance above both (F146, F147, ADR 0028).
     this.queryRad[0] = eye.longitudeRad;
     this.queryRad[1] = eye.latitudeRad;
     const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;

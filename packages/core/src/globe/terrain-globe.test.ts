@@ -402,18 +402,18 @@ describe('terrain in a globe (M4)', () => {
     const workers = terrainWorkers();
     const corruptAware: WorkerEndpointFactory = {
       ...workers,
-      create(onMessage) {
-        const endpoint = workers.create(onMessage);
+      create(onMessage, onError) {
+        const endpoint = workers.create(onMessage, onError);
         return {
           ...endpoint,
-          post(message: WorkerRequest) {
+          post(message: WorkerRequest, transfer: readonly object[]) {
             if (message.kind === 'run' && (message.input as { bytes: ArrayBuffer }).bytes.byteLength === 3) {
               queueMicrotask(() =>
                 onMessage({ kind: 'reply', id: message.id, ok: false, error: { code: 'undecodable', message: 'bad' } }),
               );
               return;
             }
-            endpoint.post(message);
+            endpoint.post(message, transfer);
           },
         };
       },
@@ -591,7 +591,7 @@ describe('terrain in a globe (M4)', () => {
       const tiles = globe.surfaceTiles();
       const values = tiles.slice(0, draws?.count ?? 0).map((tile, i) => ({
         meters: draws?.terrain.skirtMeters[i] ?? 0,
-        fallback: (draws?.terrain.levels[i] ?? -1) < Math.min(12, Math.max(0, tile.level - 2)),
+        fallback: (tile.terrainLevel ?? -1) < Math.min(12, Math.max(0, tile.level - 2)),
       }));
       globe.destroy();
       return values;
@@ -639,7 +639,7 @@ describe('terrain in a globe (M4)', () => {
     for (let i = 0; i < (draws?.count ?? 0); i++) {
       const tile = tiles[i];
       const own = Math.min(12, (tile?.level ?? 0) - 2);
-      const shown = draws?.terrain.levels[i] ?? -1;
+      const shown = tile?.terrainLevel ?? -1;
       const meters = draws?.terrain.skirtMeters[i] ?? 0;
       if (shown < own) fallbackDraws++;
       else if (meters > 0) deepenedNeighbors++;

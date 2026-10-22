@@ -1,7 +1,7 @@
 /**
  * The grid of a terrain tile (ADR 0006 §5, F134): the smallest of 8 to 256 cells per side, no more cells than the
  * tile has pixels, whose surface stays within a vertical error bound of every source sample, with the error measured,
- * not estimated. Grids finer than 64 cells serve rough tiles 64 cells cannot follow (ADR 0027). The finest grid is used
+ * not estimated. Grids finer than 64 cells serve rough tiles 64 cells cannot follow (ADR 0028). The finest grid is used
  * when none meets the bound; its measured error travels with it and widens the tile's relief range.
  */
 import { heightGrid, type HeightGrid } from './heightmap.js';

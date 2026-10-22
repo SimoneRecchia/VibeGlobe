@@ -8,7 +8,28 @@
 - M3 took about 14 hours of agent time (2026-10-21 13:20 to 2026-10-22 03:10 UTC, groundwork included): about 9.5 hours of features and 4.5 hours of making the full CI run green on its software GPU (eight single-worker end-to-end shards, isolated measurements one at a time, KB-074 and KB-075, test timing fixes logged in docs/test-changes.md). Remaining: M4 to M15, 413 active entries. Estimate to M15 at the M3 pace (about 3 entries per hour including CI stabilization): 110 to 140 hours of agent time, plus the owner-only steps in docs/open-questions.md.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## Data pipeline track (second session, `packages/tools`)
+
+Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlobe#6; status and blockers in `docs/parallel-tracks.md`.
+
+- **2026-10-21:** `vibeglobe-data` CLI (ADR 0024): estimate with cost and confirmation, license gate, resumable steps with SHA-256 checks, built-in GeoTIFF reader, PNG, JPEG and Terrarium encoders, PMTiles and MBTiles writers, OSM PBF to MVT, GDAL only in a digest-pinned Docker image (convert hook and `verify`). Configurations `world-low`, `italy-high`, `test-mont-blanc` with lock files. Licenses re-verified (ADR 0025, `docs/data-licenses.md`), dataset-build skill, hosting guide. Verified on real Copernicus DEM (Mont Blanc) and the real Natural Earth fallback; Sentinel-2 cloudless and OSM through fixture stubs (owner question 21; Geofabrik is not reachable from the container). Browser checks: `npx playwright test -c packages/tools/playwright.config.ts`.
+- **2026-10-22:** Detailed imagery switched to the ESA WorldCover 2021 Sentinel-2 RGBNIR composite (owner answer to question 22, ADR 0026): windowed COG reads with range requests, a fixed colour stretch (B04, B03, B02; `255 × min(1, r / 3000) ^ 0.5`), composite gaps filled by WorldCover land-cover class, sea at the measured median sea colour. Verified on real data: Mont Blanc sample (74 MB instead of 2.3 GB), Gulf of Naples, and the world-low sample at overview 4. Merged `main` after pull request SimoneRecchia/VibeGlobe#7.
+- Passing: F330–F335, F338, F340, F343–F346, F552, F553, F307. F553's check: the playground's production build ran from a plain static server (`http-server` with CORS and ranges, Docker Hub being rate-limited for nginx), with the worker and base image under `/static/vibeglobe/` and the sample tiles; every request answered 200 and the zoom-5 frame had no empty pixel. Following the guide also showed that the unbundled worker cannot be served as is; the guide now says to serve the bundled one. Waiting on main-track engine capabilities (adapters, attribution, source chains, offline mode): F336, F337, F339, F341, F304, F305, F551, F554.
+- Notes: Docker Hub rate-limits this container's pulls intermittently, and GHCR blobs are blocked, so the configurations pin `docker.io/osgeo/gdal:ubuntu-small-3.6.3` by digest. Raster tiling runs at about 0.1 s per 256-px tile on one core, and the OSM reader holds the needed nodes in memory: both are noted in `docs/follow-ups.md` for full builds.
+
 ## Session log (newest first)
+
+### UI and GIS utilities track (third session) — 2026-10-21 (M12)
+
+Branch `claude/m12-ui-gis-utilities-yd90i2`, SimoneRecchia/VibeGlobe#7. New package `@vibeglobe/gis` (coordinate formats and parsing, CRS transforms through proj4js, geodesic measurement on core's geodesics, view-state serialization); `@vibeglobe/ui` gained the control API, six controls, theming, English and Italian, keyboard access and contrast. Browser tests mount the ui package on the playground through the Vite dev server (`e2e/support/ui-layer.ts`).
+
+Passing: F404, F405, F418, F428–F433, F435 (F430's baselines recorded by the Visual baselines workflow and compared in CI run 39687581609, all Chromium shards green). Pending the reference tablet: F419, F420, F427. Waiting for engine features: F406–F417, F421–F426, F434, F436, F437 (`docs/parallel-tracks.md`).
+
+Notes for the next session of this track:
+
+- Control animations run on the engine clock (`Globe.timeMs`) through `frame` events: the container's software GPU draws about 4 frames per second, and wall-clock tweens jumped there.
+- Pointer input on `.vg-ui` must not cancel a running tween (fixed: chained zoom presses lost part of a level).
+- Local Chromium (141) differs from the baselines' (156), so screenshot comparisons are advisory locally and binding in CI.
 
 ### Session 4 — 2026-10-20/21 (milestone 2)
 

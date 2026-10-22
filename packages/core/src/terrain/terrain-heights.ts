@@ -4,7 +4,7 @@ import type { TerrainLayer } from './terrain-draws.js';
 
 /** An elevation query's answer (F144, F145). */
 export interface ElevationSample {
-  /** Meters above the WGS84 ellipsoid; 0 (the ellipsoid, ADR 0026's no-data surface) where there is no terrain. */
+  /** Meters above the WGS84 ellipsoid; 0 (the ellipsoid, ADR 0027's no-data surface) where there is no terrain. */
   heightMeters: number;
   /** The terrain level the height came from, -1 without terrain. */
   level: number;

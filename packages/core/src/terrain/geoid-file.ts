@@ -1,5 +1,5 @@
 /**
- * The geoid grid file a consumer hosts for geoid-referenced terrain (ADR 0026, F133): the ASCII magic `VGEOID1\0`,
+ * The geoid grid file a consumer hosts for geoid-referenced terrain (ADR 0027, F133): the ASCII magic `VGEOID1\0`,
  * the row and column counts as little-endian uint32, then rows × columns little-endian float32 undulations in meters,
  * rows from 90° N to 90° S inclusive, columns eastward from 180° W. `docs/guides/terrain.md` shows how to write one
  * from a published geoid model.

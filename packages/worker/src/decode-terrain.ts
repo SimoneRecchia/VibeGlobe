@@ -42,7 +42,7 @@ function isGzip(bytes: Uint8Array): boolean {
  * The most bytes a gzip-compressed terrain tile may inflate to (F131: no unbounded allocation). Quantized-mesh tiles,
  * even with 32-bit indices and every extension, stay well below it.
  */
-export const MAX_INFLATED_BYTES = 32 * 1024 * 1024;
+const MAX_INFLATED_BYTES = 32 * 1024 * 1024;
 
 /**
  * Inflates gzip bytes with the platform's DecompressionStream, chunk by chunk, failing with `undecodable` once the
@@ -122,7 +122,7 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
       let raw: Uint8Array<ArrayBuffer> = new Uint8Array(bytes);
       if (isGzip(raw)) raw = await gunzip(raw);
       const mesh = decodeQuantizedMesh(raw);
-      // From `meshCells` up to 256 cells, the first grid within the bound of every mesh vertex (F134, ADR 0027).
+      // From `meshCells` up to 256 cells, the first grid within the bound of every mesh vertex (F134, ADR 0028).
       let raster = rasterizeQuantizedMesh(mesh, meshCells);
       let errorMeters = meshGridErrorMeters(mesh, raster);
       for (let cells = meshCells * 2; cells <= MAX_MESH_CELLS && errorMeters > maxErrorMeters; cells *= 2) {

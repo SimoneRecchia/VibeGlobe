@@ -1,5 +1,5 @@
 /**
- * Terrain collision (F146, F147, ADR 0027): how high the camera's target is raised along its normal so the eye keeps
+ * Terrain collision (F146, F147, ADR 0028): how high the camera's target is raised along its normal so the eye keeps
  * its clearance above the terrain. Pure arithmetic, per frame; allocates nothing.
  */
 

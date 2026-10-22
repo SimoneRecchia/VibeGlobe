@@ -340,7 +340,7 @@ export interface GlobeOptions {
   readonly imagery?: readonly ImagerySource[];
   /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
-   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0026).
+   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
    */
   readonly terrain?: TerrainSource;
   /**

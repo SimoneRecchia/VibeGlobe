@@ -4062,7 +4062,7 @@
         "Assert the tile count is exact for the given area and range and the byte estimate is within 25% of the built package",
         "Assert the estimate is shown before any tile is downloaded and the user can cancel"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F308",
@@ -4358,7 +4358,7 @@
         "Verify it lists correctness, seam, performance and reproducibility issues from their issue trackers, with links",
         "Verify it states the chosen pipeline approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F331",
@@ -4371,7 +4371,7 @@
         "Verify GDAL and every other external tool run inside a Docker image pinned by digest, with nothing needed on the host beyond Node and Docker",
         "Run `npm test` and verify the pipeline's unit tests (configuration validation, tile math, build planning) pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F332",
@@ -4384,7 +4384,7 @@
         "Verify each dataset is confirmed as free for commercial use and redistribution, with its exact required attribution text",
         "Run the automated consistency check and verify the pipeline configuration files use the attribution text recorded in the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F333",
@@ -4397,7 +4397,7 @@
         "Verify no partial output folder or package is left behind",
         "Run the unit tests of the license gate against every built-in provider profile and verify allowed and forbidden cases"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F334",
@@ -4410,7 +4410,7 @@
         "Verify tile counts grow by about 4x per added zoom level for a fixed area",
         "Build a small region and verify the actual output size is within 30% of the estimate"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F552",
@@ -4423,7 +4423,7 @@
         "Run the same build non-interactively without the confirmation flag and confirm it stops before any download",
         "Confirm the cost estimate uses per-GB prices recorded in the pipeline configuration with their reading date, and the actual transfer of the sample build is within 30% of the estimate"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F335",
@@ -4436,7 +4436,7 @@
         "Verify the resumed output is identical by checksum to an uninterrupted build of the same configuration",
         "Corrupt one downloaded source file and one intermediate tile, rerun, and verify both are detected by checksum and regenerated"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F336",
@@ -4474,7 +4474,7 @@
         "Load it as the pinned base in the playground and capture screenshots of the globe from several directions: zero black or empty pixels on the globe",
         "Verify the output's license metadata states its public-domain or equivalent status"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F339",
@@ -4501,7 +4501,7 @@
         "Load the pyramid in the playground and verify imagery displays at about 10 m per pixel at the highest level, with no seams between source tiles",
         "Verify the output carries the EOX and Copernicus attribution text recorded in the license ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F341",
@@ -4554,7 +4554,7 @@
         "Build the same configuration twice in clean directories",
         "Compare both outputs by checksum and verify tiles and metadata are identical"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F344",
@@ -4567,7 +4567,7 @@
         "Assert every request targets the configured self-hosted origin",
         "Scan the built packages' default configuration and bundles for hosts of paid or restricted services and verify none is referenced outside optional adapters"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F345",
@@ -4579,7 +4579,7 @@
         "Verify every default dataset and the optional Sentinel-2 mosaic are listed with license, attribution text, source link and re-verification date",
         "Run the automated check and verify the document matches the license metadata emitted by the pipeline"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F346",
@@ -4591,7 +4591,7 @@
         "Verify it covers size estimation, building from configuration, resuming, integrity and license checks, and publishing outputs",
         "Follow the skill's steps for a small test region end to end and verify they work exactly as written"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F553",
@@ -4603,7 +4603,7 @@
         "Follow the guide to host the sample outputs and engine assets with a plain static server and confirm the playground runs from them",
         "Confirm the guide and the default configuration reference no server run by the project"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F347",
@@ -5354,7 +5354,7 @@
         "Define a custom reference system from a projection definition string and verify a transform through it",
         "Verify the projection library's license passes the license audit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F405",
@@ -5366,7 +5366,7 @@
         "Run property-based tests verifying that parsing each formatted string returns the original coordinate within the format's precision",
         "Verify the readout control and the search box use these functions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F406",
@@ -5529,7 +5529,7 @@
         "Add controls individually and remove them and verify each mounts and unmounts cleanly",
         "Replace one built-in control with a custom control built on the public control API and extend another, and verify both work"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F419",
@@ -5542,7 +5542,7 @@
         "Verify buttons are disabled at the minimum and maximum zoom",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F420",
@@ -5555,7 +5555,7 @@
         "Using only the keyboard, reset north, rotate and orient to N, E, S and W",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F421",
@@ -5646,7 +5646,7 @@
         "Emulate a browser without the Fullscreen API and verify the control is hidden",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F428",
@@ -5658,7 +5658,7 @@
         "Verify the debug overlay and performance HUD appear and disappear",
         "Verify the toggle is absent unless enabled in the configuration"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F429",
@@ -5670,7 +5670,7 @@
         "Capture screenshots of every control and verify each visual property changed as expected",
         "Run an automated check that the ui package stylesheets contain no hard-coded colors, fonts or sizes outside the variable defaults"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F430",
@@ -5682,7 +5682,7 @@
         "Capture screenshots of every control in both themes and compare against baselines within tolerance",
         "Verify the switch applies to every control without reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F431",
@@ -5694,7 +5694,7 @@
         "Run an automated check that both languages define every translation key",
         "Verify numbers and units are formatted according to the selected locale"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F432",
@@ -5706,7 +5706,7 @@
         "Verify every control shows the new strings and missing keys fall back to English",
         "Override a single English string and verify only that string changes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F433",
@@ -5718,7 +5718,7 @@
         "Verify every focused control shows a visible focus indicator in light and dark themes",
         "Operate every control with Enter, Space, arrows and Escape as documented"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F434",
@@ -5742,7 +5742,7 @@
         "Verify every ratio meets WCAG 2.1 AA",
         "Verify icons over the map keep sufficient contrast over light and dark imagery (backing shape or outline)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F436",

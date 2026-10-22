@@ -10,8 +10,11 @@ function frame(name: string): FrameCapture {
   return { widthPx: png.width, heightPx: png.height, rgba: new Uint8ClampedArray(png.data) } as FrameCapture;
 }
 
-/** The globe fills these frames: every pixel hits it. */
-const filling = { screenToGeo: () => ({ longitudeDeg: 0, latitudeDeg: 0, heightMeters: 0 }) } as unknown as Globe;
+/** The globe fills these frames: every pixel hits it, on flat ground at the ellipsoid. */
+const filling = {
+  screenToGeo: () => ({ longitudeDeg: 0, latitudeDeg: 0, heightMeters: 0 }),
+  elevationAt: () => ({ heightMeters: 0 }),
+} as unknown as Globe;
 
 describe('scenario checks on saved frames (F562, F563)', () => {
   it('the frame-difference check fires on two frames that differ by a pop, and not on a frame and itself', () => {

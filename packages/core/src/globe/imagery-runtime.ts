@@ -75,7 +75,7 @@ const TERRAIN_PINNED_LEVEL = 2;
 
 /**
  * How a terrain source's tiles decode: built-in encodings in the worker pool, their grid adding at most half the
- * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0026, F132).
+ * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0027, F132).
  */
 function terrainDecodeTask(
   source: TerrainSource,

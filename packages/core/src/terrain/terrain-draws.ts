@@ -308,7 +308,7 @@ export function terrainHeightRange(
       const bound = layer.gridErrorMeters[current] ?? 0;
       const measured = bound / GRID_ERROR_FACTOR + (grid.errorMeters ?? 0);
       out[2] = measured > bound ? measured : bound;
-      // At the source's finest level, the surface refines until it samples each vertex of this grid (ADR 0027); below
+      // At the source's finest level, the surface refines until it samples each vertex of this grid (ADR 0028); below
       // it, finer terrain is still to come and the selection's own limit applies.
       const sampled = Math.log2(grid.cells / TILE_SEGMENTS);
       out[3] =

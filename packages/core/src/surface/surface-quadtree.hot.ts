@@ -171,10 +171,17 @@ const TEXEL = 3;
  * shows, within the global range); from {@link QuadtreeSelectionOptions.terrainRange}.
  */
 const tileRange = new Float64Array(4);
+/**
+ * Per-tile terrain measures, in an array because a double stored in a module variable or returned from a call is boxed
+ * (ADR 0018).
+ */
+const relief = new Float64Array(3);
 /** The deepest level the tile's terrain is worth refining to (from {@link QuadtreeSelectionOptions.terrainRange}). */
-let terrainLevelLimit = 0;
+const LEVEL_LIMIT = 0;
 /** The share of the level's terrain error a tile shows (latitude scaling of Mercator terrain), set by measureTile. */
-let terrainErrorScale = 1;
+const ERROR_SCALE = 1;
+/** The lower bound of the eye's distance to the tile's relief, set by reliefDistance. */
+const DISTANCE = 2;
 
 /**
  * Writes a tile's relief range into {@link tileRange}: its own when known, else the whole terrain's, with the
@@ -183,11 +190,11 @@ let terrainErrorScale = 1;
 function measureRelief(tile: QuadtreeTile, options: QuadtreeSelectionOptions): void {
   const globalLow = options.terrainMinMeters ?? 0;
   const globalHigh = options.terrainMaxMeters ?? 0;
-  terrainLevelLimit = options.terrainMaxLevel ?? 0;
+  relief[LEVEL_LIMIT] = options.terrainMaxLevel ?? 0;
   if (options.terrainRange?.(tile, tileRange)) {
-    // At the source's finest level the tile's own grid sets how deep its terrain is worth refining (ADR 0027).
+    // At the source's finest level the tile's own grid sets how deep its terrain is worth refining (ADR 0028).
     const limit = tileRange[3] ?? Number.POSITIVE_INFINITY;
-    if (limit !== Number.POSITIVE_INFINITY) terrainLevelLimit = limit;
+    if (limit !== Number.POSITIVE_INFINITY) relief[LEVEL_LIMIT] = limit;
     const error = tileRange[2] ?? 0;
     const low = (tileRange[0] ?? 0) - error;
     const high = (tileRange[1] ?? 0) + error;
@@ -210,11 +217,14 @@ function measureRelief(tile: QuadtreeTile, options: QuadtreeSelectionOptions): v
  * center laterally (plus what the relief's tilted normals add) and, since the ellipsoid is convex, at or below the
  * tangent plane by at most radius² / A plus the chord sag, before the relief raises it.
  */
-function reliefDistance(): number {
+function reliefDistance(): void {
   const high = tileRange[1] ?? 0;
   const sphere = (measure[CLOSEST] ?? 0) - high;
   // Without terrain the surface is the ellipsoid, where the sphere's bound has always measured the selection.
-  if (state.options.terrainRange === undefined) return sphere;
+  if (state.options.terrainRange === undefined) {
+    relief[DISTANCE] = sphere;
+    return;
+  }
   const radius = measure[RADIUS] ?? 0;
   const ox = offset[0] ?? 0;
   const oy = offset[1] ?? 0;
@@ -229,7 +239,7 @@ function reliefDistance(): number {
   const bottom = low - (radius * radius) / A - (measure[SAG] ?? 0) - reach;
   const rise = above > high ? above - high : above < bottom ? bottom - above : 0;
   const shell = gap > 0 ? Math.sqrt(gap * gap + rise * rise) : rise;
-  return shell > sphere ? shell : sphere;
+  relief[DISTANCE] = shell > sphere ? shell : sphere;
 }
 
 /** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
@@ -296,7 +306,8 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
   // Relief can rise toward the eye by up to the tile's highest terrain (F142).
   measureRelief(tile, options);
-  const closest = reliefDistance();
+  reliefDistance();
+  const closest = relief[DISTANCE] ?? 0;
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
   if (level >= MIN_LEVEL) {
     if (outsideFrustum(camera)) {
@@ -317,8 +328,9 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
         radius > RADIUS_TO_DISTANCE * distance ||
         (level < (options.imageryMaxLevel ?? 0) &&
           ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
-        (level < terrainLevelLimit &&
-          (((options.terrainErrorMeters?.[level] ?? 0) * terrainErrorScale) / distance) * state.pixelsPerRadian >
+        (level < (relief[LEVEL_LIMIT] ?? 0) &&
+          (((options.terrainErrorMeters?.[level] ?? 0) * (relief[ERROR_SCALE] ?? 1)) / distance) *
+            state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
     state.count++;
@@ -350,13 +362,15 @@ export function quadtreeTileErrorsPx(
   measureTile(tile, camera.eyeEcef);
   // The selection's distance: relief can rise toward the eye by up to the tile's highest terrain.
   measureRelief(tile, options);
-  const closest = reliefDistance();
+  reliefDistance();
+  const closest = relief[DISTANCE] ?? 0;
   state.options = previous;
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
   const pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
   out[0] = ((measure[SAG] ?? 0) / distance) * pixelsPerRadian;
   out[1] = ((measure[TEXEL] ?? 0) / distance) * pixelsPerRadian;
-  out[2] = (((options.terrainErrorMeters?.[tile.level] ?? 0) * terrainErrorScale) / distance) * pixelsPerRadian;
+  out[2] =
+    (((options.terrainErrorMeters?.[tile.level] ?? 0) * (relief[ERROR_SCALE] ?? 1)) / distance) * pixelsPerRadian;
   return out;
 }
 
@@ -410,7 +424,7 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
   const north = tile.northRad;
   const south = tile.southRad;
   const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
-  terrainErrorScale =
+  relief[ERROR_SCALE] =
     state.options.terrainMercator !== true ? 1 : tile.root === MERCATOR_ROOT ? Math.cos(equatorward) : 0;
   // The largest mesh row step: a Mercator tile's rows are densest toward the pole, so its widest step is the one at
   // its equatorward edge; a cap tile's rows are evenly spaced.

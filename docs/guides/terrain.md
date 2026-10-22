@@ -1,6 +1,6 @@
 # Terrain
 
-How to add terrain to a globe, query heights, keep the camera above the ground and host a geoid grid (M4; ADR 0006 §2–7, ADR 0026). The project serves no data (ADR 0015): you host the tiles and any geoid grid.
+How to add terrain to a globe, query heights, keep the camera above the ground and host a geoid grid (M4; ADR 0006 §2–7, ADR 0027). The project serves no data (ADR 0015): you host the tiles and any geoid grid.
 
 ## Sources
 

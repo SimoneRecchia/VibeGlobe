@@ -39,7 +39,7 @@ export function fixtureUndulationMeters(lonRad: number, latRad: number): number 
   return 30 + 20 * Math.sin(2 * lonRad) * Math.cos(latRad);
 }
 
-/** The fixture geoid as a `VGEOID1` grid file (ADR 0026): 1° steps, rows from 90° N, columns from 180° W. */
+/** The fixture geoid as a `VGEOID1` grid file (ADR 0027): 1° steps, rows from 90° N, columns from 180° W. */
 export function fixtureGeoidFile(): Buffer {
   const rows = 181;
   const columns = 360;

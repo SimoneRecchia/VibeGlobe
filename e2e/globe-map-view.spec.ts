@@ -174,7 +174,8 @@ for (const backend of BACKENDS) {
       page,
     }) => {
       test.setTimeout(120_000);
-      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=17`);
+      // A fixed 60 Hz engine clock: the animation runs on engine time (KB-099), so a slow frame here would be a bigger step.
+      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=17&clockStepMs=16.666666666666668`);
       expect((await cameraAfterFrame(page)).tiltDeg).toBeGreaterThan(40);
       // The tilt animates to 0°: every drawn frame lower, none by more than a third of the way (recorded per frame in
       // the page: several frames can pass between two round trips on a slow GPU).

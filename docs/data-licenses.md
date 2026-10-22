@@ -1,6 +1,6 @@
 # Data licenses and attributions
 
-Every dataset the VibeGlobe data pipeline builds by default, and the optional fresher Sentinel-2 mosaic, with its license, the exact attribution its outputs carry, its source and the date its terms were last re-verified. The terms and their reading are recorded in [ADR 0024](adr/0024-default-data-licenses.md). The pipeline writes the same fields into every output's metadata (`metadata.json`, PMTiles metadata, MBTiles metadata table), and `packages/tools/src/license/license-records.test.ts` checks that this document matches them.
+Every dataset the VibeGlobe data pipeline builds by default, and the optional fresher Sentinel-2 mosaic, with its license, the exact attribution its outputs carry, its source and the date its terms were last re-verified. The terms and their reading are recorded in [ADR 0025](adr/0025-default-data-licenses.md). The pipeline writes the same fields into every output's metadata (`metadata.json`, PMTiles metadata, MBTiles metadata table), and `packages/tools/src/license/license-records.test.ts` checks that this document matches them.
 
 Consumers host these outputs themselves (ADR 0015) and must show the attribution wherever the data is displayed.
 

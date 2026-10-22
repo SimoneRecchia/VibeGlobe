@@ -1,5 +1,5 @@
 /**
- * The only way the pipeline runs an external tool (ADR 0023): `docker run` of an image pinned by digest, without
+ * The only way the pipeline runs an external tool (ADR 0024): `docker run` of an image pinned by digest, without
  * network, with only the build folder mounted.
  */
 import { spawnSync } from 'node:child_process';

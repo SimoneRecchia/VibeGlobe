@@ -2,7 +2,7 @@
 
 - Status: Complete (survey for M9, F330)
 - Date: 2026-10-21
-- Decision: [ADR 0023](../adr/0023-data-pipeline.md)
+- Decision: [ADR 0024](../adr/0024-data-pipeline.md)
 
 ## 1. Scope and requirements
 
@@ -20,7 +20,7 @@ It serves the M9 entries of `feature_list.json`:
 - F336: PMTiles, MBTiles and static folders;
 - F337: license and attribution metadata.
 
-It also serves ADR 0006 §5–6, which decodes Terrarium "within its own pixels" and hides cracks with skirts. `packages/tools` belongs to the parallel session (`docs/parallel-tracks.md`). This survey only informs ADR 0023.
+It also serves ADR 0006 §5–6, which decodes Terrarium "within its own pixels" and hides cracks with skirts. `packages/tools` belongs to the parallel session (`docs/parallel-tracks.md`). This survey only informs ADR 0024.
 
 ## 2. Projects studied
 
@@ -144,7 +144,7 @@ Shallow clones, read but not run.
 
 ## 7. Approach chosen and why
 
-ADR 0023 records the decision. The survey supports the following.
+ADR 0024 records the decision. The survey supports the following.
 
 1. **Built-in reader instead of GDAL for the default datasets.** All default sources are EPSG:4326 GeoTIFFs:
    - Copernicus GLO-30: float32, DEFLATE, floating-point predictor, 1024² tiles;
@@ -157,7 +157,7 @@ ADR 0023 records the decision. The survey supports the following.
    - Global pixel (X, Y) at zoom z is sampled at `((X + 0.5) / (256 · 2^z), (Y + 0.5) / (256 · 2^z))`, so every tile at a zoom is a window of the same lattice.
    - Neighbors therefore never disagree about a pixel, which addresses CTB #71 and GDAL #3248. Children nest exactly in parents: one parent pixel is the area of 2 × 2 child pixels.
    - This is the convention MapLibre and other Terrarium consumers assume, so the tiles stay interoperable.
-   - Pixel-center sampling cannot give neighbors a **shared** edge sample. That needs a 2^k + 1 corner grid (CTB, Martini), which is a non-standard Terrarium size, or a one-pixel border. ADR 0006 decodes "within its own pixels" and covers same-level steps with skirts. ADR 0023 should confirm that, or add an opt-in bordered variant (open question 1).
+   - Pixel-center sampling cannot give neighbors a **shared** edge sample. That needs a 2^k + 1 corner grid (CTB, Martini), which is a non-standard Terrarium size, or a one-pixel border. ADR 0006 decodes "within its own pixels" and covers same-level steps with skirts. ADR 0024 should confirm that, or add an opt-in bordered variant (open question 1).
    - Quantization: `v = round((h + 32768) · 256)` with an explicit rounding rule (half up, not NumPy's half-to-even), in signed range (CTB #5). NoData and the voids that remain are filled with 0 m rather than a sentinel (rio-rgbify #35, #38).
    - Lower zooms are 2 × 2 box averages of the float32 child grids, never of encoded tiles (unlike gdal2tiles).
    - Quantized-mesh and Martini or Delatin meshing are not generated. Their seam problems (CTB #86, Martini #7) are exactly what a height-grid engine avoids.
@@ -179,10 +179,10 @@ ADR 0023 records the decision. The survey supports the following.
 ## 8. Open questions
 
 1. **Edge convention for terrain.** Keep standard 256-pixel Terrarium plus skirts (ADR 0006), or add an opt-in 258 × 258 bordered variant that gives the engine shared edges without fetching neighbors? Decide after the M4 crack sweep.
-2. **Copernicus georeferencing.** Settled: the files declare pixel-is-point (`GTRasterTypeGeoKey` = 2) and each file's width follows its latitude band, so the reader honors the key and uses each file's own pixel scale (ADR 0023).
-3. **JPEG encoder.** Settled: an original baseline encoder in `packages/tools` (ADR 0023).
+2. **Copernicus georeferencing.** Settled: the files declare pixel-is-point (`GTRasterTypeGeoKey` = 2) and each file's width follows its latitude band, so the reader honors the key and uses each file's own pixel scale (ADR 0024).
+3. **JPEG encoder.** Settled: an original baseline encoder in `packages/tools` (ADR 0024).
 4. **Gzip header across platforms.** Node's `gzipSync` writes mtime 0 and OS byte 3 on Linux. Check the Windows value. If it differs, write the gzip header and CRC around `deflateRawSync`.
-5. **`node:sqlite`.** Settled: available from Node 22.5 with an experimental warning; the MBTiles writer uses only its synchronous API (ADR 0023).
+5. **`node:sqlite`.** Settled: available from Node 22.5 with an experimental warning; the MBTiles writer uses only its synchronous API (ADR 0024).
 
 [ctb]: https://github.com/geo-data/cesium-terrain-builder/tree/8dd633c13582956a2bfdd9f447f62bde04682b9a
 [ctb-tb]: https://github.com/geo-data/cesium-terrain-builder/blob/8dd633c13582956a2bfdd9f447f62bde04682b9a/src/TerrainTiler.hpp

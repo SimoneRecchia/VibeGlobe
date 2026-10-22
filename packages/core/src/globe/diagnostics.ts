@@ -73,5 +73,7 @@ export const NO_RENDERER_STATS: RendererStats = Object.freeze({
   textureUploads: 0,
   matrixUpdates: 0,
   pipelineCompiles: 0,
+  pipelineSwitches: 0,
+  compressedTextures: 0,
   gpuFrameMs: null,
 });

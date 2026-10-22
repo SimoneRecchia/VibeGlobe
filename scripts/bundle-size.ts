@@ -4,6 +4,7 @@
 // is checked against `initialJs`: three.js's share after tree-shaking, and the total (F546, ADR 0010).
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { bundle } from './bundle.ts';
 import { ROOT_DIR, readWorkspace } from './workspace.ts';
 
@@ -11,6 +12,8 @@ interface Budgets {
   bundleExternal: string[];
   initialJs: { threeGzipKB: number; totalGzipKB: number };
   packages: Record<string, { bundleGzipKB?: number }>;
+  /** Lazily loaded WebAssembly binaries (ADR 0020 rule 4). */
+  wasm: Record<string, { file: string; gzipKB: number }>;
 }
 
 /** A minimal host page's globe: the engine packages a first frame needs. */
@@ -59,6 +62,14 @@ for (const [label, sizeKB, budgetKB] of [
   failed ||= over;
   console.log(
     `${over ? 'OVER' : 'ok  '}  ${label.padEnd(36)} ${sizeKB.toFixed(2).padStart(8)} KB gzip  (budget ${budgetKB} KB)`,
+  );
+}
+for (const [name, { file, gzipKB }] of Object.entries(budgets.wasm)) {
+  const sizeKB = gzipSync(readFileSync(join(ROOT_DIR, file)), { level: 9 }).length / 1024;
+  const over = sizeKB > gzipKB;
+  failed ||= over;
+  console.log(
+    `${over ? 'OVER' : 'ok  '}  ${`${name}.wasm (lazy)`.padEnd(36)} ${sizeKB.toFixed(2).padStart(8)} KB gzip  (budget ${gzipKB} KB)`,
   );
 }
 if (failed) process.exit(1);

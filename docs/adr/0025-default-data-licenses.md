@@ -1,4 +1,4 @@
-# 0024. Licenses and attribution of the default datasets, re-verified
+# 0025. Licenses and attribution of the default datasets, re-verified
 
 - Status: Accepted
 - Date: 2026-10-21
@@ -6,7 +6,7 @@
 
 ## Context
 
-`PLAN.md` lists the default datasets with license notes "checked during planning: the agent must re-verify them before shipping". F332 asks for each dataset's current terms, with reading date and source link. For each, it asks whether commercial use and redistribution are free, and for the exact required attribution. The pipeline's configuration files must use that attribution text. The pipeline refuses sources whose terms forbid packaging (F333, ADR 0023).
+`PLAN.md` lists the default datasets with license notes "checked during planning: the agent must re-verify them before shipping". F332 asks for each dataset's current terms, with reading date and source link. For each, it asks whether commercial use and redistribution are free, and for the exact required attribution. The pipeline's configuration files must use that attribution text. The pipeline refuses sources whose terms forbid packaging (F333, ADR 0024).
 
 The official pages were read on 2026-10-21. The build container cannot open some of them directly: `registry.opendata.aws`, `cloudless.eox.at`, `naturalearthdata.com`, `openstreetmap.org` and the OSMF operations site are blocked by its network policy. Their current text was then read through search-engine copies of the same pages and the licence documents they link to. Each row names the page that was read. The owner should open the links once from an unrestricted network before the first public release of data (`docs/open-questions.md`).
 

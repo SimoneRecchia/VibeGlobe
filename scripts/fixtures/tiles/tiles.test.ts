@@ -110,4 +110,22 @@ describe('fixture tile server', () => {
     expect((await fetch(`${base}/_fixture/d`, { method: 'DELETE' })).status).toBe(204);
     expect(await log('d')).toEqual([]);
   });
+
+  it('logs the host and connection of each request, throttles bandwidth and gzips on request (F089, F096, F113)', async () => {
+    await rules('e', [
+      { minLevel: 4, maxLevel: 4, bandwidthBytesPerS: 20_000 },
+      { minLevel: 5, maxLevel: 5, gzip: true },
+    ]);
+    const started = Date.now();
+    const slow = await fetch(`${base}/fixture-tiles/e/world/mercator/4/1/1.png`);
+    const bytes = (await slow.arrayBuffer()).byteLength;
+    // At 20 kB/s the body takes about bytes / 20,000 seconds.
+    expect(Date.now() - started).toBeGreaterThanOrEqual((bytes / 20_000) * 1000 * 0.8);
+    const zipped = await fetch(`${base}/fixture-tiles/e/world/mercator/5/1/1.png`);
+    expect(zipped.headers.get('content-encoding')).toBe('gzip');
+    expect(PNG.sync.read(Buffer.from(await zipped.arrayBuffer())).width).toBe(256);
+    const records = await log('e');
+    expect(records.map((record) => record.host)).toEqual([new URL(base).host, new URL(base).host]);
+    expect(records.every((record) => typeof record.connection === 'number')).toBe(true);
+  });
 });

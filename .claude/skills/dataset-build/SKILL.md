@@ -5,7 +5,7 @@ description: Build, resume, verify and publish VibeGlobe's default datasets (ter
 
 # Dataset build
 
-The pipeline is the `vibeglobe-data` command of `packages/tools` (ADR 0023). Every build is defined by a JSON configuration in `packages/tools/configs/` (`world-low.json`, `italy-high.json`, `test-mont-blanc.json`); licenses are in ADR 0024 and `docs/data-licenses.md`. Run every command from the repository root.
+The pipeline is the `vibeglobe-data` command of `packages/tools` (ADR 0024). Every build is defined by a JSON configuration in `packages/tools/configs/` (`world-low.json`, `italy-high.json`, `test-mont-blanc.json`); licenses are in ADR 0025 and `docs/data-licenses.md`. Run every command from the repository root.
 
 ## 0. Prepare
 

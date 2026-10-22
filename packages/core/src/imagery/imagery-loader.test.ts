@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { FakeTimers } from '../globe/test-renderer.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import type { DecodedTile, TileRequest, TileTransport, TransportResult } from '../scheduler/types.js';
-import type { WorkerPool, WorkerTaskDone } from '../scheduler/worker-pool-types.js';
+import { WorkerTaskError, type WorkerPool, type WorkerTaskDone } from '../scheduler/worker-pool-types.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
-import { ARRIVING, ImageryLoader } from './imagery-loader.js';
+import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
 import type { ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
@@ -32,12 +32,54 @@ class ManualTransport implements TileTransport {
   }
 }
 
-/** A worker pool that decodes at once into a fake tile. */
-function fakeWorkers(): WorkerPool {
+/**
+ * A worker pool the test drives: tasks wait until `finish` answers them, and `cancel` reports the cancel at once, as
+ * the real pool does.
+ */
+function drivenWorkers() {
+  const pending = new Map<number, WorkerTaskDone>();
+  let id = 0;
+  const pool: WorkerPool = {
+    url: 'driven',
+    run: (_request, done: WorkerTaskDone) => {
+      pending.set(++id, done);
+      return id;
+    },
+    setPriority: () => false,
+    cancel: (task) => {
+      const done = pending.get(task);
+      pending.delete(task);
+      done?.({ ok: false, error: new WorkerTaskError('cancelled', 'cancelled') });
+      return done !== undefined;
+    },
+    update: () => undefined,
+    readStats: (out) => out,
+  };
+  const finish = (task: number, outcome: Parameters<WorkerTaskDone>[0]): void => {
+    const done = pending.get(task);
+    pending.delete(task);
+    done?.(outcome);
+  };
+  return { pool, pending, finish };
+}
+
+/** A worker pool that decodes at once into a fake tile; `tasks` records each task name and input. */
+function fakeWorkers(tasks: { task: string; input: unknown }[] = []): WorkerPool {
   let id = 0;
   return {
     url: 'fake',
     run: (request, done: WorkerTaskDone) => {
+      tasks.push({ task: request.task, input: request.input });
+      // One byte stands for a payload that does not decode, two for data the device cannot use.
+      const length = (request.input as { bytes: ArrayBuffer }).bytes.byteLength;
+      if (length === 1) {
+        done({ ok: false, error: new WorkerTaskError('task-failed', 'not an image', 'undecodable') });
+        return ++id;
+      }
+      if (length === 2) {
+        done({ ok: false, error: new WorkerTaskError('task-failed', 'no transcoder', 'format-unsupported') });
+        return ++id;
+      }
       const tile: DecodedTile = { widthPx: 256, heightPx: 256, gpuBytes: 349_524, image: request.input };
       done({ ok: true, output: tile });
       return ++id;
@@ -49,7 +91,18 @@ function fakeWorkers(): WorkerPool {
   };
 }
 
-function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number; pinnedLevel?: number } = {}) {
+function setUp(
+  maxInFlight = 32,
+  memory: {
+    gpuBytes?: number;
+    ramBytes?: number;
+    pinnedLevel?: number;
+    decoder?: 'image' | 'ktx2';
+    workers?: WorkerPool;
+    source?: Partial<ImagerySource>;
+  } = {},
+) {
+  const tasks: { task: string; input: unknown }[] = [];
   const timers = new FakeTimers();
   const transport = new ManualTransport();
   const source: ImagerySource = {
@@ -60,13 +113,14 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
     tileSizePx: 256,
     pixelRatio: 1,
     transport,
-    decoder: 'image',
+    decoder: memory.decoder ?? 'image',
     request: (coord, out) => {
       if (coord.level === 9) return 'noData';
       out.url = `https://tiles.test/${coord.level}/${coord.x}/${coord.y}.png`;
       out.hostIndex = 0;
       return out;
     },
+    ...memory.source,
   };
   const network = new NetworkPool({
     now: () => timers.nowMs,
@@ -77,6 +131,7 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
   });
   const uploaded: number[] = [];
   const released: number[] = [];
+  const errors: string[] = [];
   let frames = 0;
   let frame = 0;
   // eslint-disable-next-line prefer-const -- assigned after the residency that calls it is built
@@ -89,12 +144,14 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
   loader = new ImageryLoader({
     source,
     network,
-    workers: fakeWorkers(),
+    workers: memory.workers ?? fakeWorkers(tasks),
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
+    compressedFormats: ['bc'],
     uploadTexture: (handle) => uploaded.push(handle),
     releaseTexture: (handle) => released.push(handle),
+    tileError: (_source, level, x, y, reason) => errors.push(`${reason} ${level}/${x}/${y}`),
     requestFrame: () => frames++,
     now: () => timers.nowMs,
     setTimer: (callback, delayMs) => timers.set(callback, delayMs),
@@ -112,7 +169,20 @@ function setUp(maxInFlight = 32, memory: { gpuBytes?: number; ramBytes?: number;
     residency.trim(frame, 64);
     return handles;
   };
-  return { timers, transport, loader, uploaded, released, residency, ram, ok, runFrame, frames: () => frames };
+  return {
+    timers,
+    transport,
+    loader,
+    uploaded,
+    released,
+    errors,
+    residency,
+    ram,
+    ok,
+    runFrame,
+    tasks,
+    frames: () => frames,
+  };
 }
 
 const url = (level: number, x: number, y: number): string => `https://tiles.test/${level}/${x}/${y}.png`;
@@ -275,5 +345,197 @@ describe('ImageryLoader', () => {
     transport.answer(url(6, 31, 20), ok);
     runFrame([[6, 31, 20]]);
     for (const handle of [100, 101, 102, 103, 104]) expect(residency.isPinned(handle)).toBe(true);
+  });
+
+  it('reports a corrupt tile once and never requests it again; its ancestor stays drawn (F112)', () => {
+    const { transport, errors, timers, runFrame } = setUp();
+    runFrame([
+      [4, 1, 1],
+      [3, 0, 0],
+    ]);
+    transport.answer(url(3, 0, 0), { kind: 'ok', bytes: new ArrayBuffer(8), contentType: 'image/png' });
+    transport.answer(url(4, 1, 1), { kind: 'ok', bytes: new ArrayBuffer(1), contentType: 'image/png' });
+    for (let frame = 0; frame < 4; frame++) {
+      timers.advance(5000);
+      runFrame([
+        [4, 1, 1],
+        [3, 0, 0],
+      ]);
+    }
+    expect(errors).toEqual(['corrupt 4/1/1']);
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+  });
+
+  it('transcodes KTX2 sources for the device formats and reports data it cannot use once (F104)', () => {
+    const { transport, errors, timers, runFrame, tasks, uploaded } = setUp(32, { decoder: 'ktx2' });
+    runFrame([
+      [4, 1, 1],
+      [3, 0, 0],
+    ]);
+    transport.answer(url(3, 0, 0), { kind: 'ok', bytes: new ArrayBuffer(8), contentType: 'image/ktx2' });
+    transport.answer(url(4, 1, 1), { kind: 'ok', bytes: new ArrayBuffer(2), contentType: 'image/ktx2' });
+    for (let frame = 0; frame < 4; frame++) {
+      timers.advance(5000);
+      runFrame([
+        [4, 1, 1],
+        [3, 0, 0],
+      ]);
+    }
+    expect(tasks.map((task) => task.task)).toEqual(['transcode-ktx2', 'transcode-ktx2']);
+    expect((tasks[0]?.input as { formats: string[] }).formats).toEqual(['bc']);
+    expect(uploaded).toHaveLength(1);
+    expect(errors).toEqual(['unsupported 4/1/1']);
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+  });
+
+  it('gives up after the last retry and reports the tile as failed (F091)', () => {
+    const { transport, errors, timers, runFrame } = setUp();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), { kind: 'status', status: 500, retryAfterMs: undefined });
+      timers.advance(40_000);
+    }
+    // The first request and four retries.
+    expect(transport.started).toHaveLength(5);
+    expect(errors).toEqual(['failed 4/2/2']);
+  });
+
+  it('shares one request between two loaders wanting the same tile (F095)', () => {
+    const timers = new FakeTimers();
+    const transport = new ManualTransport();
+    const network = new NetworkPool({
+      now: () => timers.nowMs,
+      setTimer: (callback, delayMs) => timers.set(callback, delayMs),
+      clearTimer: (handle) => timers.clear(handle),
+      queueTask: (callback) => timers.set(callback, 0),
+    });
+    const uploaded: number[] = [];
+    const loaders = [0, 1000].map((handleBase) => {
+      const residency = new Residency({ budgetBytes: 1e9 });
+      return new ImageryLoader({
+        source: {
+          id: 'shared',
+          tiling: WEB_MERCATOR_TILING,
+          minLevel: 0,
+          maxLevel: 10,
+          tileSizePx: 256,
+          pixelRatio: 1,
+          transport,
+          decoder: 'image',
+          request: (coord, out) => {
+            out.url = url(coord.level, coord.x, coord.y);
+            return out;
+          },
+        },
+        network,
+        workers: fakeWorkers(),
+        memory: { residency, ram: new RamTier({ budgetBytes: 1e9 }), frame: () => 1 },
+        handleBase,
+        pinnedLevel: -1,
+        compressedFormats: [],
+        uploadTexture: (handle) => uploaded.push(handle),
+        releaseTexture: () => undefined,
+        requestFrame: () => undefined,
+        tileError: () => undefined,
+        now: () => timers.nowMs,
+        setTimer: (callback, delayMs) => timers.set(callback, delayMs),
+        random: () => 0.5,
+      });
+    });
+    for (const loader of loaders) {
+      loader.beginFrame();
+      loader.want(6, 3, 3, 1);
+      loader.endFrame();
+    }
+    transport.answer(url(6, 3, 3), { kind: 'ok', bytes: new ArrayBuffer(8), contentType: 'image/png' });
+    for (const loader of loaders) {
+      loader.beginFrame();
+      loader.want(6, 3, 3, 1);
+      loader.endFrame();
+    }
+    expect(transport.started).toEqual([url(6, 3, 3)]);
+    expect(uploaded).toEqual([0, 1000]);
+  });
+
+  it('loads the whole pinned base even when its tiles are also wanted as visible ancestors (KB-067)', () => {
+    const { transport, loader, residency, ok } = setUp(2, { pinnedLevel: 1 });
+    for (let frame = 1; frame <= 6 && !loader.pinnedComplete; frame++) {
+      residency.startFrame(frame);
+      loader.beginFrame();
+      // A pinned level-1 tile wanted as the ancestor of an edge tile gets a larger key (1024 + 1 + 2 · distance) than
+      // a visible tile at the center (1024 + 6).
+      loader.want(1, 1, 1, 1027);
+      loader.want(6, 30, 20, 1030 - 4);
+      loader.endFrame();
+      for (const u of [...transport.open.keys()]) transport.answer(u, ok);
+    }
+    expect(loader.pinnedComplete).toBe(true);
+  });
+
+  it('cancelling a decoding tile keeps every other active tile tracked, so it is cancelled when unwanted (M3 review)', () => {
+    const workers = drivenWorkers();
+    const { transport, ok, runFrame, timers } = setUp(32, { workers: workers.pool });
+    runFrame([
+      [5, 1, 1],
+      [5, 2, 2],
+    ]);
+    // 5/1/1 is decoding; 5/2/2 is still loading.
+    transport.answer(url(5, 1, 1), ok);
+    for (let frame = 0; frame < 3; frame++) runFrame([[5, 2, 2]]);
+    for (let frame = 0; frame < 3; frame++) runFrame([]);
+    timers.advance(5000);
+    expect(transport.aborted).toContain(url(5, 2, 2));
+  });
+
+  it('a tile of a full host steps aside for a tile of a free host (M3 review)', () => {
+    const { transport, runFrame } = setUp(32, {
+      source: {
+        maxRequestsPerHost: 1,
+        request: (coord, out) => {
+          out.url = `https://${coord.x === 9 ? 'b' : 'a'}.tiles.test/${coord.level}/${coord.x}/${coord.y}.png`;
+          out.hostIndex = 0;
+          return out;
+        },
+      },
+    });
+    runFrame([
+      [6, 1, 1],
+      [6, 2, 1],
+      [6, 9, 1],
+    ]);
+    expect(transport.started.map((u) => new URL(u).host)).toEqual(['a.tiles.test', 'b.tiles.test']);
+  });
+
+  it('a tile the GPU budget refuses is not counted as an upload and waits before it is decoded again (M3 review)', () => {
+    const { transport, loader, ok, runFrame, tasks, timers } = setUp(32, { gpuBytes: 1000 });
+    runFrame([[4, 1, 1]]);
+    transport.answer(url(4, 1, 1), ok);
+    for (let frame = 0; frame < 5; frame++) runFrame([[4, 1, 1]]);
+    const stats = { queued: 0, loading: 0, decoding: 0, ready: 0, failed: 0, noData: 0, requested: 0, uploads: 0 };
+    loader.addStats(stats as Parameters<ImageryLoader['addStats']>[0]);
+    expect(stats.uploads).toBe(0);
+    expect(tasks).toHaveLength(1);
+    expect(loader.busy).toBe(false);
+    timers.advance(1000);
+    runFrame([[4, 1, 1]]);
+    expect(tasks).toHaveLength(2);
+  });
+
+  it('a decode the worker cannot finish is retried with backoff, then reported (M3 review)', () => {
+    const workers = drivenWorkers();
+    const { transport, ok, runFrame, errors, timers } = setUp(32, { workers: workers.pool });
+    runFrame([[4, 1, 1]]);
+    transport.answer(url(4, 1, 1), ok);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const [task] = [...workers.pending.keys()];
+      workers.finish(task ?? -1, { ok: false, error: new WorkerTaskError('crash', 'worker crashed') });
+      runFrame([[4, 1, 1]]);
+      expect(workers.pending.size).toBe(0);
+      timers.advance(10_000);
+      runFrame([[4, 1, 1]]);
+    }
+    expect(errors).toEqual(['failed 4/1/1']);
+    // From the RAM copy: the tile was downloaded once.
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
   });
 });

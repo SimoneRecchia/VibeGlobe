@@ -1,6 +1,6 @@
 /**
  * A dataset build from a configuration file: license gate, estimate and confirmation before any download, then the
- * download, convert, tile and package steps of each dataset, each resumable (ADR 0023).
+ * download, convert, tile and package steps of each dataset, each resumable (ADR 0024).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

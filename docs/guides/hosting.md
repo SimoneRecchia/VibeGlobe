@@ -51,7 +51,7 @@ The worker program must be one self-contained module. Bundlers that resolve `new
 
 ## Attribution
 
-Every output's `metadata.json` (and the PMTiles and MBTiles metadata) carries the exact `attribution` its license requires (ADR 0024, `docs/data-licenses.md` in the repository). Show it wherever the data is displayed, for example in the map's credits:
+Every output's `metadata.json` (and the PMTiles and MBTiles metadata) carries the exact `attribution` its license requires (ADR 0025, `docs/data-licenses.md` in the repository). Show it wherever the data is displayed, for example in the map's credits:
 
 ```ts
 const { attribution } = await (await fetch('https://tiles.example.com/imagery/metadata.json')).json();

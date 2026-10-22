@@ -36,6 +36,8 @@ export type {
   Globe,
   GlobeEvents,
   GlobeOptions,
+  ImageryStats,
+  MemoryOptions,
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
@@ -45,6 +47,10 @@ export type {
   RenderHost,
   ResourceCounts,
   ScreenPoint,
+  SurfaceStats,
+  SurfaceTileInfo,
+  TileErrorEvent,
+  TileErrorReason,
   ViewInit,
 } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';
@@ -97,6 +103,35 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage } from './imagery/imagery-source.js';
 export type { ImagerySource } from './imagery/imagery-source.js';
+export { FRAME_PHASES } from './diagnostics/observability.js';
+export type {
+  FramePhase,
+  GlobeDiagnostics,
+  LogEntry,
+  LogLevel,
+  LogSink,
+  PhaseTimesMs,
+  TraceEvent,
+} from './diagnostics/observability.js';
+export {
+  chooseKtx2Target,
+  isKtx2,
+  Ktx2Error,
+  KTX2_TARGET_CODES,
+  ktx2GpuBytes,
+  ktx2LevelBytes,
+  ktx2LevelRange,
+  ktx2LevelSize,
+  readKtx2,
+} from './imagery/ktx2.js';
+export type {
+  CompressedLevel,
+  CompressedTileImage,
+  Ktx2ErrorCode,
+  Ktx2Info,
+  Ktx2Kind,
+  Ktx2Target,
+} from './imagery/ktx2.js';
 export type {
   AbortHandle,
   DecodedTile,

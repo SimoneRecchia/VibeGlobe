@@ -1,4 +1,4 @@
-/** Terrarium height encoding: `height = R·256 + G + B/256 − 32768` meters, a step of 1/256 m (ADR 0023). */
+/** Terrarium height encoding: `height = R·256 + G + B/256 − 32768` meters, a step of 1/256 m (ADR 0024). */
 import { encodePng } from './png.js';
 
 /** Quantization step of Terrarium heights, in meters. */

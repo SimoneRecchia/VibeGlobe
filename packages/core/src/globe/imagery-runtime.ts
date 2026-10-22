@@ -1,17 +1,19 @@
 import { rgba8Bytes } from '../cache/byte-size.js';
+import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, type ImageryLayer } from '../imagery/imagery-draws.js';
-import type { DrawList } from '../imagery/draw-list.js';
-import { ImageryLoader, type ImageryLoaderStats, type TileMemory } from '../imagery/imagery-loader.js';
+import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
+import { ImageryFades } from '../imagery/fades.js';
+import { ImageryLoader, type ImageryLoaderStats, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import type { ImageryStats, MemoryOptions, RendererBackend } from './types.js';
+import type { ImageryStats, MemoryOptions, RendererBackend, TileErrorEvent } from './types.js';
 
 /** Texture handles of layer `i` start at `i × HANDLES_PER_LAYER`. */
 const HANDLES_PER_LAYER = 1 << 22;
@@ -21,6 +23,36 @@ const DEFAULT_RAM_BUDGET_BYTES = 256 * 1024 * 1024;
 /** Evictions per frame outside admissions (ADR 0007): at most 64 tiles or 1 ms. */
 const TRIM_TILES = 64;
 const TRIM_MS = 1;
+
+/** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
+let pagePool: { pool: NetworkPool; users: number } | undefined;
+
+function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
+  pagePool ??= {
+    pool: new NetworkPool({
+      now: () => host.now(),
+      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
+      clearTimer: (handle) => host.clearTimer(handle),
+    }),
+    users: 0,
+  };
+  pagePool.users++;
+  return pagePool.pool;
+}
+
+function releaseNetworkPool(pool: NetworkPool): void {
+  if (pagePool?.pool !== pool || --pagePool.users > 0) return;
+  pool.dispose();
+  pagePool = undefined;
+}
+
+/** What the runtime reports to its engine instance. */
+export interface ImageryCallbacks {
+  /** Something arrived that changes the picture or the queue. */
+  requestFrame(): void;
+  /** A tile failed for good; its ancestors stay drawn (F112). */
+  tileError(event: TileErrorEvent): void;
+}
 
 /**
  * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
@@ -61,20 +93,22 @@ export class ImageryRuntime {
   private readonly residency: Residency;
   private readonly ram: RamTier;
   private frame = 0;
+  private readonly fades = new ImageryFades();
+  /** Keeps a texture still faded from resident this frame. */
+  private readonly keepTexture = (handle: number): void => {
+    if (handle !== BASE_TEXTURE) this.loaderOf(handle)?.markDrawn(handle);
+  };
 
   constructor(
     sources: readonly ImagerySource[],
     workers: WorkerEndpointFactory,
     memory: MemoryOptions,
     renderer: RendererBackend,
-    requestFrame: () => void,
+    callbacks: ImageryCallbacks,
+    observability?: Observability,
   ) {
     const host = renderer.host;
-    this.network = new NetworkPool({
-      now: () => host.now(),
-      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
-      clearTimer: (handle) => host.clearTimer(handle),
-    });
+    this.network = acquireNetworkPool(host);
     this.lease = acquireWorkerPool(workers, {
       timers: {
         set: (callback, delayMs) => host.setTimer(callback, delayMs),
@@ -108,9 +142,12 @@ export class ImageryRuntime {
         memory: shared,
         handleBase: index * HANDLES_PER_LAYER,
         pinnedLevel: pinned[index] ?? -1,
+        compressedFormats: renderer.capabilities.compressedTextureFormats,
+        ...(observability ? { observability } : {}),
         uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
         releaseTexture: (handle) => renderer.releaseTexture(handle),
-        requestFrame,
+        requestFrame: () => callbacks.requestFrame(),
+        tileError: (source, level, x, y, reason) => callbacks.tileError({ sourceId: source.id, level, x, y, reason }),
         now: () => host.now(),
         setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
         random: Math.random,
@@ -132,13 +169,33 @@ export class ImageryRuntime {
     return true;
   }
 
-  /** Wants the frame's imagery and writes the draws of the tiles it covers (the base image stays elsewhere). */
-  draw(list: DrawList, tiles: readonly QuadtreeTile[], count: number, camera: Camera): void {
+  /** True while a tile of the last frame was cross-fading: the engine keeps drawing (F105). */
+  get fading(): boolean {
+    return this.fades.fading;
+  }
+
+  /**
+   * Wants the frame's imagery, writes the draws of the tiles it covers (the base image stays elsewhere) and their
+   * cross-fades of `fadeMs` at engine time `nowMs[0]`.
+   */
+  draw(
+    list: DrawList,
+    tiles: readonly QuadtreeTile[],
+    count: number,
+    camera: Camera,
+    nowMs: Float64Array,
+    fadeMs: number,
+    timer?: PhaseTimer,
+  ): void {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
     drawImagery(list, tiles, count, this.layers, camera);
-    for (const layer of this.layers) layer.loader.endFrame();
+    this.fades.apply(list, nowMs, fadeMs, this.keepTexture);
+    for (const layer of this.layers) layer.loader.scheduleRequests();
+    timer?.end(PHASE_SCHEDULING);
+    for (const layer of this.layers) layer.loader.drainUploads();
+    timer?.end(PHASE_UPLOAD);
     this.residency.trim(this.frame, TRIM_TILES, TRIM_MS);
     this.lease.pool.update();
   }
@@ -177,7 +234,7 @@ export class ImageryRuntime {
   /** Cancels every request and task and releases the worker pool share. */
   destroy(): void {
     for (const layer of this.layers) layer.loader.destroy();
-    this.network.dispose();
+    releaseNetworkPool(this.network);
     this.lease.release();
     this.ram.clear();
   }

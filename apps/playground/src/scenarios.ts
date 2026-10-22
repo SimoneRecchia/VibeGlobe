@@ -99,9 +99,38 @@ function depthRange(globe: Globe): void {
 /** The horizon distance from about 1 m above the ground: √(2 · R · h) with R = 6371 km. */
 const HORIZON_METERS = 3570;
 
+/**
+ * F090's camera path: from Milan to Tokyo along the great circle at zoom 7 in 4 s, one step per display frame, then
+ * `document.body.dataset['scenario']` becomes `done`. Tiles passed on the way should be cancelled, not loaded.
+ */
+function pathMilanTokyo(globe: Globe): void {
+  const rad = Math.PI / 180;
+  const unit = (lonDeg: number, latDeg: number): [number, number, number] => [
+    Math.cos(latDeg * rad) * Math.cos(lonDeg * rad),
+    Math.cos(latDeg * rad) * Math.sin(lonDeg * rad),
+    Math.sin(latDeg * rad),
+  ];
+  const from = unit(9.19, 45.46);
+  const to = unit(139.7, 35.7);
+  const angle = Math.acos(from[0] * to[0] + from[1] * to[1] + from[2] * to[2]);
+  const durationMs = 4000;
+  const startMs = performance.now();
+  const advance = (): void => {
+    const t = Math.min(1, (performance.now() - startMs) / durationMs);
+    const a = Math.sin((1 - t) * angle) / Math.sin(angle);
+    const b = Math.sin(t * angle) / Math.sin(angle);
+    const [x, y, z] = [0, 1, 2].map((i) => a * (from[i] ?? 0) + b * (to[i] ?? 0)) as [number, number, number];
+    globe.jumpTo({ longitudeDeg: Math.atan2(y, x) / rad, latitudeDeg: Math.atan2(z, Math.hypot(x, y)) / rad, zoom: 7 });
+    if (t < 1) requestAnimationFrame(advance);
+    else document.body.dataset['scenario'] = 'done';
+  };
+  advance();
+}
+
 const SCENARIOS: Readonly<Record<string, (globe: Globe) => void>> = {
   'street-level-jitter': streetLevelJitter,
   'depth-range': depthRange,
+  'path-milan-tokyo': pathMilanTokyo,
 };
 
 /** Sets up a named scenario once the globe is ready; unknown names do nothing. */

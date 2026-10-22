@@ -1,4 +1,5 @@
 import { geodeticToEcef } from '../geodesy/ecef.js';
+import { WGS84 } from '../geodesy/wgs84.js';
 import { quadtreeRowLatitudeRad, QUADTREE_SEGMENTS, type QuadtreeTile } from './surface-quadtree.hot.js';
 
 /** Geometry of one surface tile for the renderer: float32 offsets from a float64 origin (ADR 0004). */
@@ -137,9 +138,19 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
   const rowLatitudes = Array.from({ length: GRID }, (_, row) => quadtreeRowLatitudeRad(tile, row));
   const northRad = rowLatitudes[0] ?? 0;
   const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
+  // Skirts slope outward four times as far as they hang down, so the skirts of neighbors overlap below the surface and
+  // close the corners and slivers where tiles of different levels meet (KB-069); a skirt hangs at most a fraction of
+  // a percent of the radius down, so even at this slope it stays inside the ellipsoid.
+  const outwardRad = (4 * skirtDepthMeters) / WGS84.semiMajorAxisMeters;
   const write = (index: number, row: number, col: number, heightMeters: number): void => {
-    const lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
-    const latRad = rowLatitudes[row] ?? 0;
+    let lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
+    let latRad = rowLatitudes[row] ?? 0;
+    if (heightMeters < 0) {
+      const lonOut = outwardRad / Math.max(0.01, Math.cos(latRad));
+      lonRad += col === 0 ? -lonOut : col === TILE_SEGMENTS ? lonOut : 0;
+      latRad += row === 0 ? outwardRad : row === TILE_SEGMENTS ? -outwardRad : 0;
+      latRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, latRad));
+    }
     geodeticToEcef(lonRad, latRad, heightMeters, vertex);
     for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
     // Rows are uniform in the tile's own scheme (Mercator y for the Mercator root, latitude for the caps).

@@ -7,14 +7,14 @@ import { outputMetadata } from '../output/metadata.js';
 import { PROVIDER_PROFILES } from './profiles.js';
 
 const docs = new URL('../../../../docs/', import.meta.url);
-const adr = readFileSync(new URL('adr/0024-default-data-licenses.md', docs), 'utf8');
+const adr = readFileSync(new URL('adr/0025-default-data-licenses.md', docs), 'utf8');
 const licensesDoc = readFileSync(new URL('data-licenses.md', docs), 'utf8');
 const configs = readdirSync(CONFIG_DIR)
   .filter((f) => f.endsWith('.json') && !f.endsWith('.lock.json'))
   .map((f) => loadConfig(join(CONFIG_DIR, f)).config);
 
 describe('license records', () => {
-  it.each(PROVIDER_PROFILES.filter((p) => p.id !== 'fixture'))('ADR 0024 records profile $id', (profile) => {
+  it.each(PROVIDER_PROFILES.filter((p) => p.id !== 'fixture'))('ADR 0025 records profile $id', (profile) => {
     const row = adr.split('\n').find((line) => line.startsWith(`| \`${profile.id}\``));
     expect(row, `a row for ${profile.id}`).toBeDefined();
     expect(row).toContain(profile.termsReadDate);
@@ -22,7 +22,7 @@ describe('license records', () => {
     else expect(row).toMatch(/refused/);
   });
 
-  it('the shipped configurations use only profiles whose attribution ADR 0024 records', () => {
+  it('the shipped configurations use only profiles whose attribution ADR 0025 records', () => {
     for (const config of configs) {
       for (const dataset of config.datasets) {
         const metadata = outputMetadata(config, dataset, { west: 0, south: 0, east: 1, north: 1 });

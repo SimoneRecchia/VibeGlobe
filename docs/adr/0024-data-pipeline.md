@@ -1,4 +1,4 @@
-# 0023. Data pipeline: a TypeScript pipeline with built-in readers, external tools only in pinned Docker images
+# 0024. Data pipeline: a TypeScript pipeline with built-in readers, external tools only in pinned Docker images
 
 - Status: Accepted
 - Date: 2026-10-21
@@ -24,7 +24,7 @@ Option 3.
 - **Tiling:** Web Mercator XYZ tiles of 256 px on one global pixel grid. The maximum zoom of a dataset is sampled from the sources at pixel centers, with bilinear interpolation and box supersampling when a pixel covers several source pixels. Lower zooms are 2×2 means of their children, so every level comes from the same samples.
 - **Terrain encoding:** Terrarium PNG (`(R·256 + G + B/256) − 32768` m, a step of 1/256 m). Each tile holds only its own pixels; the engine hides cracks with skirts (ADR 0006). A bordered 258-px variant stays a follow-up until M4's crack sweep shows a need for it.
 - **Imagery:** PNG for the fallback pyramid; baseline JPEG (an original encoder written from ITU-T T.81, 4:4:4) for Sentinel-2. **Vectors:** MVT with a 64-unit buffer, clipped per tile.
-- **Outputs:** static `z/x/y` folders, PMTiles v3 (original writer: tiles in Hilbert order, deduplicated by SHA-256, gzip-compressed directories with a zero mtime) and MBTiles (`node:sqlite`). Each output carries a `metadata.json` with license and attribution (ADR 0024).
+- **Outputs:** static `z/x/y` folders, PMTiles v3 (original writer: tiles in Hilbert order, deduplicated by SHA-256, gzip-compressed directories with a zero mtime) and MBTiles (`node:sqlite`). Each output carries a `metadata.json` with license and attribution (ADR 0025).
 - **Reproducibility and resumption:** configurations pin source versions and image digests. Encoders are deterministic, and outputs contain no timestamps. Each step writes files atomically (a temporary file, then a rename) and appends the file's SHA-256 to a step log. A rerun skips an item only when its file still matches the logged checksum, so corrupted downloads and tiles are regenerated.
 - **Estimates and cost:** tile counts are exact per zoom level. Bytes come from each dataset's measured average tile size, and cost from the per-GB prices and reading date recorded in the configuration. Nothing is downloaded before the estimate is shown and confirmed (`--yes` in non-interactive runs).
 

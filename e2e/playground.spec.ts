@@ -79,20 +79,20 @@ test.describe('in a small window, so the software GPU draws many frames', () => 
       if (!anchor) throw new Error('no anchor');
       const before = hooks.events.length;
       const framesBefore = globe.frameNumber;
-      // Drag from animation frames for two seconds, as a pointer would.
+      // Drag from animation frames, as a pointer would, until 30 frames are drawn (at most 20 s on a loaded machine).
       await new Promise<void>((done) => {
         const start = performance.now();
         const tick = (time: number): void => {
           const angle = (time - start) / 200;
           globe.navigation.dragTo(anchor, { xPx: 160 + 30 * Math.cos(angle), yPx: 120 + 30 * Math.sin(angle) });
-          if (time - start < 2000) requestAnimationFrame(tick);
+          if (globe.frameNumber - framesBefore < 30 && time - start < 20_000) requestAnimationFrame(tick);
           else done();
         };
         requestAnimationFrame(tick);
       });
       return { added: hooks.events.length - before, frames: globe.frameNumber - framesBefore };
     });
-    expect(counts.frames).toBeGreaterThan(10);
+    expect(counts.frames).toBeGreaterThanOrEqual(30);
     expect(counts.added).toBe(0);
   });
 });

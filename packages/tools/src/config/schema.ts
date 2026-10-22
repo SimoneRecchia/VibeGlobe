@@ -1,5 +1,5 @@
 /**
- * Versioned build configuration files (ADR 0023): every build is defined only by one of these JSON files, so a new
+ * Versioned build configuration files (ADR 0024): every build is defined only by one of these JSON files, so a new
  * region or dataset needs no code change.
  */
 import type { Ring } from '../tiles/area.js';

@@ -19,9 +19,13 @@ export interface UploadBudget {
 /** The budget of `docs/plan/quality.md`: 2 ms and 8 MB (8,000,000 bytes, the stricter reading of "MB") per frame. */
 export const DEFAULT_UPLOAD_BUDGET: UploadBudget = Object.freeze({ maxMs: 2, maxBytes: 8_000_000 });
 
+/** Written into `measuredMs[0]` by an upload function that did not upload the tile (a refused admission). */
+export const UPLOAD_REFUSED = -2;
+
 /**
  * Uploads one tile to the GPU and writes how long it took, in milliseconds, into `measuredMs[0]`; it leaves the value
- * negative when it cannot measure, and the prediction stands in for it. It must not change the queue while it runs.
+ * negative when it cannot measure, and the prediction stands in for it, or writes {@link UPLOAD_REFUSED} when it did
+ * not upload the tile. It must not change the queue while it runs.
  */
 export type UploadFunction<T extends DecodedTile> = (tile: T, measuredMs: Float64Array) => void;
 
@@ -218,6 +222,8 @@ export class UploadQueue<T extends DecodedTile> {
       measured[0] = -1;
       this.upload(tile, measured);
       const ms = measured[0] ?? -1;
+      // Refused by the memory budget: nothing reached the GPU, so neither time, bytes nor the upload count.
+      if (ms === UPLOAD_REFUSED) continue;
       if (ms >= 0) {
         this.costModel.recordAt(bytes, measured, 0, kind === 1);
         state[DRAIN_MS] = (state[DRAIN_MS] ?? 0) + ms;

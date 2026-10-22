@@ -1,5 +1,5 @@
 /**
- * A built-in GeoTIFF reader for the default datasets (ADR 0023): classic TIFF, tiled or stripped, chunky samples,
+ * A built-in GeoTIFF reader for the default datasets (ADR 0024): classic TIFF, tiled or stripped, chunky samples,
  * no/LZW/DEFLATE compression, predictors 1–3, unsigned 8/16-bit, signed 16-bit and float32 samples, with the
  * georeferencing of an EPSG:4326 raster (pixel scale and tie point, pixel-is-area or pixel-is-point).
  */

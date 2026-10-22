@@ -1,6 +1,6 @@
 /**
  * Built-in provider profiles: the license and attribution of every source the pipeline and the package builder know,
- * as re-verified in ADR 0024 (docs/adr/0024-default-data-licenses.md). The attribution strings here are the ones the
+ * as re-verified in ADR 0025 (docs/adr/0025-default-data-licenses.md). The attribution strings here are the ones the
  * ADR records; `license-records.test.ts` checks that both agree.
  */
 

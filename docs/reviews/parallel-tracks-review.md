@@ -1,0 +1,25 @@
+# Review of the parallel-track packages
+
+One review (2026-10-22, review session on branch `claude/vigilant-ptolemy-11wj3l`) of every package merged from the
+parallel tracks: `sources`, `offline`, `layers`, `vue`, `web-component`, `ui`, `gis` and `tools`. It reports only
+correctness bugs and missing requirements against the packages' `feature_list.json` entries (ADR 0021, ADR 0022). Each
+fix inside a package starts with a failing regression test; a finding that needs `core`, the renderer or the worker
+goes to `docs/known-bugs.md` for the main session.
+
+Status values: **fixed** (commit and regression test named), **deferred** (with the reason and where it is tracked).
+
+## Findings
+
+| Id    | Package       | Entry      | Finding                                                                                                                                                                                                                                                                                                                                                               | Status                                                                                                                                                                                                       |
+| ----- | ------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PT-01 | web-component | F482, F483 | A property set on the element before `defineVibeGlobe` ran (a script or a framework rendering before the module loads) stayed an own data property: `imagery` was overwritten by the class field on upgrade, and `zoom`, `center`, `heading-deg` and `tilt-deg` kept hiding the reflecting accessors, so later assignments never reached the attribute or the engine. | fixed: the constructor moves such properties over and applies them on connect; test "keeps properties set before the element was defined (PT-01)" in `packages/web-component/src/vibe-globe-element.test.ts` |
+
+## Packages without findings
+
+- `gis`: CRS transforms (proj4js, ETRS89, UTM zones and the Norway and Svalbard exceptions), coordinate formats with
+  carry-over rounding and decimal commas, parsing of every written format, geodesic measurement and view-state
+  serialization checked against F404 and F405.
+- `ui`: control layer (add, remove, replace, extend), themes, English and Italian strings (every key), pluggable
+  translations, keyboard operation and focus ring, debug toggle checked against F418, F428–F433 and F435.
+- `vue`: component, SSR placeholder and hydration, event forwarding, unmount cleanup and composables checked against
+  F473 and F477–F480.

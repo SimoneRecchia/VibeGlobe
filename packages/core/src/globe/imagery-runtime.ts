@@ -8,6 +8,7 @@ import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import {
   ImageryLoader,
+  type DecodeTask,
   type ImageryLoaderOptions,
   type ImageryLoaderStats,
   type TileMemory,
@@ -20,6 +21,9 @@ import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { drawTerrain, type TerrainLayer } from '../terrain/terrain-draws.js';
 import type { HeightGrid } from '../terrain/heightmap.js';
+import { toEllipsoidal } from '../terrain/vertical-datum.js';
+import type { DecodedTile } from '../scheduler/types.js';
+import type { TileCoord } from '../tiling/tile-key.js';
 import { FINEST_FAILED, TerrainHeights, type ElevationSample } from '../terrain/terrain-heights.js';
 import { GlobeError } from './errors.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
@@ -33,6 +37,9 @@ const DEFAULT_RAM_BUDGET_BYTES = 256 * 1024 * 1024;
 /** Evictions per frame outside admissions (ADR 0007): at most 64 tiles or 1 ms. */
 const TRIM_TILES = 64;
 const TRIM_MS = 1;
+/** The extent of a terrain tile being converted to ellipsoidal heights. */
+const extent = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
+
 /** Elevation queries load at the priority class after visible tiles (ADR 0007). */
 const ELEVATION_QUERY_CLASS = 2 * 1024;
 
@@ -58,19 +65,36 @@ const MESH_GRID_CELLS = 64;
 /** Terrain tiles at this level and coarser form the terrain's pinned base: a few hundred kilobytes (F084). */
 const TERRAIN_PINNED_LEVEL = 2;
 
-/** The worker task of a terrain source's tiles; its grid adds at most half the level's geometric error (ADR 0006). */
+/**
+ * How a terrain source's tiles decode: built-in encodings in the worker pool, their grid adding at most half the
+ * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0024, F132).
+ */
 function terrainDecodeTask(
   source: TerrainSource,
-): (bytes: ArrayBuffer, contentType: string, level: number) => { task: string; input: unknown } {
-  return (bytes, _contentType, level) => ({
-    task: 'decode-terrain',
-    input: {
-      bytes,
-      encoding: source.decoder.kind,
-      maxErrorMeters: source.geometricErrorMeters(level) / 2,
-      meshCells: MESH_GRID_CELLS,
-    },
-  });
+): (bytes: ArrayBuffer, contentType: string, coord: TileCoord) => DecodeTask {
+  const decoder = source.decoder;
+  return (bytes, _contentType, coord) => {
+    if (decoder.kind === 'custom') {
+      return { task: 'custom-terrain', input: undefined, run: () => heightTile(decoder.decode(bytes, coord)) };
+    }
+    return {
+      task: 'decode-terrain',
+      input: {
+        bytes,
+        encoding: decoder.kind,
+        maxErrorMeters: source.geometricErrorMeters(coord.level) / 2,
+        meshCells: MESH_GRID_CELLS,
+      },
+    };
+  };
+}
+
+/** A custom decoder's grid as a decoded tile, checked so a wrong grid fails like undecodable bytes. */
+function heightTile(grid: HeightGrid): DecodedTile {
+  const side = grid.cells + 1;
+  if (!Number.isInteger(grid.cells) || grid.cells < 1 || grid.heightsMeters.length !== side * side)
+    throw new TypeError(`a height grid of ${grid.cells} cells needs ${side * side} heights`);
+  return { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: grid };
 }
 
 /** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
@@ -266,6 +290,14 @@ export class ImageryRuntime {
         onDecoded: (coord, tile) => {
           const metadata = (tile.image as { metadata?: unknown }).metadata;
           if (metadata !== undefined) source.tileMetadata?.(coord, metadata);
+          // Geoid heights become ellipsoidal before upload and queries (F133): a few thousand lookups per tile.
+          if (source.datum.kind === 'geoid') {
+            const e = source.tiling.tileExtent(coord, extent);
+            const mercator = source.tiling.crs === 'EPSG:3857';
+            const grid = tile.image as HeightGrid;
+            const converted = toEllipsoidal(grid, source.datum, e.westRad, e.southRad, e.eastRad, e.northRad, mercator);
+            (tile as { image: unknown }).image = { ...grid, ...converted };
+          }
         },
       }),
     };

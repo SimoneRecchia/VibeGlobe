@@ -22,7 +22,7 @@ Open points: where the decode function of a third-party adapter runs, and where 
 Options 2 and 4.
 
 - Built-in decoders run in workers (F134), behind the `decode-terrain` task of `@vibeglobe/worker`, which also inflates gzip-compressed tiles. A custom decoder is a pure function the engine runs in the inline executor between frames; the terrain guide says what that costs.
-- Every terrain source declares its datum. Geoid heights are converted with h = H + N, N bilinear in the consumer's grid, before meshing and elevation queries, in the worker for built-in decoders.
+- Every terrain source declares its datum. Geoid heights are converted with h = H + N, N bilinear in the consumer's grid, once per tile as it arrives decoded, before upload and elevation queries: a few thousand lookups per tile, so on the main thread and for every decoder alike. An unknown datum is rejected when the globe is created, naming the source.
 - Recording the real EGM2008 grid and checking it against published undulations (F133 step 1) needs the dataset download, an owner step: F133 stays `pending` once its other steps pass, listed in `docs/open-questions.md`.
 
 ## Consequences

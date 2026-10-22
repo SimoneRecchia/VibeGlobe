@@ -45,9 +45,15 @@ export function undulationMeters(model: GeoidModel, lonRad: number, latRad: numb
   return top + (bottom - top) * fy;
 }
 
+/** Mercator y of a latitude (unbounded). */
+function mercatorY(latRad: number): number {
+  return Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+}
+
 /**
- * Converts a height grid covering [west, east] × [south, north] (radians, rows from the north) to WGS84 ellipsoidal
- * heights in place, and updates its range. Ellipsoidal sources are returned unchanged.
+ * Converts a height grid covering [west, east] × [south, north] (radians, rows from the north, spaced evenly in
+ * latitude, or in Mercator y when `mercator`) to WGS84 ellipsoidal heights in place, and updates its range.
+ * Ellipsoidal sources are returned unchanged.
  */
 export function toEllipsoidal(
   grid: HeightGrid,
@@ -56,14 +62,20 @@ export function toEllipsoidal(
   southRad: number,
   eastRad: number,
   northRad: number,
+  mercator = false,
 ): HeightGrid {
   if (datum.kind === 'ellipsoid') return grid;
   const side = grid.cells + 1;
   const heights = grid.heightsMeters;
+  const top = mercatorY(northRad);
+  const bottom = mercatorY(southRad);
   let min = Infinity;
   let max = -Infinity;
   for (let row = 0; row < side; row++) {
-    const lat = northRad + ((southRad - northRad) * row) / grid.cells;
+    const fraction = row / grid.cells;
+    const lat = mercator
+      ? 2 * Math.atan(Math.exp(top + (bottom - top) * fraction)) - Math.PI / 2
+      : northRad + (southRad - northRad) * fraction;
     for (let col = 0; col < side; col++) {
       const lon = westRad + ((eastRad - westRad) * col) / grid.cells;
       const i = row * side + col;

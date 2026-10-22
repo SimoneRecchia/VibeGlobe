@@ -17,7 +17,7 @@ import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
 import type { TileErrorReason } from '../globe/types.js';
 import type { Observability } from '../diagnostics/observability.js';
-import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
+import { WorkerTaskError, type WorkerPool, type WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import type { TileSource } from './imagery-source.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import {
@@ -34,6 +34,16 @@ import {
   type TileRecord,
 } from './tile-table.js';
 
+/** Runs an inline decode, turning an exception into the failure a worker task reports for bytes it cannot decode. */
+function runInline(run: () => DecodedTile): WorkerTaskOutcome {
+  try {
+    return { ok: true, output: run() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: new WorkerTaskError('task-failed', message, 'undecodable') };
+  }
+}
+
 /**
  * What {@link ImageryLoader.want} returns for a tile whose bytes are in hand (decoding or waiting for its upload): it
  * arrives within a few frames, so its ancestors need not be requested.
@@ -49,6 +59,16 @@ const DECODE_RETRY_MS = 500;
 const REFUSED_RETRY_MS = 1000;
 /** Queued tiles of full hosts a dispatch steps over before it gives up for this pass. */
 const MAX_HOST_SKIPS = 32;
+
+/**
+ * How a tile's bytes are decoded: a worker task by name and input, or `run`, a pure function the loader calls on the
+ * main thread between frames (a third-party terrain decoder, ADR 0024), its exception a decode failure.
+ */
+export interface DecodeTask {
+  readonly task: string;
+  readonly input: unknown;
+  readonly run?: () => DecodedTile;
+}
 
 /** A decoded tile waiting for its upload, tagged with its record. */
 interface PendingUpload extends DecodedTile {
@@ -70,11 +90,7 @@ export interface ImageryLoaderOptions {
    * The worker task that decodes a tile's bytes and its input (imagery: `decode-image` or `transcode-ktx2`; terrain:
    * `decode-terrain`). The bytes are transferred to the worker.
    */
-  decodeTask(
-    bytes: ArrayBuffer,
-    contentType: string,
-    level: number,
-  ): { readonly task: string; readonly input: unknown };
+  decodeTask(bytes: ArrayBuffer, contentType: string, coord: TileCoord): DecodeTask;
   /** Receives every decoded tile with its coordinates before it queues for upload (terrain metadata, F128). */
   onDecoded?(coord: TileCoord, tile: DecodedTile): void;
   readonly network: NetworkPool;
@@ -477,9 +493,18 @@ export class ImageryLoader implements NetworkPoolClient {
 
   private decode(record: TileRecord, bytes: ArrayBuffer, contentType: string): void {
     record.state = DECODING;
+    const request = this.options.decodeTask(bytes, contentType, record.coord);
+    const run = request.run;
+    if (run) {
+      // Between frames, in a timer of its own, like a worker's reply.
+      record.task = -1;
+      this.options.setTimer(() => this.decoded(record, runInline(run)), 0);
+      return;
+    }
     record.task = this.options.workers.run(
       {
-        ...this.options.decodeTask(bytes, contentType, record.coord.level),
+        task: request.task,
+        input: request.input,
         transfer: [bytes],
         priority: this.table.priorities[record.slot] ?? 0,
       },

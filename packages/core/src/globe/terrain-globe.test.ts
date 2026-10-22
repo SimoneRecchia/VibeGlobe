@@ -209,6 +209,39 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('decodes a third-party encoding through a custom decoder, between frames (F132)', async () => {
+    const custom: TerrainSource = {
+      ...terrain([]),
+      id: 'custom-float32',
+      decoder: {
+        kind: 'custom',
+        decode: (bytes, coord) => {
+          const [level = 0, x = 0, y = 0] = new Float64Array(bytes);
+          expect([level, x, y]).toEqual([coord.level, coord.x, coord.y]);
+          const n = 2 ** level;
+          const heights = new Float32Array(4).map((_, i) => heightAt((x + (i % 2)) / n, (y + (i >> 1)) / n));
+          return { cells: 1, heightsMeters: heights, minMeters: 0, maxMeters: 3000 };
+        },
+      },
+    };
+    const { globe } = await terrainGlobe(custom);
+    const sample = globe.elevationAt({ longitudeDeg: 7.2, latitudeDeg: 46.1 });
+    const [x, y] = mercator(7.2, 46.1);
+    expect(sample.noData).toBe(false);
+    expect(sample.heightMeters).toBeCloseTo(heightAt(x, y), 2);
+    globe.destroy();
+  });
+
+  it('converts geoid heights to ellipsoidal ones before queries (F133)', async () => {
+    // A uniform 30 m geoid: every ellipsoidal height is the geoid height plus 30 m.
+    const model = { rows: 3, columns: 4, undulationsMeters: new Float32Array(12).fill(30) };
+    const { globe } = await terrainGlobe({ ...terrain([]), datum: { kind: 'geoid', model } });
+    const position = { longitudeDeg: 7.2, latitudeDeg: 46.1 };
+    const [x, y] = mercator(7.2, 46.1);
+    expect(globe.elevationAt(position).heightMeters).toBeCloseTo(heightAt(x, y) + 30, 2);
+    globe.destroy();
+  });
+
   it('rejects a terrain source with an unknown vertical datum, naming the source (F133)', () => {
     const { factory } = fakeRenderer();
     const source = { ...terrain([]), datum: { kind: 'navd88' } } as unknown as TerrainSource;

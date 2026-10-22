@@ -500,6 +500,20 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('stops drawing once the eye has settled above the terrain (KB-089)', async () => {
+    const { globe, run } = await terrainGlobe(terrain([]), 60, terrainWorkers(), {
+      longitudeDeg: 7,
+      latitudeDeg: 46,
+      zoom: 22,
+      tiltDeg: 60,
+    });
+    await run(60);
+    const settled = globe.frameNumber;
+    await run(30);
+    expect(globe.frameNumber).toBe(settled);
+    globe.destroy();
+  });
+
   it('decodes a third-party encoding through a custom decoder, between frames (F132)', async () => {
     const custom: TerrainSource = {
       ...terrain([]),

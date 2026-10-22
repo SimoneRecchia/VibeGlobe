@@ -38,6 +38,9 @@ const MAX_TEXEL_ERROR_PX = 1.5;
 /** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
 
+/** A lift change smaller than this, meters, is rounding, not motion (KB-089). */
+const LIFT_SETTLED_METERS = 1e-3;
+
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
  * draw list the renderer draws, reusing every array (ADR 0018). Keeps what the last drawn frame selected for the
@@ -147,7 +150,9 @@ export class SurfaceFrame {
     camera.groundHeightMeters = surface;
     const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
     imagery.chargeTerrainMs(imagery.now() - start);
-    if (next === lift) return false;
+    // Under a millimeter the lift has settled: rounding alone would keep moving the eye, and drawing, forever.
+    const change = next - lift;
+    if (change < LIFT_SETTLED_METERS && change > -LIFT_SETTLED_METERS) return false;
     pose.targetHeightMeters = next;
     camera.update();
     return true;

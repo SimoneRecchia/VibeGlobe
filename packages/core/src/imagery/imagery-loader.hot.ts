@@ -214,6 +214,22 @@ export class ImageryLoader implements NetworkPoolClient {
     return -1;
   }
 
+  /** The handle of a resident tile, without marking it used (elevation queries); -1 when it is not resident. */
+  peekHandle(level: number, x: number, y: number): number {
+    const record = this.table.find(level, x, y);
+    return record?.state === READY ? this.options.handleBase + record.slot : -1;
+  }
+
+  /** True for a tile known to have no data (404, outside coverage): it never arrives. */
+  noData(level: number, x: number, y: number): boolean {
+    return this.table.find(level, x, y)?.state === NO_DATA;
+  }
+
+  /** True for a tile that failed for good (corrupt, or its retries ran out). */
+  failed(level: number, x: number, y: number): boolean {
+    return this.table.find(level, x, y)?.state === DEAD;
+  }
+
   /** The texture handle of a tile on the GPU, or -1; does not want it, but keeps it resident this frame. */
   readyHandle(level: number, x: number, y: number): number {
     const record = this.table.find(level, x, y);

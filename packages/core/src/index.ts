@@ -120,6 +120,8 @@ export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
 export { sampleHeight } from './terrain/sample-height.js';
 export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';
 export type { TerrainDecoder, TerrainSource } from './terrain/terrain-source.js';
+export type { ElevationSample } from './terrain/terrain-heights.js';
+export type { AbortSignalLike } from './globe/imagery-runtime.js';
 export { geoidModel, toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
 export type { GeoidModel, VerticalDatum } from './terrain/vertical-datum.js';
 export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';

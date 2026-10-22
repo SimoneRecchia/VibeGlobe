@@ -1,5 +1,7 @@
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
+import type { ElevationSample } from '../terrain/terrain-heights.js';
+import type { AbortSignalLike } from './imagery-runtime.js';
 import type { GlobeDiagnostics, LogLevel, LogSink } from '../diagnostics/observability.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
@@ -501,6 +503,19 @@ export interface Globe {
   surfaceStats(): SurfaceStats;
   /** Counters of the imagery streaming; undefined without imagery layers or before the renderer starts. */
   imageryStats(): ImageryStats | undefined;
+  /**
+   * The terrain height at a position from the terrain already in memory, with the level it came from (F144): the
+   * deepest resident tile, interpolated as the surface shows it. Where no terrain is resident or covers the position,
+   * the ellipsoid's height 0 with `noData` set. Writes into `out` when given, so a caller can query without
+   * allocating. Throws a GlobeError ('invalid-coordinate') for an invalid position.
+   */
+  elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample;
+  /**
+   * The terrain height at a position from the finest terrain the source delivers there, loading it first (F145).
+   * Rejects with a GlobeError: 'resource-failed' when that tile fails for good, 'aborted' when `signal` aborts,
+   * 'destroyed' when the globe is destroyed first. Without terrain it resolves with the ellipsoid's height 0, `noData`.
+   */
+  elevationAtAsync(position: GeoPosition, options?: { signal?: AbortSignalLike }): Promise<ElevationSample>;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */

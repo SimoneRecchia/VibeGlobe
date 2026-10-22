@@ -22,6 +22,34 @@ describe('buildTileMesh', () => {
   });
 });
 
+describe('terrain attributes (M4)', () => {
+  it('gives every vertex its unit ellipsoid normal, along which the renderer displaces heights', () => {
+    const tile = quadtreeTileBounds(MERCATOR_ROOT, 6, 33, 22, 1, {
+      key: 0,
+      root: 0,
+      level: 0,
+      x: 0,
+      y: 0,
+      span: 1,
+      westRad: 0,
+      southRad: 0,
+      eastRad: 0,
+      northRad: 0,
+    });
+    const mesh = buildQuadtreeTileMesh(tile, 50);
+    const vertices = mesh.positions.length / 3;
+    expect(mesh.normals.length).toBe(vertices * 3);
+    for (let i = 0; i < vertices; i++) {
+      const [x = 0, y = 0, z = 0] = mesh.normals.subarray(i * 3, i * 3 + 3);
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 6);
+    }
+    // The north-west corner's normal points at its latitude and longitude.
+    const [x = 0, y = 0, z = 0] = mesh.normals.subarray(0, 3);
+    expect(Math.asin(z)).toBeCloseTo(tile.northRad, 6);
+    expect(Math.atan2(y, x)).toBeCloseTo(tile.westRad, 6);
+  });
+});
+
 describe('tile-local texture coordinates (M3 plan §2.4)', () => {
   const GRID = TILE_SEGMENTS + 1;
   const uvw = (mesh: TileMeshData, vertex: number): number[] =>

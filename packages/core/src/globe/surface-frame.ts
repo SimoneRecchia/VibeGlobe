@@ -11,9 +11,12 @@ import type { SurfaceCache } from '../surface/surface-cache.js';
 import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
-import { ImageryRuntime, type ImageryCallbacks } from './imagery-runtime.js';
+import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
+import type { ElevationSample } from '../terrain/terrain-heights.js';
+import { validatePosition } from './validation.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel } from '../terrain/terrain-draws.js';
 import type {
+  GeoPosition,
   GlobeOptions,
   ImageryStats,
   RendererBackend,
@@ -21,6 +24,8 @@ import type {
   SurfaceTileInfo,
   TileDrawList,
 } from './types.js';
+
+const DEG_TO_RAD = Math.PI / 180;
 
 /** ADR 0006's τ_imagery: the largest an imagery texel may look, in render-target pixels. */
 const MAX_TEXEL_ERROR_PX = 1.5;
@@ -148,6 +153,29 @@ export class SurfaceFrame {
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */
   get baseReady(): boolean {
     return this.imagery?.baseReady ?? true;
+  }
+
+  /**
+   * The height at a WGS84 position from the terrain in memory (F144); the ellipsoid, flagged no-data, without terrain.
+   * Throws a GlobeError ('invalid-coordinate') for an invalid position.
+   */
+  elevationAt(position: GeoPosition, out: ElevationSample): ElevationSample {
+    validatePosition(position);
+    const heights = this.imagery?.heights;
+    if (heights) return heights.sample(position.longitudeDeg * DEG_TO_RAD, position.latitudeDeg * DEG_TO_RAD, out);
+    out.heightMeters = 0;
+    out.level = -1;
+    out.noData = true;
+    return out;
+  }
+
+  /** The height at a WGS84 position from the finest terrain the source delivers (F145). */
+  queryElevation(position: GeoPosition, signal?: AbortSignalLike): Promise<ElevationSample> {
+    validatePosition(position);
+    const imagery = this.imagery;
+    if (imagery?.heights)
+      return imagery.queryElevation(position.longitudeDeg * DEG_TO_RAD, position.latitudeDeg * DEG_TO_RAD, signal);
+    return Promise.resolve({ heightMeters: 0, level: -1, noData: true });
   }
 
   /** The imagery counters, if there is imagery. */

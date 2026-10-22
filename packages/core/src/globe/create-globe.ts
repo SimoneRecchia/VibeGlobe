@@ -17,6 +17,8 @@ import { EngineClock } from './engine-clock.js';
 import { FrameWaits } from './frame-waits.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
+import type { AbortSignalLike } from './imagery-runtime.js';
+import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { keepGroundScale, positionAt, screenOf } from './view-geometry.js';
 import type {
   BackendName,
@@ -396,24 +398,22 @@ class GlobeEngine implements Globe {
     return this.emitter.on(event, handler);
   }
 
-  resourceCounts(): ResourceCounts {
-    return this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 };
+  // Diagnostics delegate to the renderer and the surface frame.
+  readonly resourceCounts = (): ResourceCounts =>
+    this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 };
+  readonly rendererStats = (): RendererStats => this.renderer?.stats() ?? NO_RENDERER_STATS;
+  readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
+  readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
+  readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
+
+  elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample {
+    this.assertAlive();
+    return this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
   }
 
-  rendererStats(): RendererStats {
-    return this.renderer?.stats() ?? NO_RENDERER_STATS;
-  }
-
-  surfaceTiles(): SurfaceTileInfo[] {
-    return this.surfaceFrame.describe(this.cam);
-  }
-
-  surfaceStats(): SurfaceStats {
-    return this.surfaceFrame.stats();
-  }
-
-  imageryStats(): ImageryStats | undefined {
-    return this.surfaceFrame.imageryStats();
+  elevationAtAsync(position: GeoPosition, options: { signal?: AbortSignalLike } = {}): Promise<ElevationSample> {
+    this.assertAlive();
+    return this.surfaceFrame.queryElevation(position, options.signal);
   }
 
   setDebugShapes(shapes: readonly DebugShape[]): void {

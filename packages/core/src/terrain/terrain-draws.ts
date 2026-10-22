@@ -54,7 +54,7 @@ const mapping = new Float64Array(7);
 const transform = new Float64Array(4);
 
 /** The terrain level a surface tile of `surfaceLevel` wants, within the source's levels. */
-export function terrainLevelOf(surfaceLevel: number, source: TerrainSource): number {
+function terrainLevelOf(surfaceLevel: number, source: TerrainSource): number {
   const level = surfaceLevel - TERRAIN_LEVEL_OFFSET;
   return level < source.minLevel ? source.minLevel : level > source.maxLevel ? source.maxLevel : level;
 }

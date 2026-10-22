@@ -15,6 +15,7 @@ import {
   quadtreeTileKey,
   selectQuadtreeTiles,
   SOUTH_CAP,
+  type QuadtreeSelectionOptions,
   type QuadtreeTile,
 } from './surface-quadtree.hot.js';
 
@@ -157,6 +158,22 @@ describe('selectQuadtreeTiles', () => {
       expect(reach).toBeGreaterThanOrEqual(1);
     }
     expect(count).toBeLessThan(3000);
+  });
+
+  it('keeps tiles whose relief can rise above the horizon, and refines while the terrain error shows (F142, F126)', () => {
+    // From 1 km, tilted toward the horizon: tiles wholly behind the ellipsoid's horizon (about 113 km away) are culled,
+    // but a 4,000 m peak stays visible to about 340 km, so with the terrain's heights more tiles stay drawn.
+    const c = camera(9.19, 45.46, 1000, 85, 0);
+    const flat = { maxScreenErrorPx: 1, maxLevel: 25 };
+    const flatCount = selectQuadtreeTiles(c, flat, out);
+    const relief: QuadtreeSelectionOptions = { ...flat, terrainMaxMeters: 4000, terrainMinMeters: -100 };
+    expect(selectQuadtreeTiles(c, relief, out)).toBeGreaterThan(flatCount);
+    // Terrain whose error is large next to the ellipsoid's chord sag refines the view further.
+    const nadir = camera(7, 46, 50_000);
+    const deepest = (options: QuadtreeSelectionOptions): number =>
+      Math.max(...out.slice(0, selectQuadtreeTiles(nadir, options, out)).map((t) => t.level));
+    const errors = new Float64Array(26).map((_, level) => 4e6 / 2 ** level);
+    expect(deepest({ ...flat, terrainErrorMeters: errors, terrainMaxLevel: 25 })).toBeGreaterThan(deepest(flat));
   });
 
   it('refines to tiles small enough for float32 offsets at 1 m altitude (ADR 0004)', () => {

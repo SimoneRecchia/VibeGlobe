@@ -3096,7 +3096,7 @@
         "Load the same archive from a local file (File or Blob) and assert identical tiles",
         "Fuzz archive headers and directories and assert corrupted archives never crash the engine or blank the view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F233",
@@ -3109,7 +3109,7 @@
         "Load the same package from a local file and from a fixture HTTP server and assert identical tiles in the playground",
         "Fuzz package files and assert corrupted databases produce a descriptive error and never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F234",

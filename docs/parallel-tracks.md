@@ -99,3 +99,17 @@ The third session's packages are `@vibeglobe/ui` (controls, theming, translation
 | F434       | The ARIA states of the 2D/3D/Auto toggle (F421) and the layer switcher (F425), which the audit must cover       |
 | F436       | Flights that become quick fades with reduced motion (F214, F195)                                                |
 | F437       | The attribution control (F424), which the layout must never cover                                               |
+
+## Source adapters track: status
+
+Fourth session, branch `claude/m7-source-adapters-0gkrjg`. Adapters in `packages/sources`, shared conformance suites in `@vibeglobe/sources/conformance`, browser tests in `e2e/sources-*.spec.ts` (they mount a globe with the adapter over the playground through the Vite dev server, `e2e/support/sources.ts`; the playground is unchanged).
+
+Passing: F232 (PMTiles), F233 (MBTiles).
+
+### What the frozen contract lacks, and the workaround
+
+| Gap                                                                                                                         | Workaround in `@vibeglobe/sources`                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ImagerySource` has no attribution or provider profile (docs/plan/api.md `SourceMetadata`)                                  | Adapters return `DescribedImagerySource`: the contract's fields plus `attribution` and `profile` (`metadata.ts`), for the engine to read when it builds credits (F254) and enforces profiles                                                    |
+| `request()` is synchronous and returns a URL, while archives (PMTiles, MBTiles) and session-based services need async steps | The adapter factory is async (it reads the header, metadata or session first); `request()` writes a pseudo URL `<archive>#z/x/y` that keeps the host for per-host concurrency, and the adapter's own transport (`archiveTransport`) resolves it |
+| Network faults on a package downloaded whole (MBTiles) happen while opening, not per tile                                   | The tiled conformance suite takes `network: 'on-open'` for such sources and checks that opening fails with a descriptive error                                                                                                                  |

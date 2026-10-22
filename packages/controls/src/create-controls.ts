@@ -124,6 +124,9 @@ function attach(
   // The browser must not take drags and pinches over the map for scrolling or page zoom (F189).
   const touchAction = element.style.touchAction;
   element.style.touchAction = 'none';
+  // Keyboard navigation needs a focusable map (F213): an application's own canvas may not be.
+  const focusable = element.hasAttribute('tabindex');
+  if (!focusable) element.tabIndex = 0;
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: false });
   return {
     port,
@@ -151,6 +154,7 @@ function attach(
     destroy() {
       for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
       element.style.touchAction = touchAction;
+      if (!focusable) element.removeAttribute('tabindex');
       box.cancel();
       element.style.outline = '';
     },

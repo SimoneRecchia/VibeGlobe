@@ -11,6 +11,7 @@ import {
   positionAt,
   record,
   settle,
+  type RecordedFrame,
 } from './support/controls.ts';
 
 const BACKENDS = ['webgl2', 'webgpu'] as const;
@@ -330,7 +331,9 @@ test('trackpad scrolls and pinches zoom continuously at the cursor, in proportio
   expect(maxDrift(recorded, () => at)).toBeLessThan(1);
   // No stepping: the largest frame-to-frame change is the largest single delta, not an accumulation.
   const steps = recorded.map((frame, i) =>
-    Math.abs(groundZoom(frame.camera) - (recorded[i - 1] ? groundZoom(recorded[i - 1].camera) : zoom)),
+    Math.abs(
+      groundZoom(frame.camera) - (recorded[i - 1] ? groundZoom((recorded[i - 1] as RecordedFrame).camera) : zoom),
+    ),
   );
   expect(Math.max(...steps)).toBeLessThanOrEqual(3 / 100 + 1e-9);
 });

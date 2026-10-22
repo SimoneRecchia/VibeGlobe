@@ -221,3 +221,16 @@ describe('the offline engine', () => {
     expect(checks.length).toBeLessThanOrEqual(7);
   });
 });
+
+describe('offline engine waits', () => {
+  it('forgets a wait for a connectivity change once it timed out (PT-15)', async () => {
+    const offline = engine({ mode: 'hybrid' });
+    const internals = offline as unknown as {
+      context(): { waitForChange(maxMs: number): Promise<void> };
+      waiters: unknown[];
+    };
+    const context = internals.context();
+    await Promise.all([context.waitForChange(5), context.waitForChange(5), context.waitForChange(5)]);
+    expect(internals.waiters.length).toBe(0);
+  });
+});

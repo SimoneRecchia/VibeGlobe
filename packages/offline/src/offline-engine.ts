@@ -285,11 +285,16 @@ class OfflineEngine implements Offline {
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
       waitForChange: (maxMs) =>
         new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, maxMs);
-          this.waiters.push(() => {
+          const waiter = (): void => {
             clearTimeout(timer);
             resolve();
-          });
+          };
+          // A wait that times out leaves the list, which would otherwise grow for the whole outage.
+          const timer = setTimeout(() => {
+            this.waiters = this.waiters.filter((w) => w !== waiter);
+            resolve();
+          }, maxMs);
+          this.waiters.push(waiter);
         }),
       offlineOnly: () => this.currentMode === 'offline',
       count: (sourceId, tier, coord, packageId) => {

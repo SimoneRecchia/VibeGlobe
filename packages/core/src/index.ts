@@ -31,6 +31,7 @@ export type {
   ControlsFactory,
   FrameCapture,
   FrameView,
+  TileDrawLayer,
   TileDrawList,
   GeoPosition,
   Globe,
@@ -53,6 +54,7 @@ export type {
   TileErrorReason,
   ViewInit,
 } from './globe/types.js';
+export { NO_TERRAIN } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';
 export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';

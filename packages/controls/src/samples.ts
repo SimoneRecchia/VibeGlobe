@@ -15,8 +15,16 @@ export class SampleRing {
     this.count = 0;
   }
 
-  /** Records one sample. */
+  /**
+   * Records one sample. One with the same time as the previous replaces it: browsers dispatch the moves of several
+   * fingers of one touch event one by one with one timestamp, and only the last shows them all moved.
+   */
   add(timeMs: number, a: number, b = 0, c = 0, d = 0): void {
+    const previous = (this.head - 1 + CAPACITY) % CAPACITY;
+    if (this.count > 0 && this.times[previous] === timeMs) {
+      this.head = previous;
+      this.count--;
+    }
     const i = this.head;
     this.times[i] = timeMs;
     this.values[i * 4] = a;

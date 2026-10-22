@@ -26,6 +26,10 @@ export class TouchGestures {
   private readonly downX = new Float64Array(2);
   private readonly downY = new Float64Array(2);
   private count = 0;
+  /** Each finger's last and previous move times, to see a touch event whose fingers are half reported. */
+  private readonly moveMs = new Float64Array(2);
+  private readonly previousMoveMs = new Float64Array(2);
+  private waited = false;
   private latestMs = 0;
   private dirty = false;
   private rebaseline = false;
@@ -33,6 +37,9 @@ export class TouchGestures {
   private anchor: GeoPosition | undefined;
   private readonly mid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly applied: MutablePoint = { xPx: 0, yPx: 0 };
+  /** The midpoint when the fingers last changed, where the next frame grabs the anchor. */
+  private readonly startMid: MutablePoint = { xPx: 0, yPx: 0 };
+  private tiltY = 0;
   private startMs = 0;
   private startDistance = 1;
   private startAngle = 0;
@@ -55,6 +62,8 @@ export class TouchGestures {
   // Velocity of a two-finger gesture whose fingers lift one after the other.
   private readonly carried: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
   private carriedMs = -Infinity;
+  private carriedAnchor: GeoPosition | undefined;
+  private readonly carriedPixel: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly velocity = new Float64Array(4);
   private readonly release: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
 
@@ -87,7 +96,7 @@ export class TouchGestures {
       this.tapMid.yPx = ((this.downY[0] ?? 0) + (this.downY[1] ?? 0)) / 2;
     }
     this.latestMs = timeMs;
-    this.rebaseline = true;
+    this.snapshot();
     return true;
   }
 
@@ -97,6 +106,8 @@ export class TouchGestures {
     if (slot < 0) return false;
     this.x[slot] = xPx;
     this.y[slot] = yPx;
+    this.previousMoveMs[slot] = this.moveMs[slot] ?? 0;
+    this.moveMs[slot] = timeMs;
     const { tapMaxMovePx } = this.context.options.touch;
     if (Math.hypot(xPx - (this.downX[slot] ?? 0), yPx - (this.downY[slot] ?? 0)) > tapMaxMovePx) {
       this.sessionMoved = true;
@@ -104,6 +115,8 @@ export class TouchGestures {
     this.latestMs = timeMs;
     this.measure();
     this.samples.add(timeMs, this.mid.xPx, this.mid.yPx, Math.log2(this.lastDistanceNow()), this.unwrappedAngle);
+    // The tilt decision depends on event times, so it is made here, not at the next (possibly late) frame.
+    if (this.count === 2 && this.tiltPossible) this.decideTilt();
     this.dirty = true;
     return true;
   }
@@ -126,7 +139,7 @@ export class TouchGestures {
     this.count--;
     this.latestMs = timeMs;
     if (this.count > 0) {
-      this.rebaseline = true;
+      this.snapshot();
       return true;
     }
     if (cancelled) {
@@ -161,13 +174,15 @@ export class TouchGestures {
     return Math.max(1, Math.hypot((this.x[1] ?? 0) - (this.x[0] ?? 0), (this.y[1] ?? 0) - (this.y[0] ?? 0)));
   }
 
-  private start(): void {
-    this.rebaseline = false;
-    this.dirty = false;
+  /**
+   * Re-baselines at a finger change, from the positions at that moment: distance, angle, the tilt decision's start and
+   * the samples. The next frame grabs the anchor at the midpoint recorded here, then applies any motion since.
+   */
+  private snapshot(): void {
+    this.rebaseline = true;
     this.measure();
-    this.anchor = this.context.options.gestures.dragPan ? this.context.port.grab(this.mid) : undefined;
-    this.applied.xPx = this.mid.xPx;
-    this.applied.yPx = this.mid.yPx;
+    this.startMid.xPx = this.mid.xPx;
+    this.startMid.yPx = this.mid.yPx;
     this.startMs = this.latestMs;
     this.startDistance = this.lastDistance = this.lastDistanceNow();
     this.startAngle = this.lastAngle = this.unwrappedAngle;
@@ -184,17 +199,43 @@ export class TouchGestures {
     this.samples.add(this.latestMs, this.mid.xPx, this.mid.yPx, Math.log2(this.startDistance), this.unwrappedAngle);
   }
 
+  /** Grabs the anchor at the midpoint of the last finger change. */
+  private start(): void {
+    this.rebaseline = false;
+    this.anchor = this.context.options.gestures.dragPan ? this.context.port.grab(this.startMid) : undefined;
+    this.applied.xPx = this.startMid.xPx;
+    this.applied.yPx = this.startMid.yPx;
+    this.measure();
+  }
+
   /** Turns the recorded fingers into camera changes once per frame. */
   apply(): void {
     if (this.count === 0) return;
-    if (this.rebaseline) {
-      this.start();
-      return;
-    }
+    if (this.rebaseline) this.start();
     if (!this.dirty) return;
+    if (this.count === 2 && this.halfReported()) return;
     this.dirty = false;
     if (this.count === 2) this.applyTwoFingers();
     else this.applyPan();
+  }
+
+  /**
+   * True, at most one frame in a row, when the fingers moved in step so far and only one has reported the latest touch
+   * event: the browser dispatches each finger's move separately, and a frame between them would show half the motion.
+   */
+  private halfReported(): boolean {
+    const a0 = this.moveMs[0] ?? 0;
+    const a1 = this.moveMs[1] ?? 0;
+    const p0 = this.previousMoveMs[0] ?? 0;
+    const p1 = this.previousMoveMs[1] ?? 0;
+    const half = (a0 > a1 && p0 === a1) || (a1 > a0 && p1 === a0);
+    if (half && !this.waited) {
+      this.waited = true;
+      this.context.port.requestNextFrame();
+      return true;
+    }
+    this.waited = false;
+    return false;
   }
 
   private applyPan(): void {
@@ -205,7 +246,7 @@ export class TouchGestures {
 
   /**
    * Decides whether two fingers tilt: side by side, both moving mostly vertically the same way, early in the gesture.
-   * Any other motion past the start distance, or the decision time passing, rules the tilt out.
+   * Sideways or opposite motion, or the decision time passing, rules the tilt out.
    */
   private decideTilt(): void {
     const { tiltStartPx, tiltDecisionMs } = this.context.options.touch;
@@ -223,19 +264,22 @@ export class TouchGestures {
     const early = this.latestMs - this.startMs <= tiltDecisionMs;
     if (sideBySide && vertical && early) {
       this.tilting = true;
-      this.applied.yPx = this.mid.yPx;
+      this.tiltY = this.mid.yPx;
       this.tiltPossible = false;
-    } else if (!sideBySide || !early || Math.max(Math.hypot(dx0, dy0), Math.hypot(dx1, dy1)) >= tiltStartPx) {
-      this.tiltPossible = false;
+    } else {
+      // Fingers report one at a time: only motion that contradicts a tilt rules it out.
+      const sideways = (dx: number, dy: number): boolean =>
+        Math.hypot(dx, dy) >= tiltStartPx && Math.abs(dx) >= Math.abs(dy);
+      const opposite = Math.abs(dy0) >= tiltStartPx && Math.abs(dy1) >= tiltStartPx && dy0 * dy1 < 0;
+      if (!sideBySide || !early || opposite || sideways(dx0, dy0) || sideways(dx1, dy1)) this.tiltPossible = false;
     }
   }
 
   private applyTwoFingers(): void {
     const { port, options } = this.context;
-    if (this.tiltPossible) this.decideTilt();
     if (this.tilting) {
-      const dy = this.mid.yPx - this.applied.yPx;
-      this.applied.yPx = this.mid.yPx;
+      const dy = this.mid.yPx - this.tiltY;
+      this.tiltY = this.mid.yPx;
       port.rotate(
         0,
         (-dy * options.tiltDegPerViewportHeight) / Math.max(1, this.context.heightPx()),
@@ -270,6 +314,10 @@ export class TouchGestures {
   private carryVelocity(timeMs: number): void {
     this.measureRelease(this.carried);
     this.carriedMs = timeMs;
+    // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
+    this.carriedAnchor = this.anchor;
+    this.carriedPixel.xPx = this.applied.xPx;
+    this.carriedPixel.yPx = this.applied.yPx;
   }
 
   private measureRelease(out: ReleaseVelocity): void {
@@ -295,8 +343,9 @@ export class TouchGestures {
     const { options, zoom, port, inertia } = this.context;
     const { tapMaxMs } = options.touch;
     const quick = timeMs - this.sessionStartMs <= tapMaxMs && !this.sessionMoved;
-    const anchor = this.anchor;
     const carried = timeMs - this.carriedMs <= LIFT_TOGETHER_MS;
+    const anchor = carried ? this.carriedAnchor : this.anchor;
+    const pixel = carried ? this.carriedPixel : this.applied;
     this.reset();
     if (quick && this.sessionFingers === 2) {
       if (options.gestures.touchZoom) zoom.add(-1, this.tapMid.xPx, this.tapMid.yPx, options.zoomAnimationMs);
@@ -315,7 +364,7 @@ export class TouchGestures {
     if (!options.gestures.inertia) return false;
     if (carried) Object.assign(this.release, this.carried);
     else this.measureRelease(this.release);
-    inertia.start(this.release, this.context.inertiaTaus(), anchor, this.applied, options.maxTiltDeg);
+    inertia.start(this.release, this.context.inertiaTaus(), anchor, pixel, options.maxTiltDeg);
     if (inertia.active) port.requestNextFrame();
     return inertia.active;
   }

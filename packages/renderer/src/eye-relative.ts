@@ -65,7 +65,11 @@ function placePlaneEyeRelative(mesh: Object3D, planeCenter: Float64Array, eye: F
 const planeCenter = new Float64Array(3);
 
 /** Places a surface tile for a frame: its globe origin and its plane center, both relative to the eye. */
-export function placeTile(mesh: Object3D, data: TileMeshData, view: FrameView): void {
+export function placeTile(
+  mesh: Object3D,
+  data: Pick<TileMeshData, 'originEcef' | 'planeCenter'>,
+  view: FrameView,
+): void {
   placeEyeRelative(mesh, data.originEcef, view.eyeEcef);
   view.morph.tilePlaneCenterInto(data.planeCenter, planeCenter);
   placePlaneEyeRelative(mesh, planeCenter, view.eyeEcef);
@@ -83,6 +87,24 @@ export function makeMorphedEyeRelative(
   planeOffset: Node<'vec3'>,
   morph: Node<'float'>,
 ): void {
+  const viewPosition = cameraViewMatrix.mul(vec4(morphedEyeRelative(globeOffset, planeOffset, morph), 1));
+  material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
+  if (depthPath === 'fragment') {
+    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
+    material.depthFunc = GreaterEqualDepth;
+  }
+}
+
+/**
+ * A vertex's position relative to the eye between the globe and the flat map (ADR 0008): the globe endpoint from the
+ * mesh's origin and the plane endpoint from its plane center (both placed by {@link placeTile}), mixed as
+ * (1 − m)·globe + m·plane, written out (never `mix`).
+ */
+export function morphedEyeRelative(
+  globeOffset: Node<'vec3'>,
+  planeOffset: Node<'vec3'>,
+  morph: Node<'float'>,
+): Node<'vec3'> {
   const column0 = modelWorldMatrix.mul(vec4(1, 0, 0, 0));
   const column1 = modelWorldMatrix.mul(vec4(0, 1, 0, 0));
   const column2 = modelWorldMatrix.mul(vec4(0, 0, 1, 0));
@@ -90,13 +112,7 @@ export function makeMorphedEyeRelative(
   const planeLow = vec3(column1.z, column2.x, column2.y);
   const globe = eyeRelativePosition(globeOffset);
   const plane = planeOffset.add(planeHigh).add(planeLow);
-  const position = globe.mul(float(1).sub(morph)).add(plane.mul(morph));
-  const viewPosition = cameraViewMatrix.mul(vec4(position, 1));
-  material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
-  if (depthPath === 'fragment') {
-    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
-    material.depthFunc = GreaterEqualDepth;
-  }
+  return globe.mul(float(1).sub(morph)).add(plane.mul(morph));
 }
 
 /**

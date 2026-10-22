@@ -19,6 +19,8 @@ import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
 import { createDebugEntry, disposeDebugEntries, placeDebugEntries, type DebugEntry } from './debug-meshes.js';
+import { meshBytes } from './debug-meshes.js';
+import { LayerBatches } from './layer-batches.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
@@ -91,6 +93,7 @@ export class ThreeBackend implements RendererBackend {
   /** Surface tiles by key (no Map: it boxes keys beyond 31 bits on every per-frame lookup, ADR 0018). */
   private readonly tiles = new IntegerKeyMap<TileEntry>(1024);
   private debugEntries: DebugEntry[] = [];
+  readonly layers = new LayerBatches(this.scene, 'reversed-z'); // Data layers (ADR 0037).
   private textureUploads = 0;
   private meshUploads = 0;
   private matrixUpdates = 0;
@@ -170,9 +173,8 @@ export class ThreeBackend implements RendererBackend {
     // A recovery may find WebGPU gone (blocked after a GPU-process crash): WebGL2 takes over, reported (KB-049),
     // unless a self-test failure reports it (KB-052).
     const previous = (this.capabilities as RendererCapabilities | undefined)?.backend;
-    if (forceWebGL && previous === 'webgpu' && this.webgpuFailure === undefined) {
+    if (forceWebGL && previous === 'webgpu' && this.webgpuFailure === undefined)
       this.events.backendFallback('WebGPU is no longer available after a device loss; using WebGL2');
-    }
     if (webgpu) patchIdentitySwizzle(scope);
     const canvas = this.canvases.next(webgpu);
     const renderer = new WebGPURenderer({
@@ -185,6 +187,7 @@ export class ThreeBackend implements RendererBackend {
     });
     await renderer.init();
     this.depthPath = depthPathOf(renderer);
+    this.layers.restore(this.depthPath);
     // Every path stores near / d, cleared to 0, nearest kept by greater-equal (ADR 0005 §1). With reversed depth three.js
     // inverts the clear value and the compare itself.
     if (this.depthPath === 'fragment') renderer.setClearDepth(0);
@@ -351,6 +354,7 @@ export class ThreeBackend implements RendererBackend {
     }
     surface.setSurfaceMorph(this.material, view.morph);
     placeDebugEntries(this.debugEntries, view.eyeEcef);
+    this.layers.place(view);
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.pipelineSwitches?.begin();
@@ -371,13 +375,11 @@ export class ThreeBackend implements RendererBackend {
 
   /** GPU resource counters, counted from what is actually held (after destroy too, so a leak shows). */
   resourceCounts(): ResourceCounts {
-    let gpuBytes = 0;
-    this.tiles.forEach((entry) => (gpuBytes += entry.data.byteLength + entry.data.indices.byteLength));
-    for (const entry of this.debugEntries) gpuBytes += entry.data.positions.byteLength;
-    const image = this.imagery;
-    const textureBytes = image && this.imageryTexture ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
+    const gpuBytes = meshBytes(this.tiles, this.debugEntries);
+    const image = this.imageryTexture ? this.imagery : undefined;
+    const textureBytes = image ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
     return {
-      meshes: this.tiles.size + this.debugEntries.length,
+      meshes: this.tiles.size + this.debugEntries.length + this.layers.meshCount,
       textures: (this.imageryTexture ? 1 : 0) + this.tileTextures.size,
       gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes,
       vertexArrays: this.destroyed ? this.vertexArraysLeft : countVertexArrays(this.renderer.backend),
@@ -487,6 +489,7 @@ export class ThreeBackend implements RendererBackend {
     this.tiles.forEach((_, key) => keys.push(key));
     for (const key of keys) this.removeMesh(key);
     this.setDebugMeshes([]);
+    this.layers.dispose();
     this.material?.dispose();
     this.material = undefined;
     this.imageryTexture?.dispose();

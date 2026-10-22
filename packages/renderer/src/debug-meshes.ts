@@ -1,4 +1,4 @@
-import type { DebugMeshData, DepthPath } from '@vibeglobe/core';
+import type { DebugMeshData, DepthPath, TileMeshData } from '@vibeglobe/core';
 import { positionLocal, sin, vec3 } from 'three/tsl';
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial, type Scene } from 'three/webgpu';
 import { makeEyeRelative, placeEyeRelative } from './eye-relative.js';
@@ -52,4 +52,15 @@ export function disposeDebugEntries(scene: Scene, entries: readonly DebugEntry[]
     entry.mesh.geometry.dispose();
     (entry.mesh.material as MeshBasicNodeMaterial).dispose();
   }
+}
+
+/** Bytes of vertex data held for surface tiles and debug quads, for the resource counters. */
+export function meshBytes(
+  tiles: { forEach(visit: (entry: { readonly data: TileMeshData }) => void): void },
+  debugEntries: readonly DebugEntry[],
+): number {
+  let bytes = 0;
+  tiles.forEach((entry) => (bytes += entry.data.byteLength + entry.data.indices.byteLength));
+  for (const entry of debugEntries) bytes += entry.data.positions.byteLength;
+  return bytes;
 }

@@ -69,3 +69,4 @@ export type { ParsedVectorData, VectorFormatAdapter, VectorInput, VectorSource }
 export { anchorOf, geometryFamily, toFeatureGeometry } from './geojson.js';
 export type { Feature, FeatureCollection, Geometry, GeometryFamily, Position } from './geojson.js';
 export { pointLayer, markerLayer, labelLayer, polylineLayer, polygonLayer, circleLayer } from './factories.js';
+export { createGlobeLayers } from './globe-layers.js';

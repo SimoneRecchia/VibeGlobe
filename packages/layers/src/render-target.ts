@@ -85,9 +85,7 @@ export class RecordingRenderTarget implements LayerRenderTarget {
   readonly #batches = new Map<number, RecordedBatch>();
   #nextId = 1;
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   createBatch(descriptor: BatchDescriptor): BatchHandle {
     const id = this.#nextId++;
     this.#batches.set(id, {
@@ -105,9 +103,7 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     return { id };
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   growBatch(handle: BatchHandle, capacity: number): void {
     const batch = this.#get(handle);
     for (const [attribute, values] of batch.attributes) {
@@ -118,9 +114,7 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     batch.capacity = capacity;
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   writeRange(
     handle: BatchHandle,
     attribute: BatchAttribute,
@@ -140,9 +134,7 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.writes.push({ batch: handle.id, attribute, first, count });
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   writeStrings(
     handle: BatchHandle,
     channel: BatchStringChannel,
@@ -161,33 +153,25 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.stringWrites.push({ batch: handle.id, channel, first, count });
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   writeGeometry(handle: BatchHandle, feature: number, geometry: FeatureGeometry): void {
     this.#get(handle).geometry.set(feature, geometry);
     this.stringWrites.push({ batch: handle.id, channel: 'geometry', first: feature, count: 1 });
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   setUniform(handle: BatchHandle, attribute: BatchAttribute, value: Float64Array | undefined): void {
     const batch = this.#get(handle);
     if (value === undefined) batch.uniforms.delete(attribute);
     else batch.uniforms.set(attribute, Float64Array.from(value));
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   setCount(handle: BatchHandle, count: number): void {
     this.#get(handle).count = count;
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   setOrder(handle: BatchHandle, order: number): void {
     this.#get(handle).order = order;
   }
@@ -197,9 +181,7 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.#get(handle).visible = visible;
   }
 
-  /**
-   *
-   */
+  /** See {@link LayerRenderTarget}. */
   release(handle: BatchHandle): void {
     this.#get(handle);
     this.#batches.delete(handle.id);

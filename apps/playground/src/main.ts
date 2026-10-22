@@ -444,6 +444,9 @@ if (params.get('experiment') === 'gpu-probes') {
   showViewModeControls(globe, app, params.get('viewMode'));
   showCameraControls(globe, app);
   runScenario(globe, scenario);
+  // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
+  if (params.get('layers') === 'demo')
+    void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;

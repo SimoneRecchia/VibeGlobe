@@ -24,6 +24,9 @@
       "path": "../../packages/controls"
     },
     {
+      "path": "../../packages/layers"
+    },
+    {
       "path": "../../packages/sources"
     },
     {

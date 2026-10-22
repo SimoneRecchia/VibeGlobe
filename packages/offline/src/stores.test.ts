@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { runCacheStoreContract } from './contract/cache-store-contract.js';
 import { runNetworkPolicyContract } from './contract/network-policy-contract.js';
 import { defaultNetworkPolicy } from './policy.js';
@@ -8,6 +8,7 @@ import { SwitchBoard } from './switches.js';
 import { indexedDbStore } from './idb-store.js';
 import { memoryStore } from './memory-store.js';
 import { workerStore } from './worker-store.js';
+import { createOffline } from './offline-engine.js';
 import type { CachedTile, NetworkPolicy } from './types.js';
 
 const tile = (size: number): CachedTile => ({
@@ -146,5 +147,35 @@ describe('indexedDbStore shared by several tabs', () => {
     reloaded.close();
     expect(stored).toBeLessThanOrEqual(20_000 * 1.05);
     for (const usage of usages) expect(usage.bytes).toBe(stored);
+  });
+});
+
+describe('cache eviction detection after clearing the cache', () => {
+  it('reports no eviction on the next start after the application cleared the cache itself (PT-21)', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => void saved.set(key, value),
+    });
+    try {
+      const first = createOffline({ store: 'main-thread' });
+      const internals = first as unknown as { put(key: string, tile: CachedTile): Promise<void> };
+      await internals.put('osm/0/0/0', {
+        bytes: new ArrayBuffer(10),
+        contentType: 'image/png',
+        storedAtMs: 0,
+        freshUntilMs: 0,
+      });
+      await first.clearCache();
+      first.destroy();
+      const second = createOffline({ store: 'main-thread' });
+      const lost: unknown[] = [];
+      second.on('storage-lost', (event) => lost.push(event));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      second.destroy();
+      expect(lost).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

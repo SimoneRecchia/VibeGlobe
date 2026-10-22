@@ -222,6 +222,9 @@ class OfflineEngine implements Offline {
 
   async clearCache(sourceId?: string): Promise<void> {
     await this.store.deletePrefix(sourceId === undefined ? '' : `${encodeURIComponent(sourceId)}/`);
+    // A cache the application emptied itself is no eviction to report on the next start (F275).
+    const usage = await this.store.usage().catch(() => undefined);
+    if (usage?.bytes === 0) this.markCache(false);
   }
 
   requestPersistentStorage(): Promise<PersistenceResult> {

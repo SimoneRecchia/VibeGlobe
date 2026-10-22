@@ -19,17 +19,21 @@ const geodetic = new Float64Array(3);
 
 /**
  * The position under a screen point as the frame shows it (ADR 0008: on the morphed surface, measured on the
- * ellipsoid), for an up-to-date camera and view state, or undefined off the surface.
+ * ellipsoid), after bringing the camera and view state up to date, or undefined off the surface.
  */
 export function positionAt(camera: Camera, view: ViewState, point: ScreenPoint): GeoPosition | undefined {
+  camera.update();
+  view.update(camera);
   pixel[0] = point.xPx;
   pixel[1] = point.yPx;
   if (!pickMorphedAt(camera, view.morph, pixel, pick)) return undefined;
   return { longitudeDeg: wrapDegrees(pick.longitudeRad * DEG), latitudeDeg: pick.latitudeRad * DEG, heightMeters: 0 };
 }
 
-/** The screen point showing a position as the frame draws it, for an up-to-date camera and view, or undefined behind it. */
+/** The screen point showing a position as the frame draws it (camera and view brought up to date), or undefined behind it. */
 export function screenOf(camera: Camera, view: ViewState, position: GeoPosition): ScreenPoint | undefined {
+  camera.update();
+  view.update(camera);
   geodetic[0] = position.longitudeDeg * RAD;
   geodetic[1] = position.latitudeDeg * RAD;
   geodetic[2] = position.heightMeters ?? 0;

@@ -17,6 +17,7 @@ import { EngineClock } from './engine-clock.js';
 import { FrameWaits } from './frame-waits.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
+import type { ViewMode } from '../view/view-state.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { createFrameView, keepGroundScale, positionAt, screenOf, type MutableFrameView } from './view-geometry.js';
@@ -56,6 +57,7 @@ import {
   type ValidView,
 } from './validation.js';
 
+const RAD = Math.PI / 180;
 /**
  * Creates a globe engine instance in a container (architecture §2). The returned object is usable at once; `ready`
  * resolves after the first complete frame. Invalid options throw a GlobeError synchronously.
@@ -119,11 +121,18 @@ class GlobeEngine implements Globe {
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
     this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
+    if (options.view?.tiltDeg !== undefined) this.surfaceFrame.view.chooseTilt(this.pendingView.tiltDeg * RAD);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.
       grab: (point) => (isScreenPoint(point) ? this.pick(point) : undefined),
-      dragTo: (anchor, point) => this.dragTo(anchor, point),
-      zoomAt: (point, deltaZoom) => this.zoomAt(point, deltaZoom),
+      dragTo: (anchor, point) => {
+        this.assertAlive();
+        if (!this.waiting && dragCamera(this.cam, this.surfaceFrame.view, anchor, point)) this.requestRender();
+      },
+      zoomAt: (point, deltaZoom) => {
+        this.assertAlive();
+        if (!this.waiting && zoomCamera(this.cam, this.surfaceFrame.view, point, deltaZoom)) this.requestRender();
+      },
       requestUpdate: () => this.requestRender(),
     };
     this.ready = new Promise<void>((resolve, reject) => {
@@ -150,9 +159,19 @@ class GlobeEngine implements Globe {
   }
 
   get camera(): CameraState {
-    const pending = this.pendingView;
     // Before the viewport has a size, range and altitude are unknown (types.ts, Globe.camera).
-    return pending ? requestedCameraState(pending) : readCameraState(this.cam);
+    const view = this.surfaceFrame.view;
+    return this.pendingView ? requestedCameraState(this.pendingView, view) : readCameraState(this.cam, view);
+  }
+
+  get viewMode(): ViewMode {
+    return this.surfaceFrame.view.mode;
+  }
+
+  setViewMode(mode: '2d' | '3d' | 'auto'): void {
+    this.assertAlive();
+    this.surfaceFrame.view.setMode(mode);
+    this.requestRender();
   }
 
   get frameNumber(): number {
@@ -312,7 +331,7 @@ class GlobeEngine implements Globe {
       this.emitter.emit('frame', this.framePayload);
     }
     if (this.emitter.has('camera-change'))
-      this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload));
+      this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload, this.surfaceFrame.view));
     // With imagery, `ready` waits for the pinned base: from then on zooming out always shows a complete picture (F084).
     if (this.resolveReady && this.surfaceFrame.baseReady) {
       this.resolveReady();
@@ -348,6 +367,8 @@ class GlobeEngine implements Globe {
       if (error instanceof GlobeError) this.emitter.emit('error', error);
       throw error;
     }
+    // A view given with a tilt chooses it (manual mode, ADR 0029).
+    if (target.tiltDeg !== undefined) this.surfaceFrame.view.chooseTilt(view.tiltDeg * RAD);
     if (pending) {
       // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
       if (keepRange) keepGroundScale(pending, view);
@@ -366,29 +387,13 @@ class GlobeEngine implements Globe {
 
   /** The position under a valid screen point; none before the viewport has a size. */
   private pick(point: ScreenPoint): GeoPosition | undefined {
-    if (this.waiting) return undefined;
-    this.cam.update();
-    this.surfaceFrame.view.update(this.cam);
-    return positionAt(this.cam, this.surfaceFrame.view, point);
+    return this.waiting ? undefined : positionAt(this.cam, this.surfaceFrame.view, point);
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
     this.assertAlive();
     validatePosition(position);
-    if (this.waiting) return undefined;
-    this.cam.update();
-    this.surfaceFrame.view.update(this.cam);
-    return screenOf(this.cam, this.surfaceFrame.view, position);
-  }
-
-  private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
-    this.assertAlive();
-    if (!this.waiting && dragCamera(this.cam, this.surfaceFrame.view, anchor, point)) this.requestRender();
-  }
-
-  private zoomAt(point: ScreenPoint, deltaZoom: number): void {
-    this.assertAlive();
-    if (!this.waiting && zoomCamera(this.cam, this.surfaceFrame.view, point, deltaZoom)) this.requestRender();
+    return this.waiting ? undefined : screenOf(this.cam, this.surfaceFrame.view, position);
   }
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {

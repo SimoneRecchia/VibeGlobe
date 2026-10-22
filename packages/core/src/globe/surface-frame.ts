@@ -12,7 +12,7 @@ import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadt
 import type { Camera } from '../camera/camera.js';
 import { validateViewCurves } from '../view/curves.js';
 import { ViewState } from '../view/view-state.js';
-import type { MorphFrame } from '../view/morph.js';
+import { mercatorScaleInto, type MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -156,9 +156,15 @@ export class SurfaceFrame {
     this.queryRad[0] = eye.longitudeRad;
     this.queryRad[1] = eye.latitudeRad;
     const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;
-    const surface = drawn === drawn ? drawn : finest;
+    // Heights as the frame draws them: times the relief factor, and σ·k(φ) on the flat map (ADR 0008).
+    this.queryRad[0] = eye.latitudeRad;
+    mercatorScaleInto(this.queryRad);
+    const factors = this.view.morph.factors;
+    const m = factors[0] ?? 0;
+    const scale = (factors[1] ?? 1) * (1 - m + m * (factors[2] ?? 1) * (this.queryRad[1] ?? 1));
+    const surface = (drawn === drawn ? drawn : finest) * scale;
     camera.groundHeightMeters = surface;
-    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
+    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest * scale, this.clearanceMeters);
     imagery.chargeTerrainMs(imagery.now() - start);
     // Under a millimeter the lift has settled: rounding alone would keep moving the eye, and drawing, forever.
     const change = next - lift;
@@ -174,7 +180,9 @@ export class SurfaceFrame {
     timer.end(PHASE_UPDATE);
     if (tracer.enabled) this.traceCamera(camera);
     this.clock.timeInto(this.nowMs);
-    // The zoom curves and the morph of this frame (ADR 0008): selection, draws and the renderer all use them.
+    // The applied tilt, then the zoom curves and the morph of this frame (ADR 0008, ADR 0029): selection, draws and
+    // the renderer all use them.
+    this.view.applyTilt(camera, this.imagery?.heights ? this.clearanceMeters : 0);
     this.view.update(camera);
     if (this.imagery) {
       this.selection.terrainMinMeters = this.imagery.terrainMinMeters;

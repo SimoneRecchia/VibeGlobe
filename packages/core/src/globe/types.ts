@@ -9,6 +9,7 @@ import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
 import type { MorphFrame } from '../view/morph.js';
 import type { ViewCurvesInit } from '../view/curves.js';
+import type { ViewMode } from '../view/view-state.js';
 
 /** A WGS84 geodetic position: degrees and meters above the ellipsoid, whatever the display projection. */
 export interface GeoPosition {
@@ -293,9 +294,17 @@ export interface CameraState {
    * included (F146, F147); 0 without terrain. `altitudeMeters` minus this is the eye's height above the ground.
    */
   readonly groundHeightMeters: number;
+  /** The view mode: the zoom curves drive the tilt ('auto'), it stays 0° ('2d'), or the user chose it ('manual'). */
+  readonly viewMode: ViewMode;
+  /**
+   * The tilt and heading the user chose (F164). `tiltDeg` and `headingDeg` are the applied values: a temporary clamp
+   * (terrain, empty sky; F165, F166) or the Auto curve may lower the tilt, never the choice.
+   */
+  readonly chosenTiltDeg: number;
+  readonly chosenHeadingDeg: number;
 }
 
-/** Initial camera. */
+/** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0029). */
 export interface ViewInit {
   readonly longitudeDeg?: number;
   readonly latitudeDeg?: number;
@@ -531,6 +540,14 @@ export interface Globe {
    * and leaves the camera unchanged.
    */
   jumpTo(target: ViewInit): void;
+  /** The current view mode (F161–F163). */
+  readonly viewMode: ViewMode;
+  /**
+   * The 2D / 3D / Auto toggle (F163): '2d' keeps the tilt at 0° at every zoom while the globe still flattens, '3d'
+   * chooses the default tilt (manual mode), 'auto' restores the zoom-driven curves. Anything else throws a GlobeError
+   * ('invalid-option').
+   */
+  setViewMode(mode: '2d' | '3d' | 'auto'): void;
   /**
    * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. A point
    * without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').

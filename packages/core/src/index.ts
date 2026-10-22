@@ -206,6 +206,7 @@ export {
   type BatchKind,
   type BatchStringChannel,
   type FeatureGeometry,
+  type LayerGround,
   type LayerRenderTarget,
   type Placement,
 } from './layers/layer-target.js';

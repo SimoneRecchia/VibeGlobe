@@ -1,4 +1,4 @@
-import type { LayerRenderTarget } from '../layers/layer-target.js';
+import type { LayerGround, LayerRenderTarget } from '../layers/layer-target.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -227,6 +227,8 @@ export interface RendererBackend {
   readonly inputElement: unknown;
   /** Draws data layers (ADR 0037); absent in renderers that draw none. */
   readonly layers?: LayerRenderTarget;
+  /** Optional: where clamped and draped layer features take their heights from (ADR 0037). */
+  setLayerGround?(ground: LayerGround): void;
   /** Uploads a surface tile mesh; returns false while the renderer cannot accept it. */
   addMesh(mesh: TileMeshData): void;
   removeMesh(key: number): void;

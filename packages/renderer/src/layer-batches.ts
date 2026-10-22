@@ -7,6 +7,7 @@ import {
   type DepthPath,
   type FeatureGeometry,
   type FrameView,
+  type LayerGround,
   type LayerRenderTarget,
 } from '@vibeglobe/core';
 import {
@@ -38,6 +39,11 @@ interface Batch extends BatchContents {
   arrays: LayerArrays | undefined;
 }
 
+/** Whether a batch's features stand on the terrain ('clamp-to-ground', 'drape') rather than at absolute altitudes. */
+function onGround(batch: Batch): boolean {
+  return typeof batch.descriptor.placement === 'string';
+}
+
 function shapeOf(batch: BatchContents): LayerShape {
   const kind = batch.kind;
   if (kind === 'polygon' && (batch.attributes.has('heightMeters') || batch.uniforms.has('heightMeters')))
@@ -57,6 +63,9 @@ export class LayerBatches implements LayerRenderTarget {
   /** Labels and marker images (ADR 0037). */
   private readonly atlas = new LayerAtlas();
   private atlasGeneration = 0;
+  /** The terrain clamped and draped features stand on, and the version their heights were taken at. */
+  private ground: LayerGround | undefined;
+  private groundVersion = -1;
   /** The last frame's view, for picking. */
   private lastView: FrameView | undefined;
 
@@ -171,6 +180,12 @@ export class LayerBatches implements LayerRenderTarget {
     this.batches.delete(handle.id);
   }
 
+  /** Sets the terrain clamped and draped features take their heights from (ADR 0037). */
+  setGround(ground: LayerGround): void {
+    this.ground = ground;
+    this.groundVersion = -1;
+  }
+
   /** Registers or replaces a marker image by name (the `icon` channel names it); markers using it redraw. */
   addImage(name: string, image: unknown): void {
     this.atlas.addImage(name, image as AtlasImage);
@@ -194,6 +209,13 @@ export class LayerBatches implements LayerRenderTarget {
   place(view: FrameView): void {
     this.lastView = view;
     this.atlas.setPixelRatio(view.pixelRatio);
+    const version = this.ground?.version() ?? 0;
+    if (version !== this.groundVersion) {
+      // Finer terrain arrived: features on the ground are placed on it again.
+      this.groundVersion = version;
+      for (const batch of this.batches.values())
+        if (batch.descriptor.placement !== undefined && onGround(batch)) batch.dirty = true;
+    }
     if (this.atlas.generation !== this.atlasGeneration) {
       // The atlas started over: every label and marker is drawn into it again.
       this.atlasGeneration = this.atlas.generation;
@@ -252,7 +274,7 @@ export class LayerBatches implements LayerRenderTarget {
   private rebuild(batch: Batch): void {
     batch.dirty = false;
     this.disposeMesh(batch);
-    const arrays = buildLayerArrays(batch, this.atlas);
+    const arrays = buildLayerArrays(batch, this.atlas, onGround(batch) ? this.ground : undefined);
     batch.arrays = arrays;
     if (!arrays) return;
     const geometry = new BufferGeometry();

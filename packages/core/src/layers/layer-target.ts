@@ -140,3 +140,12 @@ export interface LayerRenderTarget {
    */
   addImage?(name: string, image: unknown): void;
 }
+
+/**
+ * The terrain under data layers (ADR 0037): the height the frame shows at a position (degrees), and a version that
+ * changes when finer terrain arrives, so clamped and draped features are placed again.
+ */
+export interface LayerGround {
+  heightAt(longitudeDeg: number, latitudeDeg: number): number;
+  version(): number;
+}

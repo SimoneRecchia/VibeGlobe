@@ -396,3 +396,46 @@ for (const backend of BACKENDS) {
     }
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`ground-clamped points sit on the terrain once it has loaded, in the tilted view on ${backend} (F363)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openGlobe(
+      page,
+      `backend=${backend}&terrain=terrarium&scenario=data-clamped&lon=6.86&lat=45.78&zoom=9.8&tilt=45`,
+    );
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    // Every terrain tile settled, then one more frame: the points were placed again on the finest terrain.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const stats = window.vibeglobePlayground?.globe.terrainStats();
+            return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : -1;
+          }),
+        { timeout: 90_000 },
+      )
+      .toBe(0);
+    await page.waitForTimeout(300);
+    await waitForIdle(page);
+    const image = await canvasImage(page);
+    const points = await page.evaluate(() => {
+      const globe = window.vibeglobePlayground?.globe;
+      if (!globe) throw new Error('no globe');
+      return Array.from({ length: 100 }, (_, i) => {
+        const position = { longitudeDeg: 6.61 + (i % 10) * 0.05, latitudeDeg: 45.6 + Math.floor(i / 10) * 0.05 };
+        const ground = globe.elevationAt(position).heightMeters;
+        return { ground, screen: globe.geoToScreen({ ...position, heightMeters: ground }) };
+      });
+    });
+    const inView = points.filter(
+      ({ screen }) => screen && screen.xPx > 3 && screen.yPx > 3 && screen.xPx < 477 && screen.yPx < 357,
+    );
+    expect(inView.length).toBeGreaterThan(20);
+    // Some of them stand high on the mountain: on the ellipsoid they would draw far from these positions.
+    expect(Math.max(...inView.map((p) => p.ground))).toBeGreaterThan(2000);
+    for (const { screen } of inView) if (screen) expect(near(image, screen.xPx, screen.yPx, 1, isRed)).toBe(true);
+  });
+}

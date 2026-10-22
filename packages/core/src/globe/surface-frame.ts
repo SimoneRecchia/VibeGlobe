@@ -1,3 +1,4 @@
+import type { LayerGround } from '../layers/layer-target.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -248,6 +249,15 @@ export class SurfaceFrame {
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */
   get baseReady(): boolean {
     return this.imagery?.baseReady ?? true;
+  }
+
+  /** The terrain data layers stand on (ADR 0037): heights as `elevationAt`, versioned by the height uploads. */
+  layerGround(): LayerGround {
+    const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
+    return {
+      heightAt: (longitudeDeg, latitudeDeg) => this.elevationAt({ longitudeDeg, latitudeDeg }, sample).heightMeters,
+      version: () => this.terrainStats()?.uploads ?? 0,
+    };
   }
 
   /**

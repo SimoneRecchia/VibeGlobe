@@ -5,6 +5,7 @@ import {
   type BatchAttribute,
   type BatchKind,
   type FeatureGeometry,
+  type LayerGround,
   type LayerOrigin,
 } from '@vibeglobe/core';
 import earcut from 'earcut';
@@ -81,7 +82,16 @@ class Builder {
   other = { positions: [] as number[], normals: [] as number[], planes: [] as number[], heights: [] as number[] };
   private readonly one = { positions: new Float32Array(3), normals: new Float32Array(3), planes: new Float32Array(4) };
 
-  constructor(readonly origin: LayerOrigin) {}
+  constructor(
+    readonly origin: LayerOrigin,
+    /** With a ground, heights are above the terrain under each vertex (clamped and draped features). */
+    private readonly ground?: LayerGround,
+  ) {}
+
+  /** The longest straight piece of a line or polygon edge, degrees: finer on the terrain, so drapes follow it. */
+  stepDeg(extentDeg: number): number {
+    return this.ground ? Math.min(MAX_STEP_DEG, Math.max(DRAPE_STEP_DEG, extentDeg / MAX_DRAPE_PIECES)) : MAX_STEP_DEG;
+  }
 
   get count(): number {
     return this.heights.length;
@@ -98,13 +108,13 @@ class Builder {
     uv: number[] = [-1, -1],
   ): void {
     this.attributesOf(lonDeg, latDeg, this);
-    this.heights.push(heightMeters);
+    this.heights.push(heightMeters + (this.ground?.heightAt(lonDeg, latDeg) ?? 0));
     this.colors.push(...color);
     this.corners.push(...corner);
     this.uvs.push(...uv);
     if (to) {
       this.attributesOf(to[0] ?? 0, to[1] ?? 0, this.other);
-      this.other.heights.push(to[2] ?? 0);
+      this.other.heights.push((to[2] ?? 0) + (this.ground?.heightAt(to[0] ?? 0, to[1] ?? 0) ?? 0));
     }
   }
 
@@ -236,12 +246,13 @@ function buildLines(batch: BatchContents, builder: Builder): void {
   for (let feature = 0; feature < batch.count; feature++) {
     const geometry = batch.geometry.get(feature);
     if (!geometry || valueOf(batch, 'visible', feature) <= 0) continue;
+    const step = builder.stepDeg(extentOf(geometry));
     const color = colorOf(batch, feature);
     const half = valueOf(batch, 'widthPx', feature) / 2;
     forEachPart(geometry, (start, end) => {
       for (let i = start; i + 1 < end; i++) {
         // Long segments follow the surface: pieces of at most MAX_STEP_DEG along the great circle.
-        const pieces = greatCirclePoints(vertexOf(geometry, i), vertexOf(geometry, i + 1));
+        const pieces = greatCirclePoints(vertexOf(geometry, i), vertexOf(geometry, i + 1), step);
         for (let k = 0; k + 1 < pieces.length; k++) {
           const a = pieces[k] ?? [0, 0, 0];
           const b = pieces[k + 1] ?? [0, 0, 0];
@@ -262,6 +273,7 @@ function buildPolygons(batch: BatchContents, builder: Builder): void {
   for (let feature = 0; feature < batch.count; feature++) {
     const geometry = batch.geometry.get(feature);
     if (!geometry || valueOf(batch, 'visible', feature) <= 0) continue;
+    const step = builder.stepDeg(extentOf(geometry));
     const color = colorOf(batch, feature);
     const top = valueOf(batch, 'heightMeters', feature);
     const base = valueOf(batch, 'baseMeters', feature);
@@ -279,7 +291,7 @@ function buildPolygons(batch: BatchContents, builder: Builder): void {
       for (let t = 0; t + 2 < triangles.length; t += 3) {
         const corners = [0, 1, 2].map((c) => vertexOf(geometry, first + (triangles[t + c] ?? 0)));
         // Large triangles follow the surface: split until every edge is at most MAX_STEP_DEG.
-        for (const triangle of subdivide(corners as Triangle)) {
+        for (const triangle of subdivide(corners as Triangle, step)) {
           for (const v of triangle) builder.add(v[0], v[1], top > 0 ? top : v[2], color, [0, 0, 0, 0]);
           const at = builder.count - 3;
           builder.indices.push(at, at + 1, at + 2);
@@ -318,13 +330,16 @@ function buildWalls(
 
 /** The longest edge, degrees, drawn as one straight piece: shorter ones stay within a few meters of the surface. */
 const MAX_STEP_DEG = 1;
+/** On the terrain: pieces of about a kilometer, at most this many across a feature. */
+const DRAPE_STEP_DEG = 0.01;
+const MAX_DRAPE_PIECES = 100;
 
 type Vertex = [number, number, number];
 type Triangle = [Vertex, Vertex, Vertex];
 
 /** Points from `a` to `b` (degrees, meters) along the great circle, at most {@link MAX_STEP_DEG} apart. */
-function greatCirclePoints(a: Vertex, b: Vertex): Vertex[] {
-  const steps = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) / MAX_STEP_DEG);
+function greatCirclePoints(a: Vertex, b: Vertex, stepDeg: number): Vertex[] {
+  const steps = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) / stepDeg);
   if (steps <= 1) return [a, b];
   const rad = Math.PI / 180;
   const unit = (v: Vertex): number[] => [
@@ -352,15 +367,37 @@ function greatCirclePoints(a: Vertex, b: Vertex): Vertex[] {
 }
 
 /** A triangle split in four at its edge midpoints (degrees) until no edge exceeds {@link MAX_STEP_DEG}. */
-function subdivide(triangle: Triangle): Triangle[] {
+function subdivide(triangle: Triangle, stepDeg: number): Triangle[] {
   const [a, b, c] = triangle;
   const span = (u: Vertex, v: Vertex): number => Math.max(Math.abs(u[0] - v[0]), Math.abs(u[1] - v[1]));
-  if (Math.max(span(a, b), span(b, c), span(c, a)) <= MAX_STEP_DEG) return [triangle];
+  if (Math.max(span(a, b), span(b, c), span(c, a)) <= stepDeg) return [triangle];
   const mid = (u: Vertex, v: Vertex): Vertex => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2, (u[2] + v[2]) / 2];
   const ab = mid(a, b);
   const bc = mid(b, c);
   const ca = mid(c, a);
-  return [...subdivide([a, ab, ca]), ...subdivide([ab, b, bc]), ...subdivide([ca, bc, c]), ...subdivide([ab, bc, ca])];
+  return [
+    ...subdivide([a, ab, ca], stepDeg),
+    ...subdivide([ab, b, bc], stepDeg),
+    ...subdivide([ca, bc, c], stepDeg),
+    ...subdivide([ab, bc, ca], stepDeg),
+  ];
+}
+
+/** The larger side of a feature's longitude and latitude bounding box, degrees. */
+function extentOf(geometry: FeatureGeometry): number {
+  let west = Infinity;
+  let east = -Infinity;
+  let south = Infinity;
+  let north = -Infinity;
+  for (let i = 0; i * 3 < geometry.positions.length; i++) {
+    const lon = geometry.positions[i * 3] ?? 0;
+    const lat = geometry.positions[i * 3 + 1] ?? 0;
+    west = Math.min(west, lon);
+    east = Math.max(east, lon);
+    south = Math.min(south, lat);
+    north = Math.max(north, lat);
+  }
+  return Math.max(east - west, north - south, 0);
 }
 
 function vertexOf(geometry: FeatureGeometry, i: number): [number, number, number] {
@@ -383,10 +420,14 @@ function firstPosition(batch: BatchContents): [number, number] | undefined {
 }
 
 /** The vertex arrays of a batch's visible features, or undefined when there is nothing to draw. */
-export function buildLayerArrays(batch: BatchContents, images?: QuadImages): LayerArrays | undefined {
+export function buildLayerArrays(
+  batch: BatchContents,
+  images?: QuadImages,
+  ground?: LayerGround,
+): LayerArrays | undefined {
   const first = firstPosition(batch);
   if (!first) return undefined;
-  const builder = new Builder(layerOrigin(first[0], first[1]));
+  const builder = new Builder(layerOrigin(first[0], first[1]), ground);
   if (batch.kind === 'polyline') buildLines(batch, builder);
   // Circles arrive as their geodesic outlines (the layers package's `ellipseGeometry`).
   else if (batch.kind === 'polygon' || batch.kind === 'circle') buildPolygons(batch, builder);

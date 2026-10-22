@@ -226,6 +226,18 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
         'fill-extrusion-base': ['get', 'b'],
       },
     }),
+  // Points on the ground across the fixture's 4,000 m peak at (6.86°, 45.83°), with `&terrain=terrarium` (F363).
+  'data-clamped': () =>
+    new DataLayer('point', {
+      id: 'clamped',
+      data: Array.from({ length: 100 }, (_, i) =>
+        feature(`c${String(i)}`, {
+          type: 'Point',
+          coordinates: [6.61 + (i % 10) * 0.05, 45.6 + Math.floor(i / 10) * 0.05],
+        }),
+      ),
+      style: { 'circle-color': '#ff2020', 'circle-radius': 4 },
+    }),
   // Images with several anchors, sizes and rotations (F352).
   'data-markers': () =>
     new DataLayer('marker', {

@@ -4,6 +4,7 @@ import {
   type DebugMeshData,
   type DepthPath,
   type FrameView,
+  type LayerGround,
   type RendererBackend,
   type FrameCapture,
   type RendererCapabilities,
@@ -135,9 +136,7 @@ export class ThreeBackend implements RendererBackend {
     private readonly settings: BackendSettings,
   ) {
     this.canvases = new CanvasSlot(surface);
-    this.camera.matrixAutoUpdate = false;
-    this.camera.matrixWorldAutoUpdate = false;
-    this.scene.matrixWorldAutoUpdate = false;
+    this.camera.matrixAutoUpdate = this.camera.matrixWorldAutoUpdate = this.scene.matrixWorldAutoUpdate = false;
   }
 
   /** Creates and initializes a backend; rejects with GlobeError 'unsupported-device' when nothing can render. */
@@ -260,6 +259,7 @@ export class ThreeBackend implements RendererBackend {
     return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
+  readonly setLayerGround = (ground: LayerGround): void => this.layers.setGround(ground);
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
     disposeDebugEntries(this.scene, this.debugEntries);

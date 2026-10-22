@@ -36,3 +36,4 @@ Conventions:
 | [0024](0024-data-pipeline.md)                    | Data pipeline: a TypeScript pipeline with built-in readers, external tools only in pinned Docker images     | Accepted                                                          |
 | [0025](0025-default-data-licenses.md)            | Licenses and attribution of the default datasets, re-verified                                               | Accepted                                                          |
 | [0026](0026-worldcover-imagery.md)               | Detailed imagery from the ESA WorldCover 2021 Sentinel-2 composite                                          | Accepted                                                          |
+| [0029](0029-data-layers.md)                      | Data layers: feature storage, styling, clustering, labels and picking ids                                   | Accepted                                                          |

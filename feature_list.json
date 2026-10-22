@@ -4634,7 +4634,7 @@
         "Verify it lists known failure modes with issue references (for example missed picks on terrain, precision at street level, picking cost per frame, picking during motion)",
         "Verify it states the chosen approach, why it matches or beats the studied engines, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F349",
@@ -4647,7 +4647,7 @@
         "Verify it lists known failure modes with issue references (for example blurry text, flicker during motion, collision jitter, missing glyphs, cost of re-placement)",
         "Verify it states the chosen approach, why, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F350",
@@ -4661,7 +4661,7 @@
         "Verify it summarizes how those projects test and benchmark data layers",
         "Verify it states the chosen approach and why, linking the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F351",

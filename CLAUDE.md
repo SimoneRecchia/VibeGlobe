@@ -38,7 +38,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
-- Parallel tracks (`docs/parallel-tracks.md`): a second session owns `packages/tools` (M9 and the offline package builder CLI) and a third owns `packages/ui` and the GIS utilities package (M12, F404–F437); this session edits neither and reviews their pull requests instead.
+- Parallel tracks (`docs/parallel-tracks.md`): other sessions own `packages/tools` (M9 and the offline package builder CLI), `packages/ui` and the GIS utilities package (M12), the M7 source adapters in `packages/sources`, `packages/vue`, `packages/web-component` and the Nuxt example (M14), and `packages/offline` (the engine side of M8); this session edits none of them and reviews their pull requests instead. At the end of each feature group, check the file's "Hook requests" table and add small hooks promptly.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
 
 ## Working efficiently

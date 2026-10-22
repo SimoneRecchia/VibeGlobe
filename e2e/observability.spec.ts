@@ -93,20 +93,32 @@ test('the performance HUD shows frame time, frame rate and per-phase costs live,
   page,
 }) => {
   await openGlobe(page, 'backend=webgl2&scenario=drag&zoom=3&level=4');
-  const cpuMean = async (): Promise<number> => {
+  // The median CPU frame time of a 1.5 s window: GC pauses and the odd slow frame do not count as the HUD's cost.
+  const cpuMedian = async (): Promise<number> => {
     await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1500);
     const samples = await page.evaluate(() => window.vibeglobePlayground?.cpuFrameTimesMs() ?? []);
-    return samples.reduce((a, b) => a + b, 0) / Math.max(1, samples.length);
+    samples.sort((a, b) => a - b);
+    return samples[Math.floor(samples.length / 2)] ?? 0;
   };
-  const without = await cpuMean();
-  await page.evaluate(() => window.vibeglobePlayground?.showHud(true));
+  const showHud = (on: boolean): Promise<void> =>
+    page.evaluate((show) => window.vibeglobePlayground?.showHud(show), on);
+  await showHud(true);
   const hud = page.locator('.vibeglobe-hud');
   await expect(hud).toContainText(/\d+(\.\d+)? ms · \d+ fps/);
   for (const phase of ['update', 'selection', 'scheduling', 'upload', 'render']) await expect(hud).toContainText(phase);
   const first = await hud.innerText();
   await expect.poll(() => hud.innerText(), { timeout: 5000 }).not.toBe(first);
-  const withHud = await cpuMean();
+  // Windows without and with the HUD alternate, so a drift of the machine or the scenario between them cancels out.
+  let without = 0;
+  let withHud = 0;
+  const pairs = 3;
+  for (let pair = 0; pair < pairs; pair++) {
+    await showHud(false);
+    without += (await cpuMedian()) / pairs;
+    await showHud(true);
+    withHud += (await cpuMedian()) / pairs;
+  }
   console.log(`CPU frame time without HUD ${without.toFixed(3)} ms, with HUD ${withHud.toFixed(3)} ms`);
   // docs/guides/debugging.md documents the HUD's overhead: at most 0.5 ms of main-thread time per frame.
   expect(withHud - without).toBeLessThan(0.5);

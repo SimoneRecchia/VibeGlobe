@@ -53,7 +53,7 @@ export class SurfaceFrame {
 
   constructor(
     options: GlobeOptions,
-    private readonly clock: { readonly timeMs: number },
+    private readonly clock: { timeInto(out: Float64Array): void },
     private readonly observability: Observability,
   ) {
     this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;

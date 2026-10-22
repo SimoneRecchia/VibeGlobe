@@ -207,7 +207,7 @@ test('image decoding runs off the main thread while imagery streams, with no lon
   await waitForImagery(page);
   // Prefetched tiles (F088) may still be on their way: trace until every request has ended, then count the tiles that
   // arrived (a request cancelled on the way decodes nothing).
-  await expect.poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats().loading)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats()?.loading)).toBe(0);
   await browser.stopTracing();
   const tiles = (await requestLog(page, session)).filter((r) => r.status === 200 && !r.aborted).length;
   const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {

@@ -6,8 +6,8 @@ import { captureCanvas, compareImages, CROSS_BACKEND, expectMatchesBaseline, vie
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
 /**
- * Canonical views (ADR 0012): the globe, a region, a pole, the antimeridian, both street-level scenarios, and minified
- * imagery.
+ * Canonical views (ADR 0012): the globe, a region, a pole, the antimeridian, both street-level scenarios, minified
+ * imagery and terrain.
  */
 const VIEWS: readonly { name: string; query: string; drawCalls?: number; imagery?: boolean; crossBackend?: false }[] = [
   { name: 'orbit', query: 'lon=-30&lat=20&zoom=1.5' },
@@ -25,6 +25,18 @@ const VIEWS: readonly { name: string; query: string; drawCalls?: number; imagery
     imagery: true,
     crossBackend: false,
   },
+  // Tilted relief of the fixture terrain in each built-in encoding, under the `world` fixture imagery (F127, F129,
+  // F130). Each backend has its own baseline: `world`'s one-pixel grid lines lie on tile seams, whose pixels differ
+  // across backends as stripes-minified's do (test-changes); terrain-smooth compares the relief across backends.
+  { name: 'terrain-terrarium', query: 'scenario=terrain-terrarium&session=visual', imagery: true, crossBackend: false },
+  { name: 'terrain-rgb', query: 'scenario=terrain-rgb&session=visual', imagery: true, crossBackend: false },
+  {
+    name: 'terrain-quantized-mesh',
+    query: 'scenario=terrain-quantized-mesh&session=visual',
+    imagery: true,
+    crossBackend: false,
+  },
+  { name: 'terrain-smooth', query: 'scenario=terrain-terrarium&imagery=smooth&session=visual', imagery: true },
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
@@ -51,7 +63,8 @@ for (const backend of BACKENDS) {
 
 for (const view of VIEWS.filter((v) => v.crossBackend !== false)) {
   test(`canonical view ${view.name} looks the same on WebGPU and WebGL2 (F073)`, async ({ page }, testInfo) => {
-    if (view.imagery) test.setTimeout(90_000);
+    // Two captures, each streaming its tiles (up to about 40 s each on CI's software WebGPU; test-changes).
+    if (view.imagery) test.setTimeout(150_000);
     const captures = [];
     for (const backend of BACKENDS) {
       await openGlobe(page, `backend=${backend}&${view.query}`);

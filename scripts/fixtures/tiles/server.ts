@@ -1,14 +1,15 @@
 // The fixture tile server (M3 plan §4.1) as a Node middleware: the playground's Vite plugin and the standalone
 // servers mount it. Tiles: GET /fixture-tiles/{session}/{source}/{scheme}/{z}/{x}/{y}.{png,etc1s.ktx2,uastc.ktx2}
 // with source one of the patterns (KTX2 tiles have a full mip chain, ADR 0020). Terrain (M4 plan §2): source `terrain`
-// with {y}.terrarium.png, .terrain-rgb.png, .f32 (rows from the north) or .terrain (quantized-mesh, TMS rows from the
-// south), and GET /fixture-tiles/{session}/terrain/{scheme}/layer.json. Per-session fault rules: POST
+// with {y}.terrarium.png, .terrain-rgb.png, .f32, .rgb24 (rows from the north) or .terrain (quantized-mesh, TMS rows from the
+// south), source `terrain-geoid` for the same heights above the fixture geoid, GET /fixture-geoid.bin for that geoid
+// (VGEOID1), and GET /fixture-tiles/{session}/terrain/{scheme}/layer.json. Per-session fault rules: POST
 // /_fixture/{session}/rules; the session's layer.json: POST /_fixture/{session}/layer; request log: GET
 // /_fixture/{session}/log; DELETE /_fixture/{session} resets all three. A session id per test keeps tests independent.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
-import { terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
+import { fixtureGeoidFile, terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
 import {
   encodeTilePng,
   renderTile,
@@ -82,7 +83,7 @@ interface Session {
 const PATTERNS: readonly string[] = ['world', 'levels', 'border', 'smooth', 'tiles', 'stripes', 'patches'];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
 const TILE_PATH =
-  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32)$/;
+  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
 /** Terrain file extensions and their encodings. */
@@ -91,6 +92,7 @@ const TERRAIN: Readonly<Record<string, TerrainEncoding>> = {
   'terrain-rgb.png': 'terrain-rgb',
   terrain: 'quantized-mesh',
   f32: 'float32',
+  rgb24: 'rgb24',
 };
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   png: 'image/png',
@@ -98,6 +100,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   'terrain-rgb.png': 'image/png',
   terrain: 'application/vnd.quantized-mesh',
   f32: 'application/octet-stream',
+  rgb24: 'application/octet-stream',
 };
 
 /** The default layer.json: every tile of levels 0–16 available, in TMS order, with no extensions. */
@@ -148,6 +151,17 @@ export class FixtureServer {
     const control = CONTROL_PATH.exec(url.pathname);
     if (control) {
       this.control(control[1] ?? '', control[2], req, res);
+      return;
+    }
+    if (url.pathname === '/fixture-geoid.bin') {
+      const body = fixtureGeoidFile();
+      res
+        .writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*',
+          'Content-Length': String(body.length),
+        })
+        .end(body);
       return;
     }
     const layer = LAYER_PATH.exec(url.pathname);
@@ -251,7 +265,8 @@ export class FixtureServer {
       record.aborted = true;
       record.endMs = this.now();
     });
-    const terrain = source === 'terrain' && TERRAIN[extension] !== undefined;
+    // `terrain-geoid` serves the same terrain above the fixture geoid instead of the ellipsoid (F133).
+    const terrain = (source === 'terrain' || source === 'terrain-geoid') && TERRAIN[extension] !== undefined;
     // Quantized-mesh rows count from the south (TMS); everything else from the north.
     if (terrain && extension === 'terrain') tile.y = 2 ** tile.level - 1 - tile.y;
     if ((!terrain && !PATTERNS.includes(source)) || !SCHEMES.includes(scheme) || !tileExists(tile)) {
@@ -312,8 +327,9 @@ export class FixtureServer {
     if (!body) {
       const encoding = TERRAIN[extension];
       body =
-        tile.pattern === ('terrain' as FixturePattern) && encoding
-          ? terrainTile(tile, encoding, 256, 32, meshExtensions)
+        (tile.pattern === ('terrain' as FixturePattern) || tile.pattern === ('terrain-geoid' as FixturePattern)) &&
+        encoding
+          ? terrainTile(tile, encoding, 256, 32, meshExtensions, tile.pattern === ('terrain-geoid' as FixturePattern))
           : extension === 'png'
             ? encodeTilePng(tile)
             : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');

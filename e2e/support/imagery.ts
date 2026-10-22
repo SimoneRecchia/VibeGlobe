@@ -23,6 +23,10 @@ export interface LoggedRequest {
   status?: number;
   host?: string;
   connection?: number;
+  /** The fixture source of the path (`terrain`, `world`, …). */
+  source?: string;
+  /** The request's Accept header (F128). */
+  accept?: string;
 }
 
 /** The fixture server's log of a session's requests. */

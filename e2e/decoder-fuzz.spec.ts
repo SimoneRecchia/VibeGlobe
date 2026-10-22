@@ -61,9 +61,10 @@ async function fuzz(
   page: Page,
   seed: number,
   count: number,
+  kind: 'imagery' | 'terrain' = 'imagery',
 ): Promise<{ outcomes: Record<string, number>; slowestMs: number }> {
   return page.evaluate(
-    async ({ seed, count }) => {
+    async ({ seed, count, kind }) => {
       const hooks = window.vibeglobePlayground;
       if (!hooks) throw new Error('no playground');
       // mulberry32: a small seeded generator, so a failure replays from its seed.
@@ -105,26 +106,58 @@ async function fuzz(
         }
         return random() < 0.3 ? out.slice(0, int(out.length + 1)) : out;
       };
+      // Terrain (F131): Terrarium and Terrain-RGB heightmaps and quantized-mesh tiles, plain and gzip-compressed.
+      const terrainBytes = async (path: string): Promise<Uint8Array> => bytes(await (await fetch(path)).blob());
+      const mesh = await terrainBytes('/fixture-tiles/fuzz/terrain/geographic/8/261/165.terrain');
+      const gzip = async (raw: Uint8Array): Promise<Uint8Array> =>
+        bytes(await new Response(new Blob([raw.slice()]).stream().pipeThrough(new CompressionStream('gzip'))).blob());
+      const terrain =
+        kind === 'terrain'
+          ? [
+              {
+                encoding: 'terrarium',
+                bytes: await terrainBytes('/fixture-tiles/fuzz/terrain/mercator/8/132/90.terrarium.png'),
+              },
+              {
+                encoding: 'terrain-rgb',
+                bytes: await terrainBytes('/fixture-tiles/fuzz/terrain/mercator/8/132/90.terrain-rgb.png'),
+              },
+              { encoding: 'quantized-mesh', bytes: mesh },
+              { encoding: 'quantized-mesh', bytes: await gzip(mesh) },
+            ]
+          : [];
+      const terrainRun = () => {
+        const sample = terrain[int(terrain.length)] ?? terrain[0];
+        const input = mutate(sample?.bytes ?? new Uint8Array(0)).buffer;
+        return {
+          task: 'decode-terrain',
+          input: { bytes: input, encoding: sample?.encoding, maxErrorMeters: 5, meshCells: 32 },
+          transfer: [input],
+        };
+      };
       const outcomes: Record<string, number> = {};
       let slowestMs = 0;
       for (let i = 0; i < count; i++) {
-        // Every decoder gets `count` inputs: the image decoder (three formats) and the KTX2 transcoder.
-        for (const run of [
-          () => {
-            const image = images[int(images.length)] ?? images[0];
-            const input = mutate(image?.bytes ?? new Uint8Array(0)).buffer;
-            const type = random() < 0.1 ? '' : (image?.type ?? '');
-            return { task: 'decode-image', input: { bytes: input, contentType: type }, transfer: [input] };
-          },
-          () => {
-            const input = mutate(ktx2[int(ktx2.length)] ?? new Uint8Array(0)).buffer;
-            return {
-              task: 'transcode-ktx2',
-              input: { bytes: input, formats: ['bc', 'etc2', 'astc'] },
-              transfer: [input],
-            };
-          },
-        ]) {
+        // Every decoder gets `count` inputs: the image decoder (three formats) and the KTX2 transcoder, or the terrain
+        // decoder.
+        for (const run of kind === 'terrain'
+          ? [terrainRun]
+          : [
+              () => {
+                const image = images[int(images.length)] ?? images[0];
+                const input = mutate(image?.bytes ?? new Uint8Array(0)).buffer;
+                const type = random() < 0.1 ? '' : (image?.type ?? '');
+                return { task: 'decode-image', input: { bytes: input, contentType: type }, transfer: [input] };
+              },
+              () => {
+                const input = mutate(ktx2[int(ktx2.length)] ?? new Uint8Array(0)).buffer;
+                return {
+                  task: 'transcode-ktx2',
+                  input: { bytes: input, formats: ['bc', 'etc2', 'astc'] },
+                  transfer: [input],
+                };
+              },
+            ]) {
           const { task, input, transfer } = run();
           const startMs = performance.now();
           const outcome = await hooks.workerTask(task, input, transfer);
@@ -135,7 +168,7 @@ async function fuzz(
       }
       return { outcomes, slowestMs };
     },
-    { seed, count },
+    { seed, count, kind },
   );
 }
 
@@ -171,6 +204,31 @@ test('the worker program answers random and mutated image and KTX2 bytes with a 
   expect(Math.max(first.slowestMs, replay.slowestMs)).toBeLessThan(SLOW_MS);
   // No input grows the worker beyond a few tiles' working size (KB-068: a declared level size once grew it to 272 MB),
   // and replaying the same inputs leaves nothing behind (garbage collection noise aside).
+  expect(afterFirst).toBeLessThan(32 * 1024 * 1024);
+  expect(afterReplay - afterFirst).toBeLessThan(256 * 1024);
+});
+
+test('the worker program answers random and mutated terrain tiles with a height grid or a typed error, its memory flat (F131)', async ({
+  page,
+  browser,
+}) => {
+  await openGlobe(page, 'backend=webgl2');
+  const seed = Number(process.env['VIBEGLOBE_FC_SEED'] ?? Date.now() % 1_000_000);
+  console.log(`terrain decoder fuzzing seed ${seed} (replay: VIBEGLOBE_FC_SEED=${seed})`);
+  const first = await fuzz(page, seed, RUNS, 'terrain');
+  const afterFirst = await workerHeap(browser);
+  const replay = await fuzz(page, seed, RUNS, 'terrain');
+  const afterReplay = await workerHeap(browser);
+  console.log(
+    `terrain decoder fuzzing: ${JSON.stringify(first.outcomes)}; slowest ${first.slowestMs.toFixed(0)} ms; ` +
+      `worker memory ${afterFirst} → ${afterReplay} bytes after the replay`,
+  );
+  for (const key of Object.keys(first.outcomes))
+    expect(['decode-terrain ok', 'decode-terrain undecodable']).toContain(key);
+  expect(replay.outcomes).toEqual(first.outcomes);
+  expect(first.outcomes['decode-terrain ok']).toBeGreaterThan(0);
+  expect(first.outcomes['decode-terrain undecodable']).toBeGreaterThan(0);
+  expect(Math.max(first.slowestMs, replay.slowestMs)).toBeLessThan(SLOW_MS);
   expect(afterFirst).toBeLessThan(32 * 1024 * 1024);
   expect(afterReplay - afterFirst).toBeLessThan(256 * 1024);
 });

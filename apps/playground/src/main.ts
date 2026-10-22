@@ -1,6 +1,7 @@
 import { createControls } from '@vibeglobe/controls';
 import {
   createGlobe,
+  readGeoidFile,
   WGS84,
   type Globe,
   type GlobeOptions,
@@ -14,6 +15,7 @@ import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
+import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
@@ -21,6 +23,72 @@ const OVERLAY_REFRESH_MS = 250;
 const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
+
+/**
+ * Terrain scenarios (M4): URL parameters each one sets unless the URL gives them, over the fixture server's analytic
+ * terrain (a 4,000 m peak at 6.86° E, 45.83° N and a sharp 1,500 m ridge along 46.5° N from 7° to 10° E).
+ */
+const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  // The peak and its valleys, tilted (F126, F134, F138, F146).
+  'terrain-alps': { terrain: 'terrarium', imagery: 'world', lon: '6.86', lat: '45.7', zoom: '11', tilt: '60' },
+  // One view per encoding (F127, F129, F130).
+  'terrain-terrarium': {
+    terrain: 'terrarium',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '9.5',
+    tilt: '45',
+    heading: '30',
+  },
+  'terrain-rgb': {
+    terrain: 'terrain-rgb',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '9.5',
+    tilt: '45',
+    heading: '30',
+  },
+  // Farther out: quantized-mesh's level-zero error (65 samples per tile) refines about two levels deeper than 256 px
+  // heightmaps, so the same view would stream about 230 tiles.
+  'terrain-quantized-mesh': {
+    terrain: 'quantized-mesh',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '7.5',
+    tilt: '30',
+    heading: '30',
+  },
+  // Steep relief across tiles of different levels: the ridge seen along its length (F137).
+  'terrain-crack-sweep': { terrain: 'terrain-rgb', imagery: 'world', lon: '8.5', lat: '46.42', zoom: '13', tilt: '70' },
+  // The eye 2 m above the peak's steep flank (F136).
+  'terrain-street-level': {
+    terrain: 'terrarium',
+    imagery: 'world',
+    lon: '6.9',
+    lat: '45.84',
+    zoom: '22',
+    tilt: '75',
+    terrainClearance: '2',
+  },
+  // The peak 250 km away, just behind the ellipsoid's horizon from about 1 km up (F142).
+  'terrain-horizon-peaks': { terrain: 'terrarium', imagery: 'world', lon: '6.86', lat: '43.6', zoom: '15', tilt: '88' },
+  // Terrain to level 10, imagery to level 18 (F140).
+  'independent-levels': {
+    terrain: 'terrarium',
+    terrainMax: '10',
+    imagery: 'world',
+    imageryMax: '18',
+    lon: '6.86',
+    lat: '45.7',
+    zoom: '17',
+    tilt: '45',
+  },
+};
+for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
+  if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
 const status = document.querySelector<HTMLParagraphElement>('#status');
@@ -104,18 +172,34 @@ function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
   const workers = (): WorkerEndpointFactory =>
     assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   if (quantizedMesh) return { terrain: quantizedMesh, workers: workers() };
+  // `?terrain=rgb24|float32`: the fixture terrain in two encodings the engine does not know, decoded by the test
+  // adapters of `terrain-adapters.ts` (F132).
+  if (encoding === 'rgb24' || encoding === 'float32') {
+    const url = `${import.meta.env.BASE_URL}fixture-tiles/${params.get('session') ?? 'playground'}/terrain/mercator/{z}/{x}/{y}.${encoding === 'rgb24' ? 'rgb24' : 'f32'}`;
+    const adapter = encoding === 'rgb24' ? rgb24Terrain : float32Terrain;
+    return { terrain: adapter(`fixture-terrain-${encoding}`, url), workers: workers() };
+  }
   if (encoding !== 'terrarium' && encoding !== 'terrain-rgb') return {};
   const session = params.get('session') ?? 'playground';
   const scheme = params.get('terrainTiling') === 'geographic' ? 'geographic' : 'mercator';
+  // `&terrainDatum=geoid`: the same terrain served above the fixture geoid, with the geoid's grid file (F133).
+  const path = geoid ? 'terrain-geoid' : 'terrain';
   const terrain = heightmapTerrain({
     id: `fixture-terrain-${encoding}`,
-    url: `${import.meta.env.BASE_URL}fixture-tiles/${session}/terrain/${scheme}/{z}/{x}/{y}.${encoding}.png`,
+    url: `${import.meta.env.BASE_URL}fixture-tiles/${session}/${path}/${scheme}/{z}/{x}/{y}.${encoding}.png`,
     encoding,
     tiling: scheme,
     maxLevel: params.has('terrainMax') ? Number(params.get('terrainMax')) : 14,
+    ...(geoid ? { datum: { kind: 'geoid' as const, model: geoid } } : {}),
   });
   return { terrain, workers: workers() };
 }
+
+/** The fixture geoid for `?terrainDatum=geoid`, read before the globe starts. */
+const geoid =
+  params.get('terrainDatum') === 'geoid'
+    ? readGeoidFile(await (await fetch(`${import.meta.env.BASE_URL}fixture-geoid.bin`)).arrayBuffer())
+    : undefined;
 
 /**
  * `?terrain=quantized-mesh` reads the fixture server's `layer.json` for the session (geographic by default,
@@ -168,6 +252,8 @@ function startGlobe(
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
+    // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
+    ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });

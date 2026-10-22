@@ -4,7 +4,7 @@ import { PNG } from 'pngjs';
 import { fixturePosition, type FixtureTile } from './generate.ts';
 
 /** Terrain encodings the fixture server serves. */
-export type TerrainEncoding = 'terrarium' | 'terrain-rgb' | 'quantized-mesh' | 'float32';
+export type TerrainEncoding = 'terrarium' | 'terrain-rgb' | 'quantized-mesh' | 'float32' | 'rgb24';
 
 const DEG = Math.PI / 180;
 
@@ -34,13 +34,38 @@ export function fixtureHeightMeters(lonRad: number, latRad: number): number {
   return h;
 }
 
-/** Heights of a tile's (size)² samples at pixel centers, north row first. */
-function samples(tile: FixtureTile, size: number): Float64Array {
+/** The fixture geoid's undulation, meters: smooth, so a 1° grid interpolates it within millimeters (F133). */
+export function fixtureUndulationMeters(lonRad: number, latRad: number): number {
+  return 30 + 20 * Math.sin(2 * lonRad) * Math.cos(latRad);
+}
+
+/** The fixture geoid as a `VGEOID1` grid file (ADR 0024): 1° steps, rows from 90° N, columns from 180° W. */
+export function fixtureGeoidFile(): Buffer {
+  const rows = 181;
+  const columns = 360;
+  const out = Buffer.alloc(16 + rows * columns * 4);
+  out.write('VGEOID1\0', 0, 'latin1');
+  out.writeUInt32LE(rows, 8);
+  out.writeUInt32LE(columns, 12);
+  for (let row = 0; row < rows; row++)
+    for (let col = 0; col < columns; col++) {
+      const value = fixtureUndulationMeters(((col - 180) * Math.PI) / 180, ((90 - row) * Math.PI) / 180);
+      out.writeFloatLE(value, 16 + (row * columns + col) * 4);
+    }
+  return out;
+}
+
+/**
+ * Heights of a tile's (size)² samples at pixel centers, north row first: above the ellipsoid, or above the fixture
+ * geoid with `geoid`.
+ */
+function samples(tile: FixtureTile, size: number, geoid = false): Float64Array {
   const out = new Float64Array(size * size);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       const { lonRad, latRad } = fixturePosition(tile, (x + 0.5) / size, (y + 0.5) / size);
-      out[y * size + x] = fixtureHeightMeters(lonRad, latRad);
+      const h = fixtureHeightMeters(lonRad, latRad);
+      out[y * size + x] = geoid ? h - fixtureUndulationMeters(lonRad, latRad) : h;
     }
   return out;
 }
@@ -68,6 +93,21 @@ function heightPng(heights: Float64Array, size: number, encoding: 'terrarium' | 
     png.data.set([r, g, b, 255], i * 4);
   }
   return PNG.sync.write(png);
+}
+
+/**
+ * Raw 24-bit RGB samples with a formula of their own, the first custom encoding of F132: height =
+ * (R × 65536 + G × 256 + B) / 100 − 50000 meters, three bytes per sample, rows from the north.
+ */
+function rgb24Tile(heights: Float64Array): Buffer {
+  const out = Buffer.alloc(heights.length * 3);
+  heights.forEach((h, i) => {
+    const v = Math.round((h + 50000) * 100);
+    out[i * 3] = Math.floor(v / 65536);
+    out[i * 3 + 1] = Math.floor(v / 256) % 256;
+    out[i * 3 + 2] = v % 256;
+  });
+  return out;
 }
 
 /** Raw little-endian float32 heights, the second custom encoding of F132. */
@@ -199,8 +239,10 @@ export function terrainTile(
   sizePx = 256,
   cells = 32,
   extensions: QuantizedMeshExtensions = {},
+  geoid = false,
 ): Buffer {
   if (encoding === 'quantized-mesh') return quantizedMesh(tile, cells, extensions);
-  const heights = samples(tile, sizePx);
-  return encoding === 'float32' ? float32Tile(heights) : heightPng(heights, sizePx, encoding);
+  const heights = samples(tile, sizePx, geoid);
+  if (encoding === 'float32') return float32Tile(heights);
+  return encoding === 'rgb24' ? rgb24Tile(heights) : heightPng(heights, sizePx, encoding);
 }

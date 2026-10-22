@@ -343,3 +343,22 @@ describe('offline package installs that fail', () => {
     expect(await load(source, tile(2, 2, 2))).toBe('1:2/2/2');
   });
 });
+
+describe('served offline packages', () => {
+  it('reads a served package again after the server failed its first read, without calling it corrupt (PT-17)', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const net = server({ '/lan/rome.json': JSON.stringify(manifest), '/lan/rome.pmtiles': data });
+    let down = true;
+    const flaky = ((input: RequestInfo | URL, init?: RequestInit) =>
+      down && String(input).endsWith('.pmtiles')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : net.fetchImpl(input, init)) as typeof fetch;
+    const lan = setup(new IDBFactory(), flaky);
+    await lan.manager.addServedPackage('https://lan.test/lan/rome.json');
+    expect(await load(lan.source, tile(2, 2, 2))).not.toBe('1:2/2/2');
+    down = false;
+    expect(await load(lan.source, tile(2, 2, 2))).toBe('1:2/2/2');
+    expect(lan.errors).toEqual([]);
+  });
+});

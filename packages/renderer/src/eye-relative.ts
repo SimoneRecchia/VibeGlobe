@@ -34,7 +34,8 @@ export function placeEyeRelative(mesh: Object3D, origin: Float64Array, eye: Floa
 }
 
 /**
- * Makes a material place its vertices eye-relative: (offset + T_hi) + T_lo, then the rotation-only view and the
+ * Makes a material place its vertices (`offset` from the mesh's origin, the geometry's positions by default)
+ * eye-relative: (offset + T_hi) + T_lo, then the rotation-only view and the
  * projection, all in float32 on the GPU. The first sum is exact where the vertex is near the eye, so a vertex keeps
  * float32 precision relative to its own distance from the eye (0.01 px at 4K, `eye-offset.test.ts`).
  *
@@ -42,8 +43,12 @@ export function placeEyeRelative(mesh: Object3D, origin: Float64Array, eye: Floa
  * near / d, with d the view-space distance interpolated perspective-correctly, and keeps the nearest fragment with a
  * greater-equal test: the same stored value as the hardware reversed-Z path.
  */
-export function makeEyeRelative(material: NodeMaterial, depthPath: DepthPath): void {
-  const viewPosition = eyeRelativeViewPosition(positionGeometry);
+export function makeEyeRelative(
+  material: NodeMaterial,
+  depthPath: DepthPath,
+  offset: Node<'vec3'> = positionGeometry,
+): void {
+  const viewPosition = eyeRelativeViewPosition(offset);
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
   if (depthPath === 'fragment') {
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));

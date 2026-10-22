@@ -1,6 +1,6 @@
 import { createControls } from '@vibeglobe/controls';
 import { createGlobe, WGS84, type Globe, type GlobeOptions, type LogEntry, type ViewInit } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
@@ -87,6 +87,33 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   return { imagery: [source], workers, memory };
 }
 
+/**
+ * `?terrain=terrarium|terrain-rgb` displaces the surface with the fixture server's analytic terrain (M4 plan §2) in
+ * that encoding; `&terrainTiling=geographic` serves it in the geographic scheme, `&terrainMax=` limits its levels.
+ */
+function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
+  const encoding = params.get('terrain');
+  if (encoding !== 'terrarium' && encoding !== 'terrain-rgb') return {};
+  const session = params.get('session') ?? 'playground';
+  const scheme = params.get('terrainTiling') === 'geographic' ? 'geographic' : 'mercator';
+  const terrain = heightmapTerrain({
+    id: `fixture-terrain-${encoding}`,
+    url: `${import.meta.env.BASE_URL}fixture-tiles/${session}/terrain/${scheme}/{z}/{x}/{y}.${encoding}.png`,
+    encoding,
+    tiling: scheme,
+    maxLevel: params.has('terrainMax') ? Number(params.get('terrainMax')) : 14,
+  });
+  const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  return { terrain, workers };
+}
+
+/** The fixture imagery and terrain of the URL, sharing one worker pool. */
+function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
+  const imagery = fixtureImagery();
+  const terrain = fixtureTerrain();
+  return { ...terrain, ...imagery };
+}
+
 /** Creates one engine instance in a container with its own canvas. */
 function startGlobe(
   container: HTMLElement,
@@ -110,7 +137,7 @@ function startGlobe(
     controls: createControls(),
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
-    ...fixtureImagery(),
+    ...fixtureLayers(),
     // `?clockStepMs=` steps engine time by a fixed amount per drawn frame and `?fadeMs=` sets the imagery cross-fade
     // (scenario tests, F105; `fadeMs=0` is their injected pop).
     ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),

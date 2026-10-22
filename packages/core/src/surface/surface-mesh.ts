@@ -16,6 +16,11 @@ export interface TileMeshData {
    * imagery texture through a per-draw transform.
    */
   readonly uvs: Float32Array;
+  /**
+   * The ellipsoid normal at each vertex, xyz (ECEF directions), along which the renderer displaces terrain heights
+   * (ADR 0006 §5); skirt vertices carry the normal of their own position.
+   */
+  readonly normals: Float32Array;
   /** Triangle indices, shared by every tile with the same grid size. */
   readonly indices: Uint16Array;
   /** Approximate bytes of vertex data, for memory accounting. */
@@ -77,6 +82,14 @@ function skirtEdges(): number[][] {
 
 const vertex = new Float64Array(3);
 
+/** Writes the unit ellipsoid normal at a geodetic position. */
+function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
+  const cosLat = Math.cos(latRad);
+  normals[index * 3] = cosLat * Math.cos(lonRad);
+  normals[index * 3 + 1] = cosLat * Math.sin(lonRad);
+  normals[index * 3 + 2] = Math.sin(latRad);
+}
+
 function writeUvs(uvs: Float32Array, index: number, u: number, vOwn: number, vGeographic: number): void {
   uvs[index * 3] = u;
   uvs[index * 3 + 1] = vOwn;
@@ -111,9 +124,12 @@ export function buildTileMesh(
   geodeticToEcef((westRad + eastRad) / 2, (southRad + northRad) / 2, 0, originEcef);
   const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const normals = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const write = (index: number, row: number, col: number, heightMeters: number): void => {
     const latRad = northRad + ((southRad - northRad) * row) / TILE_SEGMENTS;
-    geodeticToEcef(westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS, latRad, heightMeters, vertex);
+    const lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
+    geodeticToEcef(lonRad, latRad, heightMeters, vertex);
+    writeNormal(normals, index, lonRad, latRad);
     for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
     // Rows are linear in latitude: both v are the row fraction.
     writeUvs(uvs, index, col / TILE_SEGMENTS, row / TILE_SEGMENTS, row / TILE_SEGMENTS);
@@ -121,7 +137,8 @@ export function buildTileMesh(
   for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
   writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
   const indices = tileIndices();
-  return { key, originEcef, positions, uvs, indices, byteLength: positions.byteLength + uvs.byteLength };
+  const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength;
+  return { key, originEcef, positions, uvs, normals, indices, byteLength };
 }
 
 /**
@@ -135,6 +152,7 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
   geodeticToEcef((westRad + eastRad) / 2, quadtreeRowLatitudeRad(tile, TILE_SEGMENTS / 2), 0, originEcef);
   const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
+  const normals = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const rowLatitudes = Array.from({ length: GRID }, (_, row) => quadtreeRowLatitudeRad(tile, row));
   const northRad = rowLatitudes[0] ?? 0;
   const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
@@ -152,6 +170,7 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
       latRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, latRad));
     }
     geodeticToEcef(lonRad, latRad, heightMeters, vertex);
+    writeNormal(normals, index, lonRad, latRad);
     for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
     // Rows are uniform in the tile's own scheme (Mercator y for the Mercator root, latitude for the caps).
     const vGeographic = row === 0 ? 0 : row === TILE_SEGMENTS ? 1 : (northRad - latRad) / heightRad;
@@ -160,5 +179,6 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
   for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
   writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
   const indices = tileIndices();
-  return { key: tile.key, originEcef, positions, uvs, indices, byteLength: positions.byteLength + uvs.byteLength };
+  const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength;
+  return { key: tile.key, originEcef, positions, uvs, normals, indices, byteLength };
 }

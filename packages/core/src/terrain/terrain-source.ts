@@ -1,6 +1,5 @@
-import type { TileRequest, TileTransport, TimeoutsMs } from '../scheduler/types.js';
+import type { TileSource } from '../imagery/imagery-source.js';
 import type { TileCoord } from '../tiling/tile-key.js';
-import type { TileRectangleRad, TilingScheme } from '../tiling/tiling-scheme.js';
 import type { HeightGrid } from './heightmap.js';
 import type { VerticalDatum } from './vertical-datum.js';
 
@@ -23,15 +22,7 @@ export type TerrainDecoder =
  * what its heights are measured from. Adapters such as `terrariumTerrain` and `quantizedMeshTerrain` in
  * `@vibeglobe/sources` implement it; any other encoding implements it with a custom decoder (F132).
  */
-export interface TerrainSource {
-  /** Unique per engine instance; part of every coalescing and cache key. */
-  readonly id: string;
-  readonly tiling: TilingScheme;
-  readonly minLevel: number;
-  readonly maxLevel: number;
-  /** The areas with data: tiles outside every rectangle are never requested. */
-  readonly coverage?: readonly TileRectangleRad[];
-  readonly transport: TileTransport;
+export interface TerrainSource extends TileSource {
   readonly decoder: TerrainDecoder;
   /** What the heights are measured from; geoid heights are converted to ellipsoidal ones before meshing (F133). */
   readonly datum: VerticalDatum;
@@ -40,11 +31,6 @@ export interface TerrainSource {
    * Selection refines a tile while this error exceeds τ_terrain pixels on screen (ADR 0006 §2, F126).
    */
   geometricErrorMeters(level: number): number;
-  readonly maxRequestsPerHost?: number;
-  readonly multiplexed?: boolean;
-  readonly timeoutsMs?: TimeoutsMs;
-  /** As {@link ImagerySource.request}: the tile's URL and host, or 'noData'. */
-  request(coord: TileCoord, out: TileRequest): TileRequest | 'noData';
 }
 
 /**

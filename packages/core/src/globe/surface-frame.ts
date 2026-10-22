@@ -1,4 +1,4 @@
-import { DrawList, drawOnBaseImage } from '../imagery/draw-list.js';
+import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
   PHASE_SCHEDULING,
@@ -66,8 +66,8 @@ export class SurfaceFrame {
    * are textured with the layers' tiles.
    */
   startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
-    const { imagery: sources, workers } = options;
-    if (!sources || sources.length === 0 || !workers) return;
+    const { imagery: sources = [], terrain, workers } = options;
+    if ((sources.length === 0 && !terrain) || !workers) return;
     const logger = this.observability.logger;
     const imagery = new ImageryRuntime(
       sources,
@@ -82,6 +82,7 @@ export class SurfaceFrame {
         },
       },
       this.observability,
+      terrain,
     );
     this.imagery = imagery;
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
@@ -98,6 +99,7 @@ export class SurfaceFrame {
     this.draws.reserve(count);
     cache.prepare(this.tiles, count, this.draws.meshKeys);
     drawOnBaseImage(this.draws, this.tiles, count);
+    drawWithoutTerrain(this.draws, count);
     timer.end(PHASE_SELECTION);
     if (this.imagery) {
       this.imagery.draw(this.draws, this.tiles, count, camera, this.nowMs, this.fadeMs, timer);

@@ -102,7 +102,7 @@ export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage } from './imagery/imagery-source.js';
-export type { ImagerySource } from './imagery/imagery-source.js';
+export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
 export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
 export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
 export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';

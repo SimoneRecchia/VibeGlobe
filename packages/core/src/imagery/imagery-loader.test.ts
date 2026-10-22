@@ -7,7 +7,7 @@ import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
-import type { ImagerySource } from './imagery-source.js';
+import { imageryDecodeTask, type ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
 class ManualTransport implements TileTransport {
@@ -148,7 +148,7 @@ function setUp(
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
-    compressedFormats: ['bc'],
+    decodeTask: imageryDecodeTask(source, ['bc']),
     uploadTexture: (handle) => uploaded.push(handle),
     releaseTexture: (handle) => released.push(handle),
     tileError: (_source, level, x, y, reason) => errors.push(`${reason} ${level}/${x}/${y}`),
@@ -418,10 +418,7 @@ describe('ImageryLoader', () => {
           tiling: WEB_MERCATOR_TILING,
           minLevel: 0,
           maxLevel: 10,
-          tileSizePx: 256,
-          pixelRatio: 1,
           transport,
-          decoder: 'image',
           request: (coord, out) => {
             out.url = url(coord.level, coord.x, coord.y);
             return out;
@@ -432,7 +429,7 @@ describe('ImageryLoader', () => {
         memory: { residency, ram: new RamTier({ budgetBytes: 1e9 }), frame: () => 1 },
         handleBase,
         pinnedLevel: -1,
-        compressedFormats: [],
+        decodeTask: (bytes, contentType) => ({ task: 'decode-image', input: { bytes, contentType } }),
         uploadTexture: (handle) => uploaded.push(handle),
         releaseTexture: () => undefined,
         requestFrame: () => undefined,

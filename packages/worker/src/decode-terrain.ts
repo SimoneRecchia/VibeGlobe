@@ -98,5 +98,8 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
     throw new TaskError('undecodable', error instanceof Error ? error.message : String(error));
   }
   if (context.isCancelled()) throw new TaskError('cancelled', 'decode-terrain was cancelled');
-  return { output: grid, transfer: [grid.heightsMeters.buffer] };
+  // Core's DecodedTile: a float32 texture of the grid's vertices, without mipmaps.
+  const side = grid.cells + 1;
+  const output = { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: grid };
+  return { output, transfer: [grid.heightsMeters.buffer] };
 }

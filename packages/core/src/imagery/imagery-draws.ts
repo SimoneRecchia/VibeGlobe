@@ -127,7 +127,7 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number): n
 }
 
 /** Distance of a tile's center from the screen center, 0 at the center and 1 at a corner or beyond. */
-function screenDistance(tile: QuadtreeTile, camera: Camera): number {
+export function screenDistance(tile: QuadtreeTile, camera: Camera): number {
   geodeticToEcef((tile.westRad + tile.eastRad) / 2, (tile.southRad + tile.northRad) / 2, 0, centerEcef);
   if (!projectToScreen(camera, centerEcef, screen)) return 1;
   const halfWidth = camera.widthPx / 2;

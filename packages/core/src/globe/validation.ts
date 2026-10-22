@@ -106,6 +106,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
   validateImagery(input.imagery, input.workers);
+  validateTerrain(input.terrain, input.workers);
   const memory = input.memory as Partial<Record<string, unknown>> | undefined;
   if (memory !== undefined) {
     if (memory === null || typeof memory !== 'object')
@@ -152,6 +153,45 @@ function validateImagery(imagery: unknown, workers: unknown): void {
     throw new GlobeError(
       'invalid-option',
       'workers is required when imagery is set: pass createWorkers() from @vibeglobe/worker',
+    );
+  }
+}
+
+const TERRAIN_DECODERS: readonly string[] = ['terrarium', 'terrain-rgb', 'quantized-mesh', 'custom'];
+
+/**
+ * A terrain source: a tile source with a known decoder, a declared vertical datum (F133) and a geometric error per
+ * level; like imagery, it needs the worker pool.
+ */
+function validateTerrain(terrain: unknown, workers: unknown): void {
+  if (terrain === undefined) return;
+  const source = terrain as Partial<Record<string, unknown>> | null;
+  if (
+    source === null ||
+    typeof source !== 'object' ||
+    typeof source['id'] !== 'string' ||
+    typeof source['request'] !== 'function' ||
+    typeof source['transport'] !== 'object' ||
+    typeof source['tiling'] !== 'object' ||
+    typeof source['geometricErrorMeters'] !== 'function'
+  ) {
+    throw new GlobeError('invalid-option', `terrain must be a terrain source, got ${describeInput(terrain)}`);
+  }
+  const id = source['id'];
+  const decoder = source['decoder'] as Partial<Record<string, unknown>> | null | undefined;
+  if (typeof decoder !== 'object' || decoder === null || !TERRAIN_DECODERS.includes(decoder['kind'] as string))
+    throw new GlobeError('invalid-option', `terrain source ${id}: unknown decoder ${describeInput(decoder)}`);
+  if (decoder['kind'] === 'custom' && typeof decoder['decode'] !== 'function')
+    throw new GlobeError('invalid-option', `terrain source ${id}: a custom decoder needs a decode function`);
+  const datum = source['datum'] as Partial<Record<string, unknown>> | null | undefined;
+  const geoid = datum?.['kind'] === 'geoid' && typeof datum['model'] === 'object' && datum['model'] !== null;
+  if (typeof datum !== 'object' || datum === null || !(datum['kind'] === 'ellipsoid' || geoid))
+    throw new GlobeError('invalid-option', `terrain source ${id}: unknown vertical datum ${describeInput(datum)}`);
+  const factory = workers as Partial<Record<string, unknown>> | null | undefined;
+  if (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function') {
+    throw new GlobeError(
+      'invalid-option',
+      'workers is required when terrain is set: pass createWorkers() from @vibeglobe/worker',
     );
   }
 }

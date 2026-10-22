@@ -18,7 +18,7 @@ import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/typ
 import type { TileErrorReason } from '../globe/types.js';
 import type { Observability } from '../diagnostics/observability.js';
 import type { WorkerPool, WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
-import type { ImagerySource } from './imagery-source.js';
+import type { TileSource } from './imagery-source.js';
 import {
   DEAD,
   DECODED,
@@ -64,7 +64,16 @@ export interface TileMemory {
 
 /** What a loader needs from the engine; core stays DOM-free (ADR 0011). */
 export interface ImageryLoaderOptions {
-  readonly source: ImagerySource;
+  readonly source: TileSource;
+  /**
+   * The worker task that decodes a tile's bytes and its input (imagery: `decode-image` or `transcode-ktx2`; terrain:
+   * `decode-terrain`). The bytes are transferred to the worker.
+   */
+  decodeTask(
+    bytes: ArrayBuffer,
+    contentType: string,
+    level: number,
+  ): { readonly task: string; readonly input: unknown };
   readonly network: NetworkPool;
   readonly workers: WorkerPool;
   readonly memory: TileMemory;
@@ -72,8 +81,6 @@ export interface ImageryLoaderOptions {
   readonly handleBase: number;
   /** Tiles at this level and coarser form the pinned base (-1: none): loaded first, never evicted (F084). */
   readonly pinnedLevel: number;
-  /** Compressed texture families the device decodes, for KTX2 sources (`RendererCapabilities`, ADR 0020). */
-  readonly compressedFormats: readonly string[];
   /** Traces and debug messages of tiles and requests (F120, F121); none when absent. */
   readonly observability?: Observability;
   uploadTexture(handle: number, tile: DecodedTile): void;
@@ -81,7 +88,7 @@ export interface ImageryLoaderOptions {
   /** Asks for a frame: something arrived that changes the picture or the queue. */
   requestFrame(): void;
   /** A tile failed for good: its bytes were corrupt, or its retries ran out (F112). Its ancestors stay drawn. */
-  tileError(source: ImagerySource, level: number, x: number, y: number, reason: TileErrorReason): void;
+  tileError(source: TileSource, level: number, x: number, y: number, reason: TileErrorReason): void;
   now(): number;
   setTimer(callback: () => void, delayMs: number): unknown;
   random(): number;
@@ -446,9 +453,7 @@ export class ImageryLoader implements NetworkPoolClient {
     record.state = DECODING;
     record.task = this.options.workers.run(
       {
-        ...(this.options.source.decoder === 'ktx2'
-          ? { task: 'transcode-ktx2', input: { bytes, formats: this.options.compressedFormats } }
-          : { task: 'decode-image', input: { bytes, contentType } }),
+        ...this.options.decodeTask(bytes, contentType, record.coord.level),
         transfer: [bytes],
         priority: this.table.priorities[record.slot] ?? 0,
       },

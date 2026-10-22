@@ -1,4 +1,5 @@
 import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { GlobeDiagnostics, LogLevel, LogSink } from '../diagnostics/observability.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
@@ -164,19 +165,37 @@ export interface RendererEvents {
  * own coordinates into the texture's. `geographic[i]` is 1 when the texture's rows are linear in latitude (the tile's
  * geographic v), 0 when they are in the tile's own scheme.
  */
-export interface TileDrawList {
-  readonly count: number;
-  readonly meshKeys: Float64Array;
+/**
+ * One layer's choice for every draw of a frame (ADR 0006 §4): the texture each draw shows, with its UV transform and
+ * choice of v, and the one it fades from.
+ */
+export interface TileDrawLayer {
   readonly textures: Int32Array;
+  /** Scale u, scale v, offset u, offset v from tile coordinates into the texture's, four per draw. */
   readonly uvTransforms: Float32Array;
+  /** 1 where the texture's rows are linear in latitude, 0 where they follow the tile's own rows. */
   readonly geographic: Uint8Array;
-  /** The imagery each draw cross-fades from (F105): like `textures`, `uvTransforms` and `geographic`. */
+  /** What each draw cross-fades from (F105, F138): like `textures`, `uvTransforms` and `geographic`. */
   readonly fromTextures: Int32Array;
   readonly fromUvTransforms: Float32Array;
   readonly fromGeographic: Uint8Array;
-  /** Each draw's fade progress: 0 shows only the `from` imagery, 1 only its own. */
+  /** Each draw's fade progress: 0 shows only the `from` data, 1 only its own. */
   readonly fades: Float32Array;
 }
+
+/** The surface tiles a frame draws, with their imagery (the list's own layer) and their terrain heights. */
+export interface TileDrawList extends TileDrawLayer {
+  readonly count: number;
+  readonly meshKeys: Float64Array;
+  /**
+   * Terrain heights (M4, ADR 0006 §5): height-grid textures by handle, {@link NO_TERRAIN} where a draw shows the
+   * ellipsoid (no terrain source, or none resident yet).
+   */
+  readonly terrain: TileDrawLayer;
+}
+
+/** The terrain handle of a draw without terrain: heights are 0 on the ellipsoid. */
+export const NO_TERRAIN = -1;
 
 /** The engine's renderer interface; three.js stays behind it (ADR 0010). */
 export interface RendererBackend {
@@ -304,7 +323,12 @@ export interface GlobeOptions {
    * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
    */
   readonly imagery?: readonly ImagerySource[];
-  /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required when `imagery` is set. */
+  /**
+   * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
+   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0024).
+   */
+  readonly terrain?: TerrainSource;
+  /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required with `imagery` or `terrain`. */
   readonly workers?: WorkerEndpointFactory;
   /** Memory budgets of the imagery caches (ADR 0007). */
   readonly memory?: MemoryOptions;

@@ -45,3 +45,4 @@ Conventions:
 | [0032](0032-openstreetmap-tile-usage-policy.md)   | OpenStreetMap tile usage policy and the OpenStreetMap public-servers profile                                | Accepted                                                          |
 | [0033](0033-offline-storage-and-network-modes.md) | Offline storage, packages and network modes                                                                 | Accepted                                                          |
 | [0034](0034-view-modes-and-morph-in-engine.md)    | The globe-to-flat morph in the engine, relief with tilt, and view modes                                     | Accepted (decided by agent; owner may revisit)                    |
+| [0035](0035-faster-ci.md)                         | A faster full CI run: one build per run, sixteen shards, the cross-browser job in Playwright's image        | Accepted                                                          |

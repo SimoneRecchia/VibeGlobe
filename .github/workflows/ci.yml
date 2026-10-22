@@ -2,8 +2,9 @@ name: CI
 
 # Saves minutes (ADR 0015): every push and every pull request run one job with every fast check (pull requests
 # run only the unit tests their changes reach; builds and browsers are cached); pushes to main, the nightly schedule
-# and manual runs add the browser jobs: the end-to-end suite in eight shards, the isolated
-# measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
+# and manual runs add the browser jobs: the end-to-end suite in sixteen shards, the isolated
+# measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022), all on one
+# build made once per run (ADR 0035).
 on:
   push:
   pull_request:
@@ -83,19 +84,11 @@ jobs:
       - name: Tree shaking
         run: npm run treeshake
 
-  e2e:
-    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/8)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+  build:
+    # ADR 0035: one build per run, handed to every browser job as an artifact instead of a build in each.
+    name: Build for the browser jobs
+    if: github.event.schedule == '23 2 * * *' || github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    # ADR 0022: the functional suite is split across eight runners by test file, one test at a time on each: two tests
-    # rendering at once on the software GPU slowed each other's frames past their time limits. The machine-wide
-    # measurements run in their own job below, so no shard waits for them and none of them shares a machine with a test.
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    env:
-      CI: true
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -111,6 +104,38 @@ jobs:
             node_modules/.cache
           key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      - run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-output
+          path: |
+            packages/*/dist
+            apps/*/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  e2e:
+    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/16)
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: build
+    runs-on: ubuntu-latest
+    # ADR 0022, ADR 0035: the functional suite is split across sixteen runners by test file, one test at a time on each: two tests
+    # rendering at once on the software GPU slowed each other's frames past their time limits. The machine-wide
+    # measurements run in their own job below, so no shard waits for them and none of them shares a machine with a test.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
       - uses: actions/cache@v4
         id: browsers
         with:
@@ -120,8 +145,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run build
-      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/8 --workers=1
+      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/16 --workers=1
       - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
         if: matrix.shard == 1
         run: npm run geodtest
@@ -136,6 +160,7 @@ jobs:
   measurements:
     name: Isolated measurements (allocation, rendering probes)
     if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch'
+    needs: build
     runs-on: ubuntu-latest
     # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
     # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
@@ -147,16 +172,9 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
       - uses: actions/cache@v4
         id: browsers
         with:
@@ -166,7 +184,6 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run build
       # One test at a time: they measure the whole machine (playwright.config.ts).
       - run: npx playwright test --project=measurements --no-deps --workers=1
       # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
@@ -192,12 +209,19 @@ jobs:
   cross-browser:
     name: Firefox and WebKit (WebGL2, informational until F504)
     if: github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch'
+    needs: build
     runs-on: ubuntu-latest
     # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
     # suites; both are inputs to F504 (M15), which makes this job binding (ADR 0012, update 2026-10-21).
     continue-on-error: true
+    # ADR 0035: Playwright's own image for this Playwright version brings Firefox, WebKit and their system libraries;
+    # installing them on the runner took up to 47 minutes of apt.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     env:
       CI: true
+      # Firefox refuses a home directory owned by another user when it runs as root in the container.
+      HOME: /root
       VIBEGLOBE_CROSS_BROWSER: '1'
       VIBEGLOBE_DEVICE: ci-software
     steps:
@@ -205,28 +229,13 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - uses: actions/cache@v4
-        id: browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: browsers-firefox-webkit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps firefox webkit
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps firefox webkit
-      # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner.
-      - run: sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2
-      - run: npm run build
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
+      # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner (installed only if missing).
+      - run: |
+          dpkg -s libegl1 libgl1-mesa-dri libgles2 >/dev/null 2>&1 ||
+            (apt-get update && apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2)
       # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
       - run: npx playwright test --project=firefox --project=webkit
       # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).
@@ -248,6 +257,7 @@ jobs:
   benchmarks:
     name: Benchmarks (recorded, not gated)
     if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: build
     runs-on: ubuntu-latest
     env:
       VIBEGLOBE_DEVICE: ci-swiftshader
@@ -256,16 +266,9 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
       - uses: actions/cache@v4
         id: browsers
         with:
@@ -275,7 +278,6 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run build
       # Timings on SwiftShader are not meaningful (ADR 0012): record them as a trend, gate only deterministic counters.
       - run: npm run bench -- --report-only
       - run: npm run bench:micro -- --report-only

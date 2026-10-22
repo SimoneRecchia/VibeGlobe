@@ -1,3 +1,4 @@
+import type { LayerRenderTarget } from '../layers/layer-target.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -224,6 +225,8 @@ export interface RendererBackend {
   readonly host: RenderHost;
   /** The element that receives input (the canvas). */
   readonly inputElement: unknown;
+  /** Draws data layers (ADR 0037); absent in renderers that draw none. */
+  readonly layers?: LayerRenderTarget;
   /** Uploads a surface tile mesh; returns false while the renderer cannot accept it. */
   addMesh(mesh: TileMeshData): void;
   removeMesh(key: number): void;
@@ -739,6 +742,11 @@ export interface Globe {
   elevationAtAsync(position: GeoPosition, options?: { signal?: AbortSignalLike }): Promise<ElevationSample>;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;
+  /**
+   * Where data layers draw (ADR 0037): the renderer's batches, each change shown on the next frame. Undefined until the
+   * renderer has started (after `ready`) or when it draws no layers.
+   */
+  layerTarget(): LayerRenderTarget | undefined;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */
   simulateDeviceLoss(): void;
   /**

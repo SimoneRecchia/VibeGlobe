@@ -51,3 +51,9 @@ export function buildDebugMesh(shape: DebugShape): DebugMeshData {
   for (let i = 0; i < 12; i++) positions[i] = (ecef[i] ?? 0) - (originEcef[i % 3] ?? 0);
   return { originEcef, positions, colorRgb: shape.colorRgb, checkerMeters: shape.checkerMeters ?? 0 };
 }
+
+/** Validated shapes as meshes; before the renderer exists they are kept and handed over when it starts (KB-042). */
+export function debugMeshesOf(shapes: readonly DebugShape[]): DebugMeshData[] {
+  validateDebugShapes(shapes);
+  return shapes.map((shape) => buildDebugMesh(shape));
+}

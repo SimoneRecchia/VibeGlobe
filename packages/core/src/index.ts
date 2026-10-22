@@ -209,3 +209,4 @@ export {
   type LayerRenderTarget,
   type Placement,
 } from './layers/layer-target.js';
+export { layerOrigin, writeLayerVertex, type LayerOrigin, type LayerVertices } from './layers/layer-geometry.js';

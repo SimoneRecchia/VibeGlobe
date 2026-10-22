@@ -95,7 +95,7 @@ const mercator = new Float64Array(2);
 const scale = new Float64Array(2);
 
 /** The capped Mercator x and y of a position into a new array, for a tile's plane center. */
-function planeCenterOf(lonRad: number, latRad: number): Float64Array {
+export function planeCenterOf(lonRad: number, latRad: number): Float64Array {
   lonLat[0] = lonRad;
   lonLat[1] = latRad;
   const center = new Float64Array(2);
@@ -104,7 +104,7 @@ function planeCenterOf(lonRad: number, latRad: number): Float64Array {
 }
 
 /** Writes a vertex's plane endpoint data (see {@link TileMeshData.planes}). */
-function writePlane(
+export function writePlane(
   planes: Float32Array,
   index: number,
   lonRad: number,
@@ -124,7 +124,7 @@ function writePlane(
 }
 
 /** Writes the unit ellipsoid normal at a geodetic position. */
-function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
+export function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
   const cosLat = Math.cos(latRad);
   normals[index * 3] = cosLat * Math.cos(lonRad);
   normals[index * 3 + 1] = cosLat * Math.sin(lonRad);

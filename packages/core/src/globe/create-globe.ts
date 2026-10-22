@@ -1,9 +1,10 @@
+import { requestingTarget } from '../layers/layer-geometry.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
-import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
+import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
 import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
@@ -14,7 +15,6 @@ import type { ViewMode } from '../view/view-state.js';
 import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewControl } from './view-control.js';
 import { wireView, type Movements } from './movements.js';
-import type { AbortSignalLike } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
@@ -411,25 +411,18 @@ class GlobeEngine implements Globe {
   readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
-
-  readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample => (
-    this.assertAlive(),
-    this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true })
-  );
-  readonly elevationAtAsync = (
-    position: GeoPosition,
-    options: { signal?: AbortSignalLike } = {},
-  ): Promise<ElevationSample> => (this.assertAlive(), this.surfaceFrame.queryElevation(position, options.signal));
-
+  readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
+    this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
+  readonly elevationAtAsync: Globe['elevationAtAsync'] = (position, options = {}) =>
+    this.assertAlive() ?? this.surfaceFrame.queryElevation(position, options.signal);
+  readonly layerTarget: Globe['layerTarget'] = () =>
+    this.assertAlive() ?? requestingTarget(this.renderer?.layers, () => this.requestRender());
   setDebugShapes(shapes: readonly DebugShape[]): void {
     this.assertAlive();
-    validateDebugShapes(shapes);
-    this.debugMeshes = shapes.map((shape) => buildDebugMesh(shape));
-    // Before the renderer exists they are kept and handed over when it starts (KB-042).
+    this.debugMeshes = debugMeshesOf(shapes);
     this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
   }
-
   captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
     return captureWhenDrawn({
@@ -443,12 +436,10 @@ class GlobeEngine implements Globe {
       draw: (renderer) => this.drawNow(renderer),
     });
   }
-
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */
   private get waiting(): boolean {
     return this.pendingView !== undefined || this.collapsed;
   }
-
   readonly simulateDeviceLoss = (): void => (this.assertAlive(), this.renderer?.simulateDeviceLoss());
 
   destroy(): void {

@@ -345,3 +345,54 @@ for (const backend of BACKENDS) {
     }
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`extrusions are shaded volumes at their heights, and points at absolute altitudes draw where those project, on ${backend} (F355, F362)`, async ({
+    page,
+  }) => {
+    await openScenario(page, backend, 'data-extrusions');
+    const view = { longitudeDeg: 12.4975, latitudeDeg: 41.889, zoom: 13.3, tiltDeg: 35 };
+    const image = await showPhase(page, { name: 'tilted', view, mode: 'manual' });
+    const tan = ([r, g, b]: Rgb): number => (r > 120 && r > b + 20 && g > b ? r + g + b : -1);
+    // Each block's roof shows at its height; a wall below the roof is darker than the roof.
+    const roofs = await page.evaluate(() =>
+      [
+        [12.4925, 41.8925, 100],
+        [12.4975, 41.8925, 300],
+        [12.5025, 41.8925, 400],
+      ].map(([lon = 0, lat = 0, h = 0]) =>
+        window.vibeglobePlayground?.globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: lat, heightMeters: h }),
+      ),
+    );
+    for (const roof of roofs) {
+      expect(roof).toBeDefined();
+      if (roof) expect(tan(pixel(image, roof.xPx, roof.yPx))).toBeGreaterThan(0);
+    }
+    const [wall] = await page.evaluate(() => [
+      window.vibeglobePlayground?.globe.geoToScreen({ longitudeDeg: 12.4975, latitudeDeg: 41.89, heightMeters: 150 }),
+    ]);
+    const high = roofs[1];
+    if (wall && high) expect(tan(pixel(image, wall.xPx, wall.yPx))).toBeLessThan(tan(pixel(image, high.xPx, high.yPx)));
+    await openScenario(page, backend, 'data-altitudes');
+    for (const phase of [
+      { name: 'globe', view: { longitudeDeg: 12.55, latitudeDeg: 41.9, zoom: 4 }, mode: 'auto' },
+      { name: 'tilted', view: { longitudeDeg: 12.55, latitudeDeg: 41.85, zoom: 10, tiltDeg: 60 }, mode: 'manual' },
+    ] as const) {
+      const shot = await showPhase(page, phase);
+      const points = await page.evaluate(() =>
+        [0, 1000, 10_000].map((h, i) =>
+          window.vibeglobePlayground?.globe.geoToScreen({
+            longitudeDeg: 12.5 + i * 0.05,
+            latitudeDeg: 41.9,
+            heightMeters: h,
+          }),
+        ),
+      );
+      const inView = points.filter(
+        (p) => p && p.xPx > 2 && p.yPx > 2 && p.xPx < shot.width - 2 && p.yPx < shot.height - 2,
+      );
+      expect(inView.length, phase.name).toBeGreaterThanOrEqual(2);
+      for (const point of inView) if (point) expect(near(shot, point.xPx, point.yPx, 1, isRed), phase.name).toBe(true);
+    }
+  });
+}

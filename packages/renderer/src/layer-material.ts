@@ -29,7 +29,7 @@ import {
 import { eyeRelativePosition, morphedEyeRelative } from './eye-relative.js';
 
 /** How a layer mesh places its vertices (ADR 0037). */
-export type LayerShape = 'flat' | 'quad' | 'line';
+export type LayerShape = 'flat' | 'solid' | 'quad' | 'line';
 
 /**
  * The share of its distance by which a layer vertex is pulled toward the eye: features on the ground draw over the
@@ -54,8 +54,10 @@ function endpoint(
   pull: number,
 ): Node<'vec3'> {
   const sigma = morphParams.z;
-  const globe = globeOffset.add(normal.mul(heightMeters));
-  const planeLocal = vec3(plane.x.mul(sigma), plane.y.mul(sigma), heightMeters.mul(plane.w).mul(sigma));
+  // Heights scale with the relief factor, as the terrain's do (ADR 0034): features keep their height above it.
+  const height = heightMeters.mul(morphParams.y);
+  const globe = globeOffset.add(normal.mul(height));
+  const planeLocal = vec3(plane.x.mul(sigma), plane.y.mul(sigma), height.mul(plane.w).mul(sigma));
   return morphedEyeRelative(globe, morphAxes.mul(planeLocal), morphParams.x).mul(1 - pull);
 }
 
@@ -96,7 +98,9 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atl
   }
   const material = new MeshBasicNodeMaterial();
   material.vertexNode =
-    shape === 'flat' ? clip : vec4(clip.xy.add(offsetPx.mul(2).div(viewport).mul(clip.w)), clip.z, clip.w);
+    shape === 'flat' || shape === 'solid'
+      ? clip
+      : vec4(clip.xy.add(offsetPx.mul(2).div(viewport).mul(clip.w)), clip.z, clip.w);
   if (depthPath === 'fragment') {
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
@@ -105,8 +109,9 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atl
   // Screen-sized quads are not depth-tested: the curved surface around their anchor would cut them (see layerColor).
   if (shape === 'quad') material.depthTest = false;
   material.colorNode = vec4(rgb, alpha);
-  material.transparent = true;
-  material.depthWrite = false;
+  // Extruded volumes write depth so their faces occlude each other (F355); flat layers blend without writing it.
+  material.transparent = shape !== 'solid';
+  material.depthWrite = shape === 'solid';
   material.side = DoubleSide;
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;

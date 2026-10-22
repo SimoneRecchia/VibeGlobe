@@ -38,7 +38,10 @@ interface Batch extends BatchContents {
   arrays: LayerArrays | undefined;
 }
 
-function shapeOf(kind: BatchDescriptor['kind']): LayerShape {
+function shapeOf(batch: BatchContents): LayerShape {
+  const kind = batch.kind;
+  if (kind === 'polygon' && (batch.attributes.has('heightMeters') || batch.uniforms.has('heightMeters')))
+    return 'solid';
   return kind === 'polyline' ? 'line' : kind === 'polygon' || kind === 'circle' ? 'flat' : 'quad';
 }
 
@@ -259,10 +262,10 @@ export class LayerBatches implements LayerRenderTarget {
     geometry.setAttribute('layerHeight', new BufferAttribute(arrays.heights, 1));
     geometry.setAttribute('layerColor', new BufferAttribute(arrays.colors, 4));
     geometry.setAttribute('layerCorner', new BufferAttribute(arrays.corners, 4));
-    if (shapeOf(batch.kind) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 2));
+    if (shapeOf(batch) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 2));
     if (arrays.other) setOtherEndpoint(geometry, arrays.other, arrays.vertices);
     geometry.setIndex(new BufferAttribute(arrays.indices, 1));
-    const mesh = new Mesh(geometry, this.material(shapeOf(batch.kind)));
+    const mesh = new Mesh(geometry, this.material(shapeOf(batch)));
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
     mesh.frustumCulled = false;

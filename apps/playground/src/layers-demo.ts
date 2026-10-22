@@ -207,6 +207,25 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
       ],
       style: { 'fill-color': '#ff8000', 'fill-opacity': 0.9 },
     }),
+  // Adjacent extruded blocks of different heights and bases (F355).
+  'data-extrusions': () =>
+    new DataLayer('polygon', {
+      id: 'extrusions',
+      data: [
+        feature('low', { type: 'Polygon', coordinates: [rectangle(12.49, 41.89, 12.495, 41.895)] }, { h: 100, b: 0 }),
+        feature('high', { type: 'Polygon', coordinates: [rectangle(12.495, 41.89, 12.5, 41.895)] }, { h: 300, b: 0 }),
+        feature(
+          'floating',
+          { type: 'Polygon', coordinates: [rectangle(12.5, 41.89, 12.505, 41.895)] },
+          { h: 400, b: 200 },
+        ),
+      ],
+      style: {
+        'fill-color': '#c0a080',
+        'fill-extrusion-height': ['get', 'h'],
+        'fill-extrusion-base': ['get', 'b'],
+      },
+    }),
   // Images with several anchors, sizes and rotations (F352).
   'data-markers': () =>
     new DataLayer('marker', {
@@ -251,12 +270,26 @@ function markerImages(): Record<string, HTMLCanvasElement> {
  * `?scenario=data-points`, `data-lines` and `data-polygons` (F351, F353, F354): the data layers' test scenes, drawn
  * through the layers package's public API.
  */
+/** Points at 0, 1,000 and 10,000 m above the ellipsoid, one layer each (F362). */
+function altitudeLayers(): DataLayer[] {
+  return [0, 1000, 10_000].map(
+    (altitude, i) =>
+      new DataLayer('point', {
+        id: `altitude-${String(altitude)}`,
+        data: [feature(`a${String(i)}`, { type: 'Point', coordinates: [12.5 + i * 0.05, 41.9] })],
+        placement: { absoluteAltitudeMeters: altitude },
+        style: { 'circle-color': '#ff2020', 'circle-radius': 5 },
+      }),
+  );
+}
+
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (name === 'data-markers')
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
   const scene = DATA_SCENES[name];
-  const layer = scene && stack.add(scene());
-  window.vibeglobeLayers = { stack, layers: layer ? { [layer.id]: layer } : {}, interaction };
+  const added = scene ? [scene()] : name === 'data-altitudes' ? altitudeLayers() : [];
+  const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
+  window.vibeglobeLayers = { stack, layers, interaction };
 }

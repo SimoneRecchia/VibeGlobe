@@ -25,7 +25,7 @@ const QUERY_BUDGET_MS = 4;
 const CLEARANCE_METERS = 10;
 
 /** Waits until no terrain tile is queued, loading, decoding or waiting for its upload, and the engine is idle. */
-async function waitForTerrain(page: Page): Promise<void> {
+async function waitForTerrain(page: Page, timeoutMs = 90_000): Promise<void> {
   await expect
     .poll(
       () =>
@@ -33,7 +33,7 @@ async function waitForTerrain(page: Page): Promise<void> {
           const stats = window.vibeglobePlayground?.globe.terrainStats();
           return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : -1;
         }),
-      { timeout: 90_000 },
+      { timeout: timeoutMs },
     )
     .toBe(0);
   await waitForIdle(page);
@@ -271,14 +271,16 @@ for (const backend of BACKENDS) {
   });
 
   test(`the camera rises smoothly when higher fine terrain arrives under it on ${backend} (F147)`, async ({ page }) => {
-    // Fine terrain arrives 8 s late, well after recording starts; near the summit the coarse grids lie below it.
-    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 11, latencyMs: 8000 }]);
+    // Terrain from level 9 arrives 15 s late, after recording starts even on WebGPU's slower start; near the summit the
+    // coarser grids shown until then lie meters below it.
+    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 9, latencyMs: 15_000 }]);
     await openGlobe(
       page,
       `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-alps&lon=6.8605&lat=45.8302&zoom=22&tilt=60`,
     );
     await recordClearance(page);
-    await waitForTerrain(page);
+    // The delayed tiles come a few at a time per host, 15 s each: up to about two minutes in all.
+    await waitForTerrain(page, 180_000);
     const record = await clearance(page);
     const steps = record.altitudes.slice(1).map((altitude, i) => altitude - (record.altitudes[i] ?? altitude));
     const rising = steps.filter((step) => step > 0.01);

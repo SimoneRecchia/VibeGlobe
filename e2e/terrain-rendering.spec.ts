@@ -221,11 +221,11 @@ for (const backend of BACKENDS) {
       page,
     }) => {
       const session = await fixtureSession(page);
-      // The fixture's 4,000 m mountain seen from above: its smooth flanks hide nothing from a nearly vertical view, so
-      // a hidden probe above the analytic surface is a depth or height error, not an occlusion.
+      // The fixture's 4,000 m mountain seen from well above it: its smooth flanks hide nothing from a nearly vertical
+      // view, so a hidden probe above the analytic surface is a depth or height error, not an occlusion.
       await openGlobe(
         page,
-        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=6.88&lat=45.84&zoom=12.5&tilt=0`,
+        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=6.88&lat=45.84&zoom=10&tilt=0`,
       );
       await waitForTerrain(page);
       const result = await probeRelief(page, 100);
@@ -376,7 +376,11 @@ function reliefProbes(count: number): ReliefProbe[] {
   const side = Math.ceil(Math.sqrt(count));
   for (let row = 0; row < side && probes.length < count; row++) {
     for (let col = 0; col < side && probes.length < count; col++) {
-      const at = globe.screenToGeo({ xPx: ((col + 0.5) / side) * width, yPx: ((row + 0.5) / side) * height });
+      // The middle 70 % of the view: raised by the relief, a probe near the edge would project off the canvas.
+      const at = globe.screenToGeo({
+        xPx: (0.15 + (0.7 * (col + 0.5)) / side) * width,
+        yPx: (0.15 + (0.7 * (row + 0.5)) / side) * height,
+      });
       if (!at) continue;
       const eye = globe.camera;
       const dLat = (at.latitudeDeg - eye.eyeLatitudeDeg) * metersPerDeg;

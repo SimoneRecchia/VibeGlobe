@@ -25,7 +25,7 @@ export type { WmsImageryOptions } from './ogc/wms-imagery.js';
 export { parseWmsCapabilities } from './ogc/wms-capabilities.js';
 export type { WmsCapabilities, WmsLayer } from './ogc/wms-capabilities.js';
 export type { CropImage } from './ogc/wms-transport.js';
-export { googleImagery, googleProfile } from './providers/google.js';
+export { googleImagery, googleProfile } from './providers/google-provider.js';
 export type {
   GoogleBillingRegion,
   GoogleImageryOptions,
@@ -33,8 +33,12 @@ export type {
   GoogleProfile,
   GoogleSourceOptions,
   GoogleViewport,
-} from './providers/google.js';
-export { googleStreetView } from './providers/google-street-view.js';
-export type { GoogleStreetView, StreetViewMetadata, StreetViewQuery } from './providers/google-street-view.js';
-export { OSM_PUBLIC_MAX_CONCURRENT, OSM_PUBLIC_PROFILE, openStreetMapImagery } from './providers/openstreetmap.js';
-export type { OpenStreetMapImageryOptions } from './providers/openstreetmap.js';
+} from './providers/google-provider.js';
+export { googleStreetView } from './providers/google-street-view-provider.js';
+export type { GoogleStreetView, StreetViewMetadata, StreetViewQuery } from './providers/google-street-view-provider.js';
+export {
+  OSM_PUBLIC_MAX_CONCURRENT,
+  OSM_PUBLIC_PROFILE,
+  openStreetMapImagery,
+} from './providers/openstreetmap-provider.js';
+export type { OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';

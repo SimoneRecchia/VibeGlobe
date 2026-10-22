@@ -48,8 +48,12 @@ their `tileMetadata` hook) belong to M4 and are not part of the fourth session's
 Hooks a track needs in a package it does not own. The requesting session adds a row; the main session answers in the
 last column (landed on `main`, or why not) and announces any change to the source contract above.
 
-| Date | Track | Hook needed (package, API, why) | Answer |
-| ---- | ----- | ------------------------------- | ------ |
+| Date       | Track           | Hook needed (package, API, why)                                                                                                                                                                                                                                  | Answer |
+| ---------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-10-22 | Source adapters | `packages/worker`: register `VECTOR_TASKS` from `@vibeglobe/sources/vector` in the worker program's task table, so the GeoJSON, KML, GPX and MVT parsers run in the engine's pool (F236–F239; until then a browser test runs them in a module worker of its own) |        |
+| 2026-10-22 | Source adapters | `packages/core`: read `attribution` and `profile` from sources that carry them (`DescribedImagerySource`), for the credits list and profile enforcement (F254, F255, F258, F259, F264)                                                                           |        |
+| 2026-10-22 | Source adapters | `packages/core` transport contract: carry the response's `Cache-Control` and `Expires` in an `ok` result, so the RAM tier can reuse Google tiles only while their headers allow it (F260)                                                                        |        |
+| 2026-10-22 | Source adapters | `packages/core` imagery decoder description: an optional crop rectangle, so WMS gutters are cropped in the decode task instead of re-encoded in the adapter's transport (F231 works meanwhile)                                                                   |        |
 
 ## Status
 

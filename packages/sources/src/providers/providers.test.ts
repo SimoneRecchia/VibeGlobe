@@ -4,9 +4,9 @@ import { failures, runTiledConformance } from '../conformance/index.js';
 import { fixtureCopyright, GOOGLE_FIXTURE_KEY, googleFixture } from '../__fixtures__/google-server.js';
 import type { DescribedImagerySource } from '../metadata.js';
 import { SourceConfigError } from '../metadata.js';
-import { googleImagery, googleProfile } from './google.js';
-import { googleStreetView } from './google-street-view.js';
-import { OSM_PUBLIC_PROFILE, openStreetMapImagery } from './openstreetmap.js';
+import { googleImagery, googleProfile } from './google-provider.js';
+import { googleStreetView } from './google-street-view-provider.js';
+import { OSM_PUBLIC_PROFILE, openStreetMapImagery } from './openstreetmap-provider.js';
 
 const encoder = new TextEncoder();
 const tileBytes = (z: number, x: number, y: number): Uint8Array => encoder.encode(`google ${z}/${x}/${y}`);

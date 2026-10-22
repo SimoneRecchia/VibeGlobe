@@ -1,7 +1,7 @@
 import { HttpStatusError } from '../archive-transport.js';
 import { retryAfterMs } from '../fetch-transport.js';
 import { type Attribution, SourceConfigError } from '../metadata.js';
-import { type GoogleProfile, googleProfile, GoogleSession, type GoogleSourceOptions } from './google.js';
+import { type GoogleProfile, googleProfile, GoogleSession, type GoogleSourceOptions } from './google-provider.js';
 
 /** Where to look for a panorama: its id, or a position and a search radius. */
 export type StreetViewQuery =

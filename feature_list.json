@@ -613,7 +613,7 @@
         "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
         "Confirm the latest run on main is green, and that a run of the full workflow, scheduled (nightly) or started by hand (workflow_dispatch), contains the fast, end-to-end and benchmark jobs and is green"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F041",

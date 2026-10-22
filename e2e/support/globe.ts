@@ -71,7 +71,11 @@ export async function nextFrame(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 }
 
-/** Waits until the engine has drawn every requested frame and gone idle. */
+/**
+ * Waits until the engine has drawn every requested frame and gone idle: no frame for 300 ms, and none in the next two
+ * animation frames. A frame the engine requested (a running cross-fade, for one) is drawn in the same animation frame
+ * as a callback registered after it, so a slow frame of a software GPU, longer than 300 ms, is not taken for idle.
+ */
 export async function waitForIdle(page: Page): Promise<number> {
   return page.evaluate(
     () =>
@@ -79,13 +83,16 @@ export async function waitForIdle(page: Page): Promise<number> {
         const globe = window.vibeglobePlayground?.globe;
         if (!globe) throw new Error('no globe');
         let last = globe.frameNumber;
+        const again = (): void => {
+          last = globe.frameNumber;
+          check();
+        };
         const check = (): void => {
           setTimeout(() => {
-            if (globe.frameNumber === last) resolve(last);
-            else {
-              last = globe.frameNumber;
-              check();
-            }
+            if (globe.frameNumber !== last) return again();
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => (globe.frameNumber === last ? resolve(last) : again())),
+            );
           }, 300);
         };
         check();

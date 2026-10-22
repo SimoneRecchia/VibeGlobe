@@ -17,7 +17,7 @@
     "typecheck": "tsc -b",
     "dev": "npm run dev -w @vibeglobe/playground",
     "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage && vitest run packages/core/src/globe/frame-allocation.test.ts packages/core/src/cache/cache-allocation.test.ts packages/renderer/src/eye-relative.test.ts",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",

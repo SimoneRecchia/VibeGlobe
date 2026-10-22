@@ -234,3 +234,16 @@ describe('offline engine waits', () => {
     expect(internals.waiters.length).toBe(0);
   });
 });
+
+describe('offline engine endpoints', () => {
+  it('checks every host a source spreads its tiles over, not only the first (PT-16)', async () => {
+    const net = fakeNetwork((url) => (url.startsWith('https://b.tiles.test') ? 'down' : {}));
+    const offline = engine({ fetch: net.fetchImpl, healthChecks: { minIntervalMs: 20, maxIntervalMs: 200 } });
+    const source = offline.source(
+      xyzImagery({ id: 'abc', url: 'https://{s}.tiles.test/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }),
+    );
+    // (x + y) % 3 = 1 picks host b.
+    await load(source, tile(2, 1, 0));
+    await expect.poll(() => offline.connectivity).toBe('degraded');
+  });
+});

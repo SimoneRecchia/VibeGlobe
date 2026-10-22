@@ -280,6 +280,9 @@ class OfflineEngine implements Offline {
       },
       readPackage: (sourceId, coord, signal) =>
         this.packageReader ? this.packageReader.read(sourceId, coord, signal) : Promise.resolve(undefined),
+      addEndpoint: (endpoint, probeUrl) => {
+        if (/^https?:/.test(probeUrl)) this.monitor.addEndpoint(endpoint, probeUrl);
+      },
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),

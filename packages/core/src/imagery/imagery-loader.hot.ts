@@ -239,6 +239,11 @@ export class ImageryLoader implements NetworkPoolClient {
     return record?.state === READY ? this.options.handleBase + record.slot : -1;
   }
 
+  /** The level of the tile uploaded under a texture handle of this loader. */
+  levelOf(handle: number): number {
+    return this.table.bySlot[handle - this.options.handleBase]?.coord.level ?? -1;
+  }
+
   /** True for a tile known to have no data (404, outside coverage): it never arrives. */
   noData(level: number, x: number, y: number): boolean {
     return this.table.find(level, x, y)?.state === NO_DATA;

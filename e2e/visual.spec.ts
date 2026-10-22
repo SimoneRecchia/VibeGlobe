@@ -46,6 +46,16 @@ const VIEWS: readonly {
     slow: true,
   },
   { name: 'terrain-smooth', query: 'scenario=terrain-terrarium&imagery=smooth&session=visual', imagery: true },
+  // M5's phases in Auto mode: the globe (F151), the flat 2D map at city scale (F153) and the tilted street view with
+  // relief (F154). Grid lines on tile seams differ across backends, as for stripes-minified (test-changes).
+  { name: 'globe-world', query: 'scenario=globe-world&session=visual', imagery: true, crossBackend: false },
+  { name: 'map-2d-city', query: 'scenario=map-2d-city&session=visual', imagery: true, crossBackend: false },
+  {
+    name: 'street-tilted',
+    query: 'scenario=zoom-city-to-street&zoom=17&session=visual',
+    imagery: true,
+    crossBackend: false,
+  },
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });

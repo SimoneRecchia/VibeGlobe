@@ -97,6 +97,10 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     zoom: '17',
     tilt: '45',
   },
+  // M5 phases: the whole globe (F151), a city on the flat 2D map (F153) and a city in Auto mode to zoom into (F154).
+  'globe-world': { imagery: 'world', lon: '10', lat: '20', zoom: '1' },
+  'map-2d-city': { imagery: 'world', lon: '12.5', lat: '41.9', zoom: '11' },
+  'zoom-city-to-street': { imagery: 'world', lon: '12.5', lat: '41.9', zoom: '12' },
   // M5: the fixture cones at 100° E seen from the south, tilted, at ground zoom 14.2 (F157); the URL sets the latitude.
   'terrain-cones': { terrain: 'terrarium', imagery: 'smooth', lon: '100', lat: '0', zoom: '14.2', tilt: '83' },
   // The flat map in 2D just west of the antimeridian, for drags across it (F159).

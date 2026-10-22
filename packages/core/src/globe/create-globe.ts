@@ -1,12 +1,6 @@
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import {
-  applyView,
-  newCameraState,
-  readCameraState,
-  requestedCameraState,
-  writeCameraState,
-} from './camera-state.js';
+import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';

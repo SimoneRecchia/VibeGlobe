@@ -14,6 +14,7 @@ import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
+import { liftMeters } from '../terrain/collision.js';
 import { displayedHeightMeters } from '../terrain/displayed-height.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel, terrainHeightRange } from '../terrain/terrain-draws.js';
 import type {
@@ -110,7 +111,9 @@ export class SurfaceFrame {
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
       this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
-      this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET);
+      // Two levels beyond the finest terrain's own: a 256-cell grid (rough tiles, ADR 0027) needs them for the surface
+      // to sample each of its vertices.
+      this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET + 2);
       const { terrain: layer, heights } = imagery;
       if (layer && heights) this.selection.terrainRange = (tile, out) => terrainHeightRange(layer, heights, tile, out);
     }
@@ -133,17 +136,14 @@ export class SurfaceFrame {
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
     const drawn = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
-    // The finest resident terrain under the eye: the eye never goes below it, even while the frame still shows coarser
-    // relief there or draws nothing there (F146); the clearance is kept above the displayed surface, so finer terrain
-    // lifts the eye as it morphs in (F147).
+    // Where nothing resident is drawn under the eye, the finest resident terrain stands in for the shown surface
+    // (KB-081); `liftMeters` keeps the clearance above both (F146, F147, ADR 0027).
     this.queryRad[0] = eye.longitudeRad;
     this.queryRad[1] = eye.latitudeRad;
     const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;
     const surface = drawn === drawn ? drawn : finest;
     camera.groundHeightMeters = surface;
-    const floor = surface + this.clearanceMeters > finest ? surface + this.clearanceMeters : finest;
-    const needed = floor - (eye.heightMeters - lift);
-    const next = needed > 0 ? needed : 0;
+    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
     if (next === lift) return false;
     pose.targetHeightMeters = next;
     return true;

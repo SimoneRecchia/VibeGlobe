@@ -18,7 +18,7 @@ export interface TileMeshData {
   readonly uvs: Float32Array;
   /**
    * The ellipsoid normal at each vertex, xyz (ECEF directions), along which the renderer displaces terrain heights
-   * (ADR 0006 §5); skirt vertices carry the normal of their own position.
+   * (ADR 0006 §5); skirt vertices carry the normal of their own position, doubled to mark them.
    */
   readonly normals: Float32Array;
   /** Triangle indices, shared by every tile with the same grid size. */
@@ -90,6 +90,15 @@ function writeNormal(normals: Float32Array, index: number, lonRad: number, latRa
   normals[index * 3 + 2] = Math.sin(latRad);
 }
 
+/**
+ * Doubles the normals of the skirt vertices: the renderer tells them apart by that length and lowers them further
+ * where a tile shows terrain coarser than its level's (`TileDrawLayer.skirtMeters`); it normalizes every normal.
+ */
+function markSkirts(normals: Float32Array): void {
+  for (let i = SURFACE_VERTICES * 3; i < (SURFACE_VERTICES + SKIRT_VERTICES) * 3; i++)
+    normals[i] = (normals[i] ?? 0) * 2;
+}
+
 function writeUvs(uvs: Float32Array, index: number, u: number, vOwn: number, vGeographic: number): void {
   uvs[index * 3] = u;
   uvs[index * 3 + 1] = vOwn;
@@ -136,6 +145,7 @@ export function buildTileMesh(
   };
   for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
   writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
+  markSkirts(normals);
   const indices = tileIndices();
   const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength;
   return { key, originEcef, positions, uvs, normals, indices, byteLength };
@@ -178,6 +188,7 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
   };
   for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
   writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
+  markSkirts(normals);
   const indices = tileIndices();
   const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength;
   return { key: tile.key, originEcef, positions, uvs, normals, indices, byteLength };

@@ -355,6 +355,35 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('settles a query whose deeper availability comes with the metadata of an ancestor, off screen (F145)', async () => {
+    // Levels below 2 are known only once the level-2 tile covering them, which carries their availability, has loaded;
+    // then they turn out to have no data there.
+    const urls: string[] = [];
+    let carrierLoaded = false;
+    const base = terrain(urls, 12);
+    const source: TerrainSource = {
+      ...base,
+      transport: {
+        start(request, timeouts, done) {
+          return base.transport.start(request, timeouts, (result) => {
+            if (request.url.startsWith('/terrain/2/')) carrierLoaded = true;
+            done(result);
+          });
+        },
+      },
+      request: (coord, out) => (coord.level <= 2 ? base.request(coord, out) : carrierLoaded ? 'noData' : 'unknown'),
+    };
+    const { globe, run } = await terrainGlobe(source, 5);
+    // The other side of the world from the view.
+    const query = globe.elevationAtAsync({ longitudeDeg: -170.5, latitudeDeg: -40.25 });
+    let settled = false;
+    void query.then(() => (settled = true));
+    await run(40);
+    expect(settled).toBe(true);
+    expect((await query).level).toBe(2);
+    globe.destroy();
+  });
+
   it('settles a query whose finest levels have no data with the finest level that has, and rejects on destroy (F145)', async () => {
     const { globe, run } = await terrainGlobe(
       terrain([], 12, (level) => level > 9),
@@ -405,6 +434,38 @@ describe('terrain in a globe (M4)', () => {
     const [x, y] = mercator(7.2, 46.1);
     expect(sample.noData).toBe(false);
     expect(sample.heightMeters).toBeCloseTo(heightAt(x, y), 2);
+    globe.destroy();
+  });
+
+  it('deepens the skirts of tiles showing terrain coarser than their level, by that terrain error (M4 review)', async () => {
+    const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 10, tiltDeg: 30 };
+    const skirts = async (failing?: (level: number) => boolean): Promise<number[]> => {
+      const { globe, renderer } = await terrainGlobe(terrain([], 12, failing), 40, terrainWorkers(), view);
+      const draws = renderer.lastDraws;
+      const values = Array.from(draws?.terrain.skirtMeters.subarray(0, draws.count) ?? []);
+      globe.destroy();
+      return values;
+    };
+    // Every level loads: each tile shows its own level's terrain.
+    expect((await skirts()).every((meters) => meters === 0)).toBe(true);
+    // Levels below 2 fail: tiles show level-2 terrain, whose error (1.5 × 2,500 m) is twice what their skirts get.
+    const fallback = await skirts((level) => level > 2);
+    expect(fallback.length).toBeGreaterThan(0);
+    expect(fallback.every((meters) => meters === 2 * 1.5 * 2500)).toBe(true);
+  });
+
+  it('fails the tiles of a custom decoder that returns non-finite heights (F132)', async () => {
+    const custom: TerrainSource = {
+      ...terrain([]),
+      id: 'custom-nan',
+      decoder: {
+        kind: 'custom',
+        decode: () => ({ cells: 1, heightsMeters: Float32Array.of(0, Number.NaN, 0, 0), minMeters: 0, maxMeters: 0 }),
+      },
+    };
+    const { globe } = await terrainGlobe(custom);
+    expect(globe.terrainStats()?.failed).toBeGreaterThan(0);
+    expect(globe.elevationAt({ longitudeDeg: 7.2, latitudeDeg: 46.1 }).noData).toBe(true);
     globe.destroy();
   });
 

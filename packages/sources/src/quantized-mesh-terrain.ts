@@ -89,7 +89,8 @@ export async function quantizedMeshTerrain(options: QuantizedMeshTerrainOptions)
     },
     tileMetadata(coord: TileCoord, metadata: unknown): void {
       const available = (metadata as { available?: unknown } | null)?.available;
-      if (available !== undefined) availability.addFromMetadata(coord.level + 1, readRanges(available, 'available'));
+      if (available !== undefined)
+        availability.addFromMetadata(coord.level + 1, readRanges(available, 'available'), coord);
     },
   };
 }

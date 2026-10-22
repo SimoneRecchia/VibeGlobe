@@ -93,13 +93,24 @@ export class TerrainAvailability {
     this.levels = layer.available.map((ranges) => [...ranges]);
   }
 
-  /** Adds the availability a tile's metadata extension declares for the levels below it, starting at `level`. */
-  addFromMetadata(level: number, ranges: readonly (readonly TileRange[])[]): void {
+  /** The tiles whose metadata has been added, as `level/x/yFromNorth`. */
+  private readonly metadataTiles = new Set<string>();
+
+  /**
+   * Adds the availability a tile's metadata extension declares for the levels below it, starting at `level`. With
+   * `from`, the tile that carried it (y from the north): the tiles it covers and does not list become unavailable.
+   */
+  addFromMetadata(
+    level: number,
+    ranges: readonly (readonly TileRange[])[],
+    from?: { level: number; x: number; y: number },
+  ): void {
     ranges.forEach((list, i) => {
       const z = level + i;
       while (this.levels.length <= z) this.levels.push([]);
       this.levels[z]?.push(...list);
     });
+    if (from) this.metadataTiles.add(`${from.level}/${from.x}/${from.y}`);
   }
 
   /** Whether tile (z, x, y) exists, with y counted from the north (the engine's convention). */
@@ -111,7 +122,16 @@ export class TerrainAvailability {
     if (ranges?.some((r) => x >= r.startX && x <= r.endX && y >= r.startY && y <= r.endY)) return 'available';
     // Levels the document lists are complete; deeper ones are complete only without metadata spread over tiles,
     // otherwise a missing range may still come with the metadata tile that covers it.
-    if (this.layer.metadataEvery === 0 || z < this.layer.available.length) return 'unavailable';
+    const every = this.layer.metadataEvery;
+    if (every === 0 || z < this.layer.available.length) return 'unavailable';
+    // The tile carrying this level's availability: the ancestor at the nearest multiple of `every` above it.
+    const carrier = Math.floor((z - 1) / every) * every;
+    const shift = 2 ** (z - carrier);
+    const carrierX = Math.floor(x / shift);
+    const carrierY = Math.floor(yFromNorth / shift);
+    // Its metadata has arrived without listing the tile; or the carrier itself does not exist.
+    if (this.metadataTiles.has(`${carrier}/${carrierX}/${carrierY}`)) return 'unavailable';
+    if (carrier > 0 && this.status(carrier, carrierX, carrierY) === 'unavailable') return 'unavailable';
     return 'unknown';
   }
 }

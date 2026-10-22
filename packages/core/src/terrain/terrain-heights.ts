@@ -4,7 +4,7 @@ import type { TerrainLayer } from './terrain-draws.js';
 
 /** An elevation query's answer (F144, F145). */
 export interface ElevationSample {
-  /** Meters above the WGS84 ellipsoid; 0 (the ellipsoid, ADR 0024's no-data surface) where there is no terrain. */
+  /** Meters above the WGS84 ellipsoid; 0 (the ellipsoid, ADR 0026's no-data surface) where there is no terrain. */
   heightMeters: number;
   /** The terrain level the height came from, -1 without terrain. */
   level: number;
@@ -205,16 +205,19 @@ export class TerrainHeights {
     position[0] = lonRad;
     position[1] = latRad;
     project(mercator, position);
+    // The finest tile that may still arrive is wanted, and so is every coarser one down to the first resident: an
+    // ancestor may carry the availability of the levels below it (F128), which says whether the finest one exists.
+    let wanted = FINEST_RESIDENT;
     for (let level = source.maxLevel; level >= source.minLevel; level--) {
       locate(mercator, level);
       const x = located[2] ?? 0;
       const y = located[3] ?? 0;
-      if (loader.peekHandle(level, x, y) >= 0) return FINEST_RESIDENT;
-      if (loader.failed(level, x, y)) return FINEST_FAILED;
+      if (loader.peekHandle(level, x, y) >= 0) return wanted;
+      if (loader.failed(level, x, y)) return wanted === FINEST_RESIDENT ? FINEST_FAILED : wanted;
       if (loader.noData(level, x, y)) continue;
       loader.want(level, x, y, priority);
-      return level;
+      if (wanted === FINEST_RESIDENT) wanted = level;
     }
-    return FINEST_RESIDENT;
+    return wanted;
   }
 }

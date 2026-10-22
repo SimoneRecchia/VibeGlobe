@@ -1,5 +1,5 @@
 /**
- * Geoid grid files for geoid-referenced terrain (ADR 0024, F133; `docs/guides/terrain.md`).
+ * Geoid grid files for geoid-referenced terrain (ADR 0026, F133; `docs/guides/terrain.md`).
  *
  *   node scripts/geoid-grid.ts convert <grid.txt> <out.bin>
  *     Writes a VGEOID1 file from a text grid: one `latitudeDeg longitudeDeg undulationMeters` line per node of a

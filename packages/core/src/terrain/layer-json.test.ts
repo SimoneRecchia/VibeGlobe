@@ -44,6 +44,22 @@ describe('layer.json', () => {
     expect(availability.status(3, 5, 4)).toBe('available');
   });
 
+  it('answers unavailable once the metadata tile covering a tile has loaded without listing it (F145)', () => {
+    const availability = new TerrainAvailability(readLayerJson(LAYER));
+    // Every tenth level carries the next ten levels' availability: level 0's tile covers levels 1 to 10.
+    expect(availability.status(3, 0, 0)).toBe('unknown');
+    expect(availability.status(12, 0, 0)).toBe('unknown');
+    availability.addFromMetadata(1, readRanges([[], [], [{ startX: 4, startY: 2, endX: 5, endY: 3 }]], 'metadata'), {
+      level: 0,
+      x: 0,
+      y: 0,
+    });
+    expect(availability.status(3, 5, 4)).toBe('available');
+    expect(availability.status(3, 0, 0)).toBe('unavailable');
+    // Below a tile its covering metadata leaves out, nothing exists either.
+    expect(availability.status(12, 0, 0)).toBe('unavailable');
+  });
+
   it('rejects documents that are not quantized-mesh terrain or have invalid fields', () => {
     expect(() => readLayerJson({ ...LAYER, format: 'heightmap-1.0' })).toThrow(TypeError);
     expect(() => readLayerJson({ ...LAYER, projection: 'EPSG:2056' })).toThrow(TypeError);

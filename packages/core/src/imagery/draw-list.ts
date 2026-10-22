@@ -17,6 +17,8 @@ export class DrawLayer implements TileDrawLayer {
   fades: Float32Array;
   /** 1 when the draw's `from` fields were seeded for a tile drawn for the first time (terrain morphs, F138). */
   seeded: Uint8Array;
+  /** Skirt depth added to the mesh's own, meters (terrain shown from a coarser level than the tile's, M4 review). */
+  skirtMeters: Float32Array;
 
   constructor(capacity: number) {
     this.textures = new Int32Array(capacity);
@@ -28,6 +30,7 @@ export class DrawLayer implements TileDrawLayer {
     this.fromGeographic = new Uint8Array(capacity);
     this.fades = new Float32Array(capacity);
     this.seeded = new Uint8Array(capacity);
+    this.skirtMeters = new Float32Array(capacity);
   }
 
   /** Draw `index` shows `texture` (with no fade yet) through the transform in `transform[0..3]`. */
@@ -39,6 +42,7 @@ export class DrawLayer implements TileDrawLayer {
     this.fromGeographic[index] = geographic;
     this.fades[index] = 1;
     this.seeded[index] = 0;
+    this.skirtMeters[index] = 0;
     const at = index * 4;
     for (let c = 0; c < 4; c++) {
       const value = transform[c] ?? 0;
@@ -100,6 +104,10 @@ export class DrawList implements TileDrawList {
   /** Imagery fade progress of each draw. */
   get fades(): Float32Array {
     return this.imagery.fades;
+  }
+  /** No extra skirt depth for imagery (0 for every draw). */
+  get skirtMeters(): Float32Array {
+    return this.imagery.skirtMeters;
   }
 
   /** Makes room for `count` draws, keeping none of the current ones (called before a frame fills the list). */

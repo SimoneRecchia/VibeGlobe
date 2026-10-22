@@ -53,7 +53,8 @@ export interface SurfaceDraw {
   /**
    * x: bit flags, set when the rows of the imagery (1), the imagery faded from (2), the terrain (4) and the terrain
    * morphed from (8) are linear in latitude rather than the tile's own; y: the imagery fade (0 only the `from` imagery,
-   * 1 only the tile's own); z: the terrain morph, likewise.
+   * 1 only the tile's own); z: the terrain morph, likewise; w: meters to lower the skirts by beyond the mesh's own
+   * depth (terrain coarser than the tile's level, `TileDrawList.terrain.skirtMeters`).
    */
   readonly params: Vector4;
 }
@@ -226,7 +227,10 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
     });
     return color;
   })();
-  makeEyeRelative(material, depthPath, positionGeometry.add(tileNormal.mul(height)));
+  // Skirt vertices carry a normal of length 2 (the mesh marks them so): they hang `params.w` lower still.
+  const skirt = tileNormal.length().greaterThan(1.5);
+  const displacement = height.sub(skirt.select(params.w, 0));
+  makeEyeRelative(material, depthPath, positionGeometry.add(tileNormal.normalize().mul(displacement)));
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;
@@ -256,7 +260,7 @@ export function applyDraw(
     2 * (draws.fromGeographic[i] ?? 1) +
     4 * (terrain.geographic[i] ?? 1) +
     8 * (terrain.fromGeographic[i] ?? 1);
-  draw.params.set(flags, draws.fades[i] ?? 1, terrain.fades[i] ?? 1, 0);
+  draw.params.set(flags, draws.fades[i] ?? 1, terrain.fades[i] ?? 1, terrain.skirtMeters[i] ?? 0);
   const e = draw.transforms.elements;
   const at = i * 4;
   for (let c = 0; c < 4; c++) {

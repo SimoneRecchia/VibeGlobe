@@ -183,6 +183,11 @@ export interface TileDrawLayer {
   readonly fromGeographic: Uint8Array;
   /** Each draw's fade progress: 0 shows only the `from` data, 1 only its own. */
   readonly fades: Float32Array;
+  /**
+   * Meters to lower each draw's skirts by beyond its mesh's own depth (terrain only, 0 otherwise): a tile showing
+   * terrain coarser than its level's may differ from its neighbors by that terrain's error.
+   */
+  readonly skirtMeters: Float32Array;
 }
 
 /** The surface tiles a frame draws, with their imagery (the list's own layer) and their terrain heights. */
@@ -335,7 +340,7 @@ export interface GlobeOptions {
   readonly imagery?: readonly ImagerySource[];
   /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
-   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0024).
+   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0026).
    */
   readonly terrain?: TerrainSource;
   /**

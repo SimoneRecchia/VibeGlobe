@@ -18,7 +18,8 @@ function layerHeight(
   v: number,
 ): number {
   const grid = handle >= 0 ? heights.grid(handle) : undefined;
-  if (!grid) return 0;
+  // A tile drawn without terrain lies on the ellipsoid; NaN tells the caller nothing resident is shown there.
+  if (!grid) return Number.NaN;
   const tu = u * (transforms[at] ?? 1) + (transforms[at + 2] ?? 0);
   const tv = v * (transforms[at + 1] ?? 1) + (transforms[at + 3] ?? 0);
   return sampleHeight(grid, tu, tv);
@@ -27,7 +28,8 @@ function layerHeight(
 /**
  * The height of the surface as the frame shows it at a position (ADR 0006 §4): the drawn tile containing it, its
  * terrain and the terrain it morphs from, mixed by the morph's progress, exactly as the vertex shader does at the
- * tile's vertices. NaN where no drawn tile contains the position. Allocates nothing.
+ * tile's vertices. NaN where no drawn tile contains the position, or the tile containing it shows no terrain. Allocates
+ * nothing.
  */
 export function displayedHeightMeters(
   list: DrawList,
@@ -67,7 +69,10 @@ export function displayedHeightMeters(
       u,
       terrain.fromGeographic[i] === 1 ? vGeographic : vOwn,
     );
-    return from + (to - from) * fade;
+    // Mid-morph, a side without terrain is the ellipsoid, as the shader draws it.
+    const fromMeters = from === from ? from : 0;
+    const toMeters = to === to ? to : 0;
+    return fromMeters + (toMeters - fromMeters) * fade;
   }
   return Number.NaN;
 }

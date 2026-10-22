@@ -128,7 +128,7 @@ export function drawTerrain(
     const level = mapping[MAPPING_LEVEL] ?? -1;
     list.terrain.set(index, handle, level, geographic, transform);
     layer.shown.current.set(tile.key, level);
-    if (tile.root === MERCATOR_ROOT && !layer.shown.previous.has(tile.key)) seedMorph(list, index, tile, level, layer);
+    if (!layer.shown.previous.has(tile.key)) seedMorph(list, index, tile, level, layer);
   }
   layer.shown.swap();
 }
@@ -142,19 +142,26 @@ function writeTransform(from: Float64Array): void {
 }
 
 /**
- * The terrain level shown last frame where a Mercator tile drawn for the first time lies (F138): its parent's when it
- * appears by refinement, else the finest of its children's when it appears by coarsening; -1 when neither was drawn.
+ * The terrain level shown last frame where a tile drawn for the first time lies (F138): its nearest ancestor's within
+ * {@link MAX_TERRAIN_MORPH_LEVELS} levels when it appears by refinement, else the finest of its descendants' within as
+ * many levels when it appears by coarsening; -1 when none was drawn. Every root splits a tile's column in two (cap
+ * tiles of two children keep both in one column pair), so a parent is (x / 2, y / 2) and the children are among the
+ * four of (2x, 2y). Allocates nothing.
  */
-function previousLevel(tile: QuadtreeTile, previous: IntegerKeyMap<number>): number {
-  if (tile.level > 0) {
-    const parent = previous.get(quadtreeTileKey(MERCATOR_ROOT, tile.level - 1, tile.x >> 1, tile.y >> 1));
-    if (parent !== undefined) return parent;
+export function previousLevel(tile: QuadtreeTile, previous: IntegerKeyMap<number>): number {
+  for (let up = 1; up <= MAX_TERRAIN_MORPH_LEVELS && up <= tile.level; up++) {
+    const level = previous.get(quadtreeTileKey(tile.root, tile.level - up, tile.x >> up, tile.y >> up));
+    if (level !== undefined) return level;
   }
   let finest = -1;
-  for (let child = 0; child < 4; child++) {
-    const key = quadtreeTileKey(MERCATOR_ROOT, tile.level + 1, 2 * tile.x + (child & 1), 2 * tile.y + (child >> 1));
-    const level = previous.get(key);
-    if (level !== undefined && level > finest) finest = level;
+  for (let down = 1; down <= MAX_TERRAIN_MORPH_LEVELS && finest < 0; down++) {
+    const side = 1 << down;
+    for (let i = 0; i < side * side; i++) {
+      const x = tile.x * side + (i % side);
+      const y = tile.y * side + Math.floor(i / side);
+      const level = previous.get(quadtreeTileKey(tile.root, tile.level + down, x, y));
+      if (level !== undefined && level > finest) finest = level;
+    }
   }
   return finest;
 }
@@ -169,10 +176,14 @@ function seedMorph(list: DrawList, index: number, tile: QuadtreeTile, level: num
   const before = previousLevel(tile, layer.shown.previous);
   if (before < 0 || before === level || Math.abs(before - level) > MAX_TERRAIN_MORPH_LEVELS) return;
   const source = layer.source;
-  const mapped =
-    source.tiling.crs === 'EPSG:3857'
-      ? mapMercator(tile, before, seedMapping, 0)
-      : mapGeographic(tile, before, seedMapping, 0);
+  let mapped: boolean;
+  if (source.tiling.crs !== 'EPSG:3857') mapped = mapGeographic(tile, before, seedMapping, 0);
+  else if (tile.root === MERCATOR_ROOT) mapped = mapMercator(tile, before, seedMapping, 0);
+  else {
+    // A cap tile samples the Mercator edge row; the current mapping is no longer needed once the draw is set.
+    mapped = mapCapToMercatorEdge(tile, before);
+    seedMapping.set(mapping);
+  }
   if (!mapped) return;
   const seedLevel = seedMapping[MAPPING_LEVEL] ?? -1;
   if (seedLevel === level) return;
@@ -278,10 +289,43 @@ export function terrainHeightRange(
       gridRangeInto(grid, part);
       out[0] = part[4] ?? grid.minMeters;
       out[1] = part[5] ?? grid.maxMeters;
-      out[2] = layer.gridErrorMeters[current] ?? 0;
+      // What finer levels may add: the level's bound, or more where the grid's measured error exceeds its share of it.
+      const bound = layer.gridErrorMeters[current] ?? 0;
+      const measured = bound / GRID_ERROR_FACTOR + (grid.errorMeters ?? 0);
+      out[2] = measured > bound ? measured : bound;
       return true;
     }
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);
   }
   return false;
+}
+
+/**
+ * Deepens the skirts of draws showing terrain coarser than their surface level's (a fallback ancestor, or a morph from
+ * one; M4 review): their edges may differ from a neighbor showing finer terrain by up to twice the coarser grid's
+ * error, more than the mesh's skirts, which are sized for the tile's own level. Call after the terrain fades.
+ * Allocates nothing.
+ */
+export function deepenFallbackSkirts(
+  list: DrawList,
+  tiles: readonly QuadtreeTile[],
+  count: number,
+  layer: TerrainLayer,
+): void {
+  const terrain = list.terrain;
+  for (let index = 0; index < count; index++) {
+    const tile = tiles[index];
+    const level = terrain.levels[index] ?? -1;
+    if (!tile || level < 0) {
+      terrain.skirtMeters[index] = 0;
+      continue;
+    }
+    let coarsest = level;
+    if ((terrain.fades[index] ?? 1) < 1) {
+      const from = layer.loader.coordOf(terrain.fromTextures[index] ?? -1)?.level ?? level;
+      if (from < coarsest) coarsest = from;
+    }
+    const wanted = terrainLevelOf(tile.level, layer.source);
+    terrain.skirtMeters[index] = coarsest < wanted ? 2 * (layer.gridErrorMeters[coarsest] ?? 0) : 0;
+  }
 }

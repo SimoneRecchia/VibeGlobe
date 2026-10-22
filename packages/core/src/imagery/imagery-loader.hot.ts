@@ -62,7 +62,7 @@ const MAX_HOST_SKIPS = 32;
 
 /**
  * How a tile's bytes are decoded: a worker task by name and input, or `run`, a pure function the loader calls on the
- * main thread between frames (a third-party terrain decoder, ADR 0024), its exception a decode failure.
+ * main thread between frames (a third-party terrain decoder, ADR 0026), its exception a decode failure.
  */
 export interface DecodeTask {
   readonly task: string;

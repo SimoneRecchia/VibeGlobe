@@ -115,6 +115,7 @@ export {
   EXTENSION_METADATA,
   EXTENSION_OCT_NORMALS,
   EXTENSION_WATER_MASK,
+  meshGridErrorMeters,
   rasterizeQuantizedMesh,
 } from './terrain/quantized-mesh.js';
 export type { QuantizedMesh } from './terrain/quantized-mesh.js';

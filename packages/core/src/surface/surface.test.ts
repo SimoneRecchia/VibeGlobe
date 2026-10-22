@@ -23,7 +23,7 @@ describe('buildTileMesh', () => {
 });
 
 describe('terrain attributes (M4)', () => {
-  it('gives every vertex its unit ellipsoid normal, along which the renderer displaces heights', () => {
+  it('gives every vertex its ellipsoid normal, along which the renderer displaces heights: unit, doubled on skirts', () => {
     const tile = quadtreeTileBounds(MERCATOR_ROOT, 6, 33, 22, 1, {
       key: 0,
       root: 0,
@@ -39,9 +39,12 @@ describe('terrain attributes (M4)', () => {
     const mesh = buildQuadtreeTileMesh(tile, 50);
     const vertices = mesh.positions.length / 3;
     expect(mesh.normals.length).toBe(vertices * 3);
+    // The skirt vertices follow the (segments + 1)² surface vertices; their doubled normal marks them (M4 review).
+    const side = Math.round(Math.sqrt(4 + vertices) - 2);
+    expect(side * side + 4 * side).toBe(vertices);
     for (let i = 0; i < vertices; i++) {
       const [x = 0, y = 0, z = 0] = mesh.normals.subarray(i * 3, i * 3 + 3);
-      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 6);
+      expect(Math.hypot(x, y, z)).toBeCloseTo(i < side * side ? 1 : 2, 6);
     }
     // The north-west corner's normal points at its latitude and longitude.
     const [x = 0, y = 0, z = 0] = mesh.normals.subarray(0, 3);

@@ -23,6 +23,7 @@ import {
   drawTerrain,
   gridErrorsByLevel,
   MAX_TERRAIN_MORPH_LEVELS,
+  deepenFallbackSkirts,
   ShownLevels,
   type TerrainLayer,
 } from '../terrain/terrain-draws.js';
@@ -74,7 +75,7 @@ const TERRAIN_PINNED_LEVEL = 2;
 
 /**
  * How a terrain source's tiles decode: built-in encodings in the worker pool, their grid adding at most half the
- * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0024, F132).
+ * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0026, F132).
  */
 function terrainDecodeTask(
   source: TerrainSource,
@@ -96,12 +97,24 @@ function terrainDecodeTask(
   };
 }
 
-/** A custom decoder's grid as a decoded tile, checked so a wrong grid fails like undecodable bytes. */
+/**
+ * A custom decoder's grid as a decoded tile, checked so a wrong grid fails like undecodable bytes: every height must be
+ * finite, and the range is measured from the heights rather than taken from the decoder, since culling and selection
+ * trust it (F132, F142).
+ */
 function heightTile(grid: HeightGrid): DecodedTile {
   const side = grid.cells + 1;
   if (!Number.isInteger(grid.cells) || grid.cells < 1 || grid.heightsMeters.length !== side * side)
     throw new TypeError(`a height grid of ${grid.cells} cells needs ${side * side} heights`);
-  return { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: grid };
+  let minMeters = Infinity;
+  let maxMeters = -Infinity;
+  for (const height of grid.heightsMeters) {
+    if (!Number.isFinite(height)) throw new TypeError(`a height grid has a height of ${height}`);
+    if (height < minMeters) minMeters = height;
+    if (height > maxMeters) maxMeters = height;
+  }
+  const checked: HeightGrid = { cells: grid.cells, heightsMeters: grid.heightsMeters, minMeters, maxMeters };
+  return { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: checked };
 }
 
 /** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
@@ -353,6 +366,9 @@ export class ImageryRuntime {
         query.resolve(heights.sample(query.lonRad, query.latRad, { heightMeters: 0, level: -1, noData: true }));
       }
     }
+    // Queries are served between frames: one still waiting asks for the next, even when nothing else changes on screen
+    // (a level that turned out to have no data moves the query to the next coarser one).
+    if (this.elevationQueries.length > 0) this.callbacks.requestFrame();
   }
 
   /** Widens the height range by a terrain tile's. */
@@ -404,6 +420,7 @@ export class ImageryRuntime {
       terrain.loader.beginFrame();
       drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
+      deepenFallbackSkirts(list, tiles, count, terrain);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart;
     }

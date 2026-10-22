@@ -14,6 +14,8 @@ export interface HeightGrid {
   readonly heightsMeters: Float32Array;
   readonly minMeters: number;
   readonly maxMeters: number;
+  /** The largest vertical distance measured between the grid's surface and the source's own heights, meters. */
+  readonly errorMeters?: number;
 }
 
 /** Terrarium: height = (R × 256 + G + B / 256) − 32768 meters. */

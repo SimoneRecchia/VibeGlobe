@@ -5,6 +5,7 @@
  * is bounds-checked, so malformed bytes throw a `RangeError` instead of reading garbage (F131).
  */
 import type { HeightGrid } from './heightmap.js';
+import { sampleHeight } from './sample-height.js';
 
 /** Quantized coordinates run from 0 to 32767 across the tile and the height range. */
 const QUANTIZED_MAX = 32767;
@@ -319,4 +320,14 @@ export function rasterizeQuantizedMesh(mesh: QuantizedMesh, cells: number): Heig
     if (value > max) max = value;
   }
   return { cells, heightsMeters: heights, minMeters: min, maxMeters: max };
+}
+
+/** The largest |grid surface − vertex height| over a mesh's vertices: what rasterizing it to `grid` lost (F134). */
+export function meshGridErrorMeters(mesh: QuantizedMesh, grid: HeightGrid): number {
+  let worst = 0;
+  for (let i = 0; i < mesh.heightsMeters.length; i++) {
+    const error = Math.abs(sampleHeight(grid, mesh.u[i] ?? 0, 1 - (mesh.v[i] ?? 0)) - (mesh.heightsMeters[i] ?? 0));
+    if (error > worst) worst = error;
+  }
+  return worst;
 }

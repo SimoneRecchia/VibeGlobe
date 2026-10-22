@@ -1,138 +1,159 @@
-import type { Controls, ControlsFactory, GeoPosition, NavigationApi } from '@vibeglobe/core';
+import type { Controls, ControlsFactory, NavigationApi } from '@vibeglobe/core';
+import { HeadingTarget, Inertia, type InertiaTaus, KeyMotion, ZoomTarget } from './animators.js';
+import { CameraPort, type ConnectedGlobe } from './camera-port.js';
+import type { GestureContext } from './gesture-context.js';
+import { KeyboardInput } from './keyboard.js';
+import { MouseGestures } from './mouse-gestures.js';
+import { type ControlsOptions, resolveControlsOptions, type ResolvedControlsOptions } from './options.js';
+import { TouchGestures } from './touch-gestures.js';
+import { WheelInput } from './wheel-input.js';
+import { ZoomBox } from './zoom-box.js';
+import { domListeners } from './dom-listeners.js';
 
-/** Wheel pixels per zoom level (ADR 0009: Δzoom = −Δy / 300). */
-const WHEEL_PIXELS_PER_LEVEL = 300;
-const LINE_HEIGHT_PX = 16;
+/** The controls factory with commands for buttons and applications. */
+export interface NavigationControls extends ControlsFactory {
+  /** The settings in use, defaults filled in. */
+  readonly options: ResolvedControlsOptions;
+  /**
+   * Connects the globe the controls drive, after `createGlobe`: rotation and tilt, and the engine clock for inertia,
+   * need it until the engine's navigation interface carries them (docs/parallel-tracks.md, "M6 input" hooks). Without
+   * it, pan and zoom work and rotate and tilt gestures are off.
+   */
+  connect(globe: ConnectedGlobe): void;
+  /** Zooms in one level about the screen center, animated; rapid calls accumulate (F174). */
+  zoomIn(): void;
+  /** Zooms out one level about the screen center, animated; rapid calls accumulate (F174). */
+  zoomOut(): void;
+  /** Turns the view to north up along the shortest arc, keeping center and tilt. */
+  resetNorth(): void;
+}
 
 /**
- * Creates basic mouse and touch navigation (M2): drag the globe keeping the grabbed point under the pointer, and zoom
- * with the wheel anchored at the cursor. DOM handlers only record input; once per frame the engine calls `update`,
- * which turns it into at most one grab, one drag and one zoom (ADR 0009 §3–4).
+ * Creates mouse, trackpad, touch and keyboard navigation (M6, ADR 0009 §3–6). DOM handlers only record input; once
+ * per frame the engine calls `update`, which turns it into camera intents, steps inertia and the smoothed zoom, and
+ * keeps frames coming while anything moves. Invalid options throw a GlobeError ('invalid-option').
  */
-export function createControls(): ControlsFactory {
-  return (element, navigation) => attach(element as HTMLElement, navigation);
+export function createControls(options?: ControlsOptions): NavigationControls {
+  const resolved = resolveControlsOptions(options);
+  let globe: ConnectedGlobe | undefined;
+  let current: Attached | undefined;
+  const factory = (element: unknown, navigation: NavigationApi): Controls => {
+    const attached = attach(element as HTMLElement, navigation, resolved, globe);
+    current = attached;
+    return {
+      update: attached.update,
+      destroy() {
+        attached.destroy();
+        if (current === attached) current = undefined;
+      },
+    };
+  };
+  return Object.assign(factory, {
+    options: resolved,
+    connect(target: ConnectedGlobe) {
+      globe = target;
+      if (current) current.port.globe = target;
+    },
+    zoomIn: () => current?.keyboard.zoomBy(1),
+    zoomOut: () => current?.keyboard.zoomBy(-1),
+    resetNorth: () => current?.keyboard.resetNorth(),
+  });
 }
 
-/** A screen point overwritten in place. */
-interface MutablePoint {
-  xPx: number;
-  yPx: number;
+/** One attachment to an input element. */
+interface Attached {
+  readonly port: CameraPort;
+  readonly keyboard: KeyboardInput;
+  update(): void;
+  destroy(): void;
 }
 
-/** Input recorded by the DOM handlers between two frames, applied by {@link RecordedInput.apply}. */
-class RecordedInput {
-  pointerId: number | undefined;
-  private anchor: GeoPosition | undefined;
-  private grabPending = false;
-  private movePending = false;
-  private releasePending = false;
-  private wheelLevels = 0;
-  readonly downAt: MutablePoint = { xPx: 0, yPx: 0 };
-  readonly pointer: MutablePoint = { xPx: 0, yPx: 0 };
-  readonly wheelAt: MutablePoint = { xPx: 0, yPx: 0 };
-
-  press(pointerId: number): void {
-    this.pointerId = pointerId;
-    this.grabPending = true;
-    this.movePending = false;
-    this.releasePending = false;
-  }
-
-  move(): void {
-    this.movePending = true;
-  }
-
-  /** Ends the drag; returns whether a frame is needed to apply a position recorded before the release. */
-  release(): boolean {
-    this.pointerId = undefined;
-    if (this.movePending) {
-      this.releasePending = true;
-      return true;
-    }
-    this.grabPending = false;
-    this.anchor = undefined;
-    return false;
-  }
-
-  wheel(levels: number): void {
-    this.wheelLevels += levels;
-  }
-
-  /**
-   * Turns the recorded input into intents. The grab waits for the first move, so a click without motion costs no
-   * frame; the last position before a release still applies.
-   */
-  apply(navigation: NavigationApi): void {
-    if (this.movePending) {
-      this.movePending = false;
-      if (this.grabPending) {
-        this.grabPending = false;
-        this.anchor = navigation.grab(this.downAt);
-      }
-      if (this.anchor) navigation.dragTo(this.anchor, this.pointer);
-    }
-    if (this.releasePending) {
-      this.releasePending = false;
-      this.anchor = undefined;
-    }
-    if (this.wheelLevels !== 0) {
-      const levels = this.wheelLevels;
-      this.wheelLevels = 0;
-      navigation.zoomAt(this.wheelAt, levels);
-    }
-  }
+/** Whether the system asks for reduced motion now; false where the browser cannot tell. */
+function reducedMotionQuery(element: HTMLElement): MediaQueryList | undefined {
+  return element.ownerDocument.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)');
 }
 
-function attach(element: HTMLElement, navigation: NavigationApi): Controls {
-  const input = new RecordedInput();
-  const record = (event: MouseEvent, out: MutablePoint): void => {
-    const rect = element.getBoundingClientRect();
-    out.xPx = event.clientX - rect.left;
-    out.yPx = event.clientY - rect.top;
+function createContext(element: HTMLElement, port: CameraPort, options: ResolvedControlsOptions): GestureContext {
+  const query = options.reducedMotion === 'system' ? reducedMotionQuery(element) : undefined;
+  const full: InertiaTaus = options.inertia;
+  const quarter: InertiaTaus = {
+    panTauMs: full.panTauMs / 4,
+    rotateTauMs: full.rotateTauMs / 4,
+    tiltTauMs: full.tiltTauMs / 4,
+    zoomTauMs: full.zoomTauMs / 4,
   };
-  const onDown = (event: PointerEvent): void => {
-    if (event.button !== 0 || input.pointerId !== undefined) return;
-    record(event, input.downAt);
-    record(event, input.pointer);
-    input.press(event.pointerId);
-    element.setPointerCapture(event.pointerId);
-    event.preventDefault();
+  const context: GestureContext = {
+    port,
+    options,
+    inertia: new Inertia(),
+    zoom: new ZoomTarget(),
+    heading: new HeadingTarget(),
+    keys: new KeyMotion(),
+    widthPx: () => element.clientWidth,
+    heightPx: () => element.clientHeight,
+    // The media query is read at each release, so a change of the system setting applies without a reload (F214).
+    inertiaTaus: () => (options.reducedMotion === 'reduce' || query?.matches === true ? quarter : full),
+    interrupt() {
+      context.inertia.stop();
+      context.zoom.stop();
+      context.heading.stop();
+    },
   };
-  const onMove = (event: PointerEvent): void => {
-    if (event.pointerId !== input.pointerId) return;
-    record(event, input.pointer);
-    input.move();
-    navigation.requestUpdate();
-  };
-  const onUp = (event: PointerEvent): void => {
-    if (event.pointerId !== input.pointerId) return;
-    if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
-    if (input.release()) navigation.requestUpdate();
-  };
-  const onWheel = (event: WheelEvent): void => {
-    event.preventDefault();
-    const scale = event.deltaMode === 1 ? LINE_HEIGHT_PX : event.deltaMode === 2 ? element.clientHeight : 1;
-    record(event, input.wheelAt);
-    input.wheel((-event.deltaY * scale) / WHEEL_PIXELS_PER_LEVEL);
-    navigation.requestUpdate();
-  };
-  const listeners = [
-    ['pointerdown', onDown],
-    ['pointermove', onMove],
-    ['pointerup', onUp],
-    ['pointercancel', onUp],
-  ] as const;
-  for (const [type, listener] of listeners) element.addEventListener(type, listener);
-  element.addEventListener('wheel', onWheel, { passive: false });
-  // The browser must not take one-finger drags and pinches for scrolling or page zoom (ADR 0009 §3).
+  return context;
+}
+
+function attach(
+  element: HTMLElement,
+  navigation: NavigationApi,
+  options: ResolvedControlsOptions,
+  globe: ConnectedGlobe | undefined,
+): Attached {
+  const view = element.ownerDocument.defaultView;
+  const port = new CameraPort(navigation, () => view?.performance.now() ?? Date.now());
+  port.globe = globe;
+  const context = createContext(element, port, options);
+  const box = new ZoomBox(element);
+  const mouse = new MouseGestures(context, box);
+  const touch = new TouchGestures(context);
+  const wheel = new WheelInput(context);
+  const keyboard = new KeyboardInput(context, () => {
+    if (box.drawing) mouse.cancel();
+    box.stop();
+  });
+  const listeners = domListeners(element, port, context, { mouse, touch, wheel, keyboard, box });
+  // The browser must not take drags and pinches over the map for scrolling or page zoom (F189).
   const touchAction = element.style.touchAction;
   element.style.touchAction = 'none';
+  for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: false });
   return {
-    update: () => input.apply(navigation),
+    port,
+    keyboard,
+    update() {
+      const now = port.beginFrame();
+      mouse.apply();
+      touch.apply();
+      wheel.apply();
+      let moving = context.zoom.step(now, port);
+      moving = context.inertia.step(now, port) || moving;
+      moving = context.heading.step(now, port, options.maxTiltDeg) || moving;
+      moving =
+        context.keys.step(
+          now,
+          port,
+          options.keyboard.smoothingMs,
+          context.widthPx(),
+          context.heightPx(),
+          options.maxTiltDeg,
+        ) || moving;
+      moving = box.step(now, port) || moving;
+      if (moving) port.requestNextFrame();
+    },
     destroy() {
-      for (const [type, listener] of listeners) element.removeEventListener(type, listener);
-      element.removeEventListener('wheel', onWheel);
+      for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
       element.style.touchAction = touchAction;
+      box.cancel();
+      element.style.outline = '';
     },
   };
 }
+

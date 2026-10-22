@@ -289,3 +289,47 @@ Passing: F473, F477–F484, F486, F487.
 | F488  | Every engine feature group of PLAN.md (Map experience through Security): the Nuxt example gains a page per group as each lands.                                                                                             |
 | F555  | Network modes and offline packages (F271, F292, M8) and attribution (F254) for the guide's sections, and publishing to npm (owner question 17 in `docs/open-questions.md`) for "installation from the public npm registry". |
 | F490  | The entries above; M14's acceptance belongs to the main session.                                                                                                                                                            |
+
+## M6 input track: status
+
+The eighth session (owner, 2026-10-22 evening) works on branch `claude/modest-wozniak-067cfl`, pull requests into
+`main`, merged by the owner. It owns `packages/controls`: mouse, trackpad, touch and keyboard input, the gesture
+recognizers and their conflicts, inertia, and their settings (ADR 0009 points 3, 4 and 6). Camera animations (`flyTo`,
+`easeTo`, `jumpTo`, tours, orbit, fit to bounds), the constraints, the chosen/applied stage and everything in `core` and
+`renderer` stay with the main session; this track drives the camera only through the engine's public API. Its browser
+tests run on its own harness page on the playground's dev server (`e2e/support/controls.html`), since the playground
+is the main session's.
+
+### Entries of this track
+
+| Entry | What                                                     |
+| ----- | -------------------------------------------------------- |
+| F168  | Smooth, time-based wheel zoom anchored at the cursor     |
+| F169  | Trackpad scroll and pinch zoom                           |
+| F170  | Double-click zooms in one level                          |
+| F171  | Double-tap zooms in one level                            |
+| F172  | Two-finger tap zooms out one level                       |
+| F173  | Pinch zoom anchored at the finger midpoint               |
+| F174  | Zoom-in and zoom-out commands (keys, controls API)       |
+| F175  | Shift+drag zoom box, Escape cancels                      |
+| F178  | Drag pan keeps the grabbed point under the pointer       |
+| F179  | Time-based drag inertia; no coast after holding still    |
+| F180  | Two-finger pan                                           |
+| F181  | Arrow keys pan with eased start and stop                 |
+| F182  | Right-drag rotates and tilts about the center target     |
+| F183  | Ctrl+drag rotates and tilts like right-drag              |
+| F184  | Two-finger twist rotates, combined with pinch and pan    |
+| F185  | Two-finger vertical drag tilts, exclusive of the others  |
+| F186  | Adding or lifting fingers continues without a jump       |
+| F187  | Shift+arrows rotate and tilt                             |
+| F189  | Input over the map never scrolls or zooms the host page  |
+| F213  | Every navigation action operable with the keyboard alone |
+
+Every other M6 entry is the main session's (animations, fit to bounds, orbit, compass and orientation commands, home,
+constraints, reduced motion of flights, frame-rate independence of animations, coordinate entry, the geocoder and the
+acceptance F217). Their input side (any input stops a running animation, inertia shortened under reduced motion,
+keyboard pan replayed at several refresh rates) is built and unit-tested here.
+
+### Hook requests of this track
+
+Rows in "Hook requests" above use the track name "M6 input".

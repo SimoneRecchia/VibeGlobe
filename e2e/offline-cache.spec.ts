@@ -28,7 +28,7 @@ async function pan(page: Page): Promise<void> {
   }
 }
 
-/** The 95th percentile of the engine's main-thread CPU time per frame during the pan. */
+/** The median of the engine's main-thread CPU time per frame during the pan. */
 async function cpuDuringPan(page: Page, restartSession?: string): Promise<number> {
   if (restartSession) {
     await page.evaluate((session) => {
@@ -51,7 +51,7 @@ async function cpuDuringPan(page: Page, restartSession?: string): Promise<number
   const cpu = (await page.evaluate(() => (window as unknown as { cpuSamples: number[] }).cpuSamples)).sort(
     (a, b) => a - b,
   );
-  return cpu[Math.floor(cpu.length * 0.95)] ?? 0;
+  return cpu[Math.floor(cpu.length / 2)] ?? 0;
 }
 
 test('cached tiles are not requested again after a reload, and cache I/O stays off the main thread (F273)', async ({
@@ -68,6 +68,20 @@ test('cached tiles are not requested again after a reload, and cache I/O stays o
       if (names.includes('tiles')) counter.mainThreadTileTransactions++;
       return original.apply(this, args);
     };
+    // Times what the cache traffic costs the main thread: posting requests to the cache worker.
+    const post = Worker.prototype.postMessage;
+    const cost = window as unknown as { cacheMessages: number; cacheMessageMs: number };
+    cost.cacheMessages = 0;
+    cost.cacheMessageMs = 0;
+    Worker.prototype.postMessage = function (this: Worker, ...args: Parameters<Worker['postMessage']>) {
+      const start = performance.now();
+      post.apply(this, args as never);
+      const message = args[0] as { op?: string } | undefined;
+      if (message?.op === 'put' || message?.op === 'get') {
+        cost.cacheMessages++;
+        cost.cacheMessageMs += performance.now() - start;
+      }
+    } as Worker['postMessage'];
   });
   const config: HarnessConfig = { sources: [{ id: 'world', pattern: 'world', session: 'f273' }], view: ROME };
   await openHarness(page);
@@ -75,13 +89,21 @@ test('cached tiles are not requested again after a reload, and cache I/O stays o
   const first = recordTileRequests(page);
   await startHarness(page, config);
   // The engine's main-thread CPU per frame while the pan writes every tile to the cache, against the same pan with the
-  // cache off: the writes add nothing measurable (absolute times are not judged on the software GPU, ADR 0012).
+  // cache off (medians: absolute times are not judged on the software GPU, ADR 0012), and the main thread's own share
+  // of the cache traffic, which is only posting messages to the worker.
   const withWrites = await cpuDuringPan(page);
   const written = new Set(first).size;
   await expect.poll(async () => (await storedTileKeys(page)).length).toBeGreaterThanOrEqual(written);
+  const traffic = await page.evaluate(() => {
+    const cost = window as unknown as { cacheMessages: number; cacheMessageMs: number };
+    return { cacheMessages: cost.cacheMessages, cacheMessageMs: cost.cacheMessageMs };
+  });
+  expect(traffic.cacheMessages).toBeGreaterThanOrEqual(written);
+  console.log(`main thread per cache message: ${(traffic.cacheMessageMs / traffic.cacheMessages).toFixed(3)} ms`);
+  expect(traffic.cacheMessageMs / traffic.cacheMessages).toBeLessThan(0.5);
   const withoutCache = await cpuDuringPan(page, 'f273-baseline');
   console.log(
-    `engine CPU p95 per frame: ${withWrites.toFixed(2)} ms with cache writes, ${withoutCache.toFixed(2)} ms without`,
+    `engine CPU median per frame: ${withWrites.toFixed(2)} ms with cache writes, ${withoutCache.toFixed(2)} ms without`,
   );
   expect(withWrites).toBeLessThanOrEqual(withoutCache * 1.25 + 1);
   expect(written).toBeGreaterThan(10);

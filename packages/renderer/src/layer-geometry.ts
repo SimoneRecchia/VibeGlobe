@@ -158,7 +158,7 @@ export interface QuadImages {
 }
 
 /** A region of the atlas, and its size in CSS pixels. */
-export interface AtlasRect {
+interface AtlasRect {
   readonly u0: number;
   readonly v0: number;
   readonly u1: number;

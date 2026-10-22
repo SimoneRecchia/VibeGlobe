@@ -145,9 +145,9 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number):
 }
 
 /**
- * The height range of a surface tile's relief (ADR 0006 §2): the lowest and highest heights of the deepest resident
- * terrain tile covering it, widened by that level's error, which bounds what finer levels add. Writes [min, max] into
- * `out` and returns true; false when no terrain covering the tile is resident. Wants nothing; allocates nothing.
+ * The height range of a surface tile's relief (ADR 0006 §2): writes into `out` the lowest and highest heights of the
+ * deepest resident terrain tile covering it, then that level's error, which bounds what finer levels add, and returns
+ * true; false when no terrain covering the tile is resident. Wants nothing; allocates nothing.
  */
 export function terrainHeightRange(
   layer: TerrainLayer,
@@ -168,9 +168,9 @@ export function terrainHeightRange(
     const handle = layer.loader.peekHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
     const grid = handle >= 0 ? heights.grid(handle) : undefined;
     if (grid) {
-      const margin = GRID_ERROR_FACTOR * source.geometricErrorMeters(current);
-      out[0] = grid.minMeters - margin;
-      out[1] = grid.maxMeters + margin;
+      out[0] = grid.minMeters;
+      out[1] = grid.maxMeters;
+      out[2] = GRID_ERROR_FACTOR * source.geometricErrorMeters(current);
       return true;
     }
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);

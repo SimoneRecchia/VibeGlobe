@@ -189,6 +189,28 @@ describe('terrain in a globe (M4)', () => {
     expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.1));
   });
 
+  it('keeps the tile count bounded while only coarse terrain, with errors of tens of kilometers, is resident (KB-077)', async () => {
+    // Heightmap-sized errors (39 km at level 0) and the finer levels failing: the coarse grids' heights, not their
+    // errors, set the tiles' distances.
+    const coarse = (failing: boolean): TerrainSource => ({
+      ...terrain([], 12, failing ? (level) => level > 1 : undefined),
+      geometricErrorMeters: (level) => 39_136 / 2 ** level,
+    });
+    const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 15, tiltDeg: 60 };
+    const counts: number[] = [];
+    for (const failing of [false, true]) {
+      const { globe } = await terrainGlobe(
+        coarse(failing),
+        40,
+        terrainWorkers(() => 100, true),
+        view,
+      );
+      counts.push(globe.surfaceStats().tiles);
+      globe.destroy();
+    }
+    expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.1));
+  });
+
   it('answers elevation queries from the terrain in memory with the level they came from (F144)', async () => {
     const { globe } = await terrainGlobe(terrain([]));
     const out = { heightMeters: 0, level: 0, noData: true };

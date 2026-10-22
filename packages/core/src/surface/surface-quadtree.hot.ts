@@ -70,9 +70,11 @@ export interface QuadtreeSelectionOptions {
   terrainMinMeters?: number;
   terrainMaxMeters?: number;
   /**
-   * The height range of one tile's relief, written as [min, max] meters into `out`; false when unknown (no terrain
-   * resident there, and the global range applies). Bounds, distances and culling use a tile's own range, not the whole
-   * terrain's, so one high peak does not refine or keep every tile near a low eye (KB-077).
+   * The height range of one tile's relief, written as [min, max, error] meters into `out`: the heights of the terrain
+   * it shows so far and how much finer levels may add; false when unknown (no terrain resident there, and the global
+   * range applies). A tile's distance is measured from its own highest relief, and culling uses its range widened by
+   * the error but never beyond the global range, so one high peak does not refine or keep every tile near a low eye
+   * (KB-077).
    */
   terrainRange?: ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined;
   /** Written by each selection: tiles skipped as outside the view frustum (F086) and beyond the horizon (F087). */
@@ -156,20 +158,33 @@ const CLOSEST = 1;
 const SAG = 2;
 /** Ground size of one imagery texel on the tile, meters (0 without imagery). */
 const TEXEL = 3;
-/** A tile's relief height range, [min, max] meters, from {@link QuadtreeSelectionOptions.terrainRange}. */
-const tileRange = new Float64Array(2);
+/**
+ * A tile's relief: [min, max] meters for its distance, then [min, max] for culling (widened by the error of what it
+ * shows, within the global range); from {@link QuadtreeSelectionOptions.terrainRange}.
+ */
+const tileRange = new Float64Array(4);
 
 /**
  * Writes a tile's relief range into {@link tileRange}: its own when known, else the whole terrain's, with the
  * ellipsoid (0) always inside it, since a tile without terrain lies on it.
  */
 function measureRelief(tile: QuadtreeTile, options: QuadtreeSelectionOptions): void {
-  if (!options.terrainRange?.(tile, tileRange)) {
-    tileRange[0] = options.terrainMinMeters ?? 0;
-    tileRange[1] = options.terrainMaxMeters ?? 0;
+  const globalLow = options.terrainMinMeters ?? 0;
+  const globalHigh = options.terrainMaxMeters ?? 0;
+  if (options.terrainRange?.(tile, tileRange)) {
+    const error = tileRange[2] ?? 0;
+    const low = (tileRange[0] ?? 0) - error;
+    const high = (tileRange[1] ?? 0) + error;
+    tileRange[2] = low > globalLow ? low : globalLow;
+    tileRange[3] = high < globalHigh ? high : globalHigh;
+  } else {
+    tileRange[0] = tileRange[2] = globalLow;
+    tileRange[1] = tileRange[3] = globalHigh;
   }
-  if ((tileRange[0] ?? 0) > 0) tileRange[0] = 0;
-  if ((tileRange[1] ?? 0) < 0) tileRange[1] = 0;
+  for (let i = 0; i < 4; i += 2) {
+    if ((tileRange[i] ?? 0) > 0) tileRange[i] = 0;
+    if ((tileRange[i + 1] ?? 0) < 0) tileRange[i + 1] = 0;
+  }
 }
 
 /** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
@@ -379,8 +394,8 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
 /** True when the tile's bounding sphere is entirely outside one of the frustum planes (F086). */
 function outsideFrustum(camera: Camera): boolean {
   const planes = camera.frustumPlanes;
-  const high = tileRange[1] ?? 0;
-  const low = -(tileRange[0] ?? 0);
+  const high = tileRange[3] ?? 0;
+  const low = -(tileRange[2] ?? 0);
   // The sphere grown by the tile's relief range: every displaced vertex stays inside it (F142).
   const radius = (measure[RADIUS] ?? 0) + (high > low ? high : low);
   for (let plane = 0; plane < 5; plane++) {
@@ -401,7 +416,7 @@ function outsideFrustum(camera: Camera): boolean {
  */
 function beyondHorizon(): boolean {
   // A point raised by h along its normal n gains h (n · w) ≤ h |w|: peaks behind the horizon stay drawn (F142).
-  const high = tileRange[1] ?? 0;
+  const high = tileRange[3] ?? 0;
   const reach =
     (grid[12] ?? 0) * (horizon[0] ?? 0) +
     (grid[13] ?? 0) * (horizon[1] ?? 0) +

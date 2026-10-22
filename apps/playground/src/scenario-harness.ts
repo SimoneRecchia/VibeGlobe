@@ -158,10 +158,11 @@ const SCENARIOS: Record<string, FrameScenario> = {
     4,
   ),
   // Terrain (M4). From about 50 km to 500 m above the peak's valley and back, tilted (F138, F139).
+  // Holds of 16 frames: a level change morphs over 250 ms (15 frames at 60 Hz).
   'terrain-alps-zoom': segments(
-    [9, 11, 13, 15, 13, 11, 9].map((zoom) => ({ ...ALPS, zoom, tiltDeg: 50 })),
-    8,
-    24,
+    [9, 12, 15, 12, 9].map((zoom) => ({ ...ALPS, zoom, tiltDeg: 50 })),
+    4,
+    16,
   ),
   // Steep relief across tiles of different levels: tilting from 30° to 80° while circling the ridge (F137).
   'terrain-crack-sweep': segments(
@@ -173,8 +174,8 @@ const SCENARIOS: Record<string, FrameScenario> = {
       [45, 280],
       [75, 360],
     ].map(([tiltDeg = 0, headingDeg = 0]) => ({ ...RIDGE, zoom: 13, tiltDeg, headingDeg })),
+    4,
     6,
-    12,
   ),
   // From 1 km up, 250 km south of the peak: it stays just behind the ellipsoid's horizon while the view pans from
   // the screen's center to both edges (F142).

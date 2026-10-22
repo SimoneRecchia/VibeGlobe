@@ -103,6 +103,26 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage } from './imagery/imagery-source.js';
 export type { ImagerySource } from './imagery/imagery-source.js';
+export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
+export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
+export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
+export type { MeasuredGrid } from './terrain/grid-size.js';
+export {
+  decodeQuantizedMesh,
+  EXTENSION_METADATA,
+  EXTENSION_OCT_NORMALS,
+  EXTENSION_WATER_MASK,
+  rasterizeQuantizedMesh,
+} from './terrain/quantized-mesh.js';
+export type { QuantizedMesh } from './terrain/quantized-mesh.js';
+export { readLayerJson, TerrainAvailability } from './terrain/layer-json.js';
+export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
+export { sampleHeight } from './terrain/sample-height.js';
+export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';
+export type { TerrainDecoder, TerrainSource } from './terrain/terrain-source.js';
+export { geoidModel, toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
+export type { GeoidModel, VerticalDatum } from './terrain/vertical-datum.js';
+export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
 export { FRAME_PHASES } from './diagnostics/observability.js';
 export type {
   FramePhase,

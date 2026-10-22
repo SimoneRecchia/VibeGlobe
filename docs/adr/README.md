@@ -33,3 +33,4 @@ Conventions:
 | [0021](0021-milestone-review-closure.md)         | Closing a milestone's reviews                                                                               | Accepted (§4–5 replaced by 0022)                                  |
 | [0022](0022-faster-milestone-process.md)         | A faster process for the remaining milestones                                                               | Accepted                                                          |
 | [0023](0023-simplification-decisions.md)         | Simplification decisions: libraries over own code, simpler visual checks, revised F122–F124, CI schedule    | M3 onward                                                         |
+| [0024](0024-terrain-sources.md)                  | Terrain sources: worker decoders, custom decoders inline, vertical datums and a consumer-hosted geoid grid  | M4 onward                                                         |

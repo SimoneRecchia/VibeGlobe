@@ -1,10 +1,14 @@
 // The fixture tile server (M3 plan §4.1) as a Node middleware: the playground's Vite plugin and the standalone
 // servers mount it. Tiles: GET /fixture-tiles/{session}/{source}/{scheme}/{z}/{x}/{y}.{png,etc1s.ktx2,uastc.ktx2}
-// with source one of the patterns (KTX2 tiles have a full mip chain, ADR 0020). Per-session fault rules: POST /_fixture/{session}/rules; request log: GET /_fixture/{session}/log;
-// DELETE /_fixture/{session} resets both. A session id per test keeps tests independent.
+// with source one of the patterns (KTX2 tiles have a full mip chain, ADR 0020). Terrain (M4 plan §2): source `terrain`
+// with {y}.terrarium.png, .terrain-rgb.png, .f32 (rows from the north) or .terrain (quantized-mesh, TMS rows from the
+// south), and GET /fixture-tiles/{session}/terrain/{scheme}/layer.json. Per-session fault rules: POST
+// /_fixture/{session}/rules; the session's layer.json: POST /_fixture/{session}/layer; request log: GET
+// /_fixture/{session}/log; DELETE /_fixture/{session} resets all three. A session id per test keeps tests independent.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
+import { terrainTile, type TerrainEncoding } from './terrain.ts';
 import {
   encodeTilePng,
   renderTile,
@@ -56,6 +60,8 @@ export interface RequestRecord {
   aborted?: boolean;
   status?: number;
   bytes?: number;
+  /** The request's Accept header (quantized-mesh clients name the extensions they want in it, F128). */
+  accept?: string;
   /** The Host (or HTTP/2 :authority) the request was made to. */
   host?: string;
   /** The connection (HTTP/1.1 socket or HTTP/2 session) the request came on, numbered per server. */
@@ -67,12 +73,49 @@ interface Session {
   /** How many requests each rule has matched, for `failTimes`. */
   hits: number[];
   log: RequestRecord[];
+  /** The layer.json this session serves; a default with full availability when unset. */
+  layer?: unknown;
 }
 
 const PATTERNS: readonly string[] = ['world', 'levels', 'border', 'smooth', 'tiles', 'stripes', 'patches'];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
-const TILE_PATH = /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2)$/;
-const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log))?$/;
+const TILE_PATH =
+  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32)$/;
+const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
+const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
+/** Terrain file extensions and their encodings. */
+const TERRAIN: Readonly<Record<string, TerrainEncoding>> = {
+  'terrarium.png': 'terrarium',
+  'terrain-rgb.png': 'terrain-rgb',
+  terrain: 'quantized-mesh',
+  f32: 'float32',
+};
+const CONTENT_TYPES: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  'terrarium.png': 'image/png',
+  'terrain-rgb.png': 'image/png',
+  terrain: 'application/vnd.quantized-mesh',
+  f32: 'application/octet-stream',
+};
+
+/** The default layer.json: every tile of levels 0–16 available, in TMS order, with no extensions. */
+function defaultLayer(scheme: string): unknown {
+  const geographic = scheme === 'geographic';
+  return {
+    tilejson: '2.1.0',
+    format: 'quantized-mesh-1.0',
+    version: '1.0.0',
+    scheme: 'tms',
+    tiles: ['{z}/{x}/{y}.terrain'],
+    projection: geographic ? 'EPSG:4326' : 'EPSG:3857',
+    minzoom: 0,
+    maxzoom: 16,
+    extensions: [],
+    available: Array.from({ length: 17 }, (_, z) => [
+      { startX: 0, startY: 0, endX: (geographic ? 2 : 1) * 2 ** z - 1, endY: 2 ** z - 1 },
+    ]),
+  };
+}
 
 function matches(rule: FaultRule, source: string, tile: FixtureTile): boolean {
   return (
@@ -105,6 +148,18 @@ export class FixtureServer {
       this.control(control[1] ?? '', control[2], req, res);
       return;
     }
+    const layer = LAYER_PATH.exec(url.pathname);
+    if (layer) {
+      const body = JSON.stringify(this.session(layer[1] ?? '').layer ?? defaultLayer(layer[2] ?? ''));
+      res
+        .writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        })
+        .end(body);
+      return;
+    }
     const match = TILE_PATH.exec(url.pathname);
     if (match) this.tile(url.pathname, match, req, res);
     else next();
@@ -131,10 +186,14 @@ export class FixtureServer {
       res.writeHead(204).end();
     } else if (req.method === 'GET' && kind === 'log') {
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(this.session(id).log));
-    } else if (req.method === 'POST' && kind === 'rules') {
+    } else if (req.method === 'POST' && (kind === 'rules' || kind === 'layer')) {
       const chunks: Buffer[] = [];
       req.on('data', (chunk: Buffer) => chunks.push(chunk));
-      req.on('end', () => this.setRules(id, Buffer.concat(chunks).toString('utf8'), res));
+      req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (kind === 'rules') this.setRules(id, body, res);
+        else this.setLayer(id, body, res);
+      });
     } else {
       res.writeHead(405).end();
     }
@@ -147,6 +206,15 @@ export class FixtureServer {
       const entry = this.session(id);
       entry.rules = rules as FaultRule[];
       entry.hits = rules.map(() => 0);
+      res.writeHead(204).end();
+    } catch (error) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' }).end(String(error));
+    }
+  }
+
+  private setLayer(id: string, body: string, res: ServerResponse): void {
+    try {
+      this.session(id).layer = JSON.parse(body) as unknown;
       res.writeHead(204).end();
     } catch (error) {
       res.writeHead(400, { 'Content-Type': 'text/plain' }).end(String(error));
@@ -173,6 +241,7 @@ export class FixtureServer {
       startMs: this.now(),
       host,
       connection: this.connectionOf(req),
+      ...(req.headers.accept ? { accept: req.headers.accept } : {}),
     };
     entry.log.push(record);
     res.on('close', () => {
@@ -180,7 +249,10 @@ export class FixtureServer {
       record.aborted = true;
       record.endMs = this.now();
     });
-    if (!PATTERNS.includes(source) || !SCHEMES.includes(scheme) || !tileExists(tile)) {
+    const terrain = source === 'terrain' && TERRAIN[extension] !== undefined;
+    // Quantized-mesh rows count from the south (TMS); everything else from the north.
+    if (terrain && extension === 'terrain') tile.y = 2 ** tile.level - 1 - tile.y;
+    if ((!terrain && !PATTERNS.includes(source)) || !SCHEMES.includes(scheme) || !tileExists(tile)) {
       this.finish(record, res, 404, {}, Buffer.alloc(0));
       return;
     }
@@ -196,7 +268,7 @@ export class FixtureServer {
         this.finish(record, res, rule.status, headers, Buffer.alloc(0));
         return;
       }
-      headers['Content-Type'] = rule?.contentType ?? (extension === 'png' ? 'image/png' : 'image/ktx2');
+      headers['Content-Type'] = rule?.contentType ?? CONTENT_TYPES[extension] ?? 'image/ktx2';
       let body = await this.body(tile, extension, rule);
       if (rule?.gzip) {
         body = gzipSync(body);
@@ -212,10 +284,13 @@ export class FixtureServer {
     const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}`;
     let body = this.cache.get(key);
     if (!body) {
+      const encoding = TERRAIN[extension];
       body =
-        extension === 'png'
-          ? encodeTilePng(tile)
-          : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
+        tile.pattern === ('terrain' as FixturePattern) && encoding
+          ? terrainTile(tile, encoding)
+          : extension === 'png'
+            ? encodeTilePng(tile)
+            : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
       this.cache.set(key, body);
     }
     if (rule?.randomBytes !== undefined) {

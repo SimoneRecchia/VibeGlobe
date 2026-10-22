@@ -467,6 +467,27 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('selects the stored set of terrain tiles for scripted cameras (F126)', async () => {
+    const cameras = [
+      { longitudeDeg: 7, latitudeDeg: 46, zoom: 9 },
+      { longitudeDeg: 7, latitudeDeg: 46, zoom: 12, tiltDeg: 60, headingDeg: 30 },
+      { longitudeDeg: -122.4, latitudeDeg: 37.8, zoom: 14, tiltDeg: 45 },
+    ];
+    const sets: string[][] = [];
+    for (const view of cameras) {
+      const { globe } = await terrainGlobe(terrain([], 12), 40, terrainWorkers(), view);
+      // Each drawn tile and the terrain tile level it shows.
+      sets.push(
+        globe
+          .surfaceTiles()
+          .map((t) => `${t.root}/${t.level}/${t.x}/${t.y}:${t.terrainLevel ?? '-'}`)
+          .sort(),
+      );
+      globe.destroy();
+    }
+    expect(sets).toMatchSnapshot();
+  });
+
   it('deepens the skirts of tiles showing terrain coarser than their level, by that terrain error (M4 review)', async () => {
     const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 10, tiltDeg: 30 };
     const skirts = async (failing?: (level: number) => boolean): Promise<number[]> => {

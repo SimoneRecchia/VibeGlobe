@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodeQuantizedMesh, rasterizeQuantizedMesh } from './quantized-mesh.js';
 
@@ -147,6 +148,45 @@ describe('quantized-mesh', () => {
     const mesh = decodeQuantizedMesh(encode({ ...SQUARE, padVertices: 65536 }));
     expect(mesh.u.length).toBe(65540);
     expect([...mesh.indices]).toEqual([0, 1, 2, 0, 2, 3]);
+    // The edge lists are 32-bit too: west, south, east, north.
+    expect([[...mesh.west], [...mesh.south], [...mesh.east], [...mesh.north]]).toEqual([
+      [0, 3],
+      [0, 1],
+      [1, 2],
+      [2, 3],
+    ]);
+  });
+
+  it('decodes a stored .terrain fixture to its stored reference values (F127)', () => {
+    const name = 'fixtures/geographic-8-266-62';
+    const bytes = new Uint8Array(readFileSync(new URL(`./${name}.terrain`, import.meta.url)));
+    const reference = JSON.parse(readFileSync(new URL(`./${name}.json`, import.meta.url), 'utf8')) as {
+      minHeightMeters: number;
+      maxHeightMeters: number;
+      vertexCount: number;
+      triangleCount: number;
+      edgeVertices: number;
+      quantizationMeters: number;
+      metadataAvailable: unknown;
+      samples: { u: number; v: number; heightMeters: number }[];
+    };
+    const mesh = decodeQuantizedMesh(bytes);
+    expect(mesh.minHeightMeters).toBe(reference.minHeightMeters);
+    expect(mesh.maxHeightMeters).toBe(reference.maxHeightMeters);
+    expect(mesh.u.length).toBe(reference.vertexCount);
+    expect(mesh.indices.length / 3).toBe(reference.triangleCount);
+    for (const edge of [mesh.west, mesh.south, mesh.east, mesh.north]) expect(edge.length).toBe(reference.edgeVertices);
+    expect((mesh.metadata as { available?: unknown }).available).toEqual(reference.metadataAvailable);
+    // Each sample's vertex carries the analytic terrain height, within one quantization step.
+    for (const sample of reference.samples) {
+      let found = -1;
+      for (let i = 0; i < mesh.u.length; i++)
+        if (Math.abs((mesh.u[i] ?? 0) - sample.u) < 1e-4 && Math.abs((mesh.v[i] ?? 0) - sample.v) < 1e-4) found = i;
+      expect(found).toBeGreaterThanOrEqual(0);
+      expect(Math.abs((mesh.heightsMeters[found] ?? 0) - sample.heightMeters)).toBeLessThanOrEqual(
+        reference.quantizationMeters,
+      );
+    }
   });
 
   it('rasterizes to the height grid with the barycentric heights of its triangles', () => {

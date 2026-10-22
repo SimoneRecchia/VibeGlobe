@@ -3070,7 +3070,7 @@
         "Assert KVP and RESTful requests are built correctly and tiles land at the correct positions in the playground on both backends",
         "Fuzz capabilities documents and assert malformed input produces a descriptive error and never crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F231",
@@ -3083,7 +3083,7 @@
         "Show a fixture layer with labels crossing tile edges in the playground and assert no label is cut and no seam is visible at tile edges on both backends",
         "Fuzz GetCapabilities and service exception responses and assert they never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F232",

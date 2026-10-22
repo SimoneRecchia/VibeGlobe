@@ -104,7 +104,7 @@ The third session's packages are `@vibeglobe/ui` (controls, theming, translation
 
 Fourth session, branch `claude/m7-source-adapters-0gkrjg`. Adapters in `packages/sources`, shared conformance suites in `@vibeglobe/sources/conformance`, browser tests in `e2e/sources-*.spec.ts` (they mount a globe with the adapter over the playground through the Vite dev server, `e2e/support/sources.ts`; the playground is unchanged).
 
-Passing: F232 (PMTiles), F233 (MBTiles).
+Passing: F230 (WMTS), F231 (WMS), F232 (PMTiles), F233 (MBTiles).
 
 ### What the frozen contract lacks, and the workaround
 

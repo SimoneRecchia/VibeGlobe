@@ -8,7 +8,7 @@ import type * as RendererModule from '@vibeglobe/renderer';
 import type * as SourcesModule from '@vibeglobe/sources';
 import type * as WorkerModule from '@vibeglobe/worker';
 import { PNG } from 'pngjs';
-import { BACKGROUND_RGB, openGlobe } from './globe.ts';
+import { BACKGROUND_RGB, emptyPixelsInside, openGlobe } from './globe.ts';
 
 /** What the tests reach on the page (`window.vibeglobeSources`). */
 interface SourcesTestHandle {
@@ -91,7 +91,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
 }
 
 /** Waits until every Mercator tile of the mounted globe shows imagery of its level (or the source's deepest one). */
-export async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
+async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
   await expect
     .poll(
       () =>
@@ -107,7 +107,7 @@ export async function waitForSourceImagery(page: Page, maxLevel: number): Promis
 }
 
 /** The mounted globe's current frame, composited over the page background. */
-export async function sourceFrame(page: Page): Promise<PNG> {
+async function sourceFrame(page: Page): Promise<PNG> {
   const frame = await page.evaluate(async () => {
     const capture = await window.vibeglobeSources?.globe?.captureFrame();
     if (!capture) throw new Error('no source globe');
@@ -134,7 +134,7 @@ function tileColor(z: number, x: number, y: number): [number, number, number] {
 }
 
 /** A 256-pixel PNG tile filled with its fixture color. */
-function tilePng(z: number, x: number, y: number): Uint8Array {
+export function tilePng(z: number, x: number, y: number): Uint8Array {
   const png = new PNG({ width: 256, height: 256 });
   const [r, g, b] = tileColor(z, x, y);
   for (let i = 0; i < png.data.length; i += 4) {
@@ -185,4 +185,90 @@ export async function expectCenterTileColor(page: Page, image: PNG): Promise<voi
   const i = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
   const actual = [image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0];
   for (let c = 0; c < 3; c++) expect(Math.abs((actual[c] ?? 0) - (expected[c] ?? 0))).toBeLessThanOrEqual(8);
+}
+
+/** Waits until the mounted globe has drawn every requested frame: no frame for 300 ms, nor in the next two. */
+async function waitForSourceIdle(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const globe = window.vibeglobeSources?.globe;
+        if (!globe) throw new Error('no source globe');
+        let last = globe.frameNumber;
+        const check = (): void => {
+          setTimeout(() => {
+            if (globe.frameNumber !== last) {
+              last = globe.frameNumber;
+              return check();
+            }
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                if (globe.frameNumber === last) return resolve();
+                last = globe.frameNumber;
+                check();
+              }),
+            );
+          }, 300);
+        };
+        check();
+      }),
+  );
+}
+
+/**
+ * Builds a source in the page with `body`, a function `(sources, value, sqlWasmUrl) => source | Promise<source>`
+ * written as text (it runs in the page), and mounts it.
+ */
+export async function mountSource(page: Page, body: string, value: unknown = null): Promise<void> {
+  await page.evaluate(
+    async ({ code, arg }) => {
+      const handle = window.vibeglobeSources;
+      if (!handle) throw new Error('no source handle');
+      const build = new Function('sources', 'value', 'wasm', `return (${code})(sources, value, wasm);`) as (
+        ...args: unknown[]
+      ) => Promise<CoreModule.ImagerySource>;
+      await handle.mount(await build(handle.sources, arg, handle.sqlWasmUrl));
+    },
+    { code: body, arg: value },
+  );
+}
+
+/** Waits for the mounted source's imagery at every tile, then for idle, and returns the frame. */
+export async function settledSourceFrame(page: Page, maxLevel: number): Promise<PNG> {
+  await waitForSourceImagery(page, maxLevel);
+  await waitForSourceIdle(page);
+  return sourceFrame(page);
+}
+
+/** Asserts that every pixel inside the mounted globe's silhouette shows imagery. */
+export async function expectNoEmptyPixels(page: Page, image: PNG): Promise<void> {
+  const radius = await page.evaluate(() => {
+    const globe = window.vibeglobeSources?.globe;
+    const height = document.querySelector('.vg-source-test canvas')?.clientHeight ?? NaN;
+    const b = 6356752.314245179;
+    const angular = Math.asin(b / ((globe?.camera.rangeMeters ?? NaN) + b));
+    return (Math.tan(angular) / Math.tan(0.6435011087932844 / 2)) * (height / 2) - 1.5;
+  });
+  expect(emptyPixelsInside(image, radius)).toBe(0);
+}
+
+/** Serves `bytes` cross-origin at `url`, with CORS headers and HTTP range requests. */
+export async function servePackage(page: Page, url: string, bytes: Uint8Array): Promise<void> {
+  await page.route(url, async (route) => {
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Range',
+      'Access-Control-Expose-Headers': 'Content-Range, ETag',
+    };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const range = /bytes=(\d+)-(\d+)/.exec(route.request().headers()['range'] ?? '');
+    if (!range) return route.fulfill({ status: 200, headers: cors, body: Buffer.from(bytes) });
+    const start = Number(range[1]);
+    const end = Math.min(bytes.length - 1, Number(range[2]));
+    return route.fulfill({
+      status: 206,
+      headers: { ...cors, 'Content-Range': `bytes ${start}-${end}/${bytes.length}` },
+      body: Buffer.from(bytes.subarray(start, end + 1)),
+    });
+  });
 }

@@ -25,7 +25,8 @@
     "@vibeglobe/core": "0.0.0",
     "fflate": "0.8.3",
     "pmtiles": "4.5.0",
-    "sql.js": "1.15.1"
+    "sql.js": "1.15.1",
+    "txml": "6.0.3"
   },
   "devDependencies": {
     "@types/sql.js": "1.4.11"

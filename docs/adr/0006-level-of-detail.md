@@ -159,3 +159,10 @@ Stitching is not used. If the crack sweep shows visible walls, snapping odd edge
 ## Update 2026-10-21 (polar refinement in M2)
 
 M2's geographic surface quadtree had no polar rule, and zooming in at a pole selected every tile of the polar row (KB-043). §1's cap rule now applies to it ahead of the M3 caps: a tile splits into four only while its east–west width at its equatorward edge is at least half its north–south height, and otherwise only in latitude, into two children of twice the width. Tiles therefore stay square-ish above 60° latitude and become wedges at least about 29° wide at the poles; the selection's geometric error takes the larger of the meridian and parallel chord sags. M3's Mercator quadtree with caps keeps the rule.
+
+## Update 2026-10-21: imagery cross-fades and skirts (M3, F105)
+
+- **Cross-fade:** when a surface tile's imagery changes, its one draw mixes the old and the new texture for `GlobeOptions.imageryFadeMs` (250 ms of engine time by default; 0 switches at once). The state lives per surface tile key in typed arrays (`packages/core/src/imagery/fades.ts`); the texture faded from stays resident until the fade ends.
+- **A fade under way finishes first:** imagery that arrives during a fade waits for it to end and then fades in, so what a tile shows never jumps (restarting a fade mid-way changed pixels by up to half the difference in one frame).
+- **Perceptual mix:** the two samples are mixed in a gamma-2 space (square root, mix, square). Mixed in linear light, dark pixels changed several times faster than bright ones in sRGB, beyond the popping detector's 255/15 + 4 per frame.
+- **Skirts slope outward** as far as they hang down (KB-069): vertical skirts only touched at the corners where tiles of different levels meet, and WebGPU left one sample there uncovered. At this slope a skirt stays inside the ellipsoid, so it never shows beyond the silhouette.

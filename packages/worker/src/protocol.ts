@@ -29,7 +29,8 @@ export type {
 export const WORKER_BUILD_ID = '@vibeglobe/worker@0.0.0';
 
 /** Stable codes of task failures raised by this package's tasks. */
-export type TaskErrorCode = 'invalid-input' | 'undecodable' | 'unsupported' | 'cancelled' | 'unknown-task';
+export type TaskErrorCode =
+  'invalid-input' | 'undecodable' | 'unsupported' | 'format-unsupported' | 'cancelled' | 'unknown-task';
 
 /** A typed task failure; its `code` crosses the thread boundary and becomes the pool error's `taskCode`. */
 export class TaskError extends Error {

@@ -94,6 +94,35 @@ test('workers and assets load from a configured asset base URL, the only place w
   expect(violations).toEqual([]);
 });
 
+test('KTX2 imagery transcodes in workers allowed only WebAssembly compilation, never in the page (F100, F104)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const violations = await withPolicy(page, policy());
+  // The worker program's own policy (a worker follows the policy of its script's response): WebAssembly compiles
+  // there, under 'wasm-unsafe-eval' and nothing more (ADR 0011, ADR 0020 rule 4).
+  await page.route(`${PREVIEW}/assets/vibeglobe-worker-*.js`, async (route) => {
+    const response = await route.fetch();
+    const workerPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'";
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-security-policy': workerPolicy } });
+  });
+  const transcoder: string[] = [];
+  page.on('request', (request) => {
+    if (/vibeglobe-basis.*\.wasm/.test(request.url())) transcoder.push(new URL(request.url()).pathname);
+  });
+  await streamImagery(page, 'ktx2=etc1s');
+  const stats = await page.evaluate(() => ({
+    imagery: window.vibeglobePlayground?.globe.imageryStats(),
+    renderer: window.vibeglobePlayground?.globe.rendererStats(),
+  }));
+  expect(stats.imagery?.failed).toBe(0);
+  expect(stats.renderer?.compressedTextures).toBeGreaterThan(0);
+  // A content-hashed file next to the worker program.
+  expect(transcoder.length).toBeGreaterThan(0);
+  for (const path of transcoder) expect(path).toMatch(/^\/assets\/vibeglobe-basis-[\w-]+\.wasm$/);
+  expect(violations).toEqual([]);
+});
+
 test('the built bundles contain no eval, no Function constructor and no blob-generated code (F100)', () => {
   const bundles = [
     join(DIST, 'assets'),

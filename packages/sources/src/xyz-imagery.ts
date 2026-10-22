@@ -7,6 +7,7 @@ import {
   type TileRectangleRad,
   type TileRequest,
   type TileTransport,
+  type TimeoutsMs,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
 
@@ -33,6 +34,12 @@ export interface XyzImageryOptions {
   decoder?: 'image' | 'ktx2';
   /** The network transport; `fetchTransport()` by default. */
   transport?: TileTransport;
+  /** Requests in flight to each host (default 6, or 16 with `multiplexed`, ADR 0007; F089). */
+  maxRequestsPerHost?: number;
+  /** The hosts speak HTTP/2 or HTTP/3, so more requests share one connection (F096). */
+  multiplexed?: boolean;
+  /** Time limits of each request (default 10 s to the headers, 30 s in all; F092). */
+  timeoutsMs?: TimeoutsMs;
 }
 
 /** A tiled imagery source from an XYZ or TMS URL template. */
@@ -52,6 +59,9 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.coverage ? { coverage: options.coverage } : {}),
     transport: options.transport ?? fetchTransport(),
     decoder: options.decoder ?? 'image',
+    ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
+    ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
+    ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';

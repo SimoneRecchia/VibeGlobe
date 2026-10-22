@@ -1,4 +1,6 @@
-import type { Globe, GlobeEvents } from '@vibeglobe/core';
+import type { Globe, GlobeEvents, LogEntry, WorkerEndpoint, WorkerMessage } from '@vibeglobe/core';
+import { createWorkers } from '@vibeglobe/worker';
+import type { ScenarioReport } from './scenario-harness.js';
 import type { FrameLoop } from './frame-loop.js';
 
 /** An engine event as tests read it back. */
@@ -32,6 +34,30 @@ interface PlaygroundTestHooks {
     canvas?: HTMLCanvasElement,
     backend?: 'auto' | 'webgpu' | 'webgl2',
   ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
+  /**
+   * Runs one task of the worker program on a worker of its own, started on the first call (decoder fuzzing, F114).
+   * Resolves with the task's error code, or 'ok' (an output bitmap is closed at once).
+   */
+  workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
+  /**
+   * Plays a frame-stepped scenario (`zoom-orbit-to-street`, `pole-orbit`, `antimeridian-pan`) on the first globe,
+   * drawing and checking every frame in the page (`src/scenario-harness.ts`).
+   */
+  recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
+  /** Draws a frame now and counts its holes and, with `darkBelow`, its dark pixels inside the globe (F106). */
+  checkFrame(darkBelow?: number): Promise<ScenarioReport>;
+  /** Shows or hides the performance HUD (F119). */
+  showHud(on: boolean): void;
+  /** The levels of the engine messages collected with `?logSink=1`, oldest first (F120). */
+  loggedLevels(): string[];
+  /** Forgets the collected log messages. */
+  clearLog(): void;
+}
+
+/** Playground parts the hooks reach. */
+interface PlaygroundParts {
+  readonly showHud: (on: boolean) => void;
+  readonly logEntries: LogEntry[];
 }
 
 declare global {
@@ -45,8 +71,39 @@ const RECORDED: readonly (keyof GlobeEvents)[] = [
   'device-lost',
   'device-restored',
   'backend-fallback',
+  'tile-error',
   'error',
 ];
+
+/** A worker of the worker program outside the engine's pool, so tests can feed its tasks any input. */
+function taskRunner(): PlaygroundTestHooks['workerTask'] {
+  let endpoint: WorkerEndpoint | undefined;
+  let next = 0;
+  const pending = new Map<number, (outcome: string) => void>();
+  const receive = (data: unknown): void => {
+    const message = data as WorkerMessage;
+    if (message.kind !== 'reply') return;
+    if (message.ok) (message.output as { image?: { close?: () => void } } | undefined)?.image?.close?.();
+    pending.get(message.id)?.(message.ok ? 'ok' : message.error.code);
+    pending.delete(message.id);
+  };
+  return (task, input, transfer) => {
+    endpoint ??= createWorkers().create(receive, (reason) => {
+      for (const resolve of pending.values()) resolve(`worker-error: ${reason}`);
+      pending.clear();
+    });
+    const id = ++next;
+    const reply = new Promise<string>((resolve) => pending.set(id, resolve));
+    endpoint.post({ kind: 'run', id, task, input }, transfer);
+    return reply;
+  };
+}
+
+/** The globe element's size in CSS pixels. */
+function globeSize(): { widthPx: number; heightPx: number } {
+  const element = document.querySelector('#globe') ?? document.body;
+  return { widthPx: element.clientWidth, heightPx: element.clientHeight };
+}
 
 /** Exposes the engine and a frame loop's samples to tests and benchmarks. */
 export function exposeTestHooks(
@@ -54,6 +111,7 @@ export function exposeTestHooks(
   loop: FrameLoop | undefined,
   firstFrame: Promise<number | undefined>,
   mount: PlaygroundTestHooks['mount'],
+  parts: PlaygroundParts,
 ): void {
   const globe = globes[0];
   if (!globe) return;
@@ -68,6 +126,20 @@ export function exposeTestHooks(
     gpuFrameTimesMs: () => loop?.gpuFrameTimesMs?.() ?? [],
     firstFrameMs: undefined,
     mount,
+    workerTask: taskRunner(),
+    showHud: parts.showHud,
+    loggedLevels: () => parts.logEntries.map((entry) => entry.level),
+    clearLog: () => void (parts.logEntries.length = 0),
+    async recordScenario(name, darkBelow) {
+      const { recordScenario } = await import('./scenario-harness.js');
+      return recordScenario(globe, globeSize(), name, darkBelow);
+    },
+    async checkFrame(darkBelow) {
+      const { checkFrame, emptyReport } = await import('./scenario-harness.js');
+      const report = emptyReport();
+      checkFrame(globe, await globe.captureFrame(), globeSize(), report, 0, darkBelow);
+      return report;
+    },
   };
   void firstFrame.then((timeMs) => (hooks.firstFrameMs = timeMs));
   window.vibeglobePlayground = hooks;

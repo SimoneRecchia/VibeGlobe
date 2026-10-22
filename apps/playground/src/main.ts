@@ -1,5 +1,5 @@
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, WGS84, type Globe, type GlobeOptions, type ViewInit } from '@vibeglobe/core';
+import { createGlobe, WGS84, type Globe, type GlobeOptions, type LogEntry, type ViewInit } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
@@ -9,6 +9,8 @@ import { runScenario } from './scenarios.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
+/** Engine log messages collected with `?logSink=1` (F120). */
+const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -37,6 +39,10 @@ const assets = params.get('assets');
 const backend: BackendChoice = backendParam === 'webgpu' || backendParam === 'webgl2' ? backendParam : 'auto';
 const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'auto';
 
+const DEG = Math.PI / 180;
+/** A box around Italy, radians: the coverage of `?coverage=italy`. */
+const ITALY = { westRad: 6 * DEG, southRad: 36 * DEG, eastRad: 19 * DEG, northRad: 47.5 * DEG };
+
 /**
  * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
  * fixture tile server (M3 plan §4.1); `&session=` names the server session that holds fault rules and the request log.
@@ -45,9 +51,30 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const pattern = params.get('imagery');
   if (!pattern) return {};
   const session = params.get('session') ?? 'playground';
-  const url = `${import.meta.env.BASE_URL}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.png`;
+  // `?tileBase=` serves the tiles from another fixture server (for example `http://{s}:5177/` with
+  // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
+  const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
+  // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
+  const ktx2 = params.get('ktx2');
+  const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
+  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
+  const timeoutMs = number('timeoutMs');
+  const source = xyzImagery({
+    id: `fixture-${pattern}`,
+    url,
+    minLevel: number('imageryMin') ?? 0,
+    maxLevel: number('imageryMax') ?? 18,
+    ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
+    ...(params.has('perHost') ? { maxRequestsPerHost: Number(params.get('perHost')) } : {}),
+    ...(params.has('multiplexed') ? { multiplexed: true } : {}),
+    ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
+    // `?coverage=italy` limits the source to a box around Italy (F094).
+    ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
+    ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
+  });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
     params.has(name) ? Math.round(Number(params.get(name)) * 1024 * 1024) : undefined;
@@ -57,7 +84,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [xyzImagery({ id: `fixture-${pattern}`, url, maxLevel: 18 })], workers, memory };
+  return { imagery: [source], workers, memory };
 }
 
 /** Creates one engine instance in a container with its own canvas. */
@@ -70,11 +97,26 @@ function startGlobe(
   return createGlobe({
     container,
     // `?gpuTiming=1` measures GPU time per frame where timestamp queries exist (benchmark scenarios `drag-*`).
-    renderer: createRenderer({ backend: choice, depth, canvas: target, gpuTiming: params.has('gpuTiming') }),
+    renderer: createRenderer({
+      backend: choice,
+      depth,
+      canvas: target,
+      gpuTiming: params.has('gpuTiming'),
+      // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
+      ...(params.has('compressed')
+        ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }
+        : {}),
+    }),
     controls: createControls(),
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
     ...fixtureImagery(),
+    // `?clockStepMs=` steps engine time by a fixed amount per drawn frame and `?fadeMs=` sets the imagery cross-fade
+    // (scenario tests, F105; `fadeMs=0` is their injected pop).
+    ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
+    ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
+    ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });
@@ -136,8 +178,12 @@ function startSecondGlobe(host: HTMLElement): Globe {
 
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
   // Loaded on demand so the overlay code is not part of the default page.
-  const { createDebugOverlay } = await import('@vibeglobe/ui');
+  const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
+    import('@vibeglobe/ui'),
+    import('./tile-view.js'),
+  ]);
   const overlay = createDebugOverlay(host);
+  addTileViewToggle(globe, host, params.has('imagery') ? `fixture-${params.get('imagery')}` : undefined);
   let info: (readonly [string, string])[] = [];
   let pipelineCompiles = -1;
   let surfaceInfo = '';
@@ -164,7 +210,10 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     lastRefreshMs = timestampMs;
     overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
     // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
-    const compiles = info.length > 0 ? globe.rendererStats().pipelineCompiles : -1;
+    const rendererStats = globe.rendererStats();
+    const compiles = info.length > 0 ? rendererStats.pipelineCompiles : -1;
+    // Draw calls and pipeline changes of the last frame (F103).
+    const draws = `draw calls ${rendererStats.drawCalls} · pipeline switches ${rendererStats.pipelineSwitches}`;
     // The surface selection: drawn tiles and what culling skipped (F086, F087).
     const selection = globe.surfaceStats();
     const surface =
@@ -176,15 +225,17 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const imagery = globe.imageryStats();
     const mb = (bytes: number): string => (bytes / 1048576).toFixed(1);
     const cache = imagery
-      ? `RAM hits ${imagery.ramHits} · GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
+      ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
+        `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
         `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
       : '';
-    if (compiles === pipelineCompiles && surface + cache === surfaceInfo) return;
+    if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
     pipelineCompiles = compiles;
-    surfaceInfo = surface + cache;
+    surfaceInfo = surface + cache + draws;
     overlay.setInfo([
       ...info,
       ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
+      ['draws', draws],
       ['surface', surface],
       ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
     ]);
@@ -231,5 +282,9 @@ if (params.get('experiment') === 'gpu-probes') {
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
   else if (scenario === 'drag') loop = startDragLoop(globe);
-  exposeTestHooks(globes, loop, firstFrame, mountGlobe);
+  // `?hud=1` shows the performance HUD (F119).
+  const { createHud } = await import('./hud.js');
+  const hud = createHud(globe, app);
+  if (params.has('hud')) hud(true);
+  exposeTestHooks(globes, loop, firstFrame, mountGlobe, { showHud: hud, logEntries });
 }

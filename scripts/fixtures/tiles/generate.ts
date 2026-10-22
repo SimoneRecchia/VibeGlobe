@@ -9,9 +9,11 @@ export type FixtureScheme = 'mercator' | 'geographic';
 /**
  * Patterns: `world` a smooth color field with grid lines that follow the level (continuous across tiles and levels);
  * `levels` the same tinted per level, so refinement is visible; `border` alternating colors per tile parity with a
- * 1 px edge stripe.
+ * 1 px edge stripe; `smooth` the color field alone, continuous across every tile edge (seam checks, F110, F111);
+ * `tiles` alternating colors per tile parity, contrasting at every tile edge (F106); `stripes` one-texel dark and
+ * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108).
  */
-export type FixturePattern = 'world' | 'levels' | 'border';
+export type FixturePattern = 'world' | 'levels' | 'border' | 'smooth' | 'tiles' | 'stripes' | 'patches';
 
 /** A tile request. */
 export interface FixtureTile {
@@ -57,6 +59,18 @@ const LEVEL_TINTS: readonly (readonly [number, number, number])[] = [
   [120, 255, 255],
 ];
 
+/** The sRGB colors of the `patches` pattern: a tile at (x, y) shows color `(x + 3y) mod 8`. */
+export const PATCH_COLORS: readonly (readonly [number, number, number])[] = [
+  [230, 40, 40],
+  [40, 200, 60],
+  [50, 70, 230],
+  [128, 128, 128],
+  [240, 220, 60],
+  [60, 200, 220],
+  [200, 70, 200],
+  [64, 64, 64],
+];
+
 /** Renders a tile's RGBA pixels, rows from the north. */
 export function renderTile(tile: FixtureTile): Uint8Array {
   const size = tile.sizePx ?? 256;
@@ -69,10 +83,18 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       const u = (i + 0.5) / size;
       const v = (j + 0.5) / size;
       let color: [number, number, number];
-      if (tile.pattern === 'border') {
-        const edge = i === 0 || j === 0 || i === size - 1 || j === size - 1;
+      if (tile.pattern === 'border' || tile.pattern === 'tiles') {
+        const edge = tile.pattern === 'border' && (i === 0 || j === 0 || i === size - 1 || j === size - 1);
         const odd = (tile.x + tile.y) % 2 === 1;
         color = edge ? [240, 240, 40] : odd ? [60, 60, 200] : [200, 60, 60];
+      } else if (tile.pattern === 'stripes') {
+        const value = i % 2 === 0 ? 240 : MIN_CHANNEL;
+        color = [value, value, value];
+      } else if (tile.pattern === 'patches') {
+        color = [...(PATCH_COLORS[(tile.x + 3 * tile.y) % PATCH_COLORS.length] ?? [128, 128, 128])];
+      } else if (tile.pattern === 'smooth') {
+        const { lonRad, latRad } = fixturePosition(tile, u, v);
+        color = worldColor(lonRad, latRad);
       } else {
         const { lonRad, latRad } = fixturePosition(tile, u, v);
         color = worldColor(lonRad, latRad);

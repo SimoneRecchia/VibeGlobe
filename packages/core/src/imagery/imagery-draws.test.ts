@@ -4,7 +4,7 @@ import { MERCATOR_ROOT, quadtreeTileBounds, type QuadtreeTile } from '../surface
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { DrawList, drawOnBaseImage } from './draw-list.js';
 import { drawImagery, type ImageryLayer } from './imagery-draws.js';
-import { ARRIVING, type ImageryLoader } from './imagery-loader.js';
+import { ARRIVING, type ImageryLoader } from './imagery-loader.hot.js';
 import type { ImagerySource } from './imagery-source.js';
 
 const tile = (level: number, x: number, y: number): QuadtreeTile =>
@@ -51,7 +51,8 @@ describe('drawImagery', () => {
   it('wants the tile and every second ancestor, coarse first, and draws the deepest resident one (F082, F085)', () => {
     const { layer, wanted } = fakeLayer({ 4: 42 });
     const list = draw(layer, tile(9, 300, 170));
-    expect(wanted).toEqual([9, 7, 5]);
+    // Then the prefetch of the next level under the center: the four children (F088).
+    expect(wanted).toEqual([9, 7, 5, 10, 10, 10, 10]);
     expect(list.textures[0]).toBe(42);
     expect(list.imageryLevels[0]).toBe(4);
   });
@@ -59,7 +60,7 @@ describe('drawImagery', () => {
   it('requests no ancestor while the tile itself is arriving from the RAM tier (F097)', () => {
     const { layer, wanted } = fakeLayer({ 9: ARRIVING, 4: 42 });
     const list = draw(layer, tile(9, 300, 170));
-    expect(wanted).toEqual([9]);
+    expect(wanted).toEqual([9, 10, 10, 10, 10]);
     expect(list.textures[0]).toBe(42);
   });
 });

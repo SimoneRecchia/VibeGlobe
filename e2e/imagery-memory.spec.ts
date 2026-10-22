@@ -138,6 +138,15 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
   test(`a burst of arrivals uploads within the per-frame budget, each tile once, none again when re-shown on ${backend} (F101, F102)`, async ({
     page,
   }) => {
+    // The tab can be hidden: with no frames, tiles that arrive wait for upload, a burst for the frames after it shows.
+    await page.addInitScript(() => {
+      let visibility: DocumentVisibilityState = 'visible';
+      Object.defineProperty(document, 'visibilityState', { get: () => visibility });
+      (window as unknown as { setVisibility: (state: DocumentVisibilityState) => void }).setVisibility = (state) => {
+        visibility = state;
+        document.dispatchEvent(new Event('visibilitychange'));
+      };
+    });
     const session = await fixtureSession(page);
     await openGlobe(page, `backend=${backend}&imagery=levels&session=${session}&zoom=2`);
     await waitForImagery(page);
@@ -146,8 +155,20 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     const rendererBefore = await textureUploads();
     const before = await stats(page);
     const imageryBefore = before.uploads;
+    await page.evaluate(() => window.vibeglobePlayground?.globe.diagnostics.setPhaseTiming(true, false));
     await startRecording(page);
-    await flyTo(page, { ...TOKYO, zoom: 9 });
+    // A burst of arrivals, whatever the runner's frame rate: the first frame at Tokyo requests its tiles, they arrive
+    // and decode while the tab is hidden, and all of them wait for the frames after it shows again.
+    await page.evaluate(
+      (v) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: v.lon, latitudeDeg: v.lat, zoom: 9 }),
+      TOKYO,
+    );
+    await nextFrame(page);
+    await page.evaluate(() => (window as unknown as { setVisibility: (s: string) => void }).setVisibility('hidden'));
+    await expect.poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats()?.loading)).toBe(0);
+    await page.evaluate(() => (window as unknown as { setVisibility: (s: string) => void }).setVisibility('visible'));
+    await nextFrame(page);
+    await waitForImagery(page);
     const frames = await recorded(page);
     for (const [i, frame] of frames.entries()) {
       expect(frame.stats.uploadBytesLastFrame).toBeLessThanOrEqual(8_000_000);
@@ -157,6 +178,16 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     }
     const timings = frames.map((frame) => frame.stats.uploadMsLastFrame).filter((ms) => ms > 0);
     console.log(`upload ms per frame on ${backend}: ${timings.map((ms) => ms.toFixed(1)).join(' ')}`);
+    // Every burst of arrivals drains within 15 frames (docs/plan/quality.md): no 16 frames in a row with a tile waiting.
+    let waiting = 0;
+    for (const frame of frames) {
+      waiting = frame.stats.uploadsPending > 0 ? waiting + 1 : 0;
+      expect(waiting).toBeLessThanOrEqual(15);
+    }
+    expect(Math.max(...frames.map((frame) => frame.stats.uploadsPending + 1))).toBeGreaterThan(1);
+    // CPU time per frame, from the engine's phase timing (recorded; on the software GPU times are not judged, ADR 0012).
+    const cpu = await page.evaluate(() => window.vibeglobePlayground?.globe.diagnostics.phaseTimesMs());
+    console.log(`CPU phases of the last frame on ${backend}: ${JSON.stringify(cpu)}`);
     // Each resident tile is uploaded once (F102): every upload made one more tile resident, none was evicted or came
     // back from RAM to be uploaded again, no tile was fetched twice, and three.js uploaded nothing else.
     const after = await stats(page);

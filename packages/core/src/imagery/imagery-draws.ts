@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { DrawList } from './draw-list.js';
-import { ARRIVING, type ImageryLoader } from './imagery-loader.js';
+import { ARRIVING, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -26,6 +26,8 @@ export interface ImageryLayer {
 
 /** ADR 0007's priority classes: visible tiles are class 1 (class 0 is the pinned base). */
 const VISIBLE_CLASS = 1024;
+/** ADR 0007's prefetch class, after visible tiles, flight destination and flight path. */
+const PREFETCH_CLASS = 4 * 1024;
 
 const mapping = new Float64Array(7);
 const centerEcef = new Float64Array(3);
@@ -44,10 +46,16 @@ export function drawImagery(
   layers: readonly ImageryLayer[],
   camera: Camera,
 ): void {
+  let center: QuadtreeTile | undefined;
+  let centerDistance = Infinity;
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
     const distance = screenDistance(tile, camera);
+    if (distance < centerDistance) {
+      centerDistance = distance;
+      center = tile;
+    }
     let drawn = false;
     for (let layer = layers.length - 1; layer >= 0; layer--) {
       const entry = layers[layer];
@@ -66,6 +74,26 @@ export function drawImagery(
       list.uvTransforms[at + 3] = mapping[MAPPING_OFFSET_V] ?? 0;
     }
   }
+  if (center) for (const layer of layers) prefetchChildren(layer, center, centerDistance);
+}
+
+/**
+ * Prefetches the next level under the screen center, where a zoom in goes first: the four children of the center
+ * tile's imagery, at ADR 0007's prefetch class, after every visible tile (F088).
+ */
+function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: number): void {
+  const source = layer.source;
+  const level = tile.level < source.maxLevel ? tile.level : source.maxLevel;
+  if (level >= source.maxLevel) return;
+  if (source.tiling.crs === 'EPSG:3857') {
+    if (tile.root !== MERCATOR_ROOT || !mapMercator(tile, level, mapping, 0)) return;
+  } else if (!mapGeographic(tile, level, mapping, 0)) {
+    return;
+  }
+  const x = 2 * (mapping[MAPPING_X] ?? 0);
+  const y = 2 * (mapping[MAPPING_Y] ?? 0);
+  const key = PREFETCH_CLASS + level + 1 + 2 * distance;
+  for (let child = 0; child < 4; child++) layer.loader.want(level + 1, x + (child & 1), y + (child >> 1), key);
 }
 
 /**

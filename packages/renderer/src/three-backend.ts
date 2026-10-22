@@ -28,7 +28,7 @@ import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeEyeRelative } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
-import { countCalls, countMatrixUpdates, readGpuTime, stopInternalLoop } from './three-hooks.js';
+import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import {
   RecoveryLimiter,
@@ -62,6 +62,8 @@ export interface BackendSettings {
   readonly depth: DepthChoice;
   /** Measures each frame's GPU time with timestamp queries where the device offers them (benchmarks only). */
   readonly gpuTiming: boolean;
+  /** The compressed families KTX2 imagery may use, among the device's; undefined for all of them. */
+  readonly compressedTextures: readonly string[] | undefined;
 }
 
 /**
@@ -92,6 +94,7 @@ export class ThreeBackend implements RendererBackend {
   private textureUploads = 0;
   private matrixUpdates = 0;
   private pipelineCompiles = 0;
+  private pipelineSwitches: PipelineSwitches | undefined;
   /** Why WebGPU failed its start-up self-test, after which this backend uses WebGL2 (ADR 0010 §2). */
   private webgpuFailure: string | undefined;
   private lastDrawCalls = 0;
@@ -211,8 +214,9 @@ export class ThreeBackend implements RendererBackend {
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
     countCalls(renderer.backend, 'updateTexture', () => this.textureUploads++);
     countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
+    this.pipelineSwitches = new PipelineSwitches(renderer.backend);
     this.renderer = renderer;
-    this.capabilities = readCapabilities(renderer, sceneDepth);
+    this.capabilities = readCapabilities(renderer, sceneDepth, this.settings.compressedTextures);
     renderer.setPixelRatio(this.size.pixelRatio);
     renderer.setSize(this.size.widthPx, this.size.heightPx, false);
   }
@@ -270,6 +274,8 @@ export class ThreeBackend implements RendererBackend {
       textureUploads: this.textureUploads,
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
+      pipelineSwitches: this.pipelineSwitches?.count ?? 0,
+      compressedTextures: this.tileTextures.compressedCount,
       gpuFrameMs: this.gpuFrameMs,
     };
   }
@@ -287,8 +293,7 @@ export class ThreeBackend implements RendererBackend {
 
   /** Creates the texture of an imagery tile and uploads it now (M3 plan §3). */
   uploadTexture(handle: number, tile: DecodedTile): void {
-    if (this.destroyed) return;
-    this.tileTextures.upload(this.renderer, handle, tile);
+    if (!this.destroyed) this.tileTextures.upload(this.renderer, handle, tile);
   }
 
   /** Releases an imagery tile texture and its image. */
@@ -340,7 +345,7 @@ export class ThreeBackend implements RendererBackend {
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
-      applyDraw(entry.draw, draws, i, this.tileTextures.get(draws.textures[i] ?? -1) ?? this.imageryTexture);
+      applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
       entry.mesh.visible = true;
       this.shown[this.shownCount++] = entry.mesh;
       placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
@@ -351,6 +356,7 @@ export class ThreeBackend implements RendererBackend {
     }
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
+    this.pipelineSwitches?.begin();
     this.renderer.render(this.scene, this.camera);
     if (this.settings.gpuTiming) readGpuTime(this.renderer, (ms) => (this.gpuFrameMs = ms));
     const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };

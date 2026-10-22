@@ -34,8 +34,8 @@ for (const backend of BACKENDS) {
     await openGlobe(page, `backend=${backend}&lon=10&lat=45&zoom=3`);
     await waitForIdle(page);
     const first = await stats(page);
-    // The pinned base imagery is the only texture the engine schedules in M2.
-    expect(first.textureUploads).toBe(1);
+    // Uploaded at start-up only: the pinned base imagery, and the one-texel texture of the cross-fade binding (F105).
+    expect(first.textureUploads).toBe(2);
     expect(first.matrixUpdates).toBe(0);
     expect(first.drawCalls).toBeGreaterThan(0);
     const box = await page.locator('#globe').boundingBox();
@@ -47,7 +47,7 @@ for (const backend of BACKENDS) {
     for (let i = 0; i < 10; i++) await page.mouse.wheel(0, -200);
     await waitForIdle(page);
     const after = await stats(page);
-    expect(after.textureUploads).toBe(1);
+    expect(after.textureUploads).toBe(first.textureUploads);
     expect(after.matrixUpdates).toBe(0);
   });
 

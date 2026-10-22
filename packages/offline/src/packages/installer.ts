@@ -61,7 +61,8 @@ function corruption(entry: PackageFileEntry, index: number, layout: PmtilesLayou
  * Downloads (or copies) and verifies the files of a package into browser storage, chunk by chunk (F309, F311).
  * Chunks already stored by an interrupted install of the same version are not fetched again (F308). Each chunk is
  * checked against the manifest's chunk hash, the whole file against its SHA-256, and a PMTiles header against its
- * layout; any failure removes what was stored and throws a {@link PackageError} naming the file and the part hit.
+ * layout; any other failure than a download cut by the network removes what was stored and throws a {@link PackageError}
+ * naming the file and the part hit.
  */
 export async function installFiles(
   storage: PackageStorage,
@@ -85,7 +86,8 @@ export async function installFiles(
       );
     }
   } catch (error) {
-    if (error instanceof PackageError) {
+    // A download cut by the network keeps its verified chunks, so the next install resumes (F308).
+    if (error instanceof PackageError && error.code !== 'download-failed') {
       await storage.deleteData(prefix);
       await storage.deleteRecord(partialKey(manifest));
     }

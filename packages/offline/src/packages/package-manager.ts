@@ -228,6 +228,11 @@ class Manager implements PackageManager {
     manifestUrl: string | undefined,
     options: InstallOptions,
   ): Promise<InstalledPackage> {
+    // The version is installed already: installing it again must not touch (or, on a failure, delete) its chunks.
+    const current = this.installed.find(
+      (r) => r.manifest.id === manifest.id && r.manifest.version === manifest.version,
+    );
+    if (current) return describe(current);
     await this.storage.putRecord(
       { manifest, kind: 'archive', state: 'partial', installedAtMs: Date.now(), bytes: 0 },
       partialKey(manifest),

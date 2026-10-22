@@ -3632,7 +3632,7 @@
         "Assert writes and reads happen off the main thread and frame times stay within budget during heavy cache writes",
         "Repeat in Chromium, Firefox and WebKit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F274",

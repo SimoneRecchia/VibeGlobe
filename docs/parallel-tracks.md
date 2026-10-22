@@ -135,18 +135,18 @@ offline package yet (hook requests above).
 
 ### Entries waiting for engine features
 
-| Entry                        | Waits for                                                                                                                                                      |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F271                         | Memory reuse and prefetch acting in core (F281–F285, hook request (1)); the playground's own sources wrapped (hook request (4))                                |
-| F272                         | The per-tier counters in the playground's debug overlay (hook request (4)); the persistent, package and network tiers are counted                              |
-| F273, F276                   | The Firefox and WebKit run of `e2e/offline-browsers.spec.ts` in CI (hook request (5)); Chromium passes                                                         |
-| F286, F287                   | `flyTo` (F195) and motion-aware detail (F288)                                                                                                                  |
-| F290                         | Memory reuse and prefetch switches acting in core (hook request (1)); per-layer scopes for layer chains (F247)                                                 |
-| F292–F296, F298              | Flight scenarios (`flyTo`, F195); their zoom and pan parts are covered by the network, package and LAN specs                                                   |
-| F304, F305, F336             | The PMTiles and MBTiles adapters on `main` (F232, F233); the packages load through the typed stub meanwhile                                                    |
-| F306                         | The live credits and the attribution element (F254, F255)                                                                                                      |
-| F314                         | Hook request 1 and flight scenarios (F195)                                                                                                                     |
-| F315, F316                   | Flight scenarios (F195) and prefetch with flight preloading (F284, F286) in the scenario suite                                                                 |
-| F326                         | The fourth session's shared conformance suite with profile-enforcement checks, the attribution element (F255) and core honouring a profile's concurrency limit |
-| F328                         | The terrain and MVT adapters (F129, F239) and terrain in core (M4)                                                                                             |
-| F337, F339, F341, F551, F554 | As listed for the data pipeline track above (F254/F255, F129, F239, F247/F248)                                                                                 |
+| Entry                        | Waits for                                                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| F271                         | Memory reuse and prefetch acting in core (F281–F285, hook request (1)); the playground's own sources wrapped (hook request (4))                                                                              |
+| F272                         | The per-tier counters in the playground's debug overlay (hook request (4)); the persistent, package and network tiers are counted                                                                            |
+| F276                         | The Firefox run of `e2e/offline-browsers.spec.ts` with Firefox's storage-prompt testing prefs (hook request (5)); Chromium and WebKit pass, Firefox timed out on its permission prompt in CI run 39822457570 |
+| F286, F287                   | `flyTo` (F195) and motion-aware detail (F288)                                                                                                                                                                |
+| F290                         | Memory reuse and prefetch switches acting in core (hook request (1)); per-layer scopes for layer chains (F247)                                                                                               |
+| F292–F296, F298              | Flight scenarios (`flyTo`, F195); their zoom and pan parts are covered by the network, package and LAN specs                                                                                                 |
+| F304, F305, F336             | The PMTiles and MBTiles adapters on `main` (F232, F233); the packages load through the typed stub meanwhile                                                                                                  |
+| F306                         | The live credits and the attribution element (F254, F255)                                                                                                                                                    |
+| F314                         | Hook request 1 and flight scenarios (F195)                                                                                                                                                                   |
+| F315, F316                   | Flight scenarios (F195) and prefetch with flight preloading (F284, F286) in the scenario suite                                                                                                               |
+| F326                         | The fourth session's shared conformance suite with profile-enforcement checks, the attribution element (F255) and core honouring a profile's concurrency limit                                               |
+| F328                         | The terrain and MVT adapters (F129, F239) and terrain in core (M4)                                                                                                                                           |
+| F337, F339, F341, F551, F554 | As listed for the data pipeline track above (F254/F255, F129, F239, F247/F248)                                                                                                                               |

@@ -20,8 +20,18 @@ const crossBrowserProjects =
         // The Chromium flags and executable do not apply.
         use: {
           ...devices[device],
-          // Firefox disables WebGL on software-only Linux machines unless forced.
-          launchOptions: device === 'Desktop Firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true } } : {},
+          // Firefox disables WebGL on software-only Linux machines unless forced, and asks the user before persisting
+          // storage: its testing prefs answer that prompt (F276).
+          launchOptions:
+            device === 'Desktop Firefox'
+              ? {
+                  firefoxUserPrefs: {
+                    'webgl.force-enabled': true,
+                    'dom.storageManager.prompt.testing': true,
+                    'dom.storageManager.prompt.testing.allow': true,
+                  },
+                }
+              : {},
         },
         testMatch: CROSS_BROWSER_SPECS,
         grepInvert: WEBGPU_TESTS,

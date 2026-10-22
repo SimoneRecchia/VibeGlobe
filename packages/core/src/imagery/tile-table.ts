@@ -35,6 +35,8 @@ export interface TileRecord {
   task: number;
   /** The tile belongs to the pinned base: loaded first, never evicted (ADR 0007, F084). */
   readonly pinned: boolean;
+  /** The source last answered that it cannot tell yet whether the tile exists (F128). */
+  availabilityUnknown: boolean;
 }
 
 /**
@@ -94,6 +96,7 @@ export class TileTable {
       consumer: NO_SLOT,
       task: -1,
       pinned: level <= this.pinnedLevel,
+      availabilityUnknown: false,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);

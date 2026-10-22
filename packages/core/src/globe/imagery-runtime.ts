@@ -414,7 +414,7 @@ export class ImageryRuntime {
       terrain.loader.beginFrame();
       drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
-      deepenFallbackSkirts(list, tiles, count, terrain);
+      if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart + this.chargedMs;
       this.chargedMs = 0;

@@ -127,7 +127,7 @@ export class SurfaceFrame {
   /**
    * Keeps the eye at least the clearance above the surface as this frame shows it (F146, F147): the camera's target is
    * raised along its normal by what the eye lacks, and lowered back to the ellipsoid when nothing is in the way.
-   * Returns true when the pose changed (the camera needs an update). Allocates nothing.
+   * Returns true when the pose changed (the camera is updated). Allocates nothing.
    */
   keepAboveTerrain(camera: Camera): boolean {
     const imagery = this.imagery;
@@ -149,6 +149,7 @@ export class SurfaceFrame {
     imagery.chargeTerrainMs(imagery.now() - start);
     if (next === lift) return false;
     pose.targetHeightMeters = next;
+    camera.update();
     return true;
   }
 

@@ -144,24 +144,39 @@ function writeTransform(from: Float64Array): void {
 /**
  * The terrain level shown last frame where a tile drawn for the first time lies (F138): its nearest ancestor's within
  * {@link MAX_TERRAIN_MORPH_LEVELS} levels when it appears by refinement, else the finest of its descendants' within as
- * many levels when it appears by coarsening; -1 when none was drawn. Every root splits a tile's column in two (cap
- * tiles of two children keep both in one column pair), so a parent is (x / 2, y / 2) and the children are among the
- * four of (2x, 2y). Allocates nothing.
+ * many levels when it appears by coarsening; -1 when none was drawn. Columns follow the quadtree's split rules: a tile
+ * of span s splits into four at columns 2x and 2x + s (span s), or into two at column 2x (span 2s), so its parent is at
+ * ⌊x / 2s⌋ · s or x / 2 and its descendants within two levels at columns 4x … 4x + 3s; Mercator tiles have span 1.
+ * Allocates nothing.
  */
 export function previousLevel(tile: QuadtreeTile, previous: IntegerKeyMap<number>): number {
-  for (let up = 1; up <= MAX_TERRAIN_MORPH_LEVELS && up <= tile.level; up++) {
-    const level = previous.get(quadtreeTileKey(tile.root, tile.level - up, tile.x >> up, tile.y >> up));
-    if (level !== undefined) return level;
+  const { root, level, x, y, span } = tile;
+  // Parents: k = 0 as a four-way split (same span), k = 1 as a two-way split (half the span, even columns only).
+  for (let k = 0; k < 2 && level >= 1; k++) {
+    const px = k === 0 ? Math.floor(x / (2 * span)) * span : x % 2 === 0 ? x / 2 : -1;
+    if (px < 0) continue;
+    const found = previous.get(quadtreeTileKey(root, level - 1, px, y >> 1));
+    if (found !== undefined) return found;
+  }
+  for (let k = 0; k < 4 && level >= 2 && MAX_TERRAIN_MORPH_LEVELS >= 2; k++) {
+    // Grandparents: either split at either level (k & 1 for the parent's, k >> 1 for the grandparent's).
+    const px = (k & 1) === 0 ? Math.floor(x / (2 * span)) * span : x % 2 === 0 ? x / 2 : -1;
+    const parentSpan = (k & 1) === 0 ? span : span / 2;
+    if (px < 0 || parentSpan < 1 || !Number.isInteger(parentSpan)) continue;
+    const gx = k >> 1 === 0 ? Math.floor(px / (2 * parentSpan)) * parentSpan : px % 2 === 0 ? px / 2 : -1;
+    if (gx < 0) continue;
+    const found = previous.get(quadtreeTileKey(root, level - 2, gx, y >> 2));
+    if (found !== undefined) return found;
   }
   let finest = -1;
-  for (let down = 1; down <= MAX_TERRAIN_MORPH_LEVELS && finest < 0; down++) {
-    const side = 1 << down;
-    for (let i = 0; i < side * side; i++) {
-      const x = tile.x * side + (i % side);
-      const y = tile.y * side + Math.floor(i / side);
-      const level = previous.get(quadtreeTileKey(tile.root, tile.level + down, x, y));
-      if (level !== undefined && level > finest) finest = level;
-    }
+  for (let i = 0; i < 4; i++) {
+    const found = previous.get(quadtreeTileKey(root, level + 1, 2 * x + (i & 1) * span, 2 * y + (i >> 1)));
+    if (found !== undefined && found > finest) finest = found;
+  }
+  if (finest >= 0 || MAX_TERRAIN_MORPH_LEVELS < 2) return finest;
+  for (let i = 0; i < 16; i++) {
+    const found = previous.get(quadtreeTileKey(root, level + 2, 4 * x + (i & 3) * span, 4 * y + (i >> 2)));
+    if (found !== undefined && found > finest) finest = found;
   }
   return finest;
 }
@@ -309,30 +324,52 @@ export function terrainHeightRange(
 
 /**
  * Deepens the skirts of draws showing terrain coarser than their surface level's (a fallback ancestor, or a morph from
- * one; M4 review): their edges may differ from a neighbor showing finer terrain by up to twice the coarser grid's
- * error, more than the mesh's skirts, which are sized for the tile's own level. Call after the terrain fades.
- * Allocates nothing.
+ * one; M4 review), and of the draws they touch: across a shared edge, the two surfaces may differ by up to twice the
+ * coarser grid's error (its level's bound, or its measured error when larger), more than skirts sized for each tile's
+ * own level hide, and whichever edge lies higher needs its skirt to reach the other. Call after the terrain fades.
+ * Allocates nothing; the neighbor search runs only for the few draws showing fallback terrain.
  */
 export function deepenFallbackSkirts(
   list: DrawList,
   tiles: readonly QuadtreeTile[],
   count: number,
   layer: TerrainLayer,
+  heights: TerrainHeights,
 ): void {
   const terrain = list.terrain;
+  terrain.skirtMeters.fill(0, 0, count);
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     const level = terrain.levels[index] ?? -1;
-    if (!tile || level < 0) {
-      terrain.skirtMeters[index] = 0;
-      continue;
-    }
+    if (!tile || level < 0) continue;
     let coarsest = level;
+    let handle = terrain.textures[index] ?? -1;
     if ((terrain.fades[index] ?? 1) < 1) {
-      const from = layer.loader.coordOf(terrain.fromTextures[index] ?? -1)?.level ?? level;
-      if (from < coarsest) coarsest = from;
+      const fromHandle = terrain.fromTextures[index] ?? -1;
+      const from = layer.loader.coordOf(fromHandle)?.level ?? level;
+      if (from < coarsest) {
+        coarsest = from;
+        handle = fromHandle;
+      }
     }
-    const wanted = terrainLevelOf(tile.level, layer.source);
-    terrain.skirtMeters[index] = coarsest < wanted ? 2 * (layer.gridErrorMeters[coarsest] ?? 0) : 0;
+    if (coarsest >= terrainLevelOf(tile.level, layer.source)) continue;
+    const bound = layer.gridErrorMeters[coarsest] ?? 0;
+    const measured = bound / GRID_ERROR_FACTOR + (heights.grid(handle)?.errorMeters ?? 0);
+    const depth = 2 * (measured > bound ? measured : bound);
+    if (depth > (terrain.skirtMeters[index] ?? 0)) terrain.skirtMeters[index] = depth;
+    // The draws sharing an edge or a corner with it.
+    for (let other = 0; other < count; other++) {
+      const near = tiles[other];
+      if (
+        !near ||
+        other === index ||
+        near.westRad > tile.eastRad ||
+        near.eastRad < tile.westRad ||
+        near.southRad > tile.northRad ||
+        near.northRad < tile.southRad
+      )
+        continue;
+      if (depth > (terrain.skirtMeters[other] ?? 0)) terrain.skirtMeters[other] = depth;
+    }
   }
 }

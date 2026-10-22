@@ -304,7 +304,8 @@ class GlobeEngine implements Globe {
     if (this.waiting) return this.clock.skipped();
     this.cam.update();
     const draws = this.surfaceFrame.prepare(this.cam, surface);
-    if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.cam.update();
+    // A lift moved the camera after the selection: the next frame draws the new pose, until the lift settles (F146).
+    if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.dirty = true;
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
     if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);

@@ -384,6 +384,62 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('rejects a query whose availability can never be known, its metadata tile failing for good (F145)', async () => {
+    const base = terrain([], 12);
+    const source: TerrainSource = {
+      ...base,
+      transport: {
+        start(request, timeouts, done) {
+          // The level-2 tile that would carry the deeper levels' availability is corrupt.
+          if (request.url.startsWith('/terrain/2/'))
+            queueMicrotask(() => done({ kind: 'ok', bytes: new ArrayBuffer(3), contentType: 'image/png' }));
+          else return base.transport.start(request, timeouts, done);
+          return () => undefined;
+        },
+      },
+      request: (coord, out) => (coord.level <= 2 ? base.request(coord, out) : 'unknown'),
+    };
+    const workers = terrainWorkers();
+    const corruptAware: WorkerEndpointFactory = {
+      ...workers,
+      create(onMessage) {
+        const endpoint = workers.create(onMessage);
+        return {
+          ...endpoint,
+          post(message: WorkerRequest) {
+            if (message.kind === 'run' && (message.input as { bytes: ArrayBuffer }).bytes.byteLength === 3) {
+              queueMicrotask(() =>
+                onMessage({ kind: 'reply', id: message.id, ok: false, error: { code: 'undecodable', message: 'bad' } }),
+              );
+              return;
+            }
+            endpoint.post(message);
+          },
+        };
+      },
+    };
+    const { globe, run } = await terrainGlobe(source, 5, corruptAware);
+    const query = globe.elevationAtAsync({ longitudeDeg: -170.5, latitudeDeg: -40.25 });
+    let error: unknown;
+    query.catch((reason: unknown) => (error = reason));
+    await run(60);
+    expect(error).toMatchObject({ code: 'resource-failed' } satisfies Partial<GlobeError>);
+    globe.destroy();
+  });
+
+  it('wants only the finest tile of a query point while its availability is known (F145)', async () => {
+    const urls: string[] = [];
+    const { globe, run } = await terrainGlobe(terrain(urls, 12), 5);
+    const before = urls.length;
+    const query = globe.elevationAtAsync({ longitudeDeg: -170.5, latitudeDeg: -40.25 });
+    await run(40);
+    expect((await query).level).toBe(12);
+    // The level-12 tile, and none of the levels between it and the pinned base.
+    const requested = urls.slice(before).filter((url) => !/^\/terrain\/[0-2]\//.test(url));
+    expect(requested).toEqual([expect.stringMatching(/^\/terrain\/12\//)]);
+    globe.destroy();
+  });
+
   it('rejects a query with resource-failed when its finest tile keeps failing or timing out (F145)', async () => {
     for (const mode of ['failing', 'silent'] as const) {
       const base = terrain([], 8);
@@ -503,6 +559,49 @@ describe('terrain in a globe (M4)', () => {
     const fallback = await skirts((level) => level > 2);
     expect(fallback.length).toBeGreaterThan(0);
     expect(fallback.every((meters) => meters === 2 * 1.5 * 2500)).toBe(true);
+    // One subtree missing: its tiles show coarser terrain, and their neighbors showing their own level get the same
+    // deeper skirts, so the higher of two edges always reaches the lower one.
+    const base = terrain([], 12);
+    const holed: TerrainSource = {
+      ...base,
+      transport: terrainTransport([], (level) => level > 7),
+      request: (coord, out) => {
+        const request = base.request(coord, out);
+        // Only level-8 tile x = 132 and its subtree fail; elsewhere the requests go to a transport that works.
+        if (request !== 'noData' && request !== 'unknown' && (coord.level < 8 || coord.x >> (coord.level - 8) !== 132))
+          request.url = request.url.replace('/terrain/', '/terrain-ok/');
+        return request;
+      },
+    };
+    const okTransport = terrainTransport([]);
+    const transport = holed.transport;
+    const mixed: TerrainSource = {
+      ...holed,
+      transport: {
+        start: (request, timeouts, done) =>
+          (request.url.startsWith('/terrain-ok/') ? okTransport : transport).start(
+            { ...request, url: request.url.replace('/terrain-ok/', '/terrain/') },
+            timeouts,
+            done,
+          ),
+      },
+    };
+    const { globe, renderer } = await terrainGlobe(mixed, 40, terrainWorkers(), view);
+    const draws = renderer.lastDraws;
+    const tiles = globe.surfaceTiles();
+    let fallbackDraws = 0;
+    let deepenedNeighbors = 0;
+    for (let i = 0; i < (draws?.count ?? 0); i++) {
+      const tile = tiles[i];
+      const own = Math.min(12, (tile?.level ?? 0) - 2);
+      const shown = draws?.terrain.levels[i] ?? -1;
+      const meters = draws?.terrain.skirtMeters[i] ?? 0;
+      if (shown < own) fallbackDraws++;
+      else if (meters > 0) deepenedNeighbors++;
+    }
+    expect(fallbackDraws).toBeGreaterThan(0);
+    expect(deepenedNeighbors).toBeGreaterThan(0);
+    globe.destroy();
   });
 
   it('fails the tiles of a custom decoder that returns non-finite heights (F132)', async () => {

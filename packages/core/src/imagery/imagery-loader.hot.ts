@@ -250,6 +250,11 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.table.bySlot[handle - this.options.handleBase]?.coord;
   }
 
+  /** True for a tile whose source could not tell yet whether it exists, the last time it was asked (F128). */
+  availabilityUnknown(level: number, x: number, y: number): boolean {
+    return this.table.find(level, x, y)?.availabilityUnknown ?? false;
+  }
+
   /** True for a tile known to have no data (404, outside coverage): it never arrives. */
   noData(level: number, x: number, y: number): boolean {
     return this.table.find(level, x, y)?.state === NO_DATA;
@@ -388,6 +393,7 @@ export class ImageryLoader implements NetworkPoolClient {
       if (request === 'noData') {
         this.heap.pop();
         record.state = NO_DATA;
+        record.availabilityUnknown = false;
         this.settlePinned(record);
         result = -1;
         break;
@@ -396,9 +402,11 @@ export class ImageryLoader implements NetworkPoolClient {
         // Not known yet (availability that comes with an ancestor's metadata, F128): asked again when wanted again.
         this.heap.pop();
         record.state = UNLOADED;
+        record.availabilityUnknown = true;
         result = -1;
         break;
       }
+      record.availabilityUnknown = false;
       // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
       const consumer = this.options.network.request(
         request.url,

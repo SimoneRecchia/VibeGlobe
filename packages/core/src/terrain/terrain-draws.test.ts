@@ -54,5 +54,11 @@ describe('previousLevel', () => {
     // A polar cap tile morphs too.
     shown.set(quadtreeTileKey(NORTH_CAP, 3, 2, 1), 4);
     expect(previousLevel(tile(NORTH_CAP, 4, 4, 3), shown)).toBe(4);
+    // Cap tiles of span 2 (after a two-way split) split into four at columns 2x and 2x + 2: the right-hand children
+    // find their parent, and a coarsened parent finds them.
+    shown.set(quadtreeTileKey(NORTH_CAP, 6, 8, 2), 5);
+    expect(previousLevel({ ...tile(NORTH_CAP, 7, 18, 5), span: 2 }, shown)).toBe(5);
+    shown.set(quadtreeTileKey(NORTH_CAP, 9, 22, 4), 7);
+    expect(previousLevel({ ...tile(NORTH_CAP, 8, 10, 2), span: 2 }, shown)).toBe(7);
   });
 });

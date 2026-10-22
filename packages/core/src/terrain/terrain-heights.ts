@@ -205,18 +205,20 @@ export class TerrainHeights {
     position[0] = lonRad;
     position[1] = latRad;
     project(mercator, position);
-    // The finest tile that may still arrive is wanted, and so is every coarser one down to the first resident: an
-    // ancestor may carry the availability of the levels below it (F128), which says whether the finest one exists.
+    // The finest tile that may still arrive is wanted. While the source cannot tell whether it exists, every coarser
+    // one is wanted too, down to the first resident: an ancestor carries the availability of the levels below it
+    // (F128). If that chain meets a tile that failed for good, the answer can never come: the query fails (F145).
     let wanted = FINEST_RESIDENT;
     for (let level = source.maxLevel; level >= source.minLevel; level--) {
       locate(mercator, level);
       const x = located[2] ?? 0;
       const y = located[3] ?? 0;
       if (loader.peekHandle(level, x, y) >= 0) return wanted;
-      if (loader.failed(level, x, y)) return wanted === FINEST_RESIDENT ? FINEST_FAILED : wanted;
+      if (loader.failed(level, x, y)) return FINEST_FAILED;
       if (loader.noData(level, x, y)) continue;
       loader.want(level, x, y, priority);
       if (wanted === FINEST_RESIDENT) wanted = level;
+      if (!loader.availabilityUnknown(level, x, y)) return wanted;
     }
     return wanted;
   }

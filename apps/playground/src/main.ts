@@ -89,8 +89,9 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     terrainMax: '10',
     imagery: 'world',
     imageryMax: '18',
-    lon: '6.86',
-    lat: '45.7',
+    // Over the fixture's ±300 m hills, below the eye: the view's distances match the imagery-only reference's.
+    lon: '11',
+    lat: '44.5',
     zoom: '17',
     tilt: '45',
   },

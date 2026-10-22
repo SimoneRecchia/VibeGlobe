@@ -202,13 +202,15 @@ for (const backend of BACKENDS) {
       }
       const dxs = shifts.map((s) => s.dx).sort((a, b) => a - b);
       const median = dxs[Math.floor(dxs.length / 2)] ?? 0;
+      // Turning the heading around a target below the view also moves it vertically, by the same amount each frame.
+      const medianDy = shifts.map((s) => s.dy).sort((a, b) => a - b)[Math.floor(shifts.length / 2)] ?? 0;
       console.log(
         `orbit shifts ${backend}: ${JSON.stringify(shifts.map((s) => [+s.dx.toFixed(3), +s.dy.toFixed(3)]))}`,
       );
       expect(Math.abs(median)).toBeGreaterThan(0.05);
       for (const shift of shifts) {
         expect(Math.abs(shift.dx - median)).toBeLessThan(0.25);
-        expect(Math.abs(shift.dy)).toBeLessThan(0.25);
+        expect(Math.abs(shift.dy - medianDy)).toBeLessThan(0.25);
       }
     });
 

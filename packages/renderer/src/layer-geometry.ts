@@ -181,8 +181,8 @@ function boxOf(
   images: QuadImages | undefined,
 ): { w: number; h: number; rect: AtlasRect | undefined } {
   const size = valueOf(batch, 'sizePx', feature);
-  // Points and circles: `sizePx` is the radius (MapLibre `circle-radius`).
-  if (batch.kind === 'point' || batch.kind === 'circle') return { w: size, h: size, rect: undefined };
+  // Points: `sizePx` is the radius (MapLibre `circle-radius`).
+  if (batch.kind === 'point') return { w: size, h: size, rect: undefined };
   if (batch.kind === 'label') {
     const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size);
     return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: size / 2, h: size / 2, rect };
@@ -195,7 +195,7 @@ function boxOf(
   return { w: (h * rect.widthPx) / rect.heightPx, h, rect };
 }
 
-/** Points, markers, circles and labels: a screen-sized quad around each feature's position. */
+/** Points, markers and labels: a screen-sized quad around each feature's position. */
 function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages | undefined): void {
   for (let feature = 0; feature < batch.count; feature++) {
     if (valueOf(batch, 'visible', feature) <= 0) continue;
@@ -209,7 +209,7 @@ function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages |
     const angle = (-valueOf(batch, 'rotationDeg', feature) * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    const round = batch.kind === 'point' || batch.kind === 'circle';
+    const round = batch.kind === 'point';
     // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha.
     const color =
       batch.kind === 'marker' && rect ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
@@ -374,7 +374,7 @@ function forEachPart(geometry: FeatureGeometry, visit: (start: number, end: numb
 
 /** The first position a batch holds, its origin (ADR 0004), or undefined when it holds nothing to draw. */
 function firstPosition(batch: BatchContents): [number, number] | undefined {
-  if (batch.kind === 'polyline' || batch.kind === 'polygon') {
+  if (batch.kind === 'polyline' || batch.kind === 'polygon' || batch.kind === 'circle') {
     for (const geometry of batch.geometry.values())
       if (geometry.positions.length >= 2) return [geometry.positions[0] ?? 0, geometry.positions[1] ?? 0];
     return undefined;
@@ -388,7 +388,8 @@ export function buildLayerArrays(batch: BatchContents, images?: QuadImages): Lay
   if (!first) return undefined;
   const builder = new Builder(layerOrigin(first[0], first[1]));
   if (batch.kind === 'polyline') buildLines(batch, builder);
-  else if (batch.kind === 'polygon') buildPolygons(batch, builder);
+  // Circles arrive as their geodesic outlines (the layers package's `ellipseGeometry`).
+  else if (batch.kind === 'polygon' || batch.kind === 'circle') buildPolygons(batch, builder);
   else buildQuads(batch, builder, images);
   return builder.count > 0 ? builder.arrays(batch.kind === 'polyline') : undefined;
 }

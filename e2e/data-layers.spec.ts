@@ -318,3 +318,30 @@ for (const backend of BACKENDS) {
     expect(blue(pixel(markers, square.xPx + 15, square.yPx - 15))).toBe(false);
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`circles keep their ground size in meters at any latitude in the globe, 2D and tilted phases on ${backend} (F356)`, async ({
+    page,
+  }) => {
+    await openScenario(page, backend, 'data-circles');
+    const orange = ([r, g, b]: Rgb): boolean => r > 200 && g > 90 && g < 180 && b < 80;
+    // 500 km around (10°, 60°): about 4.5° of latitude; inside at 1° (in every view) and 3.5°, outside at 5.5°.
+    for (const phase of [
+      { name: 'globe', view: { longitudeDeg: 10, latitudeDeg: 60, zoom: 2.5 }, mode: 'auto' },
+      { name: '2D', view: { longitudeDeg: 10, latitudeDeg: 60, zoom: 5.2 }, mode: '2d' },
+      { name: 'tilted', view: { longitudeDeg: 10, latitudeDeg: 60, zoom: 5.2, tiltDeg: 40 }, mode: 'manual' },
+    ] as const) {
+      const image = await showPhase(page, phase);
+      const [center, near1, inside, outside] = await project(page, [
+        [10, 60],
+        [10, 61],
+        [10, 63.5],
+        [10, 65.5],
+      ]);
+      expect(center && orange(pixel(image, center.xPx, center.yPx)), `${phase.name}: center`).toBe(true);
+      expect(near1 && orange(pixel(image, near1.xPx, near1.yPx)), `${phase.name}: 1° in`).toBe(true);
+      if (inside) expect(orange(pixel(image, inside.xPx, inside.yPx)), `${phase.name}: inside`).toBe(true);
+      if (outside) expect(orange(pixel(image, outside.xPx, outside.yPx)), `${phase.name}: outside`).toBe(false);
+    }
+  });
+}

@@ -39,7 +39,7 @@ interface Batch extends BatchContents {
 }
 
 function shapeOf(kind: BatchDescriptor['kind']): LayerShape {
-  return kind === 'polyline' ? 'line' : kind === 'polygon' ? 'flat' : 'quad';
+  return kind === 'polyline' ? 'line' : kind === 'polygon' || kind === 'circle' ? 'flat' : 'quad';
 }
 
 /**

@@ -20,11 +20,11 @@ function segmentDistance(x: number, y: number): number {
 
 /** How far a feature is from the point, pixels (0 inside it), or Infinity when it does not reach it. */
 function featureDistance(batch: BatchContents, feature: number, view: FrameView, x: number, y: number): number {
-  if (batch.kind !== 'polyline' && batch.kind !== 'polygon') {
+  if (batch.kind !== 'polyline' && batch.kind !== 'polygon' && batch.kind !== 'circle') {
     const lon = valueOf(batch, 'position', feature, 0);
     const lat = valueOf(batch, 'position', feature, 1);
     if (!projectLayerPoint(view, lon, lat, valueOf(batch, 'position', feature, 2), a)) return Infinity;
-    const radius = batch.kind === 'point' || batch.kind === 'circle' ? valueOf(batch, 'sizePx', feature) : 12;
+    const radius = batch.kind === 'point' ? valueOf(batch, 'sizePx', feature) : 12;
     const center = Math.hypot(x - (a[0] ?? 0), y - (a[1] ?? 0));
     // Overlapping points: the one whose center is nearest wins (a thousandth of the center distance breaks the tie).
     return Math.max(0, center - radius) + center * 1e-3;
@@ -38,7 +38,7 @@ function featureDistance(batch: BatchContents, feature: number, view: FrameView,
   for (let part = 0; part < geometry.partStarts.length; part++) {
     const start = geometry.partStarts[part] ?? 0;
     const end = geometry.partStarts[part + 1] ?? p.length / 3;
-    const closed = batch.kind === 'polygon';
+    const closed = batch.kind !== 'polyline';
     for (let i = start; i < end - (closed ? 0 : 1); i++) {
       const j = i + 1 < end ? i + 1 : start;
       if (!projectLayerPoint(view, p[i * 3] ?? 0, p[i * 3 + 1] ?? 0, p[i * 3 + 2] ?? 0, a)) continue;

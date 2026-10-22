@@ -2,8 +2,9 @@
  * The built-in data layer: one batch of points, markers, labels, lines, polygons or circles, styled by MapLibre
  * expressions and updated feature by feature (F369, F370, F372, F376, F377).
  */
-import type { GeoPosition } from '@vibeglobe/core';
+import type { FeatureGeometry, GeoPosition } from '@vibeglobe/core';
 import { FeatureStore, type FeatureId } from './feature-store.js';
+import { ellipseGeometry } from './circle.js';
 import {
   anchorOf,
   toFeatureGeometry,
@@ -161,7 +162,11 @@ export class DataLayer implements Layer {
     for (const feature of features) {
       if (feature.geometry === null) throw new TypeError('feature without geometry');
       const id = feature.id ?? `${this.id}:${this.store.count}:${++generatedIds}`;
-      const index = this.store.add(id, { ...feature.properties }, toFeatureGeometry(feature.geometry));
+      const index = this.store.add(
+        id,
+        { ...feature.properties },
+        this.#geometryOf(feature.geometry, feature.properties),
+      );
       this.#writeAnchor(index, anchorOf(feature.geometry));
       this.#writeIdentity(index);
       this.#evaluate(index, zoom, feature.geometry.type);
@@ -181,7 +186,7 @@ export class DataLayer implements Layer {
       this.#writeAnchor(index, 'longitudeDeg' in p ? [p.longitudeDeg, p.latitudeDeg, p.heightMeters ?? 0] : p);
     }
     if (update.geometry !== undefined) {
-      const geometry = toFeatureGeometry(update.geometry);
+      const geometry = this.#geometryOf(update.geometry, this.store.propertiesAt(index));
       if (geometry !== undefined) this.store.setGeometry(index, geometry);
       if (update.position === undefined) this.#writeAnchor(index, anchorOf(update.geometry));
     }
@@ -415,6 +420,16 @@ export class DataLayer implements Layer {
       type: type ?? this.#geometryType(index),
       properties: this.store.propertiesAt(index),
     };
+  }
+
+  /** A feature's geometry for the renderer: circles from a center and their radii (F356), others as given. */
+  #geometryOf(
+    geometry: Geometry,
+    properties: Readonly<Record<string, unknown>> | null | undefined,
+  ): FeatureGeometry | undefined {
+    if (this.kind === 'circle' && geometry.type === 'Point')
+      return ellipseGeometry(geometry.coordinates, properties ?? {});
+    return toFeatureGeometry(geometry);
   }
 
   #geometryType(index: number): string {

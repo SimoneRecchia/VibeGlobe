@@ -191,6 +191,22 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
         'text-anchor': ['get', 'a'],
       },
     }),
+  // Circles and an ellipse at the equator, at 60° and near a pole, radii in meters (F356).
+  'data-circles': () =>
+    new DataLayer('circle', {
+      id: 'circles',
+      data: [
+        feature('equator', { type: 'Point', coordinates: [10, 0] }, { radiusMeters: 500_000 }),
+        feature('sixty', { type: 'Point', coordinates: [10, 60] }, { radiusMeters: 500_000 }),
+        feature('pole', { type: 'Point', coordinates: [0, 87] }, { radiusMeters: 300_000 }),
+        feature(
+          'ellipse',
+          { type: 'Point', coordinates: [40, 30] },
+          { radiusMeters: 600_000, minorRadiusMeters: 200_000, rotationDeg: 45 },
+        ),
+      ],
+      style: { 'fill-color': '#ff8000', 'fill-opacity': 0.9 },
+    }),
   // Images with several anchors, sizes and rotations (F352).
   'data-markers': () =>
     new DataLayer('marker', {

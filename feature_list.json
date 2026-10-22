@@ -2004,7 +2004,7 @@
         "In every frame assert the camera height above the terrain at the camera position (finest loaded level) is at least the configured clearance",
         "Assert no frame shows the inside of the terrain (sentinel and back-face checks)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F147",

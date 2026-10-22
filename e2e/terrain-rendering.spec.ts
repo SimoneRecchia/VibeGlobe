@@ -170,10 +170,14 @@ for (const backend of BACKENDS) {
     test(`terrain vertices hold still at street level and move only with the camera while orbiting on ${backend} (F136)`, async ({
       page,
     }) => {
+      // About 240 tiles stream on a 320 × 240 canvas, about 55 s on the software GPU.
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width: 320, height: 240 });
       const session = await fixtureSession(page);
+      // Meter-wide stripes, 2 m above the flank of the fixture peak, looking along the slope.
       await openGlobe(page, `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-street-level`);
       await waitForTerrain(page);
-      // Imagery stops at level 18, below the surface's levels here: wait for every request to settle instead.
+      // The surface refines beyond the imagery's levels here: wait for every request to settle instead.
       await waitForStreaming(page);
       // A static hold: every frame equals the first (no vertex oscillation).
       const first = await canvasImage(page);

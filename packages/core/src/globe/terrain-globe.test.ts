@@ -211,6 +211,24 @@ describe('terrain in a globe (M4)', () => {
     expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.1));
   });
 
+  it('keeps the tile count bounded at street level beside a cliff while only coarse terrain is resident (KB-080)', async () => {
+    // Low land (1,000 m) with a 4,000 m cliff about 800 m east of the eye: coarse grids span both sides, so their
+    // highest height lies far above the ground under the eye.
+    const cliffX = (7.01 + 180) / 360;
+    const cliff = (x: number): number => (x > cliffX ? 4000 : 1000);
+    const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 21, tiltDeg: 75, headingDeg: 90 };
+    const counts: number[] = [];
+    for (const failing of [undefined, (level: number) => level > 1]) {
+      const { globe } = await terrainGlobe(terrain([], 16, failing), 40, terrainWorkers(cliff, true), view);
+      counts.push(globe.surfaceStats().tiles);
+      globe.destroy();
+    }
+    expect(counts[0]).toBeGreaterThan(0);
+    // The coarse grid shows other relief (its cell slopes from 1,000 to 4,000 m across the eye's region), so a few more
+    // tiles are near it; before the fix the coarse case selected twice as many (5,179 against 2,427).
+    expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.25));
+  });
+
   it('morphs the relief of tiles that appear when the selection changes, ending on the target terrain exactly (F138)', async () => {
     const { globe, renderer, run } = await terrainGlobe(terrain([]), 40, terrainWorkers(), {
       longitudeDeg: 7,

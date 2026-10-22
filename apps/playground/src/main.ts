@@ -66,11 +66,11 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
   // The eye 2 m above the peak's steep flank (F136).
   'terrain-street-level': {
     terrain: 'terrarium',
-    imagery: 'world',
+    imagery: 'stripes',
     lon: '6.9',
     lat: '45.84',
     zoom: '22',
-    tilt: '75',
+    tilt: '55',
     terrainClearance: '2',
   },
   // The peak 200 km away, from about 400 m up: its base lies behind the ellipsoid's horizon (about 70 km away), its

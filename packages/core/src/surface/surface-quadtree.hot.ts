@@ -151,6 +151,8 @@ const lonSin = new Float64Array(3);
 const lonCos = new Float64Array(3);
 /** The tile center relative to the eye. */
 const offset = new Float64Array(3);
+/** The ellipsoid normal at the tile center. */
+const normal = new Float64Array(3);
 /** Per-tile measures written by measureTile. */
 const measure = new Float64Array(4);
 const RADIUS = 0;
@@ -185,6 +187,35 @@ function measureRelief(tile: QuadtreeTile, options: QuadtreeSelectionOptions): v
     if ((tileRange[i] ?? 0) > 0) tileRange[i] = 0;
     if ((tileRange[i + 1] ?? 0) < 0) tileRange[i + 1] = 0;
   }
+}
+
+/**
+ * A lower bound of the distance from the eye to the tile's relief (measured by measureTile and measureRelief), never
+ * below the bounding sphere's: in the tangent plane at the tile center, the eye's lateral distance beyond the tile's
+ * radius and its height outside the relief's range (KB-080). Everything on the tile lies within its radius of the
+ * center laterally (plus what the relief's tilted normals add) and, since the ellipsoid is convex, at or below the
+ * tangent plane by at most radius² / A plus the chord sag, before the relief raises it.
+ */
+function reliefDistance(): number {
+  const high = tileRange[1] ?? 0;
+  const sphere = (measure[CLOSEST] ?? 0) - high;
+  // Without terrain the surface is the ellipsoid, where the sphere's bound has always measured the selection.
+  if (state.options.terrainRange === undefined) return sphere;
+  const radius = measure[RADIUS] ?? 0;
+  const ox = offset[0] ?? 0;
+  const oy = offset[1] ?? 0;
+  const oz = offset[2] ?? 0;
+  // The eye's height above the tangent plane, and its lateral distance from the center.
+  const above = -(ox * (normal[0] ?? 0) + oy * (normal[1] ?? 0) + oz * (normal[2] ?? 0));
+  const lateralSquared = ox * ox + oy * oy + oz * oz - above * above;
+  const lateral = lateralSquared > 0 ? Math.sqrt(lateralSquared) : 0;
+  const low = tileRange[0] ?? 0;
+  const reach = (high > -low ? high : -low) * (radius / A);
+  const gap = lateral - radius - reach;
+  const bottom = low - (radius * radius) / A - (measure[SAG] ?? 0) - reach;
+  const rise = above > high ? above - high : above < bottom ? bottom - above : 0;
+  const shell = gap > 0 ? Math.sqrt(gap * gap + rise * rise) : rise;
+  return shell > sphere ? shell : sphere;
 }
 
 /** The eye's horizon vector w = (x/a², y/a², z/b²) and its length, set once per selection. */
@@ -251,7 +282,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
   // Relief can rise toward the eye by up to the tile's highest terrain (F142).
   measureRelief(tile, options);
-  const closest = (measure[CLOSEST] ?? 0) - (tileRange[1] ?? 0);
+  const closest = reliefDistance();
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
   if (level >= MIN_LEVEL) {
     if (outsideFrustum(camera)) {
@@ -303,10 +334,10 @@ export function quadtreeTileErrorsPx(
   const previous = state.options;
   state.options = options;
   measureTile(tile, camera.eyeEcef);
-  state.options = previous;
   // The selection's distance: relief can rise toward the eye by up to the tile's highest terrain.
   measureRelief(tile, options);
-  const closest = (measure[CLOSEST] ?? 0) - (tileRange[1] ?? 0);
+  const closest = reliefDistance();
+  state.options = previous;
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
   const pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
   out[0] = ((measure[SAG] ?? 0) / distance) * pixelsPerRadian;
@@ -338,6 +369,12 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
   for (let row = 0; row < 3; row++) {
     const lat = row === 0 ? tile.northRad : row === 1 ? (tile.southRad + tile.northRad) / 2 : tile.southRad;
     const sinLat = Math.sin(lat);
+    if (row === 1) {
+      const cosLat = Math.cos(lat);
+      normal[0] = cosLat * (lonCos[1] ?? 0);
+      normal[1] = cosLat * (lonSin[1] ?? 0);
+      normal[2] = sinLat;
+    }
     const primeVerticalRadius = A / Math.sqrt(1 - E2 * sinLat * sinLat);
     const r = primeVerticalRadius * Math.cos(lat);
     const z = primeVerticalRadius * (1 - E2) * sinLat;

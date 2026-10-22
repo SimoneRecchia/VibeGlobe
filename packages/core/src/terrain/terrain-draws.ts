@@ -18,6 +18,7 @@ import {
 import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import { MERCATOR_ROOT, NORTH_CAP, quadtreeTileKey, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { gridRangeInto } from './sample-height.js';
 import type { TerrainHeights } from './terrain-heights.js';
 import type { TerrainSource } from './terrain-source.js';
 
@@ -72,12 +73,17 @@ const GRID_ERROR_FACTOR = 1.5;
 
 /**
  * The error in meters of the terrain each surface level shows, by level up to `maxLevel` (ADR 0006 §2): the source's
- * geometric error at the terrain level, plus the grid's decimation error.
+ * geometric error at the terrain level, plus the grid's decimation error. Beyond the surface level that shows the
+ * finest terrain, tiles of neighboring levels show the same grid with meshes finer than it, so what they differ by
+ * (what the skirts hide) halves with each level instead of staying the finest grid's error (KB-080).
  */
 export function terrainErrorsBySurfaceLevel(source: TerrainSource, maxLevel: number): Float64Array {
   const errors = new Float64Array(maxLevel + 1);
-  for (let level = 0; level <= maxLevel; level++)
-    errors[level] = GRID_ERROR_FACTOR * source.geometricErrorMeters(terrainLevelOf(level, source));
+  const finest = source.maxLevel + TERRAIN_LEVEL_OFFSET;
+  for (let level = 0; level <= maxLevel; level++) {
+    const beyond = level > finest ? 2 ** (level - finest) : 1;
+    errors[level] = (GRID_ERROR_FACTOR * source.geometricErrorMeters(terrainLevelOf(level, source))) / beyond;
+  }
   return errors;
 }
 
@@ -233,9 +239,12 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number):
   return -1;
 }
 
+/** {@link gridRangeInto}'s part of a grid and its range, reused per tile. */
+const part = new Float64Array(6);
+
 /**
  * The height range of a surface tile's relief (ADR 0006 §2): writes into `out` the lowest and highest heights of the
- * deepest resident terrain tile covering it, then that level's error, which bounds what finer levels add, and returns
+ * part of the deepest resident terrain tile covering it that the tile shows, then that level's error, which bounds what finer levels add, and returns
  * true; false when no terrain covering the tile is resident. Wants nothing; allocates nothing.
  */
 export function terrainHeightRange(
@@ -257,8 +266,18 @@ export function terrainHeightRange(
     const handle = layer.loader.peekHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
     const grid = handle >= 0 ? heights.grid(handle) : undefined;
     if (grid) {
-      out[0] = grid.minMeters;
-      out[1] = grid.maxMeters;
+      // The part of the grid the tile shows (KB-080): a tile far deeper than its terrain shows a few cells of it.
+      const offsetU = mapping[MAPPING_OFFSET_U] ?? 0;
+      const offsetV = mapping[MAPPING_OFFSET_V] ?? 0;
+      const endU = offsetU + (mapping[MAPPING_SCALE_U] ?? 1);
+      const endV = offsetV + (mapping[MAPPING_SCALE_V] ?? 1);
+      part[0] = offsetU < endU ? offsetU : endU;
+      part[1] = offsetU < endU ? endU : offsetU;
+      part[2] = offsetV < endV ? offsetV : endV;
+      part[3] = offsetV < endV ? endV : offsetV;
+      gridRangeInto(grid, part);
+      out[0] = part[4] ?? grid.minMeters;
+      out[1] = part[5] ?? grid.maxMeters;
       out[2] = layer.gridErrorMeters[current] ?? 0;
       return true;
     }

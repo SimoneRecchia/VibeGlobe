@@ -21,7 +21,7 @@ export async function openControls(page: Page, query = ''): Promise<void> {
 }
 
 /** The canvas's top-left corner in page coordinates (the page may scroll in `embed` mode). */
-export async function canvasOrigin(page: Page): Promise<{ x: number; y: number }> {
+async function canvasOrigin(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
     const rect = document.querySelector('#globe')?.getBoundingClientRect();
     return { x: rect?.left ?? 0, y: rect?.top ?? 0 };

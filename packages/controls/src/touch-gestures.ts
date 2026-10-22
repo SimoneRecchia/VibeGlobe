@@ -135,6 +135,8 @@ export class TouchGestures {
       this.y[0] = this.y[1] ?? 0;
       this.downX[0] = this.downX[1] ?? 0;
       this.downY[0] = this.downY[1] ?? 0;
+      this.moveMs[0] = this.moveMs[1] ?? 0;
+      this.previousMoveMs[0] = this.previousMoveMs[1] ?? 0;
     }
     this.count--;
     this.latestMs = timeMs;

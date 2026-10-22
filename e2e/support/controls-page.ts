@@ -18,7 +18,7 @@ export interface RecordedFrame {
 }
 
 /** The page's test hooks. */
-export interface ControlsHarness {
+interface ControlsHarness {
   readonly globe: Globe;
   readonly controls: NavigationControls;
   /** Records every frame from now on, with the given positions and screen points tracked. */

@@ -158,6 +158,8 @@ function fakeGlobe(camera: FlatCamera) {
   };
 }
 
+const NO_MODIFIERS = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, repeat: false };
+
 /** Controls attached to a fake 800 × 600 canvas at (10, 20), a {@link FlatCamera} and an engine clock. */
 export function controlsHarness(options?: ControlsOptions, { connect = true, reducedMotion = false } = {}) {
   const width = 800;
@@ -188,15 +190,7 @@ export function controlsHarness(options?: ControlsOptions, { connect = true, red
       timeStamp: init.t,
     });
   const key = (type: 'keydown' | 'keyup', name: string, extra: object = {}): void => {
-    const event = {
-      key: name,
-      shiftKey: false,
-      ctrlKey: false,
-      altKey: false,
-      metaKey: false,
-      repeat: false,
-      ...extra,
-    };
+    const event = { key: name, ...NO_MODIFIERS, ...extra };
     fire(element, type, event);
     fire(doc, type, event);
   };

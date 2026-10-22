@@ -5,7 +5,12 @@ import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/
  * clock and `jumpTo` for heading and tilt about the screen-center target. A temporary bridge until `NavigationApi`
  * carries these (hook request "M6 input" 1 and 2 in docs/parallel-tracks.md).
  */
-export type ConnectedGlobe = Pick<Globe, 'camera' | 'timeMs' | 'jumpTo'>;
+export type ConnectedGlobe = Pick<Globe, 'camera' | 'timeMs' | 'jumpTo'> & {
+  /** The home command (F194), used by the Home key when the engine has it. */
+  goHome?(): unknown;
+  /** The view-mode toggle (F163), used by the 2, 3 and A keys when the engine has it. */
+  setViewMode?(mode: '2d' | '3d' | 'auto'): void;
+};
 
 /** Every camera change the recognizers make goes through here. */
 export class CameraPort {

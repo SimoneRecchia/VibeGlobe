@@ -1,9 +1,10 @@
 import type { GestureContext } from './gesture-context.js';
 
-/** Keys of the key map (docs/guides/controls.md): held arrows, +/- presses, N for north, Escape. */
+/** Keys of the key map (docs/guides/controls.md): held arrows, +/- presses, N for north, Home, view modes, Escape. */
 const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'] as const;
 const ZOOM_IN = new Set(['+', '=', 'Add']);
 const ZOOM_OUT = new Set(['-', '_', 'Subtract']);
+const VIEW_MODES: Readonly<Record<string, '2d' | '3d' | 'auto'>> = { '2': '2d', '3': '3d', a: 'auto', A: 'auto' };
 
 /** A key event's fields the key map reads. */
 export interface KeyInput {
@@ -19,7 +20,8 @@ export interface KeyInput {
 /**
  * Keyboard navigation while the map has focus (F181, F187, F213): arrows pan, Shift+arrows rotate (Left/Right) and
  * tilt (Up/Down), each with an eased start and stop; + and − zoom one level per press about the screen center,
- * accumulating; N turns to north up; Escape cancels a zoom box. Keys with Ctrl, Alt or Meta are left to the browser.
+ * accumulating; N turns to north up; Home flies to the home view; 2, 3 and A pick the 2D, 3D and Auto view modes;
+ * Escape cancels a zoom box. Keys with Ctrl, Alt or Meta are left to the browser.
  */
 export class KeyboardInput {
   private readonly held = new Set<string>();
@@ -58,6 +60,24 @@ export class KeyboardInput {
     }
     if (key === 'n' || key === 'N') {
       this.resetNorth();
+      return true;
+    }
+    return this.command(key);
+  }
+
+  /** Home and the view-mode keys, through the engine's commands when the connected globe has them. */
+  private command(key: string): boolean {
+    const globe = this.context.port.globe;
+    const mode = VIEW_MODES[key];
+    if (mode !== undefined && globe?.setViewMode) {
+      this.context.interrupt();
+      globe.setViewMode(mode);
+      return true;
+    }
+    if (key === 'Home' && globe?.goHome) {
+      this.context.interrupt();
+      this.context.keys.stop();
+      globe.goHome();
       return true;
     }
     return false;

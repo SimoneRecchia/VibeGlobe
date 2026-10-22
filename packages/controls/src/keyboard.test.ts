@@ -96,6 +96,18 @@ describe('keyboard (F181, F187, F174, F213)', () => {
     expect(Math.abs(h.camera.centerX)).toBeLessThan(40);
   });
 
+  it('flies home with Home and switches view modes with 2, 3 and A when the engine has them', () => {
+    const h = controlsHarness();
+    const calls: string[] = [];
+    Object.assign(h.globe, {
+      goHome: () => void calls.push('home'),
+      setViewMode: (mode: string) => void calls.push(mode),
+    });
+    for (const key of ['Home', '2', '3', 'a']) h.key('keydown', key);
+    expect(calls).toEqual(['home', '2d', '3d', 'auto']);
+    expect(h.prevented()).toBe(4);
+  });
+
   it('shows a focus ring when focused from the keyboard', () => {
     const h = controlsHarness();
     h.fire('focus', {});

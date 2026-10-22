@@ -106,37 +106,41 @@ for (const backend of BACKENDS) {
   });
 }
 
-test('a two-finger parallel drag pans about the midpoint and coasts like a mouse drag (F180)', async ({ page }) => {
-  await openControls(page, `lon=10&lat=20&zoom=4&${SIZE}`);
-  const touch = await Touch.create(page);
-  const from = [
-    { id: 1, x: 80, y: 100 },
-    { id: 2, x: 140, y: 140 },
-  ];
-  const under = await positionAt(page, mid(from));
-  await record(page, [under as GeoPosition]);
-  await touch.start(from);
-  const end = await glide(
-    touch,
-    from,
-    [
-      { id: 1, x: 180, y: 110 },
-      { id: 2, x: 240, y: 150 },
-    ],
-    12,
+for (const backend of BACKENDS) {
+  test(`a two-finger parallel drag pans about the midpoint and coasts like a mouse drag on ${backend} (F180)`, async ({
     page,
-  );
-  await touch.end();
-  await settle(page);
-  const recorded = await frames(page);
-  expect(
-    maxDrift(
-      recorded.filter((f) => f.pointer),
-      (f) => f.pointer,
-    ),
-  ).toBeLessThan(1);
-  expect(recorded.at(-1)?.screens[0]?.xPx ?? 0).toBeGreaterThan(mid(end).xPx + 5);
-});
+  }) => {
+    await openControls(page, `backend=${backend}&lon=10&lat=20&zoom=4&${SIZE}`);
+    const touch = await Touch.create(page);
+    const from = [
+      { id: 1, x: 80, y: 100 },
+      { id: 2, x: 140, y: 140 },
+    ];
+    const under = await positionAt(page, mid(from));
+    await record(page, [under as GeoPosition]);
+    await touch.start(from);
+    const end = await glide(
+      touch,
+      from,
+      [
+        { id: 1, x: 180, y: 110 },
+        { id: 2, x: 240, y: 150 },
+      ],
+      12,
+      page,
+    );
+    await touch.end();
+    await settle(page);
+    const recorded = await frames(page);
+    expect(
+      maxDrift(
+        recorded.filter((f) => f.pointer),
+        (f) => f.pointer,
+      ),
+    ).toBeLessThan(1);
+    expect(recorded.at(-1)?.screens[0]?.xPx ?? 0).toBeGreaterThan(mid(end).xPx + 5);
+  });
+}
 
 test('a twist rotates the heading about the midpoint; a small one does not (F184)', async ({ page }) => {
   await openControls(page, `lon=10&lat=45&zoom=6&${SIZE}`);
@@ -163,6 +167,38 @@ test('a twist rotates the heading about the midpoint; a small one does not (F184
   expect(heading).toBeLessThan(-25);
   expect(heading).toBeGreaterThan(-75);
   expect(maxDrift(await frames(page), () => ({ xPx: 160, yPx: 120 }))).toBeLessThan(1);
+});
+
+test('a twist combined with pinch and pan keeps the midpoint content under the midpoint (F184)', async ({ page }) => {
+  await openControls(page, `lon=10&lat=45&zoom=6&${SIZE}`);
+  const touch = await Touch.create(page);
+  const at = (cx: number, cy: number, r: number, deg: number): TouchPoint[] => {
+    const a = (deg * Math.PI) / 180;
+    return [
+      { id: 1, x: cx - r * Math.cos(a), y: cy - r * Math.sin(a) },
+      { id: 2, x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) },
+    ];
+  };
+  const from = at(140, 120, 40, 0);
+  const under = await positionAt(page, mid(from));
+  const zoom = groundZoom(await camera(page));
+  await record(page, [under as GeoPosition]);
+  await touch.start(from);
+  const end = await glide(touch, from, at(180, 130, 70, 60), 16, page);
+  await page.waitForTimeout(150);
+  await settle(page);
+  const recorded = await frames(page);
+  await touch.end();
+  await settle(page);
+  expect(
+    maxDrift(
+      recorded.filter((f) => f.pointer),
+      (f) => f.pointer,
+    ),
+  ).toBeLessThan(1);
+  expect(recorded.at(-1)?.screens[0]?.xPx).toBeCloseTo(mid(end).xPx, 0);
+  expect(groundZoom(await camera(page)) - zoom).toBeGreaterThan(0.5);
+  expect((await camera(page)).headingDeg).toBeLessThan(-20);
 });
 
 test('a two-finger vertical drag tilts, and pinch, twist and pan do not (F185)', async ({ page }) => {
@@ -289,6 +325,19 @@ test('taps: a double tap zooms in one level at the tap, a two-finger tap zooms o
   await touch.end();
   await settle(page);
   expect(groundZoom(await camera(page))).toBeCloseTo(z2, 9);
+  // A two-finger touch that moves beyond the tap tolerance: no zoom out.
+  await touch.start([
+    { id: 1, x: 130, y: 120 },
+    { id: 2, x: 190, y: 120 },
+  ]);
+  await touch.move([
+    { id: 1, x: 130, y: 120 },
+    { id: 2, x: 210, y: 120 },
+  ]);
+  await touch.end();
+  await settle(page);
+  expect(groundZoom(await camera(page))).toBeGreaterThan(z2 - 0.5);
+  const z3 = groundZoom(await camera(page));
   // A two-finger touch held too long: no zoom.
   await touch.start([
     { id: 1, x: 130, y: 120 },
@@ -297,7 +346,7 @@ test('taps: a double tap zooms in one level at the tap, a two-finger tap zooms o
   await page.waitForTimeout(400);
   await touch.end();
   await settle(page);
-  expect(groundZoom(await camera(page))).toBeCloseTo(z2, 9);
+  expect(groundZoom(await camera(page))).toBeCloseTo(z3, 9);
 });
 
 test('touch drags over the map never scroll the page (F189)', async ({ page }) => {

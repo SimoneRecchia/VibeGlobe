@@ -8,6 +8,14 @@
 - M3 took about 14 hours of agent time (2026-10-21 13:20 to 2026-10-22 03:10 UTC, groundwork included): about 9.5 hours of features and 4.5 hours of making the full CI run green on its software GPU (eight single-worker end-to-end shards, isolated measurements one at a time, KB-074 and KB-075, test timing fixes logged in docs/test-changes.md). Remaining: M4 to M15, 413 active entries. Estimate to M15 at the M3 pace (about 3 entries per hour including CI stabilization): 110 to 140 hours of agent time, plus the owner-only steps in docs/open-questions.md.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## M6 input track (eighth session, `packages/controls`)
+
+Branch `claude/modest-wozniak-067cfl`; owned entries, hook requests and each entry's blocker in `docs/parallel-tracks.md` ("M6 input track: status").
+
+- **2026-10-22:** `@vibeglobe/controls` rebuilt for M6 (ADR 0009 §3–6): mouse pan, right-drag and Ctrl+drag rotate and tilt, Shift+drag zoom box, double click; wheel notches smoothed (100 ms, 2-level lead cap), trackpad scroll and ctrlKey pinch applied per frame, Safari gesture events; touch pan, pinch, twist and an exclusive two-finger tilt decided on event times, double tap, two-finger tap, re-baselining at finger changes; arrows, Shift+arrows, +/-, N, Home and view-mode keys; closed-form inertia on engine time (quartered under reduced motion); validated settings (`createControls(options)`), `zoomIn`, `zoomOut`, `resetNorth`, and `connect(globe)` for rotation and the engine clock until hooks 1–3 land. Guide `docs/guides/controls.md`. Browser specs on a harness page of the playground's dev server (`e2e/support/controls.html`).
+- Passing: F170, F175, F179, F181, F183, F189. Pending (reference tablet or trackpads): F169, F171, F172, F180, F184, F186. Failing until M4, M5 and the M6 movement API reach `main`: F168, F173, F174, F178, F182, F185, F187, F213.
+- Notes: on the container's software GPU an 800 × 600 frame blocks the main thread for about 250–500 ms, so pointer events arrive too far apart for the 80 ms velocity window; the inertia and touch specs use a 320 × 240 canvas (`?size=`), and `settle()` waits for 1.5 s without a frame. Chromium dispatches one pointermove per finger of a touch event with the same timestamp, and a frame can fall between them: samples with equal timestamps replace each other, and a frame waits once for a finger moving in step with the other.
+
 ## Data pipeline track (second session, `packages/tools`)
 
 Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlobe#6; status and blockers in `docs/parallel-tracks.md`.

@@ -21,6 +21,7 @@ import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import {
   drawTerrain,
+  recordShownTerrain,
   gridErrorsByLevel,
   MAX_TERRAIN_MORPH_LEVELS,
   deepenFallbackSkirts,
@@ -414,6 +415,7 @@ export class ImageryRuntime {
       terrain.loader.beginFrame();
       drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
+      recordShownTerrain(list, tiles, count, terrain);
       if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart + this.chargedMs;

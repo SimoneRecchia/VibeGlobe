@@ -290,6 +290,8 @@ for (const backend of BACKENDS) {
   test(`the camera rises smoothly when higher fine terrain arrives under it on ${backend} (F147)`, async ({ page }) => {
     // Terrain from level 9 arrives 9 s late (under the 10 s first-byte timeout); near the summit the coarser grids shown
     // until then lie meters below it. The recording starts with the page, from the first frame.
+    // A small canvas keeps software-rendered frames short.
+    await page.setViewportSize({ width: 320, height: 240 });
     const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 9, latencyMs: 9000 }]);
     await recordClearanceFromStart(page);
     await openGlobe(

@@ -116,7 +116,7 @@ export function drawTerrain(
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
-    const handle = wantTerrain(layer, tile, screenDistance(tile, camera));
+    const handle = wantTerrain(layer, tile, screenDistance(tile, camera), layer.shown.previous.get(tile.key) ?? -1);
     if (handle < 0) {
       list.terrain.textures[index] = NO_TERRAIN;
       list.terrain.levels[index] = -1;
@@ -127,8 +127,25 @@ export function drawTerrain(
     writeTransform(mapping);
     const level = mapping[MAPPING_LEVEL] ?? -1;
     list.terrain.set(index, handle, level, geographic, transform);
-    layer.shown.current.set(tile.key, level);
     if (!layer.shown.previous.has(tile.key)) seedMorph(list, index, tile, level, layer);
+  }
+}
+
+/**
+ * Records the terrain level each drawn tile shows this frame, after the morphs (a morph under way keeps showing its
+ * target): {@link drawTerrain} morphs the next frame from these, and refines no tile more than
+ * {@link MAX_TERRAIN_MORPH_LEVELS} beyond them (KB-092). Allocates nothing.
+ */
+export function recordShownTerrain(
+  list: DrawList,
+  tiles: readonly QuadtreeTile[],
+  count: number,
+  layer: TerrainLayer,
+): void {
+  for (let index = 0; index < count; index++) {
+    const tile = tiles[index];
+    const level = list.terrain.levels[index] ?? -1;
+    if (tile && level >= 0) layer.shown.current.set(tile.key, level);
   }
   layer.shown.swap();
 }
@@ -237,8 +254,12 @@ function mapCapToMercatorEdge(tile: QuadtreeTile, level: number): boolean {
   return false;
 }
 
-/** Wants a surface tile's terrain and returns the deepest resident handle, its mapping left in `mapping`; else -1. */
-function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number): number {
+/**
+ * Wants a surface tile's terrain and returns the deepest resident handle, its mapping left in `mapping`; else -1. A
+ * tile that showed level `shown` last frame advances at most {@link MAX_TERRAIN_MORPH_LEVELS} levels, to a resident
+ * ancestor of the deepest, so the change morphs instead of jumping when several finer levels arrive at once (KB-092).
+ */
+function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number, shown: number): number {
   const source = layer.source;
   const level = terrainLevelOf(tile.level, source);
   if (source.tiling.crs === 'EPSG:3857') {
@@ -258,11 +279,31 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number):
     const handle = !arriving
       ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
       : layer.loader.readyHandle(current, x, y);
-    if (handle >= 0) return handle;
+    if (handle >= 0)
+      return shown >= 0 && current > shown + MAX_TERRAIN_MORPH_LEVELS
+        ? limitAdvance(layer, shown, current, handle)
+        : handle;
     if (handle === ARRIVING) arriving = true;
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);
   }
   return -1;
+}
+
+/**
+ * The resident ancestor {@link MAX_TERRAIN_MORPH_LEVELS} levels below `shown` of the terrain tile at `level` in
+ * `mapping` (handle `handle`), its mapping left in `mapping`; `handle` and the deepest mapping when it is not resident.
+ */
+function limitAdvance(layer: TerrainLayer, shown: number, level: number, handle: number): number {
+  seedMapping.set(mapping);
+  for (let current = level; current > shown + MAX_TERRAIN_MORPH_LEVELS; current--) mapAncestor(mapping, 0, 1);
+  const ancestor = layer.loader.readyHandle(
+    mapping[MAPPING_LEVEL] ?? -1,
+    mapping[MAPPING_X] ?? 0,
+    mapping[MAPPING_Y] ?? 0,
+  );
+  if (ancestor >= 0) return ancestor;
+  mapping.set(seedMapping);
+  return handle;
 }
 
 /** {@link gridRangeInto}'s part of a grid and its range, reused per tile. */

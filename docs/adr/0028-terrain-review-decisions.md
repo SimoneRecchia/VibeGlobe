@@ -54,6 +54,8 @@ The M4 milestone review found places where two feature entries pull against each
     finest resident terrain is reached within a few frames.
 - **Morphs: 2(b).** A camera cut may switch relief at once, which is not a pop during motion. Continuous motion
   changes the selection by at most a level or two per frame, so its new tiles morph.
+  A tile already drawn never refines more than two levels beyond what it showed last frame: when several finer levels
+  arrive at once, it steps through a resident ancestor, two levels per morph (KB-092).
 - **Grids: 3(b).**
   - Heightmaps use the coarsest grid of 8 to 256 cells, never more cells than pixels, that meets the bound.
   - Quantized-mesh tiles are rasterized at 64 cells, doubled up to 256 while the mesh's vertices miss the bound.

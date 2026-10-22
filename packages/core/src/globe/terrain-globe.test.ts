@@ -254,6 +254,52 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('advances the relief of a tile at most two levels per morph when several finer levels arrive at once (KB-092)', async () => {
+    // Levels above 4 are held back until released, then all answer in the same frame.
+    const held: (() => void)[] = [];
+    let holding = true;
+    const base = terrain([], 12);
+    const transport = terrainTransport([]);
+    const source: TerrainSource = {
+      ...base,
+      transport: {
+        start: (request, timeouts, done) => {
+          const level = Number(request.url.split('/').at(-3));
+          if (!holding || level <= 4) return transport.start(request, timeouts, done);
+          held.push(() => transport.start(request, timeouts, done));
+          return () => undefined;
+        },
+      },
+    };
+    const { globe, renderer, run } = await terrainGlobe(source, 40, terrainWorkers(), {
+      longitudeDeg: 7,
+      latitudeDeg: 46,
+      zoom: 11,
+    });
+    holding = false;
+    for (const release of held.splice(0)) release();
+    // Every frame, no tile's relief jumps more than two levels: each change is a morph (ADR 0028).
+    const shown = new Map<number, number>();
+    let advanced = false;
+    for (let frame = 0; frame < 120; frame++) {
+      await run(1);
+      const draws = renderer.lastDraws;
+      if (!draws) continue;
+      for (let i = 0; i < draws.count; i++) {
+        const key = draws.meshKeys[i] ?? 0;
+        const level = globe.surfaceTiles()[i]?.terrainLevel ?? -1;
+        const before = shown.get(key);
+        if (before !== undefined && before >= 0 && level >= 0) {
+          expect(level - before).toBeLessThanOrEqual(2);
+          if (level > 4) advanced = true;
+        }
+        shown.set(key, level);
+      }
+    }
+    expect(advanced).toBe(true);
+    globe.destroy();
+  });
+
   it('answers elevation queries from the terrain in memory with the level they came from (F144)', async () => {
     const { globe } = await terrainGlobe(terrain([]));
     const out = { heightMeters: 0, level: 0, noData: true };
@@ -569,7 +615,7 @@ describe('terrain in a globe (M4)', () => {
     ];
     const sets: string[][] = [];
     for (const view of cameras) {
-      const { globe } = await terrainGlobe(terrain([], 12), 40, terrainWorkers(), view);
+      const { globe } = await terrainGlobe(terrain([], 12), 120, terrainWorkers(), view);
       // Each drawn tile and the terrain tile level it shows.
       sets.push(
         globe
@@ -586,7 +632,7 @@ describe('terrain in a globe (M4)', () => {
     const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 10, tiltDeg: 30 };
     /** Each draw's extra skirt depth, and whether it shows terrain coarser than its own level's. */
     const skirts = async (failing?: (level: number) => boolean): Promise<{ meters: number; fallback: boolean }[]> => {
-      const { globe, renderer } = await terrainGlobe(terrain([], 12, failing), 40, terrainWorkers(), view);
+      const { globe, renderer } = await terrainGlobe(terrain([], 12, failing), 120, terrainWorkers(), view);
       const draws = renderer.lastDraws;
       const tiles = globe.surfaceTiles();
       const values = tiles.slice(0, draws?.count ?? 0).map((tile, i) => ({
@@ -631,7 +677,7 @@ describe('terrain in a globe (M4)', () => {
       },
     };
     // Closer in, so a terrain tile's border crosses the view.
-    const { globe, renderer } = await terrainGlobe(mixed, 40, terrainWorkers(), { ...view, zoom: 11 });
+    const { globe, renderer } = await terrainGlobe(mixed, 120, terrainWorkers(), { ...view, zoom: 11 });
     const draws = renderer.lastDraws;
     const tiles = globe.surfaceTiles();
     let fallbackDraws = 0;

@@ -176,9 +176,10 @@ function wrapLongitudeInto(out: Float64Array): void {
 
 /**
  * The inverse of {@link cappedMercatorInto}: reads x and y (meters) from `xy[0..1]` and writes the longitude
- * (wrapped into [−π, π)) and latitude (radians, at most ±π/2) to `out[0..1]`.
+ * (wrapped into [−π, π)) and latitude (radians, at most ±π/2) to `out[0..1]`. Returns false when y lies beyond the
+ * caps' end at the poles (the latitude is then clamped to ±π/2): no point of the map is there (KB-100).
  */
-export function inverseCappedMercatorInto(xy: Float64Array, out: Float64Array): void {
+export function inverseCappedMercatorInto(xy: Float64Array, out: Float64Array): boolean {
   const x = xy[0] ?? 0;
   const y = xy[1] ?? 0;
   out[0] = x / A;
@@ -188,8 +189,15 @@ export function inverseCappedMercatorInto(xy: Float64Array, out: Float64Array): 
   if (y > HALF_EXTENT_METERS) out[1] = LIMIT_RAD + (y - HALF_EXTENT_METERS) / CAP_SLOPE_METERS_PER_RAD;
   else if (y < -HALF_EXTENT_METERS) out[1] = -LIMIT_RAD + (y + HALF_EXTENT_METERS) / CAP_SLOPE_METERS_PER_RAD;
   else out[1] = Math.atan(Math.sinh(y / A));
-  if ((out[1] ?? 0) > HALF_PI) out[1] = HALF_PI;
-  if ((out[1] ?? 0) < -HALF_PI) out[1] = -HALF_PI;
+  if ((out[1] ?? 0) > HALF_PI) {
+    out[1] = HALF_PI;
+    return false;
+  }
+  if ((out[1] ?? 0) < -HALF_PI) {
+    out[1] = -HALF_PI;
+    return false;
+  }
+  return true;
 }
 
 /**

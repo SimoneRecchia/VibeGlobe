@@ -20,7 +20,8 @@ const TOLERANCE_METERS = 1e-4;
 
 /**
  * Intersects the ray through a CSS pixel (`pixel[0..1]`) with the anchor's tangent plane; writes the longitude and
- * latitude of the hit (radians) to `lonLat` and returns true, or false when the ray points away from the plane.
+ * latitude of the hit (radians) to `lonLat` and returns true, or false when the ray points away from the plane or
+ * meets it beyond the map's polar edge (KB-100).
  */
 function pickPlane(camera: Camera, frame: MorphFrame, out: Float64Array): boolean {
   const eye = camera.eyeEcef;
@@ -43,8 +44,7 @@ function pickPlane(camera: Camera, frame: MorphFrame, out: Float64Array): boolea
   }
   planeXy[0] = (frame.anchorMercator[0] ?? 0) + east / (frame.factors[2] ?? 1);
   planeXy[1] = (frame.anchorMercator[1] ?? 0) + north / (frame.factors[2] ?? 1);
-  inverseCappedMercatorInto(planeXy, out);
-  return true;
+  return inverseCappedMercatorInto(planeXy, out);
 }
 
 /** The part of `morphed − eye` perpendicular to the ray, into `out`. */

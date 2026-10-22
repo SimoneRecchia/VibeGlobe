@@ -51,4 +51,23 @@ describe('picking the morphed surface (ADR 0008, F158)', () => {
         expect(center.latitudeRad / DEG).toBeCloseTo(45, 7);
       }
   });
+
+  it('finds nothing beyond the polar edge of the flat map (KB-100)', () => {
+    // Close to the north pole and tilted toward it: the top of the view shows the sky past the map's end.
+    const cam = new Camera();
+    cam.pose.targetLatitudeRad = 87.3 * DEG;
+    cam.pose.rangeMeters = 759_626;
+    cam.pose.tiltRad = 35 * DEG;
+    cam.widthPx = 800;
+    cam.heightPx = 600;
+    cam.update();
+    for (const m of [1, 0.9]) {
+      const frame = new MorphFrame();
+      frame.update(Float64Array.of(0, 87.3 * DEG), Float64Array.of(m, 1));
+      const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      expect(pickMorphedAt(cam, frame, Float64Array.of(2, 2), hit), `m = ${m}`).toBe(false);
+      expect(pickMorphedAt(cam, frame, Float64Array.of(400, 300), hit)).toBe(true);
+      expect(hit.latitudeRad / DEG).toBeCloseTo(87.3, 6);
+    }
+  });
 });

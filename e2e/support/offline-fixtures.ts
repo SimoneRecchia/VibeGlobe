@@ -60,6 +60,24 @@ function tileRange(
   return { x0: x(bounds.westDeg), x1: x(bounds.eastDeg), y0: y(bounds.northDeg), y1: y(bounds.southDeg) };
 }
 
+/** Fetches the fixture tiles of a package from the dev server. */
+async function fixtureTiles(
+  spec: FixturePackageSpec,
+): Promise<{ z: number; x: number; y: number; bytes: Uint8Array }[]> {
+  const tiles: { z: number; x: number; y: number; bytes: Uint8Array }[] = [];
+  for (let z = spec.minLevel; z <= spec.maxLevel; z++) {
+    if (spec.skipLevels?.includes(z)) continue;
+    const r = tileRange(z, spec.bounds);
+    for (let y = r.y0; y <= r.y1; y++)
+      for (let x = r.x0; x <= r.x1; x++) {
+        if (spec.skip?.includes(`${z}/${x}/${y}`)) continue;
+        const response = await fetch(`/fixture-tiles/${spec.session}/${spec.pattern}/mercator/${z}/${x}/${y}.png`);
+        tiles.push({ z, x, y, bytes: new Uint8Array(await response.arrayBuffer()) });
+      }
+  }
+  return tiles;
+}
+
 /** Builds a fixture package in the page. */
 export async function buildFixturePackage(spec: FixturePackageSpec): Promise<FixturePackage> {
   const repoFixtures = `${repo}/packages/offline/src/__fixtures__`;
@@ -73,17 +91,7 @@ export async function buildFixturePackage(spec: FixturePackageSpec): Promise<Fix
   >;
   const writers: Writers = { writePmtiles: pmtiles.writePmtiles, writeMbtiles: mbtiles.writeMbtiles };
   const offline = (await import(/* @vite-ignore */ `${repo}/packages/offline/src/index.ts`)) as OfflineModule;
-  const tiles: { z: number; x: number; y: number; bytes: Uint8Array }[] = [];
-  for (let z = spec.minLevel; z <= spec.maxLevel; z++) {
-    if (spec.skipLevels?.includes(z)) continue;
-    const r = tileRange(z, spec.bounds);
-    for (let y = r.y0; y <= r.y1; y++)
-      for (let x = r.x0; x <= r.x1; x++) {
-        if (spec.skip?.includes(`${z}/${x}/${y}`)) continue;
-        const response = await fetch(`/fixture-tiles/${spec.session}/${spec.pattern}/mercator/${z}/${x}/${y}.png`);
-        tiles.push({ z, x, y, bytes: new Uint8Array(await response.arrayBuffer()) });
-      }
-  }
+  const tiles = await fixtureTiles(spec);
   const format = spec.format ?? 'pmtiles';
   const b = spec.bounds;
   const file =

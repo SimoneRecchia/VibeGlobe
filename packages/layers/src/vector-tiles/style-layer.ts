@@ -96,7 +96,7 @@ function propertySpec(group: 'paint' | 'layout', type: string, name: string): St
 }
 
 /** Compiles one property value, or reports why it cannot be compiled. */
-export function compileProperty(
+function compileProperty(
   group: 'paint' | 'layout',
   type: string,
   name: string,

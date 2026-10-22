@@ -5782,7 +5782,7 @@
         "Check it records the approaches found, their trade-offs and failure modes, the chosen approach and why, with a linked ADR",
         "Confirm no restrictively licensed source-available project (for example Mapbox GL JS v2+) was studied and no code was copied"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F440",

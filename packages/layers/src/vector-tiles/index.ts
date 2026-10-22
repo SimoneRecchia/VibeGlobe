@@ -30,3 +30,31 @@ export {
   resolveBuildingParts,
 } from './buildings.js';
 export type { BuildingFeature, BuildingHeight, ExtrusionGeometry, HeightSource } from './buildings.js';
+export {
+  decodeGlyphs,
+  GLYPH_RANGE_SIZE,
+  glyphRanges,
+  GlyphStore,
+  glyphUrl,
+  MAX_GLYPH_CODE_POINT,
+  parseSpriteIndex,
+  spriteUrls,
+} from './glyphs.js';
+export type { Glyph, SpriteIcon, SpriteSheetUrls } from './glyphs.js';
+export { allowsIdeographicBreak, DEFAULT_SHAPING, ONE_EM_PX, shapeText } from './text-shaping.js';
+export type { GlyphLookup, PositionedGlyph, Shaping, ShapingOptions, TextAnchor } from './text-shaping.js';
+export { lineAnchors, placeGlyphsAlongLine, pointAlong } from './line-labels.js';
+export type { GlyphOnLine, LineAnchor, LineAnchorOptions } from './line-labels.js';
+export { byPriority, CrossTileSymbolIndex, placeSymbols, SymbolFader } from './symbol-placement.js';
+export type { ScreenBox, SymbolCandidate, TileSymbol } from './symbol-placement.js';
+export {
+  brunnel,
+  localizedName,
+  localizedTextField,
+  PLACE_CLASSES,
+  placePriority,
+  ROAD_CLASSES,
+  roadClass,
+  roadDrawOrder,
+} from './osm.js';
+export type { RoadClass } from './osm.js';

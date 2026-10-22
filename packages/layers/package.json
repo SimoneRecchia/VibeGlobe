@@ -26,6 +26,7 @@
     "@vibeglobe/core": "0.0.0",
     "@vibeglobe/sources": "0.0.0",
     "earcut": "3.2.4",
+    "pbf": "5.1.2",
     "rbush": "4.0.1",
     "supercluster": "9.1.0"
   },

@@ -5,6 +5,7 @@
  * untrusted: a malformed tile is reported and left out with its subtree, the rest of the tree is kept, and parsing
  * never throws.
  */
+import type { MetadataSchema } from './metadata.js';
 import { IDENTITY, multiply, worldVolume, type Mat4, type WorldVolume } from './volumes.js';
 
 /** A problem found while parsing, with its JSON path. */
@@ -35,6 +36,8 @@ export interface ImplicitTiling {
   /** The root's own bounding volume, as declared (subdivided for descendants). */
   readonly rootVolume: Readonly<Record<string, unknown>>;
   readonly rootGeometricError: number;
+  /** The tileset's metadata schema, for the subtrees' property tables. */
+  readonly schema?: MetadataSchema;
 }
 
 /** The coordinates of an implicit tile. */
@@ -120,6 +123,7 @@ function matrix(value: unknown): Mat4 | undefined {
 interface Context {
   readonly base: string;
   readonly problems: TilesetProblem[];
+  readonly schema: MetadataSchema | undefined;
   count: number;
 }
 
@@ -184,6 +188,7 @@ function parseImplicit(json: Json, contents: readonly TileContent[], ctx: Contex
     contents: contents.map((c) => decodeURIComponent(c.uri)),
     rootVolume: json['boundingVolume'] as Json,
     rootGeometricError: json['geometricError'] as number,
+    ...(ctx.schema === undefined ? {} : { schema: ctx.schema }),
   };
 }
 
@@ -257,7 +262,8 @@ export function parseTileset(
   url: string,
   parentTile?: Tile3D,
 ): { tileset: Tileset | undefined; problems: TilesetProblem[] } {
-  const ctx: Context = { base: url, problems: [], count: 0 };
+  const schema = isRecord(input) && isRecord(input['schema']) ? (input['schema'] as MetadataSchema) : undefined;
+  const ctx: Context = { base: url, problems: [], schema, count: 0 };
   if (!isRecord(input))
     return { tileset: undefined, problems: [{ path: '', message: 'a tileset must be a JSON object' }] };
   const asset = input['asset'];

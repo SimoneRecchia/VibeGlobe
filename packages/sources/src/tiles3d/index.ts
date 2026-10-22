@@ -19,6 +19,8 @@ export {
   subtreeUri,
 } from './implicit.js';
 export type { Subtree } from './implicit.js';
+export { propertyTableRow, resolveEntity, resolveValue } from './metadata.js';
+export type { MetadataSchema, PropertyTable, SchemaProperty } from './metadata.js';
 export { parseTileset, resolveUri, SUPPORTED_EXTENSIONS } from './tileset.js';
 export type {
   ContentState,

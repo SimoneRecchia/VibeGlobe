@@ -6055,7 +6055,7 @@
         "Fuzz tileset JSON and binary tile content and assert no crash, the tile is marked failed and its parent stays visible",
         "Run the suite against public sample tilesets where their terms allow it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F461",

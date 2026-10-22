@@ -12,6 +12,7 @@ import {
   subdivideVolume,
   subtreeUri,
 } from './implicit.js';
+import { resolveEntity } from './metadata.js';
 import { parseTileset, type Tile3D } from './tileset.js';
 import { requestsToCancel, screenSpaceError, selectTiles, type TraversalCamera } from './traversal.js';
 import { distanceToVolume, geodeticToEcef, intersectsFrustum, worldVolume } from './volumes.js';
@@ -481,3 +482,133 @@ function mulberry(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+describe('3D Tiles 1.1 metadata (F460)', () => {
+  const schema = {
+    classes: {
+      building: {
+        properties: {
+          height: { type: 'SCALAR', componentType: 'UINT16', normalized: true, scale: 100, offset: 5 },
+          name: { type: 'STRING' },
+          kind: { type: 'ENUM', enumType: 'kind' },
+          tall: { type: 'BOOLEAN' },
+          floors: { type: 'SCALAR', componentType: 'UINT8', array: true },
+          pos: { type: 'VEC2', componentType: 'FLOAT32', noData: [0, 0], default: [9, 9] },
+          note: { type: 'STRING', default: 'none' },
+        },
+      },
+    },
+    enums: {
+      kind: {
+        values: [
+          { name: 'church', value: 1 },
+          { name: 'tower', value: 2 },
+        ],
+      },
+    },
+  } as const;
+
+  it('resolves JSON entities with defaults, normalization, offset, scale and enums', () => {
+    expect(
+      resolveEntity({ class: 'building', properties: { height: 65535, kind: 2, tall: true, pos: [0, 0] } }, schema),
+    ).toEqual({
+      height: 105,
+      kind: 'tower',
+      tall: true,
+      pos: [9, 9],
+      note: 'none',
+    });
+    expect(resolveEntity({ class: 'unknown', properties: { a: 1 } }, schema)).toEqual({ a: 1 });
+  });
+
+  it('reads tile metadata from a subtree property table, rows in availability order', () => {
+    const u16 = new Uint8Array(new Uint16Array([0, 65535]).buffer);
+    const strings = encoder.encode('DuomoTorre');
+    const stringOffsets = new Uint8Array(new Uint32Array([0, 5, 10]).buffer);
+    const kinds = new Uint8Array(new Uint16Array([1, 2]).buffer);
+    const tall = new Uint8Array([0b10]);
+    const floors = new Uint8Array([3, 1, 2, 3]);
+    const floorOffsets = new Uint8Array(new Uint32Array([0, 1, 4]).buffer);
+    // Tile availability of a 2-level quadtree subtree: the root and child 3 (bits 0 and 4).
+    const availability = new Uint8Array([0b10001]);
+    const parts = [availability, u16, strings, stringOffsets, kinds, tall, floors, floorOffsets];
+    let offset = 0;
+    const bufferViews = parts.map((p) => {
+      const view = { buffer: 0, byteOffset: offset, byteLength: p.length };
+      offset += Math.ceil(p.length / 8) * 8;
+      return view;
+    });
+    const binary = new Uint8Array(offset);
+    parts.forEach((p, i) => binary.set(p, bufferViews[i]?.byteOffset ?? 0));
+    const json = {
+      buffers: [{ byteLength: binary.length }],
+      bufferViews,
+      tileAvailability: { bitstream: 0 },
+      contentAvailability: [{ constant: 0 }],
+      childSubtreeAvailability: { constant: 0 },
+      propertyTables: [
+        {
+          class: 'building',
+          count: 2,
+          properties: {
+            height: { values: 1 },
+            name: { values: 2, stringOffsets: 3 },
+            kind: { values: 4 },
+            tall: { values: 5 },
+            floors: { values: 6, arrayOffsets: 7 },
+          },
+        },
+      ],
+      tileMetadata: 0,
+    };
+    const jsonBytes = padded(JSON.stringify(json));
+    const header = new DataView(new ArrayBuffer(24));
+    [...'subt'].forEach((c, i) => header.setUint8(i, c.charCodeAt(0)));
+    header.setUint32(4, 1, true);
+    header.setBigUint64(8, BigInt(jsonBytes.length), true);
+    header.setBigUint64(16, BigInt(binary.length), true);
+    const file = concat(new Uint8Array(header.buffer), jsonBytes, binary);
+    const { tileset } = parseTileset(
+      {
+        asset: { version: '1.1' },
+        schema,
+        root: {
+          boundingVolume: { box: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+          geometricError: 8,
+          content: { uri: 'c/{level}/{x}/{y}.glb' },
+          implicitTiling: {
+            subdivisionScheme: 'QUADTREE',
+            subtreeLevels: 2,
+            availableLevels: 2,
+            subtrees: { uri: 's/{level}/{x}/{y}.subtree' },
+          },
+        },
+      },
+      `${BASE}tileset.json`,
+    );
+    const root = tileset?.root as Tile3D;
+    const subtree = parseSubtree(file, root.implicit as never);
+    if ('error' in subtree) throw new Error(subtree.error);
+    applySubtree(root, subtree);
+    expect(root.metadata).toEqual({
+      height: 5,
+      name: 'Duomo',
+      kind: 'church',
+      tall: false,
+      floors: [3],
+      pos: [9, 9],
+      note: 'none',
+    });
+    expect(root.children.map((c) => c.coordinates)).toEqual([{ level: 1, x: 1, y: 1, z: 0 }]);
+    expect(root.children[0]?.metadata).toEqual({
+      height: 105,
+      name: 'Torre',
+      kind: 'tower',
+      tall: true,
+      floors: [1, 2, 3],
+      pos: [9, 9],
+      note: 'none',
+    });
+    expect(root.contents).toEqual([]);
+  });
+});

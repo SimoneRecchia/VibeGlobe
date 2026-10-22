@@ -3,7 +3,8 @@
  * availability (bitstreams or constants), Morton indexing, and the expansion of an implicit tile into its available
  * children with subdivided bounding volumes, halved geometric errors and content URIs from the templates.
  */
-import type { ImplicitCoordinates, ImplicitTiling, Tile3D } from './tileset.js';
+import { propertyTableRow, type PropertyTable } from './metadata.js';
+import type { ImplicitCoordinates, ImplicitTiling, Tile3D, TileContent } from './tileset.js';
 import { worldVolume } from './volumes.js';
 
 /** Availability: a constant, or one bit per index (least significant bit first). */
@@ -14,9 +15,25 @@ export interface Subtree {
   readonly tiles: Availability;
   readonly contents: readonly Availability[];
   readonly childSubtrees: Availability;
+  /** The subtree's buffer views, for its property tables. */
+  readonly views: readonly Uint8Array[];
+  readonly propertyTables: readonly PropertyTable[];
+  /** Index of the property table holding the metadata of the subtree's available tiles. */
+  readonly tileMetadata?: number;
+  /** Per content, the index of the property table holding the metadata of its available contents. */
+  readonly contentMetadata: readonly (number | undefined)[];
+  readonly subtreeMetadata?: Readonly<Record<string, unknown>>;
 }
 
 const decoder = new TextDecoder();
+
+/** The number of available entries before `index` (the row of an available entry in its property table). */
+function rank(a: Availability, index: number): number {
+  if ('constant' in a) return index;
+  let count = 0;
+  for (let i = 0; i < index; i++) if (isAvailable(a, i)) count++;
+  return count;
+}
 
 function isAvailable(a: Availability, index: number): boolean {
   if ('constant' in a) return a.constant;
@@ -102,6 +119,13 @@ export function parseSubtree(input: ArrayBuffer | Uint8Array, tiling: ImplicitTi
         n ** tiling.subtreeLevels,
         'childSubtreeAvailability',
       ),
+      views,
+      propertyTables: Array.isArray(json['propertyTables']) ? (json['propertyTables'] as PropertyTable[]) : [],
+      ...(typeof json['tileMetadata'] === 'number' ? { tileMetadata: json['tileMetadata'] } : {}),
+      contentMetadata: Array.isArray(json['contentMetadata'])
+        ? json['contentMetadata'].map((m) => (typeof m === 'number' ? m : undefined))
+        : [],
+      ...(isRecord(json['subtreeMetadata']) ? { subtreeMetadata: json['subtreeMetadata'] } : {}),
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
@@ -189,6 +213,32 @@ export function subtreeUri(tile: Tile3D): string | undefined {
     : expandTemplate(tile.implicit.subtrees, tile.coordinates);
 }
 
+function row(subtree: Subtree, tiling: ImplicitTiling, table: number | undefined, index: number) {
+  const propertyTable = table === undefined ? undefined : subtree.propertyTables[table];
+  if (propertyTable === undefined || tiling.schema === undefined) return undefined;
+  return propertyTableRow(propertyTable, index, subtree.views, tiling.schema);
+}
+
+function tileMetadata(tiling: ImplicitTiling, subtree: Subtree, relative: number): Record<string, unknown> | undefined {
+  return row(subtree, tiling, subtree.tileMetadata, rank(subtree.tiles, relative));
+}
+
+function availableContents(
+  tiling: ImplicitTiling,
+  subtree: Subtree,
+  c: ImplicitCoordinates,
+  relative: number,
+): TileContent[] {
+  const out: TileContent[] = [];
+  tiling.contents.forEach((template, i) => {
+    const availability = subtree.contents[i];
+    if (availability === undefined || !isAvailable(availability, relative)) return;
+    const metadata = row(subtree, tiling, subtree.contentMetadata[i], rank(availability, relative));
+    out.push({ uri: expandTemplate(template, c), external: false, ...(metadata === undefined ? {} : { metadata }) });
+  });
+  return out;
+}
+
 function makeTile(
   parent: Tile3D,
   tiling: ImplicitTiling,
@@ -200,15 +250,8 @@ function makeTile(
   const declared = subdivideVolume(tiling.rootVolume, c, octree);
   const volume = declared === undefined ? undefined : worldVolume(declared, parent.transform);
   if (declared === undefined || volume === undefined) return undefined;
-  const contents =
-    relative === undefined
-      ? []
-      : tiling.contents
-          .filter(
-            (_, i) =>
-              slot.subtree.contents[i] !== undefined && isAvailable(slot.subtree.contents[i] as Availability, relative),
-          )
-          .map((template) => ({ uri: expandTemplate(template, c), external: false }));
+  const contents = relative === undefined ? [] : availableContents(tiling, slot.subtree, c, relative);
+  const metadata = relative === undefined ? undefined : tileMetadata(tiling, slot.subtree, relative);
   const tile: Tile3D = {
     id: `${parent.id.split('@')[0] ?? parent.id}@${c.level}/${c.x}/${c.y}${octree ? `/${c.z}` : ''}`,
     parent,
@@ -220,6 +263,7 @@ function makeTile(
     boundingVolume: declared,
     contents,
     children: [],
+    ...(metadata === undefined ? {} : { metadata }),
     implicit: tiling,
     coordinates: c,
     state: 'unloaded',
@@ -275,13 +319,8 @@ export function applySubtree(tile: Tile3D, subtree: Subtree): void {
   const tiling = tile.implicit;
   const c = tile.coordinates;
   if (tiling === undefined || c === undefined) return;
-  if (tile.contents.length === 0) {
-    const available = tiling.contents.filter(
-      (_, i) => subtree.contents[i] !== undefined && isAvailable(subtree.contents[i] as Availability, 0),
-    );
-    (tile.contents as { uri: string; external: boolean }[]).push(
-      ...available.map((t) => ({ uri: expandTemplate(t, c), external: false })),
-    );
-  }
+  if (tile.contents.length === 0) (tile.contents as TileContent[]).push(...availableContents(tiling, subtree, c, 0));
+  const metadata = tileMetadata(tiling, subtree, 0);
+  if (metadata !== undefined) (tile as { metadata?: Readonly<Record<string, unknown>> }).metadata = metadata;
   expandImplicitChildren(tile);
 }

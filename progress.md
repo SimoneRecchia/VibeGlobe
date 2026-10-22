@@ -8,6 +8,13 @@
 - M3 took about 14 hours of agent time (2026-10-21 13:20 to 2026-10-22 03:10 UTC, groundwork included): about 9.5 hours of features and 4.5 hours of making the full CI run green on its software GPU (eight single-worker end-to-end shards, isolated measurements one at a time, KB-074 and KB-075, test timing fixes logged in docs/test-changes.md). Remaining: M4 to M15, 413 active entries. Estimate to M15 at the M3 pace (about 3 entries per hour including CI stabilization): 110 to 140 hours of agent time, plus the owner-only steps in docs/open-questions.md.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## Vector tiles and 3D Tiles track (eighth session, M13 computational parts)
+
+Branch `claude/laughing-fermat-40ejeq`; owned entries, blockers and hook requests in `docs/parallel-tracks.md` ("Vector tiles and 3D Tiles track: status").
+
+- **2026-10-22:** Survey `docs/research/vector-and-3d-tiles.md` and ADR 0034. `@vibeglobe/layers/vector-tiles`: MapLibre style loading, validation with JSON paths, runtime changes with their cost and layer cross-fades (`@maplibre/maplibre-gl-style-spec` 26.4.4); fill tessellation (earcut) and line tessellation with joins, caps and width as a paint value, clipped at the tile buffer; building heights (tags, levels, defaults by type, parts) and extrusion geometry; glyph ranges, glyph PBF decoding, font fallback, sprites, text shaping; line-label anchors and glyphs along lines, collision with priorities, cross-tile ids and fades; OSM road order and place ranking with label languages; overzoom, coverage and stand-in parents; the `layout-vector-tile` worker task. `@vibeglobe/sources/tiles3d`: tilesets 1.0 and 1.1, b3dm, i3dm, pnts, cmpt and glTF content, implicit tiling with subtrees and 1.1 metadata, traversal by screen-space error (REPLACE keeps the parent until every child is covered, ADD), request priorities and cancellation, an LRU content budget; CC0 public samples as fixtures. Passing: F439, F460. Every other owned entry waits on drawing, the engine's vector and 3D Tiles sources and playground scenarios (hook requests 1–6 of this track).
+- Notes: tests run in Node only (`npx vitest run packages/layers/src/vector-tiles packages/sources/src/tiles3d`); right-to-left scripts and balanced line breaking are in `docs/follow-ups.md`; the 10-minute browser soak of F462 is in `docs/hardening-backlog.md`.
+
 ## Data pipeline track (second session, `packages/tools`)
 
 Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlobe#6; status and blockers in `docs/parallel-tracks.md`.

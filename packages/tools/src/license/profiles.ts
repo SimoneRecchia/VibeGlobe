@@ -184,6 +184,14 @@ export const FORBIDDEN_HOSTS: readonly { pattern: RegExp; profile: string }[] = 
   { pattern: /(^|\.)(googleapis|google|gstatic|ggpht)\.com$/i, profile: 'google-maps-platform' },
 ];
 
+/**
+ * Layers whose terms forbid packaging, recognised in any source URL: EOX's Sentinel-2 cloudless editions from 2018 on
+ * (`s2cloudless-2018`, `s2cloudless-2020_3857`, …) are CC BY-NC-SA, whatever profile a configuration names.
+ */
+export const FORBIDDEN_URLS: readonly { pattern: RegExp; profile: string }[] = [
+  { pattern: /s2cloudless-20(1[89]|[2-9]\d)/i, profile: 's2cloudless-2018-or-later' },
+];
+
 /** Looks up a profile by id. */
 export function findProfile(id: string): ProviderProfile | undefined {
   return PROVIDER_PROFILES.find((profile) => profile.id === id);

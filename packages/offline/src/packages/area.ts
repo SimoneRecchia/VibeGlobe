@@ -19,7 +19,7 @@ export type PackageArea = BoundsDeg | PolygonDeg;
 const DEG = Math.PI / 180;
 
 /** The bounding box of an area. */
-export function boundsOf(area: PackageArea): BoundsDeg {
+function boundsOf(area: PackageArea): BoundsDeg {
   if (!('polygonDeg' in area)) return area;
   const lons = area.polygonDeg.map((p) => p[0]);
   const lats = area.polygonDeg.map((p) => p[1]);
@@ -56,7 +56,7 @@ function segmentsCross(
 }
 
 /** True when a tile's extent and an area overlap (touching edges do not count for boxes). */
-export function tileIntersects(area: PackageArea, extent: TileRectangleRad): boolean {
+function tileIntersects(area: PackageArea, extent: TileRectangleRad): boolean {
   const w = extent.westRad / DEG;
   const s = extent.southRad / DEG;
   const e = extent.eastRad / DEG;

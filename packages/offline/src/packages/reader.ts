@@ -78,7 +78,11 @@ export class PackageTileReader implements PackageReader {
       this.onCorrupt(pkg.manifest.id, `tile ${tileKey(sourceId, coord)} fails its SHA-256 check`);
       return undefined;
     }
-    return { bytes: tile.bytes, contentType: tile.contentType, packageId: pkg.manifest.id };
+    return {
+      bytes: tile.bytes,
+      contentType: tile.contentType,
+      packageId: `${pkg.manifest.id}@${pkg.manifest.version}`,
+    };
   }
 
   private async readArchive(
@@ -98,7 +102,11 @@ export class PackageTileReader implements PackageReader {
       signal.addEventListener('abort', abort, { once: true });
     });
     if (result.kind !== 'ok' || result.bytes.byteLength === 0) return undefined;
-    return { bytes: result.bytes, contentType: result.contentType, packageId: pkg.manifest.id };
+    return {
+      bytes: result.bytes,
+      contentType: result.contentType,
+      packageId: `${pkg.manifest.id}@${pkg.manifest.version}`,
+    };
   }
 
   private fileKey(pkg: ActivePackage, file: PackageFileEntry): string {

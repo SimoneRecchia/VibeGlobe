@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./cache-worker.js": {
+      "source": "./src/cache-worker.ts",
+      "default": "./dist/cache-worker.js"
     }
   },
   "files": [

@@ -8,6 +8,7 @@ import type { CachedTile, PolicyDecision, ProviderRules, TierCounters } from './
 export interface PackageTile {
   readonly bytes: ArrayBuffer;
   readonly contentType: string;
+  /** The package and version it came from, as `id@version`. */
   readonly packageId: string;
 }
 
@@ -27,7 +28,7 @@ export interface TierContext {
   waitForChange(maxMs: number): Promise<void>;
   /** True in offline-only mode. */
   offlineOnly(): boolean;
-  count(sourceId: string, tier: keyof TierCounters): void;
+  count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
   readonly fetch: typeof fetch;
 }
 
@@ -39,6 +40,12 @@ export interface TieredSourceOptions {
   readonly rules?: ProviderRules;
   /** Per-source cache settings, which can only shorten what the headers allow (F277). */
   readonly cachePolicy?: SourceCachePolicy;
+  /**
+   * How expired tiles are revalidated (F278): `conditional` sends If-None-Match and If-Modified-Since, which a
+   * cross-origin host must allow in its CORS headers; `refetch` downloads again and keeps the stored tile when the ETag
+   * is unchanged. Default: conditional on the page's own origin, refetch elsewhere.
+   */
+  readonly revalidation?: 'conditional' | 'refetch';
 }
 
 /** How long a tile that cannot be loaded while offline is held before the engine is told to ask again. */
@@ -131,29 +138,48 @@ class TileLoader {
     const decision = this.context.decide(id, this.layerId);
     const key = tileKey(id, coord);
     const stored = decision.readPersistentCache ? await this.context.store.get(key).catch(() => undefined) : undefined;
-    if (stored && stored.freshUntilMs > Date.now()) {
-      this.context.count(id, 'persistent');
+    if (stored && this.fresh(stored)) {
+      this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
     if (decision.readPackages) {
       const tile = await this.context.readPackage(id, coord, signal).catch(() => undefined);
       if (tile) {
-        this.context.count(id, 'package');
+        this.context.count(id, 'package', coord, tile.packageId);
         return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType };
       }
     }
     const endpoint = endpointOf(url);
     if (decision.useNetwork && this.context.reachable(endpoint)) {
-      const outcome = await fetchTile(this.context.fetch, url, timeouts, signal, stored);
-      const result = this.afterFetch(outcome, key, stored, decision, endpoint);
+      const outcome = await fetchTile(
+        this.context.fetch,
+        url,
+        timeouts,
+        signal,
+        this.conditional(url) ? stored : undefined,
+      );
+      const result = this.afterFetch(outcome, key, stored, decision, endpoint, coord);
       if (result) return result;
     }
     if (stored) {
       // Expired but unreachable: a stale tile beats a hole.
-      this.context.count(id, 'persistent');
+      this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
     return this.miss(decision);
+  }
+
+  /** Fresh by its headers and by the source's own limit, which applies to tiles stored before it was set (F277). */
+  private fresh(stored: CachedTile): boolean {
+    const now = Date.now();
+    const maxAgeMs = this.options.cachePolicy?.maxAgeMs;
+    return stored.freshUntilMs > now && (maxAgeMs === undefined || stored.storedAtMs + maxAgeMs > now);
+  }
+
+  private conditional(url: string): boolean {
+    if (this.options.revalidation) return this.options.revalidation === 'conditional';
+    const page = (globalThis as { location?: { origin?: string } }).location?.origin;
+    return page !== undefined && endpointOf(url) === page;
   }
 
   /** The result of a download, or undefined when the endpoint gave no usable answer. */
@@ -163,19 +189,24 @@ class TileLoader {
     stored: CachedTile | undefined,
     decision: PolicyDecision,
     endpoint: string,
+    coord: TileCoord,
   ): TransportResult | undefined {
     const id = this.source.id;
     switch (outcome.kind) {
       case 'ok': {
         this.context.reportSuccess(endpoint);
-        this.context.count(id, 'network');
+        this.context.count(
+          id,
+          stored?.etag !== undefined && outcome.headers.etag === stored.etag ? 'revalidated' : 'network',
+          coord,
+        );
         this.write(key, decision, outcome.headers, { bytes: outcome.bytes, contentType: outcome.contentType });
         return { kind: 'ok', bytes: outcome.bytes, contentType: outcome.contentType };
       }
       case 'not-modified': {
         this.context.reportSuccess(endpoint);
         if (!stored) return { kind: 'status', status: 502, retryAfterMs: undefined };
-        this.context.count(id, 'revalidated');
+        this.context.count(id, 'revalidated', coord);
         this.write(key, decision, outcome.headers, stored);
         return okOf(stored);
       }

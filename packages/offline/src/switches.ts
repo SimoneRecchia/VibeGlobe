@@ -9,12 +9,7 @@ export const ALL_ON: Readonly<LoadingSwitches> = Object.freeze({
 });
 
 /** The names of the switches, in a fixed order. */
-export const SWITCH_NAMES: readonly LoadingSwitch[] = [
-  'persistentCache',
-  'memoryReuse',
-  'prefetch',
-  'offlinePackaging',
-];
+const SWITCH_NAMES: readonly LoadingSwitch[] = ['persistentCache', 'memoryReuse', 'prefetch', 'offlinePackaging'];
 
 /**
  * The loading switches set globally, per source and per layer (F290). The effective value for a source in a layer is

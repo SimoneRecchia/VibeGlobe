@@ -17,11 +17,14 @@ export interface Validators {
   readonly lastModified?: string;
 }
 
-/** True for a response that is a login or error page instead of tile data. */
-function looksLikePortal(response: Response): boolean {
+/**
+ * True for an answer that is a captive portal's login page instead of tile data: a redirect, or an HTML page served as
+ * a success. An HTML error page (a 404 from a web server) is a real answer from the endpoint.
+ */
+export function looksLikePortal(response: Response): boolean {
   if (response.redirected || response.type === 'opaqueredirect') return true;
   const type = (response.headers.get('Content-Type') ?? '').toLowerCase();
-  return type.startsWith('text/html');
+  return response.ok && type.startsWith('text/html');
 }
 
 async function outcomeOf(response: Response): Promise<FetchOutcome> {

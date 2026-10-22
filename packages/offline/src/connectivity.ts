@@ -1,3 +1,4 @@
+import { looksLikePortal } from './network-fetch.js';
 import type { Connectivity } from './types.js';
 
 /** Timing of the health checks (F297). */
@@ -155,9 +156,8 @@ export class ConnectivityMonitor {
         credentials: 'omit',
         cache: 'no-store',
       });
-      const html = (response.headers.get('Content-Type') ?? '').toLowerCase().startsWith('text/html');
       await response.arrayBuffer().catch(() => undefined);
-      return !response.redirected && !html && response.status < 500;
+      return !looksLikePortal(response) && response.status < 500;
     } catch {
       return false;
     } finally {

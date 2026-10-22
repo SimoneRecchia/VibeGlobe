@@ -145,7 +145,7 @@ async function installFile(
   return { ...entry, chunkBytes, chunkSha256: await chunkHashes(new Blob(chunks), chunkBytes) };
 }
 
-function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
+function concat(a: Uint8Array, b: Uint8Array): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(a.length + b.length);
   out.set(a);
   out.set(b, a.length);

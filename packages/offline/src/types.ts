@@ -104,9 +104,6 @@ export interface NetworkPolicy {
   resolve(request: PolicyRequest): PolicyDecision;
 }
 
-/** The tiers a tile can come from, in the order they are tried after the engine's own GPU and RAM tiers. */
-export type TileTier = 'persistent' | 'package' | 'network';
-
 /** Counters of where tiles came from, per tier (F272). */
 export interface TierCounters {
   /** Tiles served from the persistent cache without touching the network. */

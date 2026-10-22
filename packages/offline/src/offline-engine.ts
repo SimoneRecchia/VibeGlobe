@@ -1,6 +1,7 @@
 import type { ImagerySource, TileCoord } from '@vibeglobe/core';
 import { ConnectivityMonitor, endpointOf, type HealthCheckTiming } from './connectivity.js';
-import { indexedDbStore } from './idb-store.js';
+import { DEFAULT_CACHE_BYTES, indexedDbStore } from './idb-store.js';
+import { workerStore } from './worker-store.js';
 import { memoryStore } from './memory-store.js';
 import { requestPersistence, type PersistenceResult } from './persistence.js';
 import { defaultNetworkPolicy } from './policy.js';
@@ -41,10 +42,10 @@ export interface OfflineOptions {
   /** Global loading switches (default all on, F271). */
   readonly switches?: Partial<LoadingSwitches>;
   /**
-   * The persistent tile store: an IndexedDB store by default, a custom {@link CacheStore} (F327), or `'memory'` where
-   * nothing may be kept across sessions.
+   * The persistent tile store: IndexedDB in the cache worker by default, `'main-thread'` for IndexedDB on the page, a
+   * custom {@link CacheStore} (F327), or `'memory'` where nothing may be kept across sessions.
    */
-  readonly store?: CacheStore | 'memory';
+  readonly store?: CacheStore | 'memory' | 'main-thread';
   /** Size limit of the default persistent cache, in bytes (default 512 MiB, F274). */
   readonly cacheBytes?: number;
   /** A custom policy replacing the built-in resolution of mode, switches and provider rules (F327). */
@@ -53,6 +54,17 @@ export interface OfflineOptions {
   readonly healthChecks?: HealthCheckTiming;
   /** The `fetch` used for tiles and health checks; the global one by default. */
   readonly fetch?: typeof fetch;
+  /** Called for every tile a wrapped source delivers, with the tier it came from (debug overlays, tests). */
+  readonly onServe?: (event: ServeEvent) => void;
+}
+
+/** A tile delivered by a wrapped source and the tier it came from. */
+export interface ServeEvent {
+  readonly sourceId: string;
+  readonly coord: TileCoord;
+  readonly tier: keyof TierCounters;
+  /** The package it was read from, for the package tier. */
+  readonly packageId?: string;
 }
 
 /** The effective settings (F271). */
@@ -129,12 +141,14 @@ class OfflineEngine implements Offline {
   private waiters: (() => void)[] = [];
   private packageReader: PackageReader | undefined;
   private readonly fetchImpl: typeof fetch;
+  private readonly onServe: OfflineOptions['onServe'];
   private cacheMarked = false;
 
   constructor(options: OfflineOptions) {
     this.currentMode = options.mode ?? 'hybrid';
     if (options.switches) this.switches.set(options.switches);
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+    this.onServe = options.onServe;
     this.policy =
       options.policy ??
       defaultNetworkPolicy({
@@ -153,7 +167,7 @@ class OfflineEngine implements Offline {
       },
     });
     // Only the built-in store outlives the page; a memory or custom store is not checked.
-    if (options.store === undefined) void this.checkCacheEviction();
+    if (options.store === undefined || options.store === 'main-thread') void this.checkCacheEviction();
     else this.cacheMarked = true;
   }
 
@@ -238,12 +252,16 @@ class OfflineEngine implements Offline {
   }
 
   private createStore(options: OfflineOptions): CacheStore {
-    if (options.store === 'memory') return memoryStore({ maxBytes: options.cacheBytes ?? 512 * 1024 * 1024 });
-    if (options.store) return options.store;
-    return indexedDbStore({
+    if (options.store === 'memory') return memoryStore({ maxBytes: options.cacheBytes ?? DEFAULT_CACHE_BYTES });
+    if (options.store && options.store !== 'main-thread') return options.store;
+    const settings = {
       ...(options.cacheBytes === undefined ? {} : { maxBytes: options.cacheBytes }),
-      onLost: (reason) => this.emit('storage-lost', { cache: true, packages: [], reason }),
-    });
+      onLost: (reason: string) => this.emit('storage-lost', { cache: true, packages: [], reason }),
+    };
+    // IndexedDB in the cache worker keeps reads and writes off the main thread (F273).
+    return options.store === undefined && typeof Worker !== 'undefined'
+      ? workerStore(settings)
+      : indexedDbStore(settings);
   }
 
   private registerEndpoint(source: ImagerySource): void {
@@ -274,10 +292,11 @@ class OfflineEngine implements Offline {
           });
         }),
       offlineOnly: () => this.currentMode === 'offline',
-      count: (sourceId, tier) => {
+      count: (sourceId, tier, coord, packageId) => {
         let counters = this.counters.get(sourceId);
         if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
         counters[tier]++;
+        if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
       },
       fetch: this.fetchImpl,
     };

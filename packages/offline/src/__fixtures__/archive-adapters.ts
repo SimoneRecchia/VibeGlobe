@@ -57,39 +57,48 @@ function sourceOf(id: string, base: string, minLevel: number, maxLevel: number, 
   };
 }
 
-/** The stub adapters. */
-export const stubAdapters: ArchiveAdapters = {
-  async pmtiles({ id, archive, fetch: fetchImpl }) {
-    const bytes: Source = {
-      getKey: () => archive,
-      getBytes: async (offset, length): Promise<RangeResponse> => {
-        const response = await fetchImpl(archive, { headers: { Range: `bytes=${offset}-${offset + length - 1}` } });
-        return { data: await response.arrayBuffer() };
-      },
-    };
-    const pmtiles = new PMTiles(bytes);
-    const header = await pmtiles.getHeader();
-    return sourceOf(
-      id,
-      archive,
-      header.minZoom,
-      header.maxZoom,
-      async (z, x, y) => (await pmtiles.getZxy(z, x, y))?.data,
-    );
-  },
-  async mbtiles({ id, package: url, fetch: fetchImpl }) {
-    const { default: initSqlJs } = await import('sql.js');
-    const sql = await initSqlJs();
-    const db = new sql.Database(new Uint8Array(await (await fetchImpl(url)).arrayBuffer()));
-    const range = db.exec('SELECT MIN(zoom_level), MAX(zoom_level) FROM tiles')[0]?.values[0] ?? [0, 0];
-    const statement = db.prepare(
-      'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?',
-    );
-    return sourceOf(id, url, Number(range[0]), Number(range[1]), (z, x, y) => {
-      statement.bind([z, x, 2 ** z - 1 - y]);
-      const found = statement.step() ? statement.get()[0] : undefined;
-      statement.reset();
-      return Promise.resolve(found instanceof Uint8Array ? found.slice().buffer : undefined);
-    });
-  },
-};
+/**
+ * The stub adapters; in browsers `wasmUrl` locates sql.js's WebAssembly file.
+ *
+ * @public (imported by URL from e2e/support/offline-page.ts)
+ */
+export function createStubAdapters(options: { wasmUrl?: string } = {}): ArchiveAdapters {
+  return {
+    async pmtiles({ id, archive, fetch: fetchImpl }) {
+      const bytes: Source = {
+        getKey: () => archive,
+        getBytes: async (offset, length): Promise<RangeResponse> => {
+          const response = await fetchImpl(archive, { headers: { Range: `bytes=${offset}-${offset + length - 1}` } });
+          return { data: await response.arrayBuffer() };
+        },
+      };
+      const pmtiles = new PMTiles(bytes);
+      const header = await pmtiles.getHeader();
+      return sourceOf(
+        id,
+        archive,
+        header.minZoom,
+        header.maxZoom,
+        async (z, x, y) => (await pmtiles.getZxy(z, x, y))?.data,
+      );
+    },
+    async mbtiles({ id, package: url, fetch: fetchImpl }) {
+      const { default: initSqlJs } = await import('sql.js');
+      const sql = await initSqlJs(options.wasmUrl === undefined ? {} : { locateFile: () => options.wasmUrl ?? '' });
+      const db = new sql.Database(new Uint8Array(await (await fetchImpl(url)).arrayBuffer()));
+      const range = db.exec('SELECT MIN(zoom_level), MAX(zoom_level) FROM tiles')[0]?.values[0] ?? [0, 0];
+      const statement = db.prepare(
+        'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?',
+      );
+      return sourceOf(id, url, Number(range[0]), Number(range[1]), (z, x, y) => {
+        statement.bind([z, x, 2 ** z - 1 - y]);
+        const found = statement.step() ? statement.get()[0] : undefined;
+        statement.reset();
+        return Promise.resolve(found instanceof Uint8Array ? found.slice().buffer : undefined);
+      });
+    },
+  };
+}
+
+/** The stub adapters for Node tests. */
+export const stubAdapters = createStubAdapters();

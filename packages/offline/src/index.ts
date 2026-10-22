@@ -4,12 +4,21 @@
  * @module @vibeglobe/offline
  */
 export { createOffline } from './offline-engine.js';
-export type { Offline, OfflineEvents, OfflineOptions, OfflineSettings, PackageReader } from './offline-engine.js';
+export type {
+  Offline,
+  OfflineEvents,
+  OfflineOptions,
+  OfflineSettings,
+  PackageReader,
+  ServeEvent,
+} from './offline-engine.js';
 export type { TieredSourceOptions, PackageTile } from './tiered-source.js';
 export { DEFAULT_HEURISTIC_MAX_AGE_MS, freshnessOf } from './cache-policy.js';
 export type { CacheHeaders, Freshness, SourceCachePolicy } from './cache-policy.js';
 export { indexedDbStore, DEFAULT_CACHE_BYTES } from './idb-store.js';
 export type { IndexedDbStoreOptions } from './idb-store.js';
+export { workerStore } from './worker-store.js';
+export type { WorkerStoreOptions } from './worker-store.js';
 export { memoryStore } from './memory-store.js';
 export type { MemoryStoreOptions } from './memory-store.js';
 export { defaultNetworkPolicy } from './policy.js';

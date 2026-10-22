@@ -71,7 +71,7 @@ describe('the offline engine', () => {
         : { headers: { 'Cache-Control': 'no-cache', ETag: `"${version}"` }, body: version },
     );
     const offline = engine({ fetch: net.fetchImpl });
-    const source = offline.source(fixture());
+    const source = offline.source(fixture(), { revalidation: 'conditional' });
     expect(text(await load(source, tile(1, 0, 0)))).toBe('fresh');
     expect(text(await load(source, tile(1, 0, 0)))).toBe('fresh');
     expect(net.requests.filter((r) => r.url.endsWith('/1/0/0.png'))).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('the offline engine', () => {
     const unchanged = fakeNetwork(() => ({ status: 304, headers: { ETag: '"v1"', 'Cache-Control': 'no-cache' } }));
     const store = memoryStore();
     const second = engine({ fetch: unchanged.fetchImpl, store });
-    const revalidating = second.source(fixture());
+    const revalidating = second.source(fixture(), { revalidation: 'conditional' });
     await store.put('osm/1/1/0', {
       bytes: new TextEncoder().encode('v1').buffer,
       contentType: 'image/png',

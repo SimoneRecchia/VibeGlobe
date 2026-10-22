@@ -14,8 +14,6 @@ export const PACKAGES = 'packages';
 export const PACKAGE_FILES = 'package-files';
 /** Object store of the tiles of packages built in the browser. */
 export const PACKAGE_TILES = 'package-tiles';
-/** Object store of bookkeeping records (the eviction marker). */
-export const META = 'meta';
 
 /** The database could not be used (missing, blocked, or closed by the browser). */
 export class StorageUnavailableError extends Error {
@@ -75,7 +73,6 @@ export function openDatabase(factory: IDBFactory, name: string): Promise<IDBData
       db.createObjectStore(PACKAGES);
       db.createObjectStore(PACKAGE_FILES);
       db.createObjectStore(PACKAGE_TILES);
-      db.createObjectStore(META);
     };
     request.onsuccess = () => {
       clearTimeout(timer);

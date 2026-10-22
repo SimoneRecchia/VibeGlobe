@@ -3594,7 +3594,7 @@
         "Confirm it lists known failure modes from issue trackers (quota errors, browser eviction, captive portals, stale caches) and how the chosen design avoids each",
         "Confirm it states the chosen approach and why and links the ADRs that record it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F271",
@@ -3644,7 +3644,7 @@
         "Inject QuotaExceededError on writes and assert the engine logs one warning, keeps rendering with zero black pixels, and keeps working from memory and network",
         "Assert storage use reported by the API matches the stored data within 5%"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F275",
@@ -3681,7 +3681,7 @@
         "Assert fresh tiles are reused without requests, expired tiles are revalidated, and no-store tiles are absent from browser storage",
         "Assert per-source policy overrides in configuration can only shorten what the headers and profile allow"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F278",
@@ -3693,7 +3693,7 @@
         "Navigate again and assert revalidation requests carry If-None-Match",
         "Assert unchanged tiles get 304 and are reused, and changed tiles are downloaded and replace the stored ones without a visible flash"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F279",
@@ -3717,7 +3717,7 @@
         "Assert through storage inspection that no tile was written and through request interception that revisited tiles are downloaded again",
         "Switch it off for one source only and assert the other sources still persist"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F281",

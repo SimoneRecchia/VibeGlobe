@@ -46,7 +46,7 @@ export interface BuildContext {
 }
 
 /** Average tile size assumed by estimates before anything is downloaded. */
-export const ESTIMATED_TILE_BYTES = 20 * 1024;
+const ESTIMATED_TILE_BYTES = 20 * 1024;
 
 const CONCURRENCY = 6;
 const ATTEMPTS = 3;
@@ -59,10 +59,7 @@ function* tilesFor(request: PackageRequest, source: ImagerySource): Generator<Ti
 }
 
 /** The sources a request may package, refusing it before any download when a provider forbids packaging (F319). */
-export function checkPackaging(
-  request: PackageRequest,
-  context: BuildContext,
-): Pick<BuildReport, 'included' | 'excluded'> {
+function checkPackaging(request: PackageRequest, context: BuildContext): Pick<BuildReport, 'included' | 'excluded'> {
   if (!context.globalPackagingAllowed())
     throw new PackageError('packaging-disabled', `package '${request.id}': offline packaging is switched off globally`);
   for (const { source, rules } of request.sources) {

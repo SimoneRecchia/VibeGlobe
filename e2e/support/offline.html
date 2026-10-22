@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <title>VibeGlobe offline harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b1020;
+      }
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #globe {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The offline track's test page on the playground's dev server (docs/parallel-tracks.md): the playground's own
+         sources do not go through @vibeglobe/offline yet, so this page builds the same globe with wrapped sources. -->
+    <div id="app"><canvas id="globe" aria-label="Map"></canvas></div>
+    <script type="module" src="./offline-page.ts"></script>
+  </body>
+</html>

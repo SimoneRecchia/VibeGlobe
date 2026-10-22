@@ -2978,7 +2978,7 @@
         "Run the opt-in live-endpoint job and confirm it targets only endpoints whose terms allow automated testing, and that it records which endpoints were skipped and why",
         "Import the suite from a custom adapter package and assert it runs there unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F224",
@@ -3070,7 +3070,7 @@
         "Assert KVP and RESTful requests are built correctly and tiles land at the correct positions in the playground on both backends",
         "Fuzz capabilities documents and assert malformed input produces a descriptive error and never crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F231",
@@ -3083,7 +3083,7 @@
         "Show a fixture layer with labels crossing tile edges in the playground and assert no label is cut and no seam is visible at tile edges on both backends",
         "Fuzz GetCapabilities and service exception responses and assert they never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F232",
@@ -3096,7 +3096,7 @@
         "Load the same archive from a local file (File or Blob) and assert identical tiles",
         "Fuzz archive headers and directories and assert corrupted archives never crash the engine or blank the view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F233",
@@ -3109,7 +3109,7 @@
         "Load the same package from a local file and from a fixture HTTP server and assert identical tiles in the playground",
         "Fuzz package files and assert corrupted databases produce a descriptive error and never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F234",
@@ -3147,7 +3147,7 @@
         "Assert invalid documents (wrong nesting, NaN coordinates, unclosed rings) are reported per feature without dropping valid features",
         "Fuzz the parser and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F237",
@@ -3160,7 +3160,7 @@
         "Assert a KMZ archive with embedded icons and a ground overlay image parses into the expected engine data structures, with the icons and the overlay image extracted with their placement",
         "Fuzz KML and KMZ input and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F238",
@@ -3172,7 +3172,7 @@
         "Assert waypoints, routes, track segments, elevations and timestamps map to the expected engine data structures",
         "Fuzz GPX input and assert no input crashes the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F239",
@@ -3185,7 +3185,7 @@
         "Assert decoding happens off the main thread",
         "Fuzz tile payloads and assert malformed tiles are treated as no data and never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F240",
@@ -3405,7 +3405,7 @@
         "Confirm every rule that affects caching, prefetch, offline packaging, display-only use, logo and attribution placement and session tokens is mapped to a profile setting",
         "Confirm the profile's code references the ADR and the conformance suite checks each mapped setting"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F257",
@@ -3418,7 +3418,7 @@
         "Make the fixture expire the session and assert a new session is created transparently with zero black pixels",
         "With the owner's API key, run the opt-in live test for roadmap, satellite and terrain and capture screenshots; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F258",
@@ -3467,7 +3467,7 @@
         "Assert the effective profile settings match the respective rules recorded in the Google terms ADR",
         "Assert a missing billing region produces a configuration error rather than a silent default"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F262",
@@ -3480,7 +3480,7 @@
         "Assert the attribution and logo rules of the Google profile apply wherever the tiles are displayed",
         "With the owner's API key, run the opt-in live test; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F549",
@@ -3494,7 +3494,7 @@
         "Make the fixture server answer with a quota error and confirm the live suite stops at once with a clear message",
         "With the owner's key, run the live suite once and confirm it passes under the EEA terms"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F263",
@@ -3506,7 +3506,7 @@
         "Confirm every rule on bulk download, offline use, concurrency, application identification, caching headers and attribution is mapped to a profile setting",
         "Confirm the profile's code references the ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F264",
@@ -3531,7 +3531,7 @@
         "Log open connections per host and assert they never exceed the profile's limit",
         "Assert the view keeps showing parent-tile fallback with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F266",
@@ -3543,7 +3543,7 @@
         "Configure it with an identifier and assert every request carries a valid Referer identifying the application (the referrer policy never strips it)",
         "Assert the identification method matches the one recorded in the OpenStreetMap terms ADR"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F267",
@@ -3554,7 +3554,7 @@
         "Open the sources guide and confirm it states that the public OpenStreetMap servers are unsuitable for production and points to the self-hosted alternative",
         "Use the profile in the playground and assert exactly one console warning is logged per engine instance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F268",
@@ -4502,7 +4502,7 @@
         "Verify road, place and building layers exist, with building height and level attributes preserved where present",
         "Verify the output attribution credits OpenStreetMap contributors under the ODbL"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F342",

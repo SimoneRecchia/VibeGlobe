@@ -243,16 +243,15 @@ class Manager implements PackageManager {
     manifestUrl: string | undefined,
     options: InstallOptions,
   ): Promise<InstalledPackage> {
-    // The version is installed already: installing it again must not touch (or, on a failure, delete) its chunks.
-    const current = this.installed.find(
+    // Installing the installed version again re-verifies it; a failure must not delete the chunks it reads from.
+    const installed = this.installed.some(
       (r) => r.manifest.id === manifest.id && r.manifest.version === manifest.version,
     );
-    if (current) return describe(current);
     await this.storage.putRecord(
       { manifest, kind: 'archive', state: 'partial', installedAtMs: Date.now(), bytes: 0 },
       partialKey(manifest),
     );
-    const verified = await installFiles(this.storage, manifest, origin, this.fetchImpl, options);
+    const verified = await installFiles(this.storage, manifest, origin, this.fetchImpl, options, installed);
     const bytes = verified.files.reduce((sum, f) => sum + f.bytes, 0);
     return this.commit(completeRecord(verified, 'archive', bytes, manifestUrl));
   }

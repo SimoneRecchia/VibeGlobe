@@ -9,6 +9,7 @@ import {
   normalize,
   positionGeometry,
   smoothstep,
+  texture,
   uniform,
   varying,
   vec2,
@@ -23,6 +24,7 @@ import {
   Vector2,
   Vector4,
   type Node,
+  type Texture,
 } from 'three/webgpu';
 import { eyeRelativePosition, morphedEyeRelative } from './eye-relative.js';
 
@@ -63,7 +65,7 @@ function endpoint(
  * vertices offset across the projected segment by half the width. Colors are straight RGBA, blended over the surface,
  * depth-tested and never written. `setSurfaceMorph` and {@link setLayerViewport} update its uniforms each frame.
  */
-export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): MeshBasicNodeMaterial {
+export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atlas?: Texture): MeshBasicNodeMaterial {
   const morphParams = uniform(new Vector4(0, 1, 1, 0));
   const morphAxes = uniform(new Matrix3());
   const viewport = uniform(new Vector2(1, 1));
@@ -99,23 +101,10 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): Me
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
   }
-  // Round points: corner.zw is the unit square of the quad, faded at its circle's edge (corner.z 2 marks squares).
-  const round = length(vec2(corner.z, corner.w));
-  const edge = float(1).sub(smoothstep(0.85, 1, round));
-  let alpha: Node<'float'> = color.w;
-  if (shape === 'quad') {
-    // Screen-sized quads are not depth-tested (the curved surface around their anchor would cut them): on the globe
-    // they hide behind its horizon, where the normal at the anchor faces away from the eye; from m = ½ on nothing is
-    // behind a horizon (ADR 0008).
-    const facing = normal
-      .dot(eyeRelativePosition(positionGeometry))
-      .lessThan(0)
-      .or(morphParams.x.greaterThanEqual(0.5));
-    const shown = varying(facing.select(float(1), float(0)));
-    alpha = color.w.mul(corner.z.greaterThan(1.5).select(1, edge)).mul(shown);
-    material.depthTest = false;
-  }
-  material.colorNode = vec4(color.xyz, alpha);
+  const { rgb, alpha } = layerColor(shape, color, corner, normal, morphParams, atlas);
+  // Screen-sized quads are not depth-tested: the curved surface around their anchor would cut them (see layerColor).
+  if (shape === 'quad') material.depthTest = false;
+  material.colorNode = vec4(rgb, alpha);
   material.transparent = true;
   material.depthWrite = false;
   material.side = DoubleSide;
@@ -123,6 +112,37 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): Me
   material.userData['morphAxes'] = morphAxes;
   material.userData['viewport'] = viewport;
   return material;
+}
+
+/**
+ * The color of a layer fragment: straight RGBA, and for quads the atlas (labels, marker images) tinted by it, round
+ * points faded at their circle's edge, and anything behind the globe's horizon hidden, where the normal at the anchor
+ * faces away from the eye (from m = ½ on nothing is behind a horizon, ADR 0008).
+ */
+function layerColor(
+  shape: LayerShape,
+  color: Node<'vec4'>,
+  corner: Node<'vec4'>,
+  normal: Node<'vec3'>,
+  morphParams: Node<'vec4'>,
+  atlas: Texture | undefined,
+): { rgb: Node<'vec3'>; alpha: Node<'float'> } {
+  if (shape !== 'quad') return { rgb: color.xyz, alpha: color.w };
+  let rgb: Node<'vec3'> = color.xyz;
+  let alpha: Node<'float'> = color.w;
+  if (atlas) {
+    // White text with a dark halo takes the color, the halo stays dark; solid shapes (u < 0) use the color alone.
+    const uv = attribute('layerUv', 'vec2');
+    const textured = uv.x.greaterThanEqual(0);
+    const sample = texture(atlas, uv.max(vec2(0, 0)));
+    rgb = color.xyz.mul(textured.select(sample.xyz, vec3(1, 1, 1)));
+    alpha = color.w.mul(textured.select(sample.w, float(1)));
+  }
+  // corner.zw is the unit square of round points, 2 for every other quad.
+  const edge = float(1).sub(smoothstep(0.85, 1, length(vec2(corner.z, corner.w))));
+  const facing = normal.dot(eyeRelativePosition(positionGeometry)).lessThan(0).or(morphParams.x.greaterThanEqual(0.5));
+  const shown = varying(facing.select(float(1), float(0)));
+  return { rgb, alpha: alpha.mul(corner.z.greaterThan(1.5).select(1, edge)).mul(shown) };
 }
 
 /** Sets the CSS-pixel viewport a layer material offsets its screen-sized parts in. */

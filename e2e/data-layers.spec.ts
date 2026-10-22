@@ -273,3 +273,48 @@ for (const backend of BACKENDS) {
     for (const event of recorded.slice(0, 2)) expect(event.lon).toBeCloseTo(9.8 + 4 * 0.6, 1);
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`labels and marker images show at their coordinates with their anchors, colors and rotations on ${backend} (F352, F357)`, async ({
+    page,
+  }) => {
+    await openScenario(page, backend, 'data-labels');
+    const labels = await showPhase(page, {
+      name: 'globe',
+      view: { longitudeDeg: 25, latitudeDeg: 45, zoom: 3 },
+      mode: 'auto',
+    });
+    const [roma, athens] = await project(page, [
+      [12.5, 41.9],
+      [23.7, 38.0],
+    ]);
+    if (!roma || !athens) throw new Error('labels out of view');
+    const yellow = ([r, g, b]: Rgb): boolean => r > 200 && g > 170 && b < 90;
+    const cyan = ([r, g, b]: Rgb): boolean => b > 200 && g > 180 && r < 120;
+    // Centered: text on both sides of its coordinate.
+    expect(near(labels, roma.xPx - 30, roma.yPx, 4, yellow)).toBe(true);
+    expect(near(labels, roma.xPx + 30, roma.yPx, 4, yellow)).toBe(true);
+    // Anchored left: the text starts at its coordinate and runs right.
+    expect(near(labels, athens.xPx + 25, athens.yPx, 4, cyan)).toBe(true);
+    expect(near(labels, athens.xPx - 15, athens.yPx, 4, cyan)).toBe(false);
+    await openScenario(page, backend, 'data-markers');
+    const markers = await showPhase(page, {
+      name: '2D',
+      view: { longitudeDeg: 13.4, latitudeDeg: 41.4, zoom: 7 },
+      mode: 'auto',
+    });
+    const [pin, square] = await project(page, [
+      [12.5, 41.9],
+      [14.25, 40.85],
+    ]);
+    if (!pin || !square) throw new Error('markers out of view');
+    // The pin is anchored at its bottom: its image lies above the coordinate.
+    expect(near(markers, pin.xPx, pin.yPx - 20, 3, isRed)).toBe(true);
+    expect(near(markers, pin.xPx, pin.yPx + 8, 3, isRed)).toBe(false);
+    // The square, rotated 45° about its center: a diamond, blue at its center and on its axes, not in its corners.
+    const blue = ([r, , b]: Rgb): boolean => b > 180 && r < 90;
+    expect(blue(pixel(markers, square.xPx, square.yPx))).toBe(true);
+    expect(blue(pixel(markers, square.xPx, square.yPx - 20))).toBe(true);
+    expect(blue(pixel(markers, square.xPx + 15, square.yPx - 15))).toBe(false);
+  });
+}

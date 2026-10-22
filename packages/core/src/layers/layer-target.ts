@@ -134,4 +134,9 @@ export interface LayerRenderTarget {
    * when none is (the layers package's `PickProvider`, F379–F384).
    */
   pick?(point: { readonly xPx: number; readonly yPx: number }): Promise<number>;
+  /**
+   * Optional: registers or replaces a marker image by name, which the `icon` channel names (F352): an image, bitmap or
+   * canvas the renderer can draw.
+   */
+  addImage?(name: string, image: unknown): void;
 }

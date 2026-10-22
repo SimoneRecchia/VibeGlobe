@@ -20,6 +20,7 @@ import {
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
 import { pickAt } from './layer-picking.js';
+import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { buildLayerArrays, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
@@ -50,6 +51,9 @@ export class LayerBatches implements LayerRenderTarget {
   private readonly batches = new Map<number, Batch>();
   private readonly materials = new Map<LayerShape, MeshBasicNodeMaterial>();
   private nextId = 1;
+  /** Labels and marker images (ADR 0037). */
+  private readonly atlas = new LayerAtlas();
+  private atlasGeneration = 0;
   /** The last frame's view, for picking. */
   private lastView: FrameView | undefined;
 
@@ -164,6 +168,12 @@ export class LayerBatches implements LayerRenderTarget {
     this.batches.delete(handle.id);
   }
 
+  /** Registers or replaces a marker image by name (the `icon` channel names it); markers using it redraw. */
+  addImage(name: string, image: unknown): void {
+    this.atlas.addImage(name, image as AtlasImage);
+    for (const batch of this.batches.values()) if (batch.kind === 'marker') batch.dirty = true;
+  }
+
   /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame. */
   pick(point: { readonly xPx: number; readonly yPx: number }): Promise<number> {
     const view = this.lastView;
@@ -180,6 +190,13 @@ export class LayerBatches implements LayerRenderTarget {
   /** Brings every batch up to date and places it for this frame (call before drawing the scene). */
   place(view: FrameView): void {
     this.lastView = view;
+    this.atlas.setPixelRatio(view.pixelRatio);
+    if (this.atlas.generation !== this.atlasGeneration) {
+      // The atlas started over: every label and marker is drawn into it again.
+      this.atlasGeneration = this.atlas.generation;
+      for (const batch of this.batches.values())
+        if (batch.kind === 'label' || batch.kind === 'marker') batch.dirty = true;
+    }
     for (const batch of this.batches.values()) {
       if (batch.dirty) this.rebuild(batch);
       const mesh = batch.mesh;
@@ -207,6 +224,7 @@ export class LayerBatches implements LayerRenderTarget {
 
   /** Releases every batch and material. */
   dispose(): void {
+    this.atlas.dispose();
     for (const batch of this.batches.values()) this.disposeMesh(batch);
     this.batches.clear();
     for (const material of this.materials.values()) material.dispose();
@@ -222,7 +240,7 @@ export class LayerBatches implements LayerRenderTarget {
   private material(shape: LayerShape): MeshBasicNodeMaterial {
     let material = this.materials.get(shape);
     if (!material) {
-      material = createLayerMaterial(shape, this.depthPath);
+      material = createLayerMaterial(shape, this.depthPath, this.atlas.texture);
       this.materials.set(shape, material);
     }
     return material;
@@ -231,7 +249,7 @@ export class LayerBatches implements LayerRenderTarget {
   private rebuild(batch: Batch): void {
     batch.dirty = false;
     this.disposeMesh(batch);
-    const arrays = buildLayerArrays(batch);
+    const arrays = buildLayerArrays(batch, this.atlas);
     batch.arrays = arrays;
     if (!arrays) return;
     const geometry = new BufferGeometry();
@@ -241,6 +259,7 @@ export class LayerBatches implements LayerRenderTarget {
     geometry.setAttribute('layerHeight', new BufferAttribute(arrays.heights, 1));
     geometry.setAttribute('layerColor', new BufferAttribute(arrays.colors, 4));
     geometry.setAttribute('layerCorner', new BufferAttribute(arrays.corners, 4));
+    if (shapeOf(batch.kind) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 2));
     if (arrays.other) setOtherEndpoint(geometry, arrays.other, arrays.vertices);
     geometry.setIndex(new BufferAttribute(arrays.indices, 1));
     const mesh = new Mesh(geometry, this.material(shapeOf(batch.kind)));

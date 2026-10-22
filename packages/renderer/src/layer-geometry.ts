@@ -29,6 +29,8 @@ export interface LayerArrays {
   readonly heights: Float32Array;
   readonly colors: Float32Array;
   readonly corners: Float32Array;
+  /** Atlas coordinates of labels and marker images; (−1, −1) where a quad is a solid shape. */
+  readonly uvs: Float32Array;
   readonly indices: Uint32Array;
   /** Lines only: the other endpoint of each vertex's segment. */
   readonly other?: { positions: Float32Array; normals: Float32Array; planes: Float32Array; heights: Float32Array };
@@ -74,6 +76,7 @@ class Builder {
   heights: number[] = [];
   colors: number[] = [];
   corners: number[] = [];
+  uvs: number[] = [];
   indices: number[] = [];
   other = { positions: [] as number[], normals: [] as number[], planes: [] as number[], heights: [] as number[] };
   private readonly one = { positions: new Float32Array(3), normals: new Float32Array(3), planes: new Float32Array(4) };
@@ -85,11 +88,20 @@ class Builder {
   }
 
   /** Appends one vertex; with `to`, also the other endpoint of a line segment. */
-  add(lonDeg: number, latDeg: number, heightMeters: number, color: number[], corner: number[], to?: number[]): void {
+  add(
+    lonDeg: number,
+    latDeg: number,
+    heightMeters: number,
+    color: number[],
+    corner: number[],
+    to?: number[],
+    uv: number[] = [-1, -1],
+  ): void {
     this.attributesOf(lonDeg, latDeg, this);
     this.heights.push(heightMeters);
     this.colors.push(...color);
     this.corners.push(...corner);
+    this.uvs.push(...uv);
     if (to) {
       this.attributesOf(to[0] ?? 0, to[1] ?? 0, this.other);
       this.other.heights.push(to[2] ?? 0);
@@ -117,6 +129,7 @@ class Builder {
       heights: Float32Array.from(this.heights),
       colors: Float32Array.from(this.colors),
       corners: Float32Array.from(this.corners),
+      uvs: Float32Array.from(this.uvs),
       indices: Uint32Array.from(this.indices),
       ...(line
         ? {
@@ -138,31 +151,82 @@ function quadIndices(builder: Builder): void {
   builder.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
+/** Where labels and marker images come from (`LayerAtlas`). */
+export interface QuadImages {
+  text(text: string, sizePx: number): AtlasRect;
+  image(name: string): AtlasRect | undefined;
+}
+
+/** A region of the atlas, and its size in CSS pixels. */
+export interface AtlasRect {
+  readonly u0: number;
+  readonly v0: number;
+  readonly u1: number;
+  readonly v1: number;
+  readonly widthPx: number;
+  readonly heightPx: number;
+}
+
+/** Shift of a box of half-size (w, h) from its anchor, by `ANCHORS` index, in pixels (y up). */
+function anchorShift(anchor: number, w: number, h: number): [number, number] {
+  const x = [0, w, -w, 0, 0, w, -w, w, -w][anchor] ?? 0;
+  const y = [0, 0, 0, -h, h, -h, -h, h, h][anchor] ?? 0;
+  return [x, y];
+}
+
+/** The box of a quad feature: half-sizes and its atlas region (none: a solid shape). */
+function boxOf(
+  batch: BatchContents,
+  feature: number,
+  images: QuadImages | undefined,
+): { w: number; h: number; rect: AtlasRect | undefined } {
+  const size = valueOf(batch, 'sizePx', feature);
+  // Points and circles: `sizePx` is the radius (MapLibre `circle-radius`).
+  if (batch.kind === 'point' || batch.kind === 'circle') return { w: size, h: size, rect: undefined };
+  if (batch.kind === 'label') {
+    const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size);
+    return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: size / 2, h: size / 2, rect };
+  }
+  // Markers: the image at `sizePx` tall (its natural height when unset), or a solid square without one.
+  const name = batch.strings.get('icon')?.[feature] ?? '';
+  const rect = images?.image(name);
+  if (!rect) return { w: size / 2, h: size / 2, rect };
+  const h = (batch.attributes.has('sizePx') || batch.uniforms.has('sizePx') ? size : rect.heightPx) / 2;
+  return { w: (h * rect.widthPx) / rect.heightPx, h, rect };
+}
+
 /** Points, markers, circles and labels: a screen-sized quad around each feature's position. */
-function buildQuads(batch: BatchContents, builder: Builder): void {
+function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages | undefined): void {
   for (let feature = 0; feature < batch.count; feature++) {
     if (valueOf(batch, 'visible', feature) <= 0) continue;
     const lon = valueOf(batch, 'position', feature, 0);
     const lat = valueOf(batch, 'position', feature, 1);
     const height = valueOf(batch, 'position', feature, 2);
-    const size = valueOf(batch, 'sizePx', feature);
-    const text = batch.kind === 'label' ? (batch.strings.get('text')?.[feature] ?? '') : '';
-    // Labels: a box as wide as the text (0.6 em per character) until glyphs are drawn; markers: squares.
-    // Points and circles: `sizePx` is the radius (MapLibre `circle-radius`); markers and labels: the height.
+    const { w, h, rect } = boxOf(batch, feature, images);
+    const [ax, ay] = anchorShift(valueOf(batch, 'anchor', feature), w, h);
+    const dx = valueOf(batch, 'offsetPx', feature, 0) + ax;
+    const dy = -valueOf(batch, 'offsetPx', feature, 1) + ay;
+    const angle = (-valueOf(batch, 'rotationDeg', feature) * Math.PI) / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
     const round = batch.kind === 'point' || batch.kind === 'circle';
-    const halfHeight = round ? size : size / 2;
-    const halfWidth = batch.kind === 'label' ? 0.3 * size * text.length : halfHeight;
-    const dx = valueOf(batch, 'offsetPx', feature, 0);
-    const dy = -valueOf(batch, 'offsetPx', feature, 1);
-    const square = round ? 0 : 2;
-    const color = colorOf(batch, feature);
+    // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha.
+    const color =
+      batch.kind === 'marker' && rect ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
     for (const [sx, sy] of [
       [-1, -1],
       [1, -1],
       [1, 1],
       [-1, 1],
-    ] as const)
-      builder.add(lon, lat, height, color, [dx + sx * halfWidth, dy + sy * halfHeight, square || sx, square || sy]);
+    ] as const) {
+      const x = sx * w;
+      const y = sy * h;
+      // corner.zw: the unit square for round points, 2 for every other quad.
+      const corner = [dx + x * cos - y * sin, dy + x * sin + y * cos, round ? sx : 2, round ? sy : 2];
+      // Atlas rows run downward: the quad's top (sy = 1) samples v0.
+      const uv = rect ? [sx < 0 ? rect.u0 : rect.u1, sy > 0 ? rect.v0 : rect.v1] : [-1, -1];
+      builder.add(lon, lat, height, color, corner, undefined, uv);
+    }
     quadIndices(builder);
   }
 }
@@ -319,12 +383,12 @@ function firstPosition(batch: BatchContents): [number, number] | undefined {
 }
 
 /** The vertex arrays of a batch's visible features, or undefined when there is nothing to draw. */
-export function buildLayerArrays(batch: BatchContents): LayerArrays | undefined {
+export function buildLayerArrays(batch: BatchContents, images?: QuadImages): LayerArrays | undefined {
   const first = firstPosition(batch);
   if (!first) return undefined;
   const builder = new Builder(layerOrigin(first[0], first[1]));
   if (batch.kind === 'polyline') buildLines(batch, builder);
   else if (batch.kind === 'polygon') buildPolygons(batch, builder);
-  else buildQuads(batch, builder);
+  else buildQuads(batch, builder, images);
   return builder.count > 0 ? builder.arrays(batch.kind === 'polyline') : undefined;
 }

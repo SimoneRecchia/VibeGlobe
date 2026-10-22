@@ -9,6 +9,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { canvasImage, emptyPixelsInside, silhouetteRadiusPx, waitForIdle } from './support/globe.ts';
 import { emptyPixels, openHarness, startHarness } from './support/offline.ts';
 
+// One shared setup (beforeAll) for the file's tests: they run in order on one worker, together in one shard
+// (playwright.config.ts runs everything else fully parallel, ADR 0035).
+test.describe.configure({ mode: 'default' });
+
 const PORT = 8091;
 const LAN = `http://localhost:${PORT}`;
 const SCRIPT = 'packages/offline/lan-server/lan-server.sh';

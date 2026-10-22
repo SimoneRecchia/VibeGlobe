@@ -10,6 +10,10 @@ import { expect, test, type Page } from '@playwright/test';
 import type { createManifest as CreateManifest } from '@vibeglobe/offline';
 import { openHarness, servePackages, startHarness, viewAt } from './support/offline.ts';
 
+// One shared setup (beforeAll) for the file's tests: they run in order on one worker, together in one shard
+// (playwright.config.ts runs everything else fully parallel, ADR 0035).
+test.describe.configure({ mode: 'default' });
+
 const BIN = 'packages/tools/dist/bin.js';
 const DEV = `http://localhost:${process.env['PLAYGROUND_PORT'] ?? 5173}`;
 

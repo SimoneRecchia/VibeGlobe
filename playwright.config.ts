@@ -42,6 +42,8 @@ const crossBrowserProjects =
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.spec.ts',
+  // Shards split by test, not by file, so a long spec does not hold one shard far past the others (ADR 0035).
+  fullyParallel: true,
   // Visual baselines (ADR 0012): one per view and backend, recorded only in the pinned CI environment.
   snapshotPathTemplate: '{testDir}/__baselines__/{arg}{ext}',
   forbidOnly: Boolean(process.env['CI']),

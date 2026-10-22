@@ -34,7 +34,7 @@ import { ViewControl } from './view-control.js';
 
 const RAD = Math.PI / 180;
 /** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
-export const REDUCED_MOTION_FADE_MS = 300;
+const REDUCED_MOTION_FADE_MS = 300;
 
 /** What camera movements need from their globe. */
 export interface MovementHost {

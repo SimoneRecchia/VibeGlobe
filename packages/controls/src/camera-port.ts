@@ -1,7 +1,7 @@
 import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/core';
 
 /**
- * The part of the engine's public API the controls use beyond {@link NavigationApi}: the applied camera, the engine
+ * The part of the engine's public API the controls use beyond `NavigationApi`: the applied camera, the engine
  * clock and `jumpTo` for heading and tilt about the screen-center target. A temporary bridge until `NavigationApi`
  * carries these (hook request "M6 input" 1 and 2 in docs/parallel-tracks.md).
  */

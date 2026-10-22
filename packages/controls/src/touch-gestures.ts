@@ -213,8 +213,7 @@ export class TouchGestures {
     const dx1 = (this.x[1] ?? 0) - (this.startX[1] ?? 0);
     const dy0 = (this.y[0] ?? 0) - (this.startY[0] ?? 0);
     const dy1 = (this.y[1] ?? 0) - (this.startY[1] ?? 0);
-    const sideBySide =
-      Math.abs((this.x[1] ?? 0) - (this.x[0] ?? 0)) > Math.abs((this.y[1] ?? 0) - (this.y[0] ?? 0));
+    const sideBySide = Math.abs((this.x[1] ?? 0) - (this.x[0] ?? 0)) > Math.abs((this.y[1] ?? 0) - (this.y[0] ?? 0));
     const vertical =
       Math.abs(dy0) >= tiltStartPx &&
       Math.abs(dy1) >= tiltStartPx &&

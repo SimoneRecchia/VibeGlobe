@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>VibeGlobe controls harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0b1020;
+        color: #fff;
+        font: 14px sans-serif;
+      }
+      #app {
+        position: relative;
+        width: 800px;
+        height: 600px;
+        overflow: hidden;
+      }
+      #globe {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* ?embed=1: the map inside a page taller than the window (F189). */
+      body.embed #before,
+      body.embed #after {
+        height: 900px;
+        padding: 16px;
+      }
+      #before,
+      #after {
+        display: none;
+      }
+      body.embed #before,
+      body.embed #after {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The M6 input track's test page on the playground's dev server (docs/parallel-tracks.md): the playground is the
+         main session's, so this page builds a globe with the controls and connects them. -->
+    <div id="before">
+      <label>Search <input id="text" type="text" /></label>
+    </div>
+    <div id="app"><canvas id="globe" aria-label="Map"></canvas></div>
+    <div id="after">After the map</div>
+    <script type="module" src="./controls-page.ts"></script>
+  </body>
+</html>

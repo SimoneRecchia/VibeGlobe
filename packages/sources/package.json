@@ -25,6 +25,11 @@
       "types": "./dist/mbtiles.d.ts",
       "source": "./src/mbtiles.ts",
       "default": "./dist/mbtiles.js"
+    },
+    "./tiles3d": {
+      "types": "./dist/tiles3d/index.d.ts",
+      "source": "./src/tiles3d/index.ts",
+      "default": "./dist/tiles3d/index.js"
     }
   },
   "files": [

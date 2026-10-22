@@ -9,6 +9,8 @@ import type { GeodeticRad } from '../geodesy/ecef.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import { clampPoseRange } from './camera-state.js';
 import type { GeoPosition, ScreenPoint } from './types.js';
+import { pickMorphedAt } from '../view/pick.js';
+import type { ViewState } from '../view/view-state.js';
 
 const RAD = Math.PI / 180;
 
@@ -33,12 +35,12 @@ function readPixel(point: unknown): boolean {
 }
 
 /** Moves the camera so the point in `anchor` shows at `pixel`, or leaves it where it was when that is impossible. */
-function solveDrag(camera: Camera): void {
+function solveDrag(camera: Camera, view: ViewState | undefined): void {
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
   start[2] = pose.headingRad;
-  if (!solveAnchor(camera, anchor, pixel)) {
+  if (!solveAnchor(camera, anchor, pixel, view?.morph)) {
     pose.targetLongitudeRad = start[0] ?? 0;
     pose.targetLatitudeRad = start[1] ?? 0;
     pose.headingRad = start[2] ?? 0;
@@ -49,7 +51,7 @@ function solveDrag(camera: Camera): void {
 }
 
 /** Moves the camera so a WGS84 position shows at a screen point; returns false for invalid input (nothing changes). */
-export function dragCamera(camera: Camera, position: unknown, point: unknown): boolean {
+export function dragCamera(camera: Camera, view: ViewState | undefined, position: unknown, point: unknown): boolean {
   if (position === null || typeof position !== 'object' || !readPixel(point)) return false;
   const lon = (position as GeoPosition).longitudeDeg;
   const lat = (position as GeoPosition).latitudeDeg;
@@ -60,7 +62,9 @@ export function dragCamera(camera: Camera, position: unknown, point: unknown): b
   anchor[0] = lon * RAD;
   anchor[1] = lat * RAD;
   anchor[2] = height;
-  solveDrag(camera);
+  camera.update();
+  view?.update(camera);
+  solveDrag(camera, view);
   return true;
 }
 
@@ -68,16 +72,20 @@ export function dragCamera(camera: Camera, position: unknown, point: unknown): b
  * Zooms by `deltaZoom` levels keeping the position under a screen point there, or about the target when the point is
  * off the globe; returns false for invalid input (nothing changes).
  */
-export function zoomCamera(camera: Camera, point: unknown, deltaZoom: unknown): boolean {
+export function zoomCamera(camera: Camera, view: ViewState | undefined, point: unknown, deltaZoom: unknown): boolean {
   if (typeof deltaZoom !== 'number' || !(deltaZoom - deltaZoom === 0) || !readPixel(point)) return false;
   camera.update();
-  const anchored = camera.pickEllipsoidAt(pixel, pick);
+  // The point under the cursor as the frame shows it (ADR 0008: on the morphed surface).
+  view?.update(camera);
+  const anchored = view ? pickMorphedAt(camera, view.morph, pixel, pick) : camera.pickEllipsoidAt(pixel, pick);
   anchor[0] = pick.longitudeRad;
   anchor[1] = pick.latitudeRad;
   anchor[2] = 0;
   camera.pose.rangeMeters *= 2 ** -deltaZoom;
   clampPoseRange(camera);
   camera.update();
-  if (anchored) solveDrag(camera);
+  // The new zoom has its own morph and relief: the point must stay under the cursor on that surface.
+  view?.update(camera);
+  if (anchored) solveDrag(camera, view);
   return true;
 }

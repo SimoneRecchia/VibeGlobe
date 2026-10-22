@@ -3,6 +3,7 @@ import { enuFrame } from '../geodesy/enu.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import type { Camera } from './camera.js';
 import { projectToScreen } from './projection.js';
+import { morphPointInto, type MorphFrame } from '../view/morph.js';
 
 const MAX_ITERATIONS = 8;
 /** Iterations stop below this residual. */
@@ -16,9 +17,23 @@ const anchorEcef = new Float64Array(3);
 const targetPx = new Float64Array(2);
 const screen = new Float64Array(2);
 
-/** Screen residual of the anchor for the camera's current pose; false when it is behind the eye. */
+/** The anchor's geodetic position, and the frame's morph while the solve runs (ADR 0008). */
+const anchorGeodetic = new Float64Array(3);
+const morphAnchor = new Float64Array(2);
+let solveMorph: MorphFrame | undefined;
+
+/**
+ * Screen residual of the anchor for the camera's current pose; false when it is behind the eye. Under a morph the
+ * anchor shows where the morph anchored at the camera's target puts it, so each trial target moves it too.
+ */
 function residual(camera: Camera, out: Float64Array): boolean {
   camera.update();
+  if (solveMorph && (solveMorph.factors[0] ?? 0) > 0) {
+    morphAnchor[0] = camera.pose.targetLongitudeRad;
+    morphAnchor[1] = camera.pose.targetLatitudeRad;
+    solveMorph.update(morphAnchor, solveMorph.factors);
+    morphPointInto(solveMorph, anchorGeodetic, anchorEcef);
+  }
   if (!projectToScreen(camera, anchorEcef, screen)) return false;
   out[0] = (screen[0] ?? 0) - (targetPx[0] ?? 0);
   out[1] = (screen[1] ?? 0) - (targetPx[1] ?? 0);
@@ -41,10 +56,15 @@ const start = new Float64Array(2);
  * target longitude and latitude with a finite-difference Jacobian. When it cannot converge (the heading-held system is
  * singular near the poles) it falls back to rotating the whole camera rigidly about the Earth's center, which changes
  * the heading. Returns false only if neither reaches the pixel. Inputs come in arrays: the solver runs every frame of
- * a drag and V8 boxes doubles passed as arguments (ADR 0018).
+ * a drag and V8 boxes doubles passed as arguments (ADR 0018). With a `morph`, the anchor is placed on the morphed
+ * surface for each trial target (ADR 0008), and the morph is left anchored at the solved target.
  */
-export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64Array): boolean {
+export function solveAnchor(camera: Camera, anchor: Float64Array, pixel: Float64Array, morph?: MorphFrame): boolean {
   geodeticArrayToEcef(anchor, anchorEcef);
+  anchorGeodetic[0] = anchor[0] ?? 0;
+  anchorGeodetic[1] = anchor[1] ?? 0;
+  anchorGeodetic[2] = anchor[2] ?? 0;
+  solveMorph = morph;
   targetPx[0] = pixel[0] ?? 0;
   targetPx[1] = pixel[1] ?? 0;
   const pose = camera.pose;

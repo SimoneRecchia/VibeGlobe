@@ -7,6 +7,8 @@ import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
+import type { MorphFrame } from '../view/morph.js';
+import type { ViewCurvesInit } from '../view/curves.js';
 
 /** A WGS84 geodetic position: degrees and meters above the ellipsoid, whatever the display projection. */
 export interface GeoPosition {
@@ -54,6 +56,8 @@ export interface RendererCapabilities {
 
 /** The view the renderer draws, in eye-relative ECEF (ADR 0004): float64, rounded to float32 at upload. */
 export interface FrameView {
+  /** The frame's globe-to-flat morph (ADR 0008): the renderer forms both endpoints of every vertex and mixes them. */
+  readonly morph: MorphFrame;
   readonly view: Float64Array;
   readonly projection: Float64Array;
   readonly eyeEcef: Float64Array;
@@ -309,6 +313,11 @@ export interface GlobeOptions {
   /** URL of the pinned base imagery: an equirectangular image of the whole world. */
   readonly baseImageryUrl: string;
   readonly view?: ViewInit;
+  /**
+   * The zoom curves of the Auto view mode (F150): the globe-to-flat morph, the relief and the automatic tilt, each over
+   * a band of ground zoom; fields not given keep `DEFAULT_VIEW_CURVES`. Invalid curves throw 'invalid-option'.
+   */
+  readonly viewCurves?: ViewCurvesInit;
   /** Multiplies the device pixel ratio (default 1). */
   readonly resolutionScale?: number;
   /** Largest projected geometric error, in CSS pixels (default 1). */

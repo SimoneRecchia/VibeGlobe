@@ -84,6 +84,16 @@ const settle = async (): Promise<void> => {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 };
 
+/**
+ * View curves that keep M4's geometry: the globe at every zoom, never flattened, with full relief (M5's Auto curves
+ * flatten the globe from ground zoom 4 and raise relief only from 10).
+ */
+const GLOBE_WITH_RELIEF = {
+  morph: { startGroundZoom: 40, endGroundZoom: 41 },
+  relief: { startGroundZoom: -2, endGroundZoom: -1 },
+  tilt: { startGroundZoom: 41, endGroundZoom: 42 },
+};
+
 /** A globe over the fixture terrain, advanced `frames` frames. */
 async function terrainGlobe(
   source: TerrainSource,
@@ -99,6 +109,7 @@ async function terrainGlobe(
     terrain: source,
     workers,
     view,
+    viewCurves: GLOBE_WITH_RELIEF,
   });
   const run = async (count: number): Promise<void> => {
     for (let frame = 0; frame < count; frame++) {

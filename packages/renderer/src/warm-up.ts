@@ -30,6 +30,7 @@ function createWarmUpScene(materials: readonly Material[]): WarmUpScene {
   geometry.setAttribute('position', new BufferAttribute(Float32Array.of(-1, -1, 0.5, 3, -1, 0.5, -1, 3, 0.5), 3));
   geometry.setAttribute('tileUv', new BufferAttribute(Float32Array.of(0, 0, 0, 2, 0, 0, 0, 2, 2), 3));
   geometry.setAttribute('tileNormal', new BufferAttribute(Float32Array.of(0, 0, 1, 0, 0, 1, 0, 0, 1), 3));
+  geometry.setAttribute('tilePlane', new BufferAttribute(new Float32Array(12), 4));
   geometry.setIndex(new BufferAttribute(Uint16Array.of(0, 1, 2), 1));
   const scene = new Scene();
   scene.matrixWorldAutoUpdate = false;

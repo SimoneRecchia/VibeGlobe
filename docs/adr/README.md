@@ -38,3 +38,4 @@ Conventions:
 | [0026](0026-worldcover-imagery.md)               | Detailed imagery from the ESA WorldCover 2021 Sentinel-2 composite                                          | Accepted                                                          |
 | [0027](0027-terrain-sources.md)                  | Terrain sources: worker decoders, custom decoders inline, vertical datums and a consumer-hosted geoid grid  | M4 onward                                                         |
 | [0028](0028-terrain-review-decisions.md)         | Terrain collision, morph limits, grid sizes and fallback skirts (M4 review)                                 | Accepted (decided by agent; owner may revisit)                    |
+| [0029](0029-view-modes-and-morph-in-engine.md)   | The globe-to-flat morph in the engine, relief with tilt, and view modes                                     | Accepted (decided by agent; owner may revisit)                    |

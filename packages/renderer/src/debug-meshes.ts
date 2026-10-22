@@ -1,7 +1,7 @@
 import type { DebugMeshData, DepthPath } from '@vibeglobe/core';
 import { positionLocal, sin, vec3 } from 'three/tsl';
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
-import { makeEyeRelative } from './eye-relative.js';
+import { makeEyeRelative, placeEyeRelative } from './eye-relative.js';
 
 /** A drawn debug quad. */
 export interface DebugEntry {
@@ -35,4 +35,12 @@ export function createDebugEntry(data: DebugMeshData, depthPath: DepthPath): Deb
   mesh.matrixWorldAutoUpdate = false;
   mesh.frustumCulled = false;
   return { data, mesh };
+}
+
+/** Places the debug meshes eye-relative for a frame (ADR 0004). */
+export function placeDebugEntries(entries: readonly DebugEntry[], eye: Float64Array): void {
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry) placeEyeRelative(entry.mesh, entry.data.originEcef, eye);
+  }
 }

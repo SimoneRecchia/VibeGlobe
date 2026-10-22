@@ -18,15 +18,15 @@ import {
 import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
-import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
+import { createDebugEntry, placeDebugEntries, type DebugEntry } from './debug-meshes.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
 import { chooseWebGPU, decodeBitmap } from './environment.js';
-import { applyDraw, attachSurfaceDraw, createSurfaceMaterial, type SurfaceDraw } from './surface-material.js';
+import * as surface from './surface-material.js';
 import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
-import { placeEyeRelative } from './eye-relative.js';
+import { placeTile } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
 import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
@@ -43,7 +43,7 @@ import {
 interface TileEntry {
   readonly data: TileMeshData;
   readonly mesh: Mesh;
-  readonly draw: SurfaceDraw;
+  readonly draw: surface.SurfaceDraw;
 }
 
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
@@ -252,7 +252,7 @@ export class ThreeBackend implements RendererBackend {
     const mesh = createTileMesh(data, this.material);
     countMatrixUpdates(mesh, () => this.matrixUpdates++);
     this.scene.add(mesh);
-    return { data, mesh, draw: attachSurfaceDraw(mesh) };
+    return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
   /** Replaces the debug quads drawn with the surface's precision path. */
@@ -327,7 +327,7 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture?.dispose();
     this.imageryTexture = texture;
     this.material?.dispose();
-    this.material = createSurfaceMaterial(texture, this.depthPath);
+    this.material = surface.createSurfaceMaterial(texture, this.depthPath);
     const material = this.material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
@@ -345,15 +345,13 @@ export class ThreeBackend implements RendererBackend {
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
-      applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
+      surface.applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
       entry.mesh.visible = true;
       this.shown[this.shownCount++] = entry.mesh;
-      placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
+      placeTile(entry.mesh, entry.data, view);
     }
-    for (let i = 0; i < this.debugEntries.length; i++) {
-      const entry = this.debugEntries[i];
-      if (entry) placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
-    }
+    surface.setSurfaceMorph(this.material, view.morph);
+    placeDebugEntries(this.debugEntries, view.eyeEcef);
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.pipelineSwitches?.begin();

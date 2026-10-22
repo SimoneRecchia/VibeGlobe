@@ -19,7 +19,7 @@ import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { keepGroundScale, positionAt, screenOf } from './view-geometry.js';
+import { createFrameView, keepGroundScale, positionAt, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -109,14 +109,7 @@ class GlobeEngine implements Globe {
   private resolutionScale: number;
   private readonly diag: ReturnType<typeof createObservability>;
   readonly diagnostics: GlobeDiagnostics;
-  private readonly frameView = {
-    view: this.cam.view,
-    projection: this.cam.projection,
-    eyeEcef: this.cam.eyeEcef,
-    widthPx: 1,
-    heightPx: 1,
-    pixelRatio: 1,
-  };
+  private readonly frameView: MutableFrameView;
 
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
@@ -124,6 +117,7 @@ class GlobeEngine implements Globe {
     this.diag = createObservability(options.logLevel ?? 'warn', options.logSink, () => this.renderer?.host.now() ?? 0);
     this.diagnostics = this.diag.api;
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
+    this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     this.navigation = {
       // Input plug-ins call these every frame: invalid input is ignored, never thrown.
@@ -374,7 +368,8 @@ class GlobeEngine implements Globe {
   private pick(point: ScreenPoint): GeoPosition | undefined {
     if (this.waiting) return undefined;
     this.cam.update();
-    return positionAt(this.cam, point);
+    this.surfaceFrame.view.update(this.cam);
+    return positionAt(this.cam, this.surfaceFrame.view, point);
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
@@ -382,17 +377,18 @@ class GlobeEngine implements Globe {
     validatePosition(position);
     if (this.waiting) return undefined;
     this.cam.update();
-    return screenOf(this.cam, position);
+    this.surfaceFrame.view.update(this.cam);
+    return screenOf(this.cam, this.surfaceFrame.view, position);
   }
 
   private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.assertAlive();
-    if (!this.waiting && dragCamera(this.cam, anchor, point)) this.requestRender();
+    if (!this.waiting && dragCamera(this.cam, this.surfaceFrame.view, anchor, point)) this.requestRender();
   }
 
   private zoomAt(point: ScreenPoint, deltaZoom: number): void {
     this.assertAlive();
-    if (!this.waiting && zoomCamera(this.cam, point, deltaZoom)) this.requestRender();
+    if (!this.waiting && zoomCamera(this.cam, this.surfaceFrame.view, point, deltaZoom)) this.requestRender();
   }
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {

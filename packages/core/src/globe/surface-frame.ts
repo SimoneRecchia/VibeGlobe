@@ -10,6 +10,9 @@ import {
 import type { SurfaceCache } from '../surface/surface-cache.js';
 import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import type { Camera } from '../camera/camera.js';
+import { validateViewCurves } from '../view/curves.js';
+import { ViewState } from '../view/view-state.js';
+import type { MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -49,7 +52,10 @@ const LIFT_SETTLED_METERS = 1e-3;
 export class SurfaceFrame {
   private readonly tiles: QuadtreeTile[] = [];
   private readonly draws = new DrawList();
+  /** The zoom curves and the morph of the current frame (ADR 0008). */
+  readonly view: ViewState;
   private readonly selection = {
+    morph: undefined as MorphFrame | undefined,
     maxScreenErrorPx: 1,
     maxLevel: MAX_LEVEL,
     minLevel: 2,
@@ -85,6 +91,8 @@ export class SurfaceFrame {
     this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.fadeMs = options.imageryFadeMs ?? DEFAULT_FADE_MS;
     this.clearanceMeters = options.terrainClearanceMeters ?? DEFAULT_CLEARANCE_METERS;
+    this.view = new ViewState(validateViewCurves(options.viewCurves));
+    this.selection.morph = this.view.morph;
   }
 
   /**
@@ -166,6 +174,8 @@ export class SurfaceFrame {
     timer.end(PHASE_UPDATE);
     if (tracer.enabled) this.traceCamera(camera);
     this.clock.timeInto(this.nowMs);
+    // The zoom curves and the morph of this frame (ADR 0008): selection, draws and the renderer all use them.
+    this.view.update(camera);
     if (this.imagery) {
       this.selection.terrainMinMeters = this.imagery.terrainMinMeters;
       this.selection.terrainMaxMeters = this.imagery.terrainMaxMeters;

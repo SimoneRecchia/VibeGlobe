@@ -1,4 +1,4 @@
-import type { DepthPath, TileDrawList } from '@vibeglobe/core';
+import type { DepthPath, MorphFrame, TileDrawList } from '@vibeglobe/core';
 import {
   attribute,
   clamp,
@@ -17,23 +17,26 @@ import {
   textureSize,
   uniform,
   vec2,
+  vec3,
   vec4,
 } from 'three/tsl';
 import {
   DataTexture,
   DoubleSide,
   FloatType,
+  Matrix3,
   Matrix4,
   MeshBasicNodeMaterial,
   NearestFilter,
   RedFormat,
   Vector4,
+  type Material,
   type Node,
   type Object3D,
   type Texture,
   type TextureNode,
 } from 'three/webgpu';
-import { makeEyeRelative } from './eye-relative.js';
+import { makeMorphedEyeRelative } from './eye-relative.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
 export interface SurfaceDraw {
@@ -168,6 +171,34 @@ function mapUv(tileUv: Node<'vec3'>, transform: Node<'vec4'>, geographic: Node<'
 }
 
 /**
+ * Places the surface's vertices (ADR 0008): skirt vertices carry a normal of length 2 (the mesh marks them so) and hang
+ * `params.w` lower still; heights are scaled by the relief factor on both endpoints; on the plane each vertex sits at
+ * its Mercator offset from the tile's plane center times σ, raised σ·k(φ)·h along the anchor's up.
+ */
+function placeMorphed(
+  material: MeshBasicNodeMaterial,
+  depthPath: DepthPath,
+  height: Node<'float'>,
+  params: Node<'vec4'>,
+  morphParams: Node<'vec4'>,
+  morphAxes: Node<'mat3'>,
+): void {
+  const tileNormal = attribute('tileNormal', 'vec3');
+  const tilePlane = attribute('tilePlane', 'vec4');
+  const skirt = tileNormal.length().greaterThan(1.5);
+  const skirtExtra = skirt.select(params.w, 0);
+  const sigma = morphParams.z;
+  const reliefHeight = height.mul(morphParams.y);
+  const globeOffset = positionGeometry.add(tileNormal.normalize().mul(reliefHeight.sub(skirtExtra)));
+  const planeLocal = vec3(
+    tilePlane.x.mul(sigma),
+    tilePlane.y.mul(sigma),
+    reliefHeight.mul(tilePlane.w).mul(sigma).add(tilePlane.z).sub(skirtExtra),
+  );
+  makeMorphedEyeRelative(material, depthPath, globeOffset, morphAxes.mul(planeLocal), morphParams.x);
+}
+
+/**
  * The surface material shared by every tile: one shader and one pipeline for the whole surface (ADR 0010 §4, §7).
  * The UV transforms and flags are object-scope uniforms read from each mesh's {@link SurfaceDraw}, and the textures
  * are set per mesh before it draws (see {@link attachSurfaceDraw}), so tiles drawing different data tiles still share
@@ -176,7 +207,9 @@ function mapUv(tileUv: Node<'vec3'>, transform: Node<'vec4'>, geographic: Node<'
  */
 export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
   const tileUv = attribute('tileUv', 'vec3');
-  const tileNormal = attribute('tileNormal', 'vec3');
+  // Per frame (ADR 0008): the morph factor, the relief factor and σ; the anchor's east, north and up axes in ECEF.
+  const morphParams = uniform(new Vector4(0, 1, 1, 0));
+  const morphAxes = uniform(new Matrix3());
   const transforms = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.transforms);
   const params = uniform(new Vector4(15, 1, 1, 0)).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.params);
   const fade = params.y;
@@ -206,6 +239,8 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   material.userData['heights'] = heights;
   material.userData['fromHeights'] = fromHeights;
   material.userData['flatHeights'] = flatHeights;
+  material.userData['morphParams'] = morphParams;
+  material.userData['morphAxes'] = morphAxes;
   // Terrain: displaced along the ellipsoid normal by mix(H_from, H_to, morph) (ADR 0006 §4, §5); the morph samples
   // the second grid only while it runs.
   const height = Fn(() => {
@@ -227,10 +262,7 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
     });
     return color;
   })();
-  // Skirt vertices carry a normal of length 2 (the mesh marks them so): they hang `params.w` lower still.
-  const skirt = tileNormal.length().greaterThan(1.5);
-  const displacement = height.sub(skirt.select(params.w, 0));
-  makeEyeRelative(material, depthPath, positionGeometry.add(tileNormal.normalize().mul(displacement)));
+  placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;
@@ -269,4 +301,15 @@ export function applyDraw(
     e[8 + c] = terrain.uvTransforms[at + c] ?? 0;
     e[12 + c] = terrain.fromUvTransforms[at + c] ?? 0;
   }
+}
+
+/**
+ * Sets the morph uniforms of a surface material for a frame (ADR 0008): the morph and relief factors, σ and the
+ * anchor's axes (column-major east, north, up, as `MorphFrame.axes`).
+ */
+export function setSurfaceMorph(material: Material, morph: MorphFrame): void {
+  const params = material.userData['morphParams'] as { value: Vector4 } | undefined;
+  const axes = material.userData['morphAxes'] as { value: Matrix3 } | undefined;
+  params?.value.set(morph.morph, morph.relief, morph.sigma, 0);
+  axes?.value.fromArray(morph.axes);
 }

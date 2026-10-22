@@ -1,12 +1,14 @@
-import type { DepthPath } from '@vibeglobe/core';
+import type { DepthPath, FrameView, TileMeshData } from '@vibeglobe/core';
 import {
   cameraNear,
   cameraProjectionMatrix,
   cameraViewMatrix,
+  float,
   modelWorldMatrix,
   positionGeometry,
   transpose,
   varying,
+  vec3,
   vec4,
 } from 'three/tsl';
 import { GreaterEqualDepth, type Node, type NodeMaterial, type Object3D } from 'three/webgpu';
@@ -31,6 +33,70 @@ export function placeEyeRelative(mesh: Object3D, origin: Float64Array, eye: Floa
   elements[3] = low[0] ?? 0;
   elements[7] = low[1] ?? 0;
   elements[11] = low[2] ?? 0;
+}
+
+/**
+ * The diagonal of the rotation part of a surface mesh's world matrix. three.js picks a mesh's front-face winding from
+ * the sign of its world matrix's determinant, and on WebGPU the winding is part of the pipeline: a large diagonal keeps
+ * the determinant positive whatever the offsets stored beside it (one pipeline for every tile, ADR 0010 §4).
+ */
+const DIAGONAL = 1e30;
+
+/**
+ * Writes this frame's split offset of a tile's plane center from the eye (ADR 0008) into the mesh's world matrix,
+ * beside {@link placeEyeRelative}'s: the high part in elements 1, 2 and 4, the low part in elements 6, 8 and 9 (the
+ * rotation part, which the engine's vertex node does not use as a rotation), with {@link DIAGONAL} on its diagonal.
+ */
+export function placePlaneEyeRelative(mesh: Object3D, planeCenter: Float64Array, eye: Float64Array): void {
+  splitEyeOffset(planeCenter, eye, high, low);
+  const elements = mesh.matrixWorld.elements;
+  elements[0] = DIAGONAL;
+  elements[5] = DIAGONAL;
+  elements[10] = DIAGONAL;
+  elements[1] = high[0] ?? 0;
+  elements[2] = high[1] ?? 0;
+  elements[4] = high[2] ?? 0;
+  elements[6] = low[0] ?? 0;
+  elements[8] = low[1] ?? 0;
+  elements[9] = low[2] ?? 0;
+}
+
+/** A tile's plane center this frame, ECEF meters (ADR 0008). */
+const planeCenter = new Float64Array(3);
+
+/** Places a surface tile for a frame: its globe origin and its plane center, both relative to the eye. */
+export function placeTile(mesh: Object3D, data: TileMeshData, view: FrameView): void {
+  placeEyeRelative(mesh, data.originEcef, view.eyeEcef);
+  view.morph.tilePlaneCenterInto(data.planeCenter, planeCenter);
+  placePlaneEyeRelative(mesh, planeCenter, view.eyeEcef);
+}
+
+/**
+ * Makes a material place its vertices between the globe and the flat map (ADR 0008): each endpoint eye-relative as
+ * in {@link makeEyeRelative}, the globe one from the mesh's origin and the plane one from its plane center, mixed as
+ * (1 − m)·globe + m·plane, written out (never `mix`).
+ */
+export function makeMorphedEyeRelative(
+  material: NodeMaterial,
+  depthPath: DepthPath,
+  globeOffset: Node<'vec3'>,
+  planeOffset: Node<'vec3'>,
+  morph: Node<'float'>,
+): void {
+  const column0 = modelWorldMatrix.mul(vec4(1, 0, 0, 0));
+  const column1 = modelWorldMatrix.mul(vec4(0, 1, 0, 0));
+  const column2 = modelWorldMatrix.mul(vec4(0, 0, 1, 0));
+  const planeHigh = vec3(column0.y, column0.z, column1.x);
+  const planeLow = vec3(column1.z, column2.x, column2.y);
+  const globe = eyeRelativePosition(globeOffset);
+  const plane = planeOffset.add(planeHigh).add(planeLow);
+  const position = globe.mul(float(1).sub(morph)).add(plane.mul(morph));
+  const viewPosition = cameraViewMatrix.mul(vec4(position, 1));
+  material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
+  if (depthPath === 'fragment') {
+    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
+    material.depthFunc = GreaterEqualDepth;
+  }
 }
 
 /**

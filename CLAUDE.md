@@ -71,4 +71,5 @@ Owner's rules (2026-10-21, ADR 0022): most waste is extra tests, repeated runs a
 - A PostToolUse hook (`.claude/hooks/check-edited-file.sh`) formats, lints and type-checks every file Claude edits.
 - CI (ADR 0015, ADR 0022): every push runs one fast job with every non-browser check; the sharded end-to-end suite, the isolated measurements, cross-browser runs and benchmarks run only on `main`, nightly and manual runs (`workflow_dispatch`), so run the affected end-to-end specs locally before pushing.
 - The repository (`SimoneRecchia/VibeGlobe`) is public since 2026-10-21: everything pushed is published, so never commit secrets, personal data or third-party material whose license does not allow it.
+- Vite's dev server can miss edits written by scripts and keep serving a stale module (a page that disagrees with Node tests): restart it (`npm run dev`, after removing `node_modules/.vite`) before the end-to-end runs that follow such edits.
 - Cloud containers: Playwright uses the preinstalled Chromium via `VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium` (`init.sh` sets it).

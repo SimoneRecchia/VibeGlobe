@@ -36,17 +36,21 @@ jobs:
       # One test at a time, as in the CI shards: two views rendering at once on the software GPU slowed each capture
       # from under a second to 20-30 s, past the views' time limits.
       - run: npx playwright test e2e/visual.spec.ts --project=chromium --workers=1 --update-snapshots=all
+        # The views that were captured are committed even when another view fails (KB-102); the run stays red.
+        continue-on-error: true
+        id: views
       # The ui package's controls in the light and dark themes (F430).
       - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --workers=1 --update-snapshots=all
       # Traces of failed views (recorded on the retry, ADR 0012), to investigate a capture that never completes.
       - name: Upload the failed views' traces
-        if: failure()
+        if: steps.views.outcome == 'failure' || failure()
         uses: actions/upload-artifact@v7
         with:
           name: visual-baselines-test-results
           path: test-results/
           retention-days: 7
       - name: Commit the baselines
+        if: always()
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name 'github-actions[bot]'
@@ -63,3 +67,6 @@ jobs:
             done
             exit 1
           fi
+      - name: Fail when a view could not be recorded
+        if: steps.views.outcome == 'failure'
+        run: exit 1

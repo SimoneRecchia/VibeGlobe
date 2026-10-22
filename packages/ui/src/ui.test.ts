@@ -24,6 +24,12 @@ function fakeGlobe(): Globe & { emit(): void } {
     eyeLongitudeDeg: 9.19,
     eyeLatitudeDeg: 45.4642,
     groundHeightMeters: 0,
+    viewMode: 'auto',
+    chosenTiltDeg: 0,
+    chosenHeadingDeg: 0,
+    morphFactor: 0,
+    reliefFactor: 0,
+    phase: 'globe',
   };
   const handlers = new Map<string, Set<(payload: unknown) => void>>();
   const globe = {

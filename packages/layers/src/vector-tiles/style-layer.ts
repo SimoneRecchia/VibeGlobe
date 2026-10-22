@@ -5,8 +5,11 @@
  */
 import {
   Color,
+  convertFunction,
   createPropertyExpression,
   featureFilter,
+  isExpression,
+  isFunction,
   latest,
   type FilterSpecification,
   type StylePropertySpecification,
@@ -106,7 +109,14 @@ function compileProperty(
   if (spec === undefined) return { problem: `unknown ${group} property "${name}" for a ${type} layer` };
   if (value === undefined) value = (spec as { default?: unknown }).default;
   if (value === undefined) return { expression: { kind: 'constant', evaluate: () => undefined } };
-  const compiled = createPropertyExpression(value, name, spec);
+  // Legacy functions (`{ stops }`) convert to expressions; constants that are not expressions (for example the
+  // string array of `text-font`) are literals, as the style specification reads them.
+  const input = isFunction(value)
+    ? convertFunction(value, spec)
+    : Array.isArray(value) && !isExpression(value)
+      ? ['literal', value]
+      : value;
+  const compiled = createPropertyExpression(input, name, spec);
   if (compiled.result === 'error') return { problem: compiled.value.map((e) => `${e.key} ${e.message}`).join('; ') };
   return { expression: compiled.value as unknown as Compiled };
 }

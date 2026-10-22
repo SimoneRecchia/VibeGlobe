@@ -65,6 +65,20 @@ describe('expressions follow the style specification (F446)', () => {
     expect(evaluate('circle-radius', ['coalesce', ['get', 'missing'], 3], 0, f)).toBe(3);
     // zoom
     expect(evaluate('circle-radius', ['step', ['zoom'], 1, 7, 2, 8, 3], 7.25)).toBe(2);
+    // legacy zoom and property functions
+    expect(
+      evaluate(
+        'circle-radius',
+        {
+          stops: [
+            [0, 1],
+            [10, 11],
+          ],
+        },
+        5,
+      ),
+    ).toBe(6);
+    expect(evaluate('circle-radius', { property: 'n', type: 'identity' }, 0, f)).toBe(4);
     // feature-state
     const hover = ['case', ['boolean', ['feature-state', 'hover'], false], 9, 1];
     expect(evaluate('circle-radius', hover, 0, f)).toBe(1);

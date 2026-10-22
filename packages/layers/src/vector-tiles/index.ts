@@ -58,3 +58,16 @@ export {
   roadDrawOrder,
 } from './osm.js';
 export type { RoadClass } from './osm.js';
+export {
+  ancestorAt,
+  inCoverage,
+  overzoom,
+  retainedTiles,
+  tileKey,
+  tilesToDraw,
+  tilesToRequest,
+  toTargetTile,
+} from './tile-pyramid.js';
+export type { OverzoomTransform, SourceCoverage, TileDraw, TileId } from './tile-pyramid.js';
+export { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile, VECTOR_TILE_TASKS } from './layout-tile.js';
+export type { Bucket, BucketFeature, BucketGeometry, BucketLabel, LayoutInput } from './layout-tile.js';

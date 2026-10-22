@@ -35,6 +35,35 @@ export function countMatrixUpdates(mesh: Mesh, onUpdate: () => void): void {
   };
 }
 
+/**
+ * Counts how often the drawn render pipeline changes within a frame (F103). The backend's `draw` is wrapped with its
+ * two fixed arguments, so counting allocates nothing per draw (F064).
+ */
+export class PipelineSwitches {
+  /** Changes since the last {@link PipelineSwitches.begin}: the last frame's once it is drawn. */
+  count = 0;
+  private last: unknown;
+
+  constructor(backend: unknown) {
+    const target = backend as { draw?: (renderObject: { pipeline: unknown }, info: unknown) => unknown };
+    const draw = target.draw;
+    if (typeof draw !== 'function') return;
+    target.draw = (renderObject, info) => {
+      if (renderObject.pipeline !== this.last) {
+        this.count++;
+        this.last = renderObject.pipeline;
+      }
+      return draw.call(backend, renderObject, info);
+    };
+  }
+
+  /** Starts counting a frame. */
+  begin(): void {
+    this.count = 0;
+    this.last = undefined;
+  }
+}
+
 /** Counts the calls of an object's method, if it has one. */
 export function countCalls(object: unknown, name: string, onCall: () => void): void {
   const target = object as Record<string, unknown>;

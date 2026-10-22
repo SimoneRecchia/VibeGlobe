@@ -27,6 +27,11 @@ export interface RendererOptions {
    * `RendererStats.gpuFrameMs` (default false). For benchmarks: reading the queries back allocates every frame.
    */
   readonly gpuTiming?: boolean;
+  /**
+   * Limits the compressed texture families KTX2 imagery may use to these ('bc', 'etc2', 'astc'), among those the device
+   * decodes (default: all of them; [] forces RGBA8). For tests, and for drivers that emulate a family (ADR 0020).
+   */
+  readonly compressedTextures?: readonly string[];
 }
 
 /**
@@ -39,6 +44,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     choice: options.backend ?? 'auto',
     depth: options.depth ?? 'auto',
     gpuTiming: options.gpuTiming ?? false,
+    compressedTextures: options.compressedTextures,
   } as const;
   return async (container, events) => {
     const canvas = options.canvas;

@@ -8,6 +8,19 @@ import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
 /** The Chromium build Playwright 1.64.1 pins (its browsers.json), which CI runs and the baselines come from. */
 const PINNED_CHROMIUM = '156.0.8078.4';
 
+/** What the scenario harness reports (apps/playground/src/scenario-harness.ts). */
+export interface ScenarioReport {
+  frames: number;
+  staticFrames: number;
+  holes: number;
+  firstHoleFrame: number;
+  dark: number;
+  firstDarkFrame: number;
+  firstHole?: { xPx: number; yPx: number; latitudeDeg: number; longitudeDeg: number };
+  pops: number;
+  firstPopFrame: number;
+}
+
 declare global {
   interface Window {
     /** The playground's test hooks (apps/playground/src/test-hooks.ts). */
@@ -21,6 +34,12 @@ declare global {
         canvas?: HTMLCanvasElement,
         backend?: 'auto' | 'webgpu' | 'webgl2',
       ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
+      workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
+      recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
+      checkFrame(darkBelow?: number): Promise<ScenarioReport>;
+      showHud(on: boolean): void;
+      loggedLevels(): string[];
+      clearLog(): void;
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };
@@ -52,7 +71,11 @@ export async function nextFrame(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 }
 
-/** Waits until the engine has drawn every requested frame and gone idle. */
+/**
+ * Waits until the engine has drawn every requested frame and gone idle: no frame for 300 ms, and none in the next two
+ * animation frames. A frame the engine requested (a running cross-fade, for one) is drawn in the same animation frame
+ * as a callback registered after it, so a slow frame of a software GPU, longer than 300 ms, is not taken for idle.
+ */
 export async function waitForIdle(page: Page): Promise<number> {
   return page.evaluate(
     () =>
@@ -60,13 +83,16 @@ export async function waitForIdle(page: Page): Promise<number> {
         const globe = window.vibeglobePlayground?.globe;
         if (!globe) throw new Error('no globe');
         let last = globe.frameNumber;
+        const again = (): void => {
+          last = globe.frameNumber;
+          check();
+        };
         const check = (): void => {
           setTimeout(() => {
-            if (globe.frameNumber === last) resolve(last);
-            else {
-              last = globe.frameNumber;
-              check();
-            }
+            if (globe.frameNumber !== last) return again();
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => (globe.frameNumber === last ? resolve(last) : again())),
+            );
           }, 300);
         };
         check();

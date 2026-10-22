@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   distribution,
   findBudgetViolations,
+  isDeterministicViolation,
   median,
   percentile,
   summarizeRun,
@@ -121,5 +122,12 @@ describe('findBudgetViolations', () => {
     const runs = [208, 210, 207].map((draws) => summarizeRun([16], [1], 0, null, draws));
     expect(summarizeScenario(runs).drawCalls).toBe(208);
     expect(summarizeScenario([summarizeRun([16], [1], 0)]).drawCalls).toBeNull();
+  });
+});
+
+describe('isDeterministicViolation', () => {
+  it('fails report-only runs on the streaming counters but not on timings (F564)', () => {
+    expect(isDeterministicViolation('streaming: 2 failed tiles > 0')).toBe(true);
+    expect(isDeterministicViolation('startup: p90 time to the first complete frame 900 ms > 800 ms')).toBe(false);
   });
 });

@@ -4,8 +4,10 @@
  */
 import { decodeImage } from './decode-image.js';
 import type { TaskTable } from './protocol.js';
+import { transcodeKtx2 } from './transcode-ktx2.js';
 
 /** The built-in tasks. */
 export const TASKS: TaskTable = Object.freeze({
   'decode-image': decodeImage,
+  'transcode-ktx2': transcodeKtx2,
 });

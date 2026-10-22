@@ -26,6 +26,11 @@ export class EngineClock {
     return this.state[TIME] ?? 0;
   }
 
+  /** Writes the engine time in milliseconds to `out[0]`: per-frame code reads it without boxing a returned double. */
+  timeInto(out: Float64Array): void {
+    out[0] = this.state[TIME] ?? 0;
+  }
+
   /** The last frame's step in milliseconds. */
   get deltaMs(): number {
     return this.state[DELTA] ?? 0;

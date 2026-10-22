@@ -349,13 +349,15 @@ for (const backend of BACKENDS) {
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
     const center = { xPx: box.width / 2, yPx: box.height / 2 };
-    // The globe's screen radius below the center: the last pixel that still shows the ellipsoid.
+    // The globe's screen radius below the center: the last pixel that still shows the ellipsoid (a binary search, so
+    // the test spends its time on the drags).
     let radiusPx = 0;
-    while (
-      center.yPx + radiusPx + 1 < box.height &&
-      (await screenToGeo(page, { ...center, yPx: center.yPx + radiusPx + 1 }))
-    )
-      radiusPx++;
+    let outsidePx = Math.floor(box.height - center.yPx);
+    while (outsidePx - radiusPx > 1) {
+      const middle = Math.floor((radiusPx + outsidePx) / 2);
+      if (await screenToGeo(page, { ...center, yPx: center.yPx + middle })) radiusPx = middle;
+      else outsidePx = middle;
+    }
     expect(radiusPx).toBeGreaterThan(100);
     for (const [from, to] of [
       [center, { xPx: center.xPx + 150, yPx: center.yPx + 60 }],
@@ -382,9 +384,20 @@ for (const backend of BACKENDS) {
           yPx: from.yPx + ((to.yPx - from.yPx) * step) / steps,
         };
         await page.mouse.move(box.x + point.xPx, box.y + point.yPx);
-        await nextFrame(page);
-        const shown = await geoToScreen(page, grabbed);
-        expect(Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx)).toBeLessThan(1);
+        // The move lands in the frame after the one that may already be under way when the event arrives (a loaded
+        // CI runner measured one step behind): wait for the frame that applied it, then hold it to 1 px.
+        // A failure names the step, the distance and whether the engine drew frames meanwhile.
+        const framesBefore = await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0);
+        const deadline = Date.now() + 5000;
+        let distancePx: number;
+        do {
+          await nextFrame(page);
+          const shown = await geoToScreen(page, grabbed);
+          distancePx = Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx);
+        } while (distancePx >= 1 && Date.now() < deadline);
+        const framesDrawn =
+          (await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0)) - framesBefore;
+        expect(distancePx, `step ${step} from ${JSON.stringify(from)}: ${framesDrawn} frames drawn`).toBeLessThan(1);
         const next = await geoToScreen(page, companion);
         expect(Math.hypot(next.xPx - companionShown.xPx, next.yPx - companionShown.yPx)).toBeLessThan(3 * stepPx);
         companionShown = next;

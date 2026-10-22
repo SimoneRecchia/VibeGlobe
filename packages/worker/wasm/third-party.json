@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Basis Universal transcoder",
+    "version": "1.60 (commit 323239a6a5ffa57d6570cfc403be99156e33a8b0)",
+    "license": "Apache-2.0",
+    "licenseFile": "licenses/basis_universal.txt",
+    "url": "https://github.com/BinomialLLC/basis_universal"
+  },
+  {
+    "name": "Zstandard decoder (bundled with Basis Universal)",
+    "version": "1.4.9",
+    "license": "BSD-3-Clause",
+    "licenseFile": "licenses/zstd.txt",
+    "url": "https://github.com/facebook/zstd"
+  }
+]

@@ -1,4 +1,5 @@
 import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { GlobeDiagnostics, LogLevel, LogSink } from '../diagnostics/observability.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
@@ -94,6 +95,10 @@ export interface RendererStats {
    * material variants draw. Debug shapes have their own materials and count.
    */
   readonly pipelineCompiles: number;
+  /** Times the render pipeline changed between draws in the last frame, the output pass included (F103). */
+  readonly pipelineSwitches: number;
+  /** Imagery tile textures held in a block-compressed format (KTX2 sources, ADR 0020). */
+  readonly compressedTextures: number;
   /**
    * GPU time of the last frame measured, in milliseconds: null unless the renderer was asked to measure it and the
    * device offers timestamp queries (benchmarks).
@@ -165,6 +170,12 @@ export interface TileDrawList {
   readonly textures: Int32Array;
   readonly uvTransforms: Float32Array;
   readonly geographic: Uint8Array;
+  /** The imagery each draw cross-fades from (F105): like `textures`, `uvTransforms` and `geographic`. */
+  readonly fromTextures: Int32Array;
+  readonly fromUvTransforms: Float32Array;
+  readonly fromGeographic: Uint8Array;
+  /** Each draw's fade progress: 0 shows only the `from` imagery, 1 only its own. */
+  readonly fades: Float32Array;
 }
 
 /** The engine's renderer interface; three.js stays behind it (ADR 0010). */
@@ -280,6 +291,15 @@ export interface GlobeOptions {
    */
   readonly manualClockStepMs?: number;
   /**
+   * Duration of the cross-fade when a surface tile's imagery changes, in milliseconds of engine time (F105): 250 by
+   * default; 0 switches at once (a test's injected pop).
+   */
+  readonly imageryFadeMs?: number;
+  /** The quietest messages the engine logs (F120): 'debug', 'info', 'warn' (default), 'error' or 'silent'. */
+  readonly logLevel?: LogLevel;
+  /** Receives the engine's log messages instead of the console (F120). */
+  readonly logSink?: LogSink;
+  /**
    * Tiled imagery layers, bottom first (M3): each surface tile shows the topmost layer that has a tile for it, else the
    * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
    */
@@ -349,7 +369,24 @@ export interface GlobeEvents {
   'device-restored': Record<string, never>;
   /** WebGPU could not be used and WebGL2 took over; the canvas may have been replaced, as for `device-restored`. */
   'backend-fallback': { readonly reason: string };
+  /** An imagery tile failed for good; its area keeps showing an ancestor (F112). */
+  'tile-error': TileErrorEvent;
   error: GlobeError;
+}
+
+/**
+ * Why a tile failed for good: `corrupt` bytes that do not decode, `failed` after its retries ran out, or
+ * `unsupported` data the engine or device cannot use (for example KTX2 without a usable transcoder, ADR 0020).
+ */
+export type TileErrorReason = 'corrupt' | 'failed' | 'unsupported';
+
+/** A tile that failed for good. */
+export interface TileErrorEvent {
+  readonly sourceId: string;
+  readonly level: number;
+  readonly x: number;
+  readonly y: number;
+  readonly reason: TileErrorReason;
 }
 
 /** A surface tile of the last drawn frame, for diagnostics (ADR 0006 §1: a Web Mercator root and two polar caps). */
@@ -390,6 +427,8 @@ export interface SurfaceStats {
 export interface Globe {
   /** Resolves after the first complete frame; rejects with a GlobeError when the engine cannot start. */
   readonly ready: Promise<void>;
+  /** Log level, phase timing and event traces (F118–F121, docs/guides/debugging.md). */
+  readonly diagnostics: GlobeDiagnostics;
   /** Active backend, available after `ready`. */
   readonly backend: BackendName | undefined;
   /** Device capabilities, available after `ready`. */

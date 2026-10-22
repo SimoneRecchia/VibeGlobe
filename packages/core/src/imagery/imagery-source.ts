@@ -1,4 +1,4 @@
-import type { TileTransport, TileRequest } from '../scheduler/types.js';
+import type { TileTransport, TileRequest, TimeoutsMs } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import type { TileRectangleRad, TilingScheme } from '../tiling/tiling-scheme.js';
 
@@ -22,6 +22,12 @@ export interface ImagerySource {
   readonly transport: TileTransport;
   /** How the bytes are decoded in the worker pool: browser image formats, or KTX2 (ADR 0020). */
   readonly decoder: 'image' | 'ktx2';
+  /** Requests in flight to each of the source's hosts (default 6, or 16 when `multiplexed`; F089). */
+  readonly maxRequestsPerHost?: number;
+  /** The hosts speak HTTP/2 or HTTP/3 (F096). */
+  readonly multiplexed?: boolean;
+  /** Time limits of each request; ADR 0007's 10 s to the headers and 30 s in all by default (F092). */
+  readonly timeoutsMs?: TimeoutsMs;
   /**
    * Writes the URL and host of a tile into `out` and returns it, or returns 'noData' for a tile the source has no
    * data for (outside its levels or coverage), which the engine then never requests (F093, F094).

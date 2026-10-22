@@ -16,6 +16,12 @@ export class DrawList implements TileDrawList {
   geographic: Uint8Array;
   /** The imagery level each draw shows, -1 for the world base image (diagnostics, F083). */
   imageryLevels: Int8Array;
+  /** What each draw fades from (F105): texture, UV transform and choice of v; equal to the draw's own when done. */
+  fromTextures: Int32Array;
+  fromUvTransforms: Float32Array;
+  fromGeographic: Uint8Array;
+  /** How far each draw's fade is, from 0 (only the old imagery) to 1 (only the new). */
+  fades: Float32Array;
 
   constructor(capacity = 256) {
     this.meshKeys = new Float64Array(capacity);
@@ -23,6 +29,10 @@ export class DrawList implements TileDrawList {
     this.uvTransforms = new Float32Array(capacity * 4);
     this.geographic = new Uint8Array(capacity);
     this.imageryLevels = new Int8Array(capacity);
+    this.fromTextures = new Int32Array(capacity);
+    this.fromUvTransforms = new Float32Array(capacity * 4);
+    this.fromGeographic = new Uint8Array(capacity);
+    this.fades = new Float32Array(capacity);
   }
 
   /** Makes room for `count` draws, keeping none of the current ones (called before a frame fills the list). */
@@ -39,6 +49,10 @@ export class DrawList implements TileDrawList {
     this.uvTransforms = new Float32Array(capacity * 4);
     this.geographic = new Uint8Array(capacity);
     this.imageryLevels = new Int8Array(capacity);
+    this.fromTextures = new Int32Array(capacity);
+    this.fromUvTransforms = new Float32Array(capacity * 4);
+    this.fromGeographic = new Uint8Array(capacity);
+    this.fades = new Float32Array(capacity);
   }
 }
 
@@ -55,10 +69,14 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     list.textures[index] = BASE_TEXTURE;
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;
+    list.fromTextures[index] = BASE_TEXTURE;
+    list.fromGeographic[index] = 1;
+    list.fades[index] = 1;
     const at = index * 4;
     list.uvTransforms[at] = (tile.eastRad - tile.westRad) / (2 * Math.PI);
     list.uvTransforms[at + 1] = (tile.northRad - tile.southRad) / Math.PI;
     list.uvTransforms[at + 2] = (tile.westRad + Math.PI) / (2 * Math.PI);
     list.uvTransforms[at + 3] = (Math.PI / 2 - tile.northRad) / Math.PI;
+    for (let c = 0; c < 4; c++) list.fromUvTransforms[at + c] = list.uvTransforms[at + c] ?? 0;
   }
 }

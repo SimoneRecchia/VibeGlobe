@@ -45,6 +45,25 @@ export function validateView(view: unknown, current: ValidView): ValidView {
   };
 }
 
+/** Numeric options and their ranges. */
+const NUMBER_OPTIONS = [
+  ['resolutionScale', 0.1, 4],
+  ['maxScreenErrorPx', 0.1, 64],
+  ['manualClockStepMs', 0.001, 1000],
+  ['imageryFadeMs', 0, 5000],
+] as const;
+
+/** Validates the logging options (F120). */
+function validateLogging(level: unknown, sink: unknown): void {
+  if (level !== undefined && !['debug', 'info', 'warn', 'error', 'silent'].includes(level as string))
+    throw new GlobeError(
+      'invalid-option',
+      `logLevel must be debug, info, warn, error or silent, got ${describeInput(level)}`,
+    );
+  if (sink !== undefined && typeof sink !== 'function')
+    throw new GlobeError('invalid-option', 'logSink must be a function');
+}
+
 /** Validates the options of createGlobe at the API boundary. Throws a typed GlobeError naming the bad option. */
 export function validateOptions(options: unknown): GlobeOptions {
   if (options === null || typeof options !== 'object') {
@@ -62,11 +81,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   if (typeof input.baseImageryUrl !== 'string' || input.baseImageryUrl.length === 0) {
     throw new GlobeError('invalid-option', 'baseImageryUrl must be a non-empty string');
   }
-  for (const [name, min, max] of [
-    ['resolutionScale', 0.1, 4],
-    ['maxScreenErrorPx', 0.1, 64],
-    ['manualClockStepMs', 0.001, 1000],
-  ] as const) {
+  for (const [name, min, max] of NUMBER_OPTIONS) {
     const value = input[name];
     if (value !== undefined) {
       const number = typeof value === 'number' ? value : NaN;
@@ -78,6 +93,7 @@ export function validateOptions(options: unknown): GlobeOptions {
       }
     }
   }
+  validateLogging(input.logLevel, input.logSink);
   const minLevel = input.minSurfaceLevel;
   if (
     minLevel !== undefined &&
@@ -152,6 +168,7 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'device-lost',
   'device-restored',
   'backend-fallback',
+  'tile-error',
   'error',
 ]);
 

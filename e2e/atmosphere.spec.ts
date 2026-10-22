@@ -159,9 +159,6 @@ for (const backend of BACKENDS) {
         await setFlatness(page, i / 25);
         const image = await renderFrame(page, VIEWS['tilted-100km'] ?? { lonDeg: 0, latDeg: 0, rangeM: 1e5 });
         if (previous) morph.push(meanDifference(previous, image, FULL));
-        test
-          .info()
-          .annotations.push({ type: 'measure', description: `morph step ${i}: ${morph.at(-1)?.toFixed(2) ?? '-'}` });
         previous = image;
       }
       await setFlatness(page, 0);

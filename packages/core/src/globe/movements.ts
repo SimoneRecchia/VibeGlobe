@@ -1,11 +1,20 @@
 import type { Camera } from '../camera/camera.js';
 import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js';
-import { groundZoomFromMercatorZoom, rangeForGroundZoom } from '../camera/zoom.js';
+import { Orbit } from '../camera/orbit.js';
+import {
+  groundZoomForRange,
+  groundZoomFromMercatorZoom,
+  mercatorZoomFromGroundZoom,
+  rangeForGroundZoom,
+} from '../camera/zoom.js';
+import { WGS84 } from '../geodesy/wgs84.js';
 import type { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import type {
   CameraMovement,
   GeoBounds,
+  GeoPosition,
+  HomeView,
   GlobeEvents,
   MoveCause,
   MoveOutcome,
@@ -15,7 +24,7 @@ import type {
 } from './types.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import { validateBounds, viewForBounds } from './fit-bounds.js';
-import { validateView, type ValidView } from './validation.js';
+import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
 import type { EngineClock } from './engine-clock.js';
@@ -29,19 +38,29 @@ export interface MovementHost {
   readonly cam: Camera;
   readonly view: ViewState;
   readonly emitter: Emitter<GlobeEvents>;
+  /** Throws once the globe is destroyed. */
+  assertAlive(): void;
   /** The engine clock's time of the frame being drawn, milliseconds. */
   timeMs(): number;
   /** The current view as validated fields, the base of a partial target. */
   currentView(): ValidView;
   /** A target with a tilt chooses it: manual mode (ADR 0034). */
   chooseTilt(tiltDeg: number): void;
+  /** Sets the view mode (F163), as the home view asks. */
+  setMode(mode: '2d' | '3d' | 'auto'): void;
   /** Sets the chosen tilt a movement animates, without a mode change. */
   animateTilt(tiltRad: number): void;
   requestRender(): void;
 }
 
+/** A running animation: an ease or flight, or an orbit (F192). */
+interface Animation {
+  readonly animatesTilt: boolean;
+  step(camera: Camera, io: Float64Array): boolean;
+}
+
 interface Running {
-  readonly animator: CameraAnimator;
+  readonly animator: Animation;
   readonly settle: (outcome: MoveOutcome) => void;
   readonly detach: () => void;
 }
@@ -68,22 +87,13 @@ export class Movements {
 
   /** Starts an ease or a flight; invalid input rejects with a GlobeError and moves nothing. */
   start(kind: AnimationKind, target: ViewInit, options: MovementOptions | undefined): CameraMovement {
-    let settle: (outcome: MoveOutcome) => void = () => undefined;
-    let cancel = (): void => undefined;
-    const promise = new Promise<MoveOutcome>((resolve) => {
-      settle = resolve;
-    }) as CameraMovement;
-    promise.cancel = () => cancel();
+    this.host.assertAlive();
     let view: ValidView;
     let durationMs: number | undefined;
     try {
       view = validateView(target, this.host.currentView());
       durationMs = validDuration(options?.durationMs);
-      if (
-        options?.signal !== undefined &&
-        (typeof options.signal !== 'object' || options.signal === null || !('aborted' in options.signal))
-      )
-        throw new GlobeError('invalid-option', 'A movement signal must be an AbortSignal');
+      validSignal(options?.signal);
     } catch (error) {
       return rejected(error);
     }
@@ -101,15 +111,79 @@ export class Movements {
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
-    const animator = new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs);
-    const signal = options?.signal;
+    return this.begin(new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs), options?.signal);
+  }
+
+  /**
+   * Orbits the camera about `center` (by default its target) at `degreesPerSecond` (default 10) until cancelled,
+   * interrupted or replaced (F192).
+   */
+  orbit(
+    options:
+      | { readonly center?: GeoPosition; readonly degreesPerSecond?: number; readonly signal?: AbortSignalLike }
+      | undefined,
+  ): CameraMovement {
+    this.host.assertAlive();
+    const camera = this.host.cam;
+    const center = Float64Array.of(camera.pose.targetLongitudeRad, camera.pose.targetLatitudeRad);
+    let rate: number;
+    try {
+      if (options?.center !== undefined) {
+        validatePosition(options.center);
+        center[0] = options.center.longitudeDeg * RAD;
+        center[1] = options.center.latitudeDeg * RAD;
+      }
+      rate = options?.degreesPerSecond ?? 10;
+      if (typeof rate !== 'number' || !Number.isFinite(rate))
+        throw new GlobeError('invalid-option', `degreesPerSecond must be a finite number, got ${String(rate)}`);
+      validSignal(options?.signal);
+    } catch (error) {
+      return rejected(error);
+    }
+    this.interrupt();
+    return this.begin(new Orbit(camera, center, rate * RAD, this.host.timeMs()), options?.signal);
+  }
+
+  /** Turns to a heading along the shorter arc, keeping center and tilt (F191). */
+  rotateTo(headingDeg: number, options: MovementOptions | undefined): CameraMovement {
+    this.host.assertAlive();
+    return this.start('ease', { headingDeg }, options);
+  }
+
+  /** Flies out to the whole globe over the current location (F193): the eye three Earth radii from the target. */
+  resetToGlobe(options: MovementOptions | undefined): CameraMovement {
+    this.host.assertAlive();
+    const camera = this.host.cam;
+    const latitudeRad = camera.pose.targetLatitudeRad;
+    const zoom = mercatorZoomFromGroundZoom(
+      groundZoomForRange(3 * WGS84.semiMajorAxisMeters, camera.heightPx, camera.fovYRad),
+      latitudeRad,
+    );
+    const view = this.host.currentView();
+    return this.start('fly', { longitudeDeg: view.longitudeDeg, latitudeDeg: view.latitudeDeg, zoom }, options);
+  }
+
+  /** Flies to the home view, setting its view mode first (F194). */
+  goHome(home: HomeView, options: MovementOptions | undefined): CameraMovement {
+    this.host.assertAlive();
+    if (home.viewMode !== undefined) this.host.setMode(home.viewMode);
+    // The view mode is no view field: validation reads only those.
+    return this.start('fly', home, options);
+  }
+
+  /** Starts a validated animation: its promise, events and signal (ADR 0036). */
+  private begin(animator: Animation, signal: AbortSignalLike | undefined): CameraMovement {
+    let settle: (outcome: MoveOutcome) => void = () => undefined;
+    const promise = new Promise<MoveOutcome>((resolve) => {
+      settle = resolve;
+    }) as CameraMovement;
     const onAbort = (): void => this.finish(running, 'cancelled');
     const running: Running = {
       animator,
       settle: (outcome) => settle(outcome),
       detach: () => signal?.removeEventListener('abort', onAbort),
     };
-    cancel = () => this.finish(running, 'cancelled');
+    promise.cancel = () => this.finish(running, 'cancelled');
     this.running = running;
     this.moveEvent.cause = 'api';
     this.host.emitter.emit('movestart', { cause: 'api' });
@@ -124,6 +198,7 @@ export class Movements {
     bounds: GeoBounds,
     options: (MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' }) | undefined,
   ): CameraMovement {
+    this.host.assertAlive();
     const camera = this.host.cam;
     let target;
     try {
@@ -142,6 +217,7 @@ export class Movements {
 
   /** Plays a tour (F199): each leg a movement, then its dwell, announcing each waypoint. */
   tour(waypoints: readonly TourWaypoint[], options: { readonly signal?: AbortSignalLike } | undefined): CameraMovement {
+    this.host.assertAlive();
     try {
       if (!Array.isArray(waypoints) || waypoints.length === 0)
         throw new GlobeError('invalid-option', 'A tour needs at least one waypoint');
@@ -287,6 +363,12 @@ export class Movements {
   }
 }
 
+/** Throws unless `signal` is undefined or an AbortSignal. */
+function validSignal(signal: unknown): void {
+  if (signal !== undefined && (typeof signal !== 'object' || signal === null || !('aborted' in signal)))
+    throw new GlobeError('invalid-option', 'A movement signal must be an AbortSignal');
+}
+
 /** A movement that failed validation: rejected, with nothing to cancel. */
 function rejected(error: unknown): CameraMovement {
   const promise = Promise.reject(error) as CameraMovement;
@@ -330,10 +412,12 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
   const movements: Movements = new Movements({
     cam: globe.cam,
     view: globe.view,
+    assertAlive: () => globe.assertAlive(),
     emitter: globe.emitter,
     timeMs: () => globe.clock.timeMs,
     currentView: () => currentView(globe.cam),
     chooseTilt: (tiltDeg) => viewControl.chooseTilt(tiltDeg),
+    setMode: (mode) => viewControl.setMode(mode),
     animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
     requestRender: () => globe.requestRender(),
   });

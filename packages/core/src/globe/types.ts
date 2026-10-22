@@ -330,6 +330,8 @@ export interface GlobeOptions {
   /** URL of the pinned base imagery: an equirectangular image of the whole world. */
   readonly baseImageryUrl: string;
   readonly view?: ViewInit;
+  /** The project's home view (F194), which {@link Globe.goHome} flies to; by default the start view. */
+  readonly home?: HomeView;
   /**
    * The zoom curves of the Auto view mode (F150): the globe-to-flat morph, the relief and the automatic tilt, each over
    * a band of ground zoom; fields not given keep `DEFAULT_VIEW_CURVES`. Invalid curves throw 'invalid-option'.
@@ -502,6 +504,11 @@ export interface CameraMovement extends Promise<MoveOutcome> {
   cancel(): void;
 }
 
+/** A home view (F194): a view, and optionally the view mode to set on the way. */
+export interface HomeView extends ViewInit {
+  readonly viewMode?: '2d' | '3d' | 'auto';
+}
+
 /** A geographic rectangle in degrees; `eastDeg` below `westDeg` crosses the antimeridian. */
 export interface GeoBounds {
   readonly westDeg: number;
@@ -632,6 +639,21 @@ export interface Globe {
    * takes over, and cancelled through cancel() or the signal.
    */
   tour(waypoints: readonly TourWaypoint[], options?: { readonly signal?: AbortSignalLike }): CameraMovement;
+  /** Turns the view to `headingDeg` along the shorter arc, keeping center and tilt (F191: 0 north, 90 east…). */
+  rotateTo(headingDeg: number, options?: MovementOptions): CameraMovement;
+  /** Flies out to the whole globe centered on the current location (F193). */
+  resetToGlobe(options?: MovementOptions): CameraMovement;
+  /** Flies to the home view (F194), setting its view mode first when it has one. */
+  goHome(options?: MovementOptions): CameraMovement;
+  /**
+   * Orbits the camera about `center` (by default the target) at `degreesPerSecond` (default 10), keeping the center
+   * fixed on screen, until cancelled, interrupted by input or replaced by another movement (F192).
+   */
+  orbit(options?: {
+    readonly center?: GeoPosition;
+    readonly degreesPerSecond?: number;
+    readonly signal?: AbortSignalLike;
+  }): CameraMovement;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
   /**

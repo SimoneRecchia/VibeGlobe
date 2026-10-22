@@ -6,7 +6,7 @@ import { GlobeError } from './errors.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
-import { FrameWaits } from './frame-waits.js';
+import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
@@ -18,7 +18,6 @@ import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
-  CameraMovement,
   CameraState,
   Controls,
   DebugMeshData,
@@ -38,7 +37,6 @@ import type {
   SurfaceStats,
   SurfaceTileInfo,
   ResourceCounts,
-  MovementOptions,
   ScreenPoint,
   ViewInit,
 } from './types.js';
@@ -362,19 +360,15 @@ class GlobeEngine implements Globe {
     this.pendingView = this.movements.jump(target, this.pendingView, this.collapsed) ?? this.pendingView;
   }
 
-  readonly easeTo = (target: ViewInit, options?: MovementOptions): CameraMovement => (
-    this.assertAlive(),
-    this.movements.start('ease', target, options)
-  );
-  readonly fitBounds: Globe['fitBounds'] = (bounds, options) => (
-    this.assertAlive(),
-    this.movements.fitBounds(bounds, options)
-  );
-  readonly tour: Globe['tour'] = (waypoints, options) => (this.assertAlive(), this.movements.tour(waypoints, options));
-  readonly flyTo = (target: ViewInit, options?: MovementOptions): CameraMovement => (
-    this.assertAlive(),
-    this.movements.start('fly', target, options)
-  );
+  readonly easeTo: Globe['easeTo'] = (target, options) => this.movements.start('ease', target, options);
+  readonly flyTo: Globe['flyTo'] = (target, options) => this.movements.start('fly', target, options);
+  readonly fitBounds: Globe['fitBounds'] = (bounds, options) => this.movements.fitBounds(bounds, options);
+  readonly tour: Globe['tour'] = (waypoints, options) => this.movements.tour(waypoints, options);
+  readonly orbit: Globe['orbit'] = (options) => this.movements.orbit(options);
+  readonly rotateTo: Globe['rotateTo'] = (heading, options) => this.movements.rotateTo(heading, options);
+  readonly resetToGlobe: Globe['resetToGlobe'] = (options) => this.movements.resetToGlobe(options);
+  readonly goHome: Globe['goHome'] = (options) =>
+    this.movements.goHome(this.options.home ?? this.options.view ?? DEFAULT_VIEW, options);
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
@@ -420,20 +414,18 @@ class GlobeEngine implements Globe {
     this.requestRender();
   }
 
-  async captureFrame(): Promise<FrameCapture> {
+  captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
-    await this.ready;
-    for (;;) {
-      const renderer = this.renderer;
-      if (this.destroyed || !renderer) throw new GlobeError('destroyed', 'The globe was destroyed');
-      if (this.failure) throw this.failure;
-      const drawn = this.frames;
-      // Drawn and read in one task: the canvas keeps the frame only until the browser presents it.
-      this.drawNow(renderer);
-      if (this.frames > drawn) return renderer.capture();
-      // Nothing could be drawn (a recovery, a container without a size): wait for a drawn frame (KB-051).
-      await this.captureWaits.next();
-    }
+    return captureWhenDrawn({
+      ready: this.ready,
+      waits: this.captureWaits,
+      state: () => ({
+        renderer: this.destroyed ? undefined : this.renderer,
+        failure: this.failure,
+        frames: this.frames,
+      }),
+      draw: (renderer) => this.drawNow(renderer),
+    });
   }
 
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */

@@ -65,6 +65,15 @@ function validateLogging(level: unknown, sink: unknown): void {
     throw new GlobeError('invalid-option', 'logSink must be a function');
 }
 
+/** Throws a GlobeError unless the home view (F194) is undefined or a valid view with an optional view mode. */
+function validateHome(home: unknown): void {
+  if (home === undefined) return;
+  validateView(home, DEFAULT_VIEW);
+  const mode = (home as { viewMode?: unknown }).viewMode;
+  if (mode !== undefined && mode !== '2d' && mode !== '3d' && mode !== 'auto')
+    throw new GlobeError('invalid-option', `home.viewMode must be '2d', '3d' or 'auto', got ${describeInput(mode)}`);
+}
+
 /** Validates the options of createGlobe at the API boundary. Throws a typed GlobeError naming the bad option. */
 export function validateOptions(options: unknown): GlobeOptions {
   if (options === null || typeof options !== 'object') {
@@ -106,6 +115,7 @@ export function validateOptions(options: unknown): GlobeOptions {
     );
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
+  validateHome(input.home);
   validateImagery(input.imagery, input.workers);
   validateTerrain(input.terrain, input.workers);
   const memory = input.memory as Partial<Record<string, unknown>> | undefined;

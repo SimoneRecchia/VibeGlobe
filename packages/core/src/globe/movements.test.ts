@@ -180,3 +180,89 @@ describe('fitting bounds and tours (F176, F199)', () => {
     globe.destroy();
   });
 });
+
+describe('orientation, orbit, reset and home (F191–F194)', () => {
+  it('turns to each compass direction along the shorter arc, keeping center and tilt (F191)', async () => {
+    const { globe, ticks } = await started({
+      longitudeDeg: 9,
+      latitudeDeg: 45,
+      zoom: 15,
+      tiltDeg: 30,
+      headingDeg: 300,
+    });
+    for (const heading of [0, 90, 180, 270]) {
+      const turn = globe.rotateTo(heading, { durationMs: 200 });
+      ticks(20);
+      expect(await turn).toBe('completed');
+      // The public heading lies in [−180°, 180°).
+      const wrapped = ((((heading + 180) % 360) + 360) % 360) - 180;
+      expect(globe.camera.headingDeg).toBeCloseTo(wrapped, 9);
+      expect(globe.camera.chosenHeadingDeg).toBeCloseTo(wrapped, 9);
+      expect(globe.camera.longitudeDeg).toBeCloseTo(9, 9);
+      expect(globe.camera.tiltDeg).toBeCloseTo(30, 6);
+    }
+    globe.destroy();
+  });
+
+  it('orbits a given point keeping it fixed on screen at a constant distance, until cancelled (F192)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 15, tiltDeg: 45 });
+    ticks(3);
+    const center = { longitudeDeg: 9.002, latitudeDeg: 45.001 };
+    const start = globe.geoToScreen(center);
+    if (!start) throw new Error('center off screen');
+    const orbit = globe.orbit({ center, degreesPerSecond: 30 });
+    for (let i = 0; i < 30; i++) {
+      ticks(1);
+      const shown = globe.geoToScreen(center);
+      expect(Math.hypot((shown?.xPx ?? NaN) - start.xPx, (shown?.yPx ?? NaN) - start.yPx)).toBeLessThan(1);
+    }
+    expect(globe.camera.headingDeg).toBeGreaterThan(5);
+    orbit.cancel();
+    expect(await orbit).toBe('cancelled');
+    globe.destroy();
+  });
+
+  it('resets to the whole globe over the current place, and flies home with its view mode (F193, F194)', async () => {
+    const { renderer, factory } = (await import('./test-renderer.js')).fakeRenderer();
+    const home = { longitudeDeg: 2.35, latitudeDeg: 48.86, zoom: 12, headingDeg: 45, viewMode: '2d' as const };
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'w',
+      view: { longitudeDeg: 9, latitudeDeg: 45, zoom: 17 },
+      home,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    const ticks = (count: number): void => {
+      for (let i = 0; i < count; i++) {
+        renderer.timers.advance(16);
+        renderer.flush();
+      }
+    };
+    const reset = globe.resetToGlobe();
+    ticks(600);
+    expect(await reset).toBe('completed');
+    expect(globe.camera.longitudeDeg).toBeCloseTo(9, 9);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(45, 9);
+    expect(globe.camera.phase).toBe('globe');
+    // The whole globe: the eye three Earth radii from the target, wider than the Earth in view.
+    expect(globe.camera.rangeMeters).toBeCloseTo(3 * 6378137, -3);
+    const homeward = globe.goHome();
+    ticks(600);
+    expect(await homeward).toBe('completed');
+    expect(globe.viewMode).toBe('2d');
+    expect([globe.camera.longitudeDeg, globe.camera.latitudeDeg]).toEqual([
+      expect.closeTo(2.35, 9),
+      expect.closeTo(48.86, 9),
+    ]);
+    expect(globe.camera.zoom).toBeCloseTo(12, 6);
+    expect(globe.camera.headingDeg).toBeCloseTo(45, 9);
+    expect(() =>
+      createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', home: { latitudeDeg: 99 } }),
+    ).toThrow(expect.objectContaining({ code: 'invalid-coordinate' }));
+    globe.destroy();
+  });
+});

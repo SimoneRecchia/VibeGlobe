@@ -55,4 +55,20 @@ describe('defineVibeGlobe', () => {
     element.zoom = undefined;
     expect(element.hasAttribute('zoom')).toBe(false);
   });
+
+  it('keeps properties set before the element was defined (PT-01)', () => {
+    const element = document.createElement('early-globe') as InstanceType<ReturnType<typeof defineVibeGlobe>>;
+    const imagery = [{ id: 'early' }] as unknown as typeof element.imagery;
+    element.zoom = 5;
+    element.imagery = imagery;
+    element.setAttribute('base-imagery-url', '/base.jpg');
+    document.body.append(element);
+    defineVibeGlobe('early-globe');
+    expect(element.getAttribute('zoom')).toBe('5');
+    expect(created.at(-1)?.view).toEqual({ zoom: 5 });
+    expect(created.at(-1)?.imagery).toEqual(imagery);
+    element.zoom = 6;
+    expect(element.getAttribute('zoom')).toBe('6');
+    element.remove();
+  });
 });

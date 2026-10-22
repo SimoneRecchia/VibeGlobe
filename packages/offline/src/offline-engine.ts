@@ -222,6 +222,9 @@ class OfflineEngine implements Offline {
 
   async clearCache(sourceId?: string): Promise<void> {
     await this.store.deletePrefix(sourceId === undefined ? '' : `${encodeURIComponent(sourceId)}/`);
+    // A cache the application emptied itself is no eviction to report on the next start (F275).
+    const usage = await this.store.usage().catch(() => undefined);
+    if (usage?.bytes === 0) this.markCache(false);
   }
 
   requestPersistentStorage(): Promise<PersistenceResult> {
@@ -280,16 +283,24 @@ class OfflineEngine implements Offline {
       },
       readPackage: (sourceId, coord, signal) =>
         this.packageReader ? this.packageReader.read(sourceId, coord, signal) : Promise.resolve(undefined),
+      addEndpoint: (endpoint, probeUrl) => {
+        if (/^https?:/.test(probeUrl)) this.monitor.addEndpoint(endpoint, probeUrl);
+      },
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
       waitForChange: (maxMs) =>
         new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, maxMs);
-          this.waiters.push(() => {
+          const waiter = (): void => {
             clearTimeout(timer);
             resolve();
-          });
+          };
+          // A wait that times out leaves the list, which would otherwise grow for the whole outage.
+          const timer = setTimeout(() => {
+            this.waiters = this.waiters.filter((w) => w !== waiter);
+            resolve();
+          }, maxMs);
+          this.waiters.push(waiter);
         }),
       offlineOnly: () => this.currentMode === 'offline',
       count: (sourceId, tier, coord, packageId) => {

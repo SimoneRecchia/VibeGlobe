@@ -32,6 +32,12 @@ export const DEFAULT_CACHE_BYTES = 512 * 1024 * 1024;
 /** After an eviction the cache shrinks to this fraction of its limit, so evictions do not run on every write. */
 const EVICT_TO = 0.9;
 
+/**
+ * Other tabs write to the same database with byte counts of their own: the total is read again from the size index
+ * after this fraction of the limit was written here, so the shared database stays within its limit.
+ */
+const RESUM_EVERY = 0.05;
+
 interface IndexRecord {
   readonly size: number;
   readonly accessMs: number;
@@ -47,6 +53,8 @@ class IndexedDbStore implements CacheStore {
   private readonly factory: IDBFactory | undefined;
   private db: Promise<IDBDatabase> | undefined;
   private bytes = 0;
+  /** Bytes written by this instance since the total was last read from the database. */
+  private writtenSinceSum = 0;
   private closed = false;
   /** Access times waiting to be written, batched so reads cost no write each. */
   private readonly touched = new Map<string, number>();
@@ -76,12 +84,14 @@ class IndexedDbStore implements CacheStore {
     try {
       await transactionDone(tx);
       this.bytes += size - ((await previous)?.size ?? 0);
+      this.writtenSinceSum += size;
     } catch (error) {
       if (!isQuotaError(error)) throw error;
       // The browser quota: make room for the next writes (F274).
       await this.evict(Math.floor(this.bytes * 0.75));
       return 'quota';
     }
+    if (this.writtenSinceSum >= this.maxBytes * RESUM_EVERY) await this.resum(db);
     if (this.bytes > this.maxBytes) await this.evict(Math.floor(this.maxBytes * EVICT_TO));
     return 'stored';
   }
@@ -117,7 +127,7 @@ class IndexedDbStore implements CacheStore {
   }
 
   async usage(): Promise<StorageUsage> {
-    await this.open();
+    await this.resum(await this.open());
     return { bytes: this.bytes, quotaBytes: this.maxBytes };
   }
 
@@ -152,6 +162,12 @@ class IndexedDbStore implements CacheStore {
     db.onversionchange = () => lost('the database is being deleted or upgraded elsewhere');
     this.bytes = await this.sumSizes(db);
     return db;
+  }
+
+  /** Reads the total again, which includes the writes of other tabs. */
+  private async resum(db: IDBDatabase): Promise<void> {
+    this.writtenSinceSum = 0;
+    this.bytes = await this.sumSizes(db);
   }
 
   /** The stored bytes, read from the size index alone. */

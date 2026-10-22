@@ -61,7 +61,16 @@ export class LayerStack {
       },
     };
     this.#entries.splice(position === undefined ? this.#entries.length : this.#resolve(position), 0, entry);
-    layer.attach(context);
+    try {
+      layer.attach(context);
+    } catch (error) {
+      // A layer that cannot attach (no pick slot left) leaves the stack as it was, and frees what it took.
+      this.#entries.splice(this.#entries.indexOf(entry), 1);
+      layer.detach();
+      for (const slot of entry.slots) this.#slots.release(slot);
+      entry.slots.clear();
+      throw error;
+    }
     this.#renumber();
     return layer;
   }

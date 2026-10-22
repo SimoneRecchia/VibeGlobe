@@ -49,12 +49,20 @@ export function workerStore(options: WorkerStoreOptions = {}): CacheStore {
     if (message.ok) call?.resolve(message.value);
     else call?.reject(new Error(message.error));
   };
-  worker.onerror = () => {
-    for (const call of pending.values()) call.reject(new Error('the cache worker failed'));
+  /** Why later calls fail at once: a worker that failed (a missing script, a CSP refusal) or was closed never answers. */
+  let failure: string | undefined;
+  const fail = (reason: string): void => {
+    failure = reason;
+    for (const call of pending.values()) call.reject(new Error(reason));
     pending.clear();
   };
+  worker.onerror = () => fail('the cache worker failed');
   const send = <T>(request: WithoutId<CacheWorkerRequest>, transfer: Transferable[] = []): Promise<T> =>
     new Promise<T>((resolve, reject) => {
+      if (failure !== undefined) {
+        reject(new Error(failure));
+        return;
+      }
       const id = next++;
       pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       worker.postMessage({ ...request, id }, transfer);
@@ -72,8 +80,7 @@ export function workerStore(options: WorkerStoreOptions = {}): CacheStore {
     usage: () => send<StorageUsage>({ op: 'usage' }),
     close() {
       worker.terminate();
-      for (const call of pending.values()) call.reject(new Error('the cache store is closed'));
-      pending.clear();
+      fail('the cache store is closed');
     },
   };
 }

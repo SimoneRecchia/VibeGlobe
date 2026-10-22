@@ -311,3 +311,65 @@ describe('offline packages', () => {
     expect(lost).toEqual([['rome']]);
   });
 });
+
+describe('offline package installs that fail', () => {
+  it('keeps the chunks of an install the network interrupted, and resumes it (PT-12)', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const net = server({ '/pkg/rome.json': JSON.stringify(manifest), '/pkg/rome.pmtiles': data });
+    let ranges = 0;
+    const dropping = ((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('.pmtiles') && ++ranges > 3) return Promise.reject(new TypeError('Failed to fetch'));
+      return net.fetchImpl(input, init);
+    }) as typeof fetch;
+    const factory = new IDBFactory();
+    const first = setup(factory, dropping);
+    await expect(first.manager.install('https://lan.test/pkg/rome.json')).rejects.toThrow(/could not be downloaded/);
+    const second = setup(factory, net.fetchImpl);
+    let resumed = 0;
+    await second.manager.install('https://lan.test/pkg/rome.json', { onProgress: (p) => (resumed = p.resumedBytes) });
+    expect(resumed).toBe(3 * 64);
+    expect(await load(second.source, tile(2, 2, 2))).toBe('1:2/2/2');
+  });
+
+  it('a failed install of the version already installed leaves that version intact (PT-13)', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const net = server({ '/pkg/rome.json': JSON.stringify(manifest), '/pkg/rome.pmtiles': data });
+    const { manager, source } = setup(new IDBFactory(), net.fetchImpl);
+    await manager.install('https://lan.test/pkg/rome.json');
+    const truncated = new Blob([data.slice(0, 100) as Uint8Array<ArrayBuffer>]);
+    await manager.install({ manifest, files: { 'rome.pmtiles': truncated } }).catch(() => undefined);
+    expect(await load(source, tile(2, 2, 2))).toBe('1:2/2/2');
+  });
+});
+
+describe('served offline packages', () => {
+  it('reads a served package again after the server failed its first read, without calling it corrupt (PT-17)', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const net = server({ '/lan/rome.json': JSON.stringify(manifest), '/lan/rome.pmtiles': data });
+    let down = true;
+    const flaky = ((input: RequestInfo | URL, init?: RequestInit) =>
+      down && String(input).endsWith('.pmtiles')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : net.fetchImpl(input, init)) as typeof fetch;
+    const lan = setup(new IDBFactory(), flaky);
+    await lan.manager.addServedPackage('https://lan.test/lan/rome.json');
+    expect(await load(lan.source, tile(2, 2, 2))).not.toBe('1:2/2/2');
+    down = false;
+    expect(await load(lan.source, tile(2, 2, 2))).toBe('1:2/2/2');
+    expect(lan.errors).toEqual([]);
+  });
+});
+
+describe('served offline packages and integrity', () => {
+  it('refuses to serve a package whose manifest has no chunk hashes to verify reads against (PT-18)', async () => {
+    const data = archive('1');
+    const { files, ...rest } = await manifestOf('1', data);
+    const unverifiable = { ...rest, files: files.map((file) => ({ ...file, chunkSha256: undefined })) };
+    const net = server({ '/lan/rome.json': JSON.stringify(unverifiable), '/lan/rome.pmtiles': data });
+    const lan = setup(new IDBFactory(), net.fetchImpl);
+    await expect(lan.manager.addServedPackage('https://lan.test/lan/rome.json')).rejects.toThrow(/chunk/);
+  });
+});

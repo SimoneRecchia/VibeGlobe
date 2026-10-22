@@ -98,3 +98,26 @@ describe('clustered point layer', () => {
     ).toThrow(TypeError);
   });
 });
+
+describe('clustered point layer in and out of the stack', () => {
+  it('clusters again after being removed and added back (PT-10)', async () => {
+    const layer = new ClusterLayer({ data: randomPoints(500), cluster: { radiusPx: 60, transitionMs: 0 } });
+    const stack = new LayerStack(new RecordingRenderTarget());
+    stack.add(layer);
+    await layer.loaded;
+    stack.frame(frameAt(0, 3));
+    await settle();
+    stack.frame(frameAt(16, 3));
+    stack.remove(layer);
+    stack.add(layer);
+    const errors: string[] = [];
+    layer.on('error', (e) => errors.push(e.message));
+    await layer.loaded;
+    stack.frame(frameAt(32, 8));
+    await settle();
+    stack.frame(frameAt(48, 8));
+    expect(errors).toEqual([]);
+    expect(layer.shownZoom).toBe(8);
+    expect(layer.shownPointCount()).toBe(500);
+  });
+});

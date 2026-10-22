@@ -98,3 +98,22 @@ describe('sources', () => {
     );
   });
 });
+
+describe('downloads resumed after the whole file arrived', () => {
+  it('finishes a download whose partial file is already complete instead of failing on 416 (PT-22)', async () => {
+    const requests: (string | null)[] = [];
+    const strict = (async (url: string, init?: RequestInit) => {
+      const range = (init?.headers as Record<string, string> | undefined)?.['range'];
+      if (range && Number(/bytes=(\d+)-/.exec(range)?.[1]) >= body.length) {
+        requests.push(range);
+        return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${body.length}` } });
+      }
+      return server(requests)(url, init);
+    }) as typeof fetch;
+    const ctx = context(strict);
+    ctx.lock = { 'a.tif': sha256(body) };
+    writeFileSync(join(ctx.folder, 'a.tif.download'), body);
+    expect(await downloadFile(file, ctx)).toMatchObject({ status: 'downloaded', sha256: sha256(body) });
+    expect(new Uint8Array(readFileSync(join(ctx.folder, 'a.tif')))).toEqual(body);
+  });
+});

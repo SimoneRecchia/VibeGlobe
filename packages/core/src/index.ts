@@ -54,6 +54,12 @@ export type {
   TileErrorEvent,
   TileErrorReason,
   ViewInit,
+  CameraMovement,
+  MoveCause,
+  MoveEndEvent,
+  MoveEvent,
+  MoveOutcome,
+  MovementOptions,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';

@@ -466,7 +466,46 @@ export interface GlobeEvents {
   'tile-error': TileErrorEvent;
   /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
   'view-mode-change': { readonly mode: ViewMode };
+  /** A camera movement began (F200, ADR 0036). */
+  movestart: MoveEvent;
+  /** The camera moved in a movement, at most once per drawn frame. The payload object is reused. */
+  move: MoveEvent;
+  /** A camera movement ended, with how. */
+  moveend: MoveEndEvent;
   error: GlobeError;
+}
+
+/** What moved the camera (F200): a movement call, the user's input through the controls, or the controls' inertia. */
+export type MoveCause = 'api' | 'user' | 'inertia';
+
+/** How a movement ended (ADR 0036): it reached its target, a newer movement or user input took over, or it was cancelled. */
+export type MoveOutcome = 'completed' | 'interrupted' | 'cancelled';
+
+/** The payload of `movestart` and `move`. */
+export interface MoveEvent {
+  readonly cause: MoveCause;
+}
+
+/** The payload of `moveend`. */
+export interface MoveEndEvent extends MoveEvent {
+  readonly outcome: MoveOutcome;
+}
+
+/**
+ * A running camera movement (ADR 0036): a promise of its outcome, which never rejects once the movement started, and
+ * a way to stop it where it is.
+ */
+export interface CameraMovement extends Promise<MoveOutcome> {
+  /** Stops the movement where the last frame left it; the promise settles as 'cancelled'. */
+  cancel(): void;
+}
+
+/** Options of {@link Globe.easeTo} and {@link Globe.flyTo}. */
+export interface MovementOptions {
+  /** The movement's duration, milliseconds (0 or more); by default 1 s for an ease and, for a flight, the path's length. */
+  readonly durationMs?: number;
+  /** Cancels the movement when aborted, as {@link CameraMovement.cancel} does. */
+  readonly signal?: AbortSignalLike;
 }
 
 /**
@@ -550,6 +589,17 @@ export interface Globe {
    * and leaves the camera unchanged.
    */
   jumpTo(target: ViewInit): void;
+  /**
+   * Moves the camera to `target` with eased interpolation of center, zoom, heading and tilt, the shorter way round
+   * (F198). Fields not given keep their values: the chosen tilt, heading and view mode stay unless given (F201).
+   * Invalid input rejects with a GlobeError and moves nothing.
+   */
+  easeTo(target: ViewInit, options?: MovementOptions): CameraMovement;
+  /**
+   * Flies the camera to `target` along van Wijk and Nuij's zoom-out and zoom-in path (F195, F196), ending exactly
+   * there. Fields not given keep their values, as for {@link easeTo}.
+   */
+  flyTo(target: ViewInit, options?: MovementOptions): CameraMovement;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
   /**

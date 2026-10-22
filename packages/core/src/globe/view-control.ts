@@ -18,6 +18,8 @@ export interface ViewHost {
   waiting(): boolean;
   assertAlive(): void;
   requestRender(): void;
+  /** The user moved the camera through an intent: it interrupts a running movement (F202, ADR 0036). */
+  userInput(): void;
 }
 
 /**
@@ -33,11 +35,15 @@ export class ViewControl {
       grab: (point) => (isScreenPoint(point) ? this.positionAt(point) : undefined),
       dragTo: (anchor, point) => {
         host.assertAlive();
-        if (!host.waiting() && dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
+        if (host.waiting()) return;
+        host.userInput();
+        if (dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
-        if (!host.waiting() && zoomCamera(host.cam, host.view, point, deltaZoom)) host.requestRender();
+        if (host.waiting()) return;
+        host.userInput();
+        if (zoomCamera(host.cam, host.view, point, deltaZoom)) host.requestRender();
       },
       requestUpdate: () => host.requestRender(),
     };

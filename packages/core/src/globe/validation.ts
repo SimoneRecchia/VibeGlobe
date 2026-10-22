@@ -212,6 +212,9 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'tile-error',
   'error',
   'view-mode-change',
+  'movestart',
+  'move',
+  'moveend',
 ]);
 
 /** Throws a typed error unless `event` is a globe event and `handler` a function (KB-038). */

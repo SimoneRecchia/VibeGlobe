@@ -2,7 +2,6 @@ import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import {
   applyView,
-  currentView,
   newCameraState,
   readCameraState,
   requestedCameraState,
@@ -18,12 +17,14 @@ import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
 import type { ViewCurvesInit } from '../view/curves.js';
-import { ViewControl } from './view-control.js';
+import type { ViewControl } from './view-control.js';
+import { wireView, type Movements } from './movements.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { createFrameView, keepGroundScale, screenOf, type MutableFrameView } from './view-geometry.js';
+import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
+  CameraMovement,
   CameraState,
   Controls,
   DebugMeshData,
@@ -43,6 +44,7 @@ import type {
   SurfaceStats,
   SurfaceTileInfo,
   ResourceCounts,
+  MovementOptions,
   ScreenPoint,
   ViewInit,
 } from './types.js';
@@ -69,6 +71,7 @@ class GlobeEngine implements Globe {
   readonly ready: Promise<void>;
   readonly navigation: NavigationApi;
   private readonly viewControl: ViewControl;
+  private readonly movements: Movements;
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
@@ -121,14 +124,15 @@ class GlobeEngine implements Globe {
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
     this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
-    this.viewControl = new ViewControl({
+    ({ viewControl: this.viewControl, movements: this.movements } = wireView({
       cam: this.cam,
       view: this.surfaceFrame.view,
       emitter: this.emitter,
+      clock: this.clock,
       waiting: () => this.waiting,
       assertAlive: () => this.assertAlive(),
       requestRender: () => this.requestRender(),
-    });
+    }));
     this.navigation = this.viewControl.navigation;
     if (options.view?.tiltDeg !== undefined) this.viewControl.chooseTilt(this.pendingView.tiltDeg);
     this.ready = new Promise<void>((resolve, reject) => {
@@ -310,7 +314,12 @@ class GlobeEngine implements Globe {
     this.inFrame = true;
     renderer.host.checkSize?.();
     // Until the requested view has a viewport there is no camera to draw or report (KB-040).
-    if (!this.waiting) this.controls?.update?.();
+    // A running movement steps to this frame's time first; input the controls apply then interrupts it (ADR 0036).
+    if (!this.waiting) {
+      this.movements.step();
+      this.controls?.update?.();
+      this.movements.afterInput();
+    }
     this.inFrame = false;
     this.dirty = false;
     // A frame not drawn takes no step of the manual clock (KB-058).
@@ -339,7 +348,8 @@ class GlobeEngine implements Globe {
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
       this.diag.logger.log('info', `started on ${renderer.capabilities.backend}`);
     }
-    if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing) this.requestRender();
+    if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing || this.movements.active)
+      this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
       this.idlePayload.frameNumber = this.frames;
       this.emitter.emit('idle', this.idlePayload);
@@ -355,30 +365,17 @@ class GlobeEngine implements Globe {
 
   jumpTo(target: ViewInit): void {
     this.assertAlive();
-    const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
-    // While the container has no size a jump with a zoom is kept as a request, like before start (KB-046); one without
-    // keeps the camera's range, which needs no viewport (KB-056).
-    const pending = this.pendingView ?? (this.collapsed && !keepRange ? currentView(this.cam) : undefined);
-    let view;
-    try {
-      view = validateView(target, pending ?? currentView(this.cam));
-    } catch (error) {
-      // The view stays as it was; the error reaches both the caller and the error event.
-      if (error instanceof GlobeError) this.emitter.emit('error', error);
-      throw error;
-    }
-    // A view given with a tilt chooses it (manual mode, ADR 0034).
-    if (target.tiltDeg !== undefined) this.viewControl.chooseTilt(view.tiltDeg);
-    if (pending) {
-      // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
-      if (keepRange) keepGroundScale(pending, view);
-      this.pendingView = view;
-      return;
-    }
-    applyView(this.cam, view, keepRange);
-    this.cam.update();
-    this.requestRender();
+    this.pendingView = this.movements.jump(target, this.pendingView, this.collapsed) ?? this.pendingView;
   }
+
+  readonly easeTo = (target: ViewInit, options?: MovementOptions): CameraMovement => (
+    this.assertAlive(),
+    this.movements.start('ease', target, options)
+  );
+  readonly flyTo = (target: ViewInit, options?: MovementOptions): CameraMovement => (
+    this.assertAlive(),
+    this.movements.start('fly', target, options)
+  );
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
@@ -406,15 +403,14 @@ class GlobeEngine implements Globe {
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
 
-  elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample {
-    this.assertAlive();
-    return this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
-  }
-
-  elevationAtAsync(position: GeoPosition, options: { signal?: AbortSignalLike } = {}): Promise<ElevationSample> {
-    this.assertAlive();
-    return this.surfaceFrame.queryElevation(position, options.signal);
-  }
+  readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample => (
+    this.assertAlive(),
+    this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true })
+  );
+  readonly elevationAtAsync = (
+    position: GeoPosition,
+    options: { signal?: AbortSignalLike } = {},
+  ): Promise<ElevationSample> => (this.assertAlive(), this.surfaceFrame.queryElevation(position, options.signal));
 
   setDebugShapes(shapes: readonly DebugShape[]): void {
     this.assertAlive();
@@ -446,10 +442,7 @@ class GlobeEngine implements Globe {
     return this.pendingView !== undefined || this.collapsed;
   }
 
-  simulateDeviceLoss(): void {
-    this.assertAlive();
-    this.renderer?.simulateDeviceLoss();
-  }
+  readonly simulateDeviceLoss = (): void => (this.assertAlive(), this.renderer?.simulateDeviceLoss());
 
   destroy(): void {
     if (this.destroyed) return;

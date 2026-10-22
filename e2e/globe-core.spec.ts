@@ -386,9 +386,18 @@ for (const backend of BACKENDS) {
           yPx: from.yPx + ((to.yPx - from.yPx) * step) / steps,
         };
         await page.mouse.move(box.x + point.xPx, box.y + point.yPx);
-        await nextFrame(page);
-        const shown = await geoToScreen(page, grabbed);
-        expect(Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx)).toBeLessThan(1);
+        // The move lands in the frame after the one that may already be under way when the event arrives (a loaded
+        // CI runner measured one step behind): wait for the frame that applied it, then hold it to 1 px.
+        await expect
+          .poll(
+            async () => {
+              await nextFrame(page);
+              const shown = await geoToScreen(page, grabbed);
+              return Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx);
+            },
+            { timeout: 5000, intervals: [0] },
+          )
+          .toBeLessThan(1);
         const next = await geoToScreen(page, companion);
         expect(Math.hypot(next.xPx - companionShown.xPx, next.yPx - companionShown.yPx)).toBeLessThan(3 * stepPx);
         companionShown = next;

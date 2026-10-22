@@ -32,6 +32,8 @@ test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
 for (const backend of BACKENDS) {
   for (const view of VIEWS) {
     test(`canonical view ${view.name} matches its baseline on ${backend} (F072, F074)`, async ({ page }, testInfo) => {
+      // Tiled imagery streams about 120 tiles before the capture, beyond 30 s on CI's software WebGPU.
+      if (view.imagery) test.setTimeout(90_000);
       await openGlobe(page, `backend=${backend}&${view.query}`);
       if (view.drawCalls !== undefined) {
         await page.waitForFunction(
@@ -49,6 +51,7 @@ for (const backend of BACKENDS) {
 
 for (const view of VIEWS.filter((v) => v.crossBackend !== false)) {
   test(`canonical view ${view.name} looks the same on WebGPU and WebGL2 (F073)`, async ({ page }, testInfo) => {
+    if (view.imagery) test.setTimeout(90_000);
     const captures = [];
     for (const backend of BACKENDS) {
       await openGlobe(page, `backend=${backend}&${view.query}`);

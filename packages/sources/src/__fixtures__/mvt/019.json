@@ -6,27 +6,12 @@
       "features": [
         {
           "id": 1,
-          "tags": [
-            0,
-            0
-          ],
+          "tags": [0, 0],
           "type": 3,
-          "geometry": [
-            9,
-            6,
-            12,
-            18,
-            10,
-            12,
-            24,
-            44,
-            15
-          ]
+          "geometry": [9, 6, 12, 18, 10, 12, 24, 44, 15]
         }
       ],
-      "keys": [
-        "hello"
-      ],
+      "keys": ["hello"],
       "values": [
         {
           "string_value": "world"

@@ -6,29 +6,12 @@
       "features": [
         {
           "id": 1,
-          "tags": [
-            0,
-            0
-          ],
+          "tags": [0, 0],
           "type": 3,
-          "geometry": [
-            9,
-            1,
-            1,
-            26,
-            8196,
-            0,
-            0,
-            8196,
-            8195,
-            0,
-            15
-          ]
+          "geometry": [9, 1, 1, 26, 8196, 0, 0, 8196, 8195, 0, 15]
         }
       ],
-      "keys": [
-        "type"
-      ],
+      "keys": ["type"],
       "values": [
         {
           "string_value": "one unit buffer"

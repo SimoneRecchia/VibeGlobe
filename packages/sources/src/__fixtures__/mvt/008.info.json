@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "optional uint32 extent",
-    "optional string extent"
-  ]
+  "proto": ["2.1", "optional uint32 extent", "optional string extent"]
 }

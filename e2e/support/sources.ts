@@ -6,13 +6,15 @@ import { expect, type Page } from '@playwright/test';
 import type * as CoreModule from '@vibeglobe/core';
 import type * as RendererModule from '@vibeglobe/renderer';
 import type * as SourcesModule from '@vibeglobe/sources';
+import type * as MbtilesModule from '@vibeglobe/sources/mbtiles';
 import type * as WorkerModule from '@vibeglobe/worker';
 import { PNG } from 'pngjs';
 import { BACKGROUND_RGB, emptyPixelsInside, openGlobe } from './globe.ts';
 
 /** What the tests reach on the page (`window.vibeglobeSources`). */
 interface SourcesTestHandle {
-  readonly sources: typeof SourcesModule;
+  /** The main entry and the MBTiles entry of `@vibeglobe/sources`. */
+  readonly sources: typeof SourcesModule & typeof MbtilesModule;
   /** Replaces the mounted globe with one showing `source` over the base image. */
   mount(source: CoreModule.ImagerySource): Promise<void>;
   globe?: CoreModule.Globe;
@@ -28,6 +30,15 @@ declare global {
 
 const fsUrl = (path: string): string => `/@fs${resolve(path)}`;
 
+/** The packages the page imports, through the Vite dev server. */
+const ENTRIES = {
+  core: fsUrl('packages/core/src/index.ts'),
+  renderer: fsUrl('packages/renderer/src/index.ts'),
+  worker: fsUrl('packages/worker/src/index.ts'),
+  sources: fsUrl('packages/sources/src/index.ts'),
+  mbtiles: fsUrl('packages/sources/src/mbtiles.ts'),
+};
+
 /** Opens the playground at a view, removes its globe and prepares the source globe's modules. */
 export async function openSources(page: Page, query: string): Promise<void> {
   await openGlobe(page, query);
@@ -37,7 +48,10 @@ export async function openSources(page: Page, query: string): Promise<void> {
       const core = (await import(/* @vite-ignore */ entries.core)) as typeof CoreModule;
       const renderer = (await import(/* @vite-ignore */ entries.renderer)) as typeof RendererModule;
       const worker = (await import(/* @vite-ignore */ entries.worker)) as typeof WorkerModule;
-      const sources = (await import(/* @vite-ignore */ entries.sources)) as typeof SourcesModule;
+      const sources = {
+        ...((await import(/* @vite-ignore */ entries.sources)) as typeof SourcesModule),
+        ...((await import(/* @vite-ignore */ entries.mbtiles)) as typeof MbtilesModule),
+      };
       const playground = window.vibeglobePlayground?.globe;
       if (!playground) throw new Error('no playground globe');
       const view = { ...playground.camera };
@@ -78,12 +92,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
       window.vibeglobeSources = handle;
     },
     {
-      entries: {
-        core: fsUrl('packages/core/src/index.ts'),
-        renderer: fsUrl('packages/renderer/src/index.ts'),
-        worker: fsUrl('packages/worker/src/index.ts'),
-        sources: fsUrl('packages/sources/src/index.ts'),
-      },
+      entries: ENTRIES,
       backend,
       sqlWasmUrl: fsUrl('node_modules/sql.js/dist/sql-wasm-browser.wasm'),
     },

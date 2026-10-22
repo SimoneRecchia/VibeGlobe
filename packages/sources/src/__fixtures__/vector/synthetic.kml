@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic KML for the conformance suite: nested folders, a StyleMap, inline style over shared style,
+     ExtendedData, altitude modes, a polygon with a hole, MultiGeometry and a ground overlay with a relative icon. -->
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Trip</name>
+    <Style id="normal"><IconStyle><scale>1.2</scale><Icon><href>files/pin.png</href></Icon></IconStyle><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style>
+    <Style id="hot"><IconStyle><scale>2</scale><Icon><href>files/pin.png</href></Icon></IconStyle></Style>
+    <StyleMap id="pin"><Pair><key>normal</key><styleUrl>#normal</styleUrl></Pair><Pair><key>highlight</key><styleUrl>#hot</styleUrl></Pair></StyleMap>
+    <Style id="area"><PolyStyle><color>7f00ff00</color><fill>1</fill><outline>0</outline></PolyStyle></Style>
+    <Folder>
+      <name>Day 1</name>
+      <Folder>
+        <name>Morning</name>
+        <Placemark id="p1">
+          <name>Summit &amp; view</name>
+          <description><![CDATA[<b>Top</b> of the hill]]></description>
+          <styleUrl>#pin</styleUrl>
+          <ExtendedData>
+            <Data name="elevation"><value>4808</value></Data>
+            <SchemaData schemaUrl="#s"><SimpleData name="rating">5</SimpleData></SchemaData>
+          </ExtendedData>
+          <Point><altitudeMode>absolute</altitudeMode><coordinates>6.8652,45.8326,4808</coordinates></Point>
+        </Placemark>
+      </Folder>
+      <Placemark>
+        <name>Path</name>
+        <styleUrl>#normal</styleUrl>
+        <Style><LineStyle><width>5</width></LineStyle></Style>
+        <LineString><gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode><coordinates>
+          6.80,45.80,10 6.82,45.81,20
+          6.85,45.83,30
+        </coordinates></LineString>
+      </Placemark>
+    </Folder>
+    <Placemark>
+      <name>Lake</name>
+      <styleUrl>#area</styleUrl>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>6,45 7,45 7,46 6,46 6,45</coordinates></LinearRing></outerBoundaryIs>
+        <innerBoundaryIs><LinearRing><coordinates>6.4,45.4 6.6,45.4 6.6,45.6 6.4,45.6</coordinates></LinearRing></innerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Both</name>
+      <MultiGeometry>
+        <Point><coordinates>7,46</coordinates></Point>
+        <LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>7,46 8,47</coordinates></LineString>
+      </MultiGeometry>
+    </Placemark>
+    <Placemark><name>Broken</name><Point><coordinates>abc,def</coordinates></Point></Placemark>
+    <GroundOverlay>
+      <name>Scan</name>
+      <Icon><href>files/overlay.png</href></Icon>
+      <LatLonBox><north>46</north><south>45</south><east>7</east><west>6</west><rotation>12.5</rotation></LatLonBox>
+    </GroundOverlay>
+  </Document>
+</kml>

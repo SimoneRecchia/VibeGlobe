@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "optional string string_value",
-    "optional uint64 string_value"
-  ]
+  "proto": ["2.1", "optional string string_value", "optional uint64 string_value"]
 }

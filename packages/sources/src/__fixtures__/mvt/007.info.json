@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "required uint32 version",
-    "required string version"
-  ]
+  "proto": ["2.1", "required uint32 version", "required string version"]
 }

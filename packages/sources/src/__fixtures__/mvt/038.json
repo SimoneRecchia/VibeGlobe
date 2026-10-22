@@ -6,39 +6,12 @@
       "features": [
         {
           "id": 1,
-          "tags": [
-            0,
-            0,
-            1,
-            1,
-            2,
-            2,
-            3,
-            3,
-            4,
-            4,
-            5,
-            5,
-            6,
-            6
-          ],
+          "tags": [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
           "type": 1,
-          "geometry": [
-            9,
-            50,
-            34
-          ]
+          "geometry": [9, 50, 34]
         }
       ],
-      "keys": [
-        "string_value",
-        "bool_value",
-        "int_value",
-        "double_value",
-        "float_value",
-        "sint_value",
-        "uint_value"
-      ],
+      "keys": ["string_value", "bool_value", "int_value", "double_value", "float_value", "sint_value", "uint_value"],
       "values": [
         {
           "string_value": "ello"

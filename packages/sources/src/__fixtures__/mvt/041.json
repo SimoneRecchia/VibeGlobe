@@ -6,21 +6,12 @@
       "features": [
         {
           "id": 1,
-          "tags": [
-            2.2391,
-            4.5654
-          ],
+          "tags": [2.2391, 4.5654],
           "type": 1,
-          "geometry": [
-            9,
-            50,
-            34
-          ]
+          "geometry": [9, 50, 34]
         }
       ],
-      "keys": [
-        "type"
-      ],
+      "keys": ["type"],
       "values": [
         {
           "string_value": "park"

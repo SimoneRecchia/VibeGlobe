@@ -15,6 +15,16 @@
       "types": "./dist/conformance/index.d.ts",
       "source": "./src/conformance/index.ts",
       "default": "./dist/conformance/index.js"
+    },
+    "./vector": {
+      "types": "./dist/vector/index.d.ts",
+      "source": "./src/vector/index.ts",
+      "default": "./dist/vector/index.js"
+    },
+    "./mbtiles": {
+      "types": "./dist/mbtiles.d.ts",
+      "source": "./src/mbtiles.ts",
+      "default": "./dist/mbtiles.js"
     }
   },
   "files": [
@@ -24,11 +34,13 @@
   "dependencies": {
     "@vibeglobe/core": "0.0.0",
     "fflate": "0.8.3",
+    "pbf": "5.1.2",
     "pmtiles": "4.5.0",
     "sql.js": "1.15.1",
     "txml": "6.0.3"
   },
   "devDependencies": {
+    "@mapbox/vector-tile": "3.0.0",
     "@types/sql.js": "1.4.11"
   }
 }

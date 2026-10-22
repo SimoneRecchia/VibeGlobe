@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "required string name",
-    "optional string name"
-  ]
+  "proto": ["2.1", "required string name", "optional string name"]
 }

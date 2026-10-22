@@ -6,29 +6,12 @@
       "features": [
         {
           "id": 1,
-          "tags": [
-            0,
-            0
-          ],
+          "tags": [0, 0],
           "type": 3,
-          "geometry": [
-            9,
-            399,
-            399,
-            26,
-            8992,
-            0,
-            0,
-            8992,
-            8991,
-            0,
-            15
-          ]
+          "geometry": [9, 399, 399, 26, 8992, 0, 0, 8992, 8991, 0, 15]
         }
       ],
-      "keys": [
-        "type"
-      ],
+      "keys": ["type"],
       "values": [
         {
           "string_value": "large 200 unit buffer"

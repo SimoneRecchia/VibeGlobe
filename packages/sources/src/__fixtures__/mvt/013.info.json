@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "repeated string keys",
-    "repeated uint32 keys"
-  ]
+  "proto": ["2.1", "repeated string keys", "repeated uint32 keys"]
 }

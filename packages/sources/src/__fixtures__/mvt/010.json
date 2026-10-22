@@ -8,16 +8,10 @@
           "id": 1,
           "tags": [],
           "type": 1,
-          "geometry": [
-            9,
-            50,
-            34
-          ]
+          "geometry": [9, 50, 34]
         }
       ],
-      "keys": [
-        "key1"
-      ],
+      "keys": ["key1"],
       "values": [
         {
           "string_value": 1234567890123456

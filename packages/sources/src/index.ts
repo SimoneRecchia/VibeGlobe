@@ -10,8 +10,6 @@ export { CUSTOM_PROFILE, SourceConfigError } from './metadata.js';
 export type { Attribution, DescribedImagerySource, LoadingSwitches, ProviderProfile } from './metadata.js';
 export { pmtilesImagery } from './pmtiles-imagery.js';
 export type { PmtilesImageryOptions } from './pmtiles-imagery.js';
-export { mbtilesImagery } from './mbtiles-imagery.js';
-export type { MbtilesImageryOptions } from './mbtiles-imagery.js';
 export { wmtsImagery } from './ogc/wmts-imagery.js';
 export type { WmtsImageryOptions } from './ogc/wmts-imagery.js';
 export { parseWmtsCapabilities } from './ogc/wmts-capabilities.js';

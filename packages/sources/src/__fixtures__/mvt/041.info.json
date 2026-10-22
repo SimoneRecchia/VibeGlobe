@@ -6,9 +6,5 @@
     "v2": false,
     "error": "fatal"
   },
-  "proto": [
-    "2.1",
-    "repeated uint32 tags",
-    "repeated float tags"
-  ]
+  "proto": ["2.1", "repeated uint32 tags", "repeated float tags"]
 }

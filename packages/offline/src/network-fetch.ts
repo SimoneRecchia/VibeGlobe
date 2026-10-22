@@ -1,0 +1,83 @@
+import type { TimeoutsMs } from '@vibeglobe/core';
+import { retryAfterMs } from '@vibeglobe/sources';
+import { cacheHeadersOf, type CacheHeaders } from './cache-policy.js';
+
+/** How one network request ended, with what the cache needs to know. */
+export type FetchOutcome =
+  | { readonly kind: 'ok'; readonly bytes: ArrayBuffer; readonly contentType: string; readonly headers: CacheHeaders }
+  | { readonly kind: 'not-modified'; readonly headers: CacheHeaders }
+  | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
+  /** A redirect or an HTML page where a tile was expected: a captive portal or a misconfigured endpoint (F297). */
+  | { readonly kind: 'portal' }
+  | { readonly kind: 'network-error' | 'timeout' | 'aborted' };
+
+/** Validators sent to revalidate a stored tile (F278). */
+export interface Validators {
+  readonly etag?: string;
+  readonly lastModified?: string;
+}
+
+/** True for a response that is a login or error page instead of tile data. */
+function looksLikePortal(response: Response): boolean {
+  if (response.redirected || response.type === 'opaqueredirect') return true;
+  const type = (response.headers.get('Content-Type') ?? '').toLowerCase();
+  return type.startsWith('text/html');
+}
+
+async function outcomeOf(response: Response): Promise<FetchOutcome> {
+  const headers = cacheHeadersOf(response.headers);
+  if (response.status === 304) return { kind: 'not-modified', headers };
+  if (looksLikePortal(response)) return { kind: 'portal' };
+  if (!response.ok)
+    return {
+      kind: 'status',
+      status: response.status,
+      retryAfterMs: retryAfterMs(response.headers.get('Retry-After'), Date.now()),
+    };
+  const bytes = await response.arrayBuffer();
+  return { kind: 'ok', bytes, contentType: response.headers.get('Content-Type') ?? '', headers };
+}
+
+/**
+ * Fetches one tile with time limits (to the headers and in all), revalidating with If-None-Match and If-Modified-Since
+ * when validators are given. Never throws. `signal` aborts it.
+ */
+export async function fetchTile(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeouts: TimeoutsMs,
+  signal: AbortSignal,
+  validators?: Validators,
+): Promise<FetchOutcome> {
+  const controller = new AbortController();
+  let reason: 'aborted' | 'timeout' = 'aborted';
+  const expire = (): void => {
+    reason = 'timeout';
+    controller.abort();
+  };
+  const onAbort = (): void => controller.abort();
+  signal.addEventListener('abort', onAbort);
+  const firstByte = setTimeout(expire, timeouts.firstByteMs);
+  const total = setTimeout(expire, timeouts.totalMs);
+  const headers = new Headers();
+  if (validators?.etag) headers.set('If-None-Match', validators.etag);
+  if (validators?.lastModified) headers.set('If-Modified-Since', validators.lastModified);
+  try {
+    const response = await fetchImpl(url, {
+      signal: controller.signal,
+      mode: 'cors',
+      credentials: 'omit',
+      headers,
+      // The engine keeps its own cache: the HTTP cache would hide revalidations and serve stale tiles twice.
+      cache: 'no-store',
+    });
+    clearTimeout(firstByte);
+    return await outcomeOf(response);
+  } catch {
+    return { kind: controller.signal.aborted ? reason : 'network-error' };
+  } finally {
+    clearTimeout(firstByte);
+    clearTimeout(total);
+    signal.removeEventListener('abort', onAbort);
+  }
+}

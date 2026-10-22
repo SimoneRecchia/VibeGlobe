@@ -19,6 +19,7 @@ import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { drawTerrain, type TerrainLayer } from '../terrain/terrain-draws.js';
+import type { HeightGrid } from '../terrain/heightmap.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ImageryStats, MemoryOptions, RendererBackend, TileErrorEvent } from './types.js';
 
@@ -147,6 +148,9 @@ export class ImageryRuntime {
   readonly layers: ImageryLayer[];
   /** The terrain layer, when the engine has a terrain source (M4). */
   readonly terrain: TerrainLayer | undefined;
+  /** The lowest and highest height of every terrain tile uploaded so far, meters (selection bounds, F142). */
+  terrainMinMeters = 0;
+  terrainMaxMeters = 0;
   /** Texels along a tile edge of the finest layer, for the selection's texel refinement. */
   readonly texelsPerTile: number;
   /** The finest level any layer serves. */
@@ -213,11 +217,21 @@ export class ImageryRuntime {
       source: terrain,
       loader: new ImageryLoader({
         ...loaderOptions(terrain, sources.length, Math.min(TERRAIN_PINNED_LEVEL, terrain.maxLevel)),
+        uploadTexture: (handle, tile) => {
+          renderer.uploadTexture(handle, tile);
+          this.noteHeights(tile.image as HeightGrid);
+        },
         decodeTask: terrainDecodeTask(terrain),
       }),
     };
     this.texelsPerTile = Math.max(0, ...sources.map((source) => source.tileSizePx));
     this.maxLevel = Math.max(0, ...sources.map((source) => source.maxLevel));
+  }
+
+  /** Widens the height range by a terrain tile's. */
+  private noteHeights(grid: HeightGrid): void {
+    if (grid.minMeters < this.terrainMinMeters) this.terrainMinMeters = grid.minMeters;
+    if (grid.maxMeters > this.terrainMaxMeters) this.terrainMaxMeters = grid.maxMeters;
   }
 
   /** True while any layer still loads a wanted tile: `idle` waits for it (ADR 0007). */

@@ -12,6 +12,7 @@ import { selectQuadtreeTiles, type QuadtreeTile } from '../surface/surface-quadt
 import type { Camera } from '../camera/camera.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type ImageryCallbacks } from './imagery-runtime.js';
+import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel } from '../terrain/terrain-draws.js';
 import type {
   GlobeOptions,
   ImageryStats,
@@ -42,6 +43,10 @@ export class SurfaceFrame {
     imageryTexelsPerTile: 0,
     imageryMaxLevel: 0,
     maxTexelErrorPx: MAX_TEXEL_ERROR_PX,
+    terrainErrorMeters: undefined as Float64Array | undefined,
+    terrainMaxLevel: 0,
+    terrainMinMeters: 0,
+    terrainMaxMeters: 0,
   };
   private imagery: ImageryRuntime | undefined;
 
@@ -87,6 +92,15 @@ export class SurfaceFrame {
     this.imagery = imagery;
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
+    if (terrain) {
+      this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
+      this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET);
+    }
+  }
+
+  /** The error of the terrain each surface level shows, once terrain is started (skirt depths, ADR 0006 §6). */
+  get terrainErrorMeters(): Float64Array | undefined {
+    return this.selection.terrainErrorMeters;
   }
 
   /** Selects this frame's tiles and returns their draws, fades at the clock's time included. */
@@ -95,6 +109,10 @@ export class SurfaceFrame {
     timer.end(PHASE_UPDATE);
     if (tracer.enabled) this.traceCamera(camera);
     this.clock.timeInto(this.nowMs);
+    if (this.imagery) {
+      this.selection.terrainMinMeters = this.imagery.terrainMinMeters;
+      this.selection.terrainMaxMeters = this.imagery.terrainMaxMeters;
+    }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     this.draws.reserve(count);
     cache.prepare(this.tiles, count, this.draws.meshKeys);

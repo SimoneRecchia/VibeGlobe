@@ -16,7 +16,14 @@ export class SurfaceCache {
   private readonly lastUsed = new IntegerKeyMap<number>(CACHE_LIMIT);
   private frame = 0;
 
-  constructor(private readonly renderer: RendererBackend) {}
+  /**
+   * `terrainErrorMeters`: the error of the terrain each surface level shows (ADR 0006 §6), which deepens the skirts;
+   * none without terrain.
+   */
+  constructor(
+    private readonly renderer: RendererBackend,
+    private readonly terrainErrorMeters?: Float64Array,
+  ) {}
 
   /** Number of meshes held. */
   get size(): number {
@@ -44,8 +51,14 @@ export class SurfaceCache {
 
   private build(tile: QuadtreeTile): TileMeshData {
     const size = tile.northRad - tile.southRad;
-    // Skirts deeper than the chord sag of the coarser neighbor hide every crack between levels.
-    const skirtDepthMeters = Math.max(1, 6378137 * size * size * 0.1);
+    // Skirts deeper than the chord sag of the coarser neighbor hide every crack between levels; with terrain, at least
+    // twice the terrain error of the tile and its parent, which bounds the height step to a coarser or morphing
+    // neighbor (ADR 0006 §6, F137).
+    const errors = this.terrainErrorMeters;
+    const terrainDepth = errors
+      ? 2 * ((errors[tile.level] ?? 0) + (errors[tile.level > 0 ? tile.level - 1 : 0] ?? 0))
+      : 0;
+    const skirtDepthMeters = Math.max(1, 6378137 * size * size * 0.1, terrainDepth);
     return buildQuadtreeTileMesh(tile, skirtDepthMeters);
   }
 

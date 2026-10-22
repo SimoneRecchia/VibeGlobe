@@ -53,6 +53,22 @@ export interface QuadtreeSelectionOptions {
   imageryMaxLevel?: number;
   /** Largest texel size on screen, in pixels (ADR 0006's τ_imagery); default 1.5. */
   maxTexelErrorPx?: number;
+  /**
+   * Terrain (M4, ADR 0006 §2): the geometric error in meters of the terrain a surface tile of each level shows, indexed
+   * by level (undefined without terrain). A tile refines while this error exceeds {@link maxTerrainErrorPx} pixels, up
+   * to {@link terrainMaxLevel}.
+   */
+  terrainErrorMeters?: Float64Array | undefined;
+  /** The deepest surface level whose terrain is finer than its parent's. */
+  terrainMaxLevel?: number;
+  /** ADR 0006's τ_terrain, in render-target pixels; default 2. */
+  maxTerrainErrorPx?: number;
+  /**
+   * The lowest and highest terrain heights the surface may show, meters: bounding volumes reach from one to the other,
+   * so culling never removes visible relief (F142). Both 0 without terrain.
+   */
+  terrainMinMeters?: number;
+  terrainMaxMeters?: number;
   /** Written by each selection: tiles skipped as outside the view frustum (F086) and beyond the horizon (F087). */
   culledByFrustum?: number;
   culledByHorizon?: number;
@@ -196,7 +212,8 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   measureTile(tile, camera.eyeEcef);
   const radius = measure[RADIUS] ?? 0;
   // Comparisons, not Math.max, here and below: code not yet fully optimized calls it with boxed doubles.
-  const closest = measure[CLOSEST] ?? 0;
+  // Relief can rise toward the eye by up to the highest terrain height (F142).
+  const closest = (measure[CLOSEST] ?? 0) - (options.terrainMaxMeters ?? 0);
   const distance = closest > camera.nearMeters ? closest : camera.nearMeters;
   if (level >= MIN_LEVEL) {
     if (outsideFrustum(camera)) {
@@ -216,7 +233,10 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
       (screenError > options.maxScreenErrorPx ||
         radius > RADIUS_TO_DISTANCE * distance ||
         (level < (options.imageryMaxLevel ?? 0) &&
-          ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5))));
+          ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
+        (level < (options.terrainMaxLevel ?? 0) &&
+          ((options.terrainErrorMeters?.[level] ?? 0) / distance) * state.pixelsPerRadian >
+            (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
     state.count++;
     return;
@@ -332,7 +352,10 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
 /** True when the tile's bounding sphere is entirely outside one of the frustum planes (F086). */
 function outsideFrustum(camera: Camera): boolean {
   const planes = camera.frustumPlanes;
-  const radius = measure[RADIUS] ?? 0;
+  const high = state.options.terrainMaxMeters ?? 0;
+  const low = -(state.options.terrainMinMeters ?? 0);
+  // The sphere grown by the terrain's height range: every displaced vertex stays inside it (F142).
+  const radius = (measure[RADIUS] ?? 0) + (high > low ? high : low);
   for (let plane = 0; plane < 5; plane++) {
     const signedDistance =
       (planes[plane * 4] ?? 0) * (offset[0] ?? 0) +
@@ -347,13 +370,15 @@ function outsideFrustum(camera: Camera): boolean {
 /**
  * True when the whole tile lies beyond the horizon (F087): a point P of the ellipsoid is visible from the eye exactly
  * when P · w ≥ 1, with w = (Ex/a², Ey/a², Ez/b²), so a bounding sphere with center C and radius R shows nothing when
- * C · w + R |w| < 1 (KB-012).
+ * C · w + R |w| < 1 (KB-012). Terrain raises points by at most the highest terrain height.
  */
 function beyondHorizon(): boolean {
+  // A point raised by h along its normal n gains h (n · w) ≤ h |w|: peaks behind the horizon stay drawn (F142).
+  const high = state.options.terrainMaxMeters ?? 0;
   const reach =
     (grid[12] ?? 0) * (horizon[0] ?? 0) +
     (grid[13] ?? 0) * (horizon[1] ?? 0) +
     (grid[14] ?? 0) * (horizon[2] ?? 0) +
-    (measure[RADIUS] ?? 0) * (horizon[3] ?? 0);
+    ((measure[RADIUS] ?? 0) + (high > 0 ? high : 0)) * (horizon[3] ?? 0);
   return reach < 1;
 }

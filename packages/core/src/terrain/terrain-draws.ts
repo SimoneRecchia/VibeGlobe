@@ -31,7 +31,21 @@ const MAX_GRID_CELLS = 64;
  * Levels between a surface tile and the terrain it shows: a terrain tile of 64 cells covers 4 × 4 surface tiles of
  * {@link TILE_SEGMENTS} segments, so the surface vertices sample every terrain vertex and nested grids stay exact.
  */
-const TERRAIN_LEVEL_OFFSET = Math.round(Math.log2(MAX_GRID_CELLS / TILE_SEGMENTS));
+export const TERRAIN_LEVEL_OFFSET = Math.round(Math.log2(MAX_GRID_CELLS / TILE_SEGMENTS));
+
+/** A grid adds at most half its level's geometric error (ADR 0006 §5, the worker task's bound). */
+const GRID_ERROR_FACTOR = 1.5;
+
+/**
+ * The error in meters of the terrain each surface level shows, by level up to `maxLevel` (ADR 0006 §2): the source's
+ * geometric error at the terrain level, plus the grid's decimation error.
+ */
+export function terrainErrorsBySurfaceLevel(source: TerrainSource, maxLevel: number): Float64Array {
+  const errors = new Float64Array(maxLevel + 1);
+  for (let level = 0; level <= maxLevel; level++)
+    errors[level] = GRID_ERROR_FACTOR * source.geometricErrorMeters(terrainLevelOf(level, source));
+  return errors;
+}
 
 /** ADR 0007's priority class of visible tiles; terrain shares it with imagery. */
 const VISIBLE_CLASS = 1024;
@@ -39,9 +53,9 @@ const VISIBLE_CLASS = 1024;
 const mapping = new Float64Array(7);
 const transform = new Float64Array(4);
 
-/** The terrain level a surface tile wants, within the source's levels. */
-function terrainLevelOf(tile: QuadtreeTile, source: TerrainSource): number {
-  const level = tile.level - TERRAIN_LEVEL_OFFSET;
+/** The terrain level a surface tile of `surfaceLevel` wants, within the source's levels. */
+export function terrainLevelOf(surfaceLevel: number, source: TerrainSource): number {
+  const level = surfaceLevel - TERRAIN_LEVEL_OFFSET;
   return level < source.minLevel ? source.minLevel : level > source.maxLevel ? source.maxLevel : level;
 }
 
@@ -78,7 +92,7 @@ export function drawTerrain(
 /** Wants a surface tile's terrain and returns the deepest resident handle, its mapping left in `mapping`; else -1. */
 function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number): number {
   const source = layer.source;
-  const level = terrainLevelOf(tile, source);
+  const level = terrainLevelOf(tile.level, source);
   if (source.tiling.crs === 'EPSG:3857') {
     if (!mapMercator(tile, level, mapping, 0)) return -1;
   } else if (!mapGeographic(tile, level, mapping, 0)) {

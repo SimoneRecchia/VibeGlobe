@@ -103,12 +103,6 @@ test('the performance HUD shows frame time, frame rate and per-phase costs live,
   };
   const showHud = (on: boolean): Promise<void> =>
     page.evaluate((show) => window.vibeglobePlayground?.showHud(show), on);
-  await showHud(true);
-  const hud = page.locator('.vibeglobe-hud');
-  await expect(hud).toContainText(/\d+(\.\d+)? ms · \d+ fps/);
-  for (const phase of ['update', 'selection', 'scheduling', 'upload', 'render']) await expect(hud).toContainText(phase);
-  const first = await hud.innerText();
-  await expect.poll(() => hud.innerText(), { timeout: 5000 }).not.toBe(first);
   // Windows without and with the HUD alternate, so a drift of the machine or the scenario between them cancels out.
   let without = 0;
   let withHud = 0;
@@ -119,6 +113,12 @@ test('the performance HUD shows frame time, frame rate and per-phase costs live,
     await showHud(true);
     withHud += (await cpuMedian()) / pairs;
   }
+  // The HUD, shown since the last window, updates live.
+  const hud = page.locator('.vibeglobe-hud');
+  await expect(hud).toContainText(/\d+(\.\d+)? ms · \d+ fps/);
+  for (const phase of ['update', 'selection', 'scheduling', 'upload', 'render']) await expect(hud).toContainText(phase);
+  const first = await hud.innerText();
+  await expect.poll(() => hud.innerText(), { timeout: 5000 }).not.toBe(first);
   console.log(`CPU frame time without HUD ${without.toFixed(3)} ms, with HUD ${withHud.toFixed(3)} ms`);
   // docs/guides/debugging.md documents the HUD's overhead: at most 0.5 ms of main-thread time per frame.
   expect(withHud - without).toBeLessThan(0.5);

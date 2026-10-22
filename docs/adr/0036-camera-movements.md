@@ -44,3 +44,7 @@ unless a call gives them (F201), interruption by any user input (F202) and frame
 - The same animator serves tours, `fitBounds`, orbit and home flights (F192–F194, F199), which compute a target and
   hand it over.
 - Reduced motion (F214) replaces a flight by a short ease when the system setting asks for it.
+
+## Addendum: reduced motion (F214)
+
+The renderer's host reports the system's reduced-motion setting (`RenderHost.observeReducedMotion`, from `prefers-reduced-motion`), followed at runtime and exposed as `Globe.reducedMotion`. While it is set, a flight (`flyTo`, `fitBounds`, `resetToGlobe`, `goHome` and a tour's flight legs) does not traverse its path: the view fades out, the camera jumps to the target at the midpoint and the view fades back in, over 300 ms of engine time (`RenderHost.setOpacity` sets the canvas opacity). Eases stay as they are: they are short by design. Input inertia is the controls package's, which reads `Globe.reducedMotion` (a hook request in `docs/parallel-tracks.md`).

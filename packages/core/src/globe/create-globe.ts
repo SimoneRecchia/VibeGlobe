@@ -123,6 +123,7 @@ class GlobeEngine implements Globe {
       view: this.surfaceFrame.view,
       emitter: this.emitter,
       clock: this.clock,
+      setOpacity: (opacity) => this.renderer?.host.setOpacity?.(opacity),
       waiting: () => this.waiting,
       assertAlive: () => this.assertAlive(),
       requestRender: () => this.requestRender(),
@@ -157,6 +158,10 @@ class GlobeEngine implements Globe {
     // Before the viewport has a size, range and altitude are unknown (types.ts, Globe.camera).
     const view = this.surfaceFrame.view;
     return this.pendingView ? requestedCameraState(this.pendingView, view) : readCameraState(this.cam, view);
+  }
+
+  get reducedMotion(): boolean {
+    return this.movements.reducedMotion;
   }
 
   get viewMode(): ViewMode {
@@ -230,6 +235,7 @@ class GlobeEngine implements Globe {
         this.visible = visible;
         if (visible) this.requestRender();
       }),
+      renderer.host.observeReducedMotion?.((reduce) => (this.movements.reducedMotion = reduce)) ?? (() => undefined),
     );
     this.attachControls();
     await renderer.setBaseImagery(this.options.baseImageryUrl);

@@ -55,6 +55,8 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     checkSize() {
       if (ratioQuery && !ratioQuery.matches) onRatioChange?.();
     },
+    observeReducedMotion: (callback) => observeReducedMotion(view, callback),
+    setOpacity: (opacity) => setCanvasOpacity(container, opacity),
     observeVisibility(callback) {
       const document = container.ownerDocument;
       const onChange = (): void => callback(document.visibilityState === 'visible');
@@ -62,4 +64,19 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
       return () => document.removeEventListener('visibilitychange', onChange);
     },
   };
+}
+
+/** Calls `callback` now and on every change with the system's reduced-motion setting (F214); returns an unsubscribe. */
+function observeReducedMotion(view: Window, callback: (reduce: boolean) => void): () => void {
+  const query = view.matchMedia('(prefers-reduced-motion: reduce)');
+  const onChange = (): void => callback(query.matches);
+  query.addEventListener('change', onChange);
+  onChange();
+  return () => query.removeEventListener('change', onChange);
+}
+
+/** Shows the canvases the backend draws into, the container's own (ADR 0011), at `opacity` (F214). */
+function setCanvasOpacity(container: HTMLElement, opacity: number): void {
+  for (const canvas of container.querySelectorAll<HTMLCanvasElement>(':scope > canvas'))
+    canvas.style.opacity = opacity >= 1 ? '' : String(opacity);
 }

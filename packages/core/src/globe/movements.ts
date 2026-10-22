@@ -1,5 +1,6 @@
 import type { Camera } from '../camera/camera.js';
 import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js';
+import { FadeJump } from '../camera/fade-jump.js';
 import { Orbit } from '../camera/orbit.js';
 import {
   groundZoomForRange,
@@ -32,6 +33,8 @@ import type { ViewState } from '../view/view-state.js';
 import { ViewControl } from './view-control.js';
 
 const RAD = Math.PI / 180;
+/** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
+export const REDUCED_MOTION_FADE_MS = 300;
 
 /** What camera movements need from their globe. */
 export interface MovementHost {
@@ -50,12 +53,16 @@ export interface MovementHost {
   setMode(mode: '2d' | '3d' | 'auto'): void;
   /** Sets the chosen tilt a movement animates, without a mode change. */
   animateTilt(tiltRad: number): void;
+  /** Shows the view at this opacity (1 opaque): a reduced-motion flight's fade (F214). */
+  setOpacity(opacity: number): void;
   requestRender(): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
 interface Animation {
   readonly animatesTilt: boolean;
+  /** The view's opacity while the animation runs, for a reduced-motion fade (F214); undefined keeps it opaque. */
+  readonly opacity?: number;
   step(camera: Camera, io: Float64Array): boolean;
 }
 
@@ -77,6 +84,11 @@ export class Movements {
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
   private userInputThisFrame = false;
+  /**
+   * The system's reduced-motion setting (F214), followed at runtime: flights then fade to their target instead of
+   * traversing the path. Input inertia reads it too (`Globe.reducedMotion`).
+   */
+  reducedMotion = false;
 
   constructor(private readonly host: MovementHost) {}
 
@@ -111,7 +123,11 @@ export class Movements {
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
-    return this.begin(new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs), options?.signal);
+    const animator =
+      kind === 'fly' && this.reducedMotion
+        ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
+        : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs);
+    return this.begin(animator, options?.signal);
   }
 
   /**
@@ -293,6 +309,8 @@ export class Movements {
       this.stepIo[0] = this.host.timeMs();
       const done = running.animator.step(this.host.cam, this.stepIo);
       if (running.animator.animatesTilt) this.host.animateTilt(this.stepIo[1] ?? 0);
+      const opacity = running.animator.opacity;
+      if (opacity !== undefined) this.host.setOpacity(opacity);
       this.host.cam.update();
       this.moveEvent.cause = 'api';
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
@@ -357,6 +375,8 @@ export class Movements {
     if (this.running !== running) return;
     this.running = undefined;
     running.detach();
+    // A fade cut short still leaves the view opaque.
+    if (running.animator.opacity !== undefined) this.host.setOpacity(1);
     this.host.emitter.emit('moveend', { cause: 'api', outcome });
     running.settle(outcome);
     this.host.requestRender();
@@ -393,6 +413,7 @@ export interface ViewWiring {
   readonly view: ViewState;
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
+  setOpacity(opacity: number): void;
   waiting(): boolean;
   assertAlive(): void;
   requestRender(): void;
@@ -419,6 +440,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     chooseTilt: (tiltDeg) => viewControl.chooseTilt(tiltDeg),
     setMode: (mode) => viewControl.setMode(mode),
     animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
+    setOpacity: (opacity) => globe.setOpacity(opacity),
     requestRender: () => globe.requestRender(),
   });
   return { viewControl, movements };

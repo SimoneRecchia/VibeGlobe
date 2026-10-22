@@ -157,6 +157,13 @@ export interface RenderHost {
   containerSize(): { widthPx: number; heightPx: number };
   /** Device pixel ratio. */
   pixelRatio(): number;
+  /**
+   * Optional: calls `callback` now and on every change with whether the system asks for reduced motion (F214); returns
+   * an unsubscribe. Without it the engine assumes full motion.
+   */
+  observeReducedMotion?(callback: (reduce: boolean) => void): () => void;
+  /** Optional: shows the drawn view at `opacity` (0 to 1), for a reduced-motion flight's fade (F214). */
+  setOpacity?(opacity: number): void;
 }
 
 /** Callbacks a renderer uses to report device events to the engine. */
@@ -668,6 +675,11 @@ export interface Globe {
   }): CameraMovement;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
+  /**
+   * Whether the system asks for reduced motion (F214), followed at runtime: flights then fade to their target in
+   * 300 ms instead of traversing the path, and input should keep inertia and other large animations to a minimum.
+   */
+  readonly reducedMotion: boolean;
   /**
    * The 2D / 3D / Auto toggle (F163): '2d' keeps the tilt at 0° at every zoom while the globe still flattens, '3d'
    * chooses the default tilt (manual mode), 'auto' restores the zoom-driven curves. Anything else throws a GlobeError

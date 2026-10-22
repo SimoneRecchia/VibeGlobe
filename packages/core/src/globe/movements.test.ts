@@ -300,4 +300,53 @@ describe('camera constraints (F209–F211)', () => {
     );
     globe.destroy();
   });
+
+  it('fades a flight to its target under the reduced-motion setting, following changes at runtime (F214)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    let setReduce: (reduce: boolean) => void = () => undefined;
+    const opacities: number[] = [];
+    Object.assign(renderer.host, {
+      observeReducedMotion: (callback: (reduce: boolean) => void) => {
+        setReduce = callback;
+        callback(true);
+        return () => undefined;
+      },
+      setOpacity: (opacity: number) => opacities.push(opacity),
+    });
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'w',
+      view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 15 },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    expect(globe.reducedMotion).toBe(true);
+    const longitudes: number[] = [];
+    globe.on('move', () => longitudes.push(globe.camera.longitudeDeg));
+    const flight = globe.flyTo({ longitudeDeg: 139.69, latitudeDeg: 35.68, zoom: 15 });
+    for (let i = 0; i < 30; i++) {
+      renderer.timers.advance(16);
+      renderer.flush();
+    }
+    expect(await flight).toBe('completed');
+    // Never between the two places: at the start until the jump, then at the target.
+    expect(longitudes.every((lon) => Math.abs(lon - 9.19) < 1e-9 || Math.abs(lon - 139.69) < 1e-9)).toBe(true);
+    expect(globe.camera.longitudeDeg).toBeCloseTo(139.69, 9);
+    expect(Math.min(...opacities)).toBeLessThan(0.1);
+    expect(opacities.at(-1)).toBe(1);
+    // Within the 300 ms fade.
+    expect(longitudes.length).toBeLessThanOrEqual(Math.ceil(300 / 16) + 1);
+    setReduce(false);
+    const full = globe.flyTo({ longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 15 });
+    for (let i = 0; i < 600; i++) {
+      renderer.timers.advance(16);
+      renderer.flush();
+    }
+    expect(await full).toBe('completed');
+    expect(longitudes.some((lon) => lon > 20 && lon < 130)).toBe(true);
+    globe.destroy();
+  });
 });

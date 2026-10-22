@@ -43,6 +43,10 @@
         display: flex;
         gap: 2px;
       }
+      /* A ui layer brings its own controls to that corner (M12): the playground's toggle steps aside. */
+      #app:has(.vg-ui) #view-modes {
+        display: none;
+      }
       #view-modes button {
         font: inherit;
         font-size: 13px;

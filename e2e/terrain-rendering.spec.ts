@@ -42,9 +42,17 @@ async function waitForTerrain(page: Page): Promise<void> {
 }
 
 /** Plays a frame-stepped scenario on a fresh fixture session and returns what its detectors found. */
-async function record(page: Page, query: string, scenario: string, darkBelow = 0): Promise<ScenarioReport> {
+async function record(
+  page: Page,
+  query: string,
+  scenario: string,
+  darkBelow = 0,
+  settled = false,
+): Promise<ScenarioReport> {
   const session = await fixtureSession(page);
   await openGlobe(page, `session=${session}&${CLOCK}&${query}`);
+  // `settled`: the scenario starts from the view with its terrain loaded, not while it still streams in.
+  if (settled) await waitForTerrain(page);
   const report = await page.evaluate(([name, dark]) => window.vibeglobePlayground?.recordScenario(name, dark), [
     scenario,
     darkBelow,
@@ -154,7 +162,14 @@ for (const backend of BACKENDS) {
     test(`peaks behind the horizon and at the screen edge never disappear or flicker while panning on ${backend} (F142)`, async ({
       page,
     }) => {
-      const report = await record(page, `backend=${backend}&scenario=terrain-horizon-peaks`, 'terrain-horizon-pan');
+      // From the loaded view: what pans in must never disappear or flicker, streaming at the start is F139's.
+      const report = await record(
+        page,
+        `backend=${backend}&scenario=terrain-horizon-peaks&imagery=smooth`,
+        'terrain-horizon-pan',
+        0,
+        true,
+      );
       expect([report.holes, report.pops]).toEqual([0, 0]);
       // In every frame the peak rises above the ellipsoid's horizon: at least 6 px of terrain above it in a column
       // (the ±300 m hills reach about 2 px there).

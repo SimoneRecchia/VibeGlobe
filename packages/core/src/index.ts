@@ -196,3 +196,16 @@ export type {
   WorkerRequest,
   WorkerRunMessage,
 } from './scheduler/worker-protocol.js';
+export {
+  ANCHORS,
+  ATTRIBUTE_COMPONENTS,
+  BATCH_ATTRIBUTES,
+  type BatchAttribute,
+  type BatchDescriptor,
+  type BatchHandle,
+  type BatchKind,
+  type BatchStringChannel,
+  type FeatureGeometry,
+  type LayerRenderTarget,
+  type Placement,
+} from './layers/layer-target.js';

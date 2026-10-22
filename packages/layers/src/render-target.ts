@@ -5,134 +5,28 @@
  */
 import type { GeoPosition, ScreenPoint } from '@vibeglobe/core';
 
-/** Primitive families a batch can hold. */
-export type BatchKind = 'point' | 'marker' | 'label' | 'polyline' | 'polygon' | 'circle';
-
-/**
- * Numeric per-feature attributes of a batch, stored structure-of-arrays (ADR 0029). Components per feature are in
- * {@link ATTRIBUTE_COMPONENTS}: `position` holds longitude and latitude in degrees and height in meters (float64);
- * colors are straight (not premultiplied) RGBA in 0–1; `anchor` is an index into
- * {@link ANCHORS}; `visible` is a visibility factor in 0–1 (0 hidden, 1 shown, between while a label fades); `pickId` is the packed id of picking.ts.
- */
-export type BatchAttribute =
-  | 'position'
-  | 'color'
-  | 'outlineColor'
-  | 'sizePx'
-  | 'widthPx'
-  | 'opacity'
-  | 'rotationDeg'
-  | 'offsetPx'
-  | 'heightMeters'
-  | 'baseMeters'
-  | 'anchor'
-  | 'visible'
-  | 'pickId';
-
-/** Components per feature of each attribute. */
-export const ATTRIBUTE_COMPONENTS: Readonly<Record<BatchAttribute, number>> = {
-  position: 3,
-  color: 4,
-  outlineColor: 4,
-  sizePx: 1,
-  widthPx: 1,
-  opacity: 1,
-  rotationDeg: 1,
-  offsetPx: 2,
-  heightMeters: 1,
-  baseMeters: 1,
-  anchor: 1,
-  visible: 1,
-  pickId: 1,
-};
-
-/** Anchors of labels and markers (MapLibre `text-anchor` and `icon-anchor`), in the order the `anchor` attribute indexes. */
-export const ANCHORS = [
-  'center',
-  'left',
-  'right',
-  'top',
-  'bottom',
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-] as const;
-
-/** Every numeric attribute, in a fixed order (the bit order of the store's dirty flags). */
-export const BATCH_ATTRIBUTES = Object.keys(ATTRIBUTE_COMPONENTS) as readonly BatchAttribute[];
-
-/** Per-feature text channels: a label's text and a marker's icon name (the renderer lays out glyphs and atlases icons). */
-export type BatchStringChannel = 'text' | 'icon';
-
-/** Line and polygon geometry of one feature: flat `[lon, lat, height, ...]` vertices and the start of each part. */
-export interface FeatureGeometry {
-  readonly positions: Float64Array;
-  /** Vertex index where each line or ring starts; polygons list the outer ring first, then holes. */
-  readonly partStarts: Uint32Array;
-  /** For polygons: index into `partStarts` where each polygon starts (multi-polygons have several). */
-  readonly polygonStarts?: Uint32Array;
-}
-
-/** How features are placed in height (PLAN.md, Data layers: placement). */
-export type Placement = 'clamp-to-ground' | 'drape' | { readonly absoluteAltitudeMeters: number };
-
-/** What the renderer needs to allocate a batch. */
-export interface BatchDescriptor {
-  readonly kind: BatchKind;
-  /** Owning layer id, for diagnostics. */
-  readonly layerId: string;
-  /** Features the buffers hold before they must grow. */
-  readonly capacity: number;
-  readonly placement: Placement;
-}
-
-/** An opaque handle to a renderer-side batch. */
-export interface BatchHandle {
-  readonly id: number;
-}
-
-/** The draw interface data layers use; every call takes effect on the next frame. */
-export interface LayerRenderTarget {
-  /** Allocates GPU buffers for a batch. */
-  createBatch(descriptor: BatchDescriptor): BatchHandle;
-  /** Reallocates a batch for a larger capacity, keeping its contents (not a rebuild: no data is re-uploaded). */
-  growBatch(handle: BatchHandle, capacity: number): void;
-  /**
-   * Uploads features `[first, first + count)` of one attribute; `data` holds the whole attribute array (the renderer
-   * reads only the range, so a single-feature change uploads one feature).
-   */
-  writeRange(
-    handle: BatchHandle,
-    attribute: BatchAttribute,
-    first: number,
-    count: number,
-    data: Float64Array | Float32Array | Uint32Array,
-  ): void;
-  /** Uploads text or icon names of features `[first, first + count)`; `values` holds the whole channel. */
-  writeStrings(
-    handle: BatchHandle,
-    channel: BatchStringChannel,
-    first: number,
-    count: number,
-    values: readonly string[],
-  ): void;
-  /** Sets the line or polygon geometry of one feature (lines and polygons only). */
-  writeGeometry(handle: BatchHandle, feature: number, geometry: FeatureGeometry): void;
-  /**
-   * Overrides an attribute for every feature of the batch with one value (zoom-only style expressions, evaluated once
-   * per frame); `undefined` returns to the per-feature values.
-   */
-  setUniform(handle: BatchHandle, attribute: BatchAttribute, value: Float64Array | undefined): void;
-  /** Number of features the renderer draws, from index 0. */
-  setCount(handle: BatchHandle, count: number): void;
-  /** Draw order of batches: lower first, so higher values draw on top. */
-  setOrder(handle: BatchHandle, order: number): void;
-  /** Shows or hides the whole batch. */
-  setVisible(handle: BatchHandle, visible: boolean): void;
-  /** Frees the batch's GPU buffers. */
-  release(handle: BatchHandle): void;
-}
+export {
+  ANCHORS,
+  ATTRIBUTE_COMPONENTS,
+  BATCH_ATTRIBUTES,
+  type BatchAttribute,
+  type BatchDescriptor,
+  type BatchHandle,
+  type BatchKind,
+  type BatchStringChannel,
+  type FeatureGeometry,
+  type LayerRenderTarget,
+  type Placement,
+} from '@vibeglobe/core';
+import { ATTRIBUTE_COMPONENTS } from '@vibeglobe/core';
+import type {
+  BatchAttribute,
+  BatchDescriptor,
+  BatchHandle,
+  BatchStringChannel,
+  FeatureGeometry,
+  LayerRenderTarget,
+} from '@vibeglobe/core';
 
 /** Projection of geographic positions to the screen for the frame being drawn (label placement, clusters). */
 export interface ScreenProjector {
@@ -191,6 +85,9 @@ export class RecordingRenderTarget implements LayerRenderTarget {
   readonly #batches = new Map<number, RecordedBatch>();
   #nextId = 1;
 
+  /**
+   *
+   */
   createBatch(descriptor: BatchDescriptor): BatchHandle {
     const id = this.#nextId++;
     this.#batches.set(id, {
@@ -208,6 +105,9 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     return { id };
   }
 
+  /**
+   *
+   */
   growBatch(handle: BatchHandle, capacity: number): void {
     const batch = this.#get(handle);
     for (const [attribute, values] of batch.attributes) {
@@ -218,6 +118,9 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     batch.capacity = capacity;
   }
 
+  /**
+   *
+   */
   writeRange(
     handle: BatchHandle,
     attribute: BatchAttribute,
@@ -237,6 +140,9 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.writes.push({ batch: handle.id, attribute, first, count });
   }
 
+  /**
+   *
+   */
   writeStrings(
     handle: BatchHandle,
     channel: BatchStringChannel,
@@ -255,21 +161,33 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.stringWrites.push({ batch: handle.id, channel, first, count });
   }
 
+  /**
+   *
+   */
   writeGeometry(handle: BatchHandle, feature: number, geometry: FeatureGeometry): void {
     this.#get(handle).geometry.set(feature, geometry);
     this.stringWrites.push({ batch: handle.id, channel: 'geometry', first: feature, count: 1 });
   }
 
+  /**
+   *
+   */
   setUniform(handle: BatchHandle, attribute: BatchAttribute, value: Float64Array | undefined): void {
     const batch = this.#get(handle);
     if (value === undefined) batch.uniforms.delete(attribute);
     else batch.uniforms.set(attribute, Float64Array.from(value));
   }
 
+  /**
+   *
+   */
   setCount(handle: BatchHandle, count: number): void {
     this.#get(handle).count = count;
   }
 
+  /**
+   *
+   */
   setOrder(handle: BatchHandle, order: number): void {
     this.#get(handle).order = order;
   }
@@ -279,6 +197,9 @@ export class RecordingRenderTarget implements LayerRenderTarget {
     this.#get(handle).visible = visible;
   }
 
+  /**
+   *
+   */
   release(handle: BatchHandle): void {
     this.#get(handle);
     this.#batches.delete(handle.id);

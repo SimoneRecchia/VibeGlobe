@@ -17,6 +17,14 @@ Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlo
 - Passing: F330–F335, F338, F340, F343–F346, F552, F553, F307. F553's check: the playground's production build ran from a plain static server (`http-server` with CORS and ranges, Docker Hub being rate-limited for nginx), with the worker and base image under `/static/vibeglobe/` and the sample tiles; every request answered 200 and the zoom-5 frame had no empty pixel. Following the guide also showed that the unbundled worker cannot be served as is; the guide now says to serve the bundled one. Waiting on main-track engine capabilities (adapters, attribution, source chains, offline mode): F336, F337, F339, F341, F304, F305, F551, F554.
 - Notes: Docker Hub rate-limits this container's pulls intermittently, and GHCR blobs are blocked, so the configurations pin `docker.io/osgeo/gdal:ubuntu-small-3.6.3` by digest. Raster tiling runs at about 0.1 s per 256-px tile on one core, and the OSM reader holds the needed nodes in memory: both are noted in `docs/follow-ups.md` for full builds.
 
+## Source adapters track (fourth session, `packages/sources`)
+
+Branch `claude/m7-source-adapters-0gkrjg`; status, contract workarounds and what each remaining entry waits for in `docs/parallel-tracks.md`.
+
+- **2026-10-22:** Adapters on the frozen source contract (ADR 0030): PMTiles (range requests, `pmtiles` library), MBTiles (`sql.js`, `@vibeglobe/sources/mbtiles`), WMTS and WMS (capabilities, CRS choice, gutter cropping), GeoJSON, KML/KMZ, GPX and a validating MVT decoder (`@vibeglobe/sources/vector`, worker task table), Google Map Tiles API 2D and Street View with session renewal (ADR 0031), the OpenStreetMap public-servers profile (ADR 0032). Shared, framework-free conformance suites (`@vibeglobe/sources/conformance`), an opt-in live run (`npm run test:live-sources`), the survey `docs/research/source-adapters.md` and the guide `docs/guides/sources.md`.
+- Passing: F223, F230–F233, F236–F239, F256, F257, F261–F263, F265–F267, and F341 of the data pipeline track. Pending the owner: F549 (one live run with the Google key). Waiting on the main track: F218–F220, F227, F228, F234, F235, F258–F260, F264, F268, F269.
+- Notes: the container reaches GitHub but not Google's, the OSMF's or most OGC servers, so the terms were read through search excerpts (owner question 24) and recorded capabilities come from the OpenLayers and OWSLib test suites. Fixed during development: concurrent Google 401s created one session per tile (now one renewal per refused token, unit test).
+
 ## Framework adapters track (fifth session, M14)
 
 Branch `claude/m14-framework-adapters-y3ky8k`; status, stubs and blockers in `docs/parallel-tracks.md`.

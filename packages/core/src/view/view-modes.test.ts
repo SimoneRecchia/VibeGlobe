@@ -230,3 +230,46 @@ describe('temporary tilt clamps (F165, F166)', () => {
     expect(view.chosenTiltRad).toBeCloseTo(80 * DEG, 12);
   });
 });
+
+describe('view regressions of the M5 review', () => {
+  it('keeps the point under the cursor when a wheel zoom crosses the Auto tilt band (KB-098)', async () => {
+    const { globe, frames } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 14 });
+    frames(3);
+    const cursor = { xPx: 700, yPx: 100 };
+    for (let step = 0; step < 8; step++) {
+      const grabbed = globe.screenToGeo(cursor);
+      if (!grabbed) throw new Error('off the globe');
+      globe.navigation.zoomAt(cursor, 0.25);
+      frames(3);
+      const shown = globe.geoToScreen(grabbed);
+      expect(
+        Math.hypot((shown?.xPx ?? NaN) - cursor.xPx, (shown?.yPx ?? NaN) - cursor.yPx),
+        `step ${step}`,
+      ).toBeLessThan(0.5);
+    }
+    globe.destroy();
+  });
+
+  it('eases a mode change over the same time whatever the frame rate (KB-099)', () => {
+    const tiltAfter = (stepMs: number): number => {
+      const view = new ViewState(DEFAULT_VIEW_CURVES);
+      const camera = new Camera();
+      camera.widthPx = 800;
+      camera.heightPx = 600;
+      camera.pose.rangeMeters = 300;
+      camera.update();
+      // Street scale in Auto: the curve's 50° tilt, applied.
+      view.frameTimeMs[0] = 0;
+      view.applyTilt(camera, 0);
+      view.setMode('2d');
+      for (let time = stepMs; time <= 192; time += stepMs) {
+        view.frameTimeMs[0] = time;
+        view.applyTilt(camera, 0);
+      }
+      return camera.pose.tiltRad / DEG;
+    };
+    // 120 Hz and 30 Hz reach the same tilt after the same 192 ms.
+    expect(tiltAfter(8)).toBeGreaterThan(1);
+    expect(tiltAfter(8)).toBeCloseTo(tiltAfter(32), 6);
+  });
+});

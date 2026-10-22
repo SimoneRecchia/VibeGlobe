@@ -36,6 +36,8 @@ export type ViewPhase = 'globe' | 'flattening' | '2d' | '3d';
  * released clamp or new curves ease over a few frames instead of jumping. Offsets below the floors end at once.
  */
 const OFFSET_KEPT = 0.75;
+/** The frame the share is kept over (60 Hz), milliseconds: at other rates it is kept per elapsed time (KB-099). */
+const OFFSET_FRAME_MS = 1000 / 60;
 const MIN_TILT_OFFSET_RAD = (0.05 * Math.PI) / 180;
 const MIN_FACTOR_OFFSET = 1e-4;
 
@@ -54,6 +56,9 @@ const WANTED_TILT = 7;
 /** The bracket of the probed terrain limit (KB-096). */
 const LOW_TILT = 8;
 const HIGH_TILT = 9;
+/** The engine time of the last applied frame, and the share of an offset kept this frame (KB-099). */
+const LAST_TIME = 10;
+const KEPT = 11;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -64,13 +69,15 @@ const HIGH_TILT = 9;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = new Float64Array(10);
+  private readonly values = new Float64Array(12);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
   private clamped = false;
   /** True when the next frame applies the target tilt at once (a camera cut), not eased. */
   private snap = true;
+  /** The engine time of the frame being prepared, milliseconds: written by the frame loop before {@link applyTilt}. */
+  readonly frameTimeMs = new Float64Array(1);
   /** The current mode; `manual` holds the chosen tilt at every zoom. */
   mode: ViewMode = 'auto';
 
@@ -162,6 +169,10 @@ export class ViewState {
     this.computeTarget();
     const target = values[TARGET_TILT] ?? 0;
     if (this.snap) values[TILT_OFFSET] = 0;
+    // The share kept over the time since the last frame, so transitions take the same time at every frame rate.
+    const elapsed = (this.frameTimeMs[0] ?? 0) - (values[LAST_TIME] ?? 0);
+    values[KEPT] = elapsed > 0 && elapsed < 1000 ? OFFSET_KEPT ** (elapsed / OFFSET_FRAME_MS) : OFFSET_KEPT;
+    values[LAST_TIME] = this.frameTimeMs[0] ?? 0;
     decay(values, TILT_OFFSET, MIN_TILT_OFFSET_RAD);
     decay(values, MORPH_OFFSET, MIN_FACTOR_OFFSET);
     decay(values, RELIEF_OFFSET, MIN_FACTOR_OFFSET);
@@ -208,6 +219,28 @@ export class ViewState {
     }
     values[APPLIED_TILT] = values[LOW_TILT] ?? 0;
     clears(camera, values, APPLIED_TILT, ground);
+  }
+
+  /**
+   * Sets the camera's tilt to what the next frame will apply at its current range, before an input solves for a point
+   * under the cursor (KB-098): the mode's target with the running offset, at most the sky limit. Changes no state.
+   */
+  previewTilt(camera: Camera): void {
+    this.computeCurves(camera);
+    this.computeTarget();
+    const values = this.values;
+    limits[0] = camera.pose.rangeMeters;
+    limits[1] = camera.pose.targetHeightMeters;
+    limits[2] = camera.fovYRad;
+    limits[3] = this.morph.factors[0] ?? 0;
+    skyTiltLimitRad(limits);
+    values[WANTED_TILT] = (values[TARGET_TILT] ?? 0) + (values[TILT_OFFSET] ?? 0);
+    if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
+    if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
+    // Never above the tilt the camera has: a terrain clamp holding it lower stays.
+    if ((values[WANTED_TILT] ?? 0) > camera.pose.tiltRad && this.clamped) return;
+    camera.pose.tiltRad = values[WANTED_TILT] ?? 0;
+    camera.update();
   }
 
   /** Recomputes the state from the camera's pose and viewport (after {@link Camera.update}). */
@@ -269,6 +302,6 @@ function clears(camera: Camera, values: Float64Array, slot: number, ground: Grou
 
 /** Shrinks the offset in `values[slot]` by one frame's share, ending it below `floor`. */
 function decay(values: Float64Array, slot: number, floor: number): void {
-  values[slot] = (values[slot] ?? 0) * OFFSET_KEPT;
+  values[slot] = (values[slot] ?? 0) * (values[KEPT] ?? OFFSET_KEPT);
   if ((values[slot] ?? 0) < floor && (values[slot] ?? 0) > -floor) values[slot] = 0;
 }

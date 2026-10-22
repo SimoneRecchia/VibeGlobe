@@ -106,6 +106,8 @@ export function zoomCamera(camera: Camera, view: ViewState | undefined, point: u
   clampPoseRange(camera);
   if (anchored) writeZoomGuess(camera);
   camera.update();
+  // The tilt the next frame applies at the new zoom (the Auto curve), so the point stays under the cursor (KB-098).
+  view?.previewTilt(camera);
   // The new zoom has its own morph and relief: the point must stay under the cursor on that surface.
   view?.update(camera);
   if (anchored) solveDrag(camera, view, zoomGuess);

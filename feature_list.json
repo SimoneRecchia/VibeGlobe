@@ -1877,7 +1877,7 @@
         "Record every frame during a slow scripted orbit and during a static hold",
         "Assert by frame differencing that terrain features move only by the expected camera motion and the static hold shows zero vertex oscillation above the jitter threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F137",
@@ -1930,7 +1930,7 @@
         "Assert imagery levels exceed terrain levels and the on-screen imagery texel density matches the imagery-only reference within tolerance",
         "Capture screenshots on both backends and assert no seams where imagery tile edges cross terrain tiles (edge-detection check along tile borders)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F141",

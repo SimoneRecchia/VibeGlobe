@@ -384,6 +384,36 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('rejects a query with resource-failed when its finest tile keeps failing or timing out (F145)', async () => {
+    for (const mode of ['failing', 'silent'] as const) {
+      const base = terrain([], 8);
+      const source: TerrainSource = {
+        ...base,
+        timeoutsMs: { firstByteMs: 100, totalMs: 200 },
+        transport: {
+          start(request, timeouts, done) {
+            if (!request.url.startsWith('/terrain/8/')) return base.transport.start(request, timeouts, done);
+            // Level 8 answers 500 every time, or never answers (the network pool's watchdog times it out).
+            if (mode === 'failing')
+              queueMicrotask(() => done({ kind: 'status', status: 500, retryAfterMs: undefined }));
+            return () => undefined;
+          },
+        },
+      };
+      const { globe, renderer, run } = await terrainGlobe(source, 5);
+      const query = globe.elevationAtAsync({ longitudeDeg: 7.2, latitudeDeg: 46.1 });
+      let error: unknown;
+      query.catch((reason: unknown) => (error = reason));
+      // Retries back off for up to a minute or so: advance well past them.
+      for (let i = 0; i < 200 && error === undefined; i++) {
+        renderer.timers.advance(2000);
+        await run(1);
+      }
+      expect(error).toMatchObject({ code: 'resource-failed' } satisfies Partial<GlobeError>);
+      globe.destroy();
+    }
+  });
+
   it('settles a query whose finest levels have no data with the finest level that has, and rejects on destroy (F145)', async () => {
     const { globe, run } = await terrainGlobe(
       terrain([], 12, (level) => level > 9),

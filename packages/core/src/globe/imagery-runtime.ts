@@ -28,8 +28,8 @@ import {
   type TerrainLayer,
 } from '../terrain/terrain-draws.js';
 import type { HeightGrid } from '../terrain/heightmap.js';
+import { heightTile } from '../terrain/height-tile.js';
 import { toEllipsoidal } from '../terrain/vertical-datum.js';
-import type { DecodedTile } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import { FINEST_FAILED, TerrainHeights, type ElevationSample } from '../terrain/terrain-heights.js';
 import { emptyLoaderStats, terrainStatsOf } from './diagnostics.js';
@@ -95,26 +95,6 @@ function terrainDecodeTask(
       },
     };
   };
-}
-
-/**
- * A custom decoder's grid as a decoded tile, checked so a wrong grid fails like undecodable bytes: every height must be
- * finite, and the range is measured from the heights rather than taken from the decoder, since culling and selection
- * trust it (F132, F142).
- */
-function heightTile(grid: HeightGrid): DecodedTile {
-  const side = grid.cells + 1;
-  if (!Number.isInteger(grid.cells) || grid.cells < 1 || grid.heightsMeters.length !== side * side)
-    throw new TypeError(`a height grid of ${grid.cells} cells needs ${side * side} heights`);
-  let minMeters = Infinity;
-  let maxMeters = -Infinity;
-  for (const height of grid.heightsMeters) {
-    if (!Number.isFinite(height)) throw new TypeError(`a height grid has a height of ${height}`);
-    if (height < minMeters) minMeters = height;
-    if (height > maxMeters) maxMeters = height;
-  }
-  const checked: HeightGrid = { cells: grid.cells, heightsMeters: grid.heightsMeters, minMeters, maxMeters };
-  return { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: checked };
 }
 
 /** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
@@ -222,6 +202,8 @@ export class ImageryRuntime {
   terrainMaxMeters = 0;
   /** Main-thread milliseconds the last frame spent on terrain (F134). */
   private terrainMs = 0;
+  /** Main-thread terrain work done since the last frame outside `draw` (F134): charged to the next frame's time. */
+  private chargedMs = 0;
   /** Texels along a tile edge of the finest layer, for the selection's texel refinement. */
   readonly texelsPerTile: number;
   /** The finest level any layer serves. */
@@ -316,11 +298,13 @@ export class ImageryRuntime {
           if (metadata !== undefined) source.tileMetadata?.(coord, metadata);
           // Geoid heights become ellipsoidal before upload and queries (F133): a few thousand lookups per tile.
           if (source.datum.kind === 'geoid') {
+            const start = renderer.host.now();
             const e = source.tiling.tileExtent(coord, extent);
             const mercator = source.tiling.crs === 'EPSG:3857';
             const grid = tile.image as HeightGrid;
             const converted = toEllipsoidal(grid, source.datum, e.westRad, e.southRad, e.eastRad, e.northRad, mercator);
             (tile as { image: unknown }).image = { ...grid, ...converted };
+            this.chargedMs += renderer.host.now() - start;
           }
         },
       }),
@@ -377,6 +361,16 @@ export class ImageryRuntime {
     if (grid.maxMeters > this.terrainMaxMeters) this.terrainMaxMeters = grid.maxMeters;
   }
 
+  /** The engine's time now, milliseconds. */
+  now(): number {
+    return this.renderer.host.now();
+  }
+
+  /** Adds main-thread terrain work done outside `draw` (selection relief ranges, collision) to its time (F134). */
+  chargeTerrainMs(ms: number): void {
+    this.chargedMs += ms;
+  }
+
   /** True while any layer still loads a wanted tile or an elevation query waits: `idle` waits for it (ADR 0007). */
   get busy(): boolean {
     if (this.elevationQueries.length > 0) return true;
@@ -422,7 +416,8 @@ export class ImageryRuntime {
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       deepenFallbackSkirts(list, tiles, count, terrain);
       this.serveElevationQueries();
-      this.terrainMs = host.now() - terrainStart;
+      this.terrainMs = host.now() - terrainStart + this.chargedMs;
+      this.chargedMs = 0;
     }
     for (const layer of this.layers) layer.loader.scheduleRequests();
     terrainStart = terrain ? host.now() : 0;

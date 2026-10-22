@@ -130,8 +130,10 @@ export class SurfaceFrame {
    * Returns true when the pose changed (the camera needs an update). Allocates nothing.
    */
   keepAboveTerrain(camera: Camera): boolean {
-    const heights = this.imagery?.heights;
-    if (!heights) return false;
+    const imagery = this.imagery;
+    const heights = imagery?.heights;
+    if (!imagery || !heights) return false;
+    const start = imagery.now();
     const pose = camera.pose;
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
@@ -144,6 +146,7 @@ export class SurfaceFrame {
     const surface = drawn === drawn ? drawn : finest;
     camera.groundHeightMeters = surface;
     const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
+    imagery.chargeTerrainMs(imagery.now() - start);
     if (next === lift) return false;
     pose.targetHeightMeters = next;
     return true;
@@ -159,7 +162,12 @@ export class SurfaceFrame {
       this.selection.terrainMinMeters = this.imagery.terrainMinMeters;
       this.selection.terrainMaxMeters = this.imagery.terrainMaxMeters;
     }
+    // With terrain, the selection measures relief ranges per tile: its time counts as terrain time (F134).
+    const imagery = this.imagery;
+    const timed = imagery?.heights !== undefined;
+    const selectionStart = timed ? imagery.now() : 0;
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
+    if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
     this.draws.reserve(count);
     cache.prepare(this.tiles, count, this.draws.meshKeys);
     drawOnBaseImage(this.draws, this.tiles, count);

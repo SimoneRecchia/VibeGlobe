@@ -177,8 +177,9 @@ describe('the offline engine', () => {
     const changes: string[] = [];
     offline.on('connectivity-change', (event) => changes.push(event.connectivity));
     const source = offline.source(fixture());
-    // The first failure goes to the engine, which backs off; the portal page is never a tile.
-    expect((await load(source, tile(3, 1, 1))).kind).toBe('network-error');
+    // The failure waits for the health check it triggered: unreachable, so the engine is asked to try again later
+    // instead of counting a failure; the portal page is never a tile.
+    expect((await load(source, tile(3, 1, 1))).kind).toBe('aborted');
     await expect.poll(() => offline.connectivity).toBe('offline');
     // While unreachable a miss is held, then handed back as an abort without a request.
     expect((await load(source, tile(3, 2, 2))).kind).toBe('aborted');
@@ -187,6 +188,22 @@ describe('the offline engine', () => {
     await expect.poll(() => offline.connectivity, { timeout: 3000 }).toBe('online');
     expect(text(await load(source, tile(3, 2, 2)))).toBe('tile');
     expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it('a failure on an endpoint the health check finds reachable goes to the engine, which backs off (F315)', async () => {
+    let first = true;
+    const net = fakeNetwork((url) => {
+      if (url.endsWith('/4/1/1.png') && first) {
+        first = false;
+        return 'down';
+      }
+      return {};
+    });
+    const offline = engine({ fetch: net.fetchImpl });
+    const source = offline.source(fixture());
+    expect((await load(source, tile(4, 1, 1))).kind).toBe('network-error');
+    expect(offline.connectivity).toBe('online');
+    expect(text(await load(source, tile(4, 1, 1)))).toBe('tile');
   });
 
   it('marks only the dead endpoint unreachable and backs its checks off (F297)', async () => {

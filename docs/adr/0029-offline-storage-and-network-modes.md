@@ -62,12 +62,15 @@ engine's GPU and RAM tiers stay as M3 built them, and everything below them happ
   hybrid uses both. Switches are global, per source and per layer; the effective value is
   `global ∧ layer ∧ source ∧ profile allows`. A provider profile that forbids packaging makes the build fail before
   any download.
-- **Connectivity from health checks** against each endpoint's level-0 tile: a redirect, an HTML answer, a 5xx or no
-  answer means unreachable. A failed tile request triggers a check; checks back off from 2 s to 60 s and never run more
-  than once per endpoint per interval; `online`/`offline` events only trigger checks. While an endpoint is unreachable,
-  a tile no tier holds is held for 500 ms and handed back as an abort, so the engine asks again later without spending
-  its retries; while it still counts as reachable, failures go to the engine's backoff. In offline-only mode such a
-  tile is no data.
+- **Connectivity from health checks** against each endpoint's coarsest tile: a redirect, an HTML page served as a
+  success, a 5xx or no answer means unreachable (an HTML error page is an answer). A failed tile request triggers a
+  check; checks back off from 2 s to 60 s and never run more than once per endpoint per interval; `online`/`offline`
+  events only trigger checks. A failed download waits up to 3 s for the check it triggered: if the endpoint is
+  unreachable the failure never reaches the engine (whose host probing would otherwise let one request through at a
+  time, slowing cached and packaged tiles too); if it is reachable the engine gets the failure and backs off. While an
+  endpoint is unreachable, a tile no tier holds is held for 500 ms and handed back as an abort, so the engine asks
+  again later without spending its retries and loads it once connectivity returns. In offline-only mode such a tile
+  is no data.
 
 ## Consequences
 
@@ -76,4 +79,8 @@ engine's GPU and RAM tiers stay as M3 built them, and everything below them happ
   new package version reaches tiles already in GPU or RAM memory only after the globe is recreated.
 - A tile that became no data in offline-only mode stays so in that globe after switching to hybrid (core treats no
   data as final); the hook request for a source reload covers it.
+- A start with no reachable data for the pinned coarse levels (no world package, no cache, network down) shows the
+  base image but keeps `Globe.ready` pending until connectivity returns, because held tiles never settle; a hybrid
+  setup installs a low-detail world package, which settles them. A transport result that counts as settled for
+  `ready` is requested from core.
 - Verified by `packages/offline/src/*.test.ts` (fake IndexedDB) and the browser specs `e2e/offline-*.spec.ts`.

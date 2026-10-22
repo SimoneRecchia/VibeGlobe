@@ -57,6 +57,11 @@ export function tileKey(sourceId: string, coord: TileCoord): string {
   return `${encodeURIComponent(sourceId)}/${root}${coord.level}/${coord.x}/${coord.y}`;
 }
 
+const FAILED_NETWORK: TransportResult = { kind: 'network-error' };
+const FAILED_TIMEOUT: TransportResult = { kind: 'timeout' };
+/** How long a failed download waits for the health check it triggered before the failure counts. */
+const CHECK_WAIT_MS = 3000;
+
 const NOT_FOUND: TransportResult = { kind: 'status', status: 404, retryAfterMs: undefined };
 
 let wrapperCount = 0;
@@ -159,7 +164,14 @@ class TileLoader {
         this.conditional(url) ? stored : undefined,
       );
       const result = this.afterFetch(outcome, key, stored, decision, endpoint, coord);
-      if (result) return result;
+      if (result !== FAILED_NETWORK && result !== FAILED_TIMEOUT) return result;
+      // No usable answer: wait for the health check this triggered. An outage then never reaches the engine as a
+      // failure (which would make it probe the host one request at a time, slowing cached and packaged tiles too);
+      // a failure on a reachable endpoint does, and the engine backs off (F298, F315).
+      if (!stored) {
+        await this.context.waitForChange(CHECK_WAIT_MS);
+        if (this.context.reachable(endpoint) && !signal.aborted) return result;
+      }
     }
     if (stored) {
       // Expired but unreachable: a stale tile beats a hole.
@@ -190,7 +202,7 @@ class TileLoader {
     decision: PolicyDecision,
     endpoint: string,
     coord: TileCoord,
-  ): TransportResult | undefined {
+  ): TransportResult {
     const id = this.source.id;
     switch (outcome.kind) {
       case 'ok': {
@@ -219,10 +231,7 @@ class TileLoader {
       case 'network-error':
       case 'timeout':
         this.context.reportFailure(endpoint);
-        // While the endpoint still counts as reachable the failure goes to the engine, which backs off (F315); once a
-        // health check finds it unreachable the request falls back to stale tiles or waits (F298).
-        if (stored || !this.context.reachable(endpoint)) return undefined;
-        return { kind: outcome.kind === 'timeout' ? 'timeout' : 'network-error' };
+        return outcome.kind === 'timeout' ? FAILED_TIMEOUT : FAILED_NETWORK;
     }
   }
 
@@ -260,6 +269,8 @@ class TileLoader {
     if (this.context.offlineOnly() || !decision.useNetwork) return NOT_FOUND;
     this.context.count(this.source.id, 'offlineMisses');
     await this.context.waitForChange(OFFLINE_HOLD_MS);
+    // Not a failure: a transient error would make the engine probe the host with one request at a time, which would
+    // also slow the tiles the cache and the packages hold.
     return { kind: 'aborted' };
   }
 }

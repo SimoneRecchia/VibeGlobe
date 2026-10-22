@@ -205,3 +205,13 @@ export async function publishFixture(
 }
 
 type OfflineHarnessApi = NonNullable<Window['offlineHarness']>;
+
+/** The pixels without imagery inside the globe in the frame drawn now, without waiting for idle. */
+export async function emptyPixelsNow(page: Page): Promise<number> {
+  return emptyPixelsInside(await canvasImage(page), await silhouetteRadiusPx(page));
+}
+
+/** The connectivity the offline engine reports. */
+export async function connectivity(page: Page): Promise<string | undefined> {
+  return page.evaluate(() => window.offlineHarness?.offline?.connectivity);
+}

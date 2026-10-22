@@ -2,9 +2,12 @@ import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { runCacheStoreContract } from './contract/cache-store-contract.js';
+import { runNetworkPolicyContract } from './contract/network-policy-contract.js';
+import { defaultNetworkPolicy } from './policy.js';
+import { SwitchBoard } from './switches.js';
 import { indexedDbStore } from './idb-store.js';
 import { memoryStore } from './memory-store.js';
-import type { CachedTile } from './types.js';
+import type { CachedTile, NetworkPolicy } from './types.js';
 
 const tile = (size: number): CachedTile => ({
   bytes: new ArrayBuffer(size),
@@ -23,6 +26,17 @@ describe('cache stores', () => {
       expect(results.filter((r) => !r.passed)).toEqual([]);
       expect(results.length).toBeGreaterThan(5);
     }
+  });
+
+  it('the built-in network policy passes the network-policy contract (F327)', () => {
+    const results = runNetworkPolicyContract(() =>
+      defaultNetworkPolicy({ mode: () => 'hybrid', switches: new SwitchBoard(), rules: () => undefined }),
+    );
+    expect(results.filter((r) => !r.passed)).toEqual([]);
+    const broken = runNetworkPolicyContract(() => ({
+      resolve: () => ({ useNetwork: 1 }) as unknown as ReturnType<NetworkPolicy['resolve']>,
+    }));
+    expect(broken.filter((r) => !r.passed).length).toBeGreaterThan(0);
   });
 
   it('evicts least-recently-used tiles and stays within its limit (F274)', async () => {

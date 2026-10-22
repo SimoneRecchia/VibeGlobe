@@ -17,6 +17,21 @@ Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlo
 - Passing: F330–F335, F338, F340, F343–F346, F552, F553, F307. F553's check: the playground's production build ran from a plain static server (`http-server` with CORS and ranges, Docker Hub being rate-limited for nginx), with the worker and base image under `/static/vibeglobe/` and the sample tiles; every request answered 200 and the zoom-5 frame had no empty pixel. Following the guide also showed that the unbundled worker cannot be served as is; the guide now says to serve the bundled one. Waiting on main-track engine capabilities (adapters, attribution, source chains, offline mode): F336, F337, F339, F341, F304, F305, F551, F554.
 - Notes: Docker Hub rate-limits this container's pulls intermittently, and GHCR blobs are blocked, so the configurations pin `docker.io/osgeo/gdal:ubuntu-small-3.6.3` by digest. Raster tiling runs at about 0.1 s per 256-px tile on one core, and the OSM reader holds the needed nodes in memory: both are noted in `docs/follow-ups.md` for full builds.
 
+## Offline engine track (sixth session, `packages/offline`)
+
+Branch `claude/gifted-mayer-p0kexd`; status, stubs and waiting entries in `docs/parallel-tracks.md`.
+
+- **2026-10-22:** `@vibeglobe/offline` (ADR 0029): tiers in a transport wrapper (persistent cache, packages, network),
+  IndexedDB cache in a dedicated worker with LRU eviction and quota handling, HTTP cache policy and ETag revalidation,
+  eviction detection, persistence requests, health-check connectivity with captive-portal detection and backoff,
+  network modes and switches with provider rules, the package manager (URL, local files and in-browser builds;
+  integrity per chunk; versions; resumable installs), contracts for cache stores and network policies, the Docker LAN
+  server, the offline guide, and the research survey. Browser specs `e2e/offline-*.spec.ts` on a harness page of the
+  playground's dev server (the playground itself is the main track's).
+- Notes for the next session of this track: the fixture tile server sends `no-store`, so specs rewrite cache headers
+  with `tileHeaders()`; Docker's daemon is not running in a fresh container (`dockerd &`); `Globe.ready` stays pending
+  in a start with the network down and no data for the pinned levels (ADR 0029, hook request 3).
+
 ## Session log (newest first)
 
 ### UI and GIS utilities track (third session) — 2026-10-21 (M12)

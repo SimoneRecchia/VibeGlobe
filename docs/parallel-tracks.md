@@ -48,13 +48,13 @@ their `tileMetadata` hook) belong to M4 and are not part of the fourth session's
 Hooks a track needs in a package it does not own. The requesting session adds a row; the main session answers in the
 last column (landed on `main`, or why not) and announces any change to the source contract above.
 
-| Date       | Track               | Hook needed (package, API, why)                                                                                                                                                                                                                                                                                                                                                  | Answer |
-| ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 2026-10-22 | Offline engine (M8) | `packages/core`: honour per-source loading decisions in the imagery loader, through a `NetworkPolicy`-like hook (`keepInMemory`, `prefetch`) that `@vibeglobe/offline` resolves from the mode, the switches and the provider profile. Without it the memory-reuse and prefetch switches are stored and resolved but core ignores them (F271, F290, F314; shared with F281–F285). |        |
-| 2026-10-22 | Offline engine (M8) | `packages/core`: `Globe.reloadSource(sourceId)` (or an invalidation event) that drops a source's GPU and RAM tiles and its no-data marks, so a new package version or a switch from offline-only to hybrid reaches tiles already in memory without recreating the globe (F279, F312 seamless; today the harness recreates the globe).                                            |        |
-| 2026-10-22 | Offline engine (M8) | `packages/core` (optional): a transport result `offline` that parks a tile until a resume signal, replacing the offline track's hold-and-abort workaround (a miss while an endpoint is unreachable is held 500 ms, then answered `aborted`).                                                                                                                                     |        |
-| 2026-10-22 | Offline engine (M8) | `apps/playground`: wrap its fixture sources with `createOffline().source()`, add `?network=online\|offline\|hybrid`, and show the per-tier counters (`Offline.stats()`) in the debug overlay (`?debug=1`). The offline specs use `e2e/support/offline.html` on the playground's dev server meanwhile (F272, F291–F293 name the playground).                                      |        |
-| 2026-10-22 | Offline engine (M8) | `playwright.config.ts`: add `offline-browsers.spec.ts` (WebGL-free storage checks) to `CROSS_BROWSER_SPECS`, so CI's Firefox and WebKit job runs them (F273, F276 ask for all three browsers; the container cannot download Firefox or WebKit).                                                                                                                                  |        |
+| Date       | Track               | Hook needed (package, API, why)                                                                                                                                                                                                                                                                                                                                                                                        | Answer |
+| ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-10-22 | Offline engine (M8) | (1) `packages/core`: honour per-source loading decisions in the imagery loader, through a `NetworkPolicy`-like hook (`keepInMemory`, `prefetch`) that `@vibeglobe/offline` resolves from the mode, the switches and the provider profile. Without it the memory-reuse and prefetch switches are stored and resolved but core ignores them (F271, F290, F314; shared with F281–F285).                                   |        |
+| 2026-10-22 | Offline engine (M8) | (2) `packages/core`: `Globe.reloadSource(sourceId)` (or an invalidation event) that drops a source's GPU and RAM tiles and its no-data marks, so a new package version or a switch from offline-only to hybrid reaches tiles already in memory without recreating the globe (F279, F312 seamless; today the harness recreates the globe).                                                                              |        |
+| 2026-10-22 | Offline engine (M8) | (3) `packages/core` (optional): a transport result `offline` that parks a tile until a resume signal, replacing the offline track's hold-and-abort workaround (a miss while an endpoint is unreachable is held 500 ms, then answered `aborted`), and that counts as settled for `Globe.ready`: today a start with the network down and no data for the pinned levels keeps `ready` pending until connectivity returns. |        |
+| 2026-10-22 | Offline engine (M8) | (4) `apps/playground`: wrap its fixture sources with `createOffline().source()`, add `?network=online\|offline\|hybrid`, and show the per-tier counters (`Offline.stats()`) in the debug overlay (`?debug=1`). The offline specs use `e2e/support/offline.html` on the playground's dev server meanwhile (F272, F291–F293 name the playground).                                                                        |        |
+| 2026-10-22 | Offline engine (M8) | (5) `playwright.config.ts`: add `offline-browsers.spec.ts` (WebGL-free storage checks) to `CROSS_BROWSER_SPECS`, so CI's Firefox and WebKit job runs them (F273, F276 ask for all three browsers; the container cannot download Firefox or WebKit).                                                                                                                                                                    |        |
 
 ## Status
 
@@ -115,3 +115,38 @@ The third session's packages are `@vibeglobe/ui` (controls, theming, translation
 | F434       | The ARIA states of the 2D/3D/Auto toggle (F421) and the layer switcher (F425), which the audit must cover       |
 | F436       | Flights that become quick fades with reduced motion (F214, F195)                                                |
 | F437       | The attribution control (F424), which the layout must never cover                                               |
+
+## Offline engine track (sixth session): status
+
+Branch `claude/gifted-mayer-p0kexd`. `@vibeglobe/offline` (ADR 0029, survey `docs/research/offline-and-network.md`,
+guide `docs/guides/offline.md`): tier wrapper for sources (`createOffline().source()`), IndexedDB cache in a worker,
+cache policy and revalidation, connectivity from health checks, network modes and loading switches, the package manager
+(install, list, update, remove, integrity, resumable installs, in-browser builds), and the Docker LAN server
+(`packages/offline/lan-server/`). Browser specs: `e2e/offline-*.spec.ts`, on the harness page
+`e2e/support/offline.html` of the playground's dev server, because the playground's own sources do not go through the
+offline package yet (hook requests above).
+
+### Stubs
+
+| Stub                                                                           | Where                                                   | Replaced by                                                             |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| PMTiles and MBTiles adapters (`ArchiveAdapters`, the M7 signatures)            | `packages/offline/src/__fixtures__/archive-adapters.ts` | `pmtilesImagery`, `mbtilesImagery` of `@vibeglobe/sources` (F232, F233) |
+| Provider rules (`ProviderRules`, structurally the adapters' `ProviderProfile`) | `packages/offline/src/types.ts`                         | The adapters' `ProviderProfile` (M7), passed as is                      |
+
+### Entries waiting for engine features
+
+| Entry                        | Waits for                                                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F271                         | Memory reuse and prefetch acting in core (F281–F285, hook request (1)); the playground's own sources wrapped (hook request (4))                                |
+| F272                         | The per-tier counters in the playground's debug overlay (hook request (4)); the persistent, package and network tiers are counted                              |
+| F273, F276                   | The Firefox and WebKit run of `e2e/offline-browsers.spec.ts` in CI (hook request (5)); Chromium passes                                                         |
+| F286, F287                   | `flyTo` (F195) and motion-aware detail (F288)                                                                                                                  |
+| F290                         | Memory reuse and prefetch switches acting in core (hook request (1)); per-layer scopes for layer chains (F247)                                                 |
+| F292–F296, F298              | Flight scenarios (`flyTo`, F195); their zoom and pan parts are covered by the network, package and LAN specs                                                   |
+| F304, F305, F336             | The PMTiles and MBTiles adapters on `main` (F232, F233); the packages load through the typed stub meanwhile                                                    |
+| F306                         | The live credits and the attribution element (F254, F255)                                                                                                      |
+| F314                         | Hook request 1 and flight scenarios (F195)                                                                                                                     |
+| F315, F316                   | Flight scenarios (F195) and prefetch with flight preloading (F284, F286) in the scenario suite                                                                 |
+| F326                         | The fourth session's shared conformance suite with profile-enforcement checks, the attribution element (F255) and core honouring a profile's concurrency limit |
+| F328                         | The terrain and MVT adapters (F129, F239) and terrain in core (M4)                                                                                             |
+| F337, F339, F341, F551, F554 | As listed for the data pipeline track above (F254/F255, F129, F239, F247/F248)                                                                                 |

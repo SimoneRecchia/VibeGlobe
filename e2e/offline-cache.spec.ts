@@ -92,7 +92,10 @@ test('cached tiles are not requested again after a reload, and cache I/O stays o
   const second = recordTileRequests(page);
   await startHarness(page, config);
   await pan(page);
-  expect(second).toEqual([]);
+  // No tile the first visit cached is requested again (a tile it never loaded may be: selection follows timing).
+  const cached = new Set(first);
+  expect(second.filter((path) => cached.has(path))).toEqual([]);
+  expect(second.length).toBeLessThan(cached.size / 10);
   expect((await servedTiers(page))['persistent']).toBeGreaterThan(10);
   expect(await emptyPixels(page)).toBe(0);
   expect(

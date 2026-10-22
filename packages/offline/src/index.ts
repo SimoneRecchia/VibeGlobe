@@ -28,6 +28,7 @@ export type { HealthCheckTiming } from './connectivity.js';
 export { requestPersistence } from './persistence.js';
 export type { PersistenceResult } from './persistence.js';
 export { runCacheStoreContract } from './contract/cache-store-contract.js';
+export { runNetworkPolicyContract } from './contract/network-policy-contract.js';
 export type { ContractResult } from './contract/cache-store-contract.js';
 export { createPackageManager } from './packages/package-manager.js';
 export type {

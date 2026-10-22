@@ -3851,7 +3851,7 @@
         "Navigate the package's area and assert no tile is read from the package (per-tier counters) and all come from the network or caches",
         "Block the network and assert the engine reports that it is offline, keeps the pinned base visible and does not read the package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F292",
@@ -3927,7 +3927,7 @@
         "Simulate a single dead endpoint while others work and assert only that endpoint is marked unreachable",
         "Assert health checks back off while offline and never exceed one request per endpoint per configured interval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F298",
@@ -3953,7 +3953,7 @@
         "Record frames and assert refinement cross-fades with no popping and no black pixels",
         "Assert a connectivity event reports the change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F300",
@@ -4170,7 +4170,7 @@
         "Run the guide's code examples as tests and assert they pass",
         "Follow the LAN server setup in the guide on a clean machine and confirm the playground runs offline from it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F318",
@@ -4183,7 +4183,7 @@
         "Inspect browser storage through Playwright and assert no tile of that source was written",
         "Assert tiles of the other sources in the same view were written"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F319",
@@ -4292,7 +4292,7 @@
         "Run the cache-store and network-policy contract tests against the built-in implementations and the custom ones and assert all pass",
         "Attach the custom store and policy in the playground and assert tiles are stored and requests decided through them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F328",
@@ -4318,7 +4318,7 @@
         "From another machine or container on the same network with no internet route, open the playground and confirm offline navigation with zero black pixels",
         "Confirm the offline mode 1 end-to-end tests start the same server image"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F329",

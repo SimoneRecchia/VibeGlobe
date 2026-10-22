@@ -20,6 +20,7 @@ import {
   type SourceCachePolicy,
 } from '@vibeglobe/offline';
 import { createRenderer } from '@vibeglobe/renderer';
+import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
@@ -60,6 +61,15 @@ export interface HarnessConfig {
   }[];
   /** Manifest URLs of packages read from a LAN server without installing (offline mode 1). */
   readonly served?: readonly string[];
+  /** Engine time per drawn frame, for frame-by-frame checks of cross-fades. */
+  readonly clockStepMs?: number;
+  /**
+   * Waits for the globe's `ready` (default true). A start with no reachable data for the pinned levels resolves it
+   * only once connectivity returns (docs/parallel-tracks.md, hook requests).
+   */
+  readonly awaitReady?: boolean;
+  /** Uses the custom cache store and network policy of `e2e/fixtures/offline-plugin` (F327). */
+  readonly plugin?: boolean;
 }
 
 /** The harness on the page. */
@@ -112,6 +122,15 @@ const adapters = stub.createStubAdapters({ wasmUrl: `${repo}/node_modules/sql.js
 
 let config: HarnessConfig | undefined;
 
+async function loadPlugin(): Promise<ReturnType<typeof PluginModule.createPlugin>> {
+  const module = (await import(
+    /* @vite-ignore */ `${repo}/e2e/fixtures/offline-plugin/index.ts`
+  )) as typeof PluginModule;
+  const plugin = module.createPlugin();
+  (window as unknown as { pluginCounters: Record<string, number> }).pluginCounters = plugin.counters;
+  return plugin;
+}
+
 function sourcesOf(offline: Offline, current: HarnessConfig): ReturnType<typeof xyzImagery>[] {
   return current.sources.map((s) => {
     const url = s.url ?? `/fixture-tiles/${s.session ?? 'offline'}/${s.pattern ?? 'world'}/mercator/{z}/{x}/{y}.png`;
@@ -140,6 +159,7 @@ function createGlobeFor(offline: Offline, current: HarnessConfig): Globe {
     view: current.view ?? {},
     imagery: sourcesOf(offline, current),
     workers: createWorkers(),
+    ...(current.clockStepMs === undefined ? {} : { manualClockStepMs: current.clockStepMs }),
   });
   // The shared end-to-end helpers (waitForIdle, canvasImage) read the playground's hook names.
   (window as unknown as { vibeglobePlayground: unknown }).vibeglobePlayground = { globe, globes: [globe], events: [] };
@@ -156,7 +176,9 @@ const harness: OfflineHarness = {
   async start(next) {
     harness.stop();
     config = next;
+    const plugin = next.plugin ? await loadPlugin() : undefined;
     const offline = createOffline({
+      ...(plugin ? { store: plugin.store, policy: plugin.policy } : {}),
       ...(next.network ? { mode: next.network } : {}),
       ...(next.switches ? { switches: next.switches } : {}),
       ...(next.store ? { store: next.store } : {}),
@@ -174,14 +196,14 @@ const harness: OfflineHarness = {
     await manager.ready;
     for (const url of next.served ?? []) await manager.addServedPackage(url);
     Object.assign(harness, { offline, manager, globe: createGlobeFor(offline, next) });
-    await harness.globe?.ready;
+    if (next.awaitReady !== false) await harness.globe?.ready;
   },
   async restartGlobe() {
     if (!config || !harness.offline) throw new Error('not started');
     harness.globe?.destroy();
     harness.served.length = 0;
     Object.assign(harness, { globe: createGlobeFor(harness.offline, config) });
-    await harness.globe?.ready;
+    if (config.awaitReady !== false) await harness.globe?.ready;
   },
   async installFixture(spec) {
     if (!harness.manager) throw new Error('not started');

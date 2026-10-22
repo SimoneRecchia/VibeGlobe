@@ -66,6 +66,8 @@ export class SurfaceFrame {
   private lastCamera = '';
   /** A synchronous elevation query's position in radians, in an array so passing it boxes nothing (ADR 0018). */
   private readonly queryRad = new Float64Array(2);
+  /** The finest resident terrain under the eye, each frame. */
+  private readonly eyeGround: ElevationSample = { heightMeters: 0, level: -1, noData: true };
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
   private readonly nowMs = new Float64Array(1);
 
@@ -130,9 +132,17 @@ export class SurfaceFrame {
     const pose = camera.pose;
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
-    const surface = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
+    const drawn = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
+    // The finest resident terrain under the eye: the eye never goes below it, even while the frame still shows coarser
+    // relief there or draws nothing there (F146); the clearance is kept above the displayed surface, so finer terrain
+    // lifts the eye as it morphs in (F147).
+    this.queryRad[0] = eye.longitudeRad;
+    this.queryRad[1] = eye.latitudeRad;
+    const finest = heights.sampleAt(this.queryRad, this.eyeGround).heightMeters;
+    const surface = drawn === drawn ? drawn : finest;
     camera.groundHeightMeters = surface;
-    const needed = surface + this.clearanceMeters - (eye.heightMeters - lift);
+    const floor = surface + this.clearanceMeters > finest ? surface + this.clearanceMeters : finest;
+    const needed = floor - (eye.heightMeters - lift);
     const next = needed > 0 ? needed : 0;
     if (next === lift) return false;
     pose.targetHeightMeters = next;

@@ -215,6 +215,9 @@ function at(capture: FrameCapture, x: number, y: number, channel: number): numbe
   return capture.rgba[(Math.round(y) * capture.widthPx + Math.round(x)) * 4 + channel] ?? 0;
 }
 
+/** {@link checkFrame}'s terrain height at a candidate hole. */
+const ground = { heightMeters: 0, level: -1, noData: true };
+
 /** Transparent pixels on a grid inside the globe, at least 2 px from its silhouette. */
 /**
  * Counts, inside the globe and 2 px from its outline, the transparent pixels (holes) and, with `darkBelow`, the opaque
@@ -257,9 +260,12 @@ export function checkFrame(
         if (report.firstDarkFrame < 0) report.firstDarkFrame = frame;
         continue;
       }
+      // The ray meets the ellipsoid here; where the terrain lies below the ellipsoid it may pass over the terrain to
+      // the sky beyond its horizon. At or above it, the ray reached the ellipsoid inside the terrain: a hole.
+      const where = globe.screenToGeo({ xPx: x / scale, yPx: y / scale });
+      if (where && globe.elevationAt(where, ground).heightMeters < 0) continue;
       report.holes++;
       if (report.firstHoleFrame < 0) report.firstHoleFrame = frame;
-      const where = globe.screenToGeo({ xPx: x / scale, yPx: y / scale });
       if (where) report.firstHole ??= { xPx: x / scale, yPx: y / scale, ...where };
     }
   }

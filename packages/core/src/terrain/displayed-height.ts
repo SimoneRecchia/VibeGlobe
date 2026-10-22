@@ -27,7 +27,7 @@ function layerHeight(
 /**
  * The height of the surface as the frame shows it at a position (ADR 0006 §4): the drawn tile containing it, its
  * terrain and the terrain it morphs from, mixed by the morph's progress, exactly as the vertex shader does at the
- * tile's vertices. 0 (the ellipsoid) where no drawn tile contains the position. Allocates nothing.
+ * tile's vertices. NaN where no drawn tile contains the position. Allocates nothing.
  */
 export function displayedHeightMeters(
   list: DrawList,
@@ -69,5 +69,5 @@ export function displayedHeightMeters(
     );
     return from + (to - from) * fade;
   }
-  return 0;
+  return Number.NaN;
 }

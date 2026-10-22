@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
+import { PNG } from 'pngjs';
+import { canvasImage, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
 import { hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import { fixtureSession, requestLog } from './support/imagery.ts';
 
@@ -162,6 +163,7 @@ async function recordClearance(page: Page): Promise<void> {
       minAboveFinest: Infinity,
       altitudes: [] as number[],
       grounds: [] as number[],
+      worst: [] as number[],
     };
     (window as unknown as { clearance: typeof record }).clearance = record;
     globe.on('frame', () => {
@@ -169,6 +171,12 @@ async function recordClearance(page: Page): Promise<void> {
       const finest = globe.elevationAt({ longitudeDeg: camera.eyeLongitudeDeg, latitudeDeg: camera.eyeLatitudeDeg });
       record.frames++;
       record.minAboveDisplayed = Math.min(record.minAboveDisplayed, camera.altitudeMeters - camera.groundHeightMeters);
+      if (camera.altitudeMeters - finest.heightMeters < record.minAboveFinest) {
+        // The worst frame, for the log.
+        record.worst = [camera.eyeLongitudeDeg, camera.eyeLatitudeDeg, camera.altitudeMeters, camera.groundHeightMeters]
+          .concat([finest.heightMeters, finest.level, camera.tiltDeg, record.frames])
+          .map((value) => +value.toFixed(5));
+      }
       record.minAboveFinest = Math.min(record.minAboveFinest, camera.altitudeMeters - finest.heightMeters);
       record.altitudes.push(camera.altitudeMeters);
       record.grounds.push(camera.groundHeightMeters);
@@ -182,6 +190,8 @@ interface ClearanceRecord {
   minAboveFinest: number;
   altitudes: number[];
   grounds: number[];
+  /** The frame furthest below the finest terrain: eye lon, lat, altitude, displayed ground, finest, level, tilt, frame. */
+  worst: number[];
 }
 
 async function clearance(page: Page): Promise<ClearanceRecord> {
@@ -191,8 +201,10 @@ async function clearance(page: Page): Promise<ClearanceRecord> {
 for (const backend of BACKENDS) {
   test(`the camera stays the clearance above the terrain through 60 s of zooming, dragging, tilting and turning toward a cliff on ${backend} (F146)`, async ({
     page,
-  }) => {
-    test.setTimeout(300_000);
+  }, testInfo) => {
+    // 60 s of input plus the initial streaming on a 320 × 240 canvas.
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 320, height: 240 });
     const session = await fixtureSession(page);
     // The valley east of the peak, looking west at its flank.
     await openGlobe(
@@ -205,20 +217,21 @@ for (const backend of BACKENDS) {
     const box = await canvas.boundingBox();
     if (!box) throw new Error('no canvas');
     const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const unit = box.height / 18;
     const holes: number[] = [];
     const end = Date.now() + 60_000;
     for (let step = 0; Date.now() < end; step++) {
       switch (step % 4) {
         case 0:
           // Wheel zoom toward the flank.
-          await page.mouse.move(center.x, center.y - 60);
+          await page.mouse.move(center.x, center.y - 3 * unit);
           for (let i = 0; i < 5; i++) await page.mouse.wheel(0, -240);
           break;
         case 1:
           // Drag the ground toward the camera: the eye moves toward the cliff.
-          await page.mouse.move(center.x, center.y - 120);
+          await page.mouse.move(center.x, center.y - 6 * unit);
           await page.mouse.down();
-          for (let i = 1; i <= 8; i++) await page.mouse.move(center.x, center.y - 120 + i * 20);
+          for (let i = 1; i <= 8; i++) await page.mouse.move(center.x, center.y - 6 * unit + i * unit);
           await page.mouse.up();
           break;
         case 2:
@@ -228,16 +241,22 @@ for (const backend of BACKENDS) {
           }, step);
           break;
         default: {
-          await waitForIdle(page);
+          // A frame drawn now, while tiles still stream: no frame may show the inside of the terrain.
           const frame = (await page.evaluate(() => window.vibeglobePlayground?.checkFrame())) as ScenarioReport;
           holes.push(frame.holes);
+          // A frame with holes is saved once, to investigate offline.
+          if (frame.holes > 0 && holes.filter((count) => count > 0).length === 1) {
+            const image = await canvasImage(page);
+            const camera = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
+            writeFileSync(testInfo.outputPath('frame-with-holes.png'), PNG.sync.write(image));
+            writeFileSync(testInfo.outputPath('camera.json'), JSON.stringify(camera));
+          }
         }
       }
     }
-    await waitForIdle(page);
     const record = await clearance(page);
     console.log(
-      `collision ${backend}: ${record.frames} frames, min above displayed ${record.minAboveDisplayed.toFixed(3)} m, above finest ${record.minAboveFinest.toFixed(3)} m, holes ${JSON.stringify(holes)}`,
+      `collision ${backend}: ${record.frames} frames, min above displayed ${record.minAboveDisplayed.toFixed(3)} m, above finest ${record.minAboveFinest.toFixed(3)} m (worst frame ${JSON.stringify(record.worst)}), holes ${JSON.stringify(holes)}`,
     );
     expect(record.frames).toBeGreaterThan(50);
     // The displayed surface is the finest terrain the frame shows; the eye never passes inside the finest loaded tile.
@@ -248,8 +267,8 @@ for (const backend of BACKENDS) {
   });
 
   test(`the camera rises smoothly when higher fine terrain arrives under it on ${backend} (F147)`, async ({ page }) => {
-    // Fine terrain arrives 4 s late; near the summit the coarse grids lie below it.
-    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 11, latencyMs: 4000 }]);
+    // Fine terrain arrives 8 s late, well after recording starts; near the summit the coarse grids lie below it.
+    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 11, latencyMs: 8000 }]);
     await openGlobe(
       page,
       `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-alps&lon=6.8605&lat=45.8302&zoom=22&tilt=60`,

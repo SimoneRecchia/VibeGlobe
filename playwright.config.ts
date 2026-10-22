@@ -6,7 +6,8 @@ const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 /** Tests whose results depend on having the machine to themselves. */
-const MEASURES_THE_MACHINE = /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts/;
+const MEASURES_THE_MACHINE =
+  /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts/;
 /**
  * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
  * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
@@ -87,6 +88,13 @@ export default defineConfig({
     {
       command: 'npm run preview -w @vibeglobe/playground',
       url: `http://localhost:${process.env['PLAYGROUND_PREVIEW_PORT'] ?? 5176}`,
+      reuseExistingServer: true,
+    },
+    // The framework adapters' example pages (M14), on the packages' sources; the plain HTML page loads the Web
+    // Component's browser build (npm run build first).
+    {
+      command: 'npm run dev -w @vibeglobe/adapter-examples',
+      url: `http://localhost:${process.env['ADAPTER_EXAMPLES_PORT'] ?? 5180}`,
       reuseExistingServer: true,
     },
     {

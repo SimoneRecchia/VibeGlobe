@@ -1762,7 +1762,7 @@
         "Assert zero requests for tiles outside the declared availability and that those areas render with the best available ancestor terrain",
         "Assert extensions are requested (Accept header) only when layer.json declares them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F129",
@@ -1801,7 +1801,7 @@
         "Serve corrupted terrain tiles in the playground and record frames with a sentinel clear color on both backends",
         "Assert zero sentinel pixels and that the corrupted tiles are covered by their best available ancestor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F132",
@@ -1814,7 +1814,7 @@
         "Assert the rendered relief and elevation queries match the fixture heights within the encodings' precision",
         "Assert the test adapters import nothing beyond the published package entry points"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F133",
@@ -1827,7 +1827,7 @@
         "Assert elevation queries and rendered vertex positions agree between the two within tolerance",
         "Assert the source metadata exposes the declared datum and an unknown datum value is rejected with a validation error naming the source"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F134",

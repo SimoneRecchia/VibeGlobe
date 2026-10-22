@@ -1,6 +1,6 @@
 # Source adapters and tile formats
 
-Survey written in M7 by the source adapters track (fourth session, `docs/parallel-tracks.md`) before building the adapters of `@vibeglobe/sources`. It covers how the studied engines model sources, tiling schemes, coverage, attribution and provider terms, their known failure modes, how they test adapters, and the approach chosen. Reprojection, layer composition, source chains and color harmonization belong to the main track: this survey records what the engines do there, and the main track's ADR records the choice. Decisions: [ADR 0030](../adr/0030-source-adapters.md) (adapters), [ADR 0031](../adr/0031-google-maps-platform-terms.md) (Google profile), [ADR 0032](../adr/0032-openstreetmap-tile-usage-policy.md) (OpenStreetMap profile).
+Survey written in M7 by the source adapters track (fourth session, `docs/parallel-tracks.md`) before building the adapters of `@vibeglobe/sources`. It covers how the studied engines model sources, tiling schemes, coverage, attribution and provider terms, their known failure modes, how they test adapters, and the approach chosen. Reprojection, layer composition, source chains and color harmonization belong to the main track: this survey records what the engines do there (below), and the main track's ADR records the choice; until it is written, F218 waits for it. Decisions: [ADR 0030](../adr/0030-source-adapters.md) (adapters), [ADR 0031](../adr/0031-google-maps-platform-terms.md) (Google profile), [ADR 0032](../adr/0032-openstreetmap-tile-usage-policy.md) (OpenStreetMap profile).
 
 Only open-source projects were studied, by reading the files named below; no code was copied.
 
@@ -32,6 +32,14 @@ Only open-source projects were studied, by reading the files named below; no cod
 - **MBTiles.** SQLite with `metadata` and `tiles` (TMS rows), or the deduplicated `map` and `images` tables behind a `tiles` view. In browsers it needs SQLite compiled to WebAssembly (sql.js).
 - **MVT.** Protocol buffers with layers, keys, values and zig-zag geometry commands; the `mvt-fixtures` repository lists valid, recoverable and fatal tiles (two of its fixtures, 051 and 057, carry the same geometry with opposite verdicts).
 - **quantized-mesh** and the heightmaps are the main track's M4 terrain adapters; F235's conformance run waits for them.
+
+## Raster reprojection, source fallback and color matching
+
+These belong to the main track (layer composition); the approaches found are recorded here for its decision.
+
+- **Raster reprojection.** CesiumJS draws imagery in the geographic or Web Mercator scheme only and reprojects Web Mercator imagery to geographic per tile on the GPU (a texture lookup with a latitude remap), so other reference systems need a server that offers one of the two. OpenLayers reprojects any raster on the client: it triangulates the target extent, refines triangles until the error is under a threshold (half a pixel by default) and draws each triangle with an affine transform; seams appear when neighbouring tiles triangulate differently or when the source tile grid has gaps, and its issue tracker has many such reports. MapLibre GL JS and Leaflet do not reproject rasters. iTowns reprojects WMTS and WMS layers into the view's CRS per tile with proj4. Trade-offs: GPU remapping is exact and cheap for the two global schemes; triangulation handles any CRS at a CPU cost per tile and needs care at tile edges (sampling a one-pixel border avoids most seams).
+- **Source fallback.** All engines fall back to the parent tile while a tile loads or fails (CesiumJS draws the nearest ancestor's imagery with texture-coordinate offsets, OpenLayers keeps lower-resolution tiles from its cache, MapLibre keeps "covering" parents and children). None has priority chains of sources with coverage-based selection: CesiumJS stacks layers with rectangles and alpha, OpenLayers stacks layers with extents, MapLibre has one source per layer. Availability-based switching (an unreachable source replaced by the next) exists in none of them.
+- **Color matching.** CesiumJS exposes per-layer brightness, contrast, hue, saturation and gamma; OpenLayers offers canvas or WebGL filters per layer; MapLibre has raster brightness, contrast, saturation and hue rotation. None matches colors between sources automatically; mosaics are balanced offline (histogram matching in GDAL or the data pipeline).
 
 ## Known failure modes from the issue trackers, and how the design avoids each
 

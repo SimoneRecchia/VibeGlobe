@@ -2978,7 +2978,7 @@
         "Run the opt-in live-endpoint job and confirm it targets only endpoints whose terms allow automated testing, and that it records which endpoints were skipped and why",
         "Import the suite from a custom adapter package and assert it runs there unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F224",

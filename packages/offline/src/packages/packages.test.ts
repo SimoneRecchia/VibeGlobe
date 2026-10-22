@@ -4,6 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stubAdapters } from '../__fixtures__/archive-adapters.js';
+import { writeMbtiles } from '../__fixtures__/mbtiles-writer.js';
 import { writePmtiles } from '../__fixtures__/pmtiles-writer.js';
 import { memoryStore } from '../memory-store.js';
 import { createOffline, type Offline } from '../offline-engine.js';
@@ -126,6 +127,26 @@ describe('offline packages', () => {
     // A new page sees the same list.
     const again = setup(factory, net.fetchImpl);
     expect((await again.manager.list()).map((p) => p.id).sort()).toEqual(['rome', 'rome-local']);
+  });
+
+  it('installs and reads an MBTiles package (F311)', async () => {
+    const tiles = [0, 1].flatMap((z) =>
+      Array.from({ length: 4 ** z }, (_, i) => ({ z, x: i % 2 ** z, y: Math.floor(i / 2 ** z) })),
+    );
+    const data = await writeMbtiles(
+      tiles.map((t) => ({ ...t, bytes: new TextEncoder().encode(`mb:${t.z}/${t.x}/${t.y}`) })),
+      { name: 'mb', format: 'png', minzoom: '0', maxzoom: '1' },
+    );
+    const manifest = await createManifest({
+      id: 'mb',
+      version: '1',
+      area: BOUNDS,
+      sources: [{ ...SOURCE, file: 'mb.mbtiles', maxLevel: 1, attribution: { text: 'MB' } }],
+      files: [{ path: 'mb.mbtiles', format: 'mbtiles', data: new Blob([data as Uint8Array<ArrayBuffer>]) }],
+    });
+    const { manager, source } = setup();
+    await manager.install({ manifest, files: { 'mb.mbtiles': new Blob([data as Uint8Array<ArrayBuffer>]) } });
+    expect(await load(source, tile(1, 1, 0))).toBe('mb:1/1/0');
   });
 
   it('detects corruption in the header, the directory and the tile data, on install and on read (F309)', async () => {

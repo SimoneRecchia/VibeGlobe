@@ -16,6 +16,8 @@ export interface FixturePackageSpec {
   readonly chunkBytes?: number;
   /** Tiles left out (`z/x/y`), for partial packages. */
   readonly skip?: readonly string[];
+  /** Levels left out entirely. */
+  readonly skipLevels?: readonly number[];
   readonly license?: string;
   readonly attribution?: string;
 }
@@ -28,6 +30,11 @@ export interface FixturePackage {
 }
 
 interface Writers {
+  writeMbtiles(
+    tiles: { z: number; x: number; y: number; bytes: Uint8Array }[],
+    metadata: Record<string, string>,
+    wasmUrl?: string,
+  ): Promise<Uint8Array>;
   writePmtiles(
     tiles: { z: number; x: number; y: number; bytes: Uint8Array }[],
     metadata: Record<string, unknown>,
@@ -53,40 +60,22 @@ function tileRange(
   return { x0: x(bounds.westDeg), x1: x(bounds.eastDeg), y0: y(bounds.northDeg), y1: y(bounds.southDeg) };
 }
 
-async function writeMbtiles(
-  tiles: { z: number; x: number; y: number; bytes: Uint8Array }[],
-  spec: FixturePackageSpec,
-): Promise<Uint8Array> {
-  const { default: initSqlJs } = (await import(/* @vite-ignore */ `${repo}/node_modules/sql.js/dist/sql-wasm.js`)) as {
-    default: (o: {
-      locateFile: () => string;
-    }) => Promise<{ Database: new () => { run(sql: string, params?: unknown[]): void; export(): Uint8Array } }>;
-  };
-  const sql = await initSqlJs({ locateFile: () => `${repo}/node_modules/sql.js/dist/sql-wasm.wasm` });
-  const db = new sql.Database();
-  db.run('CREATE TABLE metadata (name text, value text)');
-  db.run('CREATE TABLE tiles (zoom_level integer, tile_column integer, tile_row integer, tile_data blob)');
-  const b = spec.bounds;
-  for (const [name, value] of [
-    ['name', spec.id],
-    ['format', 'png'],
-    ['minzoom', String(spec.minLevel)],
-    ['maxzoom', String(spec.maxLevel)],
-    ['bounds', `${b.westDeg},${b.southDeg},${b.eastDeg},${b.northDeg}`],
-  ])
-    db.run('INSERT INTO metadata VALUES (?, ?)', [name, value]);
-  for (const t of tiles) db.run('INSERT INTO tiles VALUES (?, ?, ?, ?)', [t.z, t.x, 2 ** t.z - 1 - t.y, t.bytes]);
-  return db.export();
-}
-
 /** Builds a fixture package in the page. */
 export async function buildFixturePackage(spec: FixturePackageSpec): Promise<FixturePackage> {
-  const writers = (await import(
-    /* @vite-ignore */ `${repo}/packages/offline/src/__fixtures__/pmtiles-writer.ts`
-  )) as Writers;
+  const repoFixtures = `${repo}/packages/offline/src/__fixtures__`;
+  const pmtiles = (await import(/* @vite-ignore */ `${repoFixtures}/pmtiles-writer.ts`)) as Pick<
+    Writers,
+    'writePmtiles'
+  >;
+  const mbtiles = (await import(/* @vite-ignore */ `${repoFixtures}/mbtiles-writer.ts`)) as Pick<
+    Writers,
+    'writeMbtiles'
+  >;
+  const writers: Writers = { writePmtiles: pmtiles.writePmtiles, writeMbtiles: mbtiles.writeMbtiles };
   const offline = (await import(/* @vite-ignore */ `${repo}/packages/offline/src/index.ts`)) as OfflineModule;
   const tiles: { z: number; x: number; y: number; bytes: Uint8Array }[] = [];
   for (let z = spec.minLevel; z <= spec.maxLevel; z++) {
+    if (spec.skipLevels?.includes(z)) continue;
     const r = tileRange(z, spec.bounds);
     for (let y = r.y0; y <= r.y1; y++)
       for (let x = r.x0; x <= r.x1; x++) {
@@ -104,7 +93,17 @@ export async function buildFixturePackage(spec: FixturePackageSpec): Promise<Fix
           version: spec.version,
           bounds: [b.westDeg, b.southDeg, b.eastDeg, b.northDeg],
         })
-      : await writeMbtiles(tiles, spec);
+      : await writers.writeMbtiles(
+          tiles,
+          {
+            name: spec.id,
+            format: 'png',
+            minzoom: String(spec.minLevel),
+            maxzoom: String(spec.maxLevel),
+            bounds: `${b.westDeg},${b.southDeg},${b.eastDeg},${b.northDeg}`,
+          },
+          `${repo}/node_modules/sql.js/dist/sql-wasm.wasm`,
+        );
   const path = `${spec.id}.${format}`;
   const manifest = await offline.createManifest({
     id: spec.id,

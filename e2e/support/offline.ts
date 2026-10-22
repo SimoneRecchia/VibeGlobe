@@ -155,3 +155,53 @@ export async function viewAt(page: Page, longitudeDeg: number, latitudeDeg: numb
 export function tileColumn(path: string): number {
   return Number(/\/(\d+)\/\d+\.png$/.exec(path)?.[1] ?? NaN);
 }
+
+/** A package served to the page under `/offline-fixtures/` (offline mode 1's LAN server, as a route). */
+export interface PackageServer {
+  /** Files by path below `/offline-fixtures/`; set or replace them at any time. */
+  readonly files: Map<string, Buffer | string>;
+  /** Every request with its Range header, oldest first. */
+  readonly requests: { path: string; range: string | undefined }[];
+}
+
+/** Serves files with range requests under `/offline-fixtures/`. */
+export async function servePackages(page: Page): Promise<PackageServer> {
+  const server: PackageServer = { files: new Map(), requests: [] };
+  await page.route('**/offline-fixtures/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname.replace(/^\/offline-fixtures\//, '');
+    const range = request.headers()['range'];
+    server.requests.push({ path, range });
+    const body = server.files.get(path);
+    if (body === undefined) return route.fulfill({ status: 404, body: 'not found' });
+    if (typeof body === 'string') return route.fulfill({ status: 200, contentType: 'application/json', body });
+    const match = /bytes=(\d+)-(\d+)/.exec(range ?? '');
+    if (!match) return route.fulfill({ status: 200, contentType: 'application/octet-stream', body });
+    const start = Number(match[1]);
+    const end = Math.min(body.length - 1, Number(match[2]));
+    return route.fulfill({
+      status: 206,
+      contentType: 'application/octet-stream',
+      headers: { 'Content-Range': `bytes ${start}-${end}/${body.length}` },
+      body: body.subarray(start, end + 1),
+    });
+  });
+  return server;
+}
+
+/** Builds a fixture package in the page and puts its manifest and file on the package server. */
+export async function publishFixture(
+  page: Page,
+  server: PackageServer,
+  spec: Parameters<OfflineHarnessApi['buildFixture']>[0],
+  edit?: (file: Buffer) => Buffer,
+): Promise<{ manifestUrl: string; file: Buffer }> {
+  const built = await page.evaluate((s) => window.offlineHarness?.buildFixture(s), spec);
+  if (!built) throw new Error('no harness');
+  const file = Buffer.from(built.base64, 'base64');
+  server.files.set(`${spec.id}/${built.path}`, edit ? edit(file) : file);
+  server.files.set(`${spec.id}/manifest.json`, JSON.stringify(built.manifest));
+  return { manifestUrl: `/offline-fixtures/${spec.id}/manifest.json`, file };
+}
+
+type OfflineHarnessApi = NonNullable<Window['offlineHarness']>;

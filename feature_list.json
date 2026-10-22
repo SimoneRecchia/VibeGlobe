@@ -3705,7 +3705,7 @@
         "Install version 2 with some changed tiles and navigate again",
         "Assert every tile shown comes from version 2 and no stale version-1 tile remains in memory or browser storage"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F280",
@@ -3827,7 +3827,7 @@
         "Assert the package contains only the other source's tiles and the build report states why the first one was excluded",
         "Switch it off globally and assert package builds are refused with a descriptive error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F290",
@@ -4061,7 +4061,7 @@
         "Resume each and assert already completed tiles are not requested again",
         "Assert the final package is identical to an uninterrupted build"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F309",
@@ -4073,7 +4073,7 @@
         "Install and read each and assert corruption is detected with a descriptive error",
         "Assert corrupted tiles are treated as missing, with parent fallback and zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F310",
@@ -4085,7 +4085,7 @@
         "Navigate them in offline-only mode and record frames",
         "Assert available tiles are shown, gaps are covered by the best ancestor or the next source in the chain, and no frame is blank or frozen"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F311",
@@ -4097,7 +4097,7 @@
         "Assert progress events are emitted and the list API returns both with name, version, area, zoom range, sources, licenses and size",
         "Reload the page and assert the list is unchanged"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F312",
@@ -4108,7 +4108,7 @@
         "Update an installed fixture package to a new version and assert the list shows the new version and only its tiles are used",
         "Remove a package and assert it disappears from the list, its storage is freed, and the view falls back to other tiers without black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F313",
@@ -4119,7 +4119,7 @@
         "Install packages and fill the cache in the playground",
         "Call the storage-use API and assert per-package, cache and total sizes match the stored data within 5% and the quota is reported when the browser provides it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F314",
@@ -4195,7 +4195,7 @@
         "Assert the build stops before any download with an error naming the source and the rule",
         "Assert the same package without that source builds normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F320",

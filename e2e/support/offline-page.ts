@@ -10,7 +10,9 @@ import {
   type LoadingSwitches,
   type NetworkMode,
   type Offline,
+  type BuildReport,
   type InstalledPackage,
+  type PackageArea,
   type PackageManager,
   type PackageManifest,
   type ProviderRules,
@@ -77,6 +79,18 @@ interface OfflineHarness {
   installFixture(spec: FixturePackageSpec): Promise<InstalledPackage>;
   /** Builds a fixture package in the page; the file comes back base64-encoded for a test server. */
   buildFixture(spec: FixturePackageSpec): Promise<{ manifest: PackageManifest; path: string; base64: string }>;
+  /** Downloads an area of fixture sources into a package in the browser; resolves its report or the error message. */
+  buildArea(request: AreaRequest): Promise<{ report?: BuildReport; tiles?: number; error?: string }>;
+}
+
+/** An in-browser package build of fixture sources (F289, F319). */
+interface AreaRequest {
+  readonly id: string;
+  readonly version: string;
+  readonly area: PackageArea;
+  readonly minLevel: number;
+  readonly maxLevel: number;
+  readonly sources: readonly HarnessSource[];
 }
 
 declare global {
@@ -183,6 +197,26 @@ const harness: OfflineHarness = {
     for (let i = 0; i < built.file.length; i += 0x8000)
       binary += String.fromCharCode(...built.file.subarray(i, i + 0x8000));
     return { manifest: built.manifest, path: built.path, base64: btoa(binary) };
+  },
+  async buildArea(request) {
+    if (!harness.manager || !harness.offline) throw new Error('not started');
+    try {
+      const installed = await harness.manager.install({
+        ...request,
+        sources: request.sources.map((s) => ({
+          source: xyzImagery({
+            id: s.id,
+            url: `${location.origin}/fixture-tiles/${s.session ?? 'offline'}/${s.pattern ?? 'world'}/mercator/{z}/{x}/{y}.png`,
+          }),
+          ...(s.rules ? { rules: { ...s.rules, forbids: new Set(s.rules.forbids) } } : {}),
+          license: 'CC-BY-4.0',
+          attribution: { text: `Fixture ${s.pattern ?? 'world'}` },
+        })),
+      });
+      return { ...(installed.report ? { report: installed.report } : {}), tiles: installed.report?.tiles ?? 0 };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
   },
   stop() {
     harness.globe?.destroy();

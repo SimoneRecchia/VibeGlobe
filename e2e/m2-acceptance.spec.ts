@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import type { DebugShape } from '@vibeglobe/core';
 import {
+  GLOBE_GEOMETRY,
   canvasImage,
   expectCompleteGlobe,
   geoToScreen,
@@ -219,7 +220,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     // The checkered street-level quad is placed under the initial target, where the zoom ends.
     await openGlobe(
       page,
-      `backend=${backend}&scenario=street-level-jitter&lon=${MILAN.longitudeDeg}&lat=${MILAN.latitudeDeg}&zoom=2`,
+      // M2's globe geometry: the debug quads are placed on the unmorphed ellipsoid, which M5's curves flatten here.
+      `backend=${backend}&scenario=street-level-jitter&lon=${MILAN.longitudeDeg}&lat=${MILAN.latitudeDeg}&zoom=2&${GLOBE_GEOMETRY}`,
     );
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');

@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { canvasImage, nextFrame, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.js';
+import {
+  GLOBE_GEOMETRY,
+  canvasImage,
+  nextFrame,
+  openGlobe,
+  waitForIdle,
+  type ScenarioReport,
+} from './support/globe.js';
 import { fixtureSession, waitForImagery } from './support/imagery.js';
 
 /** M3 increment 7: visual quality of tiled imagery, checked frame by frame in the page (plan §4.2). */
@@ -114,7 +121,12 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     page,
   }) => {
     const session = await fixtureSession(page);
-    await openGlobe(page, `backend=${backend}&imagery=stripes&session=${session}&lon=12.5&lat=41.9&zoom=6&tilt=70`);
+    // On the globe, as before M5: at this zoom M5's curves show the flat map, where the stripes near the camera are not
+    // minified.
+    await openGlobe(
+      page,
+      `backend=${backend}&imagery=stripes&session=${session}&lon=12.5&lat=41.9&zoom=6&tilt=70&${GLOBE_GEOMETRY}`,
+    );
     await waitForImagery(page);
     // A slow turn: a twentieth of a degree per frame, so the content moves by under a pixel near the center.
     const changes: number[] = [];

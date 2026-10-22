@@ -228,3 +228,16 @@ export async function screenToGeo(
 ): Promise<{ longitudeDeg: number; latitudeDeg: number } | undefined> {
   return page.evaluate((p) => window.vibeglobePlayground?.globe.screenToGeo(p), point);
 }
+
+/**
+ * A playground query that keeps M3 and M4's view geometry (`?curves=`): the globe never flattens and relief is full at
+ * every zoom. For tests of imagery and terrain rendering whose views M5's Auto curves would otherwise turn into the flat
+ * map or flat terrain (ADR 0034).
+ */
+export const GLOBE_GEOMETRY = `curves=${encodeURIComponent(
+  JSON.stringify({
+    morph: { startGroundZoom: 40, endGroundZoom: 41 },
+    relief: { startGroundZoom: -2, endGroundZoom: -1 },
+    tilt: { startGroundZoom: 41, endGroundZoom: 42 },
+  }),
+)}`;

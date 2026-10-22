@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { canvasImage, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
+import { GLOBE_GEOMETRY, canvasImage, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
 import { measureShift } from './support/image.ts';
 import { fixtureHeightMeters } from '../scripts/fixtures/tiles/terrain.ts';
 import { fixtureSession, requestLog, waitForStreaming } from './support/imagery.ts';
@@ -240,7 +240,8 @@ for (const backend of BACKENDS) {
       // view, so a hidden probe above the analytic surface is a depth or height error, not an occlusion.
       await openGlobe(
         page,
-        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=6.88&lat=45.84&zoom=10&tilt=0`,
+        // Full relief at this zoom, as before M5 (whose Auto curves raise it only from ground zoom 10).
+        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=6.88&lat=45.84&zoom=10&tilt=0&${GLOBE_GEOMETRY}`,
       );
       await waitForTerrain(page);
       const result = await probeRelief(page, 100);

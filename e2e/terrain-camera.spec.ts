@@ -49,8 +49,10 @@ test('terrain decodes on worker threads, and its main-thread time and uploads pe
   page,
   browser,
 }, testInfo) => {
+  // Terrain only, on a small canvas: imagery streaming is not what this measures and only slows the zoom steps.
+  await page.setViewportSize({ width: 320, height: 240 });
   const session = await fixtureSession(page);
-  await openGlobe(page, `scenario=terrain-alps&session=${session}&zoom=10&tilt=45`);
+  await openGlobe(page, `scenario=terrain-alps&session=${session}&zoom=10&tilt=45&imagery=none`);
   await waitForTerrain(page);
   const tracePath = testInfo.outputPath('trace.json');
   await browser.startTracing(page, {

@@ -341,7 +341,8 @@ export function deepenFallbackSkirts(
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     const level = terrain.levels[index] ?? -1;
-    if (!tile || level < 0) continue;
+    // Cap tiles over Mercator terrain show its edge row by design (ADR 0006 §7): not a fallback.
+    if (!tile || level < 0 || (tile.root !== MERCATOR_ROOT && layer.source.tiling.crs === 'EPSG:3857')) continue;
     let coarsest = level;
     let handle = terrain.textures[index] ?? -1;
     if ((terrain.fades[index] ?? 1) < 1) {

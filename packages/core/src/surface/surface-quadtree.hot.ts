@@ -59,6 +59,11 @@ export interface QuadtreeSelectionOptions {
    * to {@link terrainMaxLevel}.
    */
   terrainErrorMeters?: Float64Array | undefined;
+  /**
+   * The terrain is tiled in Web Mercator: its error per level, given at the equator, shrinks with the cosine of a tile's
+   * latitude like its ground spacing, and polar cap tiles, which continue its edge row, never refine for it.
+   */
+  terrainMercator?: boolean;
   /** The deepest surface level whose terrain is finer than its parent's. */
   terrainMaxLevel?: number;
   /** ADR 0006's τ_terrain, in render-target pixels; default 2. */
@@ -168,6 +173,8 @@ const TEXEL = 3;
 const tileRange = new Float64Array(4);
 /** The deepest level the tile's terrain is worth refining to (from {@link QuadtreeSelectionOptions.terrainRange}). */
 let terrainLevelLimit = 0;
+/** The share of the level's terrain error a tile shows (latitude scaling of Mercator terrain), set by measureTile. */
+let terrainErrorScale = 1;
 
 /**
  * Writes a tile's relief range into {@link tileRange}: its own when known, else the whole terrain's, with the
@@ -311,7 +318,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
         (level < (options.imageryMaxLevel ?? 0) &&
           ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
         (level < terrainLevelLimit &&
-          ((options.terrainErrorMeters?.[level] ?? 0) / distance) * state.pixelsPerRadian >
+          (((options.terrainErrorMeters?.[level] ?? 0) * terrainErrorScale) / distance) * state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
     state.count++;
@@ -349,7 +356,7 @@ export function quadtreeTileErrorsPx(
   const pixelsPerRadian = camera.heightPx / (2 * Math.tan(camera.fovYRad / 2));
   out[0] = ((measure[SAG] ?? 0) / distance) * pixelsPerRadian;
   out[1] = ((measure[TEXEL] ?? 0) / distance) * pixelsPerRadian;
-  out[2] = ((options.terrainErrorMeters?.[tile.level] ?? 0) / distance) * pixelsPerRadian;
+  out[2] = (((options.terrainErrorMeters?.[tile.level] ?? 0) * terrainErrorScale) / distance) * pixelsPerRadian;
   return out;
 }
 
@@ -403,6 +410,8 @@ function measureTile(tile: QuadtreeTile, eye: Float64Array): void {
   const north = tile.northRad;
   const south = tile.southRad;
   const equatorward = south >= 0 ? south : north <= 0 ? -north : 0;
+  terrainErrorScale =
+    state.options.terrainMercator !== true ? 1 : tile.root === MERCATOR_ROOT ? Math.cos(equatorward) : 0;
   // The largest mesh row step: a Mercator tile's rows are densest toward the pole, so its widest step is the one at
   // its equatorward edge; a cap tile's rows are evenly spaced.
   let step = (north - south) / QUADTREE_SEGMENTS;

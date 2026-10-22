@@ -57,6 +57,7 @@ export class SurfaceFrame {
     imageryMaxLevel: 0,
     maxTexelErrorPx: MAX_TEXEL_ERROR_PX,
     terrainErrorMeters: undefined as Float64Array | undefined,
+    terrainMercator: false,
     terrainMaxLevel: 0,
     terrainMinMeters: 0,
     terrainMaxMeters: 0,
@@ -114,6 +115,7 @@ export class SurfaceFrame {
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
       this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
+      this.selection.terrainMercator = terrain.tiling.crs === 'EPSG:3857';
       // Tiles showing the finest terrain may refine further where its grid is finer than 64 cells (terrainRange, ADR
       // 0027).
       this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET);

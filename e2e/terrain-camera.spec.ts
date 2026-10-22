@@ -155,35 +155,48 @@ test('10,000 synchronous elevation queries at random positions fit in a frame (F
 });
 
 /** Starts recording, after every frame, the eye's height above the displayed surface and above the finest terrain. */
-async function recordClearance(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const globe = window.vibeglobePlayground?.globe;
-    if (!globe) throw new Error('no globe');
-    const record = {
-      frames: 0,
-      minAboveDisplayed: Infinity,
-      minAboveFinest: Infinity,
-      altitudes: [] as number[],
-      grounds: [] as number[],
-      worst: [] as number[],
-    };
-    (window as unknown as { clearance: typeof record }).clearance = record;
-    globe.on('frame', () => {
-      const camera = globe.camera;
-      const finest = globe.elevationAt({ longitudeDeg: camera.eyeLongitudeDeg, latitudeDeg: camera.eyeLatitudeDeg });
-      record.frames++;
-      record.minAboveDisplayed = Math.min(record.minAboveDisplayed, camera.altitudeMeters - camera.groundHeightMeters);
-      if (camera.altitudeMeters - finest.heightMeters < record.minAboveFinest) {
-        // The worst frame, for the log.
-        record.worst = [camera.eyeLongitudeDeg, camera.eyeLatitudeDeg, camera.altitudeMeters, camera.groundHeightMeters]
-          .concat([finest.heightMeters, finest.level, camera.tiltDeg, record.frames])
-          .map((value) => +value.toFixed(5));
-      }
-      record.minAboveFinest = Math.min(record.minAboveFinest, camera.altitudeMeters - finest.heightMeters);
-      record.altitudes.push(camera.altitudeMeters);
-      record.grounds.push(camera.groundHeightMeters);
-    });
+/** In the page: records, after every frame, the eye's height above the displayed surface and above the finest terrain. */
+function installClearanceRecorder(): void {
+  const globe = window.vibeglobePlayground?.globe;
+  if (!globe) throw new Error('no globe');
+  const record = {
+    frames: 0,
+    minAboveDisplayed: Infinity,
+    minAboveFinest: Infinity,
+    altitudes: [] as number[],
+    grounds: [] as number[],
+    worst: [] as number[],
+  };
+  (window as unknown as { clearance: typeof record }).clearance = record;
+  globe.on('frame', () => {
+    const camera = globe.camera;
+    const finest = globe.elevationAt({ longitudeDeg: camera.eyeLongitudeDeg, latitudeDeg: camera.eyeLatitudeDeg });
+    record.frames++;
+    record.minAboveDisplayed = Math.min(record.minAboveDisplayed, camera.altitudeMeters - camera.groundHeightMeters);
+    if (camera.altitudeMeters - finest.heightMeters < record.minAboveFinest) {
+      // The worst frame, for the log.
+      record.worst = [camera.eyeLongitudeDeg, camera.eyeLatitudeDeg, camera.altitudeMeters, camera.groundHeightMeters]
+        .concat([finest.heightMeters, finest.level, camera.tiltDeg, record.frames])
+        .map((value) => +value.toFixed(5));
+    }
+    record.minAboveFinest = Math.min(record.minAboveFinest, camera.altitudeMeters - finest.heightMeters);
+    record.altitudes.push(camera.altitudeMeters);
+    record.grounds.push(camera.groundHeightMeters);
   });
+}
+
+/** Starts the clearance recording on the page's globe. */
+async function recordClearance(page: Page): Promise<void> {
+  await page.evaluate(installClearanceRecorder);
+}
+
+/** Starts the clearance recording with the page itself, from the globe's first frame: before a slow start can hide it. */
+async function recordClearanceFromStart(page: Page): Promise<void> {
+  await page.addInitScript(`(() => {
+    const install = ${installClearanceRecorder.toString()};
+    const wait = () => (window.vibeglobePlayground?.globe ? install() : setTimeout(wait, 5));
+    wait();
+  })()`);
 }
 
 interface ClearanceRecord {
@@ -271,15 +284,15 @@ for (const backend of BACKENDS) {
   });
 
   test(`the camera rises smoothly when higher fine terrain arrives under it on ${backend} (F147)`, async ({ page }) => {
-    // Terrain from level 9 arrives 15 s late, after recording starts even on WebGPU's slower start; near the summit the
-    // coarser grids shown until then lie meters below it.
-    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 9, latencyMs: 15_000 }]);
+    // Terrain from level 9 arrives 9 s late (under the 10 s first-byte timeout); near the summit the coarser grids shown
+    // until then lie meters below it. The recording starts with the page, from the first frame.
+    const session = await fixtureSession(page, [{ source: 'terrain', minLevel: 9, latencyMs: 9000 }]);
+    await recordClearanceFromStart(page);
     await openGlobe(
       page,
       `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-alps&lon=6.8605&lat=45.8302&zoom=22&tilt=60`,
     );
-    await recordClearance(page);
-    // The delayed tiles come a few at a time per host, 15 s each: up to about two minutes in all.
+    // The delayed tiles come a few at a time per host, 9 s each: over a minute in all.
     await waitForTerrain(page, 180_000);
     const record = await clearance(page);
     const steps = record.altitudes.slice(1).map((altitude, i) => altitude - (record.altitudes[i] ?? altitude));

@@ -500,6 +500,30 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('scales Mercator terrain error with latitude: a view near the pole selects about as many tiles as without terrain (KB-090)', async () => {
+    const view = { longitudeDeg: 0, latitudeDeg: 84.5, zoom: 6, tiltDeg: 50 };
+    const counts: number[] = [];
+    for (const source of [undefined, terrain([], 12)]) {
+      const { renderer, factory } = fakeRenderer();
+      const globe = createGlobe({
+        container: {},
+        renderer: factory,
+        baseImageryUrl: 'w',
+        workers: terrainWorkers(),
+        view,
+        ...(source ? { terrain: source } : {}),
+      });
+      for (let frame = 0; frame < 40; frame++) {
+        await settle();
+        renderer.timers.advance(16);
+        renderer.flush();
+      }
+      counts.push(globe.surfaceStats().tiles);
+      globe.destroy();
+    }
+    expect(counts[1]).toBeLessThanOrEqual(2 * (counts[0] ?? 0));
+  });
+
   it('stops drawing once the eye has settled above the terrain (KB-089)', async () => {
     const { globe, run } = await terrainGlobe(terrain([]), 60, terrainWorkers(), {
       longitudeDeg: 7,
@@ -560,19 +584,25 @@ describe('terrain in a globe (M4)', () => {
 
   it('deepens the skirts of tiles showing terrain coarser than their level, by that terrain error (M4 review)', async () => {
     const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 10, tiltDeg: 30 };
-    const skirts = async (failing?: (level: number) => boolean): Promise<number[]> => {
+    /** Each draw's extra skirt depth, and whether it shows terrain coarser than its own level's. */
+    const skirts = async (failing?: (level: number) => boolean): Promise<{ meters: number; fallback: boolean }[]> => {
       const { globe, renderer } = await terrainGlobe(terrain([], 12, failing), 40, terrainWorkers(), view);
       const draws = renderer.lastDraws;
-      const values = Array.from(draws?.terrain.skirtMeters.subarray(0, draws.count) ?? []);
+      const tiles = globe.surfaceTiles();
+      const values = tiles.slice(0, draws?.count ?? 0).map((tile, i) => ({
+        meters: draws?.terrain.skirtMeters[i] ?? 0,
+        fallback: (draws?.terrain.levels[i] ?? -1) < Math.min(12, Math.max(0, tile.level - 2)),
+      }));
       globe.destroy();
       return values;
     };
     // Every level loads: each tile shows its own level's terrain.
-    expect((await skirts()).every((meters) => meters === 0)).toBe(true);
-    // Levels below 2 fail: tiles show level-2 terrain, whose error (1.5 × 2,500 m) is twice what their skirts get.
+    expect((await skirts()).every(({ meters }) => meters === 0)).toBe(true);
+    // Levels below 2 fail: tiles wanting finer terrain show level-2 terrain, whose error (1.5 × 2,500 m) is twice what
+    // their skirts get.
     const fallback = await skirts((level) => level > 2);
-    expect(fallback.length).toBeGreaterThan(0);
-    expect(fallback.every((meters) => meters === 2 * 1.5 * 2500)).toBe(true);
+    expect(fallback.some(({ fallback }) => fallback)).toBe(true);
+    for (const draw of fallback) if (draw.fallback) expect(draw.meters).toBe(2 * 1.5 * 2500);
     // One subtree missing: its tiles show coarser terrain, and their neighbors showing their own level get the same
     // deeper skirts, so the higher of two edges always reaches the lower one.
     const base = terrain([], 12);
@@ -600,7 +630,8 @@ describe('terrain in a globe (M4)', () => {
           ),
       },
     };
-    const { globe, renderer } = await terrainGlobe(mixed, 40, terrainWorkers(), view);
+    // Closer in, so a terrain tile's border crosses the view.
+    const { globe, renderer } = await terrainGlobe(mixed, 40, terrainWorkers(), { ...view, zoom: 11 });
     const draws = renderer.lastDraws;
     const tiles = globe.surfaceTiles();
     let fallbackDraws = 0;

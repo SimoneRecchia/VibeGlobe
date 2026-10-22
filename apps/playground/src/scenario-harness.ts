@@ -177,15 +177,15 @@ const SCENARIOS: Record<string, FrameScenario> = {
     4,
     6,
   ),
-  // From 1 km up, 250 km south of the peak: it stays just behind the ellipsoid's horizon while the view pans from
-  // the screen's center to both edges (F142).
+  // About 400 m up, 200 km south of the peak: its base stays behind the ellipsoid's horizon while the view pans it
+  // from the screen's center to both edges (F142).
   'terrain-horizon-pan': {
     ...segments(
       [0, -20, -26, 0, 20, 26, 0].map((headingDeg) => ({
         longitudeDeg: 6.86,
-        latitudeDeg: 43.6,
-        zoom: 15,
-        tiltDeg: 88,
+        latitudeDeg: 44.03,
+        zoom: 12,
+        tiltDeg: 87,
         headingDeg,
       })),
       6,
@@ -194,17 +194,13 @@ const SCENARIOS: Record<string, FrameScenario> = {
     relief: true,
   },
   // Fiji, across ±180° (F143).
-  'terrain-antimeridian': segments(
-    orbit({ longitudeDeg: 180, latitudeDeg: -17.5 }, [7, 10], 50, [0, 90, 180, 270]),
-    6,
-    4,
-  ),
+  'terrain-antimeridian': segments(orbit({ longitudeDeg: 180, latitudeDeg: -17.5 }, [7, 10], 50, [0, 180]), 6, 4),
   // Svalbard, the Antarctic coast and both polar cap boundaries at ±85.05° (F143).
   'terrain-poles': chain(
-    segments(orbit({ longitudeDeg: 16, latitudeDeg: 78.5 }, [7], 50, [0, 120, 240, 360]), 6, 4),
-    segments(orbit({ longitudeDeg: 0, latitudeDeg: -70 }, [7], 50, [0, 120, 240, 360]), 6, 4),
-    segments(orbit({ longitudeDeg: 0, latitudeDeg: 84.5 }, [6], 40, [0, 120, 240, 360]), 6, 4),
-    segments(orbit({ longitudeDeg: 120, latitudeDeg: -84.5 }, [6], 40, [0, 120, 240, 360]), 6, 4),
+    segments(orbit({ longitudeDeg: 16, latitudeDeg: 78.5 }, [7], 50, [0, 180]), 6, 4),
+    segments(orbit({ longitudeDeg: 0, latitudeDeg: -70 }, [7], 50, [0, 180]), 6, 4),
+    segments(orbit({ longitudeDeg: 0, latitudeDeg: 84.5 }, [6], 40, [0, 180]), 6, 4),
+    segments(orbit({ longitudeDeg: 120, latitudeDeg: -84.5 }, [6], 40, [0, 180]), 6, 4),
   ),
 };
 

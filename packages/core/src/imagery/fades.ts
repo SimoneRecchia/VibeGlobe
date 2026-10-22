@@ -32,7 +32,9 @@ export class ImageryFades {
   /**
    * Writes each draw's fade at engine time `now[0]` into `list`: the texture it fades from and how far it is (`fades`,
    * 1 when done). A draw whose imagery changes during a fade keeps the fade's imagery until it ends. `keep` is called
-   * with every texture a fade still needs, so the memory budget keeps it resident.
+   * with every texture a fade still needs, so the memory budget keeps it resident. A change across more than
+   * `maxLevelGap` levels switches at once: terrain morphs between levels that far apart would open cracks wider than
+   * any skirt against neighbors already showing the finer level (KB-079).
    */
   apply(
     list: { readonly count: number; readonly meshKeys: Float64Array },
@@ -40,6 +42,7 @@ export class ImageryFades {
     now: Float64Array,
     durationMs: number,
     keep: (handle: number) => void,
+    maxLevelGap = Infinity,
   ): void {
     const nowMs = now[0] ?? 0;
     this.frame++;
@@ -50,18 +53,14 @@ export class ImageryFades {
       const texture = layer.textures[i] ?? 0;
       const level = layer.levels[i] ?? -1;
       if (slot === undefined) {
-        slot = this.allocate(key);
-        this.store(slot, layer, i);
-        this.startMs[slot] = -Infinity;
-        if (layer.seeded[i] === 1) {
-          // A new tile whose draw names what was shown there before (terrain, F138): it morphs from that.
-          this.fromTexture[slot] = layer.fromTextures[i] ?? 0;
-          this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
-          for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
-          this.startMs[slot] = nowMs;
-        }
+        slot = this.begin(key, layer, i, nowMs);
       } else if (this.toTexture[slot] !== texture || this.toLevel[slot] !== level) {
-        if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
+        const gap = (this.toLevel[slot] ?? -1) - level;
+        if (gap > maxLevelGap || -gap > maxLevelGap) {
+          // Too far apart to morph: the draw shows its new data at once.
+          this.store(slot, layer, i);
+          this.startMs[slot] = -Infinity;
+        } else if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
           // A fade is under way: it finishes first, so what the tile shows never jumps; the new imagery fades in next.
           keep(texture);
           keep(this.toTexture[slot] ?? 0);
@@ -93,6 +92,23 @@ export class ImageryFades {
       }
     }
     this.dropUndrawn();
+  }
+
+  /**
+   * A slot for a tile drawn for the first time: it starts without a fade, or, when its draw names what was shown there
+   * before (`seeded`, terrain, F138), fading from that.
+   */
+  private begin(key: number, layer: DrawLayer, i: number, nowMs: number): number {
+    const slot = this.allocate(key);
+    this.store(slot, layer, i);
+    this.startMs[slot] = -Infinity;
+    if (layer.seeded[i] === 1) {
+      this.fromTexture[slot] = layer.fromTextures[i] ?? 0;
+      this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
+      for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
+      this.startMs[slot] = nowMs;
+    }
+    return slot;
   }
 
   private store(slot: number, layer: DrawLayer, i: number): void {

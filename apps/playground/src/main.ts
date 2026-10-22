@@ -73,8 +73,16 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     tilt: '75',
     terrainClearance: '2',
   },
-  // The peak 250 km away, just behind the ellipsoid's horizon from about 1 km up (F142).
-  'terrain-horizon-peaks': { terrain: 'terrarium', imagery: 'world', lon: '6.86', lat: '43.6', zoom: '15', tilt: '88' },
+  // The peak 200 km away, from about 400 m up: its base lies behind the ellipsoid's horizon (about 70 km away), its
+  // top about 8 px above it on a 480 × 360 canvas (F142).
+  'terrain-horizon-peaks': {
+    terrain: 'terrarium',
+    imagery: 'world',
+    lon: '6.86',
+    lat: '44.03',
+    zoom: '12',
+    tilt: '87',
+  },
   // Terrain to level 10, imagery to level 18 (F140).
   'independent-levels': {
     terrain: 'terrarium',

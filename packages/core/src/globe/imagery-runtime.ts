@@ -19,7 +19,13 @@ import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import { drawTerrain, gridErrorsByLevel, ShownLevels, type TerrainLayer } from '../terrain/terrain-draws.js';
+import {
+  drawTerrain,
+  gridErrorsByLevel,
+  MAX_TERRAIN_MORPH_LEVELS,
+  ShownLevels,
+  type TerrainLayer,
+} from '../terrain/terrain-draws.js';
 import type { HeightGrid } from '../terrain/heightmap.js';
 import { toEllipsoidal } from '../terrain/vertical-datum.js';
 import type { DecodedTile } from '../scheduler/types.js';
@@ -397,7 +403,7 @@ export class ImageryRuntime {
     if (terrain) {
       terrain.loader.beginFrame();
       drawTerrain(list, tiles, count, terrain, camera);
-      this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture);
+      this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart;
     }

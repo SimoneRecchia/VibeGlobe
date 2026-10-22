@@ -56,4 +56,20 @@ describe('ImageryFades (F105)', () => {
     fades.apply(frame(list, 13, 6), list.imageryLayer, now, 250, () => undefined);
     expect([list.fades[0], fades.fading]).toEqual([1, false]);
   });
+
+  it('switches at once across more levels than the gap allows, and fades within it (terrain morphs, KB-079)', () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(4);
+    const now = new Float64Array([0]);
+    const keep = (): void => undefined;
+    fades.apply(frame(list, 10, 2), list.imageryLayer, now, 250, keep, 2);
+    // From a level-2 fallback straight to level 10: no morph.
+    now[0] = 100;
+    fades.apply(frame(list, 11, 10), list.imageryLayer, now, 250, keep, 2);
+    expect([list.fades[0], list.fromTextures[0], fades.fading]).toEqual([1, 11, false]);
+    // One level finer: a morph.
+    now[0] = 400;
+    fades.apply(frame(list, 12, 11), list.imageryLayer, now, 250, keep, 2);
+    expect([list.fades[0], list.fromTextures[0], fades.fading]).toEqual([0, 11, true]);
+  });
 });

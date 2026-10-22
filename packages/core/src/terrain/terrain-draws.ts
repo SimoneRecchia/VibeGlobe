@@ -60,6 +60,13 @@ const MAX_GRID_CELLS = 64;
  */
 export const TERRAIN_LEVEL_OFFSET = Math.round(Math.log2(MAX_GRID_CELLS / TILE_SEGMENTS));
 
+/**
+ * The most levels a terrain morph spans (F138, KB-079): a tile morphing from a much coarser fallback (the levels between
+ * not loaded yet) would rise or sink kilometers while its neighbors already show the finer terrain, opening cracks
+ * wider than any skirt; such a change switches at once.
+ */
+export const MAX_TERRAIN_MORPH_LEVELS = 2;
+
 /** A grid adds at most half its level's geometric error (ADR 0006 §5, the worker task's bound). */
 const GRID_ERROR_FACTOR = 1.5;
 
@@ -154,7 +161,7 @@ function previousLevel(tile: QuadtreeTile, previous: IntegerKeyMap<number>): num
  */
 function seedMorph(list: DrawList, index: number, tile: QuadtreeTile, level: number, layer: TerrainLayer): void {
   const before = previousLevel(tile, layer.shown.previous);
-  if (before < 0 || before === level) return;
+  if (before < 0 || before === level || Math.abs(before - level) > MAX_TERRAIN_MORPH_LEVELS) return;
   const source = layer.source;
   const mapped =
     source.tiling.crs === 'EPSG:3857'

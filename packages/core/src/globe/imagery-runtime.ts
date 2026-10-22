@@ -1,4 +1,5 @@
 import { rgba8Bytes } from '../cache/byte-size.js';
+import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
@@ -10,7 +11,6 @@ import {
   ImageryLoader,
   type DecodeTask,
   type ImageryLoaderOptions,
-  type ImageryLoaderStats,
   type TileMemory,
 } from '../imagery/imagery-loader.hot.js';
 import { imageryDecodeTask, type ImagerySource, type TileSource } from '../imagery/imagery-source.js';
@@ -25,9 +25,10 @@ import { toEllipsoidal } from '../terrain/vertical-datum.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import { FINEST_FAILED, TerrainHeights, type ElevationSample } from '../terrain/terrain-heights.js';
+import { emptyLoaderStats, terrainStatsOf } from './diagnostics.js';
 import { GlobeError } from './errors.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
-import type { ImageryStats, MemoryOptions, RendererBackend, TileErrorEvent } from './types.js';
+import type { ImageryStats, MemoryOptions, RendererBackend, TerrainStats, TileErrorEvent } from './types.js';
 
 /** Texture handles of layer `i` start at `i × HANDLES_PER_LAYER`. */
 const HANDLES_PER_LAYER = 1 << 22;
@@ -200,6 +201,8 @@ export class ImageryRuntime {
   /** The lowest and highest height of every terrain tile uploaded so far, meters (selection bounds, F142). */
   terrainMinMeters = 0;
   terrainMaxMeters = 0;
+  /** Main-thread milliseconds the last frame spent on terrain (F134). */
+  private terrainMs = 0;
   /** Texels along a tile edge of the finest layer, for the selection's texel refinement. */
   readonly texelsPerTile: number;
   /** The finest level any layer serves. */
@@ -387,39 +390,40 @@ export class ImageryRuntime {
     drawImagery(list, tiles, count, this.layers, camera);
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
     const terrain = this.terrain;
+    const host = this.renderer.host;
+    let terrainStart = terrain ? host.now() : 0;
     if (terrain) {
       terrain.loader.beginFrame();
       drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture);
       this.serveElevationQueries();
+      this.terrainMs = host.now() - terrainStart;
     }
     for (const layer of this.layers) layer.loader.scheduleRequests();
+    terrainStart = terrain ? host.now() : 0;
     terrain?.loader.scheduleRequests();
+    if (terrain) this.terrainMs += host.now() - terrainStart;
     timer?.end(PHASE_SCHEDULING);
     for (const layer of this.layers) layer.loader.drainUploads();
+    terrainStart = terrain ? host.now() : 0;
     terrain?.loader.drainUploads();
+    if (terrain) this.terrainMs += host.now() - terrainStart;
     timer?.end(PHASE_UPLOAD);
     this.residency.trim(this.frame, TRIM_TILES, TRIM_MS);
     this.lease.pool.update();
   }
 
+  /** The counters of `Globe.terrainStats()`; undefined without terrain. */
+  terrainStats(): TerrainStats | undefined {
+    if (!this.terrain) return undefined;
+    const loader = emptyLoaderStats();
+    this.terrain.loader.addStats(loader);
+    return terrainStatsOf(loader, DEFAULT_UPLOAD_BUDGET.maxBytes, this.terrainMs);
+  }
+
   /** The counters of `Globe.imageryStats()`. */
   stats(): ImageryStats {
-    const loaders: ImageryLoaderStats = {
-      queued: 0,
-      loading: 0,
-      decoding: 0,
-      ready: 0,
-      failed: 0,
-      noData: 0,
-      requested: 0,
-      uploads: 0,
-      uploadMsLastFrame: 0,
-      uploadBytesLastFrame: 0,
-      uploadsPending: 0,
-      pinnedSettled: 0,
-      pinnedTotal: 0,
-    };
+    const loaders = emptyLoaderStats();
     for (const layer of this.layers) layer.loader.addStats(loaders);
     this.terrain?.loader.addStats(loaders);
     return {

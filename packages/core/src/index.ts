@@ -38,6 +38,7 @@ export type {
   GlobeEvents,
   GlobeOptions,
   ImageryStats,
+  TerrainStats,
   MemoryOptions,
   NavigationApi,
   RendererBackend,

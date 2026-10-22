@@ -15,7 +15,7 @@ import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './i
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
 import { displayedHeightMeters } from '../terrain/displayed-height.js';
-import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel } from '../terrain/terrain-draws.js';
+import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel, terrainHeightRange } from '../terrain/terrain-draws.js';
 import type {
   GeoPosition,
   GlobeOptions,
@@ -23,6 +23,7 @@ import type {
   RendererBackend,
   SurfaceStats,
   SurfaceTileInfo,
+  TerrainStats,
   TileDrawList,
 } from './types.js';
 
@@ -55,6 +56,7 @@ export class SurfaceFrame {
     terrainMaxLevel: 0,
     terrainMinMeters: 0,
     terrainMaxMeters: 0,
+    terrainRange: undefined as ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined,
   };
   private imagery: ImageryRuntime | undefined;
 
@@ -105,6 +107,8 @@ export class SurfaceFrame {
     if (terrain) {
       this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
       this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET);
+      const { terrain: layer, heights } = imagery;
+      if (layer && heights) this.selection.terrainRange = (tile, out) => terrainHeightRange(layer, heights, tile, out);
     }
   }
 
@@ -125,6 +129,7 @@ export class SurfaceFrame {
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
     const surface = displayedHeightMeters(this.draws, this.tiles, heights, eye.longitudeRad, eye.latitudeRad);
+    camera.groundHeightMeters = surface;
     const needed = surface + this.clearanceMeters - (eye.heightMeters - lift);
     const next = needed > 0 ? needed : 0;
     if (next === lift) return false;
@@ -205,6 +210,11 @@ export class SurfaceFrame {
   /** The imagery counters, if there is imagery. */
   imageryStats(): ImageryStats | undefined {
     return this.imagery?.stats();
+  }
+
+  /** The terrain counters, if there is terrain. */
+  terrainStats(): TerrainStats | undefined {
+    return this.imagery?.terrainStats();
   }
 
   /** True while a tile cross-fades: the next frame changes the picture (F105). */

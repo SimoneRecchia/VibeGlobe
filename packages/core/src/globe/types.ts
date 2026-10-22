@@ -276,6 +276,14 @@ export interface CameraState {
   readonly rollDeg: number;
   /** Distance from the eye to the target. */
   readonly rangeMeters: number;
+  /** The eye's own position (the fields above place the target it looks at). */
+  readonly eyeLongitudeDeg: number;
+  readonly eyeLatitudeDeg: number;
+  /**
+   * Height above the ellipsoid of the surface the last frame showed under the eye: the terrain as drawn, its morph
+   * included (F146, F147); 0 without terrain. `altitudeMeters` minus this is the eye's height above the ground.
+   */
+  readonly groundHeightMeters: number;
 }
 
 /** Initial camera. */
@@ -348,6 +356,28 @@ export interface MemoryOptions {
   readonly gpuBudgetBytes?: number;
   /** RAM for encoded tile bytes, reused without a new request (default 256 MiB, F097). */
   readonly ramBudgetBytes?: number;
+}
+
+/** Counters of the terrain streaming of one engine instance (`Globe.terrainStats()`, F134). */
+export interface TerrainStats {
+  /** Tiles waiting for a request slot, in flight, being decoded, on the GPU, failed, without data. */
+  readonly queued: number;
+  readonly loading: number;
+  readonly decoding: number;
+  readonly ready: number;
+  readonly failed: number;
+  readonly noData: number;
+  /** Requests started so far. */
+  readonly requested: number;
+  /** Height uploads so far, the time and bytes the last frame spent uploading, and the decoded tiles still waiting. */
+  readonly uploads: number;
+  readonly uploadMsLastFrame: number;
+  readonly uploadBytesLastFrame: number;
+  readonly uploadsPending: number;
+  /** The bytes terrain may upload in one frame (ADR 0007's upload budget). */
+  readonly uploadBudgetBytes: number;
+  /** Main-thread time the last frame spent on terrain: tiles wanted, morphs, elevation queries, requests, uploads. */
+  readonly msLastFrame: number;
 }
 
 /** Counters of the imagery streaming of one engine instance (`Globe.imageryStats()`). */
@@ -437,6 +467,10 @@ export interface SurfaceTileInfo {
   readonly texelErrorPx: number;
   /** The imagery level the tile shows, an ancestor's while its own is not loaded (F083); null for the base image. */
   readonly imageryLevel: number | null;
+  /** The terrain level the tile shows, an ancestor's while its own loads (F126, F139); null without terrain. */
+  readonly terrainLevel: number | null;
+  /** The projected error of the terrain the tile's level shows, in CSS pixels, as the selection measures it (F126). */
+  readonly terrainErrorPx: number;
 }
 
 /** Counters of a frame's surface selection. */
@@ -509,6 +543,8 @@ export interface Globe {
   surfaceStats(): SurfaceStats;
   /** Counters of the imagery streaming; undefined without imagery layers or before the renderer starts. */
   imageryStats(): ImageryStats | undefined;
+  /** Counters of the terrain streaming; undefined without terrain or before the renderer starts (F134). */
+  terrainStats(): TerrainStats | undefined;
   /**
    * The terrain height at a position from the terrain already in memory, with the level it came from (F144): the
    * deepest resident tile, interpolated as the surface shows it. Where no terrain is resident or covers the position,

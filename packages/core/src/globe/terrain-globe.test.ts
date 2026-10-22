@@ -1,3 +1,4 @@
+import { Session } from 'node:inspector/promises';
 import { describe, expect, it } from 'vitest';
 import type { TileRequest, TileTransport, TransportResult } from '../scheduler/types.js';
 import type { WorkerEndpointFactory, WorkerRequest } from '../scheduler/worker-protocol.js';
@@ -5,6 +6,7 @@ import type { TerrainSource } from '../terrain/terrain-source.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { createGlobe } from './create-globe.js';
 import type { GlobeError } from './errors.js';
+import type { ViewInit } from './types.js';
 import { fakeRenderer } from './test-renderer.js';
 
 /** The fixture terrain: linear in global Web Mercator x and y (0–1), so every grid interpolates it exactly. */
@@ -14,8 +16,11 @@ function heightAt(globalX: number, globalY: number): number {
 
 const CELLS = 4;
 
-/** Workers that decode a tile's bytes (its level, x and y) into a grid of the fixture terrain at once. */
-function terrainWorkers(): WorkerEndpointFactory {
+/**
+ * Workers that decode a tile's bytes (its level, x and y) into a grid of `height` at once, reporting a fixed 0–3,000 m
+ * range, or with `actualRange` each grid's own.
+ */
+function terrainWorkers(height = heightAt, actualRange = false): WorkerEndpointFactory {
   return {
     url: 'instant-worker',
     inline: () => Promise.reject(new Error('not used')),
@@ -29,8 +34,9 @@ function terrainWorkers(): WorkerEndpointFactory {
           const heights = new Float32Array((CELLS + 1) ** 2);
           for (let row = 0; row <= CELLS; row++)
             for (let col = 0; col <= CELLS; col++)
-              heights[row * (CELLS + 1) + col] = heightAt((x + col / CELLS) / n, (y + row / CELLS) / n);
-          const image = { cells: CELLS, heightsMeters: heights, minMeters: 0, maxMeters: 3000 };
+              heights[row * (CELLS + 1) + col] = height((x + col / CELLS) / n, (y + row / CELLS) / n);
+          const [minMeters, maxMeters] = actualRange ? [Math.min(...heights), Math.max(...heights)] : [0, 3000];
+          const image = { cells: CELLS, heightsMeters: heights, minMeters, maxMeters };
           const output = { widthPx: CELLS + 1, heightPx: CELLS + 1, gpuBytes: heights.byteLength, image };
           queueMicrotask(() => onMessage({ kind: 'reply', id: message.id, ok: true, output }));
         },
@@ -79,15 +85,20 @@ const settle = async (): Promise<void> => {
 };
 
 /** A globe over the fixture terrain, advanced `frames` frames. */
-async function terrainGlobe(source: TerrainSource, frames = 30) {
+async function terrainGlobe(
+  source: TerrainSource,
+  frames = 30,
+  workers = terrainWorkers(),
+  view: ViewInit = { longitudeDeg: 7, latitudeDeg: 46, zoom: 9 },
+) {
   const { renderer, factory } = fakeRenderer();
   const globe = createGlobe({
     container: {},
     renderer: factory,
     baseImageryUrl: 'world.jpg',
     terrain: source,
-    workers: terrainWorkers(),
-    view: { longitudeDeg: 7, latitudeDeg: 46, zoom: 9 },
+    workers,
+    view,
   });
   const run = async (count: number): Promise<void> => {
     for (let frame = 0; frame < count; frame++) {
@@ -99,6 +110,26 @@ async function terrainGlobe(source: TerrainSource, frames = 30) {
   await run(frames);
   return { globe, renderer, run };
 }
+
+interface SamplingNode {
+  callFrame: { url: string; functionName: string; lineNumber: number };
+  selfSize: number;
+  children: SamplingNode[];
+}
+
+/** Sampled bytes per allocation site (file:function:line), module top levels left out (as frame-allocation.test.ts). */
+function allocationSites(node: SamplingNode, out: Map<string, number>): Map<string, number> {
+  const topLevel = node.callFrame.functionName === '' && node.callFrame.lineNumber === 0;
+  if (node.selfSize > 0 && !topLevel) {
+    const site = `${node.callFrame.url}:${node.callFrame.functionName}:${node.callFrame.lineNumber + 1}`;
+    out.set(site, (out.get(site) ?? 0) + node.selfSize);
+  }
+  for (const child of node.children) allocationSites(child, out);
+  return out;
+}
+
+/** Engine sources, tests excluded. */
+const ENGINE_SOURCE = /\/packages\/core\/src\/(?!.*\.test\.ts)/;
 
 /** Global Web Mercator x and y (0–1) of a position. */
 function mercator(lonDeg: number, latDeg: number): [number, number] {
@@ -117,6 +148,45 @@ describe('terrain in a globe (M4)', () => {
     // Every terrain tile is requested once.
     expect(new Set(urls).size).toBe(urls.length);
     globe.destroy();
+  });
+
+  it("reports each tile's terrain level and error, within τ_terrain below the source's levels, and the terrain counters (F126, F134)", async () => {
+    const { globe } = await terrainGlobe(terrain([]));
+    const tiles = globe.surfaceTiles();
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) {
+      // Two levels coarser than the surface tile, or an ancestor's.
+      expect(tile.terrainLevel).not.toBeNull();
+      expect(tile.terrainLevel ?? 99).toBeLessThanOrEqual(Math.max(0, tile.level - 2));
+      // Below the source's deepest level (8), a selected tile's terrain error is at most τ_terrain, 2 px.
+      if (tile.level - 2 < 8) expect(tile.terrainErrorPx).toBeLessThanOrEqual(2);
+    }
+    const stats = globe.terrainStats();
+    expect(stats).toMatchObject({
+      queued: 0,
+      loading: 0,
+      decoding: 0,
+      uploadsPending: 0,
+      uploadBudgetBytes: 8_000_000,
+    });
+    expect(stats?.ready).toBeGreaterThan(0);
+    expect(stats?.msLastFrame).toBeGreaterThanOrEqual(0);
+    globe.destroy();
+  });
+
+  it('refines a tile by its own relief, not the highest terrain anywhere: a far peak adds no tiles near a low eye (KB-077)', async () => {
+    // Low land (100 m) everywhere, and a 8,000 m plateau on the other side of the world in the second case.
+    const low = (): number => 100;
+    const farPeak = (x: number): number => (x > 0.75 ? 8000 : 100);
+    const view = { longitudeDeg: 7, latitudeDeg: 46, zoom: 15, tiltDeg: 60 };
+    const counts: number[] = [];
+    for (const height of [low, farPeak]) {
+      const { globe } = await terrainGlobe(terrain([]), 40, terrainWorkers(height, true), view);
+      counts.push(globe.surfaceStats().tiles);
+      globe.destroy();
+    }
+    expect(counts[0]).toBeGreaterThan(0);
+    expect(counts[1]).toBeLessThanOrEqual(Math.ceil((counts[0] ?? 0) * 1.1));
   });
 
   it('answers elevation queries from the terrain in memory with the level they came from (F144)', async () => {
@@ -142,11 +212,49 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('answers 10,000 queries at random positions without allocating (F144)', async () => {
+    const { globe } = await terrainGlobe(terrain([]));
+    const out = { heightMeters: 0, level: 0, noData: true };
+    // A position object the caller reuses: GeoPosition is readonly to the engine, not to its owner.
+    const position = { longitudeDeg: 0, latitudeDeg: 0 };
+    let seed = 1;
+    const queries = (count: number): number => {
+      let sum = 0;
+      for (let i = 0; i < count; i++) {
+        seed = (seed * 16807) % 2147483647;
+        position.longitudeDeg = (seed / 2147483647) * 360 - 180;
+        position.latitudeDeg = (((seed * 7) % 2147483647) / 2147483647) * 170 - 85;
+        sum += globe.elevationAt(position, out).heightMeters;
+      }
+      return sum;
+    };
+    queries(20_000);
+    const session = new Session();
+    session.connect();
+    await session.post('HeapProfiler.enable');
+    await session.post('HeapProfiler.startSampling', {
+      samplingInterval: 64,
+      includeObjectsCollectedByMajorGC: true,
+      includeObjectsCollectedByMinorGC: true,
+    });
+    const count = 200_000;
+    expect(Number.isFinite(queries(count))).toBe(true);
+    const { profile } = (await session.post('HeapProfiler.stopSampling')) as { profile: { head: SamplingNode } };
+    session.disconnect();
+    const engine = [...allocationSites(profile.head, new Map())].filter(([site]) => ENGINE_SOURCE.test(site));
+    // Any object allocated per query costs at least 12 bytes; under 0.01 byte per query on average means none does.
+    const bytesPerQuery = engine.reduce((sum, [, bytes]) => sum + bytes, 0) / count;
+    expect(bytesPerQuery, JSON.stringify(engine)).toBeLessThan(0.01);
+    globe.destroy();
+  }, 60_000);
+
   it('answers the ellipsoid, flagged no-data, without terrain (F144)', async () => {
     const { renderer, factory } = fakeRenderer();
     const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w' });
     await settle();
     renderer.flush();
+    expect(globe.terrainStats()).toBeUndefined();
+    expect(globe.surfaceTiles().every((tile) => tile.terrainLevel === null)).toBe(true);
     expect(globe.elevationAt({ longitudeDeg: 7, latitudeDeg: 46 })).toEqual({
       heightMeters: 0,
       level: -1,
@@ -200,12 +308,14 @@ describe('terrain in a globe (M4)', () => {
     globe.jumpTo({ longitudeDeg: 7, latitudeDeg: 46, zoom: 22, tiltDeg: 60 });
     await run(20);
     const camera = globe.camera;
-    const ground = globe.elevationAt({ longitudeDeg: camera.longitudeDeg, latitudeDeg: camera.latitudeDeg });
+    const ground = globe.elevationAt({ longitudeDeg: camera.eyeLongitudeDeg, latitudeDeg: camera.eyeLatitudeDeg });
     expect(ground.noData).toBe(false);
     expect(camera.altitudeMeters).toBeGreaterThan(1000);
     // The eye's own position: its height above the terrain under it is at least the default 10 m (within the
-    // interpolation of the displayed mesh).
+    // interpolation of the displayed mesh), and the camera reports the displayed ground it keeps clear of.
     expect(camera.altitudeMeters - ground.heightMeters).toBeGreaterThanOrEqual(9.9);
+    expect(camera.groundHeightMeters).toBeCloseTo(ground.heightMeters, 1);
+    expect(camera.altitudeMeters - camera.groundHeightMeters).toBeGreaterThanOrEqual(10 - 1e-6);
     globe.destroy();
   });
 

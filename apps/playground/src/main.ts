@@ -118,6 +118,8 @@ const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'au
 const DEG = Math.PI / 180;
 /** A box around Italy, radians: the coverage of `?coverage=italy`. */
 const ITALY = { westRad: 6 * DEG, southRad: 36 * DEG, eastRad: 19 * DEG, northRad: 47.5 * DEG };
+/** The coverage of `?terrainCoverage=alps`: east of 6.5° E, so its west edge crosses the peak's valleys (F139). */
+const ALPS = { westRad: 6.5 * DEG, southRad: 43 * DEG, eastRad: 12 * DEG, northRad: 48 * DEG };
 
 /**
  * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
@@ -133,7 +135,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
   const ktx2 = params.get('ktx2');
   const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
-  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.${extension}`;
+  // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
+  const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
+  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -141,6 +145,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const source = xyzImagery({
     id: `fixture-${pattern}`,
     url,
+    tiling: imageryTiling,
     minLevel: number('imageryMin') ?? 0,
     maxLevel: number('imageryMax') ?? 18,
     ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
@@ -190,6 +195,8 @@ function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
     encoding,
     tiling: scheme,
     maxLevel: params.has('terrainMax') ? Number(params.get('terrainMax')) : 14,
+    // `&terrainCoverage=alps` limits the terrain to a box whose west edge crosses the Alps views (F139).
+    ...(params.get('terrainCoverage') === 'alps' ? { coverage: [ALPS] } : {}),
     ...(geoid ? { datum: { kind: 'geoid' as const, model: geoid } } : {}),
   });
   return { terrain, workers: workers() };

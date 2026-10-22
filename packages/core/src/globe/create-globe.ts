@@ -32,6 +32,7 @@ import type {
   GlobeEvents,
   GlobeOptions,
   ImageryStats,
+  TerrainStats,
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
@@ -406,6 +407,7 @@ class GlobeEngine implements Globe {
   readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
   readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
+  readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
 
   elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample {
     this.assertAlive();

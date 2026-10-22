@@ -51,6 +51,8 @@ export class Camera {
     tiltRad: 0,
     rollRad: 0,
   };
+  /** Height of the surface the last frame showed under the eye, meters; 0 without terrain (F146). */
+  groundHeightMeters = 0;
   /** Vertical field of view, in radians. */
   fovYRad = DEFAULT_FOV_Y_RAD;
   /** Viewport size in CSS pixels. */

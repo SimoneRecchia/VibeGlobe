@@ -19,6 +19,9 @@ export interface ScenarioReport {
   firstHole?: { xPx: number; yPx: number; latitudeDeg: number; longitudeDeg: number };
   pops: number;
   firstPopFrame: number;
+  terrainDrops: number;
+  firstTerrainDropFrame: number;
+  minReliefAboveHorizonPx: number;
 }
 
 declare global {

@@ -17,6 +17,7 @@ import {
 } from '../imagery/imagery-mapping.hot.js';
 import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
 import { MERCATOR_ROOT, NORTH_CAP, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import type { TerrainHeights } from './terrain-heights.js';
 import type { TerrainSource } from './terrain-source.js';
 
 /** The terrain of one engine instance: its source and the loader of its height grids. */
@@ -78,6 +79,7 @@ export function drawTerrain(
     const handle = wantTerrain(layer, tile, screenDistance(tile, camera));
     if (handle < 0) {
       list.terrain.textures[index] = NO_TERRAIN;
+      list.terrain.levels[index] = -1;
       continue;
     }
     layer.loader.markDrawn(handle);
@@ -140,4 +142,38 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number):
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);
   }
   return -1;
+}
+
+/**
+ * The height range of a surface tile's relief (ADR 0006 §2): the lowest and highest heights of the deepest resident
+ * terrain tile covering it, widened by that level's error, which bounds what finer levels add. Writes [min, max] into
+ * `out` and returns true; false when no terrain covering the tile is resident. Wants nothing; allocates nothing.
+ */
+export function terrainHeightRange(
+  layer: TerrainLayer,
+  heights: TerrainHeights,
+  tile: QuadtreeTile,
+  out: Float64Array,
+): boolean {
+  const source = layer.source;
+  const level = terrainLevelOf(tile.level, source);
+  if (source.tiling.crs === 'EPSG:3857') {
+    const mapped =
+      tile.root === MERCATOR_ROOT ? mapMercator(tile, level, mapping, 0) : mapCapToMercatorEdge(tile, level);
+    if (!mapped) return false;
+  } else if (!mapGeographic(tile, level, mapping, 0)) {
+    return false;
+  }
+  for (let current = mapping[MAPPING_LEVEL] ?? 0; current >= source.minLevel; current--) {
+    const handle = layer.loader.peekHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
+    const grid = handle >= 0 ? heights.grid(handle) : undefined;
+    if (grid) {
+      const margin = GRID_ERROR_FACTOR * source.geometricErrorMeters(current);
+      out[0] = grid.minMeters - margin;
+      out[1] = grid.maxMeters + margin;
+      return true;
+    }
+    if (current > source.minLevel) mapAncestor(mapping, 0, 1);
+  }
+  return false;
 }

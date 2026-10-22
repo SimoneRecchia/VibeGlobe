@@ -10,6 +10,8 @@ import type { FrameCapture, Globe, ViewInit } from '@vibeglobe/core';
 interface FrameScenario {
   readonly frames: number;
   view(frame: number): ViewInit | undefined;
+  /** Measure, in every frame, how far the terrain rises above the ellipsoid's horizon (F142). */
+  readonly relief?: boolean;
 }
 
 /** The globe element's size in CSS pixels, which `screenToGeo` and `geoToScreen` use. */
@@ -34,6 +36,14 @@ export interface ScenarioReport {
   /** Pixels that changed in one drawn frame faster than a 250 ms fade allows (F105). */
   pops: number;
   firstPopFrame: number;
+  /** Tiles whose terrain went back to a coarser level while the camera held still: a tile released early (F139). */
+  terrainDrops: number;
+  firstTerrainDropFrame: number;
+  /**
+   * The least, over the frames, of the tallest column of terrain above the ellipsoid's horizon, in device pixels
+   * (F142); -1 when the scenario does not measure it.
+   */
+  minReliefAboveHorizonPx: number;
 }
 
 /** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
@@ -76,6 +86,19 @@ function chain(...parts: FrameScenario[]): FrameScenario {
 
 const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9 };
 const TOKYO = { longitudeDeg: 139.7, latitudeDeg: 35.7 };
+/** Places of the fixture terrain (M4): the 4,000 m peak's valley, and the 1,500 m ridge along 46.5° N. */
+const ALPS = { longitudeDeg: 6.86, latitudeDeg: 45.7 };
+const RIDGE = { longitudeDeg: 8.5, latitudeDeg: 46.42 };
+
+/** An orbit around `center`: the heading turns through `headings` at each zoom and tilt. */
+function orbit(
+  center: { longitudeDeg: number; latitudeDeg: number },
+  zooms: readonly number[],
+  tiltDeg: number,
+  headings: readonly number[],
+): ViewInit[] {
+  return zooms.flatMap((zoom) => headings.map((headingDeg) => ({ ...center, zoom, tiltDeg, headingDeg })));
+}
 
 /** The frame-stepped scenarios by name. */
 const SCENARIOS: Record<string, FrameScenario> = {
@@ -133,6 +156,54 @@ const SCENARIOS: Record<string, FrameScenario> = {
     ),
     6,
     4,
+  ),
+  // Terrain (M4). From about 50 km to 500 m above the peak's valley and back, tilted (F138, F139).
+  'terrain-alps-zoom': segments(
+    [9, 11, 13, 15, 13, 11, 9].map((zoom) => ({ ...ALPS, zoom, tiltDeg: 50 })),
+    8,
+    24,
+  ),
+  // Steep relief across tiles of different levels: tilting from 30° to 80° while circling the ridge (F137).
+  'terrain-crack-sweep': segments(
+    [
+      [30, 0],
+      [55, 60],
+      [80, 120],
+      [70, 200],
+      [45, 280],
+      [75, 360],
+    ].map(([tiltDeg = 0, headingDeg = 0]) => ({ ...RIDGE, zoom: 13, tiltDeg, headingDeg })),
+    6,
+    12,
+  ),
+  // From 1 km up, 250 km south of the peak: it stays just behind the ellipsoid's horizon while the view pans from
+  // the screen's center to both edges (F142).
+  'terrain-horizon-pan': {
+    ...segments(
+      [0, -20, -26, 0, 20, 26, 0].map((headingDeg) => ({
+        longitudeDeg: 6.86,
+        latitudeDeg: 43.6,
+        zoom: 15,
+        tiltDeg: 88,
+        headingDeg,
+      })),
+      6,
+      6,
+    ),
+    relief: true,
+  },
+  // Fiji, across ±180° (F143).
+  'terrain-antimeridian': segments(
+    orbit({ longitudeDeg: 180, latitudeDeg: -17.5 }, [7, 10], 50, [0, 90, 180, 270]),
+    6,
+    4,
+  ),
+  // Svalbard, the Antarctic coast and both polar cap boundaries at ±85.05° (F143).
+  'terrain-poles': chain(
+    segments(orbit({ longitudeDeg: 16, latitudeDeg: 78.5 }, [7], 50, [0, 120, 240, 360]), 6, 4),
+    segments(orbit({ longitudeDeg: 0, latitudeDeg: -70 }, [7], 50, [0, 120, 240, 360]), 6, 4),
+    segments(orbit({ longitudeDeg: 0, latitudeDeg: 84.5 }, [6], 40, [0, 120, 240, 360]), 6, 4),
+    segments(orbit({ longitudeDeg: 120, latitudeDeg: -84.5 }, [6], 40, [0, 120, 240, 360]), 6, 4),
   ),
 };
 
@@ -228,7 +299,50 @@ export function emptyReport(frames = 1): ScenarioReport {
     firstDarkFrame: -1,
     pops: 0,
     firstPopFrame: -1,
+    terrainDrops: 0,
+    firstTerrainDropFrame: -1,
+    minReliefAboveHorizonPx: -1,
   };
+}
+
+/** The terrain level each drawn tile shows, by tile. */
+function terrainLevels(globe: Globe): Map<string, number> {
+  const levels = new Map<string, number>();
+  for (const tile of globe.surfaceTiles())
+    if (tile.terrainLevel !== null) levels.set(`${tile.root}/${tile.level}/${tile.x}/${tile.y}`, tile.terrainLevel);
+  return levels;
+}
+
+/** Counts the tiles whose terrain level fell since the previous still frame (F139). */
+function countDrops(previous: Map<string, number>, current: Map<string, number>): number {
+  let drops = 0;
+  for (const [key, level] of current) if (level < (previous.get(key) ?? -1)) drops++;
+  return drops;
+}
+
+/**
+ * The tallest column of opaque pixels above the ellipsoid's horizon, in device pixels: in each column, from the first
+ * opaque pixel down to the first row whose ray meets the ellipsoid (F142).
+ */
+function reliefAboveHorizonPx(globe: Globe, capture: FrameCapture, view: CssSize): number {
+  const scale = capture.widthPx / Math.max(1, view.widthPx);
+  const hits = (x: number, y: number): boolean => globe.screenToGeo({ xPx: x / scale, yPx: y / scale }) !== undefined;
+  let tallest = 0;
+  for (let x = 0; x < capture.widthPx; x += 4) {
+    let top = 0;
+    while (top < capture.heightPx && at(capture, x, top, 3) !== 255) top++;
+    if (top >= capture.heightPx || hits(x, top)) continue;
+    let sky = top;
+    let ground = capture.heightPx - 1;
+    if (!hits(x, ground)) continue;
+    while (ground - sky > 1) {
+      const middle = Math.floor((sky + ground) / 2);
+      if (hits(x, middle)) ground = middle;
+      else sky = middle;
+    }
+    if (ground - top > tallest) tallest = ground - top;
+  }
+  return tallest;
 }
 
 export async function recordScenario(
@@ -245,6 +359,8 @@ export async function recordScenario(
   const requestAnimationFrame = window.requestAnimationFrame;
   window.requestAnimationFrame = () => 0;
   let previous: FrameCapture | undefined;
+  let previousLevels = new Map<string, number>();
+  const terrain = globe.terrainStats() !== undefined;
   let stillSince = -1;
   try {
     for (let frame = 0; frame < scenario.frames; frame++) {
@@ -260,6 +376,20 @@ export async function recordScenario(
         const pops = countPops(previous, capture);
         report.pops += pops;
         if (pops > 0 && report.firstPopFrame < 0) report.firstPopFrame = frame;
+      }
+      if (terrain) {
+        const levels = terrainLevels(globe);
+        if (!next && frame > stillSince) {
+          const drops = countDrops(previousLevels, levels);
+          report.terrainDrops += drops;
+          if (drops > 0 && report.firstTerrainDropFrame < 0) report.firstTerrainDropFrame = frame;
+        }
+        previousLevels = levels;
+      }
+      if (scenario.relief) {
+        const relief = reliefAboveHorizonPx(globe, capture, view);
+        if (report.minReliefAboveHorizonPx < 0 || relief < report.minReliefAboveHorizonPx)
+          report.minReliefAboveHorizonPx = relief;
       }
       previous = capture;
       // A capture can complete without leaving the task (WebGL2 reads back synchronously): let timers and network

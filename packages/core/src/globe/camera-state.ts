@@ -39,6 +39,9 @@ export function newCameraState(): MutableCameraState {
     tiltDeg: 0.5,
     rollDeg: 0.5,
     rangeMeters: 0.5,
+    eyeLongitudeDeg: 0.5,
+    eyeLatitudeDeg: 0.5,
+    groundHeightMeters: 0.5,
   };
 }
 
@@ -54,6 +57,9 @@ export function writeCameraState(camera: Camera, out: MutableCameraState): Mutab
   out.tiltDeg = pose.tiltRad * DEG;
   out.rollDeg = pose.rollRad * DEG;
   out.rangeMeters = pose.rangeMeters;
+  out.eyeLongitudeDeg = wrapDegrees(camera.eyeGeodetic.longitudeRad * DEG);
+  out.eyeLatitudeDeg = camera.eyeGeodetic.latitudeRad * DEG;
+  out.groundHeightMeters = camera.groundHeightMeters;
   return out;
 }
 
@@ -123,5 +129,8 @@ export function requestedCameraState(view: ValidView): CameraState {
     tiltDeg: view.tiltDeg,
     rollDeg: 0,
     rangeMeters: Number.NaN,
+    eyeLongitudeDeg: Number.NaN,
+    eyeLatitudeDeg: Number.NaN,
+    groundHeightMeters: 0,
   };
 }

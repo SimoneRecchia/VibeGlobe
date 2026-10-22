@@ -227,21 +227,23 @@ export function validateHandler(event: unknown, handler: unknown): void {
   }
 }
 
+/** Throws a typed GlobeError naming `name` unless `value` is a finite number. */
+function requireFinite(name: string, value: unknown): void {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
+  }
+}
+
 /** Validates a WGS84 position given to a query; throws a typed GlobeError. */
 export function validatePosition(position: unknown): void {
   if (position === null || typeof position !== 'object') {
     throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describeInput(position)}`);
   }
+  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144).
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  for (const [name, value] of [
-    ['longitudeDeg', longitudeDeg],
-    ['latitudeDeg', latitudeDeg],
-    ['heightMeters', heightMeters ?? 0],
-  ] as const) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
-    }
-  }
+  requireFinite('longitudeDeg', longitudeDeg);
+  requireFinite('latitudeDeg', latitudeDeg);
+  requireFinite('heightMeters', heightMeters ?? 0);
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',

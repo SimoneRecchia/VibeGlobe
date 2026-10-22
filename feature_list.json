@@ -600,6 +600,19 @@
         "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
         "Confirm the latest run on main and the latest nightly run contain the fast, end-to-end and benchmark jobs and are green"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F565",
+      "milestone": 1,
+      "section": "Testing and verification",
+      "description": "CI saves minutes on GitHub-hosted runners without a GPU: every push and every pull request from a fork runs one fast job with the type check, lint, format check, repository checks and guards, unit tests with coverage, license audit, API documentation build and bundle-size checks, while pushes to main, a nightly schedule and manual runs add the end-to-end tests and the recorded benchmarks.",
+      "steps": [
+        "Open the CI workflow and confirm its triggers and the conditions of each job match the description",
+        "Push a branch and confirm its run contains only the fast job, every listed check runs, and a newer push cancels the older run",
+        "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
+        "Confirm the latest run on main is green, and that a run of the full workflow, scheduled (nightly) or started by hand (workflow_dispatch), contains the fast, end-to-end and benchmark jobs and is green"
+      ],
       "status": "failing"
     },
     {

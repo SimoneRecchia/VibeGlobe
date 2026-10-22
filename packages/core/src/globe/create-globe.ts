@@ -7,6 +7,7 @@ import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
 import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
+import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
@@ -64,6 +65,7 @@ class GlobeEngine implements Globe {
   readonly navigation: NavigationApi;
   private readonly viewControl: ViewControl;
   private readonly movements: Movements;
+  private readonly constraints = new Constraints();
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
@@ -126,6 +128,7 @@ class GlobeEngine implements Globe {
       requestRender: () => this.requestRender(),
     }));
     this.navigation = this.viewControl.navigation;
+    if (options.constraints) this.setConstraints(options.constraints);
     if (options.view?.tiltDeg !== undefined) this.viewControl.chooseTilt(this.pendingView.tiltDeg);
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
@@ -311,6 +314,7 @@ class GlobeEngine implements Globe {
       this.movements.step();
       this.controls?.update?.();
       this.movements.afterInput();
+      this.constraints.apply(this.cam);
     }
     this.inFrame = false;
     this.dirty = false;
@@ -366,6 +370,11 @@ class GlobeEngine implements Globe {
   readonly tour: Globe['tour'] = (waypoints, options) => this.movements.tour(waypoints, options);
   readonly orbit: Globe['orbit'] = (options) => this.movements.orbit(options);
   readonly rotateTo: Globe['rotateTo'] = (heading, options) => this.movements.rotateTo(heading, options);
+  readonly setConstraints: Globe['setConstraints'] = (constraints) => {
+    this.constraints.set(validateConstraints(constraints));
+    this.surfaceFrame.view.setMaxTilt(this.constraints.maxTiltRad);
+    this.requestRender();
+  };
   readonly resetToGlobe: Globe['resetToGlobe'] = (options) => this.movements.resetToGlobe(options);
   readonly goHome: Globe['goHome'] = (options) =>
     this.movements.goHome(this.options.home ?? this.options.view ?? DEFAULT_VIEW, options);

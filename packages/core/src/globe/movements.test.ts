@@ -266,3 +266,38 @@ describe('orientation, orbit, reset and home (F191–F194)', () => {
     globe.destroy();
   });
 });
+
+describe('camera constraints (F209–F211)', () => {
+  it('holds the zoom range, the maximum tilt and the bounds for input and movements', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
+    globe.setConstraints({
+      minZoom: 5,
+      maxZoom: 12,
+      maxTiltDeg: 30,
+      bounds: { westDeg: 170, southDeg: -50, eastDeg: -170, northDeg: 50 },
+    });
+    ticks(2);
+    // The center moves into the bounds across the antimeridian, to the nearer edge.
+    expect(Math.abs(globe.camera.longitudeDeg)).toBeGreaterThanOrEqual(170 - 1e-9);
+    for (let i = 0; i < 20; i++) {
+      globe.navigation.zoomAt({ xPx: 400, yPx: 300 }, 1);
+      ticks(1);
+      expect(globe.camera.zoom).toBeLessThanOrEqual(12 + 1e-6);
+    }
+    const out = globe.flyTo({ longitudeDeg: 0, latitudeDeg: 0, zoom: 2, tiltDeg: 60 });
+    for (let i = 0; i < 600; i++) {
+      ticks(1);
+      expect(globe.camera.zoom).toBeGreaterThanOrEqual(5 - 1e-6);
+      expect(globe.camera.zoom).toBeLessThanOrEqual(12 + 1e-6);
+      expect(globe.camera.tiltDeg).toBeLessThanOrEqual(30 + 1e-6);
+      expect(globe.camera.chosenTiltDeg).toBeLessThanOrEqual(30 + 1e-6);
+      const lon = globe.camera.longitudeDeg;
+      expect(lon >= 170 - 1e-6 || lon <= -170 + 1e-6).toBe(true);
+    }
+    await out;
+    expect(() => globe.setConstraints({ minZoom: 9, maxZoom: 3 })).toThrow(
+      expect.objectContaining({ code: 'invalid-option' }),
+    );
+    globe.destroy();
+  });
+});

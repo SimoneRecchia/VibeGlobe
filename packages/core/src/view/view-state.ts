@@ -59,6 +59,8 @@ const HIGH_TILT = 9;
 /** The engine time of the last applied frame, and the share of an offset kept this frame (KB-099). */
 const LAST_TIME = 10;
 const KEPT = 11;
+/** The maximum tilt of the camera constraints (F210), radians; NaN without one. */
+const TILT_CAP = 12;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -69,7 +71,7 @@ const KEPT = 11;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = new Float64Array(12);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -135,8 +137,15 @@ export class ViewState {
   /** A tilt chosen by the user or a view (radians): manual mode, applied at once (ADR 0034). */
   chooseTilt(tiltRad: number): void {
     this.mode = 'manual';
-    this.chosen[0] = tiltRad;
+    const cap = this.values[TILT_CAP] ?? Number.NaN;
+    this.chosen[0] = cap === cap && tiltRad > cap ? cap : tiltRad;
     this.snap = true;
+  }
+
+  /** Sets the maximum tilt of the camera constraints (F210), radians, or NaN for none; a chosen tilt above it drops. */
+  setMaxTilt(maxTiltRad: number): void {
+    this.values[TILT_CAP] = maxTiltRad;
+    if (maxTiltRad === maxTiltRad && (this.chosen[0] ?? 0) > maxTiltRad) this.chosen[0] = maxTiltRad;
   }
 
   /**
@@ -187,6 +196,7 @@ export class ViewState {
     values[WANTED_TILT] = target + (values[TILT_OFFSET] ?? 0);
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
     if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
+    if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
     values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
     if (clearanceMeters > 0 && ground) this.probeTerrainLimit(camera, ground);
     else if (clearanceMeters > 0) {
@@ -237,6 +247,7 @@ export class ViewState {
     values[WANTED_TILT] = (values[TARGET_TILT] ?? 0) + (values[TILT_OFFSET] ?? 0);
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
     if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
+    if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
     // Never above the tilt the camera has: a terrain clamp holding it lower stays.
     if ((values[WANTED_TILT] ?? 0) > camera.pose.tiltRad && this.clamped) return;
     camera.pose.tiltRad = values[WANTED_TILT] ?? 0;

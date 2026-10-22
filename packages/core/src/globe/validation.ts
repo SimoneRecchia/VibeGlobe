@@ -1,4 +1,5 @@
 import { GlobeError } from './errors.js';
+import { validateConstraints } from './constraints.hot.js';
 import type { GeoPosition, GlobeEvents, GlobeOptions, ScreenPoint, ViewInit } from './types.js';
 
 // Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
@@ -116,6 +117,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
   validateHome(input.home);
+  if (input.constraints !== undefined) validateConstraints(input.constraints);
   validateImagery(input.imagery, input.workers);
   validateTerrain(input.terrain, input.workers);
   const memory = input.memory as Partial<Record<string, unknown>> | undefined;

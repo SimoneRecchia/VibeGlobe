@@ -330,6 +330,8 @@ export interface GlobeOptions {
   /** URL of the pinned base imagery: an equirectangular image of the whole world. */
   readonly baseImageryUrl: string;
   readonly view?: ViewInit;
+  /** Camera constraints held for every input and movement (F209–F211); see {@link Globe.setConstraints}. */
+  readonly constraints?: CameraConstraints;
   /** The project's home view (F194), which {@link Globe.goHome} flies to; by default the start view. */
   readonly home?: HomeView;
   /**
@@ -504,6 +506,14 @@ export interface CameraMovement extends Promise<MoveOutcome> {
   cancel(): void;
 }
 
+/** Limits on the camera (F209–F211): zoom range, maximum tilt, and bounds for the view's center. */
+export interface CameraConstraints {
+  readonly minZoom?: number;
+  readonly maxZoom?: number;
+  readonly maxTiltDeg?: number;
+  readonly bounds?: GeoBounds;
+}
+
 /** A home view (F194): a view, and optionally the view mode to set on the way. */
 export interface HomeView extends ViewInit {
   readonly viewMode?: '2d' | '3d' | 'auto';
@@ -641,6 +651,8 @@ export interface Globe {
   tour(waypoints: readonly TourWaypoint[], options?: { readonly signal?: AbortSignalLike }): CameraMovement;
   /** Turns the view to `headingDeg` along the shorter arc, keeping center and tilt (F191: 0 north, 90 east…). */
   rotateTo(headingDeg: number, options?: MovementOptions): CameraMovement;
+  /** Replaces the camera constraints (F209–F211); invalid ones throw a GlobeError and change nothing. */
+  setConstraints(constraints: CameraConstraints): void;
   /** Flies out to the whole globe centered on the current location (F193). */
   resetToGlobe(options?: MovementOptions): CameraMovement;
   /** Flies to the home view (F194), setting its view mode first when it has one. */

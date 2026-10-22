@@ -15,5 +15,17 @@
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@vibeglobe/controls": "0.0.0",
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/renderer": "0.0.0",
+    "@vibeglobe/worker": "0.0.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "vue": "3.5.44"
+  }
 }

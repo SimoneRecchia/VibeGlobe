@@ -40,9 +40,11 @@ for (const pkg of published) {
     failed = true;
     continue;
   }
+  // Peer dependencies (Vue for the Vue adapter) are the host application's, so they are not the package's weight.
+  const peers = Object.keys(pkg.manifest.peerDependencies ?? {});
   const external = (id: string): boolean =>
     (id.startsWith('@vibeglobe/') && id !== name) ||
-    budgets.bundleExternal.some((dep) => id === dep || id.startsWith(`${dep}/`));
+    [...budgets.bundleExternal, ...peers].some((dep) => id === dep || id.startsWith(`${dep}/`));
   const { gzipBytes } = await bundle(`export * from '${name}';`, external);
   const sizeKB = gzipBytes / 1024;
   const over = sizeKB > budgetKB;

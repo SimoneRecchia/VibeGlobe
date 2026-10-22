@@ -1,0 +1,18 @@
+{
+  "name": "@vibeglobe/nuxt-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal Nuxt app with server-side rendering that uses the Vue adapter (M14).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@vibeglobe/vue": "*",
+    "nuxt": "4.5.2",
+    "vue": "3.5.44"
+  }
+}

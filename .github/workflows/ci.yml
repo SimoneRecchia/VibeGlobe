@@ -167,7 +167,8 @@ jobs:
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npm run build
-      - run: npx playwright test --project=measurements --no-deps
+      # One test at a time: they measure the whole machine (playwright.config.ts).
+      - run: npx playwright test --project=measurements --no-deps --workers=1
       # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
       - name: Rendering probes (recorded)
         if: always()

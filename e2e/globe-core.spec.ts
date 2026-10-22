@@ -386,16 +386,18 @@ for (const backend of BACKENDS) {
         await page.mouse.move(box.x + point.xPx, box.y + point.yPx);
         // The move lands in the frame after the one that may already be under way when the event arrives (a loaded
         // CI runner measured one step behind): wait for the frame that applied it, then hold it to 1 px.
-        await expect
-          .poll(
-            async () => {
-              await nextFrame(page);
-              const shown = await geoToScreen(page, grabbed);
-              return Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx);
-            },
-            { timeout: 5000, intervals: [0] },
-          )
-          .toBeLessThan(1);
+        // A failure names the step, the distance and whether the engine drew frames meanwhile.
+        const framesBefore = await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0);
+        const deadline = Date.now() + 5000;
+        let distancePx: number;
+        do {
+          await nextFrame(page);
+          const shown = await geoToScreen(page, grabbed);
+          distancePx = Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx);
+        } while (distancePx >= 1 && Date.now() < deadline);
+        const framesDrawn =
+          (await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0)) - framesBefore;
+        expect(distancePx, `step ${step} from ${JSON.stringify(from)}: ${framesDrawn} frames drawn`).toBeLessThan(1);
         const next = await geoToScreen(page, companion);
         expect(Math.hypot(next.xPx - companionShown.xPx, next.yPx - companionShown.yPx)).toBeLessThan(3 * stepPx);
         companionShown = next;

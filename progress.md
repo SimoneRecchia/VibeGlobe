@@ -18,6 +18,18 @@ Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlo
 
 ## Session log (newest first)
 
+### UI and GIS utilities track (third session) — 2026-10-21 (M12)
+
+Branch `claude/m12-ui-gis-utilities-yd90i2`, SimoneRecchia/VibeGlobe#7. New package `@vibeglobe/gis` (coordinate formats and parsing, CRS transforms through proj4js, geodesic measurement on core's geodesics, view-state serialization); `@vibeglobe/ui` gained the control API, six controls, theming, English and Italian, keyboard access and contrast. Browser tests mount the ui package on the playground through the Vite dev server (`e2e/support/ui-layer.ts`).
+
+Passing: F404, F405, F418, F428–F433, F435 (F430's baselines recorded by the Visual baselines workflow and compared in CI run 39687581609, all Chromium shards green). Pending the reference tablet: F419, F420, F427. Waiting for engine features: F406–F417, F421–F426, F434, F436, F437 (`docs/parallel-tracks.md`).
+
+Notes for the next session of this track:
+
+- Control animations run on the engine clock (`Globe.timeMs`) through `frame` events: the container's software GPU draws about 4 frames per second, and wall-clock tweens jumped there.
+- Pointer input on `.vg-ui` must not cancel a running tween (fixed: chained zoom presses lost part of a level).
+- Local Chromium (141) differs from the baselines' (156), so screenshot comparisons are advisory locally and binding in CI.
+
 ### Session 4 — 2026-10-20/21 (milestone 2)
 
 Done so far: F042–F063, F066–F070, F076, F077 (globe core: geodesics, projections, camera, quadtree surface, renderer on three.js with WebGPU and WebGL2, precision and depth, device-loss recovery, multiple instances); the visual regression suite and its baseline workflow; F064 (ADR 0018): per-frame code passes doubles only through typed arrays and object fields, avoids the builtins V8's mid tier calls with boxed arguments, keeps tile keys in `IntegerKeyMap`, and switches off three.js's unused lighting. Engine code allocates nothing per frame in Node and in Chromium; three.js still allocates about 5.6 KB per frame, with GC pauses of at most about 3 ms on CI's software GPU.

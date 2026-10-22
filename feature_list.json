@@ -5341,7 +5341,7 @@
         "Define a custom reference system from a projection definition string and verify a transform through it",
         "Verify the projection library's license passes the license audit"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F405",
@@ -5353,7 +5353,7 @@
         "Run property-based tests verifying that parsing each formatted string returns the original coordinate within the format's precision",
         "Verify the readout control and the search box use these functions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F406",
@@ -5516,7 +5516,7 @@
         "Add controls individually and remove them and verify each mounts and unmounts cleanly",
         "Replace one built-in control with a custom control built on the public control API and extend another, and verify both work"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F419",
@@ -5529,7 +5529,7 @@
         "Verify buttons are disabled at the minimum and maximum zoom",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F420",
@@ -5542,7 +5542,7 @@
         "Using only the keyboard, reset north, rotate and orient to N, E, S and W",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F421",
@@ -5633,7 +5633,7 @@
         "Emulate a browser without the Fullscreen API and verify the control is hidden",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F428",
@@ -5645,7 +5645,7 @@
         "Verify the debug overlay and performance HUD appear and disappear",
         "Verify the toggle is absent unless enabled in the configuration"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F429",
@@ -5657,7 +5657,7 @@
         "Capture screenshots of every control and verify each visual property changed as expected",
         "Run an automated check that the ui package stylesheets contain no hard-coded colors, fonts or sizes outside the variable defaults"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F430",
@@ -5669,7 +5669,7 @@
         "Capture screenshots of every control in both themes and compare against baselines within tolerance",
         "Verify the switch applies to every control without reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F431",
@@ -5681,7 +5681,7 @@
         "Run an automated check that both languages define every translation key",
         "Verify numbers and units are formatted according to the selected locale"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F432",
@@ -5693,7 +5693,7 @@
         "Verify every control shows the new strings and missing keys fall back to English",
         "Override a single English string and verify only that string changes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F433",
@@ -5705,7 +5705,7 @@
         "Verify every focused control shows a visible focus indicator in light and dark themes",
         "Operate every control with Enter, Space, arrows and Escape as documented"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F434",
@@ -5729,7 +5729,7 @@
         "Verify every ratio meets WCAG 2.1 AA",
         "Verify icons over the map keep sufficient contrast over light and dark imagery (backing shape or outline)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F436",

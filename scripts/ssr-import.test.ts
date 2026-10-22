@@ -49,7 +49,7 @@ const packageNames = readWorkspace()
 
 describe('server-side rendering import safety', () => {
   it('covers every library package', () => {
-    expect(packageNames).toHaveLength(11);
+    expect(packageNames).toHaveLength(12);
   });
 
   it.each(packageNames)('imports %s without touching browser or GPU globals', async (name) => {

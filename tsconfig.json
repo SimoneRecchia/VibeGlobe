@@ -56,6 +56,12 @@
       "path": "./packages/ui/tsconfig.test.json"
     },
     {
+      "path": "./packages/gis"
+    },
+    {
+      "path": "./packages/gis/tsconfig.test.json"
+    },
+    {
       "path": "./packages/vue"
     },
     {

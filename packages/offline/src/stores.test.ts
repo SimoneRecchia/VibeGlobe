@@ -122,3 +122,29 @@ describe('workerStore when its worker fails', () => {
     expect(settled).toBe('rejected');
   });
 });
+
+describe('indexedDbStore shared by several tabs', () => {
+  it('keeps one database under its limit when two tabs write to it (PT-20)', async () => {
+    const factory = new IDBFactory();
+    const tabs = [
+      indexedDbStore({ indexedDB: factory, maxBytes: 20_000 }),
+      indexedDbStore({ indexedDB: factory, maxBytes: 20_000 }),
+    ];
+    for (let i = 0; i < 30; i++)
+      for (const [t, store] of tabs.entries())
+        await store.put(`t${t}/${i}`, {
+          bytes: new ArrayBuffer(500),
+          contentType: 'image/png',
+          storedAtMs: 0,
+          freshUntilMs: 0,
+        });
+    const usages = await Promise.all(tabs.map((store) => store.usage()));
+    for (const store of tabs) store.close();
+    // A fresh instance sums the database itself, like a reload.
+    const reloaded = indexedDbStore({ indexedDB: factory, maxBytes: 20_000 });
+    const stored = (await reloaded.usage()).bytes;
+    reloaded.close();
+    expect(stored).toBeLessThanOrEqual(20_000 * 1.05);
+    for (const usage of usages) expect(usage.bytes).toBe(stored);
+  });
+});

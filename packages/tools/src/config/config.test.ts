@@ -1,0 +1,61 @@
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { CONFIG_DIR } from '../cli.js';
+import { estimateBuild } from '../pipeline/build.js';
+import { configProblems, loadConfig } from './load.js';
+import type { S2CloudlessSource } from './schema.js';
+
+const shipped = readdirSync(CONFIG_DIR).filter((f) => f.endsWith('.json') && !f.endsWith('.lock.json'));
+
+describe('configuration files', () => {
+  it.each(shipped)('%s is valid and pins its sources and tool images', (file) => {
+    const { config } = loadConfig(join(CONFIG_DIR, file));
+    expect(config.tools.gdal).toMatch(/@sha256:[0-9a-f]{64}$/);
+    for (const dataset of config.datasets) expect(dataset.sourceVersion).not.toBe('');
+  });
+
+  it('reports every problem of an invalid configuration', () => {
+    const { config } = loadConfig(join(CONFIG_DIR, 'italy-high.json'));
+    const broken = {
+      ...config,
+      tools: { gdal: 'ghcr.io/osgeo/gdal:latest' },
+      datasets: [{ ...config.datasets[0], minZoom: 15, maxZoom: 3, profile: 'nope', encoding: 'jpeg' }],
+    };
+    const problems = configProblems(broken).join('\n');
+    expect(problems).toMatch(/tools.gdal: must be a Docker image pinned by digest/);
+    expect(problems).toMatch(/minZoom and maxZoom/);
+    expect(problems).toMatch(/unknown provider profile "nope"/);
+    expect(problems).toMatch(/terrain needs one of terrarium/);
+  });
+
+  it('the world and Italy configurations cover every default dataset and estimate without downloading', () => {
+    const world = loadConfig(join(CONFIG_DIR, 'world-low.json'));
+    const italy = loadConfig(join(CONFIG_DIR, 'italy-high.json'));
+    const profiles = (c: typeof world): string[] => c.config.datasets.map((d) => d.profile).sort();
+    expect(profiles(world)).toEqual([
+      'copernicus-dem-glo90',
+      'esa-worldcover-s2-2021',
+      'natural-earth',
+      'openstreetmap-extract',
+    ]);
+    expect(profiles(italy)).toEqual(['copernicus-dem-glo30', 'esa-worldcover-s2-2021', 'openstreetmap-extract']);
+    const estimate = estimateBuild(italy, { sample: false });
+    const imagery = estimate.datasets.find((d) => d.dataset === 'imagery');
+    expect(imagery?.zooms.map((z) => z.z)).toEqual([9, 10, 11, 12, 13, 14]);
+    // Every default source is free to download (ADR 0026); a requester-pays source is priced.
+    expect(estimate.cost).toBe(0);
+    expect(estimate.downloadBytes).toBeGreaterThan(1e9);
+    const requesterPays: S2CloudlessSource = {
+      type: 's2cloudless',
+      baseUrl: 'https://s3.example.test',
+      edition: 2016,
+      level: 13,
+      requesterPays: true,
+    };
+    const datasets = italy.config.datasets.map((d) => (d.id === 'imagery' ? { ...d, source: requesterPays } : d));
+    expect(estimateBuild({ ...italy, config: { ...italy.config, datasets } }, { sample: false }).cost).toBeGreaterThan(
+      0,
+    );
+  });
+});

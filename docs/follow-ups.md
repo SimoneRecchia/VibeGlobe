@@ -19,3 +19,12 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Tile record recycling (M3 review, finding 6).** Imagery tile records and their key-map entries are never freed, and `dropUnwanted` walks every record each frame; CPU per frame and memory outside the budgets grow with very long sessions (handles also collide past 2^22 records per layer). Recycle records of unloaded tiles that no frame wants, keeping their RAM-tier entries keyed consistently.
 - **Memory-pressure response (ADR 0007, M3 plan §3).** The error multiplier that rises ×1.05 per frame while admissions are refused, the `memory-pressure` event and the reservation of predicted bytes at dispatch are not built; no feature entry requires them. Refused tiles now wait 1 s and come back from RAM (KB-073).
 - **A drag step at the globe's edge on an 800 × 600 page (M3 CI, unconfirmed).** On CI's software WebGPU, F060's second drag, started at 95 % of the globe's radius on an 800 × 600 page, left the grabbed point exactly one step (25.25 px) away and never caught up, on two attempts; the same test passes locally at that size and on CI at the default page size, so F060 keeps its default size. To investigate: run F060 at 800 × 600 on CI with the camera logged per step, and check whether `dragCamera` rejects a cursor point that grazes the limb.
+
+## Data pipeline track (`packages/tools`)
+
+- **Faster raster tiling for full builds:** about 0.1 s per 256-px tile on one core (Italy at z14 is about 130,000 imagery tiles, a few hours). Options: tile in worker threads, reuse row latitudes, sample whole tile rows per source raster.
+- **World terrain from COG overviews:** `world-low` downloads every GLO-90 file (upper bound 248 GB, about 100 GB of land files) to build zoom 0–8; HTTP range reads of the COGs' overview levels would cut that to a few GB.
+- **Streaming OSM reader for the planet:** the three-pass reader keeps the needed nodes in typed arrays (about 16 bytes per node; Italy needs about 2 GB). The planet (`world-low`, zooms 0–6, places and major roads only) needs a disk-backed node index.
+- **Multipolygon buildings:** OSM relations (multipolygon buildings and building parts) are not read yet; only closed ways become buildings.
+- **Smaller Terrarium tiles:** tiles keep the 1/256 m step even though the DEM's accuracy is metres; quantizing to 1/16 m before encoding would shrink them considerably without visible relief change.
+- **Bordered terrain tiles (258 px):** decide after M4's crack sweep (ADR 0024, survey open question 1).

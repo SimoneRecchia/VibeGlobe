@@ -51,8 +51,21 @@ export async function fetchRange(
   }
   if (response.status !== 206 && response.status !== 200)
     throw new HttpStatusError(response.status, retryAfterMs(response.headers.get('Retry-After'), Date.now()));
-  const bytes = await response.arrayBuffer();
+  const bytes = await readBody(response, init.signal);
   return response.status === 200 ? bytes.slice(offset, offset + length) : bytes;
+}
+
+/**
+ * The body of `response`, raising {@link NetworkError} when the connection drops while it is read, so the transport
+ * reports a retryable network error instead of a tile without data.
+ */
+export async function readBody(response: Response, signal: AbortSignal | null | undefined): Promise<ArrayBuffer> {
+  try {
+    return await response.arrayBuffer();
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new NetworkError(error);
+  }
 }
 
 function resultOf(error: unknown, reason: 'aborted' | 'timeout', aborted: boolean): TransportResult {
@@ -85,7 +98,14 @@ export function archiveTransport(read: TileReader): TileTransport {
         controller.abort();
         finish({ kind: 'timeout' });
       }, timeouts.totalMs);
-      read(request.url, controller.signal)
+      let reading: ReturnType<TileReader>;
+      try {
+        reading = read(request.url, controller.signal);
+      } catch (error) {
+        // A reader that fails before its first await (a synchronous database read) still never throws from here.
+        reading = Promise.reject(error);
+      }
+      reading
         .then((tile) =>
           finish(
             tile === undefined

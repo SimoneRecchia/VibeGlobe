@@ -293,7 +293,8 @@ describe('terrain in a globe (M4)', () => {
       }
       return sum;
     };
-    queries(20_000);
+    // Long enough a warm-up for the query path to be optimized even on a busy machine: unoptimized code boxes doubles.
+    queries(200_000);
     const session = new Session();
     session.connect();
     await session.post('HeapProfiler.enable');

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
+import { hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import { fixtureSession, requestLog } from './support/imagery.ts';
 
 /**
@@ -77,7 +78,8 @@ test('terrain decodes on worker threads, and its main-thread time and uploads pe
     `terrain per frame: ${samples.length} frames, p50 ${quantile(times, 0.5).toFixed(3)} ms, p95 ${quantile(times, 0.95).toFixed(3)} ms, max ${Math.max(...times).toFixed(3)} ms; uploads max ${Math.max(...samples.map(([, bytes = 0]) => bytes))} bytes`,
   );
   expect(samples.length).toBeGreaterThan(20);
-  expect(quantile(times, 0.95)).toBeLessThanOrEqual(TERRAIN_CPU_BUDGET_MS);
+  // The time is gated on a real GPU only (ADR 0012), like F144's; the upload bytes everywhere.
+  if (hardwareGpu()) expect(quantile(times, 0.95)).toBeLessThanOrEqual(TERRAIN_CPU_BUDGET_MS);
   for (const [, bytes = 0, budget = 0] of samples) expect(bytes).toBeLessThanOrEqual(budget);
 
   // Every terrain tile that arrived was decoded off the main thread, by the engine's worker; nothing decodes on the
@@ -101,7 +103,7 @@ test('terrain decodes on worker threads, and its main-thread time and uploads pe
   expect(workerCalls.length).toBeGreaterThanOrEqual(1);
 });
 
-test('10,000 synchronous elevation queries at random positions fit in a frame (F144)', async ({ page }) => {
+test('10,000 synchronous elevation queries at random positions fit in a frame (F144)', async ({ page }, testInfo) => {
   const session = await fixtureSession(page);
   await openGlobe(page, `scenario=terrain-alps&session=${session}`);
   await waitForTerrain(page);
@@ -117,14 +119,21 @@ test('10,000 synchronous elevation queries at random positions fit in a frame (F
     };
     const elapsed: number[] = [];
     let found = 0;
+    // The positions are drawn before the clock starts: the budget is the queries' time, not the generator's.
+    const lons = new Float64Array(10_000);
+    const lats = new Float64Array(10_000);
     for (let frame = 0; frame < 40; frame++) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      const start = performance.now();
       for (let i = 0; i < 10_000; i++) {
         // Half in the view's area, half anywhere.
         const near = (i & 1) === 0;
-        position.longitudeDeg = near ? 6.4 + next() : next() * 360 - 180;
-        position.latitudeDeg = near ? 45.3 + next() : next() * 170 - 85;
+        lons[i] = near ? 6.4 + next() : next() * 360 - 180;
+        lats[i] = near ? 45.3 + next() : next() * 170 - 85;
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const start = performance.now();
+      for (let i = 0; i < 10_000; i++) {
+        position.longitudeDeg = lons[i] ?? 0;
+        position.latitudeDeg = lats[i] ?? 0;
         if (!globe.elevationAt(position, out).noData) found++;
       }
       elapsed.push(performance.now() - start);
@@ -133,8 +142,13 @@ test('10,000 synchronous elevation queries at random positions fit in a frame (F
     return elapsed;
   });
   const warm = times.slice(5);
-  console.log(`10,000 queries: p50 ${quantile(warm, 0.5).toFixed(3)} ms, p95 ${quantile(warm, 0.95).toFixed(3)} ms`);
-  expect(quantile(warm, 0.95)).toBeLessThanOrEqual(QUERY_BUDGET_MS);
+  console.log(
+    `10,000 queries: p50 ${quantile(warm, 0.5).toFixed(3)} ms, p95 ${quantile(warm, 0.95).toFixed(3)} ms; sorted ${JSON.stringify([...warm].sort((a, b) => a - b))}`,
+  );
+  // Timings are gated on a real GPU only (ADR 0012, docs/plan/quality.md): on the software GPU its rendering threads
+  // share the CPU with the page, and the time is recorded (`npm run hardware-run` gates it).
+  testInfo.annotations.push({ type: 'p95 ms per 10,000 queries', description: quantile(warm, 0.95).toFixed(3) });
+  if (hardwareGpu()) expect(quantile(warm, 0.95)).toBeLessThanOrEqual(QUERY_BUDGET_MS);
 });
 
 /** Starts recording, after every frame, the eye's height above the displayed surface and above the finest terrain. */

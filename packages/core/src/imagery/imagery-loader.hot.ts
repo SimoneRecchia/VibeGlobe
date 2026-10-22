@@ -239,9 +239,15 @@ export class ImageryLoader implements NetworkPoolClient {
     return record?.state === READY ? this.options.handleBase + record.slot : -1;
   }
 
-  /** The level of the tile uploaded under a texture handle of this loader. */
-  levelOf(handle: number): number {
-    return this.table.bySlot[handle - this.options.handleBase]?.coord.level ?? -1;
+  /** {@link ImageryLoader.peekHandle} for a tile known to lie in the pyramid (elevation queries, F144). */
+  peekInside(level: number, x: number, y: number): number {
+    const record = this.table.findInside(level, x, y);
+    return record?.state === READY ? this.options.handleBase + record.slot : -1;
+  }
+
+  /** The tile uploaded under a texture handle of this loader. */
+  coordOf(handle: number): TileCoord | undefined {
+    return this.table.bySlot[handle - this.options.handleBase]?.coord;
   }
 
   /** True for a tile known to have no data (404, outside coverage): it never arrives. */

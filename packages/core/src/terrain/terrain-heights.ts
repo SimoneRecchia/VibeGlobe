@@ -22,6 +22,8 @@ export const FINEST_FAILED = -2;
  * slot, u and v across the tile (v from the north) and the height sampled there.
  */
 const located = new Float64Array(8);
+/** 2^level by level: rows of a tiling at each level. */
+const ROWS = Float64Array.from({ length: 32 }, (_, level) => 2 ** level);
 /** A position in radians for {@link TerrainHeights.sample} and {@link TerrainHeights.wantFinest}. */
 const position = new Float64Array(2);
 
@@ -48,7 +50,7 @@ function project(mercator: boolean, at: Float64Array): void {
  * `located[2..3]`, u and v across the tile into `located[5..6]` (the sampled height then goes to `located[7]`).
  */
 function locate(mercator: boolean, level: number): void {
-  const n = 2 ** level;
+  const n = ROWS[level] ?? 1;
   const columns = mercator ? n : 2 * n;
   const fx = (located[0] ?? 0) * columns;
   const fy = (located[1] ?? 0) * n;
@@ -72,9 +74,17 @@ export class TerrainHeights {
   private readonly grids = new Map<number, HeightGrid>();
   /** Resident grids per level: queries skip the levels with none (F144). */
   private readonly perLevel: Int32Array;
+  /** The deepest level with a resident grid (or the source's minimum): queries start there. */
+  private deepest = 0;
+  /**
+   * Per level, the area that holds resident grids across the whole tiling (0–1), as [west, east, north, south]:
+   * queries outside skip the level. Grows as grids arrive and resets when the level empties, so it may cover more than what is resident.
+   */
+  private readonly extents: Float64Array;
 
   constructor(private readonly layer: TerrainLayer) {
     this.perLevel = new Int32Array(layer.source.maxLevel + 1);
+    this.extents = new Float64Array(4 * (layer.source.maxLevel + 1));
   }
 
   /** Keeps the grid of a tile uploaded under `handle`. */
@@ -84,8 +94,36 @@ export class TerrainHeights {
   }
 
   private count(handle: number, change: number): void {
-    const level = this.layer.loader.levelOf(handle);
-    if (level >= 0 && level < this.perLevel.length) this.perLevel[level] = (this.perLevel[level] ?? 0) + change;
+    const coord = this.layer.loader.coordOf(handle);
+    if (!coord || coord.level >= this.perLevel.length) return;
+    const level = coord.level;
+    const count = (this.perLevel[level] ?? 0) + change;
+    this.perLevel[level] = count;
+    if (change < 0) {
+      while (this.deepest > 0 && (this.perLevel[this.deepest] ?? 0) === 0) this.deepest--;
+      return;
+    }
+    if (level > this.deepest) this.deepest = level;
+    // The tile's extent across the whole tiling (0–1, as `project` writes positions).
+    const rows = 2 ** level;
+    const columns = this.layer.source.tiling.crs === 'EPSG:3857' ? rows : 2 * rows;
+    const west = coord.x / columns;
+    const east = (coord.x + 1) / columns;
+    const north = coord.y / rows;
+    const south = (coord.y + 1) / rows;
+    const e = this.extents;
+    const at = 4 * level;
+    if (count === 1) {
+      e[at] = west;
+      e[at + 1] = east;
+      e[at + 2] = north;
+      e[at + 3] = south;
+      return;
+    }
+    if (west < (e[at] ?? 0)) e[at] = west;
+    if (east > (e[at + 1] ?? 0)) e[at + 1] = east;
+    if (north < (e[at + 2] ?? 0)) e[at + 2] = north;
+    if (south > (e[at + 3] ?? 0)) e[at + 3] = south;
   }
 
   /** The grid of a resident tile by handle. */
@@ -116,10 +154,32 @@ export class TerrainHeights {
     const mercator = source.tiling.crs === 'EPSG:3857';
     project(mercator, at);
     const perLevel = this.perLevel;
-    for (let level = source.maxLevel; level >= source.minLevel; level--) {
-      if ((perLevel[level] ?? 0) === 0) continue;
-      locate(mercator, level);
-      const handle = loader.peekHandle(level, located[2] ?? 0, located[3] ?? 0);
+    const extents = this.extents;
+    const gx = located[0] ?? 0;
+    const gy = located[1] ?? 0;
+    const columnsPerRow = mercator ? 1 : 2;
+    for (let level = this.deepest; level >= source.minLevel; level--) {
+      const e = 4 * level;
+      if (
+        (perLevel[level] ?? 0) === 0 ||
+        gx < (extents[e] ?? 0) ||
+        gx > (extents[e + 1] ?? 0) ||
+        gy < (extents[e + 2] ?? 0) ||
+        gy > (extents[e + 3] ?? 0)
+      )
+        continue;
+      // The tile and the position across it at this level (locate, inlined: this loop runs per query).
+      const rows = ROWS[level] ?? 1;
+      const columns = columnsPerRow * rows;
+      const fx = gx * columns;
+      const fy = gy * rows;
+      let x = Math.floor(fx);
+      let y = Math.floor(fy);
+      if (x >= columns) x = columns - 1;
+      if (y >= rows) y = rows - 1;
+      located[5] = fx - x;
+      located[6] = fy - y;
+      const handle = loader.peekInside(level, x, y);
       const grid = handle >= 0 ? this.grids.get(handle) : undefined;
       if (!grid) continue;
       sampleHeightInto(grid, located, 5);

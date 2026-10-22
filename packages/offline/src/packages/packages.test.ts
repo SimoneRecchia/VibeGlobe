@@ -362,3 +362,14 @@ describe('served offline packages', () => {
     expect(lan.errors).toEqual([]);
   });
 });
+
+describe('served offline packages and integrity', () => {
+  it('refuses to serve a package whose manifest has no chunk hashes to verify reads against (PT-18)', async () => {
+    const data = archive('1');
+    const { files, ...rest } = await manifestOf('1', data);
+    const unverifiable = { ...rest, files: files.map((file) => ({ ...file, chunkSha256: undefined })) };
+    const net = server({ '/lan/rome.json': JSON.stringify(unverifiable), '/lan/rome.pmtiles': data });
+    const lan = setup(new IDBFactory(), net.fetchImpl);
+    await expect(lan.manager.addServedPackage('https://lan.test/lan/rome.json')).rejects.toThrow(/chunk/);
+  });
+});

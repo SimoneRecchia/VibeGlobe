@@ -3,7 +3,13 @@ import { browserQuotaBytes, isPersisted, type PersistenceResult } from '../persi
 import type { PackageArea } from './area.js';
 import { buildPackage, estimateRequest, type BuildReport, type PackageRequest } from './builder.js';
 import { completeRecord, installFiles, partialKey, type FileOrigin, type InstallOptions } from './installer.js';
-import { PackageError, validateManifest, type PackageManifest, type PackageSourceEntry } from './manifest.js';
+import {
+  DEFAULT_CHUNK_BYTES,
+  PackageError,
+  validateManifest,
+  type PackageManifest,
+  type PackageSourceEntry,
+} from './manifest.js';
 import { PackageStorage, type PackageRecord, versionKey } from './package-storage.js';
 import { PackageTileReader, type ActivePackage, type ArchiveAdapters } from './reader.js';
 
@@ -168,6 +174,15 @@ class Manager implements PackageManager {
   async addServedPackage(manifestUrl: string | URL): Promise<InstalledPackage> {
     const url = new URL(String(manifestUrl), globalThis.location?.href).href;
     const manifest = await this.fetchManifest(url);
+    // A served file is read in place, never hashed whole: without chunk hashes its reads could not be verified (F309).
+    for (const file of manifest.files) {
+      const chunks = Math.ceil(file.bytes / (file.chunkBytes ?? DEFAULT_CHUNK_BYTES));
+      if (file.chunkSha256?.length !== chunks)
+        throw new PackageError(
+          'invalid-manifest',
+          `${file.path} of '${manifest.id}' has no chunk hashes (chunkSha256) to verify its reads; build the manifest with createManifest`,
+        );
+    }
     this.served.set(manifest.id, { manifest, kind: 'archive', origin: { baseUrl: url } });
     this.activate();
     return describe(completeRecord(manifest, 'archive', 0, url));

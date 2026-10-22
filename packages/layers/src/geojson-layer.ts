@@ -15,7 +15,7 @@ export interface GeoJsonLayerOptions {
   readonly id?: string;
   /** Where the data comes from; loading starts when the layer is added. */
   readonly data: VectorSource | FeatureCollection;
-  /** The format adapter (default: GeoJSON). */
+  /** The format adapter: `geojsonFormat` (default), `kmlFormat` or `gpxFormat`. */
   readonly format?: VectorFormatAdapter;
   /** Styles per family: `circle-*` for points, `line-*` for lines, `fill-*` for polygons. */
   readonly style?: { readonly point?: LayerStyle; readonly line?: LayerStyle; readonly polygon?: LayerStyle };
@@ -124,11 +124,16 @@ export class GeoJsonLayer implements Layer {
   async #load(): Promise<void> {
     const data = this.#options.data;
     try {
+      const format = this.#options.format ?? geojsonFormat;
       const collection =
         typeof data === 'object' && data !== null && (data as Partial<FeatureCollection>).type === 'FeatureCollection'
           ? await geojsonFormat.parse(data)
-          : await loadVectorData(data, this.#options.format ?? geojsonFormat, this.#options.fetch);
+          : await loadVectorData(data, format, this.#options.fetch);
       if (!this.#attached) return;
+      for (const issue of collection.issues) {
+        const where = issue.index < 0 ? '' : `feature ${issue.index}: `;
+        this.#events.emit('error', { message: `${format.format}: ${where}${issue.message}` });
+      }
       const byFamily: Record<GeometryFamily, Feature[]> = { point: [], line: [], polygon: [] };
       for (const feature of collection.features) {
         if (feature.geometry !== null) byFamily[geometryFamily(feature.geometry)].push(feature);

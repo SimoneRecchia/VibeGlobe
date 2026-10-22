@@ -9,3 +9,5 @@ playwright-report/
 docs-site/
 benchmarks/results/local/
 benchmarks/results/ci-*/
+.output/
+.nuxt/

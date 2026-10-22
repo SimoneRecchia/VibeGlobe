@@ -27,7 +27,7 @@ Since 2026-10-22 a parallel session builds the parts of M10 that do not need ren
 - **Labels.** Placement passes at most every 300 ms and whenever labels are added or removed. Labels are tried in order of `symbol-sort-key` (lower first), then feature id, and kept when their padded box overlaps no kept box in an `rbush` tree. Labels behind the globe or off screen are hidden. Opacity moves toward each decision over a 300 ms fade on the engine clock and is uploaded as the visibility factor. Collision boxes use the renderer's glyph metrics once available, an estimate until then.
 - **Picking ids.** A 32-bit id in RGBA8: 8-bit layer slot (1–255) and 24-bit row index, 0 for nothing. The layer stack owns the slot table and hands out slots round-robin, so a late readback never names a newer layer. A pick reads a small region and takes the non-zero pixel nearest its center. Interaction drops a pick answered after a newer one, so hover events never step backwards.
 - **Layer plug-in interface.** `Layer` (attach, detach, frame, order, visibility) is public; built-in and application layers implement the same interface (F388).
-- **Data loading.** `VectorFormatAdapter` is the contract the M7 adapters fill; a GeoJSON stub parses on the calling thread until they arrive.
+- **Data loading.** `VectorFormatAdapter` wraps the M7 parsers of `@vibeglobe/sources/vector` (ADR 0030) for GeoJSON, KML and GPX; a parser's issues become the layer's error events. Parsing runs on the calling thread until the worker program registers the parsers' tasks.
 
 ## Consequences
 

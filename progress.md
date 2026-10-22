@@ -22,7 +22,24 @@ Branch `claude/tools-offline-builder-uvuuxe`, pull request SimoneRecchia/VibeGlo
 Branch `claude/festive-cori-5030me`; status, stubs, hook requests and waiting entries in `docs/parallel-tracks.md` ("Data layers track: status").
 
 - **2026-10-22:** M10 surveys (picking, labels, data layers; F348–F350 passing) and ADR 0029. `packages/layers`: `LayerRenderTarget` (the draw interface) with `RecordingRenderTarget`, structure-of-arrays `FeatureStore` with dirty-run uploads, MapLibre-expression styles (`@maplibre/maplibre-gl-style-spec`), `LayerStack` with pick slots, `DataLayer`, `LabelLayer` (rbush collision, 300 ms passes and fades), `ClusterLayer` (supercluster, animated splits and merges), `InteractionController`, `GeoJsonLayer` on a stub of the M7 format adapters. 31 unit tests in Node. Every other M10 entry waits on the renderer, terrain (M4), the phases (M5) or flights (M6), listed with what each needs.
+- **2026-10-22 (later):** merged `main` with the M7 source adapters (SimoneRecchia/VibeGlobe#11) and the M14 framework adapters (SimoneRecchia/VibeGlobe#13). The GeoJSON stub is replaced by `geojsonFormat`, `kmlFormat` and `gpxFormat` on the M7 parsers; their issues become error events. No entry newly passes: F371 still needs parsing in the worker pool and drawing.
 - Notes: the style engine's fallback path (a property the style reads is missing) is about 20 times slower than a normal evaluation; cluster diffs and label passes still run on the calling thread (`docs/follow-ups.md`).
+
+## Source adapters track (fourth session, `packages/sources`)
+
+Branch `claude/m7-source-adapters-0gkrjg`; status, contract workarounds and what each remaining entry waits for in `docs/parallel-tracks.md`.
+
+- **2026-10-22:** Adapters on the frozen source contract (ADR 0030): PMTiles (range requests, `pmtiles` library), MBTiles (`sql.js`, `@vibeglobe/sources/mbtiles`), WMTS and WMS (capabilities, CRS choice, gutter cropping), GeoJSON, KML/KMZ, GPX and a validating MVT decoder (`@vibeglobe/sources/vector`, worker task table), Google Map Tiles API 2D and Street View with session renewal (ADR 0031), the OpenStreetMap public-servers profile (ADR 0032). Shared, framework-free conformance suites (`@vibeglobe/sources/conformance`), an opt-in live run (`npm run test:live-sources`), the survey `docs/research/source-adapters.md` and the guide `docs/guides/sources.md`.
+- Passing: F223, F230–F233, F236–F239, F256, F257, F261–F263, F265–F267, and F341 of the data pipeline track. Pending the owner: F549 (one live run with the Google key). Waiting on the main track: F218–F220, F227, F228, F234, F235, F258–F260, F264, F268, F269.
+- Notes: the container reaches GitHub but not Google's, the OSMF's or most OGC servers, so the terms were read through search excerpts (owner question 24) and recorded capabilities come from the OpenLayers and OWSLib test suites. Fixed during development: concurrent Google 401s created one session per tile (now one renewal per refused token, unit test).
+
+## Framework adapters track (fifth session, M14)
+
+Branch `claude/m14-framework-adapters-y3ky8k`; status, stubs and blockers in `docs/parallel-tracks.md`.
+
+- **2026-10-22:** `@vibeglobe/vue`: the `VibeGlobe` component (typed props, camera props that move the running engine, `ready`, `load`, `camera-change`, `globe-click` and `error` events, `placeholder` and default slots; the engine starts in `onMounted`) and the `useGlobe`, `useCamera` (one reactive object updated in place), `useLoading` and `useViewMode` (stub) composables. `@vibeglobe/web-component`: `defineVibeGlobe(tagName)`, the `<vibe-globe>` element (attributes and reflected properties, `CustomEvent`s, shadow DOM, kept running when moved within one task) and its browser build `dist/browser/vibe-globe.js` for pages without a bundler. Examples: `apps/adapter-examples` (Vite + Vue 3, React and Vue hosts, plain HTML) and `apps/nuxt-example` (Nuxt 4.5 with SSR; 4.6 needs Node 22.22.3).
+- Passing: F473, F477–F484, F486, F487. Waiting for engine features: F474–F476, F485, F488, F490, F555. Leak checks: 100 cycles of each adapter on both backends leave GPU objects, DOM nodes and listeners flat and the heap within 2 KB.
+- About 2.5 hours of agent time. Remaining in M14 for this track: 7 entries, all waiting on M5–M8, M10 and M12 engine features.
 
 ## Session log (newest first)
 

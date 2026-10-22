@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { frameAt } from './__fixtures__/test-support.js';
 import type { FeatureCollection } from './geojson.js';
 import { GeoJsonLayer } from './geojson-layer.js';
+import { gpxFormat, kmlFormat } from './vector-format.js';
 import { LayerStack } from './layer-stack.js';
 import { RecordingRenderTarget } from './render-target.js';
 
@@ -101,6 +102,44 @@ describe('vector data layer', () => {
       type: 'FeatureCollection',
       features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 120] } }],
     });
-    expect(badPosition.errors[0]).toMatch(/invalid position/);
+    expect(badPosition.errors[0]).toMatch(/^geojson: feature 0: .*120/);
+  });
+
+  it('loads KML placemarks and GPX waypoints, routes and tracks through the M7 adapters', async () => {
+    const kml = `<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+      <Placemark id="rome"><name>Roma</name><Point><coordinates>12.5,41.9,0</coordinates></Point></Placemark>
+      <Placemark id="road"><LineString><coordinates>0,0 1,1 2,1</coordinates></LineString></Placemark>
+      <Placemark id="area"><Polygon><outerBoundaryIs><LinearRing><coordinates>0,0 4,0 4,4 0,0</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+    </Document></kml>`;
+    const gpx = `<?xml version="1.0"?><gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">
+      <wpt lat="45.8" lon="6.86"><name>Mont Blanc</name></wpt>
+      <trk><trkseg><trkpt lat="45" lon="6"/><trkpt lat="45.1" lon="6.1"/></trkseg></trk>
+    </gpx>`;
+    for (const [format, text, counts] of [
+      [kmlFormat, kml, { point: 1, line: 1, polygon: 1 }],
+      [gpxFormat, gpx, { point: 1, line: 1, polygon: 0 }],
+    ] as const) {
+      const target = new RecordingRenderTarget();
+      const stack = new LayerStack(target);
+      const errors: string[] = [];
+      const layer = new GeoJsonLayer({ data: new File([text], `data.${format.format}`), format });
+      layer.on('error', (e) => errors.push(e.message));
+      stack.add(layer);
+      await layer.loaded;
+      expect(errors).toEqual([]);
+      expect(layer.featureCounts).toEqual(counts);
+    }
+    for (const [format, text] of [
+      [kmlFormat, 'not xml at all'],
+      [gpxFormat, '<html><body>404</body></html>'],
+    ] as const) {
+      const broken = new GeoJsonLayer({ data: text, format });
+      const errors: string[] = [];
+      broken.on('error', (e) => errors.push(e.message));
+      new LayerStack(new RecordingRenderTarget()).add(broken);
+      await broken.loaded;
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(new RegExp(`^${format.format}: `));
+    }
   });
 });

@@ -1,91 +1,78 @@
 /**
- * Vector format adapters as the data layers use them (F371). The M7 source-adapter track builds the GeoJSON, KML, GPX
- * and MVT adapters in `@vibeglobe/sources` (docs/parallel-tracks.md); until they reach `main`, this typed stub defines
- * the contract and {@link geojsonFormat} parses GeoJSON on the calling thread.
+ * Vector format adapters as the data layers use them (F371): GeoJSON, KML and KMZ, and GPX through the M7 parsers of
+ * `@vibeglobe/sources/vector` (ADR 0030). The parsers never throw: they keep the valid features and report the others
+ * as issues. They run on the calling thread until the worker program registers `VECTOR_TASKS` (docs/parallel-tracks.md,
+ * hook request of the source adapters track); Mapbox Vector Tiles are tiled data for the vector-tile layer (M13).
  */
-import type { Feature, FeatureCollection, Geometry } from './geojson.js';
+import {
+  parseGeoJson,
+  parseGpx,
+  parseKml,
+  type FeatureIssue,
+  type Geometry as SourceGeometry,
+  type VectorFeature,
+} from '@vibeglobe/sources/vector';
+import type { Feature, Geometry } from './geojson.js';
 
-/** Raw input of an adapter: the bytes of a file or response, text, or an already parsed object. */
+/** Raw input of an adapter: the bytes of a file or response, text, or (GeoJSON only) an already parsed object. */
 export type VectorInput = ArrayBuffer | Uint8Array | string | object;
 
-/** Turns one vector format into GeoJSON features. */
+/** What an adapter returns: the features it could read and one issue per feature (or document) it could not. */
+export interface ParsedVectorData {
+  readonly features: readonly Feature[];
+  readonly issues: readonly FeatureIssue[];
+}
+
+/** Turns one vector format into features. */
 export interface VectorFormatAdapter {
-  /** Format name, for errors (for example 'geojson', 'kml', 'gpx', 'mvt'). */
+  /** Format name, for errors ('geojson', 'kml', 'gpx'). */
   readonly format: string;
-  /**
-   * Parses the input; implementations parse in a worker.
-   * @throws Error (as a rejected promise) for malformed input, naming the format and the problem.
-   */
-  parse(input: VectorInput): Promise<FeatureCollection>;
+  /** Parses untrusted input; never rejects for malformed data, which comes back as issues. */
+  parse(input: VectorInput): Promise<ParsedVectorData>;
 }
 
-const GEOMETRY_TYPES = new Set(['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
-
-function fail(problem: string): never {
-  throw new Error(`geojson: ${problem}`);
-}
-
-function checkGeometry(geometry: unknown, where: string): Geometry | null {
-  if (geometry === null) return null;
-  const g = geometry as { type?: unknown; coordinates?: unknown };
-  if (typeof g !== 'object' || typeof g.type !== 'string' || !GEOMETRY_TYPES.has(g.type)) {
-    fail(`${where}: unsupported or missing geometry type`);
-  }
-  if (!Array.isArray(g.coordinates)) fail(`${where}: coordinates must be an array`);
-  return g as Geometry;
-}
-
-function toFeature(value: unknown, where: string): Feature {
-  const f = value as { type?: unknown; geometry?: unknown; properties?: unknown; id?: unknown };
-  if (typeof f !== 'object' || f === null || f.type !== 'Feature') fail(`${where}: not a Feature`);
-  const properties = f.properties === undefined || f.properties === null ? {} : f.properties;
-  if (typeof properties !== 'object') fail(`${where}: properties must be an object`);
-  const id = typeof f.id === 'string' || typeof f.id === 'number' ? f.id : undefined;
-  const feature = {
-    type: 'Feature' as const,
-    geometry: checkGeometry(f.geometry, where),
-    properties: properties as Record<string, unknown>,
-  };
-  return id === undefined ? feature : { ...feature, id };
-}
-
-function toCollection(value: unknown): FeatureCollection {
-  const v = value as { type?: unknown; features?: unknown };
-  if (typeof v !== 'object' || v === null) fail('not a GeoJSON object');
-  if (v.type === 'FeatureCollection') {
-    if (!Array.isArray(v.features)) fail('features must be an array');
-    return { type: 'FeatureCollection', features: v.features.map((f, i) => toFeature(f, `feature ${i}`)) };
-  }
-  if (v.type === 'Feature') return { type: 'FeatureCollection', features: [toFeature(v, 'feature')] };
-  if (typeof v.type === 'string' && GEOMETRY_TYPES.has(v.type)) {
-    return {
-      type: 'FeatureCollection',
-      features: [{ type: 'Feature', geometry: checkGeometry(v, 'geometry'), properties: {} }],
-    };
-  }
-  return fail(`unknown type ${String(v.type)}`);
-}
-
-/** The GeoJSON adapter stub (RFC 7946 structure checks; coordinates are validated when features are added). */
-export const geojsonFormat: VectorFormatAdapter = {
-  format: 'geojson',
-  parse(input) {
-    try {
-      let value: unknown = input;
-      if (input instanceof ArrayBuffer || input instanceof Uint8Array) value = new TextDecoder().decode(input);
-      if (typeof value === 'string') {
-        try {
-          value = JSON.parse(value);
-        } catch (cause) {
-          fail(`invalid JSON (${String(cause)})`);
-        }
-      }
-      return Promise.resolve(toCollection(value));
-    } catch (error) {
-      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+/** Splits geometry collections into one feature per member, so each member draws with its own primitive family. */
+function toFeatures(features: readonly VectorFeature[]): Feature[] {
+  const out: Feature[] = [];
+  const add = (feature: VectorFeature, geometry: SourceGeometry | null, suffix: string): void => {
+    if (geometry?.type === 'GeometryCollection') {
+      geometry.geometries.forEach((member, i) => add(feature, member, `${suffix}/${i}`));
+      return;
     }
-  },
+    const id = feature.id === undefined ? undefined : suffix === '' ? feature.id : `${String(feature.id)}${suffix}`;
+    const base = { type: 'Feature' as const, geometry: geometry as Geometry | null, properties: feature.properties };
+    out.push(id === undefined ? base : { ...base, id });
+  };
+  for (const feature of features) add(feature, feature.geometry, '');
+  return out;
+}
+
+type Parser = (input: string | Uint8Array | ArrayBuffer) => {
+  features: readonly VectorFeature[];
+  issues: readonly FeatureIssue[];
 };
+
+function adapter(format: string, parser: Parser, acceptsObjects: boolean): VectorFormatAdapter {
+  return {
+    format,
+    parse(input) {
+      let source: string | Uint8Array | ArrayBuffer;
+      if (typeof input === 'string' || input instanceof ArrayBuffer || input instanceof Uint8Array) source = input;
+      else if (acceptsObjects) source = JSON.stringify(input);
+      else
+        return Promise.resolve({ features: [], issues: [{ index: -1, message: `${format}: expected text or bytes` }] });
+      const parsed = parser(source);
+      return Promise.resolve({ features: toFeatures(parsed.features), issues: parsed.issues });
+    },
+  };
+}
+
+/** GeoJSON (RFC 7946), from text, bytes or a parsed object. */
+export const geojsonFormat: VectorFormatAdapter = adapter('geojson', parseGeoJson, true);
+/** KML and KMZ placemarks (ground overlays and archive resources are not data-layer features). */
+export const kmlFormat: VectorFormatAdapter = adapter('kml', parseKml, false);
+/** GPX waypoints, routes and tracks. */
+export const gpxFormat: VectorFormatAdapter = adapter('gpx', parseGpx, false);
 
 /** Where vector data comes from: a URL, a File or Blob, or an in-memory object or text. */
 export type VectorSource = URL | { readonly url: string } | Blob | VectorInput;
@@ -93,12 +80,13 @@ export type VectorSource = URL | { readonly url: string } | Blob | VectorInput;
 /**
  * Reads vector data from a URL, a File or Blob, or memory, and parses it with an adapter.
  * @param fetchFn the fetch implementation (the engine's transport rules apply to URLs).
+ * @throws Error (a rejected promise) when a URL answers with an error status.
  */
 export async function loadVectorData(
   source: VectorSource,
   adapter: VectorFormatAdapter,
   fetchFn: (url: string) => Promise<Response> = (url) => fetch(url),
-): Promise<FeatureCollection> {
+): Promise<ParsedVectorData> {
   let input: VectorInput;
   if (
     source instanceof URL ||

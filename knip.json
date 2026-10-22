@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts", "benchmarks/*.ts", "e2e/**/*.spec.ts"],
+      "entry": ["scripts/*.ts", "benchmarks/*.ts", "e2e/**/*.spec.ts", "e2e/support/*-worker.ts"],
       "project": ["scripts/**/*.ts", "benchmarks/**/*.ts", "e2e/**/*.ts", "*.config.ts"],
       "includeEntryExports": true,
       "ignore": ["scripts/fixtures/**"]

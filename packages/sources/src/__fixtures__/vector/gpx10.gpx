@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic GPX 1.0 for the conformance suite: a waypoint with a URL, a route, and a track with two segments, one
+     of them too short to be a line. -->
+<gpx version="1.0" creator="Fixture" xmlns="http://www.topografix.com/GPX/1/0">
+  <wpt lat="45.8326" lon="6.8652"><ele>4808</ele><time>2024-07-01T06:00:00Z</time><name>Mont Blanc</name><url>https://summit.test/</url><sym>Summit</sym></wpt>
+  <rte><name>Ascent</name><rtept lat="45.90" lon="6.80"/><rtept lat="45.85" lon="6.85"><ele>3800</ele></rtept></rte>
+  <trk><name>Walk</name><trkseg><trkpt lat="45.0" lon="7.0"><ele>100</ele><time>2024-07-01T07:00:00Z</time></trkpt><trkpt lat="45.1" lon="7.1"><ele>110.5</ele><time>2024-07-01T07:10:00Z</time></trkpt></trkseg><trkseg><trkpt lat="45.2" lon="7.2"/></trkseg><trkseg><trkpt lat="45.3" lon="7.3"/><trkpt lat="45.4" lon="7.4"/></trkseg></trk>
+  <wpt lat="91" lon="0"><name>Impossible</name></wpt>
+</gpx>

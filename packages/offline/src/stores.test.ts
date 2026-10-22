@@ -7,6 +7,7 @@ import { defaultNetworkPolicy } from './policy.js';
 import { SwitchBoard } from './switches.js';
 import { indexedDbStore } from './idb-store.js';
 import { memoryStore } from './memory-store.js';
+import { workerStore } from './worker-store.js';
 import type { CachedTile, NetworkPolicy } from './types.js';
 
 const tile = (size: number): CachedTile => ({
@@ -103,5 +104,21 @@ describe('cache stores', () => {
     expect(await store.get('e/1')).toBeUndefined();
     expect((await store.usage()).bytes).toBe(0);
     store.close();
+  });
+});
+
+describe('workerStore when its worker fails', () => {
+  it('rejects calls made after the worker failed to load, instead of leaving them pending (PT-14)', async () => {
+    const fake = { postMessage: () => undefined, terminate: () => undefined } as unknown as Worker;
+    const store = workerStore({ worker: fake });
+    fake.onerror?.(new Event('error') as ErrorEvent);
+    const settled = await Promise.race([
+      store.get('k').then(
+        () => 'resolved',
+        () => 'rejected',
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 50)),
+    ]);
+    expect(settled).toBe('rejected');
   });
 });

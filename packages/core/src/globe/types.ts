@@ -9,7 +9,7 @@ import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
 import type { MorphFrame } from '../view/morph.js';
 import type { ViewCurvesInit } from '../view/curves.js';
-import type { ViewMode } from '../view/view-state.js';
+import type { ViewMode, ViewPhase } from '../view/view-state.js';
 
 /** A WGS84 geodetic position: degrees and meters above the ellipsoid, whatever the display projection. */
 export interface GeoPosition {
@@ -302,6 +302,12 @@ export interface CameraState {
    */
   readonly chosenTiltDeg: number;
   readonly chosenHeadingDeg: number;
+  /** The globe-to-flat morph factor the last frame drew: 0 the globe, 1 the flat map (ADR 0008). */
+  readonly morphFactor: number;
+  /** The share of terrain relief the last frame drew: 0 flat, 1 full height. */
+  readonly reliefFactor: number;
+  /** The phase of the last frame (`PLAN.md`, Map experience). */
+  readonly phase: ViewPhase;
 }
 
 /** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0029). */
@@ -456,6 +462,8 @@ export interface GlobeEvents {
   'backend-fallback': { readonly reason: string };
   /** An imagery tile failed for good; its area keeps showing an ancestor (F112). */
   'tile-error': TileErrorEvent;
+  /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
+  'view-mode-change': { readonly mode: ViewMode };
   error: GlobeError;
 }
 
@@ -548,6 +556,11 @@ export interface Globe {
    * ('invalid-option').
    */
   setViewMode(mode: '2d' | '3d' | 'auto'): void;
+  /**
+   * Replaces the zoom curves (F150): fields not given keep their defaults; the view eases to the new curves without a
+   * jump. Invalid curves throw a GlobeError ('invalid-option') and change nothing.
+   */
+  setViewCurves(curves: ViewCurvesInit): void;
   /**
    * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. A point
    * without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').

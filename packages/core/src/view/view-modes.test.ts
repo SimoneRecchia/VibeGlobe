@@ -43,8 +43,15 @@ describe('view modes (F161–F164)', () => {
   it('keeps 0° at every zoom in 2D, chooses the default tilt in 3D and restores the curves in Auto', async () => {
     const { globe, frames } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 18 });
     globe.setViewMode('2d');
-    frames(1);
-    expect(globe.camera.tiltDeg).toBe(0);
+    // The tilt animates to 0° over a few frames (F162), each frame lower than the last.
+    const tilts: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      frames(1);
+      tilts.push(globe.camera.tiltDeg);
+    }
+    expect(tilts[0]).toBeGreaterThan(0);
+    expect(tilts.every((tilt, i) => i === 0 || tilt <= (tilts[i - 1] ?? 0))).toBe(true);
+    expect(tilts.at(-1)).toBe(0);
     globe.setViewMode('3d');
     globe.jumpTo({ zoom: 12 });
     // The tilt eases to the chosen one over a few frames, then holds it at region scale too.
@@ -52,7 +59,7 @@ describe('view modes (F161–F164)', () => {
     expect(globe.viewMode).toBe('manual');
     expect(globe.camera.tiltDeg).toBeCloseTo(DEFAULT_VIEW_CURVES.autoTiltDeg, 6);
     globe.setViewMode('auto');
-    frames(1);
+    frames(40);
     expect(globe.camera.tiltDeg).toBe(0);
     expect(() => globe.setViewMode('globe' as '2d')).toThrow(expect.objectContaining({ code: 'invalid-option' }));
     globe.destroy();

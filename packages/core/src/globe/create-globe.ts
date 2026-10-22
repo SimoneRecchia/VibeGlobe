@@ -10,7 +10,6 @@ import {
 } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
-import { dragCamera, zoomCamera } from './navigation.hot.js';
 import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
@@ -18,9 +17,11 @@ import { FrameWaits } from './frame-waits.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
+import type { ViewCurvesInit } from '../view/curves.js';
+import { ViewControl } from './view-control.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { createFrameView, keepGroundScale, positionAt, screenOf, type MutableFrameView } from './view-geometry.js';
+import { createFrameView, keepGroundScale, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -47,7 +48,6 @@ import type {
 } from './types.js';
 import {
   DEFAULT_VIEW,
-  isScreenPoint,
   validateHandler,
   validateResolutionScale,
   validateScreenPoint,
@@ -57,7 +57,6 @@ import {
   type ValidView,
 } from './validation.js';
 
-const RAD = Math.PI / 180;
 /**
  * Creates a globe engine instance in a container (architecture §2). The returned object is usable at once; `ready`
  * resolves after the first complete frame. Invalid options throw a GlobeError synchronously.
@@ -69,6 +68,7 @@ export function createGlobe(options: GlobeOptions): Globe {
 class GlobeEngine implements Globe {
   readonly ready: Promise<void>;
   readonly navigation: NavigationApi;
+  private readonly viewControl: ViewControl;
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
@@ -121,20 +121,16 @@ class GlobeEngine implements Globe {
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
     this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
-    if (options.view?.tiltDeg !== undefined) this.surfaceFrame.view.chooseTilt(this.pendingView.tiltDeg * RAD);
-    this.navigation = {
-      // Input plug-ins call these every frame: invalid input is ignored, never thrown.
-      grab: (point) => (isScreenPoint(point) ? this.pick(point) : undefined),
-      dragTo: (anchor, point) => {
-        this.assertAlive();
-        if (!this.waiting && dragCamera(this.cam, this.surfaceFrame.view, anchor, point)) this.requestRender();
-      },
-      zoomAt: (point, deltaZoom) => {
-        this.assertAlive();
-        if (!this.waiting && zoomCamera(this.cam, this.surfaceFrame.view, point, deltaZoom)) this.requestRender();
-      },
-      requestUpdate: () => this.requestRender(),
-    };
+    this.viewControl = new ViewControl({
+      cam: this.cam,
+      view: this.surfaceFrame.view,
+      emitter: this.emitter,
+      waiting: () => this.waiting,
+      assertAlive: () => this.assertAlive(),
+      requestRender: () => this.requestRender(),
+    });
+    this.navigation = this.viewControl.navigation;
+    if (options.view?.tiltDeg !== undefined) this.viewControl.chooseTilt(this.pendingView.tiltDeg);
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
@@ -170,8 +166,12 @@ class GlobeEngine implements Globe {
 
   setViewMode(mode: '2d' | '3d' | 'auto'): void {
     this.assertAlive();
-    this.surfaceFrame.view.setMode(mode);
-    this.requestRender();
+    this.viewControl.setMode(mode);
+  }
+
+  setViewCurves(curves: ViewCurvesInit): void {
+    this.assertAlive();
+    this.viewControl.setCurves(curves);
   }
 
   get frameNumber(): number {
@@ -368,7 +368,7 @@ class GlobeEngine implements Globe {
       throw error;
     }
     // A view given with a tilt chooses it (manual mode, ADR 0029).
-    if (target.tiltDeg !== undefined) this.surfaceFrame.view.chooseTilt(view.tiltDeg * RAD);
+    if (target.tiltDeg !== undefined) this.viewControl.chooseTilt(view.tiltDeg);
     if (pending) {
       // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
       if (keepRange) keepGroundScale(pending, view);
@@ -382,12 +382,7 @@ class GlobeEngine implements Globe {
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
-    return this.pick(validateScreenPoint(point));
-  }
-
-  /** The position under a valid screen point; none before the viewport has a size. */
-  private pick(point: ScreenPoint): GeoPosition | undefined {
-    return this.waiting ? undefined : positionAt(this.cam, this.surfaceFrame.view, point);
+    return this.viewControl.positionAt(validateScreenPoint(point));
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {

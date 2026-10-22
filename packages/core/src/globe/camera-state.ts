@@ -46,6 +46,9 @@ export function newCameraState(): MutableCameraState {
     viewMode: 'auto',
     chosenTiltDeg: 0.5,
     chosenHeadingDeg: 0.5,
+    morphFactor: 0.5,
+    reliefFactor: 0.5,
+    phase: 'globe',
   };
 }
 
@@ -68,6 +71,9 @@ export function writeCameraState(camera: Camera, out: MutableCameraState, view?:
   out.viewMode = view ? view.mode : 'manual';
   out.chosenTiltDeg = view && view.mode === 'manual' ? view.chosenTiltRad * DEG : out.tiltDeg;
   out.chosenHeadingDeg = out.headingDeg;
+  out.morphFactor = view ? (view.morph.factors[0] ?? 0) : 0;
+  out.reliefFactor = view ? (view.morph.factors[1] ?? 1) : 1;
+  out.phase = view ? view.phase : 'globe';
   return out;
 }
 
@@ -143,5 +149,9 @@ export function requestedCameraState(view: ValidView, state?: ViewState): Camera
     viewMode: state ? state.mode : 'manual',
     chosenTiltDeg: view.tiltDeg,
     chosenHeadingDeg: wrapDegrees(view.headingDeg),
+    // Nothing is drawn yet: the factors and phase are those of the start state.
+    morphFactor: state ? (state.morph.factors[0] ?? 0) : 0,
+    reliefFactor: state ? (state.morph.factors[1] ?? 1) : 1,
+    phase: state ? state.phase : 'globe',
   };
 }

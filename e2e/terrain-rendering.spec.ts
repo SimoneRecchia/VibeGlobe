@@ -245,7 +245,9 @@ for (const backend of BACKENDS) {
       for (const tile of mercator) {
         expect(tile.terrainLevel ?? 99).toBeLessThanOrEqual(10);
         expect(tile.imageryLevel).toBe(Math.min(tile.level, 18));
-        expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
+        // Coarse terrain never stops imagery refining: below the imagery's deepest level every texel is sharp. At that
+        // level, 10 m above the ground, texels near the eye are larger: there is no finer imagery to show.
+        if ((tile.imageryLevel ?? 0) < 18) expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
       }
       expect(Math.max(...mercator.map((t) => t.imageryLevel ?? 0))).toBeGreaterThan(12);
       // The same view without terrain selects the same imagery levels at the center (imagery-only reference).

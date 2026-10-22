@@ -1749,7 +1749,7 @@
         "Open `http://localhost:5173/?scenario=terrain-alps&debug=1` and drive a zoom from 50 km to 500 m altitude with Playwright",
         "Assert from the debug overlay data that terrain levels increase toward the camera and that no tile is refined beyond the source's maximum level"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F127",
@@ -1865,7 +1865,7 @@
         "Render a fixture containing an analytic synthetic mountain on both backends and compare screenshots against analytically generated baselines",
         "Read back depth at selected pixels and assert reconstructed positions match the analytic surface within the depth-precision tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F136",
@@ -1890,7 +1890,7 @@
         "Assert zero sentinel-colored pixels inside the terrain footprint in every frame",
         "Run the temporal glitch detector along tile edges and assert no shimmer, z-fighting or visible vertical walls"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F138",
@@ -1903,7 +1903,7 @@
         "Assert no frame-to-frame change at a refinement or coarsening event exceeds the popping threshold",
         "Unit test the morph: at the end of each transition the geometry equals the target level's mesh exactly"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F139",
@@ -1917,7 +1917,7 @@
         "Assert from the tile-state trace that no parent terrain tile is released before all of its replacing children are ready and that 404 tiles are not retried",
         "Assert no step or wall is visible where covered terrain meets uncovered areas, including coastlines at the edge of coverage (seam detector)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F140",
@@ -1942,7 +1942,7 @@
         "Assert the grid lines rendered over the terrain land at their expected screen positions within 1 pixel at latitudes 0°, 45° and 75° on both backends",
         "Repeat with Web Mercator heightmap terrain and geographic imagery"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F142",
@@ -1954,7 +1954,7 @@
         "Open `?scenario=terrain-horizon-peaks` with a tall peak just behind the ellipsoid horizon and another at the frustum edge",
         "Record frames while panning on both backends and assert by frame differencing that the peaks never disappear or flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F143",
@@ -1966,7 +1966,7 @@
         "Record frames during a scripted orbit on both backends with a sentinel clear color",
         "Assert zero sentinel pixels and no seam lines (edge-detection along the 180° meridian and the polar cap boundary)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F144",

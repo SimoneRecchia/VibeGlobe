@@ -472,6 +472,8 @@ export interface GlobeEvents {
   move: MoveEvent;
   /** A camera movement ended, with how. */
   moveend: MoveEndEvent;
+  /** A tour reached a waypoint (F199): its index in the tour. */
+  'tour-waypoint': { readonly index: number };
   error: GlobeError;
 }
 
@@ -498,6 +500,22 @@ export interface MoveEndEvent extends MoveEvent {
 export interface CameraMovement extends Promise<MoveOutcome> {
   /** Stops the movement where the last frame left it; the promise settles as 'cancelled'. */
   cancel(): void;
+}
+
+/** A geographic rectangle in degrees; `eastDeg` below `westDeg` crosses the antimeridian. */
+export interface GeoBounds {
+  readonly westDeg: number;
+  readonly southDeg: number;
+  readonly eastDeg: number;
+  readonly northDeg: number;
+}
+
+/** One stop of a tour (F199): where to go, how (a flight by default), how long the leg takes and how long to stay. */
+export interface TourWaypoint {
+  readonly target: ViewInit;
+  readonly movement?: 'fly' | 'ease' | 'jump';
+  readonly durationMs?: number;
+  readonly dwellMs?: number;
 }
 
 /** Options of {@link Globe.easeTo} and {@link Globe.flyTo}. */
@@ -600,6 +618,20 @@ export interface Globe {
    * there. Fields not given keep their values, as for {@link easeTo}.
    */
   flyTo(target: ViewInit, options?: MovementOptions): CameraMovement;
+  /**
+   * Flies (or eases, with `movement: 'ease'`) to the view that shows `bounds` inside the viewport minus `paddingPx`
+   * (default 0) on every side, keeping the heading and the view mode's tilt (F176).
+   */
+  fitBounds(
+    bounds: GeoBounds,
+    options?: MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' },
+  ): CameraMovement;
+  /**
+   * Plays the waypoints in order, each with its movement, duration and dwell time, announcing each with a
+   * `tour-waypoint` event (F199). It settles as completed at the end, interrupted when user input or another movement
+   * takes over, and cancelled through cancel() or the signal.
+   */
+  tour(waypoints: readonly TourWaypoint[], options?: { readonly signal?: AbortSignalLike }): CameraMovement;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
   /**

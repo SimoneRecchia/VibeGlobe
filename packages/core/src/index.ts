@@ -60,6 +60,8 @@ export type {
   MoveEvent,
   MoveOutcome,
   MovementOptions,
+  GeoBounds,
+  TourWaypoint,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';

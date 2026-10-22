@@ -103,3 +103,80 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
     globe.destroy();
   });
 });
+
+describe('fitting bounds and tours (F176, F199)', () => {
+  it('fits a city, an antimeridian area and a near-polar area inside the padded viewport, with heading and tilt', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 0, latitudeDeg: 20, zoom: 3, headingDeg: 30, tiltDeg: 20 });
+    for (const [bounds, padding] of [
+      [{ westDeg: 12.4, southDeg: 41.8, eastDeg: 12.6, northDeg: 42 }, 20],
+      [{ westDeg: 170, southDeg: -20, eastDeg: -170, northDeg: -10 }, 40],
+      [{ westDeg: 10, southDeg: 75, eastDeg: 30, northDeg: 80 }, 10],
+    ] as const) {
+      const movement = globe.fitBounds(bounds, { paddingPx: padding, movement: 'ease', durationMs: 100 });
+      ticks(30);
+      expect(await movement).toBe('completed');
+      let touching = Infinity;
+      for (let i = 0; i <= 8; i++) {
+        const f = i / 8;
+        const width =
+          bounds.eastDeg >= bounds.westDeg ? bounds.eastDeg - bounds.westDeg : bounds.eastDeg + 360 - bounds.westDeg;
+        let lon = bounds.westDeg + f * width;
+        if (lon > 180) lon -= 360;
+        for (const point of [
+          globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.southDeg }),
+          globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.northDeg }),
+        ]) {
+          if (!point) throw new Error('a bound is not on screen');
+          expect(point.xPx).toBeGreaterThanOrEqual(padding - 0.01);
+          expect(point.xPx).toBeLessThanOrEqual(800 - padding + 0.01);
+          expect(point.yPx).toBeGreaterThanOrEqual(padding - 0.01);
+          expect(point.yPx).toBeLessThanOrEqual(600 - padding + 0.01);
+          touching = Math.min(
+            touching,
+            point.xPx - padding,
+            800 - padding - point.xPx,
+            point.yPx - padding,
+            600 - padding - point.yPx,
+          );
+        }
+      }
+      // An edge sample touches the padding: as large as it can be.
+      expect(touching).toBeLessThan(2);
+      expect(globe.camera.headingDeg).toBeCloseTo(30, 6);
+    }
+    await expect(globe.fitBounds({ westDeg: 0, southDeg: 10, eastDeg: 5, northDeg: 5 })).rejects.toMatchObject({
+      code: 'invalid-coordinate',
+    });
+    globe.destroy();
+  });
+
+  it('plays the waypoints in order with their dwell times, and settles as completed, cancelled or interrupted', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 0, latitudeDeg: 20, zoom: 3 });
+    const reached: number[] = [];
+    globe.on('tour-waypoint', ({ index }) => reached.push(index));
+    const stops = [
+      { target: { longitudeDeg: 10, latitudeDeg: 45, zoom: 6 }, durationMs: 300, dwellMs: 200 },
+      { target: { longitudeDeg: 12, latitudeDeg: 42, zoom: 8 }, movement: 'ease' as const, durationMs: 200 },
+      { target: { longitudeDeg: 2, latitudeDeg: 48, zoom: 7 }, movement: 'jump' as const },
+      { target: { longitudeDeg: -3, latitudeDeg: 40, zoom: 6 }, durationMs: 300, dwellMs: 100 },
+      { target: { longitudeDeg: 9, latitudeDeg: 45, zoom: 9 }, movement: 'ease' as const, durationMs: 200 },
+    ];
+    const tour = globe.tour(stops);
+    for (let i = 0; i < 200 && reached.length < 5; i++) {
+      ticks(5);
+      await Promise.resolve();
+    }
+    expect(await tour).toBe('completed');
+    expect(reached).toEqual([0, 1, 2, 3, 4]);
+    expect(globe.camera.zoom).toBeCloseTo(9, 6);
+    const cancelled = globe.tour(stops);
+    ticks(3);
+    cancelled.cancel();
+    expect(await cancelled).toBe('cancelled');
+    const taken = globe.tour(stops);
+    ticks(3);
+    globe.navigation.zoomAt({ xPx: 400, yPx: 300 }, 0.5);
+    expect(await taken).toBe('interrupted');
+    globe.destroy();
+  });
+});

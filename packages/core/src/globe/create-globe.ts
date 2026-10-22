@@ -366,6 +366,11 @@ class GlobeEngine implements Globe {
     this.assertAlive(),
     this.movements.start('ease', target, options)
   );
+  readonly fitBounds: Globe['fitBounds'] = (bounds, options) => (
+    this.assertAlive(),
+    this.movements.fitBounds(bounds, options)
+  );
+  readonly tour: Globe['tour'] = (waypoints, options) => (this.assertAlive(), this.movements.tour(waypoints, options));
   readonly flyTo = (target: ViewInit, options?: MovementOptions): CameraMovement => (
     this.assertAlive(),
     this.movements.start('fly', target, options)

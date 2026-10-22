@@ -3,7 +3,18 @@ import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js
 import { groundZoomFromMercatorZoom, rangeForGroundZoom } from '../camera/zoom.js';
 import type { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
-import type { CameraMovement, GlobeEvents, MoveCause, MoveOutcome, MovementOptions, ViewInit } from './types.js';
+import type {
+  CameraMovement,
+  GeoBounds,
+  GlobeEvents,
+  MoveCause,
+  MoveOutcome,
+  MovementOptions,
+  TourWaypoint,
+  ViewInit,
+} from './types.js';
+import type { AbortSignalLike } from './imagery-runtime.js';
+import { validateBounds, viewForBounds } from './fit-bounds.js';
 import { validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
@@ -16,6 +27,7 @@ const RAD = Math.PI / 180;
 /** What camera movements need from their globe. */
 export interface MovementHost {
   readonly cam: Camera;
+  readonly view: ViewState;
   readonly emitter: Emitter<GlobeEvents>;
   /** The engine clock's time of the frame being drawn, milliseconds. */
   timeMs(): number;
@@ -73,9 +85,7 @@ export class Movements {
       )
         throw new GlobeError('invalid-option', 'A movement signal must be an AbortSignal');
     } catch (error) {
-      const rejected = Promise.reject(error) as CameraMovement;
-      rejected.cancel = () => undefined;
-      return rejected;
+      return rejected(error);
     }
     this.interrupt();
     const camera = this.host.cam;
@@ -106,6 +116,79 @@ export class Movements {
     if (signal?.aborted) this.finish(running, 'cancelled');
     else signal?.addEventListener('abort', onAbort);
     this.host.requestRender();
+    return promise;
+  }
+
+  /** Flies or eases to the view that shows `bounds` inside the padded viewport (F176). */
+  fitBounds(
+    bounds: GeoBounds,
+    options: (MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' }) | undefined,
+  ): CameraMovement {
+    const camera = this.host.cam;
+    let target;
+    try {
+      const valid = validateBounds(bounds);
+      const padding = options?.paddingPx ?? 0;
+      if (typeof padding !== 'number' || !(padding >= 0) || 2 * padding >= Math.min(camera.widthPx, camera.heightPx))
+        throw new GlobeError('invalid-option', `paddingPx must leave part of the viewport, got ${String(padding)}`);
+      if (options?.movement !== undefined && options.movement !== 'fly' && options.movement !== 'ease')
+        throw new GlobeError('invalid-option', `movement must be 'fly' or 'ease', got ${String(options.movement)}`);
+      target = viewForBounds(camera, this.host.view, valid, padding);
+    } catch (error) {
+      return rejected(error);
+    }
+    return this.start(options?.movement ?? 'fly', target, options);
+  }
+
+  /** Plays a tour (F199): each leg a movement, then its dwell, announcing each waypoint. */
+  tour(waypoints: readonly TourWaypoint[], options: { readonly signal?: AbortSignalLike } | undefined): CameraMovement {
+    try {
+      if (!Array.isArray(waypoints) || waypoints.length === 0)
+        throw new GlobeError('invalid-option', 'A tour needs at least one waypoint');
+      for (const waypoint of waypoints) {
+        validateView(waypoint?.target, this.host.currentView());
+        if (waypoint.movement !== undefined && !['fly', 'ease', 'jump'].includes(waypoint.movement))
+          throw new GlobeError('invalid-option', `A waypoint's movement is 'fly', 'ease' or 'jump'`);
+        validDuration(waypoint.durationMs);
+        validDuration(waypoint.dwellMs);
+      }
+    } catch (error) {
+      return rejected(error);
+    }
+    let current: CameraMovement | undefined;
+    let cancelled = false;
+    const leg = async (movement: CameraMovement): Promise<MoveOutcome> => {
+      current = movement;
+      const outcome = await movement;
+      return cancelled ? 'cancelled' : outcome;
+    };
+    const run = async (): Promise<MoveOutcome> => {
+      for (const [index, waypoint] of waypoints.entries()) {
+        if (cancelled) return 'cancelled';
+        if (waypoint.movement === 'jump') this.jump(waypoint.target, undefined, false);
+        else {
+          const outcome = await leg(
+            this.start(waypoint.movement ?? 'fly', waypoint.target, { durationMs: waypoint.durationMs }),
+          );
+          if (outcome !== 'completed') return outcome;
+        }
+        this.host.emitter.emit('tour-waypoint', { index });
+        if ((waypoint.dwellMs ?? 0) > 0) {
+          // A dwell holds the view on the engine clock: an ease to where the camera is.
+          const outcome = await leg(this.start('ease', {}, { durationMs: waypoint.dwellMs }));
+          if (outcome !== 'completed') return outcome;
+        }
+      }
+      return 'completed';
+    };
+    const promise = run() as CameraMovement;
+    promise.cancel = () => {
+      cancelled = true;
+      current?.cancel();
+    };
+    const signal = options?.signal;
+    if (signal?.aborted) promise.cancel();
+    else signal?.addEventListener('abort', () => promise.cancel());
     return promise;
   }
 
@@ -204,6 +287,13 @@ export class Movements {
   }
 }
 
+/** A movement that failed validation: rejected, with nothing to cancel. */
+function rejected(error: unknown): CameraMovement {
+  const promise = Promise.reject(error) as CameraMovement;
+  promise.cancel = () => undefined;
+  return promise;
+}
+
 /** A duration in milliseconds, 0 or more and finite, or undefined for the automatic one. */
 function validDuration(value: unknown): number | undefined {
   if (value === undefined) return undefined;
@@ -239,6 +329,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
   });
   const movements: Movements = new Movements({
     cam: globe.cam,
+    view: globe.view,
     emitter: globe.emitter,
     timeMs: () => globe.clock.timeMs,
     currentView: () => currentView(globe.cam),

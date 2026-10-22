@@ -345,6 +345,8 @@ for (const backend of BACKENDS) {
   test(`dragging keeps the grabbed point under the cursor, also near the edge and over a pole, on ${backend} (F060)`, async ({
     page,
   }) => {
+    // A smaller page: the software rasterizer of CI draws each of the 32 steps' frames in about half the time.
+    await page.setViewportSize({ width: 800, height: 600 });
     await openGlobe(page, `backend=${backend}&lon=10&lat=60&zoom=2`);
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');

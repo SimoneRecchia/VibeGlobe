@@ -85,6 +85,12 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   fromPlaceholder.anisotropy = placeholder.anisotropy;
   fromPlaceholder.needsUpdate = true;
   const fromMap = texture(fromPlaceholder, fromUv);
+  // Disposed with the material: an undisposed texture keeps its renderer reachable through its dispose listener.
+  const disposeFrom = (): void => {
+    material.removeEventListener('dispose', disposeFrom);
+    fromPlaceholder.dispose();
+  };
+  material.addEventListener('dispose', disposeFrom);
   material.userData['surfaceTexture'] = map;
   material.userData['fromTexture'] = fromMap;
   // A cross-fade mixes the two imageries in one draw, never two overlapping draws (ADR 0006), and in a perceptual

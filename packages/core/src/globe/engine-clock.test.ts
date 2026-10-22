@@ -12,6 +12,9 @@ describe('EngineClock (ADR 0009, ADR 0012)', () => {
     at(clock, 1033);
     expect(clock.timeMs).toBeCloseTo(33, 9);
     expect(clock.deltaMs).toBeCloseTo(16.5, 9);
+    const out = new Float64Array(1);
+    clock.timeInto(out);
+    expect(out[0]).toBe(clock.timeMs);
   });
 
   it('clamps a stall to 100 ms and never runs backward', () => {

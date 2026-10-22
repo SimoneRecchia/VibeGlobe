@@ -93,7 +93,7 @@ export class SurfaceFrame {
     const { timer, tracer } = this.observability;
     timer.end(PHASE_UPDATE);
     if (tracer.enabled) this.traceCamera(camera);
-    this.nowMs[0] = this.clock.timeMs;
+    this.clock.timeInto(this.nowMs);
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     this.draws.reserve(count);
     cache.prepare(this.tiles, count, this.draws.meshKeys);

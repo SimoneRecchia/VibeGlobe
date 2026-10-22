@@ -11,6 +11,9 @@ function fixtureTiles(): Plugin {
   };
 }
 
+// In CI's containers localhost may resolve to ::1 while Vite listens on 127.0.0.1: listen on both (ADR 0035).
+const HOST = process.env['CI'] ? { host: '::' } : {};
+
 export default defineConfig({
   resolve: {
     // Workspace packages resolve to their TypeScript sources, so the playground needs no prior package build.

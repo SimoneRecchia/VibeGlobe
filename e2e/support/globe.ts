@@ -109,7 +109,23 @@ export async function waitForIdle(page: Page): Promise<number> {
  */
 export async function canvasImage(page: Page, index = 0): Promise<PNG> {
   const frame = await page.evaluate(async (i) => {
-    const capture = await window.vibeglobePlayground?.globes[i]?.captureFrame();
+    const globe = window.vibeglobePlayground?.globes[i];
+    // A capture that never completes (no frame could be drawn) fails with the engine's state, to investigate in CI.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const state = globe && {
+          frames: globe.frameNumber,
+          renderer: globe.rendererStats(),
+          resources: globe.resourceCounts(),
+          terrain: globe.terrainStats(),
+          imagery: globe.imageryStats(),
+          size: [globe.camera.zoom, document.querySelector('canvas')?.width, document.querySelector('canvas')?.height],
+        };
+        reject(new Error(`captureFrame did not complete in 60 s: ${JSON.stringify(state)}`));
+      }, 60_000);
+    });
+    const capture = await Promise.race([globe?.captureFrame(), stalled]).finally(() => clearTimeout(timer));
     if (!capture) throw new Error(`no globe ${i}`);
     const bytes = new Uint8Array(capture.rgba.buffer, capture.rgba.byteOffset, capture.rgba.byteLength);
     let binary = '';

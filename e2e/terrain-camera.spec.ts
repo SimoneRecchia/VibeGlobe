@@ -165,6 +165,7 @@ function installClearanceRecorder(): void {
     minAboveFinest: Infinity,
     altitudes: [] as number[],
     grounds: [] as number[],
+    levels: [] as number[],
     worst: [] as number[],
   };
   (window as unknown as { clearance: typeof record }).clearance = record;
@@ -182,6 +183,7 @@ function installClearanceRecorder(): void {
     record.minAboveFinest = Math.min(record.minAboveFinest, camera.altitudeMeters - finest.heightMeters);
     record.altitudes.push(camera.altitudeMeters);
     record.grounds.push(camera.groundHeightMeters);
+    record.levels.push(finest.level);
   });
 }
 
@@ -205,6 +207,8 @@ interface ClearanceRecord {
   minAboveFinest: number;
   altitudes: number[];
   grounds: number[];
+  /** The level of the finest resident terrain under the eye, each frame. */
+  levels: number[];
   /** The frame furthest below the finest terrain: eye lon, lat, altitude, displayed ground, finest, level, tilt, frame. */
   worst: number[];
 }
@@ -295,7 +299,12 @@ for (const backend of BACKENDS) {
     // The delayed tiles come a few at a time per host, 9 s each: over a minute in all.
     await waitForTerrain(page, 180_000);
     const record = await clearance(page);
-    const steps = record.altitudes.slice(1).map((altitude, i) => altitude - (record.altitudes[i] ?? altitude));
+    // From the frame before the first delayed tile: the jump onto the first terrain (the eye starts on the ellipsoid,
+    // inside the mountain) is the floor of F146, not the arrival of finer terrain.
+    const first = record.levels.findIndex((level) => level >= 9);
+    expect(first).toBeGreaterThan(0);
+    const altitudes = record.altitudes.slice(first - 1);
+    const steps = altitudes.slice(1).map((altitude, i) => altitude - (altitudes[i] ?? altitude));
     const rising = steps.filter((step) => step > 0.01);
     const lift = rising.reduce((sum, step) => sum + step, 0);
     console.log(

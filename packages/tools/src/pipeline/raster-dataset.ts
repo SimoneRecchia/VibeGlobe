@@ -8,7 +8,7 @@ import { encodePng } from '../encode/png.js';
 import { encodeTerrariumTile } from '../encode/terrarium.js';
 import { tileExtension } from '../output/metadata.js';
 import { Mosaic, type MosaicEntry } from '../raster/mosaic.js';
-import { readGeoTiff } from '../raster/tiff.js';
+import { type Raster, readGeoTiff } from '../raster/tiff.js';
 import { extractZipMember } from '../raster/zip.js';
 import type { SourceFile } from '../sources/files.js';
 import type { Area } from '../tiles/area.js';
@@ -24,13 +24,27 @@ export interface DatasetFolders {
   report: (line: string) => void;
 }
 
+/**
+ * Maps a sample to a byte: clamped as is, or through the dataset's colour stretch (ADR 0026),
+ * `255 × min(1, reflectance / maxReflectance) ^ (1 / gamma)`, tabulated for every integer reflectance.
+ */
+export function byteMapping(dataset: DatasetConfig): (sample: number) => number {
+  const stretch = dataset.colorStretch;
+  if (!stretch) return (sample) => Math.max(0, Math.min(255, Math.round(sample)));
+  const table = new Uint8Array(stretch.maxReflectance + 1);
+  for (let r = 0; r <= stretch.maxReflectance; r++)
+    table[r] = Math.round(255 * (r / stretch.maxReflectance) ** (1 / stretch.gamma));
+  return (sample) => table[Math.max(0, Math.min(stretch.maxReflectance, Math.round(sample)))] ?? 255;
+}
+
 /** The tile encoder of a raster dataset. */
 function rasterEncoder(dataset: DatasetConfig): TileEncoder {
   if (dataset.encoding === 'terrarium') return (samples) => encodeTerrariumTile(samples, TILE_PX);
   const quality = dataset.quality ?? 85;
+  const toByte = byteMapping(dataset);
   return (samples) => {
     const rgb = new Uint8Array(samples.length);
-    for (let i = 0; i < samples.length; i++) rgb[i] = Math.max(0, Math.min(255, Math.round(samples[i] ?? 0)));
+    for (let i = 0; i < samples.length; i++) rgb[i] = toByte(samples[i] ?? 0);
     return dataset.encoding === 'jpeg'
       ? encodeJpeg(rgb, TILE_PX, TILE_PX, quality)
       : encodePng(rgb, TILE_PX, TILE_PX, 3);
@@ -92,15 +106,56 @@ function convertWithGdal(
 /** Builds the mosaic of converted files; files the download step found missing contribute no data. */
 export function rasterMosaic(dataset: DatasetConfig, files: SourceFile[], paths: string[]): Mosaic {
   const world = { west: -180, south: -90, east: 180, north: 90 };
-  const entries: MosaicEntry[] = files.map((file, i) => ({
-    bounds: file.bounds ?? world,
-    load: () => {
-      const path = paths[i] as string;
-      return existsSync(path) ? readGeoTiff(new Uint8Array(readFileSync(path))) : undefined;
-    },
-  }));
+  const read = (path: string | undefined): Raster | undefined =>
+    path !== undefined && existsSync(path) ? readGeoTiff(new Uint8Array(readFileSync(path))) : undefined;
+  const source = dataset.source;
+  const gapFill = source.type === 'worldcover-s2' ? source.gapFill : undefined;
+  const entries: MosaicEntry[] = [];
+  files.forEach((file, i) => {
+    if (file.gapMapFor !== undefined) return;
+    const map = gapFill ? files.findIndex((f) => f.gapMapFor === file.key) : -1;
+    entries.push({
+      bounds: file.bounds ?? world,
+      load: () => {
+        const raster = read(paths[i]);
+        const classes = map < 0 ? undefined : read(paths[map]);
+        if (raster && classes && gapFill) fillGaps(raster, classes, gapFill.classReflectance);
+        return raster;
+      },
+    });
+  });
   const channels = dataset.kind === 'terrain' ? 1 : 3;
-  return new Mosaic(entries, channels, new Array<number>(channels).fill(0));
+  const fill = dataset.colorStretch?.noDataReflectance ?? new Array<number>(channels).fill(0);
+  return new Mosaic(entries, channels, fill);
+}
+
+/**
+ * Gives every pixel without data in any band the reflectance of its land-cover class (ADR 0026), in place; pixels of
+ * classes without a colour (water) stay without data.
+ */
+export function fillGaps(
+  raster: Raster,
+  classes: Raster,
+  classReflectance: Record<string, [number, number, number]>,
+): void {
+  const spp = raster.samplesPerPixel;
+  const colours = new Map(Object.entries(classReflectance).map(([code, rgb]) => [Number(code), rgb]));
+  for (let row = 0; row < raster.height; row++) {
+    const lat = raster.northDeg - (row + 0.5) * raster.pixelHeightDeg;
+    const mapRow = Math.floor((classes.northDeg - lat) / classes.pixelHeightDeg);
+    if (mapRow < 0 || mapRow >= classes.height) continue;
+    for (let col = 0; col < raster.width; col++) {
+      const at = (row * raster.width + col) * spp;
+      let empty = true;
+      for (let c = 0; c < spp && empty; c++) empty = raster.data[at + c] === 0;
+      if (!empty) continue;
+      const lon = raster.westDeg + (col + 0.5) * raster.pixelWidthDeg;
+      const mapCol = Math.floor((lon - classes.westDeg) / classes.pixelWidthDeg);
+      if (mapCol < 0 || mapCol >= classes.width) continue;
+      const rgb = colours.get(classes.data[mapRow * classes.width + mapCol] ?? 0);
+      if (rgb) for (let c = 0; c < 3; c++) raster.data[at + c] = rgb[c] ?? 0;
+    }
+  }
 }
 
 /** The tile step of a raster dataset. */

@@ -15,7 +15,7 @@ alias vibeglobe-data='node packages/tools/dist/bin.js'
 vibeglobe-data help                            # commands and the datasets of each configuration
 ```
 
-Real downloads cost the owner's time and, for Sentinel-2 cloudless, money (requester-pays). In a session without the owner's go-ahead, work on the configuration's sample area (`--sample`) and use the fixture server for sources that need credentials or that the network blocks (step 2).
+Real downloads cost the owner's time (and money for a requester-pays source; the default sources are all free). In a session without the owner's go-ahead, work on the configuration's sample area (`--sample`) and use the fixture server for sources that need credentials or that the network blocks (step 2).
 
 ## 1. Estimate (downloads nothing)
 
@@ -39,10 +39,10 @@ Without the owner's credentials or network access to a source, serve the fixture
 ```sh
 vibeglobe-data fixtures serve --port 8710 &
 vibeglobe-data build italy-high.json --sample --yes \
-  --source-url imagery=http://127.0.0.1:8710/s2,vectors=http://127.0.0.1:8710/osm/italy.osm.pbf
+  --source-url vectors=http://127.0.0.1:8710/osm/italy.osm.pbf
 ```
 
-With real Sentinel-2 cloudless access, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in the environment (never in a file) and pass `--source-url imagery=<bucket or mirror URL>` until the configuration names the new source (open question 21).
+The detailed imagery is the ESA WorldCover 2021 Sentinel-2 composite from the public bucket `esa-worldcover-s2` (ADR 0026): no account, and a sample build reads only the internal tiles it needs with range requests (about 80 MB for the Mont Blanc sample). Its colour stretch and gap filling are fixed in the configuration (`colorStretch`, `source.gapFill`); change them only with a new ADR. The fixture stub `/s2` serves Sentinel-2 cloudless originals for configurations that still use that source; a requester-pays source reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment (never from a file).
 
 Outputs go to `packages/tools/node_modules/.vibeglobe-data/<config>[-sample]/` (ignored by git and the linters; `--out <folder>` chooses another folder):
 

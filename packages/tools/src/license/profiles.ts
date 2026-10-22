@@ -62,6 +62,19 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
+    id: 'esa-worldcover-s2-2021',
+    name: 'ESA WorldCover Sentinel-2 RGBNIR yearly median composite 2021',
+    license: 'CC-BY-4.0',
+    licenseUrl: 'https://github.com/ESA-WorldCover/esa-worldcover-datasets#copyright-license',
+    termsReadDate: '2026-10-22',
+    attribution:
+      '© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium',
+    sourceUrl: 'https://registry.opendata.aws/esa-worldcover-vito-composites/',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
     id: 's2cloudless-2016',
     name: 'Sentinel-2 cloudless 2016 by EOX',
     license: 'CC-BY-4.0',

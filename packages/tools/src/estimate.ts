@@ -73,7 +73,8 @@ export function estimateDataset(dataset: DatasetConfig, area: Area, region: stri
     tileBytes,
     outputBytes: tileBytes * outputs,
     downloadFiles: files.length,
-    downloadBytes: files.length * dataset.downloadBytesPerFile,
+    // A windowed read (ADR 0026) transfers its share of the file.
+    downloadBytes: Math.round(files.reduce((n, f) => n + (f.fraction ?? 1), 0) * dataset.downloadBytesPerFile),
     requesterPaysBytes: paid.length * dataset.downloadBytesPerFile,
     requesterPaysRequests: paid.length,
   };

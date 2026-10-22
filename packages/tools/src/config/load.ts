@@ -16,7 +16,7 @@ const ENCODINGS: Record<DatasetConfig['kind'], DatasetConfig['encoding'][]> = {
 };
 const SOURCES: Record<DatasetConfig['kind'], string[]> = {
   terrain: ['copernicus-dem'],
-  imagery: ['s2cloudless', 'geotiff', 'xyz'],
+  imagery: ['worldcover-s2', 's2cloudless', 'geotiff', 'xyz'],
   vector: ['osm-extract'],
 };
 const MAX_ZOOM = 22;
@@ -73,6 +73,21 @@ function datasetProblems(dataset: DatasetConfig, index: number): string[] {
   if (!(typeof dataset.downloadBytesPerFile === 'number' && dataset.downloadBytesPerFile > 0))
     problems.push(`${where}.downloadBytesPerFile: must be a positive number`);
   if (dataset.area !== undefined) problems.push(...areaProblems(`${where}.area`, dataset.area));
+  const stretch = dataset.colorStretch as unknown;
+  if (
+    stretch !== undefined &&
+    !(
+      isRecord(stretch) &&
+      Number.isInteger(stretch['maxReflectance']) &&
+      Number(stretch['maxReflectance']) > 0 &&
+      Number(stretch['gamma']) > 0 &&
+      Array.isArray(stretch['noDataReflectance']) &&
+      stretch['noDataReflectance'].length === 3
+    )
+  )
+    problems.push(
+      `${where}.colorStretch: needs an integer maxReflectance > 0, gamma > 0 and three noDataReflectance values`,
+    );
   return problems;
 }
 

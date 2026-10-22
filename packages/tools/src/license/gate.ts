@@ -19,6 +19,8 @@ function sourceUrls(source: SourceConfig): string[] {
     case 'copernicus-dem':
     case 's2cloudless':
       return [source.baseUrl];
+    case 'worldcover-s2':
+      return source.gapFill ? [source.baseUrl, source.gapFill.mapBaseUrl] : [source.baseUrl];
     case 'geotiff':
     case 'osm-extract':
     case 'xyz':

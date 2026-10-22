@@ -35,3 +35,4 @@ Conventions:
 | [0023](0023-simplification-decisions.md)         | Simplification decisions: libraries over own code, simpler visual checks, revised F122–F124, CI schedule    | M3 onward                                                         |
 | [0024](0024-data-pipeline.md)                    | Data pipeline: a TypeScript pipeline with built-in readers, external tools only in pinned Docker images     | Accepted                                                          |
 | [0025](0025-default-data-licenses.md)            | Licenses and attribution of the default datasets, re-verified                                               | Accepted                                                          |
+| [0026](0026-worldcover-imagery.md)               | Detailed imagery from the ESA WorldCover 2021 Sentinel-2 composite                                          | Accepted                                                          |

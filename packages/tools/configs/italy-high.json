@@ -52,22 +52,40 @@
     {
       "id": "imagery",
       "kind": "imagery",
-      "profile": "s2cloudless-2016",
-      "dataYear": 2016,
-      "sourceVersion": "s2cloudless 2016 original tiles",
+      "profile": "esa-worldcover-s2-2021",
+      "dataYear": 2021,
+      "sourceVersion": "ESA WorldCover 10 m 2021 v200, S2 RGBNIR composite",
       "source": {
-        "type": "s2cloudless",
-        "baseUrl": "https://eox-s2maps.s3.eu-central-1.amazonaws.com",
-        "edition": 2016,
-        "level": 13,
-        "requesterPays": true
+        "type": "worldcover-s2",
+        "baseUrl": "https://esa-worldcover-s2.s3.eu-central-1.amazonaws.com",
+        "year": 2021,
+        "version": "v200",
+        "overview": 0,
+        "gapFill": {
+          "mapBaseUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com",
+          "classReflectance": {
+            "10": [447, 561, 408],
+            "20": [480, 710, 405],
+            "30": [1034, 1134, 904],
+            "40": [635, 751, 429],
+            "50": [1069, 1033, 879],
+            "60": [2614, 2640, 2565],
+            "70": [3870, 4178, 4485],
+            "100": [1771, 1786, 1604]
+          }
+        }
       },
       "minZoom": 9,
       "maxZoom": 14,
       "encoding": "jpeg",
       "quality": 85,
+      "colorStretch": {
+        "maxReflectance": 3000,
+        "gamma": 2,
+        "noDataReflectance": [135, 245, 372]
+      },
       "bytesPerTile": 20000,
-      "downloadBytesPerFile": 450000,
+      "downloadBytesPerFile": 570000000,
       "outputs": {
         "static": true,
         "pmtiles": true,

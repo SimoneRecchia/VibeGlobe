@@ -40,6 +40,37 @@ export interface S2CloudlessSource {
   requesterPays: boolean;
 }
 
+/**
+ * The ESA WorldCover Sentinel-2 RGBNIR yearly median composite (ADR 0026): one cloud-optimized GeoTIFF per 1° cell in
+ * the public bucket `esa-worldcover-s2`, bands B04, B03, B02, B08 as uint16 reflectance × 10,000. Builds read only the
+ * internal tiles of the chosen overview level that their area needs, with HTTP range requests.
+ */
+export interface WorldCoverSource {
+  type: 'worldcover-s2';
+  /** Bucket URL, `https://esa-worldcover-s2.s3.amazonaws.com`. */
+  baseUrl: string;
+  /** Composite year (2021). */
+  year: number;
+  /** Product version in the file names (`v200` for 2021). */
+  version: string;
+  /** Overview level read: 0 is the full 10 m grid, each level halves the resolution (4 is about 160 m). */
+  overview: number;
+  /**
+   * Fills the composite's gaps (pixels never seen clear, mostly glaciers and high rock) by land-cover class from the
+   * WorldCover map of the same year (ADR 0026); gaps on water, unlisted classes or outside the map keep the
+   * colour stretch's `noDataReflectance`.
+   */
+  gapFill?: WorldCoverGapFill;
+}
+
+/** Land-cover-guided filling of WorldCover composite gaps. */
+interface WorldCoverGapFill {
+  /** Bucket URL of the land-cover maps, `https://esa-worldcover.s3.amazonaws.com`. */
+  mapBaseUrl: string;
+  /** Reflectance (× 10,000) of the red, green and blue bands for each WorldCover class code (`"70"` snow and ice). */
+  classReflectance: Record<string, [number, number, number]>;
+}
+
 /** A single georeferenced raster in EPSG:4326, optionally inside a zip archive (Natural Earth). */
 export interface GeoTiffSource {
   type: 'geotiff';
@@ -62,7 +93,20 @@ export interface XyzSource {
 }
 
 /** Any source a dataset can read. */
-export type SourceConfig = CopernicusDemSource | S2CloudlessSource | GeoTiffSource | OsmExtractSource | XyzSource;
+export type SourceConfig =
+  CopernicusDemSource | S2CloudlessSource | WorldCoverSource | GeoTiffSource | OsmExtractSource | XyzSource;
+
+/**
+ * A fixed colour stretch from reflectance (× 10,000) to 8-bit RGB (ADR 0026):
+ * `rgb = 255 × min(1, reflectance / maxReflectance) ^ (1 / gamma)`, the same for the three bands. Pixels without data
+ * (WorldCover masks water) take `noDataReflectance`, so open water gets a constant, documented colour.
+ */
+interface ColorStretchConfig {
+  maxReflectance: number;
+  gamma: number;
+  /** Reflectance (× 10,000) used for the red, green and blue bands where the source has no data. */
+  noDataReflectance: [number, number, number];
+}
 
 /** Which outputs a dataset build writes. */
 export interface OutputsConfig {
@@ -88,6 +132,8 @@ export interface DatasetConfig {
   encoding: 'terrarium' | 'png' | 'jpeg' | 'mvt';
   /** JPEG quality, 1–100. */
   quality?: number;
+  /** Colour stretch of reflectance sources (imagery only). */
+  colorStretch?: ColorStretchConfig;
   /** Area override for this dataset; defaults to the build's region. */
   area?: AreaConfig;
   /** Average encoded tile size used by the estimate, in bytes, per zoom level or one value for all. */

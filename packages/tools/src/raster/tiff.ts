@@ -216,6 +216,8 @@ export function readGeoTiff(file: Uint8Array): Raster {
   const chunks = layout(tags, width, height);
   const bytesPerPixel = (spp * bits) / 8;
   for (let index = 0; index < chunks.offsets.length; index++) {
+    // A chunk of zero bytes is absent (a window read of a cloud-optimized GeoTIFF): its pixels keep the value 0.
+    if (!chunks.counts[index]) continue;
     const offset = chunks.offsets[index] ?? 0;
     const raw = file.subarray(offset, offset + (chunks.counts[index] ?? 0));
     const expected = chunks.chunkWidth * chunks.chunkHeight * bytesPerPixel;

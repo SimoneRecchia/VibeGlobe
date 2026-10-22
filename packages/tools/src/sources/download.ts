@@ -2,6 +2,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type StepLog, sha256, writeAtomic } from '../pipeline/step-log.js';
+import { type CogWindow, readCogWindow } from '../raster/cog-window.js';
+import type { BBoxDeg } from '../tiles/mercator.js';
 import type { SourceFile } from './files.js';
 import { type AwsCredentials, signS3Get } from './sigv4.js';
 
@@ -87,6 +89,7 @@ export async function downloadFile(file: SourceFile, context: DownloadContext): 
     context.report(`corrupt ${file.key}: checksum mismatch, downloading again`);
     rmSync(target, { force: true });
   }
+  if (file.window) return downloadWindow(file, file.window, target, context);
   const partial = `${target}.download`;
   const offset = existsSync(partial) ? statSync(partial).size : 0;
   const response = await request(file, context, offset);
@@ -112,6 +115,39 @@ export async function downloadFile(file: SourceFile, context: DownloadContext): 
   context.log.record(STEP, file.key, checksum);
   context.report(`downloaded ${file.key} (${bytes.length} bytes${offset > 0 ? `, resumed at ${offset}` : ''})`);
   return { key: file.key, status: 'downloaded', transferred, sha256: checksum };
+}
+
+/**
+ * Reads one window of a cloud-optimized GeoTIFF into `target`: the header and the needed internal tiles with range
+ * requests (ADR 0026). The window file is written at once, so an interrupted read restarts that file.
+ */
+async function downloadWindow(
+  file: SourceFile,
+  window: { bbox: BBoxDeg; level: number },
+  target: string,
+  context: DownloadContext,
+): Promise<DownloadResult> {
+  const fetchWithRetries: typeof fetch = (url, init) =>
+    fetchWithRetry(context, String(url), (init?.headers as Record<string, string> | undefined) ?? {});
+  let result: CogWindow;
+  try {
+    result = await readCogWindow(fetchWithRetries, file.url, window.bbox, window.level);
+  } catch (error) {
+    if ((error as { status?: number }).status === 404 && file.mayBeMissing) {
+      context.log.record(STEP, file.key, MISSING);
+      context.report(`missing ${file.key} (no data there)`);
+      return { key: file.key, status: 'missing', transferred: 0 };
+    }
+    throw error;
+  }
+  const checksum = sha256(result.file);
+  const expected = context.lock[file.key];
+  if (expected !== undefined && expected !== checksum)
+    throw new Error(`${file.key}: SHA-256 ${checksum} does not match the lock file (${expected})`);
+  writeAtomic(target, result.file);
+  context.log.record(STEP, file.key, checksum);
+  context.report(`read ${file.key}: ${result.tiles} internal tiles, ${result.transferred} bytes`);
+  return { key: file.key, status: 'downloaded', transferred: result.transferred, sha256: checksum };
 }
 
 /** Downloads every file in order; returns per-file results. */

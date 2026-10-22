@@ -4,6 +4,7 @@ import { PNG } from 'pngjs';
 import { canvasImage, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
 import { hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import { fixtureSession, requestLog } from './support/imagery.ts';
+import { fixtureHeightMeters } from '../scripts/fixtures/tiles/terrain.ts';
 
 /**
  * Terrain streaming cost, elevation queries and the camera above terrain end to end (M4 increment 3): workers and
@@ -152,6 +153,38 @@ test('10,000 synchronous elevation queries at random positions fit in a frame (F
   // share the CPU with the page, and the time is recorded (`npm run hardware-run` gates it).
   testInfo.annotations.push({ type: 'p95 ms per 10,000 queries', description: quantile(warm, 0.95).toFixed(3) });
   if (hardwareGpu()) expect(quantile(warm, 0.95)).toBeLessThanOrEqual(QUERY_BUDGET_MS);
+});
+
+test('an asynchronous query loads the finest terrain away from the view, and rejects with a typed error when its tiles fail (F145)', async ({
+  page,
+}) => {
+  // East of 10° E, terrain finer than level 6 fails for good (HTTP 500 on every attempt): only the second query fails.
+  const rules = [7, 8, 9, 10, 11, 12, 13, 14].map((level) => ({
+    source: 'terrain',
+    minLevel: level,
+    maxLevel: level,
+    xRange: [Math.ceil((190 / 360) * 2 ** level), 2 ** level],
+    status: 500,
+  }));
+  const session = await fixtureSession(page, rules);
+  await openGlobe(page, `scenario=terrain-alps&imagery=&session=${session}`);
+  await waitForTerrain(page);
+  const [found, failed] = await page.evaluate(async () => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    // Far from the view, where only coarse terrain is loaded.
+    const sample = await globe.elevationAtAsync({ longitudeDeg: 8.2, latitudeDeg: 47.1 });
+    const error = await globe.elevationAtAsync({ longitudeDeg: 12.4, latitudeDeg: 47.1 }).then(
+      () => 'resolved',
+      (reason: { code?: string }) => reason.code ?? 'untyped',
+    );
+    return [sample, error] as const;
+  });
+  const rad = Math.PI / 180;
+  expect(found.level).toBe(14);
+  expect(found.noData).toBe(false);
+  expect(Math.abs(found.heightMeters - fixtureHeightMeters(8.2 * rad, 47.1 * rad))).toBeLessThan(0.5);
+  expect(failed).toBe('resource-failed');
 });
 
 /** Starts recording, after every frame, the eye's height above the displayed surface and above the finest terrain. */

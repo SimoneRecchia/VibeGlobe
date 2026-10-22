@@ -1991,7 +1991,7 @@
         "Issue 1,000 queries over the same area and assert each tile is requested at most once",
         "Assert the promise settles with a typed error (never hangs) when the source fails, times out or the query is cancelled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F146",

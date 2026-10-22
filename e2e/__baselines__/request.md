@@ -13,3 +13,4 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-21T23:00:00Z: the ui package's controls in the light and dark themes (F430, UI and GIS track)
 - 2026-10-22T05:08:10Z: four terrain views (terrain-terrarium, terrain-rgb, terrain-quantized-mesh, terrain-smooth; M4, F127, F129, F130); the other views still match their baselines locally
 - 2026-10-22T11:43:00Z: the four terrain views again after KB-080 and KB-081 (tile distances near the ground, the eye above the finest terrain); the quantized-mesh view waits up to 150 s for its imagery
+- 2026-10-22T17:15:33Z: the four terrain views again after KB-090 and KB-092 (Mercator terrain error scaled with latitude, at most two levels per morph)

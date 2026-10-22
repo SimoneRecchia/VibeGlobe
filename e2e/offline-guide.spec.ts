@@ -1,6 +1,5 @@
 // The offline guide's examples run as tests (F317): every `ts` block of docs/guides/offline.md runs in the harness page,
-// with the hosts it names served by fixtures. Until the M7 PMTiles and MBTiles adapters reach main, the offline track's
-// typed stub stands in for `pmtilesImagery` and `mbtilesImagery` (docs/parallel-tracks.md).
+// with the hosts it names served by fixtures. sql.js's WebAssembly file is served at the path the guide names.
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { openHarness, startHarness } from './support/offline.ts';
@@ -10,7 +9,7 @@ const EXAMPLES = [...GUIDE.matchAll(/```ts\n([\s\S]*?)```/g)].map((match) => mat
 
 /** Turns `import { a, b } from '@vibeglobe/x';` into reads of the page's module table. */
 function runnable(code: string): string {
-  return code.replace(/import \{([^}]+)\} from '(@vibeglobe\/[\w-]+)';/g, "const {$1} = __modules['$2'];");
+  return code.replace(/import \{([^}]+)\} from '(@vibeglobe\/[\w/-]+)';/g, "const {$1} = __modules['$2'];");
 }
 
 test('the offline guide has a section with an example for every topic, and every example runs (F317)', async ({
@@ -62,24 +61,18 @@ test('the offline guide has a section with an example for every topic, and every
     const response = await route.fetch({ url: `${dev}/fixture-tiles/guide/world/mercator${path}` });
     return route.fulfill({ response, headers: { ...response.headers(), 'access-control-allow-origin': '*' } });
   });
+  await page.route(`${dev}/sql-wasm.wasm`, (route) =>
+    route.fulfill({ contentType: 'application/wasm', body: readFileSync('node_modules/sql.js/dist/sql-wasm.wasm') }),
+  );
   page.on('pageerror', (error) => console.log(`page error: ${error.message}`));
 
   for (const [index, example] of EXAMPLES.entries()) {
     const outcome = await page.evaluate(async (code) => {
       const repo = location.pathname.replace(/\/e2e\/support\/[^/]*$/, '');
-      const sources = (await import(/* @vite-ignore */ `${repo}/packages/sources/src/index.ts`)) as Record<
-        string,
-        unknown
-      >;
-      const stub = (await import(
-        /* @vite-ignore */ `${repo}/packages/offline/src/__fixtures__/archive-adapters.ts`
-      )) as {
-        createStubAdapters(o: { wasmUrl?: string }): { pmtiles: unknown; mbtiles: unknown };
-      };
-      const adapters = stub.createStubAdapters({ wasmUrl: `${repo}/node_modules/sql.js/dist/sql-wasm.wasm` });
       const modules = {
         '@vibeglobe/offline': await import(/* @vite-ignore */ `${repo}/packages/offline/src/index.ts`),
-        '@vibeglobe/sources': { ...sources, pmtilesImagery: adapters.pmtiles, mbtilesImagery: adapters.mbtiles },
+        '@vibeglobe/sources': await import(/* @vite-ignore */ `${repo}/packages/sources/src/index.ts`),
+        '@vibeglobe/sources/mbtiles': await import(/* @vite-ignore */ `${repo}/packages/sources/src/mbtiles.ts`),
       };
       const AsyncFunction = Object.getPrototypeOf(async () => undefined).constructor as new (
         ...args: string[]

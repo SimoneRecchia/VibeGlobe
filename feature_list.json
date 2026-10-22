@@ -4013,7 +4013,7 @@
         "Assert the output is a valid PMTiles archive containing exactly the tiles of that area and zoom range",
         "Load the package in the playground in offline-only mode and assert full navigation of the area with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F305",
@@ -4025,7 +4025,7 @@
         "Assert the package contains every tile intersecting the polygon and no tile entirely outside it",
         "Load the package in the playground in offline-only mode and assert navigation within the polygon with zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F306",
@@ -4436,7 +4436,7 @@
         "Load the package through the PMTiles or MBTiles adapter and verify a sample of tiles is byte-identical to the static folder",
         "Verify the package passes the offline package integrity check"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F337",

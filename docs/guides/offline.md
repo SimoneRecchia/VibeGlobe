@@ -79,17 +79,20 @@ the headers the engine needs (MIME types, CORS, cache headers, range requests):
 packages/offline/lan-server/lan-server.sh --site apps/playground/dist --packages ./packages --tiles ./tiles --port 8080
 ```
 
-Read a package in place, without installing it, with `addServedPackage`:
+Read a package in place, without installing it, with `addServedPackage`. The package manager opens PMTiles and MBTiles
+files with the adapters of `@vibeglobe/sources` you pass it; in a browser, give `mbtilesImagery` the URL of sql.js's
+WebAssembly file (`wasmUrl`, `node_modules/sql.js/dist/sql-wasm.wasm` copied to your site):
 
 ```ts
 import { createOffline, createPackageManager } from '@vibeglobe/offline';
-import { mbtilesImagery, pmtilesImagery } from '@vibeglobe/sources';
+import { pmtilesImagery } from '@vibeglobe/sources';
+import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
 
 const offline = createOffline({ mode: 'hybrid' });
 const packages = createPackageManager(offline, {
   adapters: {
     pmtiles: (options) => pmtilesImagery(options),
-    mbtiles: (options) => mbtilesImagery(options),
+    mbtiles: (options) => mbtilesImagery({ ...options, wasmUrl: '/sql-wasm.wasm' }),
   },
 });
 const rome = await packages.addServedPackage('https://lan.example/packages/rome/manifest.json');
@@ -109,11 +112,12 @@ resumes), and verify every chunk against the manifest's SHA-256.
 
 ```ts
 import { createOffline, createPackageManager } from '@vibeglobe/offline';
-import { mbtilesImagery, pmtilesImagery } from '@vibeglobe/sources';
+import { pmtilesImagery } from '@vibeglobe/sources';
+import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
 
 const offline = createOffline();
 const packages = createPackageManager(offline, {
-  adapters: { pmtiles: (o) => pmtilesImagery(o), mbtiles: (o) => mbtilesImagery(o) },
+  adapters: { pmtiles: (o) => pmtilesImagery(o), mbtiles: (o) => mbtilesImagery({ ...o, wasmUrl: '/sql-wasm.wasm' }) },
 });
 let progress = 0;
 await packages.install('https://lan.example/packages/rome/manifest.json', {

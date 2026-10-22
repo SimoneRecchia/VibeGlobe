@@ -9,8 +9,7 @@ import { type PackageStorage, versionKey } from './package-storage.js';
 
 /**
  * The PMTiles and MBTiles adapters of `@vibeglobe/sources` (F232, F233), passed in by the application: their
- * signatures, reduced to what packages use. A typed stub stands in for them in this package's tests until they are on
- * `main` (docs/parallel-tracks.md).
+ * signatures, reduced to what packages use (`pmtilesImagery`, and `mbtilesImagery` of `@vibeglobe/sources/mbtiles`).
  */
 export interface ArchiveAdapters {
   pmtiles(options: { id: string; archive: string; fetch: typeof fetch }): Promise<ImagerySource>;

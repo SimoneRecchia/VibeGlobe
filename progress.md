@@ -28,6 +28,11 @@ Branch `claude/gifted-mayer-p0kexd`; status, stubs and waiting entries in `docs/
   integrity per chunk; versions; resumable installs), contracts for cache stores and network policies, the Docker LAN
   server, the offline guide, and the research survey. Browser specs `e2e/offline-*.spec.ts` on a harness page of the
   playground's dev server (the playground itself is the main track's).
+- **2026-10-22 (after the M7 and M14 merges):** the typed stub of the PMTiles and MBTiles adapters is gone; packages
+  load through `pmtilesImagery` and `mbtilesImagery`. Passing: F304 and F305 (CLI packages navigated offline-only,
+  `e2e/offline-cli-packages.spec.ts`) and F336 (the build's packages pass the integrity check,
+  `scripts/integration/package-outputs.test.ts`). F337, F339, F551 and F554 still wait on F254/F255, F129 and
+  F247/F248.
 - Notes for the next session of this track: the fixture tile server sends `no-store`, so specs rewrite cache headers
   with `tileHeaders()`; Docker's daemon is not running in a fresh container (`dockerd &`); `Globe.ready` stays pending
   in a start with the network down and no data for the pinned levels (ADR 0029, hook request 3).

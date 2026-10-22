@@ -1,9 +1,9 @@
 import type { TileCoord, TransportResult } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import { pmtilesImagery, xyzImagery } from '@vibeglobe/sources';
+import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
 import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { stubAdapters } from '../__fixtures__/archive-adapters.js';
 import { writeMbtiles } from '../__fixtures__/mbtiles-writer.js';
 import { writePmtiles } from '../__fixtures__/pmtiles-writer.js';
 import { memoryStore } from '../memory-store.js';
@@ -12,6 +12,7 @@ import { createManifest } from './create-manifest.js';
 import type { PackageManifest } from './manifest.js';
 import type { PackageRequest } from './builder.js';
 import { createPackageManager, type PackageManager } from './package-manager.js';
+import type { ArchiveAdapters } from './reader.js';
 
 const BOUNDS = { westDeg: 12, southDeg: 41.5, eastDeg: 13, northDeg: 42.2 };
 const SOURCE = { sourceId: 'osm', file: 'rome.pmtiles', minLevel: 0, maxLevel: 2, license: 'ODbL-1.0' };
@@ -57,6 +58,7 @@ function server(files: Record<string, Uint8Array | string>) {
   return { fetchImpl, requests };
 }
 
+const adapters: ArchiveAdapters = { pmtiles: pmtilesImagery, mbtiles: mbtilesImagery };
 const engines: { offline: Offline; manager: PackageManager }[] = [];
 
 function setup(factory = new IDBFactory(), fetchImpl?: typeof fetch, mode: 'offline' | 'hybrid' = 'offline') {
@@ -64,7 +66,7 @@ function setup(factory = new IDBFactory(), fetchImpl?: typeof fetch, mode: 'offl
   const errors: string[] = [];
   const memory = new Map<string, string>();
   const manager = createPackageManager(offline, {
-    adapters: stubAdapters,
+    adapters,
     indexedDB: factory,
     ...(fetchImpl ? { fetch: fetchImpl } : {}),
     localStorage: { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => void memory.set(k, v) },
@@ -299,7 +301,7 @@ describe('offline packages', () => {
     const lost: string[][] = [];
     offline.on('storage-lost', (event) => lost.push([...event.packages]));
     const manager = createPackageManager(offline, {
-      adapters: stubAdapters,
+      adapters,
       indexedDB: new IDBFactory(),
       localStorage: { getItem: (k) => first.memory.get(k) ?? null, setItem: () => undefined },
     });

@@ -22,7 +22,8 @@ import {
 import { createRenderer } from '@vibeglobe/renderer';
 import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
-import { xyzImagery } from '@vibeglobe/sources';
+import { pmtilesImagery, xyzImagery } from '@vibeglobe/sources';
+import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
 import { createWorkers } from '@vibeglobe/worker';
 
 /** One imagery source of the harness: fixture tiles of a pattern, or any URL template. */
@@ -112,13 +113,14 @@ declare global {
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
 const container = document.querySelector<HTMLDivElement>('#app');
 if (!canvas || !container) throw new Error('the harness page lacks #app or #globe');
-// The page is served from /@fs/<repo>/e2e/support/: the typed stub of the M7 archive adapters and sql.js's
-// WebAssembly file are reached the same way (docs/parallel-tracks.md).
+// The page is served from /@fs/<repo>/e2e/support/, so sql.js's WebAssembly file (for the MBTiles adapter) is reached
+// the same way.
 const repo = location.pathname.replace(/\/e2e\/support\/[^/]*$/, '');
-const stub = (await import(/* @vite-ignore */ `${repo}/packages/offline/src/__fixtures__/archive-adapters.ts`)) as {
-  createStubAdapters(options: { wasmUrl?: string }): ArchiveAdapters;
+const wasmUrl = `${repo}/node_modules/sql.js/dist/sql-wasm.wasm`;
+const adapters: ArchiveAdapters = {
+  pmtiles: (options) => pmtilesImagery(options),
+  mbtiles: (options) => mbtilesImagery({ ...options, wasmUrl }),
 };
-const adapters = stub.createStubAdapters({ wasmUrl: `${repo}/node_modules/sql.js/dist/sql-wasm.wasm` });
 
 let config: HarnessConfig | undefined;
 

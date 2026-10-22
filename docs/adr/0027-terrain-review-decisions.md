@@ -70,3 +70,18 @@ The M4 milestone review found places where two feature entries pull against each
 - **Grids:** `packages/core/src/terrain/grid-size.test.ts` has a rough-relief case that needs more than 64 cells.
 - **Skirts:** a regression test in `packages/core/src/globe/terrain-globe.test.ts` checks that fallback draws get deeper
   skirts.
+
+## Note on F135 step 2
+
+The step asks for screenshots of an analytic mountain compared "against analytically generated baselines". It is met in
+two parts:
+
+- The relief test probes 100 points over the fixture's analytic mountain on both backends. At each point, small quads
+  just above and just below the analytic height (computed in Node from the fixture's terrain function, not by the
+  engine) must show and stay hidden respectively. This compares the rendered depth with the analytic surface wherever
+  it is sampled.
+- The canonical terrain views (`e2e/visual.spec.ts`, including `terrain-smooth` across backends) guard the full
+  image.
+
+An image ray-traced in Node from the analytic function would duplicate the camera model in the test. The probes check
+the same thing without that duplication.

@@ -58,7 +58,12 @@ export function valueOf(batch: BatchContents, attribute: BatchAttribute, feature
 /** A feature's straight RGBA with its opacity and visibility applied to alpha. */
 function colorOf(batch: BatchContents, feature: number, attribute: BatchAttribute = 'color'): number[] {
   const alpha = valueOf(batch, 'opacity', feature) * valueOf(batch, 'visible', feature);
-  return [0, 1, 2, 3].map((c) => valueOf(batch, attribute, feature, c) * (c === 3 ? alpha : 1));
+  return [0, 1, 2, 3].map((c) => {
+    const value = valueOf(batch, attribute, feature, c);
+    // Style colors are sRGB (CSS); the renderer blends in linear light and encodes the output to sRGB.
+    if (c === 3) return value * alpha;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
 }
 
 /** Growable arrays that a builder appends vertices to. */

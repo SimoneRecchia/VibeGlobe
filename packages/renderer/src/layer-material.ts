@@ -24,7 +24,7 @@ import {
   Vector4,
   type Node,
 } from 'three/webgpu';
-import { morphedEyeRelative } from './eye-relative.js';
+import { eyeRelativePosition, morphedEyeRelative } from './eye-relative.js';
 
 /** How a layer mesh places its vertices (ADR 0037). */
 export type LayerShape = 'flat' | 'quad' | 'line';
@@ -34,6 +34,12 @@ export type LayerShape = 'flat' | 'quad' | 'line';
  * surface they lie on without fighting its depth (2 m at 10 km), and stay hidden behind relief and the globe.
  */
 const DEPTH_PULL = 2e-4;
+/**
+ * Screen-sized quads (points, markers, labels) span pixels around their anchor where the curved surface lies nearer
+ * than the anchor: they are pulled further (30 m at 10 km, 60 km at the whole globe's distance), still far less than
+ * the globe in front of its far side.
+ */
+const QUAD_DEPTH_PULL = 3e-3;
 
 /** One endpoint of the morph for a vertex (ADR 0008): its globe offset and its plane offset, eye-relative. */
 function endpoint(
@@ -43,11 +49,12 @@ function endpoint(
   heightMeters: Node<'float'>,
   morphParams: Node<'vec4'>,
   morphAxes: Node<'mat3'>,
+  pull: number,
 ): Node<'vec3'> {
   const sigma = morphParams.z;
   const globe = globeOffset.add(normal.mul(heightMeters));
   const planeLocal = vec3(plane.x.mul(sigma), plane.y.mul(sigma), heightMeters.mul(plane.w).mul(sigma));
-  return morphedEyeRelative(globe, morphAxes.mul(planeLocal), morphParams.x).mul(1 - DEPTH_PULL);
+  return morphedEyeRelative(globe, morphAxes.mul(planeLocal), morphParams.x).mul(1 - pull);
 }
 
 /**
@@ -65,7 +72,8 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): Me
   const height = attribute('layerHeight', 'float');
   const color = attribute('layerColor', 'vec4');
   const corner = attribute('layerCorner', 'vec4');
-  const here = endpoint(positionGeometry, normal, plane, height, morphParams, morphAxes);
+  const pull = shape === 'quad' ? QUAD_DEPTH_PULL : DEPTH_PULL;
+  const here = endpoint(positionGeometry, normal, plane, height, morphParams, morphAxes, pull);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const clip = cameraProjectionMatrix.mul(viewPosition).toVar();
   let offsetPx: Node<'vec2'> = vec2(corner.x, corner.y);
@@ -77,6 +85,7 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): Me
       attribute('otherHeight', 'float'),
       morphParams,
       morphAxes,
+      pull,
     );
     const otherClip = cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(other, 1)));
     const direction = normalize(otherClip.xy.div(otherClip.w).sub(clip.xy.div(clip.w)).mul(viewport));
@@ -93,7 +102,19 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath): Me
   // Round points: corner.zw is the unit square of the quad, faded at its circle's edge (corner.z 2 marks squares).
   const round = length(vec2(corner.z, corner.w));
   const edge = float(1).sub(smoothstep(0.85, 1, round));
-  const alpha = shape === 'quad' ? color.w.mul(corner.z.greaterThan(1.5).select(1, edge)) : color.w;
+  let alpha: Node<'float'> = color.w;
+  if (shape === 'quad') {
+    // Screen-sized quads are not depth-tested (the curved surface around their anchor would cut them): on the globe
+    // they hide behind its horizon, where the normal at the anchor faces away from the eye; from m = ½ on nothing is
+    // behind a horizon (ADR 0008).
+    const facing = normal
+      .dot(eyeRelativePosition(positionGeometry))
+      .lessThan(0)
+      .or(morphParams.x.greaterThanEqual(0.5));
+    const shown = varying(facing.select(float(1), float(0)));
+    alpha = color.w.mul(corner.z.greaterThan(1.5).select(1, edge)).mul(shown);
+    material.depthTest = false;
+  }
   material.colorNode = vec4(color.xyz, alpha);
   material.transparent = true;
   material.depthWrite = false;

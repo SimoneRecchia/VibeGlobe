@@ -10,10 +10,21 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./browser": "./dist/browser/vibe-globe.js"
   },
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo"
-  ]
+  ],
+  "dependencies": {
+    "@vibeglobe/controls": "0.0.0",
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/renderer": "0.0.0",
+    "@vibeglobe/sources": "0.0.0",
+    "@vibeglobe/worker": "0.0.0"
+  },
+  "scripts": {
+    "build:browser": "vite build"
+  }
 }

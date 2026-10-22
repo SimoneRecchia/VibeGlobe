@@ -10,3 +10,5 @@ docs-site/
 test-results/
 playwright-report/
 benchmark-results/
+.output/
+.nuxt/

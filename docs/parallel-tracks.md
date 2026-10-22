@@ -110,3 +110,40 @@ The third session's packages are `@vibeglobe/ui` (controls, theming, translation
 | F434       | The ARIA states of the 2D/3D/Auto toggle (F421) and the layer switcher (F425), which the audit must cover       |
 | F436       | Flights that become quick fades with reduced motion (F214, F195)                                                |
 | F437       | The attribution control (F424), which the layout must never cover                                               |
+
+## Framework adapters track: status
+
+The fifth session's packages are `@vibeglobe/vue` (the `VibeGlobe` component, `useGlobe`, `useCamera`, `useLoading`,
+`useViewMode`) and `@vibeglobe/web-component` (`defineVibeGlobe(tagName)`, the `<vibe-globe>` element and its browser
+build in `dist/browser/`). Its apps are `apps/adapter-examples` (the Vite + Vue 3 example, React and Vue hosts of the
+element, and a plain HTML page) and `apps/nuxt-example`; its end-to-end specs are `e2e/vue-adapter.spec.ts`,
+`e2e/web-component.spec.ts`, `e2e/nuxt-example.spec.ts` and `e2e/adapter-leaks.spec.ts` (measurements project).
+
+Shared files it changed, for the main session's review: `scripts/checks/dependencies.ts` (Vue and React allowed in
+`apps/adapter-examples`), `scripts/ssr-import.test.ts` and `scripts/bundle-size.ts` (both logged in
+`docs/test-changes.md`), `playwright.config.ts` (the examples' dev server on :5180, `adapter-leaks` among the
+measurements), the root `build` script (the element's browser build, the examples' vue-tsc check and build, the Nuxt
+build), `eslint.config.ts`, `.prettierignore` and `.gitignore` (Nuxt output), and `e2e/globe-leaks.spec.ts`, whose leak
+probes moved unchanged to `e2e/support/leaks.ts` for both leak suites.
+
+Passing: F473, F477–F484, F486, F487.
+
+### Stubs for engine features that do not exist yet
+
+| Stub                                     | Where                             | Replaced by                  |
+| ---------------------------------------- | --------------------------------- | ---------------------------- |
+| `useViewMode()` always answers `'3d'`    | `packages/vue/src/composables.ts` | View modes (F161, F163, M5)  |
+| The element has no `view-mode` attribute | `packages/web-component/src/`     | View modes (F161, M5)        |
+| Camera props move the camera by `jumpTo` | both adapters                     | Nothing: `jumpTo` is the API |
+
+### Entries waiting for engine features
+
+| Entry | Waits for                                                                                                                                                                                                                   |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F474  | View modes (F161), runtime layer order and visibility (F243–F245), network modes (F271, F292) and quality presets (F399). Camera props already update the engine in place (tested in `e2e/vue-adapter.spec.ts`).            |
+| F475  | `flyTo` (F195) for the flight steps and view modes (F161) for the view-mode state. The camera and loading composables are built; the camera follows drags and zooms at most once per frame (tested).                        |
+| F476  | Runtime layers and sources (F243–F245), point primitives for markers (F351) and an engine-side control list; child components need an API that adds and removes them on a running engine.                                   |
+| F485  | The attribution control and the live credits it shows (F424, F254), which the element must show inside its shadow DOM. Its container is already exposed as part `engine`.                                                   |
+| F488  | Every engine feature group of PLAN.md (Map experience through Security): the Nuxt example gains a page per group as each lands.                                                                                             |
+| F555  | Network modes and offline packages (F271, F292, M8) and attribution (F254) for the guide's sections, and publishing to npm (owner question 17 in `docs/open-questions.md`) for "installation from the public npm registry". |
+| F490  | The entries above; M14's acceptance belongs to the main session.                                                                                                                                                            |

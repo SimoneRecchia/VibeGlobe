@@ -1853,7 +1853,7 @@
         "Assert decoding and mesh generation run only on worker threads and the main-thread time attributable to terrain per frame stays within the terrain CPU budget in docs/plan",
         "Assert per-frame GPU upload bytes for terrain never exceed the upload budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F135",
@@ -1978,7 +1978,7 @@
         "In the playground, run 10,000 queries per frame at random coordinates and assert the total time stays within its CPU budget with zero heap allocations per query",
         "Assert a query outside terrain coverage returns the height of the no-data surface chosen in the terrain ADR (the ellipsoid or geoid sea level) with a no-data flag"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F145",
@@ -2017,7 +2017,7 @@
         "Assert the camera stays above the displayed surface in every frame",
         "Assert the lift spans multiple frames with per-frame displacement below the jump threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F148",

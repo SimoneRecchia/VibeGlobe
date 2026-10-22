@@ -229,9 +229,11 @@ for (const backend of BACKENDS) {
           break;
         case 1:
           // Drag the ground toward the camera: the eye moves toward the cliff.
-          await page.mouse.move(center.x, center.y - 6 * unit);
+          // The ground grabbed below the center, near the camera: each drag moves the eye tens of meters, not the
+          // thousands of kilometers a grab near the horizon would.
+          await page.mouse.move(center.x, center.y + 2 * unit);
           await page.mouse.down();
-          for (let i = 1; i <= 8; i++) await page.mouse.move(center.x, center.y - 6 * unit + i * unit);
+          for (let i = 1; i <= 8; i++) await page.mouse.move(center.x, center.y + 2 * unit + (i * unit) / 2);
           await page.mouse.up();
           break;
         case 2:

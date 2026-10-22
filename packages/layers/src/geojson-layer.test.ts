@@ -166,3 +166,28 @@ describe('vector data layer in and out of the stack', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('vector data layer with multi-points', () => {
+  it('draws every point of a MultiPoint (PT-09)', async () => {
+    const { layer } = await load({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'm',
+          properties: {},
+          geometry: {
+            type: 'MultiPoint',
+            coordinates: [
+              [1, 1],
+              [2, 2],
+              [3, 3],
+            ],
+          },
+        },
+        { type: 'Feature', id: 'p', properties: {}, geometry: { type: 'Point', coordinates: [4, 4] } },
+      ],
+    });
+    expect(layer.featureCounts.point).toBe(4);
+  });
+});

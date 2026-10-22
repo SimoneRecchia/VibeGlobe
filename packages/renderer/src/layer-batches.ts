@@ -19,6 +19,7 @@ import {
   type Scene,
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
+import { pickAt } from './layer-picking.js';
 import { buildLayerArrays, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
@@ -49,6 +50,8 @@ export class LayerBatches implements LayerRenderTarget {
   private readonly batches = new Map<number, Batch>();
   private readonly materials = new Map<LayerShape, MeshBasicNodeMaterial>();
   private nextId = 1;
+  /** The last frame's view, for picking. */
+  private lastView: FrameView | undefined;
 
   constructor(
     private readonly scene: Scene,
@@ -161,6 +164,12 @@ export class LayerBatches implements LayerRenderTarget {
     this.batches.delete(handle.id);
   }
 
+  /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame. */
+  pick(point: { readonly xPx: number; readonly yPx: number }): Promise<number> {
+    const view = this.lastView;
+    return Promise.resolve(view ? pickAt(this.batches.values(), view, point.xPx, point.yPx) : 0);
+  }
+
   /** Meshes held, for the resource counters. */
   get meshCount(): number {
     let count = 0;
@@ -170,6 +179,7 @@ export class LayerBatches implements LayerRenderTarget {
 
   /** Brings every batch up to date and places it for this frame (call before drawing the scene). */
   place(view: FrameView): void {
+    this.lastView = view;
     for (const batch of this.batches.values()) {
       if (batch.dirty) this.rebuild(batch);
       const mesh = batch.mesh;

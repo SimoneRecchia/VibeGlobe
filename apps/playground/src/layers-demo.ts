@@ -1,10 +1,17 @@
 import type { Globe } from '@vibeglobe/core';
-import { createGlobeLayers, DataLayer, type Feature, type Geometry, type LayerStack } from '@vibeglobe/layers';
+import {
+  createGlobeLayers,
+  DataLayer,
+  type InteractionController,
+  type Feature,
+  type Geometry,
+  type LayerStack,
+} from '@vibeglobe/layers';
 
 declare global {
   interface Window {
     /** The `?layers=demo` stack and its layers, for the end-to-end tests of M10. */
-    vibeglobeLayers?: { stack: LayerStack; layers: Record<string, DataLayer> };
+    vibeglobeLayers?: { stack: LayerStack; layers: Record<string, DataLayer>; interaction?: InteractionController };
   }
 }
 
@@ -166,8 +173,9 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
  * through the layers package's public API.
  */
 export function showDataScenario(globe: Globe, name: string): void {
-  const { stack } = createGlobeLayers(globe);
+  const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
+  const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   const scene = DATA_SCENES[name];
   const layer = scene && stack.add(scene());
-  window.vibeglobeLayers = { stack, layers: layer ? { [layer.id]: layer } : {} };
+  window.vibeglobeLayers = { stack, layers: layer ? { [layer.id]: layer } : {}, interaction };
 }

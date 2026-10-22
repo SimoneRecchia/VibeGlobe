@@ -129,4 +129,9 @@ export interface LayerRenderTarget {
   setVisible(handle: BatchHandle, visible: boolean): void;
   /** Frees the batch's GPU buffers. */
   release(handle: BatchHandle): void;
+  /**
+   * Optional: the `pickId` of the topmost feature drawn at a CSS-pixel screen point (nearest within a few pixels), or 0
+   * when none is (the layers package's `PickProvider`, F379–F384).
+   */
+  pick?(point: { readonly xPx: number; readonly yPx: number }): Promise<number>;
 }

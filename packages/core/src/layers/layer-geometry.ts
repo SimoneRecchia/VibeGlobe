@@ -1,6 +1,8 @@
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { planeCenterOf, writeNormal, writePlane } from '../surface/surface-mesh.js';
 import type { LayerRenderTarget } from './layer-target.js';
+import type { FrameView } from '../globe/types.js';
+import { morphPointInto } from '../view/morph.js';
 
 const RAD = Math.PI / 180;
 const vertex = new Float64Array(3);
@@ -75,5 +77,51 @@ export function requestingTarget(
     setOrder: after((handle, order) => target.setOrder(handle, order)),
     setVisible: after((handle, visible) => target.setVisible(handle, visible)),
     release: after((handle) => target.release(handle)),
+    ...(target.pick ? { pick: target.pick.bind(target) } : {}),
   };
+}
+
+const geodetic = new Float64Array(3);
+const morphed = new Float64Array(3);
+const ground = new Float64Array(3);
+
+/**
+ * The screen position (CSS pixels, into `out[0..1]`) where a frame draws a layer position (degrees, meters), on the
+ * morphed surface (ADR 0008); false behind the eye or, on the globe (m < ½), behind its horizon. For picking and tests
+ * of layer drawing (ADR 0037). Allocates nothing.
+ */
+export function projectLayerPoint(
+  view: FrameView,
+  longitudeDeg: number,
+  latitudeDeg: number,
+  heightMeters: number,
+  out: Float64Array,
+): boolean {
+  geodetic[0] = longitudeDeg * RAD;
+  geodetic[1] = latitudeDeg * RAD;
+  geodetic[2] = heightMeters;
+  morphPointInto(view.morph, geodetic, morphed);
+  const eye = view.eyeEcef;
+  const x = (morphed[0] ?? 0) - (eye[0] ?? 0);
+  const y = (morphed[1] ?? 0) - (eye[1] ?? 0);
+  const z = (morphed[2] ?? 0) - (eye[2] ?? 0);
+  if ((view.morph.factors[0] ?? 0) < 0.5) {
+    geodeticToEcef(geodetic[0] ?? 0, geodetic[1] ?? 0, 0, ground);
+    // The ellipsoid normal is close enough to the geocentric direction for this horizon test.
+    const facing = (ground[0] ?? 0) * x + (ground[1] ?? 0) * y + (ground[2] ?? 0) * z;
+    if (facing > 0) return false;
+  }
+  const v = view.view;
+  const p = view.projection;
+  const vx = (v[0] ?? 0) * x + (v[4] ?? 0) * y + (v[8] ?? 0) * z + (v[12] ?? 0);
+  const vy = (v[1] ?? 0) * x + (v[5] ?? 0) * y + (v[9] ?? 0) * z + (v[13] ?? 0);
+  const vz = (v[2] ?? 0) * x + (v[6] ?? 0) * y + (v[10] ?? 0) * z + (v[14] ?? 0);
+  const vw = (v[3] ?? 0) * x + (v[7] ?? 0) * y + (v[11] ?? 0) * z + (v[15] ?? 1);
+  const cx = (p[0] ?? 0) * vx + (p[4] ?? 0) * vy + (p[8] ?? 0) * vz + (p[12] ?? 0) * vw;
+  const cy = (p[1] ?? 0) * vx + (p[5] ?? 0) * vy + (p[9] ?? 0) * vz + (p[13] ?? 0) * vw;
+  const cw = (p[3] ?? 0) * vx + (p[7] ?? 0) * vy + (p[11] ?? 0) * vz + (p[15] ?? 0) * vw;
+  if (!(cw > 0)) return false;
+  out[0] = ((cx / cw + 1) / 2) * view.widthPx;
+  out[1] = ((1 - cy / cw) / 2) * view.heightPx;
+  return true;
 }

@@ -207,3 +207,69 @@ for (const backend of BACKENDS) {
       if (point) expect(isGreen(pixel(continent, point.xPx, point.yPx))).toBe(true);
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`picks return the point under the pointer in every phase, and hover and click events carry the feature on ${backend} (F379, F380, F384)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openScenario(page, backend, 'data-points');
+    for (const phase of PHASES) {
+      await showPhase(page, phase);
+      // Each grid point near Rome (ids g0–g99) is picked at its projected position.
+      const picks = await page.evaluate(async () => {
+        const globe = window.vibeglobePlayground?.globe;
+        const layers = window.vibeglobeLayers;
+        if (!globe || !layers?.interaction) throw new Error('no layers');
+        const results: { expected: string; picked: string | undefined }[] = [];
+        for (let i = 0; i < 100; i += 7) {
+          const point = globe.geoToScreen({
+            longitudeDeg: 9.8 + (i % 10) * 0.6,
+            latitudeDeg: 39.2 + Math.floor(i / 10) * 0.6,
+          });
+          if (!point || point.xPx < 0 || point.yPx < 0 || point.xPx > 480 || point.yPx > 360) continue;
+          const target = globe.layerTarget();
+          const id = (await target?.pick?.(point)) ?? 0;
+          const hit = layers.stack.resolvePick(id);
+          results.push({ expected: `g${String(i)}`, picked: hit ? String(hit.feature.id) : undefined });
+        }
+        return results;
+      });
+      expect(picks.length, phase.name).toBeGreaterThan(3);
+      for (const { expected, picked } of picks) expect(picked, phase.name).toBe(expected);
+    }
+    // Hover and click through the pointer: enter, click and leave, once each, in order, with the feature and position.
+    const events = await page.evaluate(() => {
+      const layer = window.vibeglobeLayers?.layers['points'];
+      const recorded: { type: string; id: string; lon: number | undefined }[] = [];
+      if (!layer) throw new Error('no layer');
+      for (const type of ['hover-enter', 'hover-leave', 'click'] as const)
+        layer.on(type, ({ feature, position }) =>
+          recorded.push({ type, id: String(feature.id), lon: position?.longitudeDeg }),
+        );
+      (window as unknown as { recorded: typeof recorded }).recorded = recorded;
+      const globe = window.vibeglobePlayground?.globe;
+      return globe?.geoToScreen({ longitudeDeg: 9.8 + 4 * 0.6, latitudeDeg: 39.2 + 4 * 0.6 });
+    });
+    expect(events).toBeDefined();
+    const box = await page.locator('#globe').boundingBox();
+    if (!box || !events) throw new Error('no canvas');
+    // From and back to a corner with no feature, in single moves, so the path crosses no other point.
+    await page.mouse.move(box.x + 5, box.y + box.height - 5);
+    await page.mouse.move(box.x + events.xPx, box.y + events.yPx);
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.mouse.move(box.x + 5, box.y + box.height - 5);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { recorded: { type: string }[] }).recorded.map((e) => e.type)),
+      )
+      .toEqual(['hover-enter', 'click', 'hover-leave']);
+    const recorded = await page.evaluate(
+      () => (window as unknown as { recorded: { id: string; lon: number }[] }).recorded,
+    );
+    for (const event of recorded) expect(event.id).toBe('g44');
+    // Enter and click carry the position under the pointer; leave, where the pointer went.
+    for (const event of recorded.slice(0, 2)) expect(event.lon).toBeCloseTo(9.8 + 4 * 0.6, 1);
+  });
+}

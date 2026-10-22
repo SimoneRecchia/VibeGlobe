@@ -33,9 +33,11 @@ jobs:
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
       - run: npm run build
-      - run: npx playwright test e2e/visual.spec.ts --update-snapshots=all
+      # One test at a time, as in the CI shards: two views rendering at once on the software GPU slowed each capture
+      # from under a second to 20-30 s, past the views' time limits.
+      - run: npx playwright test e2e/visual.spec.ts --project=chromium --workers=1 --update-snapshots=all
       # The ui package's controls in the light and dark themes (F430).
-      - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --update-snapshots=all
+      - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --workers=1 --update-snapshots=all
       # Traces of failed views (recorded on the retry, ADR 0012), to investigate a capture that never completes.
       - name: Upload the failed views' traces
         if: failure()

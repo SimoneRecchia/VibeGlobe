@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage, openGlobe, waitForIdle, type ScenarioReport } from './support/globe.ts';
 import { measureShift } from './support/image.ts';
+import { fixtureHeightMeters } from '../scripts/fixtures/tiles/terrain.ts';
 import { fixtureSession, requestLog, waitForStreaming } from './support/imagery.ts';
 
 /**
@@ -15,6 +16,8 @@ test.describe.configure({ timeout: 240_000 });
 // A small canvas: the software GPU draws every checked frame, and the checks read every pixel.
 test.use({ viewport: { width: 480, height: 360 } });
 
+/** The equator's length, meters (WGS84). */
+const EQUATOR_METERS = 2 * Math.PI * 6378137;
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 /** The playground's engine clock at 60 Hz: fades and morphs advance one frame per drawn frame. */
 const CLOCK = 'clockStepMs=16.666666666666668';
@@ -214,18 +217,18 @@ for (const backend of BACKENDS) {
       }
     });
 
-    test(`rendered relief lies at the source heights: probes just above show, probes just below stay hidden, on ${backend} (F135, F148)`, async ({
+    test(`rendered relief lies at the analytic heights: probes just above show, probes just below stay hidden, on ${backend} (F135, F148)`, async ({
       page,
     }) => {
       const session = await fixtureSession(page);
-      // Hills only (±300 m) seen from above: no relief stands between the eye and a probe, so a hidden probe above the
-      // surface is a depth error, not an occlusion.
+      // The fixture's 4,000 m mountain seen from above: its smooth flanks hide nothing from a nearly vertical view, so
+      // a hidden probe above the analytic surface is a depth or height error, not an occlusion.
       await openGlobe(
         page,
-        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=11&lat=44.5&zoom=12.5&tilt=0`,
+        `backend=${backend}&session=${session}&scenario=terrain-alps&lon=6.88&lat=45.84&zoom=12.5&tilt=0`,
       );
       await waitForTerrain(page);
-      const result = await page.evaluate(probeRelief, 100);
+      const result = await probeRelief(page, 100);
       console.log(`relief probes ${backend}: ${JSON.stringify(result)}`);
       expect(result.points).toBe(100);
       expect(result.aboveHidden).toEqual([]);
@@ -349,66 +352,123 @@ async function centerImageryLevel(page: Page): Promise<number> {
   });
 }
 
-/**
- * Runs in the page: places `count` probe points on a grid over the view, each at the displayed terrain height
- * (`elevationAt`, the deepest resident level, which the settled frame draws). For each, a small quad that follows the
- * terrain `offset` above it must show at its center pixel, and one `offset` below it must stay hidden: the GPU's depth
- * test checks the rendered relief against the source heights within `offset`, which covers the depth precision.
- */
-async function probeRelief(count: number): Promise<{ points: number; aboveHidden: number[]; belowShown: number[] }> {
+/** A probe of the relief test: where it lies, its size and how far above or below the surface it is drawn. */
+interface ReliefProbe {
+  longitudeDeg: number;
+  latitudeDeg: number;
+  sizeMeters: number;
+  offsetMeters: number;
+  /** The finest terrain level resident there (sets the source's own precision). */
+  level: number;
+  /** Analytic heights of its center and four corners, filled in Node. */
+  heightsMeters?: number[];
+}
+
+/** In the page: up to `count` probe positions on a grid over the view, sized about 8 px each. */
+function reliefProbes(count: number): ReliefProbe[] {
   const globe = window.vibeglobePlayground?.globe;
   const canvas = document.querySelector<HTMLCanvasElement>('#globe');
   if (!globe || !canvas) throw new Error('no globe');
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   const metersPerDeg = 111_320;
-  const points: { longitudeDeg: number; latitudeDeg: number; offsetMeters: number; sizeMeters: number }[] = [];
+  const probes: ReliefProbe[] = [];
   const side = Math.ceil(Math.sqrt(count));
-  for (let row = 0; row < side && points.length < count; row++) {
-    for (let col = 0; col < side && points.length < count; col++) {
+  for (let row = 0; row < side && probes.length < count; row++) {
+    for (let col = 0; col < side && probes.length < count; col++) {
       const at = globe.screenToGeo({ xPx: ((col + 0.5) / side) * width, yPx: ((row + 0.5) / side) * height });
       if (!at) continue;
-      const ground = globe.elevationAt(at);
-      // The probe covers about 8 px: its size and depth tolerance grow with the distance from the eye.
       const eye = globe.camera;
       const dLat = (at.latitudeDeg - eye.eyeLatitudeDeg) * metersPerDeg;
       const dLon = (at.longitudeDeg - eye.eyeLongitudeDeg) * metersPerDeg * Math.cos((at.latitudeDeg * Math.PI) / 180);
-      const distance = Math.hypot(dLat, dLon, eye.altitudeMeters - ground.heightMeters);
+      const distance = Math.hypot(dLat, dLon, eye.altitudeMeters - eye.groundHeightMeters);
       const pixelMeters = (distance * 2 * Math.tan(Math.PI / 8)) / height;
-      points.push({
-        ...at,
+      probes.push({
+        longitudeDeg: at.longitudeDeg,
+        latitudeDeg: at.latitudeDeg,
         sizeMeters: 4 * pixelMeters,
         offsetMeters: Math.max(1, 1e-3 * distance),
+        level: globe.elevationAt(at).level,
       });
     }
   }
-  const quad = (p: (typeof points)[number], sign: number) => {
+  return probes;
+}
+
+/**
+ * In the page: draws each probe as a quad at its analytic heights plus (`sign` 1) or minus (-1) its offset and reports
+ * which centers show it. Above the surface a probe must show; below it, stay hidden.
+ */
+async function showProbes(args: { probes: ReliefProbe[]; sign: number }): Promise<boolean[]> {
+  const { probes, sign } = args;
+  const globe = window.vibeglobePlayground?.globe;
+  const canvas = document.querySelector<HTMLCanvasElement>('#globe');
+  if (!globe || !canvas) throw new Error('no globe');
+  const metersPerDeg = 111_320;
+  const color = sign > 0 ? ([1, 0, 0] as const) : ([0, 0, 1] as const);
+  globe.setDebugShapes(
+    probes.map((p) => {
+      const dDeg = p.sizeMeters / metersPerDeg;
+      const dLonDeg = dDeg / Math.cos((p.latitudeDeg * Math.PI) / 180);
+      const corners = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([dx = 0, dy = 0], i) => ({
+        longitudeDeg: p.longitudeDeg + dx * dLonDeg,
+        latitudeDeg: p.latitudeDeg + dy * dDeg,
+        heightMeters: (p.heightsMeters?.[i + 1] ?? 0) + sign * p.offsetMeters,
+      }));
+      return { corners: corners as [never, never, never, never], colorRgb: color };
+    }),
+  );
+  const frame = await globe.captureFrame();
+  globe.setDebugShapes([]);
+  const scale = frame.widthPx / canvas.clientWidth;
+  return probes.map((p) => {
+    const screen = globe.geoToScreen({ ...p, heightMeters: (p.heightsMeters?.[0] ?? 0) + sign * p.offsetMeters });
+    if (!screen) return false;
+    const i = (Math.round(screen.yPx * scale) * frame.widthPx + Math.round(screen.xPx * scale)) * 4;
+    const [r = 0, g = 0, b = 0] = [frame.rgba[i], frame.rgba[i + 1], frame.rgba[i + 2]];
+    return sign > 0 ? r > 200 && g < 60 && b < 60 : b > 200 && r < 60 && g < 60;
+  });
+}
+
+/**
+ * Probes the relief at about `count` points against the fixture's analytic terrain (F135, F148): the heights come from
+ * the analytic function, not from the engine, and each probe's offset covers the depth precision and the source's
+ * own precision at the level shown (half its geometric error, the grid's bound, ADR 0006 §5).
+ */
+async function probeRelief(
+  page: Page,
+  count: number,
+): Promise<{ points: number; aboveHidden: number[]; belowShown: number[] }> {
+  const probes = await page.evaluate(reliefProbes, count);
+  const metersPerDeg = 111_320;
+  for (const p of probes) {
     const dDeg = p.sizeMeters / metersPerDeg;
     const dLonDeg = dDeg / Math.cos((p.latitudeDeg * Math.PI) / 180);
-    const corner = (dx: number, dy: number) => {
-      const position = { longitudeDeg: p.longitudeDeg + dx * dLonDeg, latitudeDeg: p.latitudeDeg + dy * dDeg };
-      return { ...position, heightMeters: globe.elevationAt(position).heightMeters + sign * p.offsetMeters };
-    };
-    return [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)] as const;
-  };
-  const centers = async (sign: number, color: readonly [number, number, number]) => {
-    globe.setDebugShapes(points.map((p) => ({ corners: quad(p, sign), colorRgb: color })));
-    const frame = await globe.captureFrame();
-    const scale = frame.widthPx / width;
-    return points.map((p) => {
-      const ground = globe.elevationAt(p).heightMeters + sign * p.offsetMeters;
-      const screen = globe.geoToScreen({ ...p, heightMeters: ground });
-      if (!screen) return false;
-      const i = (Math.round(screen.yPx * scale) * frame.widthPx + Math.round(screen.xPx * scale)) * 4;
-      const [r = 0, g = 0, b = 0] = [frame.rgba[i], frame.rgba[i + 1], frame.rgba[i + 2]];
-      return color[0] === 1 ? r > 200 && g < 60 && b < 60 : b > 200 && r < 60 && g < 60;
-    });
-  };
-  const above = await centers(1, [1, 0, 0]);
-  const below = await centers(-1, [0, 0, 1]);
-  globe.setDebugShapes([]);
+    p.heightsMeters = [
+      [0, 0],
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([dx = 0, dy = 0]) =>
+      fixtureHeightMeters(
+        ((p.longitudeDeg + dx * dLonDeg) * Math.PI) / 180,
+        ((p.latitudeDeg + dy * dDeg) * Math.PI) / 180,
+      ),
+    );
+    // Half the 256 px heightmap source's geometric error at that level (`heightmapGeometricErrorMeters`).
+    const sourceMeters = (0.5 * 0.25 * EQUATOR_METERS) / (256 * 2 ** Math.max(0, p.level));
+    p.offsetMeters = Math.max(p.offsetMeters, sourceMeters + 0.5);
+  }
+  const above = await page.evaluate(showProbes, { probes, sign: 1 });
+  const below = await page.evaluate(showProbes, { probes, sign: -1 });
   return {
-    points: points.length,
+    points: probes.length,
     aboveHidden: above.flatMap((shown, i) => (shown ? [] : [i])),
     belowShown: below.flatMap((shown, i) => (shown ? [i] : [])),
   };

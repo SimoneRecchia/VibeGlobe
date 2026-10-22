@@ -293,6 +293,13 @@ export function terrainHeightRange(
       const bound = layer.gridErrorMeters[current] ?? 0;
       const measured = bound / GRID_ERROR_FACTOR + (grid.errorMeters ?? 0);
       out[2] = measured > bound ? measured : bound;
+      // At the source's finest level, the surface refines until it samples each vertex of this grid (ADR 0027); below
+      // it, finer terrain is still to come and the selection's own limit applies.
+      const sampled = Math.log2(grid.cells / TILE_SEGMENTS);
+      out[3] =
+        current === source.maxLevel
+          ? current + (sampled > TERRAIN_LEVEL_OFFSET ? sampled : TERRAIN_LEVEL_OFFSET)
+          : Number.POSITIVE_INFINITY;
       return true;
     }
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);

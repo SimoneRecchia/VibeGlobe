@@ -71,8 +71,9 @@ export interface QuadtreeSelectionOptions {
   terrainMaxMeters?: number;
   /**
    * The height range of one tile's relief, written as [min, max, error] meters into `out`: the heights of the terrain
-   * it shows so far and how much finer levels may add; false when unknown (no terrain resident there, and the global
-   * range applies). A tile's distance is measured from its own highest relief, and culling uses its range widened by
+   * it shows so far and how much finer levels may add; then in `out[3]` the deepest level its terrain is worth refining
+   * to (beyond the source's finest level, where the surface samples every vertex of that grid). False when unknown (no
+   * terrain resident there, and the global range applies). A tile's distance is measured from its own highest relief, and culling uses its range widened by
    * the error but never beyond the global range, so one high peak does not refine or keep every tile near a low eye
    * (KB-077).
    */
@@ -165,6 +166,8 @@ const TEXEL = 3;
  * shows, within the global range); from {@link QuadtreeSelectionOptions.terrainRange}.
  */
 const tileRange = new Float64Array(4);
+/** The deepest level the tile's terrain is worth refining to (from {@link QuadtreeSelectionOptions.terrainRange}). */
+let terrainLevelLimit = 0;
 
 /**
  * Writes a tile's relief range into {@link tileRange}: its own when known, else the whole terrain's, with the
@@ -173,7 +176,11 @@ const tileRange = new Float64Array(4);
 function measureRelief(tile: QuadtreeTile, options: QuadtreeSelectionOptions): void {
   const globalLow = options.terrainMinMeters ?? 0;
   const globalHigh = options.terrainMaxMeters ?? 0;
+  terrainLevelLimit = options.terrainMaxLevel ?? 0;
   if (options.terrainRange?.(tile, tileRange)) {
+    // At the source's finest level the tile's own grid sets how deep its terrain is worth refining (ADR 0027).
+    const limit = tileRange[3] ?? Number.POSITIVE_INFINITY;
+    if (limit !== Number.POSITIVE_INFINITY) terrainLevelLimit = limit;
     const error = tileRange[2] ?? 0;
     const low = (tileRange[0] ?? 0) - error;
     const high = (tileRange[1] ?? 0) + error;
@@ -303,7 +310,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
         radius > RADIUS_TO_DISTANCE * distance ||
         (level < (options.imageryMaxLevel ?? 0) &&
           ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
-        (level < (options.terrainMaxLevel ?? 0) &&
+        (level < terrainLevelLimit &&
           ((options.terrainErrorMeters?.[level] ?? 0) / distance) * state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {

@@ -111,9 +111,9 @@ export class SurfaceFrame {
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
       this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
-      // Two levels beyond the finest terrain's own: a 256-cell grid (rough tiles, ADR 0027) needs them for the surface
-      // to sample each of its vertices.
-      this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET + 2);
+      // Tiles showing the finest terrain may refine further where its grid is finer than 64 cells (terrainRange, ADR
+      // 0027).
+      this.selection.terrainMaxLevel = Math.min(MAX_LEVEL, terrain.maxLevel + TERRAIN_LEVEL_OFFSET);
       const { terrain: layer, heights } = imagery;
       if (layer && heights) this.selection.terrainRange = (tile, out) => terrainHeightRange(layer, heights, tile, out);
     }

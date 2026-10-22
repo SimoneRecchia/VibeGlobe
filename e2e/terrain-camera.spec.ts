@@ -225,10 +225,10 @@ for (const backend of BACKENDS) {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 320, height: 240 });
     const session = await fixtureSession(page);
-    // The valley east of the peak, looking west at its flank.
+    // The valley east of the peak, looking west at its flank; the base image only, so the terrain streams faster.
     await openGlobe(
       page,
-      `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-alps&lon=6.98&lat=45.82&zoom=16&tilt=70&heading=270`,
+      `backend=${backend}&session=${session}&${CLOCK}&scenario=terrain-alps&imagery=&lon=6.98&lat=45.82&zoom=16&tilt=70&heading=270`,
     );
     await waitForTerrain(page);
     await recordClearance(page);

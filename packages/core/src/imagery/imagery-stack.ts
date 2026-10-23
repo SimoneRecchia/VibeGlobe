@@ -25,12 +25,56 @@ export interface ImageryLayerOptions {
 /** A layer of `GlobeOptions.imagery`: a single source, or a layer with a chain of sources and its look. */
 export type ImageryLayerInput = ImagerySource | ImageryLayerOptions;
 
-/** A layer's current look, as `Globe.imageryLayers` reports and changes it. */
+/** A source's declared metadata, as `Globe.imageryLayers.list()` reports it (F220). */
+export interface ImagerySourceInfo {
+  readonly id: string;
+  readonly crs: string;
+  readonly minLevel: number;
+  readonly maxLevel: number;
+  readonly tileSizePx: number;
+  readonly pixelRatio: number;
+  /** Coverage rectangles in degrees; absent for the whole world. */
+  readonly coverageDeg?: readonly { westDeg: number; southDeg: number; eastDeg: number; northDeg: number }[];
+  readonly attribution: readonly { readonly text: string; readonly url?: string }[];
+  readonly maxRequestsPerHost?: number;
+  readonly maxRequestsPerSecond?: number;
+}
+
+/** A layer's current look, as `Globe.imageryLayers` reports and changes it, with its sources' metadata. */
 export interface ImageryLayerState {
   readonly id: string;
   readonly opacity: number;
   readonly visible: boolean;
   readonly blend: ImageryBlend;
+  /** The layer's sources in priority order (F220). */
+  readonly sources: readonly ImagerySourceInfo[];
+}
+
+const DEG = 180 / Math.PI;
+
+/** The metadata of a source, in degrees (F220). */
+export function sourceInfo(source: ImagerySource): ImagerySourceInfo {
+  return {
+    id: source.id,
+    crs: source.tiling.crs,
+    minLevel: source.minLevel,
+    maxLevel: source.maxLevel,
+    tileSizePx: source.tileSizePx,
+    pixelRatio: source.pixelRatio,
+    ...(source.coverage
+      ? {
+          coverageDeg: source.coverage.map((r) => ({
+            westDeg: r.westRad * DEG,
+            southDeg: r.southRad * DEG,
+            eastDeg: r.eastRad * DEG,
+            northDeg: r.northRad * DEG,
+          })),
+        }
+      : {}),
+    attribution: (source.attribution ?? []).map(({ text, url }) => ({ text, ...(url ? { url } : {}) })),
+    ...(source.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: source.maxRequestsPerHost }),
+    ...(source.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: source.maxRequestsPerSecond }),
+  };
 }
 
 /** What `Globe.imageryLayers.set` can change. */
@@ -136,4 +180,77 @@ export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: num
     if (!added) break;
   }
   return levels;
+}
+
+/** The reference systems of the engine's tiling schemes (Web Mercator XYZ and the two-root geographic pyramid). */
+const SUPPORTED_CRS = new Set(['EPSG:3857', 'EPSG:4326']);
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isPositiveInteger = (value: unknown): boolean => Number.isInteger(value) && (value as number) > 0;
+
+/**
+ * What is wrong with a source's metadata (F220), or undefined when it is valid: its reference system, level range,
+ * tile size and pixel ratio, coverage rectangles, request limits and time limits, and its credits.
+ */
+export function sourceProblem(source: ImagerySource): string | undefined {
+  const { id, tiling, minLevel, maxLevel } = source as Partial<ImagerySource>;
+  if (typeof id !== 'string' || id.length === 0) return 'has no id';
+  if (typeof tiling !== 'object' || !SUPPORTED_CRS.has(String(tiling.crs)))
+    return `uses the unknown reference system ${String((tiling as { crs?: unknown } | undefined)?.crs)}`;
+  if (
+    !Number.isInteger(minLevel) ||
+    !Number.isInteger(maxLevel) ||
+    (minLevel as number) < 0 ||
+    (maxLevel as number) > 30
+  )
+    return `has levels ${String(minLevel)} to ${String(maxLevel)}: they must be integers from 0 to 30`;
+  if ((minLevel as number) > (maxLevel as number))
+    return `has a minimum level ${String(minLevel)} above its maximum ${String(maxLevel)}`;
+  if (!isPositiveInteger(source.tileSizePx)) return `has a tile size of ${String(source.tileSizePx)} pixels`;
+  if (!isFiniteNumber(source.pixelRatio) || source.pixelRatio < 1)
+    return `has a pixel ratio of ${String(source.pixelRatio)}`;
+  for (const area of source.coverage ?? []) {
+    const { westRad, southRad, eastRad, northRad } = area;
+    if (![westRad, southRad, eastRad, northRad].every(isFiniteNumber) || southRad >= northRad || westRad === eastRad)
+      return 'has a coverage rectangle that is empty, inverted or not finite';
+  }
+  if (source.maxRequestsPerHost !== undefined && !isPositiveInteger(source.maxRequestsPerHost))
+    return `allows ${String(source.maxRequestsPerHost)} requests per host`;
+  if (
+    source.maxRequestsPerSecond !== undefined &&
+    !(isFiniteNumber(source.maxRequestsPerSecond) && source.maxRequestsPerSecond >= 1)
+  )
+    return `declares a rate limit of ${String(source.maxRequestsPerSecond)} requests per second`;
+  const timeouts = source.timeoutsMs;
+  if (
+    timeouts &&
+    !(
+      isFiniteNumber(timeouts.firstByteMs) &&
+      timeouts.firstByteMs > 0 &&
+      isFiniteNumber(timeouts.totalMs) &&
+      timeouts.totalMs > 0
+    )
+  )
+    return 'has time limits that are not positive numbers';
+  for (const attribution of source.attribution ?? [])
+    if (typeof attribution?.text !== 'string') return 'has a credit without text';
+  return undefined;
+}
+
+/**
+ * The layers of `GlobeOptions.imagery` whose sources are all valid (F220); every other layer is left out and reported
+ * through `refused` with a descriptive message, so the engine still draws the valid ones.
+ */
+export function validStack(inputs: readonly ImageryLayerInput[], refused: (message: string) => void): StackEntry[] {
+  const entries: StackEntry[] = [];
+  for (const entry of stackEntries(inputs)) {
+    const problems = entry.sources.map((source) => [source, sourceProblem(source)] as const).filter(([, p]) => p);
+    if (problems.length === 0) entries.push(entry);
+    else
+      for (const [source, problem] of problems)
+        refused(
+          `Imagery source "${String((source as Partial<ImagerySource>).id)}" ${String(problem)}; its layer "${entry.id}" is left out`,
+        );
+  }
+  return entries;
 }

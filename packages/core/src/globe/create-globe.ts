@@ -223,7 +223,7 @@ class GlobeEngine implements Globe {
       requestFrame: () => this.destroyed || this.requestRender(),
       tileError: (event) => this.emitter.emit('tile-error', event),
       creditsChange: (credits) => this.emitter.emit('credits-change', { credits }),
-      ...(this.options.hiddenCredits ? { hiddenCredits: this.options.hiddenCredits } : {}),
+      sourceError: (error) => this.emitter.emit('error', error),
     });
     // After the terrain starts: its errors set the skirt depths.
     this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);

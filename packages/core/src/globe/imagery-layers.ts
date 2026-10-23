@@ -1,6 +1,7 @@
 import type { StackLayer } from '../imagery/imagery-draws.js';
 import {
   applyChanges,
+  sourceInfo,
   type ImageryLayerChanges,
   type ImageryLayers,
   type ImageryLayerState,
@@ -51,6 +52,7 @@ class ImageryLayersController implements ImageryLayers {
       opacity: entry.opacity,
       visible: entry.visible,
       blend: entry.blend,
+      sources: entry.sources.map(sourceInfo),
     }));
   }
 

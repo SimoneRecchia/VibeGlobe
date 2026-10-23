@@ -108,3 +108,36 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
     ).toThrowError(/workers is required/);
   });
 });
+
+describe('source metadata (F220)', () => {
+  it('leaves out a source with invalid metadata with a typed error, and keeps drawing the others', async () => {
+    const urls: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const broken = { ...source(urls), id: 'broken', minLevel: 9, maxLevel: 3 };
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source(urls), broken],
+      workers: instantWorkers(),
+      logLevel: 'silent',
+    });
+    const errors: { code: string; message: string }[] = [];
+    globe.on('error', (error) => errors.push({ code: error.code, message: error.message }));
+    await settle();
+    renderer.flush();
+    await settle();
+    expect(errors).toEqual([
+      {
+        code: 'invalid-option',
+        message: 'Imagery source "broken" has a minimum level 9 above its maximum 3; its layer "broken" is left out',
+      },
+    ]);
+    expect(globe.imageryLayers.list().map((layer) => layer.id)).toEqual(['fixture']);
+    // The metadata reads back through the inspection API.
+    expect(globe.imageryLayers.list()[0]?.sources).toEqual([
+      { id: 'fixture', crs: 'EPSG:3857', minLevel: 0, maxLevel: 18, tileSizePx: 256, pixelRatio: 1, attribution: [] },
+    ]);
+    globe.destroy();
+  });
+});

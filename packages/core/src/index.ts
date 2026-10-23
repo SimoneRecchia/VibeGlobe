@@ -128,6 +128,7 @@ export type {
   ImageryLayerOptions,
   ImageryLayers,
   ImageryLayerState,
+  ImagerySourceInfo,
 } from './imagery/imagery-stack.js';
 export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
 export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';

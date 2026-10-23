@@ -17,7 +17,8 @@ import { mercatorScaleInto, type MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike } from './imagery-runtime.js';
 import type { ImageryCallbacks } from './runtime-credits.js';
-import { stackEntries } from '../imagery/imagery-stack.js';
+import { validStack } from '../imagery/imagery-stack.js';
+import { GlobeError } from './errors.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
 import { liftMeters } from '../terrain/collision.js';
@@ -107,15 +108,21 @@ export class SurfaceFrame {
    */
   startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
     const { imagery: inputs = [], terrain, workers } = options;
-    if ((inputs.length === 0 && !terrain) || !workers) return;
     const logger = this.observability.logger;
+    // Sources with invalid metadata are left out with an error; the others draw (F220).
+    const entries = validStack(inputs, (message) => {
+      logger.log('error', message);
+      callbacks.sourceError?.(new GlobeError('invalid-option', message));
+    });
+    if ((entries.length === 0 && !terrain) || !workers) return;
     const imagery = new ImageryRuntime(
-      stackEntries(inputs),
+      entries,
       workers,
       options.memory ?? {},
       renderer,
       {
         ...callbacks,
+        ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
           logger.log('warn', `${event.sourceId}: tile ${event.level}/${event.x}/${event.y} ${event.reason}`);

@@ -5,6 +5,7 @@ import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { Observability } from '../diagnostics/observability.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { RendererBackend, TileErrorEvent } from './types.js';
+import type { GlobeError } from './errors.js';
 
 /**
  * The credits of one engine instance (F254, F255): which sources each frame shows, by index (imagery sources in the
@@ -61,6 +62,8 @@ export interface ImageryCallbacks {
   tileError(event: TileErrorEvent): void;
   /** The credits of the sources in view changed (F254). */
   creditsChange?(credits: readonly Credit[]): void;
+  /** A source was left out for invalid metadata (F220). */
+  sourceError?(error: GlobeError): void;
   /** Sources whose credits the application hides (`GlobeOptions.hiddenCredits`); required credits stay (F255). */
   readonly hiddenCredits?: readonly string[];
 }

@@ -361,6 +361,19 @@ function startSecondGlobe(host: HTMLElement): Globe {
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
 }
 
+/** The debug overlay's lines of each imagery source's declared metadata (F220). */
+function sourceLines(globe: Globe): [string, string][] {
+  return globe.imageryLayers
+    .list()
+    .flatMap((layer) =>
+      layer.sources.map((source): [string, string] => [
+        `source-${source.id}`,
+        `source ${source.id} ${source.crs} z${source.minLevel}–${source.maxLevel} ${source.tileSizePx}px` +
+          (source.maxRequestsPerSecond ? ` ${source.maxRequestsPerSecond}/s` : ''),
+      ]),
+    );
+}
+
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
   // Loaded on demand so the overlay code is not part of the default page.
   const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
@@ -385,6 +398,7 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
       ['device-memory', `memory ${caps.deviceMemoryGiB === undefined ? 'unknown' : `${caps.deviceMemoryGiB} GiB`}`],
       ['adapter', `adapter ${caps.adapter}`],
       ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
+      ...sourceLines(globe),
     ];
   };
   void globe.ready.then(readInfo);

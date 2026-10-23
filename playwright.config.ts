@@ -5,6 +5,12 @@ const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
+/**
+ * Elsewhere (CI's container), the full Chromium in its headless mode rather than Playwright's default headless shell:
+ * the shell has no display pacing, so it queues frames faster than SwiftShader draws them and a capture waits behind
+ * the queue for minutes (KB-102).
+ */
+const CHROMIUM = { ...devices['Desktop Chrome'], ...(chromiumPath ? {} : { channel: 'chromium' }) };
 /** Tests whose results depend on having the machine to themselves. */
 const MEASURES_THE_MACHINE =
   /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts|hud-overhead\.spec\.ts/;
@@ -58,11 +64,11 @@ export default defineConfig({
     launchOptions: { args: gpuArgs(), ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: [MEASURES_THE_MACHINE, ...NEEDS_DOCKER] },
+    { name: 'chromium', use: CHROMIUM, testIgnore: [MEASURES_THE_MACHINE, ...NEEDS_DOCKER] },
     // Measurements of the whole machine (heap sampling, GC traces) run after every other test, alone (F064).
     {
       name: 'measurements',
-      use: { ...devices['Desktop Chrome'] },
+      use: CHROMIUM,
       testMatch: MEASURES_THE_MACHINE,
       dependencies: ['chromium'],
     },

@@ -1,7 +1,7 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "name": "VibeGlobe",
-  "entryPoints": ["packages/*/src/index.ts"],
+  "entryPoints": ["packages/*/src/index.ts", "packages/core/src/decoders.ts"],
   "tsconfig": "tsconfig.docs.json",
   "out": "docs-site",
   "readme": "README.md",

@@ -256,7 +256,7 @@ export class SurfaceFrame {
     const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
     return {
       heightAt: (longitudeDeg, latitudeDeg) => this.elevationAt({ longitudeDeg, latitudeDeg }, sample).heightMeters,
-      version: () => this.terrainStats()?.uploads ?? 0,
+      version: () => this.imagery?.terrainUploads() ?? 0,
     };
   }
 

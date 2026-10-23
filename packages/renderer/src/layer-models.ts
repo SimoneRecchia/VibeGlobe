@@ -70,6 +70,8 @@ function place(model: Model, pose: ModelPose, view: FrameView): void {
  */
 export class LayerModels implements ModelRenderer {
   private readonly models = new Map<number, Model>();
+  /** The models again, walked by index each frame, which allocates nothing (F064). */
+  private readonly modelList: Model[] = [];
   /** The glTF loader, created on the first model; none unless the application gave `createRenderer` one. */
   private loader: GltfLoader | undefined;
   /** Set from `createRenderer({ gltf })`. */
@@ -92,7 +94,9 @@ export class LayerModels implements ModelRenderer {
     root.traverse((object) => (object.frustumCulled = false));
     root.visible = false;
     const id = this.nextId++;
-    this.models.set(id, { root, pose: undefined });
+    const model: Model = { root, pose: undefined };
+    this.models.set(id, model);
+    this.modelList.push(model);
     root.traverse((object) => {
       const mesh = object as Partial<Mesh>;
       if (mesh.isMesh && mesh.material) mesh.material = unlit(mesh.material as Material);
@@ -114,11 +118,14 @@ export class LayerModels implements ModelRenderer {
     this.scene.remove(model.root);
     disposeTree(model.root);
     this.models.delete(id);
+    this.modelList.splice(this.modelList.indexOf(model), 1);
   }
 
   /** Places every model for this frame. */
   place(view: FrameView): void {
-    for (const model of this.models.values()) {
+    for (let i = 0; i < this.modelList.length; i++) {
+      const model = this.modelList[i];
+      if (!model) continue;
       model.root.visible = model.pose !== undefined;
       if (model.pose) place(model, model.pose, view);
     }

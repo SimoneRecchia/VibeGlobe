@@ -317,6 +317,11 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.dispatchOne() === 1;
   }
 
+  /** Tiles uploaded so far, read without allocating (each frame, by data layers on the terrain: ADR 0037). */
+  get uploadedCount(): number {
+    return this.uploads.uploadedCount;
+  }
+
   /** Adds this loader's counters to `out`. */
   addStats(out: ImageryLoaderStats): void {
     out.queued += this.heap.size;

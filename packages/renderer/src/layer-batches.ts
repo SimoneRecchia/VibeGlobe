@@ -72,7 +72,10 @@ function shapeOf(batch: BatchContents): LayerShape {
  */
 export class LayerBatches implements LayerRenderTarget {
   private readonly batches = new Map<number, Batch>();
+  /** The batches and materials again, as arrays: each frame walks them by index, which allocates nothing (F064). */
+  private readonly batchList: Batch[] = [];
   private readonly materials = new Map<LayerShape, MeshBasicNodeMaterial>();
+  private readonly materialList: MeshBasicNodeMaterial[] = [];
   /** glTF models (F361), placed with the batches. */
   readonly models: LayerModels;
   private nextId = 1;
@@ -98,7 +101,7 @@ export class LayerBatches implements LayerRenderTarget {
   /** See {@link LayerRenderTarget}. */
   createBatch(descriptor: BatchDescriptor): BatchHandle {
     const id = this.nextId++;
-    this.batches.set(id, {
+    const batch: Batch = {
       descriptor,
       kind: descriptor.kind,
       capacity: descriptor.capacity,
@@ -113,7 +116,9 @@ export class LayerBatches implements LayerRenderTarget {
       geometry: new Map(),
       mesh: undefined,
       arrays: undefined,
-    });
+    };
+    this.batches.set(id, batch);
+    this.batchList.push(batch);
     return { id };
   }
 
@@ -216,6 +221,7 @@ export class LayerBatches implements LayerRenderTarget {
     if (!batch) return;
     this.disposeMesh(batch);
     this.batches.delete(handle.id);
+    this.batchList.splice(this.batchList.indexOf(batch), 1);
   }
 
   /** Sets the terrain clamped and draped features take their heights from (ADR 0037). */
@@ -252,16 +258,18 @@ export class LayerBatches implements LayerRenderTarget {
     if (version !== this.groundVersion) {
       // Finer terrain arrived: features on the ground are placed on it again.
       this.groundVersion = version;
-      for (const batch of this.batches.values())
+      for (const batch of this.batchList)
         if (batch.descriptor.placement !== undefined && onGround(batch)) batch.dirty = true;
     }
     if (this.atlas.generation !== this.atlasGeneration) {
       // The atlas started over: every label and marker is drawn into it again.
       this.atlasGeneration = this.atlas.generation;
-      for (const batch of this.batches.values())
-        if (batch.kind === 'label' || batch.kind === 'marker') batch.dirty = true;
+      for (const batch of this.batchList) if (batch.kind === 'label' || batch.kind === 'marker') batch.dirty = true;
     }
-    for (const batch of this.batches.values()) {
+    const batches = this.batchList;
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      if (!batch) continue;
       if (batch.dirty) this.rebuild(batch);
       else if (batch.ranges.length > 0) this.rewrite(batch);
       const mesh = batch.mesh;
@@ -270,7 +278,9 @@ export class LayerBatches implements LayerRenderTarget {
       if (batch.visible) placeTile(mesh, batch.arrays.origin, view);
     }
     // After the rebuilds, which may have created materials.
-    for (const material of this.materials.values()) {
+    for (let i = 0; i < this.materialList.length; i++) {
+      const material = this.materialList[i];
+      if (!material) continue;
       setSurfaceMorph(material, view.morph);
       setLayerViewport(material, view.widthPx, view.heightPx);
     }
@@ -285,6 +295,7 @@ export class LayerBatches implements LayerRenderTarget {
     }
     for (const material of this.materials.values()) material.dispose();
     this.materials.clear();
+    this.materialList.length = 0;
   }
 
   /** Releases every batch and material. */
@@ -293,8 +304,10 @@ export class LayerBatches implements LayerRenderTarget {
     this.atlas.dispose();
     for (const batch of this.batches.values()) this.disposeMesh(batch);
     this.batches.clear();
+    this.batchList.length = 0;
     for (const material of this.materials.values()) material.dispose();
     this.materials.clear();
+    this.materialList.length = 0;
   }
 
   private get(handle: BatchHandle): Batch {
@@ -308,6 +321,7 @@ export class LayerBatches implements LayerRenderTarget {
     if (!material) {
       material = createLayerMaterial(shape, this.depthPath, this.atlas.texture);
       this.materials.set(shape, material);
+      this.materialList.push(material);
     }
     return material;
   }

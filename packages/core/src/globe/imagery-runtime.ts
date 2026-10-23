@@ -435,6 +435,11 @@ export class ImageryRuntime {
     this.lease.pool.update();
   }
 
+  /** Terrain tiles uploaded so far (0 without terrain), without allocating: it is read every frame. */
+  terrainUploads(): number {
+    return this.terrain?.loader.uploadedCount ?? 0;
+  }
+
   /** The counters of `Globe.terrainStats()`; undefined without terrain. */
   terrainStats(): TerrainStats | undefined {
     if (!this.terrain) return undefined;

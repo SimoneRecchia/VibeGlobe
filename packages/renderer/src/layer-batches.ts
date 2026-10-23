@@ -310,6 +310,11 @@ export class LayerBatches implements LayerRenderTarget {
     this.materialList.length = 0;
   }
 
+  /** The terrain a batch stands on: none off the ground, and none before the first heights (finer pieces for nothing). */
+  private groundOf(batch: Batch): LayerGround | undefined {
+    return onGround(batch) && this.groundVersion > 0 ? this.ground : undefined;
+  }
+
   private get(handle: BatchHandle): Batch {
     const batch = this.batches.get(handle.id);
     if (!batch) throw new Error(`Unknown layer batch ${String(handle.id)}`);
@@ -330,7 +335,7 @@ export class LayerBatches implements LayerRenderTarget {
   private rewrite(batch: Batch): void {
     const { arrays, mesh } = batch;
     for (const [first, end] of batch.ranges.splice(0)) {
-      const ground = onGround(batch) ? this.ground : undefined;
+      const ground = this.groundOf(batch);
       if (!arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.atlas, ground)) {
         this.rebuild(batch);
         return;
@@ -350,7 +355,7 @@ export class LayerBatches implements LayerRenderTarget {
     batch.ranges.length = 0;
     this.rebuilds++;
     this.disposeMesh(batch);
-    const arrays = buildLayerArrays(batch, this.atlas, onGround(batch) ? this.ground : undefined);
+    const arrays = buildLayerArrays(batch, this.atlas, this.groundOf(batch));
     batch.arrays = arrays;
     if (!arrays) return;
     const geometry = new BufferGeometry();

@@ -71,7 +71,8 @@ export class ImageryFades {
           this.fromGeographic[slot] = this.toGeographic[slot] ?? 1;
           for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = this.toTransform[slot * 4 + c] ?? 0;
           this.store(slot, layer, i);
-          this.startMs[slot] = nowMs;
+          // Without a duration (a frame that shows a change at once, F243) no fade starts.
+          this.startMs[slot] = durationMs > 0 ? nowMs : -Infinity;
         }
       }
       this.stamps[slot] = this.frame;

@@ -1,6 +1,6 @@
 import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
 import type { LayerRenderTarget } from '../layers/layer-target.js';
-import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { ImageryLayerInput, ImageryLayers } from '../imagery/imagery-stack.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
@@ -206,6 +206,19 @@ export interface TileDrawLayer {
   readonly skirtMeters: Float32Array;
 }
 
+/**
+ * An overlay slot of every draw (F244, F246): imagery above the draw's own, shown with an opacity and a blend mode.
+ * `opacities[i]` 0 means draw `i` shows nothing in this slot.
+ */
+export interface TileDrawOverlay {
+  readonly textures: Int32Array;
+  readonly uvTransforms: Float32Array;
+  readonly geographic: Uint8Array;
+  readonly opacities: Float32Array;
+  /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
+  readonly blends: Uint8Array;
+}
+
 /** The surface tiles a frame draws, with their imagery (the list's own layer) and their terrain heights. */
 export interface TileDrawList extends TileDrawLayer {
   readonly count: number;
@@ -215,6 +228,8 @@ export interface TileDrawList extends TileDrawLayer {
    * ellipsoid (no terrain source, or none resident yet).
    */
   readonly terrain: TileDrawLayer;
+  /** Imagery shown above the draw's own, bottom first, in at most two slots (ADR 0038). */
+  readonly overlays: readonly TileDrawOverlay[];
 }
 
 /** The terrain handle of a draw without terrain: heights are 0 on the ellipsoid. */
@@ -377,10 +392,12 @@ export interface GlobeOptions {
   /** Receives the engine's log messages instead of the console (F120). */
   readonly logSink?: LogSink;
   /**
-   * Tiled imagery layers, bottom first (M3): each surface tile shows the topmost layer that has a tile for it, else the
-   * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
+   * Tiled imagery layers, bottom first (M3, ADR 0038): each surface tile shows the topmost opaque layer that has a tile
+   * for it (else the world base image), with up to two translucent or blended layers above it. A layer is a source, or
+   * a chain of sources with an opacity, a visibility and a blend mode (`ImageryLayerOptions`). Tiles are fetched,
+   * decoded in workers and uploaded as the view needs them.
    */
-  readonly imagery?: readonly ImagerySource[];
+  readonly imagery?: readonly ImageryLayerInput[];
   /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
@@ -750,6 +767,8 @@ export interface Globe {
    * renderer has started (after `ready`) or when it draws no layers.
    */
   layerTarget(): LayerRenderTarget | undefined;
+  /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
+  readonly imageryLayers: ImageryLayers;
   /**
    * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
    * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the

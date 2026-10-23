@@ -16,6 +16,7 @@ import { ViewState } from '../view/view-state.js';
 import { mercatorScaleInto, type MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
+import { stackEntries } from '../imagery/imagery-stack.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
 import { liftMeters } from '../terrain/collision.js';
@@ -70,7 +71,8 @@ export class SurfaceFrame {
     terrainMaxMeters: 0,
     terrainRange: undefined as ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined,
   };
-  private imagery: ImageryRuntime | undefined;
+  /** The imagery runtime, once `startImagery` ran with imagery or terrain. */
+  imagery: ImageryRuntime | undefined;
 
   private readonly fadeMs: number;
   private readonly clearanceMeters: number;
@@ -103,11 +105,11 @@ export class SurfaceFrame {
    * are textured with the layers' tiles.
    */
   startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
-    const { imagery: sources = [], terrain, workers } = options;
-    if ((sources.length === 0 && !terrain) || !workers) return;
+    const { imagery: inputs = [], terrain, workers } = options;
+    if ((inputs.length === 0 && !terrain) || !workers) return;
     const logger = this.observability.logger;
     const imagery = new ImageryRuntime(
-      sources,
+      stackEntries(inputs),
       workers,
       options.memory ?? {},
       renderer,

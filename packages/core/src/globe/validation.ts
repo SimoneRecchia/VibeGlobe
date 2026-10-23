@@ -1,3 +1,4 @@
+import { stackEntries, type ImageryLayerInput } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
 import { validateConstraints } from './constraints.hot.js';
 import type { GeoPosition, GlobeEvents, GlobeOptions, ScreenPoint, ViewInit } from './types.js';
@@ -140,23 +141,23 @@ export function validateOptions(options: unknown): GlobeOptions {
 /** Imagery sources need the worker pool that decodes their tiles: a missing one is an error, never a silent fallback. */
 function validateImagery(imagery: unknown, workers: unknown): void {
   if (imagery === undefined) return;
-  if (!Array.isArray(imagery)) throw new GlobeError('invalid-option', 'imagery must be an array of imagery sources');
+  if (!Array.isArray(imagery)) throw new GlobeError('invalid-option', 'imagery must be an array of imagery layers');
   const ids = new Set<string>();
-  for (const source of imagery as unknown[]) {
-    const candidate = source as Partial<Record<string, unknown>> | null;
-    if (
-      candidate === null ||
-      typeof candidate !== 'object' ||
-      typeof candidate['id'] !== 'string' ||
-      typeof candidate['request'] !== 'function' ||
-      typeof candidate['transport'] !== 'object' ||
-      typeof candidate['tiling'] !== 'object'
-    ) {
-      throw new GlobeError('invalid-option', `imagery entries must be imagery sources, got ${describeInput(source)}`);
+  for (const input of imagery as unknown[]) {
+    const layer = input as Partial<Record<string, unknown>> | null;
+    const chain =
+      layer !== null && typeof layer === 'object' && Array.isArray(layer['sources']) ? layer['sources'] : [input];
+    for (const source of chain as unknown[]) {
+      if (!isImagerySource(source))
+        throw new GlobeError('invalid-option', `imagery entries must be imagery sources, got ${describeInput(source)}`);
+      if (ids.has(source.id)) throw new GlobeError('invalid-option', `imagery ids must be unique: ${source.id}`);
+      ids.add(source.id);
     }
-    if (ids.has(candidate['id']))
-      throw new GlobeError('invalid-option', `imagery ids must be unique: ${candidate['id']}`);
-    ids.add(candidate['id']);
+  }
+  try {
+    stackEntries(imagery as ImageryLayerInput[]);
+  } catch (error) {
+    throw new GlobeError('invalid-option', error instanceof Error ? error.message : String(error));
   }
   const factory = workers as Partial<Record<string, unknown>> | null | undefined;
   if (
@@ -303,4 +304,17 @@ export function describeInput(value: unknown): string {
   } catch {
     return Object.prototype.toString.call(value);
   }
+}
+
+/** True for an object shaped like an imagery source. */
+function isImagerySource(source: unknown): source is { id: string } {
+  const candidate = source as Partial<Record<string, unknown>> | null;
+  return (
+    candidate !== null &&
+    typeof candidate === 'object' &&
+    typeof candidate['id'] === 'string' &&
+    typeof candidate['request'] === 'function' &&
+    typeof candidate['transport'] === 'object' &&
+    typeof candidate['tiling'] === 'object'
+  );
 }

@@ -4,7 +4,8 @@ import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } f
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
-import { drawImagery, type ImageryLayer } from '../imagery/imagery-draws.js';
+import { drawImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
+import type { StackEntry } from '../imagery/imagery-stack.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import {
@@ -192,7 +193,10 @@ function loaderBase(context: LoaderContext, source: TileSource, handleBase: numb
  * loaders' begin and end inside {@link ImageryRuntime.draw}.
  */
 export class ImageryRuntime {
+  /** Every source's loader, in the order of the stack's chains (texture handles are allocated by this index). */
   readonly layers: ImageryLayer[];
+  /** The imagery stack, bottom first (ADR 0038): reordered in place by `Globe.imageryLayers.move`. */
+  readonly stack: StackLayer[];
   /** The terrain layer, when the engine has a terrain source (M4). */
   readonly terrain: TerrainLayer | undefined;
   /** The resident terrain grids, for elevation queries (F144, F145). */
@@ -223,7 +227,7 @@ export class ImageryRuntime {
   };
 
   constructor(
-    sources: readonly ImagerySource[],
+    entries: readonly StackEntry[],
     workers: WorkerEndpointFactory,
     memory: MemoryOptions,
     private readonly renderer: RendererBackend,
@@ -232,6 +236,7 @@ export class ImageryRuntime {
     terrain?: TerrainSource,
   ) {
     const host = renderer.host;
+    const sources = entries.flatMap((entry) => entry.sources);
     this.network = acquireNetworkPool(host);
     this.lease = acquireWorkerPool(workers, {
       timers: {
@@ -268,6 +273,7 @@ export class ImageryRuntime {
         decodeTask: imageryDecodeTask(source, renderer.capabilities.compressedTextureFormats),
       }),
     }));
+    this.stack = stackOf(entries, this.layers);
     this.heights = this.terrain && new TerrainHeights(this.terrain);
     this.texelsPerTile = Math.max(0, ...sources.map((source) => source.tileSizePx));
     this.maxLevel = Math.max(0, ...sources.map((source) => source.maxLevel));
@@ -406,8 +412,9 @@ export class ImageryRuntime {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
-    drawImagery(list, tiles, count, this.layers, camera);
-    this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
+    drawImagery(list, tiles, count, this.stack, camera);
+    this.fades.apply(list, list.imageryLayer, nowMs, this.snapFades ? 0 : fadeMs, this.keepTexture);
+    this.snapFades = false;
     const terrain = this.terrain;
     const host = this.renderer.host;
     let terrainStart = terrain ? host.now() : 0;
@@ -439,6 +446,10 @@ export class ImageryRuntime {
   terrainUploads(): number {
     return this.terrain?.loader.uploadedCount ?? 0;
   }
+
+  /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
+  readonly stackChanged = (): void => ((this.snapFades = true), this.callbacks.requestFrame());
+  private snapFades = false;
 
   /** The counters of `Globe.terrainStats()`; undefined without terrain. */
   terrainStats(): TerrainStats | undefined {

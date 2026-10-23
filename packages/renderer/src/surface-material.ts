@@ -60,6 +60,14 @@ export interface SurfaceDraw {
    * depth (terrain coarser than the tile's level, `TileDrawList.terrain.skirtMeters`).
    */
   readonly params: Vector4;
+  /** The imagery of the two overlay slots (ADR 0038), drawn above the tile's own; unset where a slot is empty. */
+  overlay0: Texture | undefined;
+  overlay1: Texture | undefined;
+  /**
+   * The overlays' numbers, by column: the two UV transforms; (geographic 0, geographic 1, opacity 0, opacity 1);
+   * (blend 0, blend 1, 0, 0), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2 screen).
+   */
+  readonly overlays: Matrix4;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -68,7 +76,7 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
 }
 
 /** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */
-const PER_DRAW_TEXTURES = ['surfaceTexture', 'fromTexture', 'heights', 'fromHeights'] as const;
+const PER_DRAW_TEXTURES = ['surfaceTexture', 'fromTexture', 'heights', 'fromHeights', 'overlay0', 'overlay1'] as const;
 
 /**
  * Attaches a draw state to a new surface mesh. Its textures reach the shared texture nodes just before the mesh is
@@ -83,18 +91,24 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     fromHeights: undefined,
     transforms: new Matrix4().set(1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
     params: new Vector4(15, 1, 1, 0),
+    overlay0: undefined,
+    overlay1: undefined,
+    overlays: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
   };
   object.userData['surfaceDraw'] = draw;
-  const values = [draw.texture, draw.fromTexture, draw.heights, draw.fromHeights];
+  const values = [draw.texture, draw.fromTexture, draw.heights, draw.fromHeights, draw.overlay0, draw.overlay1];
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
     values[0] = draw.texture;
     values[1] = draw.fromTexture;
     values[2] = draw.heights;
     values[3] = draw.fromHeights;
+    values[4] = draw.overlay0;
+    values[5] = draw.overlay1;
     for (let i = 0; i < PER_DRAW_TEXTURES.length; i++) {
       const node = material.userData[PER_DRAW_TEXTURES[i] ?? ''] as { value: Texture } | undefined;
-      // Draws without terrain use the material's flat heights.
-      const value = values[i] ?? (i >= 2 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
+      // Draws without terrain use the material's flat heights; empty overlay slots keep their texture (opacity 0).
+      const value =
+        values[i] ?? (i === 2 || i === 3 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
       if (node && value) node.value = value;
     }
   };
@@ -199,6 +213,40 @@ function placeMorphed(
 }
 
 /**
+ * The overlay slots of the surface material (ADR 0038): two textures with their UV transforms, opacities and blend
+ * modes from each mesh's {@link SurfaceDraw}. Returns what composes them over a color, in the slots' order; a slot of
+ * opacity 0 samples nothing (the opacity is uniform per draw, so the branch is too). Their placeholder textures are
+ * disposed with the material.
+ */
+function overlaySlots(
+  material: MeshBasicNodeMaterial,
+  placeholder: Texture,
+  tileUv: Node<'vec3'>,
+): (color: Node<'vec4'>) => void {
+  const overlays = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlays);
+  const looks = column(overlays, 2);
+  const blends = column(overlays, 3);
+  const slots = [0, 1].map((slot) => {
+    const own = placeholderLike(placeholder);
+    material.addEventListener('dispose', () => own.dispose());
+    const node = texture(own, mapUv(tileUv, column(overlays, slot), slot === 0 ? looks.x : looks.y));
+    material.userData[`overlay${String(slot)}`] = node;
+    return { node, opacity: slot === 0 ? looks.z : looks.w, blend: slot === 0 ? blends.x : blends.y };
+  });
+  return (color) => {
+    for (const { node, opacity, blend } of slots) {
+      If(opacity.greaterThan(0), () => {
+        const over = node.xyz;
+        const multiplied = color.xyz.mul(over);
+        const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
+        const blended = select(blend.lessThan(0.5), over, select(blend.lessThan(1.5), multiplied, screened));
+        color.assign(vec4(mix(color.xyz, blended, node.w.mul(opacity)), color.w));
+      });
+    }
+  };
+}
+
+/**
  * The surface material shared by every tile: one shader and one pipeline for the whole surface (ADR 0010 §4, §7).
  * The UV transforms and flags are object-scope uniforms read from each mesh's {@link SurfaceDraw}, and the textures
  * are set per mesh before it draws (see {@link attachSurfaceDraw}), so tiles drawing different data tiles still share
@@ -255,11 +303,13 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   // space (gamma 2, close to sRGB): a linear-light mix would change dark pixels several times faster than bright ones.
   // Only fading draws sample the second texture (fade is uniform per draw, so the branch is too): on a software
   // rasterizer the extra fetch costs about half a frame.
+  const composeOverlays = overlaySlots(material, placeholder, tileUv);
   material.colorNode = Fn(() => {
     const color = map.toVar();
     If(fade.lessThan(1), () => {
       color.assign(mix(fromMap.sqrt(), color.sqrt(), fade).pow2());
     });
+    composeOverlays(color);
     return color;
   })();
   placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
@@ -300,6 +350,27 @@ export function applyDraw(
     e[4 + c] = draws.fromUvTransforms[at + c] ?? 0;
     e[8 + c] = terrain.uvTransforms[at + c] ?? 0;
     e[12 + c] = terrain.fromUvTransforms[at + c] ?? 0;
+  }
+  applyOverlays(draw, draws, i, textures);
+}
+
+/** Points a mesh's overlay slots at draw `i`'s overlays; a slot whose texture is no longer held shows nothing. */
+function applyOverlays(
+  draw: SurfaceDraw,
+  draws: TileDrawList,
+  i: number,
+  textures: { get(handle: number): Texture | undefined },
+): void {
+  const o = draw.overlays.elements;
+  for (let slot = 0; slot < 2; slot++) {
+    const overlay = draws.overlays[slot];
+    const shown = overlay && (overlay.opacities[i] ?? 0) > 0 ? textures.get(overlay.textures[i] ?? -1) : undefined;
+    if (slot === 0) draw.overlay0 = shown;
+    else draw.overlay1 = shown;
+    o[8 + slot] = overlay?.geographic[i] ?? 0;
+    o[10 + slot] = shown && overlay ? (overlay.opacities[i] ?? 0) : 0;
+    o[12 + slot] = overlay?.blends[i] ?? 0;
+    for (let c = 0; c < 4; c++) o[slot * 4 + c] = overlay?.uvTransforms[i * 4 + c] ?? 0;
   }
 }
 

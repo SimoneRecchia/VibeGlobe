@@ -260,6 +260,18 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.table.find(level, x, y)?.state === NO_DATA;
   }
 
+  /**
+   * True while a tile cannot come from this source: no data, failed for good, or backing off after a failure until its
+   * next try (a source chain then takes it from the next source, F247, F248).
+   */
+  unavailable(level: number, x: number, y: number): boolean {
+    const record = this.table.find(level, x, y);
+    if (!record) return false;
+    const state = record.state;
+    if (state === NO_DATA || state === DEAD) return true;
+    return state === FAILED && this.options.now() < (this.table.eligibleAt[record.slot] ?? 0);
+  }
+
   /** True for a tile that failed for good (corrupt, or its retries ran out). */
   failed(level: number, x: number, y: number): boolean {
     return this.table.find(level, x, y)?.state === DEAD;
@@ -358,13 +370,20 @@ export class ImageryLoader implements NetworkPoolClient {
         record.state = UNLOADED;
       }
     }
+    let cancelling = false;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const record = this.active[i];
-      if (!record || this.frame - record.wantedFrame < UNWANTED_FRAMES) continue;
+      if (!record || record.wantedFrame === this.frame) continue;
+      if (this.frame - record.wantedFrame < UNWANTED_FRAMES) {
+        cancelling = true;
+        continue;
+      }
       this.cancel(record);
       // Cancelling may already have removed it (a worker pool reports the cancel at once): remove it, not index i.
       this.leaveActive(record);
     }
+    // A request no longer wanted is cancelled by a later frame: ask for it, even when nothing else would draw (KB-105).
+    if (cancelling) this.options.requestFrame();
   }
 
   private cancel(record: TileRecord): void {

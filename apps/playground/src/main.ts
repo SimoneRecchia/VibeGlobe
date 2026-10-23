@@ -5,6 +5,8 @@ import {
   WGS84,
   type Globe,
   type GlobeOptions,
+  type ImageryBlend,
+  type ImageryLayerOptions,
   type LogEntry,
   type ViewCurvesInit,
   type ViewInit,
@@ -194,7 +196,27 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [source], workers, memory };
+  return { imagery: [source, ...overlayLayers(base, session, imageryTiling)], workers, memory };
+}
+
+/**
+ * `?overlays=<pattern>[:<opacity>[:<blend>]],…` adds fixture layers above `?imagery=`, bottom first, each with its
+ * opacity and blend mode (F243–F246); their ids are `overlay-<pattern>`.
+ */
+function overlayLayers(base: string, session: string, tiling: 'mercator' | 'geographic'): ImageryLayerOptions[] {
+  const spec = params.get('overlays');
+  if (!spec) return [];
+  return spec.split(',').map((item) => {
+    const [pattern = 'tiles', opacity = '1', blend = 'normal'] = item.split(':');
+    const source = xyzImagery({
+      id: `overlay-${pattern}`,
+      url: `${base}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
+      tiling,
+      minLevel: 0,
+      maxLevel: 18,
+    });
+    return { sources: [source], opacity: Number(opacity), blend: blend as ImageryBlend };
+  });
 }
 
 /**

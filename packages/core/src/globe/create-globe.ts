@@ -9,6 +9,9 @@ import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
 import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
+import { ControlsSlot } from './controls-slot.js';
+import { imageryLayersOf } from './imagery-layers.js';
+import type { ImageryLayers } from '../imagery/imagery-stack.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
@@ -20,7 +23,6 @@ import { createFrameView, screenOf, type MutableFrameView } from './view-geometr
 import type {
   BackendName,
   CameraState,
-  Controls,
   DebugMeshData,
   DebugShape,
   FrameCapture,
@@ -70,8 +72,7 @@ class GlobeEngine implements Globe {
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
-  private controls: Controls | undefined;
-  private controlsElement: unknown;
+  private readonly controlsSlot = new ControlsSlot();
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
   private frames = 0;
@@ -171,6 +172,10 @@ class GlobeEngine implements Globe {
   readonly setViewMode: Globe['setViewMode'] = (mode) => this.assertAlive() ?? this.viewControl.setMode(mode);
   readonly setViewCurves: Globe['setViewCurves'] = (curves) => this.assertAlive() ?? this.viewControl.setCurves(curves);
 
+  get imageryLayers(): ImageryLayers {
+    return imageryLayersOf(this.surfaceFrame);
+  }
+
   get frameNumber(): number {
     return this.frames;
   }
@@ -240,12 +245,7 @@ class GlobeEngine implements Globe {
 
   /** Attaches the controls to the renderer's input element, again when a recovery replaced it (KB-020). */
   private attachControls(): void {
-    const factory = this.options.controls;
-    const element = this.renderer?.inputElement;
-    if (!factory || (this.controls && element === this.controlsElement)) return;
-    this.controls?.destroy();
-    this.controlsElement = element;
-    this.controls = factory(element, this.navigation);
+    this.controlsSlot.attach(this.options.controls, this.renderer?.inputElement, this.navigation);
   }
 
   private syncSize(): void {
@@ -312,7 +312,7 @@ class GlobeEngine implements Globe {
     // A running movement steps to this frame's time first; input the controls apply then interrupts it (ADR 0036).
     if (!this.waiting) {
       this.movements.step();
-      this.controls?.update?.();
+      this.controlsSlot.controls?.update?.();
       this.movements.afterInput();
       this.constraints.apply(this.cam);
     }
@@ -446,9 +446,7 @@ class GlobeEngine implements Globe {
       this.rejectReady?.(new GlobeError('destroyed', 'The globe was destroyed before its first frame'));
     }
     if (this.frameId !== undefined) this.renderer?.host.cancelFrame(this.frameId);
-    this.controls?.destroy();
-    // The canvas holds its GPU context, whose device holds the renderer (KB-053).
-    this.controlsElement = undefined;
+    this.controlsSlot.destroy();
     for (const cleanup of this.cleanups) cleanup();
     this.surfaceFrame.destroy();
     this.surface?.clear();

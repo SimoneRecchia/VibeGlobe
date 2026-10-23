@@ -1,4 +1,4 @@
-import { NO_TERRAIN, type TileDrawLayer, type TileDrawList } from '../globe/types.js';
+import { NO_TERRAIN, type TileDrawLayer, type TileDrawList, type TileDrawOverlay } from '../globe/types.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 
 /** Texture handle of a draw that samples the world base image (`GlobeOptions.baseImageryUrl`). */
@@ -52,6 +52,26 @@ export class DrawLayer implements TileDrawLayer {
   }
 }
 
+/** Overlays a draw can show above its base imagery (F244, F246): further visible layers are left out. */
+export const MAX_OVERLAYS = 2;
+
+/** One overlay slot's per-draw arrays (`TileDrawList.overlays`). */
+export class OverlaySlot implements TileDrawOverlay {
+  textures: Int32Array;
+  uvTransforms: Float32Array;
+  geographic: Uint8Array;
+  opacities: Float32Array;
+  blends: Uint8Array;
+
+  constructor(capacity: number) {
+    this.textures = new Int32Array(capacity).fill(-1);
+    this.uvTransforms = new Float32Array(capacity * 4);
+    this.geographic = new Uint8Array(capacity);
+    this.opacities = new Float32Array(capacity);
+    this.blends = new Uint8Array(capacity);
+  }
+}
+
 /**
  * The per-frame list of surface tile draws (M3 plan §2.2): structs of typed arrays, reused every frame and grown only
  * on a slow path, so filling them allocates nothing (ADR 0018). The list's own arrays are its imagery layer;
@@ -62,11 +82,14 @@ export class DrawList implements TileDrawList {
   meshKeys: Float64Array;
   private imagery: DrawLayer;
   terrain: DrawLayer;
+  overlays: OverlaySlot[];
 
   constructor(capacity = 256) {
     this.meshKeys = new Float64Array(capacity);
     this.imagery = new DrawLayer(capacity);
     this.terrain = new DrawLayer(capacity);
+    this.overlays = [];
+    for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays.push(new OverlaySlot(capacity));
   }
 
   /** The imagery layer's arrays, for the fades. */
@@ -118,6 +141,7 @@ export class DrawList implements TileDrawList {
     this.meshKeys = new Float64Array(capacity);
     this.imagery = new DrawLayer(capacity);
     this.terrain = new DrawLayer(capacity);
+    for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays[slot] = new OverlaySlot(capacity);
   }
 }
 
@@ -144,6 +168,10 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     list.fromTextures[index] = BASE_TEXTURE;
     list.fromGeographic[index] = 1;
     list.fades[index] = 1;
+    for (let slot = 0; slot < list.overlays.length; slot++) {
+      const overlay = list.overlays[slot];
+      if (overlay) overlay.opacities[index] = 0;
+    }
     const at = index * 4;
     list.uvTransforms[at] = (tile.eastRad - tile.westRad) / (2 * Math.PI);
     list.uvTransforms[at + 1] = (tile.northRad - tile.southRad) / Math.PI;

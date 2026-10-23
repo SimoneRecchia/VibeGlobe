@@ -80,7 +80,19 @@ interface Session {
   layer?: unknown;
 }
 
-const PATTERNS: readonly string[] = ['world', 'levels', 'border', 'smooth', 'tiles', 'stripes', 'patches'];
+const PATTERNS: readonly string[] = [
+  'world',
+  'levels',
+  'border',
+  'smooth',
+  'tiles',
+  'stripes',
+  'patches',
+  'red',
+  'green',
+  'blue',
+  'shade',
+];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
 const TILE_PATH =
   /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;

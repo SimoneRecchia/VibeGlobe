@@ -120,6 +120,14 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage } from './imagery/imagery-source.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
+export type {
+  ImageryBlend,
+  ImageryLayerChanges,
+  ImageryLayerInput,
+  ImageryLayerOptions,
+  ImageryLayers,
+  ImageryLayerState,
+} from './imagery/imagery-stack.js';
 export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
 export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
 export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';

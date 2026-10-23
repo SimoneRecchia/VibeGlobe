@@ -271,6 +271,26 @@ describe('ImageryLoader', () => {
     expect(transport.started).toEqual([url(4, 0, 0), url(7, 9, 9)]);
   });
 
+  it('asks for the frames that cancel a request no longer wanted, even when nothing else draws (KB-105)', () => {
+    const { timers, transport, loader, frames } = setUp();
+    loader.beginFrame();
+    loader.want(4, 0, 0, 1);
+    loader.endFrame();
+    // The view left the tile and the engine would go idle: the loader keeps asking for frames until it cancels it.
+    let drawn = 0;
+    while (transport.aborted.length === 0 && drawn < 5) {
+      const before = frames();
+      loader.beginFrame();
+      loader.endFrame();
+      timers.advance(20);
+      drawn++;
+      if (frames() === before) break;
+    }
+    // The network pool aborts a released request after its grace period.
+    timers.advance(1000);
+    expect(transport.aborted).toEqual([url(4, 0, 0)]);
+  });
+
   it('keeps GPU use within its budget, evicting the least recently used tile but never one drawn (F098, F102)', () => {
     const { transport, uploaded, released, residency, ok, runFrame } = setUp(32, { gpuBytes: 3 * 349_524 });
     const answer = (): void => {

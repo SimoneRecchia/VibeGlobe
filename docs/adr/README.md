@@ -48,3 +48,4 @@ Conventions:
 | [0035](0035-faster-ci.md)                         | A faster full CI run: one build per run, Playwright's image, sixteen balanced shards                        | Accepted                                                          |
 | [0036](0036-camera-movements.md)                  | Camera movements: flights, eases, outcomes and movement events                                              | Accepted (decided by agent; owner may revisit)                    |
 | [0037](0037-drawing-data-layers.md)               | Drawing data layers in the renderer                                                                         | Accepted (decided by agent; owner may revisit)                    |
+| [0038](0038-imagery-layer-stack.md)               | The imagery layer stack                                                                                     | Accepted (decided by agent; owner may revisit)                    |

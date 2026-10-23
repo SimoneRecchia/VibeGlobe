@@ -6,6 +6,7 @@ export type GlobeErrorCode =
   | 'renderer-failed'
   | 'resource-failed'
   | 'destroyed'
+  | 'display-only'
   | 'aborted';
 
 /** The engine's typed error: every failure the engine reports carries a stable code. */

@@ -429,6 +429,7 @@ class GlobeEngine implements Globe {
     this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
   captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
+    this.surfaceFrame.refuseReadback();
     return captureWhenDrawn({
       ready: this.ready,
       waits: this.captureWaits,

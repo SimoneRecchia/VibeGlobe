@@ -1,4 +1,5 @@
 import type { LayerGround } from '../layers/layer-target.js';
+import { refuseDisplayOnly } from './display-only.js';
 import { motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
@@ -315,7 +316,7 @@ export class SurfaceFrame {
   layerGround(): LayerGround {
     const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
     return {
-      heightAt: (longitudeDeg, latitudeDeg) => this.elevationAt({ longitudeDeg, latitudeDeg }, sample).heightMeters,
+      heightAt: (longitudeDeg, latitudeDeg) => this.sampleElevation({ longitudeDeg, latitudeDeg }, sample).heightMeters,
       version: () => this.imagery?.terrainUploads() ?? 0,
     };
   }
@@ -325,6 +326,12 @@ export class SurfaceFrame {
    * Throws a GlobeError ('invalid-coordinate') for an invalid position.
    */
   elevationAt(position: GeoPosition, out: ElevationSample): ElevationSample {
+    refuseDisplayOnly(this.imagery, 'elevationAt', 'terrain');
+    return this.sampleElevation(position, out);
+  }
+
+  /** {@link SurfaceFrame.elevationAt} for the engine's own use (clamping layers): no data-access rules apply. */
+  private sampleElevation(position: GeoPosition, out: ElevationSample): ElevationSample {
     validatePosition(position);
     const heights = this.imagery?.heights;
     if (heights) {
@@ -349,11 +356,17 @@ export class SurfaceFrame {
 
   /** The height at a WGS84 position from the finest terrain the source delivers (F145). */
   queryElevation(position: GeoPosition, signal?: AbortSignalLike): Promise<ElevationSample> {
+    refuseDisplayOnly(this.imagery, 'elevationAtAsync', 'terrain');
     validatePosition(position);
     const imagery = this.imagery;
     if (imagery?.heights)
       return imagery.queryElevation(position.longitudeDeg * DEG_TO_RAD, position.latitudeDeg * DEG_TO_RAD, signal);
     return Promise.resolve({ heightMeters: 0, level: -1, noData: true });
+  }
+
+  /** Throws when a drawn layer's source is display only: its pixels may not be read back (F323). */
+  refuseReadback(): void {
+    refuseDisplayOnly(this.imagery, 'captureFrame', 'imagery');
   }
 
   /** The imagery counters, if there is imagery. */

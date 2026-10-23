@@ -10,6 +10,10 @@ export interface CreditProfile {
   readonly requiredAttribution?: Attribution;
   /** Tiles are reused only while their responses' cache headers allow it (`TransportResult` `maxAgeMs`, F260). */
   readonly respectCacheHeaders?: boolean;
+  /** The profile's name, for messages (`'google'`). */
+  readonly id?: string;
+  /** The terms allow drawing only: pixel readback, tile data and elevation sampling are refused (F323, ADR 0031). */
+  readonly displayOnly?: boolean;
 }
 
 /** The credit metadata a tiled source may carry (`DescribedImagerySource` in `@vibeglobe/sources`). */

@@ -101,7 +101,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
 }
 
 /** Waits until every Mercator tile of the mounted globe shows imagery of its level (or the source's deepest one). */
-async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
+export async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
   await expect
     .poll(
       () =>
@@ -198,7 +198,7 @@ export async function expectCenterTileColor(page: Page, image: PNG): Promise<voi
 }
 
 /** Waits until the mounted globe has drawn every requested frame: no frame for 300 ms, nor in the next two. */
-async function waitForSourceIdle(page: Page): Promise<void> {
+export async function waitForSourceIdle(page: Page): Promise<void> {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {

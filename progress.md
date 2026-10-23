@@ -24,6 +24,34 @@ Branch `claude/laughing-tesla-a6tkm3`, pull request SimoneRecchia/VibeGlobe#20; 
 - Bugs found and fixed: TB-01 (`offline.source()` bypassed the adapters' transports), TB-03 (aborted tiles counted by the tiers), TB-04 (faint lines between composed WMTS tiles). TB-02 (renderer) fixed by the main session.
 - Notes: the offline harness now mounts provider adapters, declared profiles, terrain, memory budgets and a tier overlay (`?debug`-like); flights are measured with `emptyPixelsMoving` (the camera moves between a capture and the silhouette's radius). On the software GPU a frame of a flight test costs about a second, so specs use a 320 × 240 canvas. Hybrid mode with a view past a package keeps retrying its misses and never goes idle (hook request 3 of the offline track): such specs sample settled frames instead of waiting for idle.
 
+## Models and quality track (track C, `packages/models` and `packages/quality`)
+
+Branch `claude/vigilant-hawking-h8r4u4`; owned entries, blockers and hook requests in `docs/parallel-tracks.md` ("Models and quality track: status").
+
+- **2026-10-23:** `@vibeglobe/models` (ADR 0121): GLB and glTF parsing and validation, Draco (`draco3d`) and meshopt (`meshoptimizer`) decoding in a worker task, sparse accessors, node transforms and a renderer-neutral `ModelDescription`; conformance suite over eleven Khronos samples (sixteen variants), fuzzed corrupt input, decoding in a Chromium module worker (`e2e/models.spec.ts`). `@vibeglobe/quality` (ADR 0122): presets, `choosePreset`, the `FrameTimeGovernor` (median window, dead band, reaction and stable timers, minimum change interval, raise backoff) and `createQuality`, checked in Node and on the real engine (`e2e/quality.spec.ts`).
+- Pending: F400 (reference desktop and tablet). Failing with blockers: F361 (hooks 1–2: worker registration, renderer drawing `ModelDescription`), F399 (hook 3: runtime level of detail and effects; reference desktop), F401 and F402 (hook 4: a real GPU load in the playground; 5-minute browser run in the hardening backlog).
+- About 3 hours of agent time (2026-10-23).
+
+## A. UI, GIS and framework adapters track (2026-10-23)
+
+Branch `claude/confident-ride-i2h6il`, pull request SimoneRecchia/VibeGlobe#21; entries, blockers and hook requests in
+`docs/parallel-tracks.md` ("A. UI, GIS and framework adapters track: status"); decisions in ADR 0101.
+
+- **2026-10-23:** the UI, GIS and adapter stubs are replaced with the engine's view modes (chosen and applied tilt and
+  heading), terrain heights and the controls connection. New `@vibeglobe/ui` controls: 2D / 3D / Auto with Back to
+  Auto, tilt, reset to globe and home, scale bar, attribution, layer switcher, geolocation, bookmarks, screenshot,
+  minimap, drawing (points, draped lines and polygons, editing with mouse, touch and keyboard) and measurement;
+  `addAllControls`. Accessibility audit with the IBM Equal Access engine (axe-core is MPL-2.0), reduced motion and
+  layout checks with every control. Vue: live `viewMode`, `layers` and `networkMode` props, `VibeDataLayer`,
+  `VibeMarker` and `VibeControl`. The element: `ui`, `theme`, `lang` and the `ui` part. The Nuxt example has a page
+  per feature group with browser checks; the integration guide is in the documentation site.
+- Passing: F407–F409, F411–F415, F417, F424, F426, F434, F436, F437, F475, F485. Pending (reference tablet): F406,
+  F410, F421–F423, F425; pending publishing to npm (owner question 17): F555. Failing on engine work: F416 (hook
+  request 4), F474 (F399), F476 (hook request 2), F488 (the groups' missing engine features).
+- Notes: the software GPU's frames stay slow at 640 × 480, so the specs use that size and wait for idle; the visual
+  baselines of `e2e/ui-theme.spec.ts` (F430) differ in size on this container's Chromium 141 (fonts) and pass only in
+  the pinned CI image, unchanged by this track; the ui bundle is at 24.4 of 25 KB gzip.
+
 ## M6 input track (eighth session, `packages/controls`)
 
 Branch `claude/modest-wozniak-067cfl`; owned entries, hook requests and each entry's blocker in `docs/parallel-tracks.md` ("M6 input track: status").

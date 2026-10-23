@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>VibeGlobe: element with controls</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #0b1020;
+      }
+      vibe-globe {
+        height: 100%;
+      }
+      /* A host page's theme for the controls inside the element (F485). */
+      body.branded vibe-globe::part(ui) {
+        --vg-ui-background: rgb(250, 240, 230);
+        --vg-ui-color: rgb(40, 20, 90);
+        --vg-ui-border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <vibe-globe
+      ui="all"
+      backend="webgl2"
+      base-imagery-url="/imagery/natural-earth-4096.jpg"
+      center="7.66, 45.07"
+      zoom="5"
+    ></vibe-globe>
+    <script type="module" src="/src/element-ui-main.ts"></script>
+  </body>
+</html>

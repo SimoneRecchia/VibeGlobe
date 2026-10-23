@@ -11,6 +11,12 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
+    "@vibeglobe/core": "*",
+    "@vibeglobe/gis": "*",
+    "@vibeglobe/layers": "*",
+    "@vibeglobe/offline": "*",
+    "@vibeglobe/sources": "*",
+    "@vibeglobe/ui": "*",
     "@vibeglobe/vue": "*",
     "nuxt": "4.5.2",
     "vue": "3.5.44"

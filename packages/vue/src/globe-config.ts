@@ -1,4 +1,4 @@
-import { createControls } from '@vibeglobe/controls';
+import type { NavigationControls } from '@vibeglobe/controls';
 import type { GeoPosition, Globe, GlobeOptions, ImagerySource, ScreenPoint, ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
 import { createWorkers } from '@vibeglobe/worker';
@@ -24,14 +24,18 @@ export interface GlobeConfig {
  * The engine options for a configuration: a renderer in the container, the default navigation controls, and the
  * engine's bundled workers when imagery sources need decoding and the host passes none.
  */
-export function globeOptions(container: HTMLElement, config: GlobeConfig): GlobeOptions {
+export function globeOptions(
+  container: HTMLElement,
+  config: GlobeConfig,
+  controls: NavigationControls | undefined,
+): GlobeOptions {
   const imagery = config.imagery ?? [];
   const workers = config.workers ?? (imagery.length > 0 ? createWorkers() : undefined);
   return {
     ...config.options,
     container,
     renderer: createRenderer({ backend: config.backend }),
-    ...(config.controls ? { controls: createControls() } : {}),
+    ...(controls ? { controls } : {}),
     baseImageryUrl: config.baseImageryUrl,
     view: config.view,
     ...(imagery.length > 0 ? { imagery } : {}),

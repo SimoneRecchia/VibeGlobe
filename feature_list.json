@@ -5303,7 +5303,7 @@
         "Start on the reference desktop and reference tablet and verify the chosen presets",
         "Pass an explicit preset in the configuration and verify it overrides detection"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F401",
@@ -5379,7 +5379,7 @@
         "Using only the keyboard, switch format between decimal degrees, DMS and UTM and verify the readout reports the view center while navigating by keyboard",
         "Verify the readout updates within one frame and costs no more than its per-frame budget"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F407",
@@ -5391,7 +5391,7 @@
         "Verify drawn points appear at the expected coordinates, ground-clamped, and are returned through the API and events",
         "Verify placing a point never pans or zooms the map by accident"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F408",
@@ -5403,7 +5403,7 @@
         "Verify the line preview follows the pointer while drawing and the final line drapes on the terrain",
         "Verify the resulting geometry is returned through the API and events with the expected coordinates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F409",
@@ -5415,7 +5415,7 @@
         "Verify the preview, the closed draped polygon and the geometry returned through the API and events",
         "Verify self-intersecting input is reported to the application through a validation event"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F410",
@@ -5427,7 +5427,7 @@
         "Repeat with touch emulation and with the keyboard only; manually verify on the reference tablet",
         "Verify change events carry the updated geometry after each edit and shapes stay draped on terrain"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F411",
@@ -5439,7 +5439,7 @@
         "Verify the live readout values match the geodesic utilities within display precision and update while drawing and editing",
         "Verify units scale automatically (meters to kilometers, square meters to square kilometers) and labels are translated in English and Italian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F412",
@@ -5452,7 +5452,7 @@
         "Pan, zoom and tilt and verify the bar updates within one frame without flicker",
         "Verify the control is readable with the keyboard focus and by screen readers (accessible text with the current scale)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F413",
@@ -5465,7 +5465,7 @@
         "Move the emulated position and verify the marker follows",
         "Deny permission and verify a translated message appears and the engine keeps working"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F414",
@@ -5478,7 +5478,7 @@
         "Run property-based round-trip tests on random camera states",
         "Feed malformed and out-of-range URLs and JSON and verify they are rejected or clamped with no crash"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F415",
@@ -5491,7 +5491,7 @@
         "Remove a bookmark and verify it disappears",
         "Export and re-import the bookmarks as JSON and verify they are identical"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F416",
@@ -5517,7 +5517,7 @@
         "Verify the footprint matches the main view's visible area, including the trapezoid of tilted views",
         "Verify the minimap adds no more than its documented per-frame cost and is absent unless enabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F418",
@@ -5568,7 +5568,7 @@
         "Verify the control shows the current mode, including after a manual tilt",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F422",
@@ -5581,7 +5581,7 @@
         "Verify the control shows the applied tilt and indicates when it is temporarily clamped",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F423",
@@ -5594,7 +5594,7 @@
         "Verify any user input during the flight interrupts it smoothly",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F424",
@@ -5607,7 +5607,7 @@
         "Verify a collapsed attribution on small screens still shows required logos and can be expanded with mouse, touch and keyboard",
         "Verify attribution links are keyboard-focusable and announced by screen readers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F425",
@@ -5620,7 +5620,7 @@
         "Verify the list reflects layers added and removed through the API at runtime",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F426",
@@ -5633,7 +5633,7 @@
         "Verify selecting a result flies to it, and typed decimal degrees, DMS and UTM coordinates fly to the right place",
         "Verify a failing or slow geocoder shows a translated message without blocking the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F427",
@@ -5730,7 +5730,7 @@
         "Verify zero violations",
         "Verify state changes (mode toggle, fullscreen, layer visibility) update ARIA states"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F435",
@@ -5754,7 +5754,7 @@
         "Activate every control that animates and verify no UI animation plays and camera flights become quick fades",
         "Verify behavior returns to normal when the setting is off"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F437",
@@ -5767,7 +5767,7 @@
         "Verify every interactive element on touch devices has a target of at least 44 by 44 CSS pixels",
         "At phone viewport sizes in both orientations, verify the attribution and every required logo stay fully visible and uncovered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F438",
@@ -6262,7 +6262,7 @@
         "Assert reactive updates are batched to at most one per frame",
         "Profile a 30-second flight and assert the frame budget still holds with the composables in use"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F476",
@@ -6387,7 +6387,7 @@
         "Switch between light and dark themes and assert both apply",
         "Assert the attribution is visible and not covered, and keyboard focus moves through the controls inside the element"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F486",
@@ -6451,7 +6451,7 @@
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
         "Assert the guide never names Cube-specific code or configuration as a requirement"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F490",

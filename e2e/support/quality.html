@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>VibeGlobe quality harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0b1020;
+      }
+      #app {
+        position: relative;
+        width: 320px;
+        height: 240px;
+        overflow: hidden;
+      }
+      #globe {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The models and quality track's test page on the playground's dev server (docs/parallel-tracks.md, hook
+         request 4): a globe with @vibeglobe/quality, driven by e2e/quality.spec.ts through `window.qualityHarness`. -->
+    <div id="app"><canvas id="globe" aria-label="Map"></canvas></div>
+    <script type="module" src="./quality-page.ts"></script>
+  </body>
+</html>

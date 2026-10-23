@@ -96,6 +96,12 @@
     "web-component": {
       "bundleGzipKB": 5
     },
+    "models": {
+      "bundleGzipKB": 45
+    },
+    "quality": {
+      "bundleGzipKB": 5
+    },
     "tools": {
       "bundleGzipKB": 100
     }

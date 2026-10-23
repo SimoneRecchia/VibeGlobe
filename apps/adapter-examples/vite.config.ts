@@ -49,7 +49,7 @@ export default defineConfig({
   },
   plugins: [vue({ template: { compilerOptions: { isCustomElement: (tag) => tag === 'vibe-globe' } } }), assets()],
   build: {
-    rollupOptions: { input: ['index.html', 'live.html', 'react.html', 'vue-element.html'] },
+    rollupOptions: { input: ['index.html', 'live.html', 'element-ui.html', 'react.html', 'vue-element.html'] },
   },
   server: { port: Number(process.env['ADAPTER_EXAMPLES_PORT'] ?? 5180), strictPort: true },
 });

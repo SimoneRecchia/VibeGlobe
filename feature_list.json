@@ -6387,7 +6387,7 @@
         "Switch between light and dark themes and assert both apply",
         "Assert the attribution is visible and not covered, and keyboard focus moves through the controls inside the element"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F486",

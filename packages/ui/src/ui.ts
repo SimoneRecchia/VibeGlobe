@@ -5,7 +5,7 @@
 import type { Globe } from '@vibeglobe/core';
 import type { GlobeLayers } from '@vibeglobe/layers';
 import { Translator } from './i18n/translator.js';
-import { installStyles, uninstallStyles } from './theme/install.js';
+import { installStyles, styleRootOf, uninstallStyles } from './theme/install.js';
 import type { ThemeName } from './theme/styles.js';
 
 /** Corners of the map that hold controls. */
@@ -142,7 +142,7 @@ class UiLayer implements Ui {
   #ownLayers: GlobeLayers | undefined;
 
   constructor(globe: Globe, container: HTMLElement, layers: GlobeLayers | undefined) {
-    installStyles();
+    installStyles(styleRootOf(container));
     ({ element: this.element, corners: this.#corners } = createLayer(container));
     const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
     this.#layers = layers === undefined ? undefined : Promise.resolve(layers);
@@ -227,7 +227,7 @@ class UiLayer implements Ui {
     this.element.remove();
     this.#ownLayers?.detach();
     this.#ownLayers?.stack.clear();
-    uninstallStyles();
+    uninstallStyles(styleRootOf(this.#context.container));
   }
 
   /** Applies the current language to the layer and every control. */

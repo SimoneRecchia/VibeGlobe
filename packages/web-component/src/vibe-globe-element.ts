@@ -13,6 +13,8 @@ import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 import { watchClicks, type GlobeClickEvent } from './click.js';
+import { ElementUi, UI_ATTRIBUTES } from './ui-layer.js';
+import type { Ui } from '@vibeglobe/ui';
 
 /** The `detail` of each event the element dispatches. */
 export interface VibeGlobeEventDetail {
@@ -36,6 +38,8 @@ export interface CenterDeg {
 export interface VibeGlobeElement extends HTMLElement {
   /** The running engine, for the full API; undefined while the element is not in a document. */
   readonly globe: Globe | undefined;
+  /** The UI layer inside the shadow tree, created with the `ui` attribute; undefined without it. */
+  readonly ui: Promise<Ui> | undefined;
   /** Attribute `center="<longitude>, <latitude>"`, degrees. */
   center: CenterDeg | undefined;
   /** Attribute `zoom`. */
@@ -192,7 +196,7 @@ function startEngine(
   element: HTMLElement,
   container: HTMLElement,
   sources: readonly ImagerySource[],
-): { globe: Globe; stop: () => void } {
+): { globe: Globe; ui: ElementUi; stop: () => void } {
   const emit = <E extends keyof VibeGlobeEventDetail>(type: E, detail: VibeGlobeEventDetail[E]): void =>
     void element.dispatchEvent(new CustomEvent(type, { detail }));
   const controls = element.hasAttribute('no-controls') ? undefined : createControls();
@@ -219,10 +223,14 @@ function startEngine(
     globe.on('error', (error) => emit('error', error)),
     watchClicks(container, globe, (click) => emit('globe-click', click)),
   ];
+  const ui = new ElementUi(element, globe, container);
+  ui.sync();
   return {
     globe,
+    ui,
     stop: () => {
       for (const stop of stops) stop();
+      ui.stop();
       globe.destroy();
     },
   };
@@ -243,31 +251,41 @@ function takeEarlyProperties(element: HTMLElement): [property: string, value: un
   return early;
 }
 
+/** Builds the element's shadow tree and returns the engine's container (part `engine`). */
+function buildShadow(host: HTMLElement): HTMLDivElement {
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = STYLE;
+  const container = document.createElement('div');
+  container.className = 'engine';
+  container.setAttribute('part', 'engine');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.append(document.createElement('slot'));
+  shadow.append(style, container, overlay);
+  return container;
+}
+
 function makeElementClass(): new () => VibeGlobeElement {
   const element = class extends HTMLElement {
-    static readonly observedAttributes = VIEW_ATTRIBUTES;
+    static readonly observedAttributes = [...VIEW_ATTRIBUTES, ...UI_ATTRIBUTES];
     // Before the upgrade, a property set by a script is an own data property: keep its value.
     imagery: readonly ImagerySource[] = (Reflect.get(this, 'imagery') as readonly ImagerySource[] | undefined) ?? [];
-    #engine: { globe: Globe; stop: () => void } | undefined;
+    #engine: { globe: Globe; ui: ElementUi; stop: () => void } | undefined;
     readonly #container: HTMLDivElement;
     readonly #early = takeEarlyProperties(this);
 
     constructor() {
       super();
-      const shadow = this.attachShadow({ mode: 'open' });
-      const style = document.createElement('style');
-      style.textContent = STYLE;
-      this.#container = document.createElement('div');
-      this.#container.className = 'engine';
-      this.#container.setAttribute('part', 'engine');
-      const overlay = document.createElement('div');
-      overlay.className = 'overlay';
-      overlay.append(document.createElement('slot'));
-      shadow.append(style, this.#container, overlay);
+      this.#container = buildShadow(this);
     }
 
     get globe(): Globe | undefined {
       return this.#engine?.globe;
+    }
+
+    get ui(): Promise<Ui> | undefined {
+      return this.#engine?.ui.ui;
     }
 
     connectedCallback(): void {
@@ -288,6 +306,7 @@ function makeElementClass(): new () => VibeGlobeElement {
     attributeChangedCallback(): void {
       const globe = this.#engine?.globe;
       if (!globe) return;
+      this.#engine?.ui.sync();
       const mode = parseViewMode(this.getAttribute('view-mode'));
       if (mode && !sameMode(globe.viewMode, mode)) globe.setViewMode(mode);
       const changed = changedView(globe.camera, readView(this));
@@ -316,8 +335,11 @@ function makeElementClass(): new () => VibeGlobeElement {
  *
  * Attributes: `base-imagery-url` (required), `imagery-url` (an XYZ template) and `imagery-max-level`, `backend`
  * (`auto`, `webgpu` or `webgl2`) and `no-controls`, read when the element is connected; `center`, `zoom`,
- * `heading-deg`, `tilt-deg` and `view-mode` (`auto`, `2d`, `3d`), which also change a running engine. Events (`CustomEvent`s): `ready`, `load`,
- * `camera-change`, `globe-click` and `error`. The shadow tree exposes the engine's container as part `engine`.
+ * `heading-deg`, `tilt-deg` and `view-mode` (`auto`, `2d`, `3d`), which also change a running engine; `ui` (`default` or
+ * `all`) adds the ui package's controls inside the shadow tree, `theme` (`light`, `dark`) and `lang` switch them. The
+ * shadow tree exposes the engine's container as part `engine` and the controls' layer as part `ui`: host pages theme
+ * the controls with `vibe-globe::part(ui) { --vg-ui-background: …; }`. Events (`CustomEvent`s): `ready`, `load`,
+ * `camera-change`, `globe-click` and `error`.
  */
 export function defineVibeGlobe(tagName = 'vibe-globe'): new () => VibeGlobeElement {
   const registered = customElements.get(tagName) as (new () => VibeGlobeElement) | undefined;

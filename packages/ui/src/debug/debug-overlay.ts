@@ -1,4 +1,4 @@
-import { installStyles, uninstallStyles } from '../theme/install.js';
+import { installStyles, styleRootOf, uninstallStyles } from '../theme/install.js';
 
 /** Values shown by the debug overlay; `undefined` renders as a dash. */
 export interface DebugOverlayValues {
@@ -41,7 +41,8 @@ export function createDebugOverlay(
 ): DebugOverlay {
   const panel = document.createElement('div');
   // Styled by the ui stylesheet's theme variables (F429), installed while a panel exists.
-  installStyles();
+  const root = styleRootOf(container);
+  installStyles(root);
   panel.className = 'vibeglobe-debug-overlay';
   panel.setAttribute('role', 'status');
   panel.setAttribute('aria-label', label);
@@ -73,7 +74,7 @@ export function createDebugOverlay(
       if (removed) return;
       removed = true;
       panel.remove();
-      uninstallStyles();
+      uninstallStyles(root);
     },
   };
   overlay.update({ frameTimeMs: undefined, framesPerSecond: undefined });

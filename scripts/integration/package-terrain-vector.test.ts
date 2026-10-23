@@ -127,7 +127,8 @@ describe('terrain and vector tiles in packages (F328)', { timeout: 60_000 }, () 
     const url = 'https://lan.test/terrain.mbtiles';
     const results = await runTerrainConformance({
       name: 'mbtiles terrarium',
-      create: (fetchImpl) => mbtilesTerrain({ id: 'dem', package: url, fetch: fetchImpl, encoding: 'terrarium', downloadTimeoutMs: 300 }),
+      create: (fetchImpl) =>
+        mbtilesTerrain({ id: 'dem', package: url, fetch: fetchImpl, encoding: 'terrarium', downloadTimeoutMs: 300 }),
       fixture: rangeServer(url, bytes).fetch,
       network: 'on-open',
       tiles: TILES.map((c) => ({ coord: c, bytes: tiles.get(key(c)) })),

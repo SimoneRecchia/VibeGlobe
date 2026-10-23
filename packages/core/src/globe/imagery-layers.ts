@@ -2,15 +2,20 @@ import type { StackLayer } from '../imagery/imagery-draws.js';
 import {
   applyChanges,
   sourceInfo,
+  validStack,
   type ImageryLayerChanges,
+  type ImageryLayerInput,
   type ImageryLayers,
   type ImageryLayerState,
 } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
+import type { ImageryRuntime } from './imagery-runtime.js';
 
 /** What holds a globe's imagery runtime (its `SurfaceFrame`). */
 interface ImageryHolder {
-  readonly imagery?: { readonly stack: StackLayer[]; stackChanged(): void } | undefined;
+  readonly imagery?: ImageryRuntime | undefined;
+  /** The selection reads the layers' tile sizes and levels again (a layer was added or removed). */
+  imageryChanged(): void;
 }
 
 /**
@@ -75,6 +80,46 @@ class ImageryLayersController implements ImageryLayers {
     const to = Math.max(0, Math.min(stack.length, Math.round(index)));
     stack.splice(to, 0, layer);
     this.changed();
+    this.frame.imagery?.layersChanged();
+  }
+
+  /** See {@link ImageryLayers.add}. */
+  add(input: ImageryLayerInput, index?: number): void {
+    const imagery = this.frame.imagery;
+    if (!imagery)
+      throw new GlobeError('invalid-option', 'Imagery layers can be added once the globe has started with workers');
+    let problem = '';
+    const [entry] = validStack([input], (message) => (problem = message));
+    if (!entry) throw new GlobeError('invalid-option', problem || 'The imagery layer has no source');
+    if (imagery.stack.some((layer) => layer.entry.id === entry.id))
+      throw new GlobeError('invalid-option', `An imagery layer already has the id "${entry.id}"`);
+    const taken = entry.sources.find((source) => imagery.layers.some((layer) => layer.source.id === source.id));
+    if (taken) throw new GlobeError('invalid-option', `An imagery source already has the id "${taken.id}"`);
+    const chain = entry.sources.map((source) => imagery.newLayer(source, imagery.nextIndex++, -1));
+    imagery.layers.push(...chain);
+    const at = Math.max(0, Math.min(imagery.stack.length, Math.round(index ?? imagery.stack.length)));
+    imagery.stack.splice(at, 0, { entry, chain });
+    this.restacked(imagery);
+  }
+
+  /** See {@link ImageryLayers.remove}. */
+  remove(id: string): boolean {
+    const imagery = this.frame.imagery;
+    const layer = imagery?.stack.find((candidate) => candidate.entry.id === id);
+    if (!imagery || !layer) return false;
+    imagery.stack.splice(imagery.stack.indexOf(layer), 1);
+    for (const source of layer.chain) imagery.dropLayer(source);
+    this.restacked(imagery);
+    return true;
+  }
+
+  /** After a layer was added or removed: the credits, tile sizes and levels again, and a frame. */
+  private restacked(imagery: ImageryRuntime): void {
+    imagery.credits = imagery.creditsOf();
+    imagery.setPixelRatio(imagery.pixelRatio);
+    this.frame.imageryChanged();
+    this.changed();
+    imagery.layersChanged();
   }
 
   private find(id: string): StackLayer {

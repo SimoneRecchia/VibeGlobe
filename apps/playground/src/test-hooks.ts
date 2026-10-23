@@ -1,12 +1,6 @@
-import {
-  geodesicInverse,
-  type Globe,
-  type GlobeEvents,
-  type LogEntry,
-  type WorkerEndpoint,
-  type WorkerMessage,
-} from '@vibeglobe/core';
+import { type Globe, type GlobeEvents, type LogEntry, type WorkerEndpoint, type WorkerMessage } from '@vibeglobe/core';
 import { createWorkers } from '@vibeglobe/worker';
+import { geodesicInverse } from '@vibeglobe/core/geodesy';
 import type { ScenarioReport } from './scenario-harness.js';
 import type { FrameLoop } from './frame-loop.js';
 

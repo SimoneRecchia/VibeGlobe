@@ -1,5 +1,5 @@
 import { rgba8Bytes } from '../cache/byte-size.js';
-import type { ImagerySource } from './imagery-source.js';
+import { LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** How a layer combines with the layers below it (F246). */
 export type ImageryBlend = 'normal' | 'multiply' | 'screen';
@@ -38,6 +38,11 @@ export interface ImagerySourceInfo {
   readonly attribution: readonly { readonly text: string; readonly url?: string }[];
   readonly maxRequestsPerHost?: number;
   readonly maxRequestsPerSecond?: number;
+  /** Whether the source's tiles may stay in memory off screen and load ahead (its loading flags now, F220, F290). */
+  readonly keepInMemory: boolean;
+  readonly prefetch: boolean;
+  /** Whether its requests carry credentials (F220). */
+  readonly authenticated: boolean;
 }
 
 /** A layer's current look, as `Globe.imageryLayers` reports and changes it, with its sources' metadata. */
@@ -54,6 +59,7 @@ const DEG = 180 / Math.PI;
 
 /** The metadata of a source, in degrees (F220). */
 export function sourceInfo(source: ImagerySource): ImagerySourceInfo {
+  const flags = source.loadingFlags?.() ?? LOAD_ALL;
   return {
     id: source.id,
     crs: source.tiling.crs,
@@ -74,6 +80,9 @@ export function sourceInfo(source: ImagerySource): ImagerySourceInfo {
     attribution: (source.attribution ?? []).map(({ text, url }) => ({ text, ...(url ? { url } : {}) })),
     ...(source.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: source.maxRequestsPerHost }),
     ...(source.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: source.maxRequestsPerSecond }),
+    keepInMemory: (flags & LOAD_KEEP_IN_MEMORY) !== 0,
+    prefetch: (flags & LOAD_PREFETCH) !== 0,
+    authenticated: source.authenticated === true,
   };
 }
 
@@ -95,6 +104,14 @@ export interface ImageryLayers {
   set(id: string, changes: ImageryLayerChanges): void;
   /** Moves a layer to `index` in the bottom-first order (clamped to the list). */
   move(id: string, index: number): void;
+  /**
+   * Adds a layer at `index` in the bottom-first order (default: on top) on a running globe (track A hook 2). Throws a
+   * `GlobeError` ('invalid-option') for a source with invalid metadata or an id already taken, and before the imagery
+   * starts (after `ready`) or on a globe created without `workers`.
+   */
+  add(input: ImageryLayerInput, index?: number): void;
+  /** Removes a layer and releases its tiles; false when no layer has the id. */
+  remove(id: string): boolean;
 }
 
 /** Blend modes as the renderer's per-draw numbers (`TileDrawOverlay.blends`). */

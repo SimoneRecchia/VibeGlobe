@@ -385,20 +385,25 @@ describe('terrain in a globe (M4)', () => {
     const session = new Session();
     session.connect();
     await session.post('HeapProfiler.enable');
-    await session.post('HeapProfiler.startSampling', {
-      samplingInterval: 64,
-      includeObjectsCollectedByMajorGC: true,
-      includeObjectsCollectedByMinorGC: true,
-    });
     const count = 200_000;
-    expect(Number.isFinite(queries(count))).toBe(true);
-    const { profile } = (await session.post('HeapProfiler.stopSampling')) as { profile: { head: SamplingNode } };
-    session.disconnect();
-    const engine = [...allocationSites(profile.head, new Map())].filter(([site]) => ENGINE_SOURCE.test(site));
+    let engine: [string, number][];
+    try {
+      await session.post('HeapProfiler.startSampling', {
+        samplingInterval: 64,
+        includeObjectsCollectedByMajorGC: true,
+        includeObjectsCollectedByMinorGC: true,
+      });
+      expect(Number.isFinite(queries(count))).toBe(true);
+      const { profile } = (await session.post('HeapProfiler.stopSampling')) as { profile: { head: SamplingNode } };
+      engine = [...allocationSites(profile.head, new Map())].filter(([site]) => ENGINE_SOURCE.test(site));
+    } finally {
+      session.disconnect();
+      // A failure must not leave the globe running: its requests would hold the page's network pool for later tests.
+      globe.destroy();
+    }
     // Any object allocated per query costs at least 12 bytes; under 0.01 byte per query on average means none does.
     const bytesPerQuery = engine.reduce((sum, [, bytes]) => sum + bytes, 0) / count;
     expect(bytesPerQuery, JSON.stringify(engine)).toBeLessThan(0.01);
-    globe.destroy();
   }, 60_000);
 
   it('answers the ellipsoid, flagged no-data, without terrain (F144)', async () => {

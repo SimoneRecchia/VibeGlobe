@@ -162,7 +162,7 @@ class TileLoader {
       if (signal.aborted) return ABORTED;
       if (tile) {
         this.context.count(id, 'package', coord, tile.packageId);
-        return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType };
+        return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType, cached: true };
       }
     }
     const endpoint = endpointOf(url);
@@ -241,7 +241,16 @@ class TileLoader {
           coord,
         );
         this.write(key, decision, outcome.headers, { bytes: outcome.bytes, contentType: outcome.contentType });
-        return { kind: 'ok', bytes: outcome.bytes, contentType: outcome.contentType };
+        const timing = outcome.timing;
+        return {
+          kind: 'ok',
+          bytes: outcome.bytes,
+          contentType: outcome.contentType,
+          // The network's own timings for the bandwidth estimate (F300).
+          ...(timing && !timing.cached
+            ? { waitMs: timing.waitMs, transferMs: timing.transferMs, endAgoMs: timing.endAgoMs }
+            : {}),
+        };
       }
       case 'not-modified': {
         this.context.reportSuccess(endpoint);
@@ -303,6 +312,7 @@ class TileLoader {
   }
 }
 
+/** A tile from the persistent cache or a package: local, so it says nothing about the link (F300). */
 function okOf(tile: CachedTile): TransportResult {
-  return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType };
+  return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType, cached: true };
 }

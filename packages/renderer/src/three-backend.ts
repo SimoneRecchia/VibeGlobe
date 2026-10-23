@@ -15,6 +15,7 @@ import {
   type TileDrawList,
   type TileMeshData,
 } from '@vibeglobe/core';
+import { RenderExtensions } from './extensions.js';
 import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
@@ -96,6 +97,8 @@ export class ThreeBackend implements RendererBackend {
   private debugEntries: DebugEntry[] = [];
   readonly layers = new LayerBatches(this.scene, 'reversed-z'); // Data layers (ADR 0037).
   readonly models = this.layers.models;
+  /** Subsystems added from outside the core loop (`Globe.addRenderExtension`, M13). */
+  readonly extensions = new RenderExtensions({ scene: this.scene, depthPath: () => this.depthPath });
   private textureUploads = 0;
   private meshUploads = 0;
   private matrixUpdates = 0;
@@ -298,9 +301,7 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Releases an imagery tile texture and its image. */
-  releaseTexture(handle: number): void {
-    this.tileTextures.release(handle);
-  }
+  readonly releaseTexture = (handle: number): void => this.tileTextures.release(handle);
 
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
   async setBaseImagery(url: string): Promise<void> {
@@ -354,6 +355,7 @@ export class ThreeBackend implements RendererBackend {
     surface.setSurfaceMorph(this.material, view.morph);
     placeDebugEntries(this.debugEntries, view.eyeEcef);
     this.layers.place(view);
+    this.extensions.frame(view);
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.pipelineSwitches?.begin();
@@ -387,14 +389,10 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** The frame just drawn, read from the canvas in the calling task (ADR 0012, Capture). */
-  capture(): Promise<FrameCapture> {
-    return captureCanvas(this.canvases.drawingCanvas);
-  }
+  readonly capture = (): Promise<FrameCapture> => captureCanvas(this.canvases.drawingCanvas);
 
   /** Test hook: destroys the WebGPU device or loses the WebGL2 context. */
-  simulateDeviceLoss(): void {
-    releaseDevice(this.renderer.backend);
-  }
+  readonly simulateDeviceLoss = (): void => releaseDevice(this.renderer.backend);
 
   private handleLoss(lost: WebGPURenderer, reason: string): void {
     // Only the current renderer's loss counts: one replaced or disposed by this backend is expected to go away.
@@ -489,6 +487,7 @@ export class ThreeBackend implements RendererBackend {
     for (const key of keys) this.removeMesh(key);
     this.setDebugMeshes([]);
     this.layers.dispose();
+    this.extensions.dispose();
     this.material?.dispose();
     this.material = undefined;
     this.imageryTexture?.dispose();

@@ -36,7 +36,7 @@ describe('runtime credits', () => {
     for (const creditsElement of [true, false]) {
       const credits = runtimeCredits(
         [source],
-        undefined,
+        -1,
         renderer,
         {
           requestFrame: () => undefined,

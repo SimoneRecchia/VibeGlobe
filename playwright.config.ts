@@ -18,9 +18,11 @@ const MEASURES_THE_MACHINE =
 const NEEDS_DOCKER = process.env['VIBEGLOBE_NO_DOCKER'] === '1' ? [/offline-lan\.spec\.ts/] : [];
 /**
  * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
- * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
+ * WebGL2 (and the measured link, F300, where the Network Information API is missing); tests of WebGPU itself stay
+ * Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
  */
-const CROSS_BROWSER_SPECS = /globe-(core|precision|lifecycle)\.spec\.ts|offline-browsers\.spec\.ts/;
+const CROSS_BROWSER_SPECS =
+  /globe-(core|precision|lifecycle)\.spec\.ts|offline-browsers\.spec\.ts|adaptive-loading\.spec\.ts/;
 const WEBGPU_TESTS = /webgpu|WebGPU/;
 const crossBrowserProjects =
   process.env['VIBEGLOBE_CROSS_BROWSER'] === '1'

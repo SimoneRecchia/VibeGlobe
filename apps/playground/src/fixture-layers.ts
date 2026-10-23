@@ -46,14 +46,19 @@ export function overlayLayers(
   if (!spec) return [];
   // `?overlayHosts=<base>,…` serves each overlay from another base URL, such as another origin (F251, F252).
   const hosts = (params.get('overlayHosts') ?? '').split(',');
+  // `?overlayTiling=` cuts the overlays in another scheme than the base imagery (F225).
+  const scheme = params.get('overlayTiling');
+  const overlayTiling = scheme === 'geographic' || scheme === 'mercator' ? scheme : tiling;
   return spec.split(',').map((item, index) => {
     const [pattern = 'tiles', opacity = '1', blend = 'normal'] = item.split(':');
     const host = hosts[index] || base;
     const source = xyzImagery({
       id: `overlay-${pattern}`,
-      url: `${host}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
+      url: `${host}fixture-tiles/${session}/${pattern}/${overlayTiling}/{z}/{x}/{y}.${imageFormat(params, 'overlayFormat')}`,
+      // The `holes` pattern's transparent cells show the layers below (F242).
+      ...(pattern === 'holes' ? { transparent: true } : {}),
       ...overlayTransport(params, host, pattern),
-      tiling,
+      tiling: overlayTiling,
       minLevel: 0,
       maxLevel: 18,
       // `?overlayCoverage=italy` limits the overlays to a box around Italy (F254).
@@ -121,4 +126,28 @@ export function chainSources(
       ...credits(params, `chain-${pattern}`, pattern),
     });
   });
+}
+
+/**
+ * The fixture imagery's tile size and URL suffix: `?imageryTileSize=512` serves the same tiles at 512 pixels (F240),
+ * `?imageryHiDpi=1` adds `@2x` variants through the `{r}` template field (F241); `rows` addresses the tiles.
+ */
+export function tileVariant(params: URLSearchParams): { tileSizePx: number; variant: string; rows: string } {
+  const tileSizePx = params.get('imageryTileSize') === '512' ? 512 : 256;
+  const variant = tileSizePx === 512 ? '@2x' : params.get('imageryHiDpi') === '1' ? '{r}' : '';
+  // `?imageryAddressing=tms` requests Web Mercator tiles with TMS rows from the fixture's `mercator-tms` (F229).
+  const rows = params.get('imageryAddressing') === 'tms' ? '-tms/{z}/{x}/{-y}' : '/{z}/{x}/{y}';
+  return { tileSizePx, variant, rows };
+}
+
+/** `?imageryFormat=jpg|webp|avif` (or `?overlayFormat=` for the overlays, under `name`) serves another format (F242). */
+function imageFormat(params: URLSearchParams, name = 'imageryFormat'): string {
+  const format = params.get(name);
+  return format === 'jpg' || format === 'webp' || format === 'avif' ? format : 'png';
+}
+
+/** The fixture imagery's file extension: `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain (F104). */
+export function imageExtension(params: URLSearchParams): string {
+  const ktx2 = params.get('ktx2');
+  return ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : imageFormat(params);
 }

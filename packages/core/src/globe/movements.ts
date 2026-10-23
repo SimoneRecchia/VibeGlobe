@@ -59,6 +59,13 @@ export interface MovementHost {
   interruptInput(): void;
   /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
   constrainEnd(end: Float64Array): void;
+  /**
+   * A movement to `end` starts (its tiles load ahead, F286; a flight also pauses prefetch, F287), or none runs any
+   * more (undefined).
+   */
+  preloadView?(end: Float64Array | undefined, flight?: boolean): void;
+  /** The camera jumped (`jumpTo`): motion-aware detail does not count it as motion (F085). */
+  cameraJumped?(): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -131,6 +138,7 @@ export class Movements {
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
     this.host.constrainEnd(end);
+    this.host.preloadView?.(end, kind === 'fly');
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
     const animator =
       kind === 'fly' && this.reducedMotion
@@ -374,6 +382,7 @@ export class Movements {
     }
     applyView(camera, view, keepRange);
     camera.update();
+    this.host.cameraJumped?.();
     this.jumped();
     this.host.requestRender();
     return undefined;
@@ -394,6 +403,7 @@ export class Movements {
   private finish(running: Running, outcome: MoveOutcome): void {
     if (this.running !== running) return;
     this.running = undefined;
+    this.host.preloadView?.(undefined);
     running.detach();
     // A fade cut short still leaves the view opaque.
     if (running.animator.opacity !== undefined) this.host.setOpacity(1);

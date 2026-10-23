@@ -40,7 +40,7 @@ async function idle(page: Page): Promise<void> {
 }
 
 /** Whether the frame shows a strongly red or blue pixel near a position. */
-async function colorAt(page: Page, lon: number, lat: number, color: 'red' | 'blue'): Promise<boolean> {
+async function colorAt(page: Page, lon: number, lat: number, color: 'red' | 'blue' | 'green'): Promise<boolean> {
   return page.evaluate(
     async ([longitudeDeg, latitudeDeg, wanted]) => {
       const globe = window.adapterExample?.globes()[0];
@@ -53,7 +53,9 @@ async function colorAt(page: Page, lon: number, lat: number, color: 'red' | 'blu
         for (let dx = -2; dx <= 2; dx++) {
           const i = ((Math.round(point.yPx * scale) + dy) * frame.widthPx + Math.round(point.xPx * scale) + dx) * 4;
           const [r, g, b] = [frame.rgba[i] ?? 0, frame.rgba[i + 1] ?? 0, frame.rgba[i + 2] ?? 0];
-          if (wanted === 'red' ? r > 180 && g < 90 && b < 90 : b > 150 && b > r + 60) return true;
+          if (wanted === 'red' && r > 180 && g < 90 && b < 90) return true;
+          if (wanted === 'blue' && b > 150 && b > r + 60) return true;
+          if (wanted === 'green' && g > 150 && g > r + 60 && g > b + 60) return true;
         }
       return false;
     },
@@ -191,6 +193,36 @@ test('child components add, update and remove data layers, markers and controls 
   expect(after.controls).toEqual([]);
   expect(after.meshes).toBeLessThan(full.meshes);
   await expect(page.locator('[data-control]')).toHaveCount(0);
+  // An imagery source added at runtime, its look changed in place, then removed with its tiles.
+  const imageryIds = (): Promise<string[]> =>
+    page.evaluate(
+      () =>
+        window.adapterExample
+          ?.globes()[0]
+          ?.imageryLayers.list()
+          .map((layer) => layer.id) ?? [],
+    );
+  const textures = (): Promise<number> =>
+    page.evaluate(() => window.adapterExample?.globes()[0]?.resourceCounts().textures ?? 0);
+  await set(page, { children: { overlay: true } });
+  await expect.poll(imageryIds).toEqual(['world', 'levels', 'overlay']);
+  await expect.poll(() => colorAt(page, 12.5, 41.9, 'green'), { timeout: 30_000 }).toBe(true);
+  await set(page, { overlay: { opacity: 0.3 } });
+  await idle(page);
+  expect(await colorAt(page, 12.5, 41.9, 'green')).toBe(false);
+  await set(page, { overlay: { opacity: 1, visible: false } });
+  await idle(page);
+  expect(await colorAt(page, 12.5, 41.9, 'green')).toBe(false);
+  await set(page, { overlay: { visible: true } });
+  await expect.poll(() => colorAt(page, 12.5, 41.9, 'green'), { timeout: 30_000 }).toBe(true);
+  await idle(page);
+  const withOverlay = await textures();
+  await set(page, { children: { overlay: false } });
+  await expect.poll(imageryIds).toEqual(['world', 'levels']);
+  await idle(page);
+  expect(await colorAt(page, 12.5, 41.9, 'green')).toBe(false);
+  // Its tiles' textures are released.
+  expect(await textures()).toBeLessThan(withOverlay);
 });
 
 test('the composables follow a flight and the view mode, within the frame budget over a 30-second flight (F475)', async ({

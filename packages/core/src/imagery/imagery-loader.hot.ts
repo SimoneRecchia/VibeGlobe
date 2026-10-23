@@ -4,6 +4,7 @@
  * @benchmark packages/core/src/globe/frame-allocation.test.ts
  */
 import type { RamTier } from '../cache/ram-tier.js';
+import { SLOW_LINK_BPS } from '../scheduler/bandwidth.js';
 import type { Residency } from '../cache/residency.hot.js';
 import { UPLOAD_REFUSED, UploadQueue } from '../cache/upload-queue.hot.js';
 import {
@@ -38,6 +39,8 @@ import {
 export const VISIBLE_CLASS = 1024;
 /** Priority keys of prefetched tiles start here, after every visible tile (ADR 0007). */
 export const PREFETCH_CLASS = 4 * 1024;
+/** The class of a flight's destination tiles (F286): after every visible tile, before prefetch. */
+export const PRELOAD_CLASS = 2 * 1024;
 /** Visible tiles per frame whose neighbors are prefetched; more are rare and simply not ringed. */
 const RING_CAPACITY = 1024;
 
@@ -175,6 +178,17 @@ export class ImageryLoader implements NetworkPoolClient {
   private frame = 0;
   private requested = 0;
   private destroyed = false;
+  /** 2 while a high-DPI source's `@2x` tiles are wanted (F241). */
+  pixelRatio = 1;
+  /** True while the camera moves fast: nothing beyond the view loads (F287, F288). */
+  prefetchPaused = false;
+  /**
+   * While positive (a flight runs), a visible tile is requested only once it has been wanted in every frame for this
+   * long, milliseconds: tiles a moving view shows for a moment never load (F287). Its ancestors stand in meanwhile.
+   */
+  settleMs = 0;
+  /** Surface levels finer than the source's tiles: 1 for tiles of 512 texels, which serve the next level (F240). */
+  levelShift = 0;
 
   constructor(private readonly options: ImageryLoaderOptions) {
     const { tiling } = options.source;
@@ -194,8 +208,18 @@ export class ImageryLoader implements NetworkPoolClient {
     this.removeClient = options.network.addClient(this);
   }
 
-  /** Whether the source prefetches now (`loadingFlags`): tiles beyond the view load only when it does (F284, F285). */
+  /**
+   * Whether the source prefetches now: its `loadingFlags` allow it (F284, F285), the camera does not move fast (F287)
+   * and the link is not slow, so prefetch never holds back visible tiles there (F302); tiles beyond the view load only
+   * then.
+   */
   get prefetching(): boolean {
+    if (this.prefetchPaused || (this.flags & LOAD_PREFETCH) === 0) return false;
+    return !(this.options.network.bandwidth.bitsPerSecond < SLOW_LINK_BPS);
+  }
+
+  /** Whether the source loads a flight's destination ahead: its `loadingFlags` allow prefetch (F285, F286). */
+  get preloading(): boolean {
     return (this.flags & LOAD_PREFETCH) !== 0;
   }
 
@@ -233,6 +257,7 @@ export class ImageryLoader implements NetworkPoolClient {
     const previous = this.table.priorities[record.slot] ?? Infinity;
     if (record.pinned) priority = level;
     else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
+    if (record.wantedFrame < this.frame - 1) this.table.wantedSince[record.slot] = this.options.now();
     record.wantedFrame = this.frame;
     if (priority >= VISIBLE_CLASS && priority < VISIBLE_CLASS + 1024 && this.ringCount < RING_CAPACITY) {
       const at = 4 * this.ringCount++;
@@ -241,8 +266,10 @@ export class ImageryLoader implements NetworkPoolClient {
       this.ring[at + 2] = y;
       this.ring[at + 3] = priority;
     }
-    const state = record.state;
     const handle = this.options.handleBase + record.slot;
+    // A tile whose cache headers ran out is requested again, even from the RAM tier (F260).
+    if (this.stale(record)) this.expire(record);
+    const state = record.state;
     if (state === READY) {
       this.options.memory.residency.touch(handle, this.options.memory.frame());
       return handle;
@@ -251,6 +278,7 @@ export class ImageryLoader implements NetworkPoolClient {
     priorities[record.slot] = priority;
     // A tile backing off after a failure is wanted again once eligible: from its RAM copy when it has one.
     const retry = state === FAILED && this.options.now() >= (this.table.eligibleAt[record.slot] ?? 0);
+    if (state === UNLOADED && this.unsettled(record.slot, priority)) return -1;
     if (state === UNLOADED || retry) {
       const cached = this.options.memory.ram.get(handle);
       if (cached) {
@@ -267,6 +295,12 @@ export class ImageryLoader implements NetworkPoolClient {
       this.heap.updateAt(record.slot, priorities, record.slot);
     }
     return -1;
+  }
+
+  /** Whether a flight holds back the visible tile in `slot` because it has not been wanted for long enough (F287). */
+  private unsettled(slot: number, priority: number): boolean {
+    if (this.settleMs <= 0 || priority < VISIBLE_CLASS || priority >= PRELOAD_CLASS) return false;
+    return this.options.now() - (this.table.wantedSince[slot] ?? 0) < this.settleMs;
   }
 
   /** The handle of a resident tile, without marking it used (elevation queries); -1 when it is not resident. */
@@ -316,6 +350,7 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The texture handle of a tile on the GPU, or -1; does not want it, but keeps it resident this frame. */
   readyHandle(level: number, x: number, y: number): number {
     const record = this.table.find(level, x, y);
+    if (record?.state === READY && this.stale(record)) this.expire(record);
     if (record?.state !== READY) return -1;
     const handle = this.options.handleBase + record.slot;
     this.options.memory.residency.touch(handle, this.options.memory.frame());
@@ -335,7 +370,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Drops what the frame no longer wants and starts the best queued requests (the scheduling phase, F118). */
   scheduleRequests(): void {
-    if (this.options.prefetchRing === true && (this.flags & LOAD_PREFETCH) !== 0) this.prefetchRing();
+    if (this.options.prefetchRing === true && this.prefetching) this.prefetchRing();
     this.dropUnwanted();
     while (this.heap.size > 0 && this.dispatchOne() !== 0);
   }
@@ -410,6 +445,22 @@ export class ImageryLoader implements NetworkPoolClient {
     this.active.length = 0;
     this.pinnedSettled = 0;
     this.options.requestFrame();
+  }
+
+  /** True for a tile whose cache headers no longer allow reusing it (F260). */
+  private stale(record: TileRecord): boolean {
+    return record.freshUntilMs !== Infinity && this.options.now() >= record.freshUntilMs;
+  }
+
+  /** Drops a stale tile from the GPU and the RAM tier, so wanting it requests it again; its ancestors show meanwhile. */
+  private expire(record: TileRecord): void {
+    const handle = this.options.handleBase + record.slot;
+    if (record.state === READY) {
+      if (this.options.memory.residency.release(handle)) this.options.releaseTexture(handle);
+      record.state = UNLOADED;
+    }
+    this.options.memory.ram.delete(handle);
+    record.freshUntilMs = Infinity;
   }
 
   /** Cancels everything in flight; the textures are released by the renderer. */
@@ -503,7 +554,7 @@ export class ImageryLoader implements NetworkPoolClient {
       const slot = this.heap.peek();
       const record = slot >= 0 ? this.table.bySlot[slot] : undefined;
       if (!record || (!record.pinned && !this.pinnedComplete)) break;
-      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 });
+      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 }, this.pixelRatio);
       if (request === 'noData') {
         this.heap.pop();
         record.state = NO_DATA;
@@ -578,6 +629,10 @@ export class ImageryLoader implements NetworkPoolClient {
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
+      record.freshUntilMs =
+        result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
+          ? this.options.now() + result.maxAgeMs
+          : Infinity;
       // The RAM tier keeps a copy: the bytes themselves move to the worker.
       this.options.memory.ram.put(this.options.handleBase + record.slot, {
         bytes: result.bytes.slice(0),

@@ -1,4 +1,5 @@
-import { geodesicDirect, type DebugShape, type GeoPosition, type Globe } from '@vibeglobe/core';
+import type { DebugShape, GeoPosition, Globe } from '@vibeglobe/core';
+import { geodesicDirect } from '@vibeglobe/core/geodesy';
 
 /** A point `forwardMeters` along `headingDeg` and `rightMeters` to its right from (lon, lat), at a height. */
 function offset(
@@ -127,10 +128,19 @@ function pathMilanTokyo(globe: Globe): void {
   advance();
 }
 
+/** A flight from Milan to Tokyo at zoom 9 (F286, F287, F301); the page's `data-scenario` turns 'done' on arrival. */
+function flightMilanTokyo(globe: Globe): void {
+  document.body.dataset['scenario'] = 'flying';
+  void globe.flyTo({ longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 9 }).then(() => {
+    document.body.dataset['scenario'] = 'done';
+  });
+}
+
 const SCENARIOS: Readonly<Record<string, (globe: Globe) => void>> = {
   'street-level-jitter': streetLevelJitter,
   'depth-range': depthRange,
   'path-milan-tokyo': pathMilanTokyo,
+  'flight-milan-tokyo': flightMilanTokyo,
 };
 
 /** Sets up a named scenario once the globe is ready; unknown names do nothing. */

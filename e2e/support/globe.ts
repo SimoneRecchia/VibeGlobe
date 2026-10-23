@@ -113,7 +113,9 @@ export async function waitForIdle(page: Page): Promise<number> {
 
 /**
  * The globe's current frame, read back by the engine (ADR 0012, Capture: never a page screenshot) and composited over
- * the page background the canvas is transparent against. `index` picks the instance on pages with several.
+ * the page background the canvas is transparent against. `index` picks the instance on pages with several. The one
+ * exception: the engine refuses to read back display-only content (Google, F323), so a frame showing it comes from the
+ * browser's screenshot of the globe's canvas.
  */
 export async function canvasImage(page: Page, index = 0): Promise<PNG> {
   const frame = await page.evaluate(async (i) => {
@@ -133,7 +135,18 @@ export async function canvasImage(page: Page, index = 0): Promise<PNG> {
         reject(new Error(`captureFrame did not complete in 60 s: ${JSON.stringify(state)}`));
       }, 60_000);
     });
-    const capture = await Promise.race([globe?.captureFrame(), stalled]).finally(() => clearTimeout(timer));
+    const capture = await Promise.race([globe?.captureFrame(), stalled])
+      .catch((error: unknown) => {
+        if ((error as { code?: string }).code !== 'display-only') throw error;
+        // Marks the instance's canvas (the largest in its container) for the screenshot.
+        const canvases = [...document.querySelectorAll('canvas')].sort(
+          (a, b) => b.width * b.height - a.width * a.height,
+        );
+        canvases[i]?.setAttribute('data-vg-capture', String(i));
+        return null;
+      })
+      .finally(() => clearTimeout(timer));
+    if (capture === null) return null;
     if (!capture) throw new Error(`no globe ${i}`);
     const bytes = new Uint8Array(capture.rgba.buffer, capture.rgba.byteOffset, capture.rgba.byteLength);
     let binary = '';
@@ -141,6 +154,8 @@ export async function canvasImage(page: Page, index = 0): Promise<PNG> {
       binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     return { widthPx: capture.widthPx, heightPx: capture.heightPx, base64: btoa(binary) };
   }, index);
+  if (frame === null)
+    return PNG.sync.read(await page.locator(`canvas[data-vg-capture="${String(index)}"]`).screenshot());
   const rgba = Buffer.from(frame.base64, 'base64');
   const image = new PNG({ width: frame.widthPx, height: frame.heightPx });
   for (let i = 0; i < rgba.length; i += 4) {

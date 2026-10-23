@@ -110,18 +110,13 @@ export {
   unprojectGeographicRad,
 } from './projections/geographic.js';
 export type { LonLatDeg, ProjectedPointMeters } from './projections/types.js';
-export { geodesicInverse } from './geodesy/geodesic-inverse.js';
-export type { GeodesicInverseResult } from './geodesy/geodesic-inverse.js';
-export { geodesicDirect } from './geodesy/geodesic-direct.js';
-export type { GeodesicDirectResult } from './geodesy/geodesic-direct.js';
-export { geodesicPathLengthMeters, geodesicPolygonArea } from './geodesy/geodesic-polygon.js';
-export type { GeodesicPoint, GeodesicPolygonArea } from './geodesy/geodesic-polygon.js';
 export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } from './tiling/tile-key.js';
 export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
+export type { RenderExtension, RenderExtensionContext } from './globe/render-extensions.js';
 export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
 export type {
   ImageryBlend,
@@ -174,6 +169,7 @@ export type {
 } from './scheduler/types.js';
 export { serializeTaskError, WORKER_PROTOCOL_VERSION } from './scheduler/worker-protocol.js';
 export { acquireWorkerPool } from './scheduler/worker-pool.js';
+export type { NetworkPool, RequestConsumer } from './scheduler/network-pool.js';
 export type {
   WorkerPool,
   WorkerPoolLease,

@@ -6,7 +6,7 @@ import { WorkerTaskError, type WorkerPool, type WorkerTaskDone } from '../schedu
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
-import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, ImageryLoader, VISIBLE_CLASS } from './imagery-loader.hot.js';
 import { imageryDecodeTask, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
@@ -334,6 +334,37 @@ describe('ImageryLoader', () => {
     expect(residency.usedBytes).toBeLessThanOrEqual(3 * 349_524);
   });
 
+  it('reuses a tile only while its cache headers allow it when the provider asks (F260)', () => {
+    const { transport, released, ok, runFrame, timers } = setUp(32, {
+      source: { profile: { respectCacheHeaders: true } },
+    });
+    const fresh: TransportResult = { ...ok, maxAgeMs: 1000 } as TransportResult;
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), fresh);
+    runFrame([[5, 0, 0]]);
+    const [handle] = runFrame([[5, 0, 0]]);
+    expect(handle).toBe(100);
+    // Within its lifetime: drawn without a new request.
+    timers.advance(900);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    expect(transport.started).toEqual([url(5, 0, 0)]);
+    // Expired: released, requested again; nothing is drawn from it meanwhile (its ancestors are).
+    timers.advance(200);
+    expect(runFrame([[5, 0, 0]])).toEqual([-1]);
+    expect(released).toContain(100);
+    expect(transport.started).toEqual([url(5, 0, 0), url(5, 0, 0)]);
+  });
+
+  it('ignores cache headers for sources whose provider does not ask (F260)', () => {
+    const { transport, ok, runFrame, timers } = setUp();
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), { ...ok, maxAgeMs: 0 } as TransportResult);
+    runFrame([[5, 0, 0]]);
+    timers.advance(10_000);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    expect(transport.started).toEqual([url(5, 0, 0)]);
+  });
+
   it('serves a tile evicted from the GPU from the RAM tier, with no new request (F097)', () => {
     const { transport, uploaded, ram, ok, runFrame } = setUp(32, { gpuBytes: 349_524 });
     runFrame([[5, 0, 0]]);
@@ -574,6 +605,25 @@ describe('ImageryLoader', () => {
         );
       } else expect(transport.started).toEqual([url(5, 10, 10)]);
     }
+  });
+
+  it('during a flight requests a visible tile only once it stays wanted, never one the view shows for a moment (F287)', () => {
+    const { timers, transport, loader } = setUp();
+    loader.settleMs = 400;
+    const frame = (tiles: [number, number, number][]): void => {
+      loader.beginFrame();
+      for (const [level, x, y] of tiles) loader.want(level, x, y, VISIBLE_CLASS + level);
+      loader.endFrame();
+      timers.advance(100);
+    };
+    // Wanted for 300 ms, then gone: never requested.
+    for (let i = 0; i < 3; i++) frame([[6, 1, 1]]);
+    frame([]);
+    // Wanted again from scratch: requested once it has been wanted in every frame for 400 ms.
+    for (let i = 0; i < 4; i++) frame([[6, 1, 1]]);
+    expect(transport.started).toEqual([]);
+    frame([[6, 1, 1]]);
+    expect(transport.started).toEqual([url(6, 1, 1)]);
   });
 
   it('keeps tiles that left the view in memory with memory reuse, and releases them at once without it (F281, F282)', () => {

@@ -214,6 +214,16 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
           { type: 'Polygon', coordinates: [rectangle(12.5, 41.89, 12.505, 41.895)] },
           { h: 400, b: 200 },
         ),
+        // Overlapping the floating block's east side.
+        feature(
+          'overlap',
+          { type: 'Polygon', coordinates: [rectangle(12.504, 41.891, 12.509, 41.894)] },
+          { h: 250, b: 0 },
+        ),
+        // On the west flank of the fixture's peak at (6.86°, 45.83°), with `&terrain=terrarium`: walls stand on the
+        // slope (heights above the terrain under each vertex).
+        feature('slope-a', { type: 'Polygon', coordinates: [rectangle(6.8, 45.825, 6.81, 45.835)] }, { h: 300, b: 0 }),
+        feature('slope-b', { type: 'Polygon', coordinates: [rectangle(6.81, 45.825, 6.82, 45.835)] }, { h: 150, b: 0 }),
       ],
       style: {
         'fill-color': '#c0a080',
@@ -355,13 +365,21 @@ function syncLayers(): DataLayer[] {
   ];
 }
 
+/** Scenarios in modules of their own, loaded on demand. */
+const LAZY_SCENES: Record<string, (globe: Globe) => Promise<void>> = {
+  'data-formats': async (globe) => (await import('./layers-formats.js')).showFormats(globe),
+  'data-stream': async (globe) => (await import('./layers-stream.js')).showStream(globe),
+  'data-street': async (globe) => (await import('./layers-street.js')).showStreet(globe),
+  'data-cluster': async (globe) =>
+    (await import('./layers-cluster.js')).showCluster(
+      globe,
+      Number(new URLSearchParams(location.search).get('points') ?? 100_000),
+    ),
+};
+
 export function showDataScenario(globe: Globe, name: string): void {
-  if (name === 'data-formats') return void import('./layers-formats.js').then((module) => module.showFormats(globe));
-  if (name === 'data-stream') return void import('./layers-stream.js').then((module) => module.showStream(globe));
-  if (name === 'data-cluster') {
-    const count = Number(new URLSearchParams(location.search).get('points') ?? 100_000);
-    return void import('./layers-cluster.js').then((module) => module.showCluster(globe, count));
-  }
+  const lazy = LAZY_SCENES[name];
+  if (lazy) return void lazy(globe);
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (['data-markers', 'data-styled', 'data-select', 'data-altitudes-all', 'data-drag'].includes(name))

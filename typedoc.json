@@ -1,7 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "name": "VibeGlobe",
-  "entryPoints": ["packages/*/src/index.ts", "packages/core/src/decoders.ts", "packages/layers/src/model-layer.ts"],
+  "entryPoints": [
+    "packages/*/src/index.ts",
+    "packages/core/src/decoders.ts",
+    "packages/core/src/geodesy.ts",
+    "packages/layers/src/model-layer.ts"
+  ],
   "tsconfig": "tsconfig.docs.json",
   "out": "docs-site",
   "readme": "README.md",

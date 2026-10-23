@@ -49,12 +49,31 @@ describe('clustered point layer', () => {
     for (const zoom of [0, 6, 12, 18]) {
       stack.frame(frameAt(zoom * 100, zoom));
       await settle();
-      stack.frame(frameAt(zoom * 100 + 16, zoom + 0.5));
+      // Applied a slice per frame (F375): 10,000 items take two frames.
+      for (let frame = 1; frame <= 4 && layer.shownZoom !== zoom; frame++)
+        stack.frame(frameAt(zoom * 100 + 16 * frame, zoom + 0.5));
       expect(layer.shownZoom).toBe(zoom);
       expect(layer.shownPointCount()).toBe(10_000);
       expect(target.state({ id: 1 }).count).toBe(layer.shownItems().length);
     }
     expect(layer.shownItems().length).toBe(10_000);
+  });
+
+  it('applies a zoom change of many items a slice per frame, showing the new zoom once all are in (F375)', async () => {
+    const layer = new ClusterLayer({ data: randomPoints(12_000), cluster: { radiusPx: 60, transitionMs: 0 } });
+    const target = new RecordingRenderTarget();
+    const stack = new LayerStack(target);
+    stack.add(layer);
+    await layer.loaded;
+    stack.frame(frameAt(0, 18));
+    await settle();
+    const counts: number[] = [];
+    for (let frame = 1; frame <= 3; frame++) {
+      stack.frame(frameAt(16 * frame, 18.5));
+      counts.push(layer.shownItems().length);
+      expect(layer.shownZoom).toBe(frame === 3 ? 18 : undefined);
+    }
+    expect(counts).toEqual([5000, 10_000, 12_000]);
   });
 
   it('splits and merges with animated transitions instead of pops', async () => {

@@ -40,6 +40,7 @@ function fakeLayer(
     readyHandle: (level: number) => ((states[level] ?? -1) >= 0 ? (states[level] ?? -1) : -1),
     unavailable: (level: number) => unavailable.includes(level),
     markDrawn: () => undefined,
+    levelShift: 0,
   } as unknown as ImageryLoader;
   const source = { tiling: WEB_MERCATOR_TILING, minLevel: 0, maxLevel } as ImagerySource;
   return { layer: { source, loader, index: 0 }, wanted };

@@ -37,6 +37,8 @@ export interface TileRecord {
   readonly pinned: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
+  /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
+  freshUntilMs: number;
 }
 
 /**
@@ -49,6 +51,8 @@ export class TileTable {
   priorities = new Float64Array(1024);
   /** Engine time from which a failed tile may be requested again, by slot. */
   eligibleAt = new Float64Array(1024);
+  /** Engine time since which each record has been wanted in every frame, by slot (F287). */
+  wantedSince = new Float64Array(1024);
   private readonly records = new IntegerKeyMap<TileRecord>(1024);
   private readonly coord: TileCoord = { root: 0, level: 0, x: 0, y: 0 };
   /** {@link TileTable.findInside}'s key, in an array so passing it boxes nothing (ADR 0018). */
@@ -97,12 +101,14 @@ export class TileTable {
       task: -1,
       pinned: level <= this.pinnedLevel,
       availabilityUnknown: false,
+      freshUntilMs: Infinity,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);
     if (slot >= this.priorities.length) {
       this.priorities = grown(this.priorities);
       this.eligibleAt = grown(this.eligibleAt);
+      this.wantedSince = grown(this.wantedSince);
     }
     return record;
   }

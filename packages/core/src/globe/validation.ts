@@ -259,11 +259,13 @@ export function validatePosition(position: unknown): void {
   if (position === null || typeof position !== 'object') {
     throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describeInput(position)}`);
   }
-  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144).
+  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144). The checks
+  // are inline: a double passed to a call the compiler does not inline is boxed, which a loaded machine shows.
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  requireFinite('longitudeDeg', longitudeDeg);
-  requireFinite('latitudeDeg', latitudeDeg);
-  requireFinite('heightMeters', heightMeters ?? 0);
+  if (typeof longitudeDeg !== 'number' || !Number.isFinite(longitudeDeg)) requireFinite('longitudeDeg', longitudeDeg);
+  if (typeof latitudeDeg !== 'number' || !Number.isFinite(latitudeDeg)) requireFinite('latitudeDeg', latitudeDeg);
+  if (heightMeters != null && (typeof heightMeters !== 'number' || !Number.isFinite(heightMeters)))
+    requireFinite('heightMeters', heightMeters);
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',

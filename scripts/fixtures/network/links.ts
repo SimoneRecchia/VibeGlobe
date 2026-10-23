@@ -36,12 +36,19 @@ export function lanOnly(url: URL, lanHost: string): boolean {
   return url.host === lanHost;
 }
 
-/** Attempts of one tile (or of a health check), request start times in milliseconds, oldest first. */
-export type Attempts = Readonly<Record<string, readonly number[]>>;
+/** One request of a tile: when it started (page time, ms), the globe's frame then, and whether the link failed it. */
+export interface Attempt {
+  readonly startMs: number;
+  readonly frame: number;
+  readonly failed: boolean;
+}
+
+/** The attempts of each tile (or health check), oldest first. */
+export type Attempts = Readonly<Record<string, readonly Attempt[]>>;
 
 /** Limits of the retry analysis. */
 export interface BackoffLimits {
-  /** Most attempts of one tile. */
+  /** Most attempts of one tile in a row of failures, the one that ends it included: 1 + the retry policy's retries. */
   readonly maxAttempts: number;
   /** Least gap between two health checks, ms. */
   readonly healthMinIntervalMs: number;
@@ -49,30 +56,36 @@ export interface BackoffLimits {
   readonly isHealthCheck: (key: string) => boolean;
 }
 
-/** Timer slack: gaps are measured on the page's clock between request starts. */
+/** Timer slack of the health-check interval. */
 const SLACK = 0.9;
 
 /**
- * The violations of bounded retries with backoff, one line each (empty when none): a tile asked for more than
- * `maxAttempts` times; a retry sooner after the previous one than the first retry was after its own (the gaps between
- * retries must not shrink); health checks closer together than their minimum interval.
+ * The violations of bounded retries with backoff, one line each (empty when none). A retry is a request that follows a
+ * failed one of the same tile; a request after a success or a cancellation is a new one (the tile came back into
+ * view). The engine's backoff (ADR 0007) is a random delay under a doubling ceiling, checked as an eligibility gate
+ * every frame, so single waits may shrink: what holds for every retry is that it starts in a later frame than the
+ * failure. Violations: a row of failures longer than `maxAttempts`; a retry in the frame of its failure; health checks
+ * closer together than their minimum interval.
  */
 export function backoffViolations(attempts: Attempts, limits: BackoffLimits): string[] {
   const violations: string[] = [];
-  for (const [key, times] of Object.entries(attempts)) {
-    const gaps = times.slice(1).map((t, i) => t - (times[i] ?? t));
+  for (const [key, list] of Object.entries(attempts)) {
     if (limits.isHealthCheck(key)) {
+      const gaps = list.slice(1).map((a, i) => a.startMs - (list[i]?.startMs ?? a.startMs));
       for (const gap of gaps)
         if (gap < limits.healthMinIntervalMs * SLACK)
-          violations.push(`${key}: health checks ${gap.toFixed(0)} ms apart (${gaps.join(', ')})`);
+          violations.push(`${key}: health checks ${gap.toFixed(0)} ms apart (${gaps.map(Math.round).join(', ')})`);
       continue;
     }
-    if (times.length > limits.maxAttempts) violations.push(`${key}: ${String(times.length)} attempts`);
-    // The first gap may be a new request for a tile that came back into view, not a retry: compare retries from the
-    // second gap on.
-    for (let i = 2; i < gaps.length; i++)
-      if ((gaps[i] ?? 0) < (gaps[1] ?? 0) * SLACK)
-        violations.push(`${key}: retry ${String(i)} came sooner than the first retry (${gaps.join(', ')} ms)`);
+    let row = 0;
+    for (const [i, attempt] of list.entries()) {
+      const before = list[i - 1];
+      if (before?.failed && attempt.frame <= before.frame)
+        violations.push(`${key}: retry in frame ${String(attempt.frame)}, the frame of its failure`);
+      row = before?.failed ? row + 1 : 1;
+      if (row === limits.maxAttempts + 1)
+        violations.push(`${key}: more than ${String(limits.maxAttempts)} attempts in a row`);
+    }
   }
   return violations;
 }

@@ -43,4 +43,9 @@ other specs.
 - Every scenario is deterministic: a fixed reset pattern, a stepped clock, fixture tiles only.
 - Frame times within budget need the reference hardware (open question 2): on the container's software GPU the suite
   checks holes, black pixels, pops and retries; the frame-time step stays in `docs/hardening-backlog.md`.
+- Retries are judged as the engine schedules them (ADR 0007: a random delay under a doubling ceiling, an eligibility
+  gate checked every frame): at most 1 + `maxRetries` attempts in a row of failures, each retry in a later frame than
+  its failure. Single waits may shrink with full jitter, so "each retry further apart than the one before" is not a
+  property to assert. Requests are timed in the page, with the globe's frame number, because route events reach Node
+  late on a busy machine and the manual clock counts the engine's waits in frames.
 - A new fault kind in the server is a hook request to the main session (`docs/parallel-tracks.md`).

@@ -32,8 +32,13 @@ for (const backend of BACKENDS) {
       const report = await recordPath(page, NAVIGATION, BLACK_BELOW);
       console.log(`[network] ${link.name} ${backend}: ${JSON.stringify(report)}`);
       expectClean(report);
+      const all = await attempts();
       expect(
-        backoffViolations(attempts, { maxAttempts: 6, healthMinIntervalMs: HEALTH.minIntervalMs, isHealthCheck }),
+        backoffViolations(all, {
+          maxAttempts: 5,
+          healthMinIntervalMs: HEALTH.minIntervalMs,
+          isHealthCheck,
+        }),
       ).toEqual([]);
     });
 

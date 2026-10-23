@@ -125,3 +125,73 @@ for (const backend of BACKENDS) {
     }
   });
 }
+
+const isCyan = ([r, g, b]: Rgb): boolean => r < 90 && g > 180 && b > 200;
+/** The red pyramid blended toward white (it shows about 226, 82, 82 in sRGB, hovered about 234, 152, 152). */
+const isPink = ([r, g, b]: Rgb): boolean => r > 180 && g > 120 && b > 120 && g < 200;
+
+/** Whether a target shows its hover style: cyan, the marker at 32 px, the model lightened. */
+function hovered(image: PNG, target: (typeof TARGETS)[number], at: { xPx: number; yPx: number }): boolean {
+  if (target.layer === 'sel-marker') {
+    const blue = count(image, at, 20, isBlue);
+    return blue > 700 && blue < 1300;
+  }
+  if (target.layer === 'sel-model') return count(image, at, 6, isPink) > 20;
+  return count(image, at, 6, isCyan) > 4;
+}
+
+for (const backend of BACKENDS) {
+  test(`hovering every primitive emits enter and leave once each with feature, layer and coordinates, and shows the hover style in the next frame on ${backend} (F379)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openGlobe(page, `backend=${backend}&scenario=data-select`);
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await page.evaluate(() => {
+      const globe = window.vibeglobePlayground?.globe;
+      const layers = window.vibeglobeLayers;
+      if (!globe || !layers) throw new Error('no layers');
+      const recorded: string[] = [];
+      (window as unknown as { recorded: string[] }).recorded = recorded;
+      const models = (layers as { models?: (typeof layers.layers)[string] }).models;
+      for (const layer of [...Object.values(layers.layers), ...(models ? [models] : [])])
+        for (const type of ['hover-enter', 'hover-leave'] as const)
+          layer.on(type, ({ feature, position }) =>
+            recorded.push(
+              `${type} ${feature.layerId}/${String(feature.id)} ${position?.longitudeDeg.toFixed(3) ?? '-'},${position?.latitudeDeg.toFixed(3) ?? '-'}`,
+            ),
+          );
+      document.querySelector<HTMLElement>('#camera-controls')?.style.setProperty('display', 'none');
+      globe.setViewMode('2d');
+      globe.jumpTo({ longitudeDeg: 12.5, latitudeDeg: 41.88, zoom: 9 });
+    });
+    await page.waitForTimeout(500);
+    await waitForIdle(page);
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    // A spot with no feature, between the visits.
+    const empty = await screen(page, [12.66, 41.76]);
+    await page.mouse.move(box.x + empty.xPx, box.y + empty.yPx);
+    const expected: string[] = [];
+    for (const target of TARGETS) {
+      const at = await screen(page, target.at);
+      await page.mouse.move(box.x + at.xPx, box.y + at.yPx);
+      const key = `${target.layer}/${target.id}`;
+      const where = `${target.at[0].toFixed(3)},${target.at[1].toFixed(3)}`;
+      expected.push(`hover-enter ${key} ${where}`);
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { recorded: string[] }).recorded.length))
+        .toBe(expected.length);
+      const image = await frame(page);
+      expect(hovered(image, target, at), `${target.layer} hover style`).toBe(true);
+      await page.mouse.move(box.x + empty.xPx, box.y + empty.yPx);
+      expected.push(`hover-leave ${key} 12.660,41.760`);
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { recorded: string[] }).recorded.length))
+        .toBe(expected.length);
+      const after = await frame(page);
+      expect(hovered(after, target, at), `${target.layer} hover style removed`).toBe(false);
+    }
+    expect(await page.evaluate(() => (window as unknown as { recorded: string[] }).recorded)).toEqual(expected);
+  });
+}

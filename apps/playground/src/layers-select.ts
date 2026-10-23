@@ -15,12 +15,20 @@ function rectangle(west: number, south: number, east: number, north: number): nu
   ];
 }
 
-/** Yellow while the feature is selected, else `color`. */
-const selectable = (color: string) => ['case', ['boolean', ['feature-state', 'selected'], false], '#ffff00', color];
+/** Yellow while the feature is selected, cyan while hovered (F379), else `color`. */
+const selectable = (color: string) => [
+  'case',
+  ['boolean', ['feature-state', 'selected'], false],
+  '#ffff00',
+  ['boolean', ['feature-state', 'hover'], false],
+  '#00e0ff',
+  color,
+];
 
 /**
  * `?scenario=data-select` (F381): one feature of each data-layer primitive near Rome (a point, a line, a polygon, a
- * geodesic circle, a marker, a label and an extrusion), each turning yellow (the marker growing) while selected.
+ * geodesic circle, a marker, a label and an extrusion), each turning yellow while selected and cyan while hovered
+ * (the marker growing instead).
  * Seen in 2D at zoom 9 centered on (12.5°, 41.88°).
  */
 export function selectLayers(): DataLayer[] {
@@ -58,7 +66,14 @@ export function selectLayers(): DataLayer[] {
       data: [feature('mk', { type: 'Point', coordinates: [12.5, 41.85] })],
       style: {
         'icon-image': 'square',
-        'icon-size': ['case', ['boolean', ['feature-state', 'selected'], false], 40, 24],
+        'icon-size': [
+          'case',
+          ['boolean', ['feature-state', 'selected'], false],
+          40,
+          ['boolean', ['feature-state', 'hover'], false],
+          32,
+          24,
+        ],
       },
     }),
     new DataLayer('label', {

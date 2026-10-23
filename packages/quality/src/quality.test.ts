@@ -1,0 +1,117 @@
+import type { Globe } from '@vibeglobe/core';
+import { describe, expect, it } from 'vitest';
+import {
+  createQuality,
+  QUALITY_PRESETS,
+  type AppliedQualitySettings,
+  type QualityChange,
+  type QualityTarget,
+} from './index.js';
+
+// A real globe is a quality target: the controller needs nothing beyond the public API (and the optional hook).
+const asTarget = (globe: Globe): QualityTarget => globe;
+void asTarget;
+
+/** A globe stand-in: frames are emitted by `frame(ms)`, which also advances the clock. */
+function fakeGlobe(capabilities: QualityTarget['capabilities'], withHook = true) {
+  const handlers = new Set<() => void>();
+  const state = { clockMs: 0, scales: [] as number[], settings: [] as AppliedQualitySettings[], renders: 0 };
+  const target: QualityTarget = {
+    capabilities,
+    on: (_event, handler) => {
+      const h = (): void => handler({ frameNumber: 0 });
+      handlers.add(h);
+      return () => handlers.delete(h);
+    },
+    setResolutionScale: (scale) => state.scales.push(scale),
+    requestRender: () => state.renders++,
+    ...(withHook ? { setQualitySettings: (s: AppliedQualitySettings) => state.settings.push(s) } : {}),
+  };
+  const frame = (ms: number, count = 1): void => {
+    for (let i = 0; i < count; i++) {
+      state.clockMs += ms;
+      for (const h of handlers) h();
+    }
+  };
+  return { target, state, frame, now: () => state.clockMs, listeners: () => handlers.size };
+}
+
+const DESKTOP = {
+  backend: 'webgpu',
+  maxTextureSize: 16384,
+  maxAnisotropy: 16,
+  deviceMemoryGiB: 8,
+  adapter: 'GPU',
+} as const;
+const PHONE = {
+  backend: 'webgl2',
+  maxTextureSize: 4096,
+  maxAnisotropy: 4,
+  deviceMemoryGiB: 2,
+  adapter: 'GPU',
+} as const;
+
+describe('createQuality', () => {
+  it('chooses the preset from capabilities, and an explicit preset overrides detection', () => {
+    const desktop = fakeGlobe(DESKTOP);
+    const auto = createQuality(desktop.target, { hints: { hardwareConcurrency: 8 }, now: desktop.now });
+    expect([auto.preset, auto.choice?.reason]).toEqual(['high', 'capable WebGPU device']);
+    expect(desktop.state.scales).toEqual([1]);
+    expect(desktop.state.settings[0]).toMatchObject({ anisotropy: 16, antialias: 'msaa4', atmosphere: 'high' });
+    const phone = fakeGlobe(PHONE);
+    expect(createQuality(phone.target, { hints: {}, now: phone.now }).preset).toBe('low');
+    const forced = createQuality(phone.target, { preset: 'ultra', now: phone.now });
+    expect([forced.preset, forced.choice]).toEqual(['ultra', undefined]);
+    expect(forced.settings.anisotropy).toBe(4); // 'max' is the device's maximum
+    expect(() => createQuality(phone.target, { preset: 'extreme' as 'low' })).toThrow(TypeError);
+  });
+
+  it('switches presets at runtime, applying each preset in full', () => {
+    const globe = fakeGlobe(DESKTOP);
+    const quality = createQuality(globe.target, { preset: 'high', now: globe.now });
+    const changes: QualityChange[] = [];
+    quality.onChange((c) => changes.push(c));
+    for (const name of ['low', 'medium', 'ultra', 'high'] as const) {
+      globe.frame(16, 10);
+      quality.setPreset(name);
+      expect(quality.settings).toMatchObject({
+        ...QUALITY_PRESETS[name],
+        anisotropy: QUALITY_PRESETS[name].anisotropy === 'max' ? 16 : QUALITY_PRESETS[name].anisotropy,
+      });
+    }
+    expect(changes.map((c) => [c.reason, c.preset, c.level])).toEqual([
+      ['preset', 'low', 0],
+      ['preset', 'medium', 0],
+      ['preset', 'ultra', 0],
+      ['preset', 'high', 0],
+    ]);
+    expect(globe.state.renders).toBe(5);
+  });
+
+  it('lowers on slow frames and raises back once frames are fast, through the resolution scale without the hook', () => {
+    const globe = fakeGlobe(DESKTOP, false);
+    const quality = createQuality(globe.target, { preset: 'high', now: globe.now });
+    globe.frame(16, 60);
+    expect(quality.level).toBe(0);
+    globe.frame(30, 200);
+    expect(quality.level).toBeGreaterThan(0);
+    expect(globe.state.scales.at(-1)).toBeLessThan(1);
+    globe.frame(8, 3000);
+    expect(quality.level).toBe(0);
+    expect(globe.state.scales.at(-1)).toBe(1);
+  });
+
+  it('holds the preset with adaptive quality off, and stops listening when destroyed', () => {
+    const globe = fakeGlobe(DESKTOP);
+    const quality = createQuality(globe.target, { preset: 'medium', adaptive: false, now: globe.now });
+    globe.frame(40, 300);
+    expect([quality.level, quality.adaptive]).toEqual([0, false]);
+    quality.setAdaptive(true);
+    globe.frame(40, 300);
+    expect(quality.level).toBeGreaterThan(0);
+    quality.setAdaptive(false);
+    expect(quality.level).toBe(0);
+    quality.destroy();
+    expect(globe.listeners()).toBe(0);
+  });
+});

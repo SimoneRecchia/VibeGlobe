@@ -16,6 +16,14 @@
 - **M10 Data layers, renderer side, in progress** (2026-10-23, from 05:45 UTC): passing now F362, F368, F369, F370, F376, F377, F381, F383, F384, F385, F386, F387, F388 (and F380 pending its tablet step); glTF models as interactive features (`@vibeglobe/layers/models`), terrain picking with elevation, fit to objects, the data layers guide; bugs found and fixed: KB-111 (taps lost), KB-112 (clamped features not picked), KB-113 (layer visibility without a frame), KB-114 (antimeridian and polar geometry), KB-115 (model layer handlers kept), KB-116 (removed meshes kept by three.js render objects, tiles included). core moved its quantized-mesh decoder to `@vibeglobe/core/decoders` to stay within its 60 KB budget (59.7 KB). Monday: M10 at about 2 features an hour leaves M8, M9, M12, M14 integration and M11, M13 for Saturday and Sunday; still reachable only if the parallel sessions' PRs (controls, atmosphere, M13) land by Saturday.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## Models and quality track (track C, `packages/models` and `packages/quality`)
+
+Branch `claude/vigilant-hawking-h8r4u4`; owned entries, blockers and hook requests in `docs/parallel-tracks.md` ("Models and quality track: status").
+
+- **2026-10-23:** `@vibeglobe/models` (ADR 0121): GLB and glTF parsing and validation, Draco (`draco3d`) and meshopt (`meshoptimizer`) decoding in a worker task, sparse accessors, node transforms and a renderer-neutral `ModelDescription`; conformance suite over eleven Khronos samples (sixteen variants), fuzzed corrupt input, decoding in a Chromium module worker (`e2e/models.spec.ts`). `@vibeglobe/quality` (ADR 0122): presets, `choosePreset`, the `FrameTimeGovernor` (median window, dead band, reaction and stable timers, minimum change interval, raise backoff) and `createQuality`, checked in Node and on the real engine (`e2e/quality.spec.ts`).
+- Pending: F400 (reference desktop and tablet). Failing with blockers: F361 (hooks 1–2: worker registration, renderer drawing `ModelDescription`), F399 (hook 3: runtime level of detail and effects; reference desktop), F401 and F402 (hook 4: a real GPU load in the playground; 5-minute browser run in the hardening backlog).
+- About 3 hours of agent time (2026-10-23).
+
 ## A. UI, GIS and framework adapters track (2026-10-23)
 
 Branch `claude/confident-ride-i2h6il`, pull request SimoneRecchia/VibeGlobe#21; entries, blockers and hook requests in

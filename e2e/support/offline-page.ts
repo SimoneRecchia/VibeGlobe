@@ -24,6 +24,7 @@ import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
 import {
   googleImagery,
+  heightmapTerrain,
   openStreetMapHostedImagery,
   openStreetMapImagery,
   pmtilesImagery,
@@ -95,6 +96,8 @@ export interface HarnessConfig {
    * only once connectivity returns (docs/parallel-tracks.md, hook requests).
    */
   readonly awaitReady?: boolean;
+  /** Fixture Terrarium terrain wrapped by the offline engine like the imagery (F328). */
+  readonly terrain?: { readonly id: string; readonly session: string; readonly maxLevel?: number };
   /** Uses the custom cache store and network policy of `e2e/fixtures/offline-plugin` (F327). */
   readonly plugin?: boolean;
 }
@@ -220,6 +223,18 @@ async function createGlobeFor(offline: Offline, current: HarnessConfig): Promise
     baseImageryUrl: '/imagery/natural-earth-4096.jpg',
     view: current.view ?? {},
     imagery: await sourcesOf(offline, current),
+    ...(current.terrain
+      ? {
+          terrain: offline.source(
+            heightmapTerrain({
+              id: current.terrain.id,
+              url: `${location.origin}/fixture-tiles/${current.terrain.session}/terrain/mercator/{z}/{x}/{y}.terrarium.png`,
+              encoding: 'terrarium',
+              maxLevel: current.terrain.maxLevel ?? 12,
+            }),
+          ),
+        }
+      : {}),
     workers: createWorkers(),
     ...(current.clockStepMs === undefined ? {} : { manualClockStepMs: current.clockStepMs }),
   });

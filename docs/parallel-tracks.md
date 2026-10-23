@@ -513,7 +513,7 @@ F249, F250, F269, F285–F288, F300–F303, F329):
 | F295  | M8        | Offline mode 1: LAN server                          | failing | in progress                                                                                                      |
 | F296  | M8        | Offline mode 2: browser storage only                | failing | in progress                                                                                                      |
 | F298  | M8        | Connectivity drops seamlessly                       | failing | in progress                                                                                                      |
-| F306  | M8        | Package license and attribution shown               | failing | in progress                                                                                                      |
+| F306  | M8        | Package license and attribution shown               | passing | `e2e/offline-packages.spec.ts`, `packages.test.ts`                                                               |
 | F314  | M8        | Matrix of network modes and switches                | failing | in progress                                                                                                      |
 | F315  | M8        | Network simulation suite                            | failing | in progress                                                                                                      |
 | F316  | M8        | No telemetry                                        | failing | in progress                                                                                                      |
@@ -524,4 +524,4 @@ F249, F250, F269, F285–F288, F300–F303, F329):
 | F324  | M8        | OpenStreetMap public: no packaging or bulk prefetch | passing | `e2e/offline-profiles.spec.ts`                                                                                   |
 | F325  | M8        | OpenStreetMap self-hosted or provider profile       | passing | `e2e/offline-profiles.spec.ts`                                                                                   |
 | F326  | M8        | Any provider's own profile enforced                 | passing | `e2e/offline-profiles.spec.ts`, `conformance.test.ts`                                                            |
-| F328  | M8        | Terrain and MVT in PMTiles and MBTiles packages     | failing | in progress                                                                                                      |
+| F328  | M8        | Terrain and MVT in PMTiles and MBTiles packages     | passing | `scripts/integration/package-terrain-vector.test.ts`, `e2e/offline-packages.spec.ts`                             |

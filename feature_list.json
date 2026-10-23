@@ -4050,7 +4050,7 @@
         "Assert the package metadata lists each source's license and attribution",
         "Load it in the playground and assert the attribution shown matches the package metadata for the visible tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F307",
@@ -4318,7 +4318,7 @@
         "Navigate the playground offline over the package area and assert terrain relief appears with zero black pixels",
         "Assert terrain and vector tiles are written to and read from the persistent cache like imagery tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F550",

@@ -20,6 +20,8 @@ export interface FixturePackageSpec {
   readonly skipLevels?: readonly number[];
   readonly license?: string;
   readonly attribution?: string;
+  /** File extension of the fixture tiles (default `png`; `terrarium.png` for terrain, F328). */
+  readonly extension?: string;
 }
 
 /** A built fixture package: its manifest and file. */
@@ -71,7 +73,9 @@ async function fixtureTiles(
     for (let y = r.y0; y <= r.y1; y++)
       for (let x = r.x0; x <= r.x1; x++) {
         if (spec.skip?.includes(`${z}/${x}/${y}`)) continue;
-        const response = await fetch(`/fixture-tiles/${spec.session}/${spec.pattern}/mercator/${z}/${x}/${y}.png`);
+        const response = await fetch(
+          `/fixture-tiles/${spec.session}/${spec.pattern}/mercator/${z}/${x}/${y}.${spec.extension ?? 'png'}`,
+        );
         tiles.push({ z, x, y, bytes: new Uint8Array(await response.arrayBuffer()) });
       }
   }

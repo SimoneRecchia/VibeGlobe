@@ -3,7 +3,7 @@
  * downloaded or written (F333).
  */
 import type { DatasetConfig, SourceConfig } from '../config/schema.js';
-import { FORBIDDEN_HOSTS, type ProviderProfile, findProfile } from './profiles.js';
+import { FORBIDDEN_HOSTS, FORBIDDEN_URLS, type ProviderProfile, findProfile } from './profiles.js';
 
 /** A refused source: which one, under which profile, and the term it violates. */
 export interface LicenseViolation {
@@ -42,6 +42,8 @@ function effectiveProfile(profileId: string, source: SourceConfig): ProviderProf
     const host = hostOf(url);
     const forbidden = FORBIDDEN_HOSTS.find((entry) => entry.pattern.test(host));
     if (forbidden) return findProfile(forbidden.profile);
+    const layer = FORBIDDEN_URLS.find((entry) => entry.pattern.test(url));
+    if (layer) return findProfile(layer.profile);
   }
   if (source.type === 's2cloudless' && source.edition !== 2016) return findProfile('s2cloudless-2018-or-later');
   return findProfile(profileId);

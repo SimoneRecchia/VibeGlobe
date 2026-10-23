@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { VectorTile } from '@mapbox/vector-tile';
-import { PbfReader } from 'pbf';
+import { PbfReader, PbfWriter } from 'pbf';
 import { describe, expect, it } from 'vitest';
 import { failures, runParserConformance } from '../conformance/index.js';
 import { decodeMvt, type MvtTile } from './mvt.js';
@@ -159,4 +159,37 @@ describe('decodeMvt (F239)', () => {
       }
     },
   );
+});
+
+describe('decodeMvt and UNKNOWN geometry', () => {
+  it('drops an UNKNOWN feature with geometry it cannot check and keeps the rest of the tile (PT-05)', () => {
+    const tile = new PbfWriter();
+    tile.writeMessage(
+      3,
+      (_: undefined, layer: PbfWriter) => {
+        layer.writeVarintField(15, 2);
+        layer.writeStringField(1, 'shapes');
+        layer.writeMessage(
+          2,
+          (__: undefined, feature: PbfWriter) => {
+            feature.writeVarintField(3, 3);
+            // MoveTo(2,2) LineTo(8,0)(0,8) ClosePath: a valid triangle.
+            feature.writePackedVarint(4, [9, 4, 4, 18, 16, 0, 0, 16, 15]);
+          },
+          undefined,
+        );
+        layer.writeMessage(
+          2,
+          (__: undefined, feature: PbfWriter) => {
+            // No type (UNKNOWN), a MoveTo with two points.
+            feature.writePackedVarint(4, [17, 2, 2, 4, 4]);
+          },
+          undefined,
+        );
+      },
+      undefined,
+    );
+    const decoded = decodeMvt(tile.finish());
+    expect(decoded?.layers[0]?.features.map((f) => f.type)).toEqual(['Polygon']);
+  });
 });

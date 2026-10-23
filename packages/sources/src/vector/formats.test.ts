@@ -430,3 +430,14 @@ describe('vector fuzzing (F236, F237)', () => {
     expect(failures([...geojson, ...archives])).toEqual([]);
   });
 });
+
+describe('parseKml altitude modes', () => {
+  it('reads the altitude mode of the geometry, not of a LookAt before it (PT-04)', () => {
+    const kml = parseKml(`<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+      <Placemark><name>Summit</name>
+        <LookAt><longitude>6.86</longitude><latitude>45.83</latitude><gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode></LookAt>
+        <Point><altitudeMode>absolute</altitudeMode><coordinates>6.8652,45.8326,4808</coordinates></Point>
+      </Placemark></kml>`);
+    expect(kml.features.map((f) => f.altitudeMode)).toEqual(['absolute']);
+  });
+});

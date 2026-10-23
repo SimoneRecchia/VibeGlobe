@@ -31,12 +31,21 @@ export interface VectorFormatAdapter {
   parse(input: VectorInput): Promise<ParsedVectorData>;
 }
 
-/** Splits geometry collections into one feature per member, so each member draws with its own primitive family. */
+/**
+ * Splits geometry collections into one feature per member, so each member draws with its own primitive family, and
+ * multi-points into one point feature each, since a point batch draws one anchor per feature.
+ */
 function toFeatures(features: readonly VectorFeature[]): Feature[] {
   const out: Feature[] = [];
   const add = (feature: VectorFeature, geometry: SourceGeometry | null, suffix: string): void => {
     if (geometry?.type === 'GeometryCollection') {
       geometry.geometries.forEach((member, i) => add(feature, member, `${suffix}/${i}`));
+      return;
+    }
+    if (geometry?.type === 'MultiPoint') {
+      geometry.coordinates.forEach((coordinates, i) =>
+        add(feature, { type: 'Point', coordinates } as SourceGeometry, `${suffix}/${i}`),
+      );
       return;
     }
     const id = feature.id === undefined ? undefined : suffix === '' ? feature.id : `${String(feature.id)}${suffix}`;

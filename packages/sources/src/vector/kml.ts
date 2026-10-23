@@ -157,8 +157,12 @@ function geometryOf(node: XmlElement, depth = 0): Geometry | undefined {
   }
 }
 
+/** Elements whose `altitudeMode` applies to the feature; a LookAt's or a Camera's is about the view, not the data. */
+const GEOMETRY_TAGS = new Set(['Point', 'LineString', 'LinearRing', 'Polygon', 'MultiGeometry']);
+
 function altitudeModeOf(placemark: XmlElement): AltitudeMode {
-  for (const node of [placemark, ...elements(placemark)]) {
+  const geometries = elements(placemark).filter((node) => GEOMETRY_TAGS.has(node.tagName.replace(/^.*:/, '')));
+  for (const node of [placemark, ...geometries]) {
     const mode = childText(node, 'altitudeMode');
     if (ALTITUDE_MODES.has(mode)) return mode as AltitudeMode;
   }

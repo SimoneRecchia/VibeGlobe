@@ -221,3 +221,29 @@ describe('the offline engine', () => {
     expect(checks.length).toBeLessThanOrEqual(7);
   });
 });
+
+describe('offline engine waits', () => {
+  it('forgets a wait for a connectivity change once it timed out (PT-15)', async () => {
+    const offline = engine({ mode: 'hybrid' });
+    const internals = offline as unknown as {
+      context(): { waitForChange(maxMs: number): Promise<void> };
+      waiters: unknown[];
+    };
+    const context = internals.context();
+    await Promise.all([context.waitForChange(5), context.waitForChange(5), context.waitForChange(5)]);
+    expect(internals.waiters.length).toBe(0);
+  });
+});
+
+describe('offline engine endpoints', () => {
+  it('checks every host a source spreads its tiles over, not only the first (PT-16)', async () => {
+    const net = fakeNetwork((url) => (url.startsWith('https://b.tiles.test') ? 'down' : {}));
+    const offline = engine({ fetch: net.fetchImpl, healthChecks: { minIntervalMs: 20, maxIntervalMs: 200 } });
+    const source = offline.source(
+      xyzImagery({ id: 'abc', url: 'https://{s}.tiles.test/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }),
+    );
+    // (x + y) % 3 = 1 picks host b.
+    await load(source, tile(2, 1, 0));
+    await expect.poll(() => offline.connectivity).toBe('degraded');
+  });
+});

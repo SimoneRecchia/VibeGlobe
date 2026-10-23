@@ -1,12 +1,14 @@
 import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { runCacheStoreContract } from './contract/cache-store-contract.js';
 import { runNetworkPolicyContract } from './contract/network-policy-contract.js';
 import { defaultNetworkPolicy } from './policy.js';
 import { SwitchBoard } from './switches.js';
 import { indexedDbStore } from './idb-store.js';
 import { memoryStore } from './memory-store.js';
+import { workerStore } from './worker-store.js';
+import { createOffline } from './offline-engine.js';
 import type { CachedTile, NetworkPolicy } from './types.js';
 
 const tile = (size: number): CachedTile => ({
@@ -103,5 +105,77 @@ describe('cache stores', () => {
     expect(await store.get('e/1')).toBeUndefined();
     expect((await store.usage()).bytes).toBe(0);
     store.close();
+  });
+});
+
+describe('workerStore when its worker fails', () => {
+  it('rejects calls made after the worker failed to load, instead of leaving them pending (PT-14)', async () => {
+    const fake = { postMessage: () => undefined, terminate: () => undefined } as unknown as Worker;
+    const store = workerStore({ worker: fake });
+    fake.onerror?.(new Event('error') as ErrorEvent);
+    const settled = await Promise.race([
+      store.get('k').then(
+        () => 'resolved',
+        () => 'rejected',
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 50)),
+    ]);
+    expect(settled).toBe('rejected');
+  });
+});
+
+describe('indexedDbStore shared by several tabs', () => {
+  it('keeps one database under its limit when two tabs write to it (PT-20)', async () => {
+    const factory = new IDBFactory();
+    const tabs = [
+      indexedDbStore({ indexedDB: factory, maxBytes: 20_000 }),
+      indexedDbStore({ indexedDB: factory, maxBytes: 20_000 }),
+    ];
+    for (let i = 0; i < 30; i++)
+      for (const [t, store] of tabs.entries())
+        await store.put(`t${t}/${i}`, {
+          bytes: new ArrayBuffer(500),
+          contentType: 'image/png',
+          storedAtMs: 0,
+          freshUntilMs: 0,
+        });
+    const usages = await Promise.all(tabs.map((store) => store.usage()));
+    for (const store of tabs) store.close();
+    // A fresh instance sums the database itself, like a reload.
+    const reloaded = indexedDbStore({ indexedDB: factory, maxBytes: 20_000 });
+    const stored = (await reloaded.usage()).bytes;
+    reloaded.close();
+    expect(stored).toBeLessThanOrEqual(20_000 * 1.05);
+    for (const usage of usages) expect(usage.bytes).toBe(stored);
+  });
+});
+
+describe('cache eviction detection after clearing the cache', () => {
+  it('reports no eviction on the next start after the application cleared the cache itself (PT-21)', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => void saved.set(key, value),
+    });
+    try {
+      const first = createOffline({ store: 'main-thread' });
+      const internals = first as unknown as { put(key: string, tile: CachedTile): Promise<void> };
+      await internals.put('osm/0/0/0', {
+        bytes: new ArrayBuffer(10),
+        contentType: 'image/png',
+        storedAtMs: 0,
+        freshUntilMs: 0,
+      });
+      await first.clearCache();
+      first.destroy();
+      const second = createOffline({ store: 'main-thread' });
+      const lost: unknown[] = [];
+      second.on('storage-lost', (event) => lost.push(event));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      second.destroy();
+      expect(lost).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

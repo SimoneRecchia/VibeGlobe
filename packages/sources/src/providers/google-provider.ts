@@ -1,5 +1,5 @@
 import { WEB_MERCATOR_TILING, type TileCoord, type TileRequest } from '@vibeglobe/core';
-import { archiveTransport, HttpStatusError, NetworkError } from '../archive-transport.js';
+import { archiveTransport, HttpStatusError, NetworkError, readBody } from '../archive-transport.js';
 import { retryAfterMs } from '../fetch-transport.js';
 import { type Attribution, type DescribedImagerySource, type ProviderProfile, SourceConfigError } from '../metadata.js';
 
@@ -200,7 +200,7 @@ function tileReader(session: GoogleSession): Parameters<typeof archiveTransport>
       const token = await session.token();
       const response = await session.get(session.withToken(url, token), { signal });
       if (response.ok)
-        return { bytes: await response.arrayBuffer(), contentType: response.headers.get('Content-Type') ?? '' };
+        return { bytes: await readBody(response, signal), contentType: response.headers.get('Content-Type') ?? '' };
       if (response.status === 404) return undefined;
       if ((response.status === 401 || response.status === 403) && attempt === 0) {
         await session.refused(token);

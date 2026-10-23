@@ -14,6 +14,8 @@ import {
 export class FlightPreload {
   readonly tiles: QuadtreeTile[] = [];
   count = 0;
+  /** A flight runs: prefetch around the moving view waits for its end, which only loads what the flight shows (F287). */
+  flying = false;
   private readonly camera = new Camera();
 
   /** Selects the destination's tiles; nothing for a destination the current view already shows at its zoom. */

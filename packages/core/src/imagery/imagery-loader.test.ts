@@ -6,7 +6,7 @@ import { WorkerTaskError, type WorkerPool, type WorkerTaskDone } from '../schedu
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
-import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, ImageryLoader, VISIBLE_CLASS } from './imagery-loader.hot.js';
 import { imageryDecodeTask, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
@@ -605,6 +605,25 @@ describe('ImageryLoader', () => {
         );
       } else expect(transport.started).toEqual([url(5, 10, 10)]);
     }
+  });
+
+  it('during a flight requests a visible tile only once it stays wanted, never one the view shows for a moment (F287)', () => {
+    const { timers, transport, loader } = setUp();
+    loader.settleMs = 400;
+    const frame = (tiles: [number, number, number][]): void => {
+      loader.beginFrame();
+      for (const [level, x, y] of tiles) loader.want(level, x, y, VISIBLE_CLASS + level);
+      loader.endFrame();
+      timers.advance(100);
+    };
+    // Wanted for 300 ms, then gone: never requested.
+    for (let i = 0; i < 3; i++) frame([[6, 1, 1]]);
+    frame([]);
+    // Wanted again from scratch: requested once it has been wanted in every frame for 400 ms.
+    for (let i = 0; i < 4; i++) frame([[6, 1, 1]]);
+    expect(transport.started).toEqual([]);
+    frame([[6, 1, 1]]);
+    expect(transport.started).toEqual([url(6, 1, 1)]);
   });
 
   it('keeps tiles that left the view in memory with memory reuse, and releases them at once without it (F281, F282)', () => {

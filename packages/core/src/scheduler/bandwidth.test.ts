@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BandwidthEstimator } from './bandwidth.js';
 import type { TransportResult } from './types.js';
 
-const response = (bytes: number, waitMs: number): TransportResult => ({
+const response = (bytes: number, waitMs: number): Extract<TransportResult, { kind: 'ok' }> => ({
   kind: 'ok',
   bytes: new ArrayBuffer(bytes),
   contentType: 'image/png',
@@ -33,6 +33,18 @@ describe('bandwidth estimate (F300, F303)', () => {
       simulate(estimator, bitsPerSecond, 20_000, 4, 10_000);
       expect(Math.abs(estimator.bitsPerSecond / bitsPerSecond - 1)).toBeLessThan(0.2);
     }
+  });
+
+  it('measures with the network times when the main thread notices responses late, and skips cache hits', () => {
+    const estimator = new BandwidthEstimator();
+    // 50 Mbps: 6250 bytes take 1 ms on the network, noticed 15 ms later (a busy frame).
+    for (let i = 0; i < 20; i++) {
+      const startMs = 100 * i;
+      const result: TransportResult = { ...response(6250, 2), transferMs: 1, endAgoMs: 15 };
+      estimator.ended(startMs + 18, startMs, result);
+      estimator.ended(startMs + 18, startMs, { ...result, cached: true, transferMs: 0.01 });
+    }
+    expect(Math.abs(estimator.bitsPerSecond / 50e6 - 1)).toBeLessThan(0.2);
   });
 
   it('knows nothing before a few downloads, and does not count idle time', () => {

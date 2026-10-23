@@ -90,6 +90,27 @@ async function pan(page: Page, degrees: number, durationMs: number): Promise<voi
   );
 }
 
+/** Jumps to zoom 9 and measures, frame by frame in the page, the milliseconds until every wanted tile is drawn. */
+function timeToCompleteView(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const globe = window.vibeglobePlayground?.globe;
+        const start = performance.now();
+        globe?.jumpTo({ zoom: 9 });
+        const check = (): void => {
+          const s = globe?.imageryStats();
+          const idle = s !== undefined && s.queued + s.loading + s.decoding + s.uploadsPending === 0;
+          // Complete: nothing loading and every tile at its own detail, not a coarser stand-in (motion detail, F288).
+          if (idle && globe?.surfaceTiles().every((t) => t.root !== 'mercator' || t.imageryLevel === t.level))
+            resolve(performance.now() - start);
+          else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      }),
+  );
+}
+
 const stats = (page: Page): Promise<{ bandwidth: number; latency: number }> =>
   page.evaluate(() => {
     const imagery = window.vibeglobePlayground?.globe.imageryStats();
@@ -115,6 +136,12 @@ test.describe('what loads ahead and at which detail (F285–F288)', () => {
     const log = await requestLog(page, session);
     const outside = (source: string): string[] =>
       log.filter((r) => r.source === source && r.level > 3 && !drawn.has(keyOf(r))).map(keyOf);
+    console.log(
+      '[adaptive] F285 outside',
+      JSON.stringify(outside('world')),
+      'visible',
+      JSON.stringify([...drawn].filter((k) => Number(k.split('/')[0]) > 3).sort()),
+    );
     expect(outside('world')).toEqual([]);
     expect(outside('smooth').length).toBeGreaterThan(0);
   });
@@ -234,18 +261,28 @@ test.describe('the measured link (F300–F303)', () => {
   test('the bandwidth estimate converges within 20% of the link at 400 kbps, 5 Mbps and 50 Mbps within 10 s (F300)', async ({
     page,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(300_000);
+    // Photo-sized tiles (512 px JPEG, about 40 kB, as real imagery): a 50 Mbps link moves a few-kilobyte tile in less
+    // time than a response takes to handle. A first pass without a link has the fixture server encode them all, so
+    // its encoding never stalls the measured link.
+    const tiles = 'imagery=world&imageryTileSize=512&imageryFormat=jpg';
+    const route = async (step: number): Promise<void> =>
+      page.evaluate((s) => {
+        window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 10 + 3 * s, latitudeDeg: 45, zoom: 8 });
+      }, step);
+    await openGlobe(page, `session=${await fixtureSession(page)}&${tiles}&lon=10&lat=45&zoom=8`);
+    for (let step = 0; step < 10; step++) {
+      await route(step);
+      await waitForStreaming(page);
+    }
     for (const bytesPerS of [SLOW, MEDIUM, FAST]) {
       const session = await fixtureSession(page, [{ linkBytesPerS: bytesPerS }]);
-      await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=8&debug=1`);
+      await openGlobe(page, `session=${session}&${tiles}&lon=10&lat=45&zoom=8&debug=1`);
       // Keep loading: a new area every second.
       const start = Date.now();
       let estimate = Number.NaN;
       for (let step = 0; Date.now() - start < 10_000; step++) {
-        await page.evaluate(
-          (s) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 10 + 3 * s, latitudeDeg: 45, zoom: 8 }),
-          step,
-        );
+        await route(step);
         await page.waitForTimeout(1000);
         estimate = (await stats(page)).bandwidth;
         if (Math.abs(estimate / (bytesPerS * 8) - 1) < 0.2) break;
@@ -263,18 +300,28 @@ test.describe('the measured link (F300–F303)', () => {
     const finest: number[] = [];
     for (const bytesPerS of [SLOW, FAST]) {
       const session = await fixtureSession(page, [{ linkBytesPerS: bytesPerS }]);
-      await openGlobe(page, `session=${session}&imagery=world&lon=9.19&lat=45.46&zoom=7`);
+      // Prefetch off on both links (F285), so neither run starts with the path already loaded: only flight detail differs.
+      await openGlobe(page, `session=${session}&imagery=world&prefetch=0&lon=9.19&lat=45.46&zoom=7`);
       await waitForStreaming(page);
       const before = (await requestLog(page, session)).length;
+      const startTiles = await page.evaluate(() =>
+        (window.vibeglobePlayground?.globe.surfaceTiles() ?? []).map((t) => `${t.level}/${t.x}/${t.y}`),
+      );
       const flight = page.evaluate(() =>
-        window.vibeglobePlayground?.globe.flyTo({ longitudeDeg: 30, latitudeDeg: 40, zoom: 7 }, { durationMs: 6000 }),
+        window.vibeglobePlayground?.globe.flyTo(
+          { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 7 },
+          { durationMs: 20_000 },
+        ),
       );
       const start = Date.now();
-      while (Date.now() - start < 5500) expect(blackPixels(await canvasImage(page))).toBe(0);
+      while (Date.now() - start < 19_500) expect(blackPixels(await canvasImage(page))).toBe(0);
       await flight;
       // Requests of the flight itself, not the destination preloaded at its start nor the arrival.
-      const during = (await requestLog(page, session)).slice(before).filter((r) => r.startMs !== undefined);
-      const path = during.filter((r) => Math.abs(r.x / 2 ** r.level - 210 / 360) > 0.03);
+      // Requests the flight asked for, not the start view's tiles (retried on the slow link after a timeout).
+      const log = await requestLog(page, session);
+      const startView = withAncestors(new Set([...startTiles, ...log.slice(0, before).map(keyOf)]));
+      const during = log.slice(before).filter((r) => r.startMs !== undefined && !startView.has(keyOf(r)));
+      const path = during.filter((r) => Math.abs(r.x / 2 ** r.level - (139.7 + 180) / 360) > 0.03);
       finest.push(Math.max(...path.map((r) => r.level)));
       await waitForStreaming(page);
       const full = await page.evaluate(() =>
@@ -327,10 +374,8 @@ test.describe('the measured link (F300–F303)', () => {
         const fixed = perHost === 'adaptive' ? '' : `&perHost=${perHost}&adaptive=0`;
         await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=6${fixed}`);
         await waitForStreaming(page);
-        const start = Date.now();
-        await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 8 }));
+        times[perHost] = await timeToCompleteView(page);
         await waitForStreaming(page);
-        times[perHost] = Date.now() - start;
         if (perHost !== 'adaptive') continue;
         const log = (await requestLog(page, session)).filter((r) => r.endMs !== undefined);
         // Most requests in flight at once, after the link was measured (the first six responses).

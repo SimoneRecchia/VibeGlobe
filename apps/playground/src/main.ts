@@ -192,6 +192,8 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(extension.endsWith('ktx2') ? { decoder: 'ktx2' as const } : {}),
     ...credits(params, `fixture-${pattern}`, pattern),
   });
+  // `?prefetch=0` turns prefetch and flight preloading off for this source only (F285).
+  if (params.get('prefetch') === '0') Object.assign(source, { loadingFlags: () => 1 });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
     params.has(name) ? Math.round(Number(params.get(name)) * 1024 * 1024) : undefined;
@@ -301,6 +303,8 @@ function startGlobe(
     // (scenario tests, F105; `fadeMs=0` is their injected pop).
     ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?adaptive=0` keeps every host at its own request limit, whatever the link (F303).
+    ...(params.get('adaptive') === '0' ? { adaptiveRequests: false } : {}),
     // `?hiddenCredits=<source id>,…` leaves those sources' optional credits out (F255).
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).

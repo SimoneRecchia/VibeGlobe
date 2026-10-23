@@ -34,6 +34,14 @@ export type TransportResult =
       readonly maxAgeMs?: number;
       /** Milliseconds from the request to the response's headers, when the transport knows: the link's latency (F303). */
       readonly waitMs?: number;
+      /**
+       * Milliseconds from the response's headers to its last byte, and since that last byte, as the network saw them
+       * (Resource Timing), when the transport knows: the main thread may notice a response's end a frame late (F300).
+       */
+      readonly transferMs?: number;
+      readonly endAgoMs?: number;
+      /** Served from the HTTP cache: not a measure of the link. */
+      readonly cached?: boolean;
     }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
   | { readonly kind: 'timeout' | 'aborted' }

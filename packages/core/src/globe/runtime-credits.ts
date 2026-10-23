@@ -85,6 +85,8 @@ export interface ImageryCallbacks {
   readonly hiddenCredits?: readonly string[];
   /** False when the application shows the credits itself (`GlobeOptions.creditsElement`). */
   readonly creditsElement?: boolean;
+  /** False keeps every host at its own limit (`GlobeOptions.adaptiveRequests`, F303). */
+  readonly adaptiveRequests?: boolean;
 }
 
 /** The credits of an engine's sources, shown in the renderer's attribution element and reported to the globe. */

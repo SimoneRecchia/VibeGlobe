@@ -44,5 +44,10 @@ describe('motion-aware detail (F288, F301)', () => {
     expect(run(new MotionDetail(), camera, clock, 10, 3, slow)).toBe(8);
     expect(run(new MotionDetail(), camera, clock, 10, 3, { bitsPerSecond: 50e6 })).toBe(4);
     expect(run(new MotionDetail(), camera, clock, 10, 0, slow)).toBe(1);
+    // A flight on a slow link is one level coarser from its first, still slow frames.
+    const flight = new MotionDetail();
+    flight.flying = true;
+    expect(run(flight, camera, clock, 10, 0, slow)).toBe(2);
+    expect(run(flight, camera, clock, 10, 0, { bitsPerSecond: 50e6 })).toBe(1);
   });
 });

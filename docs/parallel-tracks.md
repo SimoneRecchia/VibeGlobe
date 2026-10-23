@@ -88,6 +88,15 @@ The `'unknown'` answer arrives on `main` with the M4 merge, from branch `claude/
 contract is on `main` already. Terrain sources (`TerrainSource`, `packages/core/src/terrain/terrain-source.ts`, with
 their `tileMetadata` hook) belong to M4 and are not part of the fourth session's work.
 
+Additions since the freeze (backward compatible, optional fields):
+
+- 2026-10-23: an `ok` `TransportResult` may carry `maxAgeMs` (F260), `waitMs` (F303), and `transferMs`, `endAgoMs` and
+  `cached`, the network's own timings of the response from the Resource Timing API (F300). `fetchTransport` fills
+  them; a transport of its own may leave them out, and the engine then measures with the main thread's times.
+- 2026-10-23: the fixture server's shared link (`scripts/fixtures/tiles/link.ts`, track F) serves its responses in
+  turn from one queue: a closed response stops using the link, timers late by a millisecond are made up while the
+  queue stays busy, and streamed responses send their headers at once (F300).
+
 ## Atmosphere hook (atmosphere track, 2026-10-22)
 
 The atmosphere track (M11, F390–F396; ADR 0040) built the sky, haze, fog and sun lighting as `Atmosphere` in

@@ -53,6 +53,9 @@ const LIFT_SETTLED_METERS = 1e-3;
 /** The sample `terrainHeightRad` writes. */
 const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
 
+/** During a flight a visible tile loads once wanted this long: the moving view would show it only for a moment (F287). */
+const FLIGHT_SETTLE_MS = 400;
+
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
  * draw list the renderer draws, reusing every array (ADR 0018). Keeps what the last drawn frame selected for the
@@ -130,6 +133,7 @@ export class SurfaceFrame {
         ...callbacks,
         ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
         ...(options.creditsElement === false ? { creditsElement: false } : {}),
+        ...(options.adaptiveRequests === false ? { adaptiveRequests: false } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
           // A source without CORS headers fails every tile the same way: one error names it (F251).
@@ -237,12 +241,17 @@ export class SurfaceFrame {
     const imagery = this.imagery;
     const timed = imagery?.heights !== undefined;
     const selectionStart = timed ? imagery.now() : 0;
-    // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing.
+    // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
+    motionOf(this).flying = imagery?.preload.flying === true;
     const motion = motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
     // Written only when it changes: a new double in the options' field would allocate every frame (F064).
     const texelErrorPx = motionOf(this).baseTexelErrorPx * motion;
     if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
-    if (imagery) for (const layer of imagery.layers) layer.loader.prefetchPaused = motion > 1;
+    if (imagery)
+      for (const layer of imagery.layers) {
+        layer.loader.prefetchPaused = motion > 1 || imagery.preload.flying;
+        layer.loader.settleMs = imagery.preload.flying ? FLIGHT_SETTLE_MS : 0;
+      }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
     this.draws.reserve(count);
@@ -269,8 +278,9 @@ export class SurfaceFrame {
   }
 
   /** Loads a movement's destination tiles ahead while it runs (F286), or stops (undefined). */
-  preloadView(end: Float64Array | undefined, camera: Camera): void {
+  preloadView(end: Float64Array | undefined, camera: Camera, flight = false): void {
     if (!this.imagery) return;
+    this.imagery.preload.flying = end !== undefined && flight;
     if (end) this.imagery.preload.select(camera, end, this.selection);
     else this.imagery.preload.clear();
   }

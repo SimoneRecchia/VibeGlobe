@@ -36,11 +36,13 @@ export class BandwidthEstimator {
 
   /** A request that started at `startMs` ended at `nowMs` with `result`: a response's bytes and wait count. */
   ended(nowMs: number, startMs: number, result: TransportResult): void {
-    if (result.kind !== 'ok' || result.bytes.byteLength <= 0) return;
+    if (result.kind !== 'ok' || result.bytes.byteLength <= 0 || result.cached === true) return;
     const waitMs = Math.min(nowMs - startMs, Math.max(0, result.waitMs ?? 0));
     const at = this.next;
-    this.from[at] = startMs + waitMs;
-    this.to[at] = nowMs;
+    // The network's own times when the transport has them: the main thread notices a response's end late (F300).
+    const endMs = nowMs - Math.max(0, result.endAgoMs ?? 0);
+    this.to[at] = endMs;
+    this.from[at] = result.transferMs === undefined ? startMs + waitMs : endMs - Math.max(0, result.transferMs);
     this.sizes[at] = result.bytes.byteLength;
     this.waits[at] = result.waitMs ?? nowMs - startMs;
     this.next = (at + 1) % RECENT;
@@ -92,6 +94,7 @@ export class BandwidthEstimator {
       unionMs += stop - Math.max(start, end);
       end = stop;
     }
-    return unionMs >= 50 ? (bytes * 8000) / unionMs : Number.NaN;
+    // 10 ms of transfers: a fast link moves small tiles in about a millisecond each (F300).
+    return unionMs >= 10 ? (bytes * 8000) / unionMs : Number.NaN;
   }
 }

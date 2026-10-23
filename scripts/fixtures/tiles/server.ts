@@ -466,7 +466,12 @@ export class FixtureServer {
       'Cache-Control': 'no-store',
       'Content-Length': String(streamedLength ?? body.length),
     });
-    if (streamedLength !== undefined) return;
+    // Streamed bodies: the headers leave now, not with the first slice of the body, as on a real link (F300).
+    if (streamedLength !== undefined) {
+      // Without Nagle, the body is not held until the headers are acknowledged (40 ms and more on loopback).
+      res.socket?.setNoDelay(true);
+      return void res.flushHeaders();
+    }
     if (!bandwidthBytesPerS) {
       record.endMs = this.now();
       res.end(body);

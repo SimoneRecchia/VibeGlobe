@@ -184,6 +184,7 @@ export class ImageryRuntime {
     const host = renderer.host;
     const sources = entries.flatMap((entry) => entry.sources);
     this.network = acquireNetworkPool(host);
+    this.network.bandwidth.adaptive = callbacks.adaptiveRequests !== false;
     this.lease = acquireWorkerPool(workers, {
       timers: {
         set: (callback, delayMs) => host.setTimer(callback, delayMs),

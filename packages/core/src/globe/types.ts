@@ -403,6 +403,12 @@ export interface GlobeOptions {
    */
   readonly creditsElement?: boolean;
   /**
+   * Requests in flight follow the link measured from the downloads (default true, F303): two per host on a slow link,
+   * each host's limit otherwise. False keeps every host at its own limit. The page's requests share one pool: the
+   * last globe started sets it.
+   */
+  readonly adaptiveRequests?: boolean;
+  /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
    */

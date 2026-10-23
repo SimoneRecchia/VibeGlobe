@@ -59,8 +59,11 @@ export interface MovementHost {
   interruptInput(): void;
   /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
   constrainEnd(end: Float64Array): void;
-  /** A movement to `end` starts (its tiles load ahead, F286), or none runs any more (undefined). */
-  preloadView?(end: Float64Array | undefined): void;
+  /**
+   * A movement to `end` starts (its tiles load ahead, F286; a flight also pauses prefetch, F287), or none runs any
+   * more (undefined).
+   */
+  preloadView?(end: Float64Array | undefined, flight?: boolean): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -133,7 +136,7 @@ export class Movements {
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
     this.host.constrainEnd(end);
-    this.host.preloadView?.(end);
+    this.host.preloadView?.(end, kind === 'fly');
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
     const animator =
       kind === 'fly' && this.reducedMotion

@@ -3790,7 +3790,7 @@
         "Assert every request is for a tile that was visible when requested",
         "Switch them off for one source only and assert the other sources still prefetch"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F286",
@@ -4002,7 +4002,7 @@
         "Assert the number of prefetched tiles is larger on the fast link",
         "Assert on the slow link visible tiles are never queued behind prefetch requests"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F303",
@@ -4014,7 +4014,7 @@
         "Log concurrent requests per host and assert concurrency adapts to each link and never exceeds the host or profile limits",
         "Assert the time to a complete view is no worse than with the best fixed concurrency for that link by more than 10%"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F304",

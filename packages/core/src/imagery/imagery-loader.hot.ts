@@ -182,6 +182,11 @@ export class ImageryLoader implements NetworkPoolClient {
   pixelRatio = 1;
   /** True while the camera moves fast: nothing beyond the view loads (F287, F288). */
   prefetchPaused = false;
+  /**
+   * While positive (a flight runs), a visible tile is requested only once it has been wanted in every frame for this
+   * long, milliseconds: tiles a moving view shows for a moment never load (F287). Its ancestors stand in meanwhile.
+   */
+  settleMs = 0;
   /** Surface levels finer than the source's tiles: 1 for tiles of 512 texels, which serve the next level (F240). */
   levelShift = 0;
 
@@ -252,6 +257,7 @@ export class ImageryLoader implements NetworkPoolClient {
     const previous = this.table.priorities[record.slot] ?? Infinity;
     if (record.pinned) priority = level;
     else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
+    if (record.wantedFrame < this.frame - 1) this.table.wantedSince[record.slot] = this.options.now();
     record.wantedFrame = this.frame;
     if (priority >= VISIBLE_CLASS && priority < VISIBLE_CLASS + 1024 && this.ringCount < RING_CAPACITY) {
       const at = 4 * this.ringCount++;
@@ -272,6 +278,7 @@ export class ImageryLoader implements NetworkPoolClient {
     priorities[record.slot] = priority;
     // A tile backing off after a failure is wanted again once eligible: from its RAM copy when it has one.
     const retry = state === FAILED && this.options.now() >= (this.table.eligibleAt[record.slot] ?? 0);
+    if (state === UNLOADED && this.unsettled(record.slot, priority)) return -1;
     if (state === UNLOADED || retry) {
       const cached = this.options.memory.ram.get(handle);
       if (cached) {
@@ -288,6 +295,12 @@ export class ImageryLoader implements NetworkPoolClient {
       this.heap.updateAt(record.slot, priorities, record.slot);
     }
     return -1;
+  }
+
+  /** Whether a flight holds back the visible tile in `slot` because it has not been wanted for long enough (F287). */
+  private unsettled(slot: number, priority: number): boolean {
+    if (this.settleMs <= 0 || priority < VISIBLE_CLASS || priority >= PRELOAD_CLASS) return false;
+    return this.options.now() - (this.table.wantedSince[slot] ?? 0) < this.settleMs;
   }
 
   /** The handle of a resident tile, without marking it used (elevation queries); -1 when it is not resident. */

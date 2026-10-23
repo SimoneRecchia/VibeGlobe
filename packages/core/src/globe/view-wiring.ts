@@ -12,7 +12,10 @@ import { ViewControl } from './view-control.js';
 export interface ViewWiring {
   readonly cam: Camera;
   /** The surface: its view state, and the tiles a flight's destination needs (F286). */
-  readonly surface: { readonly view: ViewState; preloadView(end: Float64Array | undefined, camera: Camera): void };
+  readonly surface: {
+    readonly view: ViewState;
+    preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
+  };
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
   readonly constraints: Constraints;
@@ -50,7 +53,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     requestRender: () => globe.requestRender(),
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
     constrainEnd: (end) => globe.constraints.clampEnd(end),
-    preloadView: (end) => globe.surface.preloadView(end, globe.cam),
+    preloadView: (end, flight) => globe.surface.preloadView(end, globe.cam, flight),
   });
   return { viewControl, movements };
 }

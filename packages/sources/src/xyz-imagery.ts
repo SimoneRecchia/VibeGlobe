@@ -40,6 +40,8 @@ export interface XyzImageryOptions {
   maxRequestsPerHost?: number;
   /** The hosts speak HTTP/2 or HTTP/3, so more requests share one connection (F096). */
   multiplexed?: boolean;
+  /** Requests per second the hosts accept; the engine never starts more in any second (F222). */
+  maxRequestsPerSecond?: number;
   /** Time limits of each request (default 10 s to the headers, 30 s in all; F092). */
   timeoutsMs?: TimeoutsMs;
   /** Credits shown while the source's tiles are in view (F254). */
@@ -67,6 +69,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     decoder: options.decoder ?? 'image',
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
+    ...(options.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: options.maxRequestsPerSecond }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.profile ? { profile: options.profile } : {}),

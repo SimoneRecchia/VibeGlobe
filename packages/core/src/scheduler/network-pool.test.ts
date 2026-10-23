@@ -622,3 +622,23 @@ describe('NetworkPool invariants', () => {
     },
   );
 });
+
+describe('NetworkPool rate limits (F222)', () => {
+  it('starts no more requests per second on a host than its declared rate, and other hosts are not slowed', () => {
+    const { pool, transport, consume, time } = setup({ maxInFlight: 100 });
+    const limited = pool.registerHost('https://limited.example', { maxInFlight: 50, maxRequestsPerSecond: 10 });
+    const free = pool.registerHost('https://free.example', { maxInFlight: 50 });
+    const starts: number[] = [];
+    let key = 0;
+    // Every 50 ms, try to start whatever is waiting; answer requests at once so slots never run out.
+    for (let step = 0; step < 60; step++) {
+      for (let i = 0; i < 4; i++) if (consume(`l${String(key++)}`, limited) !== NO_SLOT) starts.push(time.nowMs);
+      expect(consume(`f${String(key++)}`, free)).not.toBe(NO_SLOT);
+      for (const entry of transport.open) transport.respond(entry, ok(1));
+      time.advance(50);
+    }
+    for (const at of starts) expect(starts.filter((t) => t >= at && t < at + 1000).length).toBeLessThanOrEqual(10);
+    // Three seconds at ten per second.
+    expect(starts.length).toBeGreaterThanOrEqual(28);
+  });
+});

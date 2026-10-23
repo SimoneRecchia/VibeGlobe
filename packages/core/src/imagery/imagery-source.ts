@@ -21,6 +21,8 @@ export interface TileSource {
   readonly maxRequestsPerHost?: number;
   /** The hosts speak HTTP/2 or HTTP/3 (F096). */
   readonly multiplexed?: boolean;
+  /** The most requests the source's hosts accept per second; the scheduler never starts more in any second (F222). */
+  readonly maxRequestsPerSecond?: number;
   /** Time limits of each request; ADR 0007's 10 s to the headers and 30 s in all by default (F092). */
   readonly timeoutsMs?: TimeoutsMs;
   /**

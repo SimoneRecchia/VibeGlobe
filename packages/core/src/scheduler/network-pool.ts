@@ -46,6 +46,8 @@ export interface HostOptions {
   readonly maxInFlight?: number;
   /** The host speaks HTTP/2 or HTTP/3. */
   readonly multiplexed?: boolean;
+  /** Requests started per second at most, over any one-second window (a source's declared rate limit, F222). */
+  readonly maxRequestsPerSecond?: number;
 }
 
 /** A client of the pool: one tile scheduler, which keeps its own priority queue. */
@@ -108,6 +110,9 @@ interface Host {
   inFlight: number;
   consecutiveTransient: number;
   responsesSinceThrottle: number;
+  /** Start times of the last `maxRequestsPerSecond` requests, a ring (empty without a rate limit, F222). */
+  starts: number[];
+  nextStart: number;
 }
 
 interface Flight {
@@ -150,6 +155,7 @@ export class NetworkPool {
   private readonly clients: NetworkPoolClient[] = [];
   private nextConsumerId = 1;
   private refillPending = false;
+  private rateTimerArmed = false;
   private disposed = false;
 
   constructor(options: NetworkPoolOptions) {
@@ -168,10 +174,12 @@ export class NetworkPool {
   registerHost(origin: string, options: HostOptions = {}): number {
     const fallback = options.multiplexed === true ? DEFAULT_MULTIPLEXED_HOST_MAX_IN_FLIGHT : DEFAULT_HOST_MAX_IN_FLIGHT;
     const limit = positiveInteger(options.maxInFlight, fallback, 'maxInFlight');
+    const rate = options.maxRequestsPerSecond;
     const known = this.hostIndices.get(origin);
     if (known !== undefined) {
       const host = this.hosts[known] as Host;
       if (limit < host.baseLimit) this.setHostLimit(known, limit);
+      if (rate !== undefined && (host.starts.length === 0 || rate < host.starts.length)) setRate(host, rate);
       return known;
     }
     const index = this.hosts.length;
@@ -182,7 +190,10 @@ export class NetworkPool {
       inFlight: 0,
       consecutiveTransient: 0,
       responsesSinceThrottle: 0,
+      starts: [],
+      nextStart: 0,
     });
+    if (rate !== undefined) setRate(this.hosts[index] as Host, rate);
     this.hostIndices.set(origin, index);
     return index;
   }
@@ -211,7 +222,29 @@ export class NetworkPool {
 
   /** True when a new request to the host would get a slot now. */
   hasFreeSlot(hostIndex: number): boolean {
-    return this.counters.inFlight < this.maxInFlight && this.host(hostIndex).inFlight < this.hostLimit(hostIndex);
+    const host = this.host(hostIndex);
+    return (
+      this.counters.inFlight < this.maxInFlight && host.inFlight < this.hostLimit(hostIndex) && this.rateAllows(host)
+    );
+  }
+
+  /**
+   * True when a request to the host may start now under its rate limit: fewer than the limit started in the last
+   * second. Otherwise a refill is scheduled for when the oldest of them leaves the window (F222).
+   */
+  private rateAllows(host: Host): boolean {
+    if (host.starts.length === 0) return true;
+    const oldest = host.starts[host.nextStart] ?? -Infinity;
+    const waitMs = oldest + RATE_WINDOW_MS - this.options.now();
+    if (waitMs <= 0) return true;
+    if (!this.rateTimerArmed) {
+      this.rateTimerArmed = true;
+      this.options.setTimer(() => {
+        this.rateTimerArmed = false;
+        this.scheduleRefill();
+      }, waitMs);
+    }
+    return false;
   }
 
   /** True while a request for the key is in flight and not being aborted. */
@@ -265,6 +298,10 @@ export class NetworkPool {
     const id = this.attach(flight, consumer);
     this.flights.set(key, flight);
     host.inFlight++;
+    if (host.starts.length > 0) {
+      host.starts[host.nextStart] = this.options.now();
+      host.nextStart = (host.nextStart + 1) % host.starts.length;
+    }
     this.counters.inFlight++;
     this.counters.started++;
     flight.safetyTimer = this.options.setTimer(
@@ -484,4 +521,15 @@ function positiveInteger(value: number | undefined, fallback: number, name: stri
     throw new RangeError(`${name} must be a positive integer, got ${String(value)}.`);
   }
   return value;
+}
+
+/** The window of a host's rate limit (F222). */
+const RATE_WINDOW_MS = 1000;
+
+/** Sets a host's rate limit: the ring of its last start times, empty for none. */
+function setRate(host: Host, maxRequestsPerSecond: number): void {
+  if (!(maxRequestsPerSecond >= 1))
+    throw new RangeError(`maxRequestsPerSecond must be at least 1, got ${String(maxRequestsPerSecond)}`);
+  host.starts = new Array<number>(Math.floor(maxRequestsPerSecond)).fill(-Infinity);
+  host.nextStart = 0;
 }

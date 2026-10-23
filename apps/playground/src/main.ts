@@ -181,6 +181,8 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
     ...(params.has('perHost') ? { maxRequestsPerHost: Number(params.get('perHost')) } : {}),
     ...(params.has('multiplexed') ? { multiplexed: true } : {}),
+    // `?rateLimit=` declares the source's requests per second (F222).
+    ...(params.has('rateLimit') ? { maxRequestsPerSecond: Number(params.get('rateLimit')) } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),

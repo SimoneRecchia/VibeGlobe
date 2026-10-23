@@ -163,10 +163,11 @@ export class ImageryLoader implements NetworkPoolClient {
     for (let level = 0; level <= options.pinnedLevel; level++)
       total += tiling.rootTilesX * tiling.rootTilesY * 4 ** level;
     this.pinnedTotal = total;
-    const { maxRequestsPerHost, multiplexed } = options.source;
+    const { maxRequestsPerHost, multiplexed, maxRequestsPerSecond } = options.source;
     this.hostOptions = {
       ...(maxRequestsPerHost === undefined ? {} : { maxInFlight: maxRequestsPerHost }),
       ...(multiplexed === undefined ? {} : { multiplexed }),
+      ...(maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond }),
     };
     this.uploads = new UploadQueue<PendingUpload>({ upload: (tile, measuredMs) => this.upload(tile, measuredMs) });
     this.removeClient = options.network.addClient(this);

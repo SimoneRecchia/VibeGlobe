@@ -1762,7 +1762,7 @@
         "Serve the fixtures from the local fixture tile server and open `?scenario=terrain-quantized-mesh` on `?backend=webgpu` and `?backend=webgl2`",
         "Capture screenshots and assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F128",
@@ -1788,7 +1788,7 @@
         "Open `?scenario=terrain-terrarium` with the fixtures on both backends and capture screenshots",
         "Assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F130",
@@ -1801,7 +1801,7 @@
         "Open `?scenario=terrain-rgb` with the fixtures on both backends and capture screenshots",
         "Assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F131",
@@ -1890,7 +1890,7 @@
         "Assert zero sentinel-colored pixels inside the terrain footprint in every frame",
         "Run the temporal glitch detector along tile edges and assert no shimmer, z-fighting or visible vertical walls"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F138",

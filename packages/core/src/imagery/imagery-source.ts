@@ -1,7 +1,7 @@
 import type { TileTransport, TileRequest, TimeoutsMs } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import type { TileRectangleRad, TilingScheme } from '../tiling/tiling-scheme.js';
-import type { Attribution, CreditProfile } from './credits.js';
+import type { Attribution, CreditProfile, CreditViewport } from './credits.js';
 
 /**
  * What the tile loader needs of a tiled source, imagery or terrain: where its tiles come from and how they are cut.
@@ -36,6 +36,12 @@ export interface TileSource {
   readonly attribution?: readonly Attribution[];
   /** The source's requests carry credentials (headers, tokens or a session), declared by its adapter (F220). */
   readonly authenticated?: boolean;
+  /**
+   * Optional: the credit line of a settled view, for providers whose credits depend on the area shown (Google's
+   * viewport information, F258). The engine asks once each time the camera comes to rest somewhere new while the
+   * source is in view, and shows the answer with the source's credits; an empty answer adds nothing.
+   */
+  viewportCopyright?(view: CreditViewport): Promise<string>;
   /** The provider profile's credit rules: a required credit is always shown (F255). */
   readonly profile?: CreditProfile;
   /**

@@ -1,4 +1,5 @@
 import { requestingTarget } from '../layers/layer-geometry.js';
+import { atRest } from './view-credits.js';
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
@@ -76,7 +77,6 @@ class GlobeEngine implements Globe {
   private frameId: number | undefined;
   private frames = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
-  private readonly idlePayload = { frameNumber: 0 };
   /** The debug quads, kept for a renderer that does not exist yet. */
   private debugMeshes: DebugMeshData[] = [];
   /** The camera-change payload, reused every frame (KB-037). */
@@ -356,10 +356,7 @@ class GlobeEngine implements Globe {
     }
     if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing || this.movements.active)
       this.requestRender();
-    else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
-      this.idlePayload.frameNumber = this.frames;
-      this.emitter.emit('idle', this.idlePayload);
-    }
+    else atRest(this, this.surfaceFrame, this.emitter, this.frames, this.cam);
   }
 
   setResolutionScale(scale: number): void {

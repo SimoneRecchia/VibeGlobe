@@ -5,25 +5,33 @@
  * area: the 64 leaves draw each of the 1,024 buildings (20 m footprints on a 32 m grid, 8–60 m tall), coarser levels
  * merge them into blocks with the tallest height. Levels 0 and 1 are 3D Tiles 1.0 `b3dm` with batch tables; levels 2
  * and 3 are 1.1 `glb` with `EXT_mesh_features` and an `EXT_structural_metadata` property table. Variants compress the
- * geometry with Draco or meshopt, or texture the ground with KTX2. Test code only.
+ * geometry with Draco or meshopt, or texture the ground with KTX2; `terrain` lays the ground on the fixture terrain.
+ * Run as a script, it writes every variant to `apps/playground/public/tiles3d/city-<variant>/`, where the playground's
+ * `3dtiles-city` scenario serves them (`node e2e/fixtures/tiles3d/city.ts`; the KTX2 ground is a 64 × 64 checker
+ * encoded with the fixture server's Basis encoder, ETC1S). Test code only.
  */
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { format, resolveConfig } from 'prettier';
+import { encodeKtx2 } from '../../../scripts/fixtures/tiles/ktx2.ts';
 import { fixtureHeightMeters } from '../../../scripts/fixtures/tiles/terrain.ts';
 import { writeGlb, type Compression, type PrimitiveData } from './glb-writer.ts';
 
 /** The city's center. */
-export const CITY_CENTER = { longitudeDeg: 12.4922, latitudeDeg: 41.8902, heightMeters: 0 } as const;
+const CITY_CENTER = { longitudeDeg: 12.4922, latitudeDeg: 41.8902, heightMeters: 0 } as const;
 /** Side of the city square, in meters. */
-export const CITY_SIZE_METERS = 1024;
+const CITY_SIZE_METERS = 1024;
 /** Levels of the quadtree. */
-export const CITY_LEVELS = 4;
+const CITY_LEVELS = 4;
 const CELL = 32;
 const FOOTPRINT = 20;
 const GROUND_HEIGHT = 1;
 /** The copyright every content declares (F470's copyright list). */
-export const CITY_COPYRIGHT = 'VibeGlobe fixture city';
+const CITY_COPYRIGHT = 'VibeGlobe fixture city';
 
 /** Fixture variants. */
-export type CityVariant = 'plain' | 'draco' | 'meshopt' | 'ktx2' | 'terrain';
+type CityVariant = 'plain' | 'draco' | 'meshopt' | 'ktx2' | 'terrain';
 
 /**
  * The ground's height under a point of the city (meters east and north of its center): the plate 1 m above the
@@ -47,7 +55,7 @@ export function buildingHeight(i: number, j: number): number {
 export const buildingName = (i: number, j: number): string => `building-${i}-${j}`;
 
 /** The ENU-to-ECEF transform at the city center, column-major (the root tile's `transform`). */
-export function cityTransform(): number[] {
+function cityTransform(): number[] {
   const lon = (CITY_CENTER.longitudeDeg * Math.PI) / 180;
   const lat = (CITY_CENTER.latitudeDeg * Math.PI) / 180;
   const a = 6378137;
@@ -300,7 +308,7 @@ function tileJson(level: number, x: number, y: number, bottom: number, top: numb
 }
 
 /** Every file of a variant of the city by its path relative to the tileset: `tileset.json` and the tiles. */
-export async function cityFiles(variant: CityVariant, ktx2Image?: Uint8Array): Promise<Map<string, Uint8Array>> {
+async function cityFiles(variant: CityVariant, ktx2Image?: Uint8Array): Promise<Map<string, Uint8Array>> {
   const files = new Map<string, Uint8Array>();
   const ground = variant === 'terrain' ? terrainGround : flatGround;
   let bottom = Infinity;
@@ -332,3 +340,34 @@ export async function cityFiles(variant: CityVariant, ktx2Image?: Uint8Array): P
       }
   return files;
 }
+
+const OUT = fileURLToPath(new URL('../../../apps/playground/public/tiles3d/', import.meta.url));
+
+function checker(sizePx: number): Uint8Array {
+  const rgba = new Uint8Array(sizePx * sizePx * 4);
+  for (let y = 0; y < sizePx; y++)
+    for (let x = 0; x < sizePx; x++) {
+      const on = ((x >> 3) + (y >> 3)) % 2 === 0;
+      rgba.set(on ? [150, 160, 140, 255] : [110, 120, 100, 255], (y * sizePx + x) * 4);
+    }
+  return rgba;
+}
+
+async function writeAll(): Promise<void> {
+  const ktx2 = new Uint8Array(await encodeKtx2(checker(64), 64, 64, 'etc1s'));
+  for (const variant of ['plain', 'draco', 'meshopt', 'ktx2', 'terrain'] as const satisfies readonly CityVariant[]) {
+    const dir = join(OUT, `city-${variant}`);
+    rmSync(dir, { recursive: true, force: true });
+    for (const [path, bytes] of await cityFiles(variant, ktx2)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      // JSON in the repository's own style, so the format check passes.
+      const file = join(dir, path);
+      const style = { ...(await resolveConfig(file)), filepath: file };
+      writeFileSync(file, path.endsWith('.json') ? await format(new TextDecoder().decode(bytes), style) : bytes);
+    }
+    console.log(`wrote ${dir}`);
+  }
+}
+
+// Run as a script (`node e2e/fixtures/tiles3d/city.ts`): write the variants for the playground.
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await writeAll();

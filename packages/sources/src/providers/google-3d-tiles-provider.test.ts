@@ -2,7 +2,7 @@
 // own requests, a new session before the lifetime ends, one renewal and a retry when Google refuses a token.
 import type { TransportResult } from '@vibeglobe/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { google3dTiles } from './google-3d-tiles.js';
+import { google3dTiles } from './google-3d-tiles-provider.js';
 
 const ROOT = 'https://tile.googleapis.com/v1/3dtiles/root.json';
 const TILE = 'https://tile.googleapis.com/v1/3dtiles/datasets/x/files/tile.glb?session=from-tileset';

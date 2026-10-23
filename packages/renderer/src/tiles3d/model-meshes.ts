@@ -90,7 +90,7 @@ const WRAPPING: Readonly<Record<number, Wrapping>> = {
  * stays where it is, only its depth moves. Where content lies on the engine's terrain (photogrammetry, a tileset's
  * ground), it then wins the depth test everywhere instead of fighting the surface (F467): 0.1%, 16 cm at 160 m.
  */
-export const DEPTH_PULL = 1e-3;
+const DEPTH_PULL = 1e-3;
 
 /** The light direction in view space: from above and a little behind the eye (as the data layers' models, ADR 0037). */
 const LIGHT = vec3(0.3, 0.8, 0.5).normalize();

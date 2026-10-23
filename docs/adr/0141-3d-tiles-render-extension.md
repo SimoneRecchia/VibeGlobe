@@ -40,7 +40,7 @@ coincides with the engine's terrain avoids z-fighting (F467), and how Google's 3
 2. **Option (c), ε = 0.1%** (`DEPTH_PULL`, `model-meshes.ts`): 16 cm at 160 m. Without it the fixture city's ground,
    laid on the fixture terrain, showed the terrain's imagery through its streets; with it no frame does (F467). The
    cost: content within 0.1% of its distance behind another surface draws in front of it, invisible at that margin.
-3. **Option (b)** (`providers/google-3d-tiles.ts`): the engine and its logs see URLs without the key or the session;
+3. **Option (b)** (`providers/google-3d-tiles-provider.ts`): the engine and its logs see URLs without the key or the session;
    a session is used for `sessionLifetimeMs` (default 2 h 45 min, Google's last about three hours), then a new one
    starts from the root tileset; a 400, 401 or 403 starts one new session for the whole burst of refused requests and
    retries them, so no tile fails because its token expired (F469). The Google profile applies as for the 2D tiles:

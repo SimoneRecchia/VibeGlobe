@@ -52,7 +52,6 @@
   "devDependencies": {
     "@mapbox/vector-tile": "3.0.0",
     "@types/sql.js": "1.4.11",
-    "@vibeglobe/gis": "0.0.0",
-    "@vibeglobe/models": "0.0.0"
+    "@vibeglobe/gis": "0.0.0"
   }
 }

@@ -18,8 +18,8 @@ export type { RequestEvent } from './fetcher.js';
 export { gltfInfo } from './gltf-info.js';
 export type { GltfInfo } from './gltf-info.js';
 export { tiles3d } from './loader.js';
-export { google3dTiles } from '../providers/google-3d-tiles.js';
-export type { Google3DTiles, Google3DTilesOptions } from '../providers/google-3d-tiles.js';
+export { google3dTiles } from '../providers/google-3d-tiles-provider.js';
+export type { Google3DTiles, Google3DTilesOptions } from '../providers/google-3d-tiles-provider.js';
 export { batchProperties, MAX_CONTENT_BYTES, parseTileContent } from './content.js';
 export type { BinaryTable, ContentError, ParsedContent } from './content.js';
 export {

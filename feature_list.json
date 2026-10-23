@@ -6017,7 +6017,7 @@
         "Reload and pan so the buildings come from different tiles and assert the heights are identical",
         "Check the defaults table is documented in the data layers guide"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F457",
@@ -6030,7 +6030,7 @@
         "Assert buildings fade or grow in rather than pop (frame differencing below the popping threshold)",
         "Assert walls facing different directions receive different shading in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F458",
@@ -6042,7 +6042,7 @@
         "Assert the rendered height relative to the rendered ground scale matches the projection scale factor at each latitude",
         "Measure a building's height through the engine API and assert it equals the source height in meters"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F459",

@@ -122,7 +122,8 @@ export function cityBuildings(): GeoFeature[] {
       const tags: Record<string, string | number>[] = [
         { building: 'apartments', height: 18 + ((i + j) % 5) * 6 },
         { building: 'commercial', 'building:levels': 3 + ((i * j) % 6) },
-        { building: UNTAGGED_TYPES[(i + j) % UNTAGGED_TYPES.length] ?? 'house' },
+        // Every fourth building is untagged; they cycle through the types in order.
+        { building: UNTAGGED_TYPES[Math.floor((i * 7 + j) / 4) % UNTAGGED_TYPES.length] ?? 'house' },
         { building: 'yes', height: 30, min_height: 10 },
       ];
       building(box(lon, lat, 120, 90), tags[k] ?? {}, id++);

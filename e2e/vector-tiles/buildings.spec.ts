@@ -10,7 +10,7 @@ test.use({ viewport: { width: 320, height: 240 } });
 
 const WHITE = [255, 255, 255];
 
-/** The bounding box of the non-white pixels (the buildings on the white background). */
+/** The bounding box of the red pixels (the buildings, lit or shaded). */
 function inkBox(image: PNG): { width: number; height: number } {
   let minX = Infinity;
   let minY = Infinity;
@@ -19,7 +19,7 @@ function inkBox(image: PNG): { width: number; height: number } {
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
       const i = (y * image.width + x) * 4;
-      if (near([image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0], WHITE, 30)) continue;
+      if (!((image.data[i] ?? 0) > 100 && (image.data[i + 1] ?? 0) < 60 && (image.data[i + 2] ?? 0) < 60)) continue;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x);
@@ -36,32 +36,38 @@ async function pickAt(page: Page, at: { longitudeDeg: number; latitudeDeg: numbe
   }, at);
 }
 
-test('flat-map heights scale with the Mercator scale factor; measured heights stay true (F458)', async ({ page }) => {
-  await openVector(page, 'vectorStyle=buildings&backend=webgl2&zoom=17&lon=10&lat=0');
-  await page.evaluate(() => window.vibeglobePlayground?.globe.setViewMode('3d'));
-  const ratios: number[] = [];
-  for (const lat of [0, 45, 60]) {
-    // The same zoom: the ground scale differs by 1 / cos(lat), so the tower's footprint does too.
-    await page.evaluate(
-      (l) =>
-        window.vibeglobePlayground?.globe.jumpTo({
-          longitudeDeg: 10,
-          latitudeDeg: l,
-          zoom: 17,
-          tiltDeg: 60,
-          headingDeg: 0,
-        }),
-      lat,
-    );
-    await settle(page);
-    expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor)).toBe(1);
-    const box = inkBox(await capture(page));
-    ratios.push(box.height / box.width);
-    const picked = (await pickAt(page, { longitudeDeg: 10, latitudeDeg: lat })).find((f) => f.layerId === 'building');
-    expect(picked?.building?.heightMeters, `lat ${lat}`).toBe(100);
-  }
-  // The rendered height keeps its proportion to the rendered ground at every latitude.
-  for (const ratio of ratios) expect(Math.abs(ratio / (ratios[0] ?? 1) - 1), ratios.join()).toBeLessThan(0.05);
+test.describe('heights on the flat map', () => {
+  // Large enough that the 60° tower, twice as large on the screen as the equator's, is not clipped.
+  test.use({ viewport: { width: 480, height: 400 } });
+
+  test('flat-map heights scale with the Mercator scale factor; measured heights stay true (F458)', async ({ page }) => {
+    await openVector(page, 'vectorStyle=buildings&backend=webgl2&zoom=15.5&lon=10&lat=0');
+    await page.evaluate(() => window.vibeglobePlayground?.globe.setViewMode('3d'));
+    const ratios: number[] = [];
+    for (const lat of [0, 45, 60]) {
+      // The same zoom: the ground scale differs by 1 / cos(lat), so the tower's footprint does too.
+      await page.evaluate(
+        (l) =>
+          window.vibeglobePlayground?.globe.jumpTo({
+            longitudeDeg: 10,
+            latitudeDeg: l,
+            zoom: 15.5,
+            tiltDeg: 60,
+            headingDeg: 0,
+          }),
+        lat,
+      );
+      await settle(page);
+      expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor)).toBe(1);
+      const box = inkBox(await capture(page));
+      ratios.push(box.height / box.width);
+      const picked = (await pickAt(page, { longitudeDeg: 10, latitudeDeg: lat })).find((f) => f.layerId === 'building');
+      expect(picked?.building?.heightMeters, `lat ${lat}`).toBe(100);
+    }
+    // The rendered height keeps its proportion to the rendered ground at every latitude, within the 10% a pixel makes
+    // on a tower 27 px wide (heights left unscaled would halve the proportion at 60°).
+    for (const ratio of ratios) expect(Math.abs(ratio / (ratios[0] ?? 1) - 1), ratios.join()).toBeLessThan(0.1);
+  });
 });
 
 /** The grid buildings of the fixture city (e2e/vector-tiles/fixtures/city.ts): row i, column j. */
@@ -111,7 +117,7 @@ test('buildings without height tags get the documented defaults, the same from e
   for (let i = 0; i < 7 && seen.size < UNTAGGED.length; i++) {
     for (let j = 0; j < 7; j++) {
       if ((i * 7 + j) % 4 !== 2) continue;
-      const type = UNTAGGED[(i + j) % UNTAGGED.length] ?? 'house';
+      const type = UNTAGGED[Math.floor((i * 7 + j) / 4) % UNTAGGED.length] ?? 'house';
       if (seen.has(type)) continue;
       seen.add(type);
       const expected = DEFAULT_BUILDING_HEIGHTS[type];

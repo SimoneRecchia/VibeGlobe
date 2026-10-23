@@ -4,7 +4,7 @@
  * The window of a rate limit: a second plus a margin, because requests reach the server with uneven delays, and two
  * starts just over a second apart here can arrive within the same second there.
  */
-export const RATE_WINDOW_MS = 1150;
+const RATE_WINDOW_MS = 1150;
 
 /** Start times of the last `maxRequestsPerSecond` requests, a ring. */
 export interface RateRing {

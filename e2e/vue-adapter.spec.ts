@@ -77,6 +77,8 @@ test('changing the camera props moves the running engine without a remount (F474
 });
 
 test('the camera composable follows navigation and updates at most once per frame (F475, camera)', async ({ page }) => {
+  // A small page: the drag below waits for each display frame, which Chromium paces to the software GPU (KB-102).
+  await page.setViewportSize({ width: 480, height: 360 });
   await openExample(page, '?backend=webgl2');
   const box = await page.locator('.vibeglobe').first().boundingBox();
   if (!box) throw new Error('no globe element');
@@ -122,12 +124,12 @@ test('the camera composable follows navigation and updates at most once per fram
     });
     const target = element.querySelector('canvas') ?? element;
     target.dispatchEvent(new PointerEvent('pointerdown', at(rect.width / 2)));
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 12; i++) {
       target.dispatchEvent(new PointerEvent('pointermove', at(rect.width / 2 + i * 4)));
       target.dispatchEvent(new PointerEvent('pointermove', at(rect.width / 2 + i * 4 + 2)));
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
-    target.dispatchEvent(new PointerEvent('pointerup', at(rect.width / 2 + 120)));
+    target.dispatchEvent(new PointerEvent('pointerup', at(rect.width / 2 + 48)));
     await new Promise((resolve) => requestAnimationFrame(resolve));
     running = false;
     return { updates: Number(window.adapterExample?.displayed?.()['updates']) - start, frames };

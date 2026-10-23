@@ -2600,7 +2600,7 @@
         "In every frame assert the orbit point stays within 1 px of its screen position and the camera distance to it is constant",
         "Assert user input or a cancel call stops the orbit without a jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F193",
@@ -2650,7 +2650,7 @@
         "Assert continuity of morph factor, tilt and relief in every frame (no jump)",
         "Record frames and assert zero black or empty pixels after the base has loaded"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F197",

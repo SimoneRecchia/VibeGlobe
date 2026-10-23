@@ -43,8 +43,8 @@ export interface OpenUiOptions {
   readonly debug?: boolean;
   readonly theme?: 'light' | 'dark';
   readonly language?: string;
-  /** Adds the default controls (default true). */
-  readonly defaults?: boolean;
+  /** Adds the default controls (default true); 'all' adds every navigation control (`addAllControls`). */
+  readonly defaults?: boolean | 'all';
 }
 
 /** Opens the playground, waits for its first frame and adds a UI layer with the default controls. */
@@ -58,7 +58,8 @@ export async function openUi(page: Page, options: OpenUiOptions = {}): Promise<v
       const container = document.getElementById('app');
       if (globe === undefined || container === null) throw new Error('no playground globe');
       const layer = ui.createUi(globe, container, { theme, ...(language === undefined ? {} : { language }) });
-      if (defaults) ui.addDefaultControls(layer, { debug });
+      if (defaults === 'all') ui.addAllControls(layer, { debug });
+      else if (defaults) ui.addDefaultControls(layer, { debug });
       window.vibeglobeUi = { ui, gis, layer };
     },
     {

@@ -57,7 +57,7 @@ function expectSmooth(samples: readonly number[], to: number): void {
 
 test.describe('the 2D / 3D / Auto toggle (F421)', () => {
   test('sets 2D, 3D and Auto with mouse, touch and keyboard, smoothly, and shows the mode', async ({ page }) => {
-    await openUi(page, { query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=12' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=12' });
     await waitForIdle(page);
     const button = (mode: string): Locator => page.locator(`.vg-ui__button--view-${mode}`);
     const back = page.locator('.vg-ui__button--back-to-auto');
@@ -107,7 +107,7 @@ test.describe('the tilt control (F422)', () => {
   test('sets the chosen tilt by mouse drag, touch and keys; it persists across zoom and shows a clamp', async ({
     page,
   }) => {
-    await openUi(page, { query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=12' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=12' });
     await waitForIdle(page);
     const slider = page.locator('.vg-ui__tilt-track');
     const box = await slider.boundingBox();
@@ -157,7 +157,7 @@ test.describe('reset to globe and home (F423)', () => {
   test('fly to the globe and home with mouse, touch and keyboard; input interrupts; reduced motion fades', async ({
     page,
   }) => {
-    await openUi(page, { query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=6' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=6' });
     await page.evaluate(() =>
       window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 12, latitudeDeg: 42, zoom: 10 }),
     );
@@ -211,6 +211,7 @@ test.describe('the attribution control (F424)', () => {
   }) => {
     const session = await fixtureSession(page);
     await openUi(page, {
+      defaults: 'all',
       query: `backend=webgl2&imagery=smooth&overlays=patches:0.5&overlayCoverage=italy&requiredCredit=fixture-smooth&session=${session}&lon=12.5&lat=41.9&zoom=8`,
     });
     await waitForImagery(page);
@@ -260,6 +261,7 @@ test.describe('the layer switcher (F425)', () => {
   }) => {
     const session = await fixtureSession(page);
     await openUi(page, {
+      defaults: 'all',
       query: `backend=webgl2&imagery=smooth&overlays=patches:1,stripes:0.5&session=${session}&lon=12.5&lat=41.9&zoom=5`,
     });
     await loadLayers(page);
@@ -380,7 +382,7 @@ test.describe('the scale bar (F412)', () => {
     ['tilted 3D', 'zoom=12&tilt=60'],
   ] as const)
     test(`matches the ground distance at the view center within 1% in the ${phase} phase`, async ({ page }) => {
-      await openUi(page, { query: `backend=webgl2&lon=7.6&lat=45.9&${setup}` });
+      await openUi(page, { defaults: 'all', query: `backend=webgl2&lon=7.6&lat=45.9&${setup}` });
       await waitForIdle(page);
       const { statedMeters, groundMeters } = await check(page);
       expect(Math.abs(statedMeters - groundMeters) / groundMeters).toBeLessThan(0.01);
@@ -389,7 +391,7 @@ test.describe('the scale bar (F412)', () => {
     });
 
   test('updates in the frame of each camera change, and is reachable by keyboard focus', async ({ page }) => {
-    await openUi(page, { query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=10' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=7.6&lat=45.9&zoom=10' });
     await waitForIdle(page);
     const stale = await page.evaluate(
       () =>
@@ -424,7 +426,7 @@ test.describe('geolocation (F413)', () => {
   }) => {
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 45.07, longitude: 7.69, accuracy: 300 });
-    await openUi(page, { query: 'backend=webgl2&lon=0&lat=20&zoom=3&tilt=30' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=0&lat=20&zoom=3&tilt=30' });
     const button = page.locator('.vg-ui__button--geolocate');
     for (const how of ['mouse', 'touch', 'keyboard'] as const) {
       if (how === 'mouse') await button.click();
@@ -460,7 +462,7 @@ test.describe('geolocation (F413)', () => {
 
   test('a denied permission shows a translated message and the engine keeps working', async ({ page, context }) => {
     await context.clearPermissions();
-    await openUi(page, { query: 'backend=webgl2&lon=7&lat=45&zoom=5', language: 'it' });
+    await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=7&lat=45&zoom=5', language: 'it' });
     await page.evaluate(() => {
       // Chromium's headless prompt answers nothing: deny as a user would.
       navigator.geolocation.watchPosition = (_ok, error) => {

@@ -148,7 +148,16 @@ export const RULES_CSS = `
 .vg-ui__layers-group{border:0;margin:0;padding:0}
 .vg-ui__layers-group legend{font-weight:600;padding:0}
 .vg-ui__layers-item{display:flex;align-items:center;gap:var(--vg-ui-spacing);min-height:var(--vg-ui-button-size);cursor:pointer}
+.vg-ui__bookmarks-form{display:flex;gap:var(--vg-ui-spacing);margin-bottom:var(--vg-ui-spacing)}
+.vg-ui__text-input{flex:1;min-width:0;min-height:var(--vg-ui-button-size);padding:0 var(--vg-ui-spacing);border:var(--vg-ui-border-width) solid var(--vg-ui-border-color);border-radius:var(--vg-ui-border-radius);background:var(--vg-ui-background);color:var(--vg-ui-color);font:inherit}
+.vg-ui__text-input::placeholder{color:var(--vg-ui-muted-color);opacity:1}
+.vg-ui__bookmarks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:calc(var(--vg-ui-spacing) / 2)}
+.vg-ui__bookmark{display:flex;align-items:center;gap:calc(var(--vg-ui-spacing) / 2)}
+.vg-ui__bookmark .vg-ui__button--bookmark-go{flex:1;justify-content:flex-start;font-weight:normal}
+.vg-ui__bookmarks-empty{color:var(--vg-ui-muted-color)}
+.vg-ui__minimap{overflow:hidden}
+.vg-ui__minimap-canvas{display:block;border-radius:var(--vg-ui-border-radius)}
 .vg-ui__status{padding:0 var(--vg-ui-spacing);color:var(--vg-ui-muted-color);max-width:var(--vg-ui-panel-width)}
 .vg-ui__status:empty{display:none}
-@media (pointer: coarse){.vg-ui__button,.vg-ui__search-option,.vg-ui__search-input,.vg-ui__tilt-track,.vg-ui__layers-item,.vg-ui__credit a,.vg-ui__scale{min-width:var(--vg-ui-touch-size);min-height:var(--vg-ui-touch-size)}.vg-ui__credit a{display:inline-flex;align-items:center}}
+@media (pointer: coarse){.vg-ui__button,.vg-ui__search-option,.vg-ui__search-input,.vg-ui__tilt-track,.vg-ui__layers-item,.vg-ui__credit a,.vg-ui__scale,.vg-ui__text-input{min-width:var(--vg-ui-touch-size);min-height:var(--vg-ui-touch-size)}.vg-ui__credit a{display:inline-flex;align-items:center}}
 `;

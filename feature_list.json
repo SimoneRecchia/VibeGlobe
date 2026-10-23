@@ -5478,7 +5478,7 @@
         "Run property-based round-trip tests on random camera states",
         "Feed malformed and out-of-range URLs and JSON and verify they are rejected or clamped with no crash"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F415",
@@ -5491,7 +5491,7 @@
         "Remove a bookmark and verify it disappears",
         "Export and re-import the bookmarks as JSON and verify they are identical"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F416",
@@ -5517,7 +5517,7 @@
         "Verify the footprint matches the main view's visible area, including the trapezoid of tilted views",
         "Verify the minimap adds no more than its documented per-frame cost and is absent unless enabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F418",
@@ -5633,7 +5633,7 @@
         "Verify selecting a result flies to it, and typed decimal degrees, DMS and UTM coordinates fly to the right place",
         "Verify a failing or slow geocoder shows a translated message without blocking the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F427",

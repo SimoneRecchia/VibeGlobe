@@ -25,12 +25,26 @@ export interface DefaultControlsOptions {
 }
 
 /**
+ * Adds the basic built-in controls in their default corners: search (top left); zoom, compass and fullscreen (top
+ * right); coordinates readout and, when enabled, the debug toggle (bottom left). Each can then be removed or replaced by
+ * id. {@link addAllControls} adds every navigation control.
+ */
+export function addDefaultControls(ui: Ui, options: DefaultControlsOptions = {}): void {
+  ui.add(new SearchControl(options.geocoder === undefined ? {} : { geocoder: options.geocoder }));
+  ui.add(new ZoomControl());
+  ui.add(new CompassControl());
+  ui.add(new FullscreenControl());
+  ui.add(new CoordinateReadoutControl());
+  if (options.debug === true) ui.add(new DebugToggleControl());
+}
+
+/**
  * Adds every built-in navigation control in its default corner: search and the 2D / 3D / Auto toggle (top left); zoom,
  * compass, tilt, reset-to-globe and home, geolocation, layers and fullscreen (top right); coordinates readout, scale
  * bar and, when enabled, the debug toggle (bottom left); attribution (bottom right). Each can then be removed or
  * replaced by id. The tools (drawing, measurement, bookmarks, screenshot, minimap) are added one by one.
  */
-export function addDefaultControls(ui: Ui, options: DefaultControlsOptions = {}): void {
+export function addAllControls(ui: Ui, options: DefaultControlsOptions = {}): void {
   ui.add(new SearchControl(options.geocoder === undefined ? {} : { geocoder: options.geocoder }));
   ui.add(new ViewModeControl({ position: 'top-left' }));
   ui.add(new ZoomControl());

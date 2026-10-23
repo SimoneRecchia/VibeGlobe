@@ -104,6 +104,8 @@ export const BLEND_CODES: Readonly<Record<ImageryBlend, number>> = { normal: 0, 
 export interface StackEntry {
   readonly id: string;
   readonly sources: readonly ImagerySource[];
+  /** A source of the chain has transparent areas (F242). */
+  readonly transparent: boolean;
   opacity: number;
   visible: boolean;
   blend: ImageryBlend;
@@ -116,15 +118,24 @@ function isSource(input: ImageryLayerInput): input is ImagerySource {
 /** The layers of `GlobeOptions.imagery`, normalized; throws `RangeError` for an empty chain or a duplicate id. */
 export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[] {
   const entries = inputs.map((input): StackEntry => {
-    if (isSource(input)) return { id: input.id, sources: [input], opacity: 1, visible: true, blend: 'normal' };
+    if (isSource(input))
+      return {
+        id: input.id,
+        sources: [input],
+        transparent: input.transparent === true,
+        opacity: 1,
+        visible: true,
+        blend: 'normal',
+      };
     const first = input.sources[0];
     if (!first) throw new RangeError('An imagery layer needs at least one source');
-    const entry = {
+    const entry: StackEntry = {
       id: input.id ?? first.id,
       sources: input.sources,
+      transparent: input.sources.some((source) => source.transparent === true),
       opacity: 1,
       visible: true,
-      blend: 'normal' as const,
+      blend: 'normal',
     };
     applyChanges(entry, input);
     return entry;
@@ -153,7 +164,7 @@ export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): v
 
 /** True when a layer covers what is below it where it has a tile: fully opaque and blended normally. */
 export function isOpaque(entry: StackEntry): boolean {
-  return entry.opacity >= 1 && entry.blend === 'normal';
+  return entry.opacity >= 1 && entry.blend === 'normal' && !entry.transparent;
 }
 
 /**

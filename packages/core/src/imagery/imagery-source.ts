@@ -46,6 +46,11 @@ export interface ImagerySource extends TileSource {
   /** Tile edge in pixels (256, 512, …); with `pixelRatio` 2 a texel covers half the ground. */
   readonly tileSizePx: number;
   readonly pixelRatio: number;
+  /**
+   * True when the tiles have transparent areas (PNG or WebP with alpha, reprojected rasters): the layers below show
+   * through them, so the layer is composed like a translucent one (F242, ADR 0038).
+   */
+  readonly transparent?: boolean;
   /** How the bytes are decoded in the worker pool: browser image formats, or KTX2 (ADR 0020). */
   readonly decoder: 'image' | 'ktx2';
 }

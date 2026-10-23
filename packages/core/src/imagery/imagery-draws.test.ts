@@ -50,6 +50,7 @@ function stacked(chain: ImageryLayer[], look: Partial<StackEntry> = {}): StackLa
   const entry: StackEntry = {
     id: 'a',
     sources: chain.map((l) => l.source),
+    transparent: false,
     opacity: 1,
     visible: true,
     blend: 'normal',
@@ -159,5 +160,15 @@ describe('drawImagery', () => {
     );
     expect(list.textures[0]).toBe(-1);
     expect(covered.wanted).toEqual([]);
+  });
+
+  it('composes a layer with transparent tiles over the ones below instead of covering them (F242)', () => {
+    const base = fakeLayer({ 9: 10 });
+    const transparent = fakeLayer({ 9: 11 });
+    const list = drawStack(
+      [stacked([base.layer]), stacked([transparent.layer], { id: 'clear', transparent: true })],
+      tile(9, 300, 170),
+    );
+    expect([list.textures[0], list.overlays[0]?.textures[0], list.overlays[0]?.opacities[0]]).toEqual([10, 11, 1]);
   });
 });

@@ -27,6 +27,8 @@ export interface XyzImageryOptions {
   minLevel?: number;
   maxLevel?: number;
   tileSizePx?: number;
+  /** The tiles have transparent areas, where the layers below show (F242). */
+  transparent?: boolean;
   /** 2 for high-DPI (`@2x`) tiles. */
   pixelRatio?: number;
   /** Values for `{s}`, spread over tiles so several hosts share the load (F089). */
@@ -72,6 +74,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: options.maxRequestsPerSecond }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     ...(options.attribution ? { attribution: options.attribution } : {}),
+    ...(options.transparent ? { transparent: true } : {}),
     ...(options.profile ? { profile: options.profile } : {}),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';

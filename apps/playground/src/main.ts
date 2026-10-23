@@ -12,6 +12,7 @@ import {
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
 import { chainSources, credits, overlayLayers } from './fixture-layers.js';
+import { utmLayers } from './reprojected-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -200,7 +201,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   };
   const chain = chainSources(params, base, session, imageryTiling, ITALY);
   const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
-  return { imagery: [layer, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
+  // `?utm=32632,32633` adds fixture rasters served in those UTM zones, reprojected on the client (F226).
+  const utm = utmLayers(params, base, session);
+  return { imagery: [layer, ...utm, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
 }
 
 /**

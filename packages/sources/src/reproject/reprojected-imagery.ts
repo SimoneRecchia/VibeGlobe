@@ -155,6 +155,8 @@ export function reprojectedImagery(options: ReprojectedImageryOptions): ImageryS
     maxLevel: options.maxLevel ?? 19,
     tileSizePx,
     pixelRatio: 1,
+    // Outside the data the warped tiles are transparent: the layers below show there (F242).
+    transparent: true,
     coverage,
     decoder: 'image',
     transport: reprojectTransport(

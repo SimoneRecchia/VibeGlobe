@@ -206,14 +206,15 @@ describe('rotate and tilt drags (F182, F183)', () => {
     expect(h.camera.drags).toBe(0);
   });
 
-  it('suppresses the context menu, and leaves rotation off until a globe is connected', () => {
+  it('suppresses the context menu, and rotates through the navigation API without a connected globe', () => {
     const h = controlsHarness({}, { connect: false });
     h.fire('contextmenu', {});
     expect(h.prevented()).toBe(1);
     h.pointer('pointerdown', { x: 400, y: 300, t: 0, button: 2 });
     h.pointer('pointermove', { x: 500, y: 300, t: 100, button: 2 });
     h.frame();
-    expect(h.camera.headingDeg + h.camera.drags).toBe(0);
+    expect(h.camera.headingDeg).toBeGreaterThan(0);
+    expect(h.camera.drags).toBe(0);
   });
 });
 

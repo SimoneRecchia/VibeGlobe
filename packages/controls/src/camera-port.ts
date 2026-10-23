@@ -1,11 +1,10 @@
 import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/core';
 
 /**
- * The part of the engine's public API the controls use beyond `NavigationApi`: the applied camera, the engine
- * clock and `jumpTo` for heading and tilt about the screen-center target. A temporary bridge until `NavigationApi`
- * carries these (hook request "M6 input" 1 and 2 in docs/parallel-tracks.md).
+ * The part of the engine's public API the controls use beyond `NavigationApi`: the home command and the view-mode
+ * toggle for their keys. Rotation, the clock and the applied camera come through `NavigationApi` itself.
  */
-export type ConnectedGlobe = Pick<Globe, 'camera' | 'timeMs' | 'jumpTo'> & {
+export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo'>> & {
   /** The home command (F194), used by the Home key when the engine has it. */
   goHome?(): unknown;
   /** The view-mode toggle (F163), used by the 2, 3 and A keys when the engine has it. */
@@ -44,9 +43,9 @@ export class CameraPort {
     private readonly hostNow: () => number,
   ) {}
 
-  /** Engine time, which inertia and smoothing run on; the host clock until a globe is connected. */
+  /** Engine time, which inertia and smoothing run on (`NavigationApi.timeMs`). */
   nowMs(): number {
-    return this.globe ? this.globe.timeMs : this.hostNow();
+    return this.navigation.timeMs;
   }
 
   /** Starts a frame's update; returns its engine time. */
@@ -115,19 +114,19 @@ export class CameraPort {
     if (deltaZoom !== 0) this.navigation.zoomAt(point, deltaZoom);
   }
 
-  /** True when heading and tilt can change (a globe is connected). */
+  /** True when heading and tilt can change (always: `NavigationApi.orbit`). */
   get canRotate(): boolean {
-    return this.globe !== undefined;
+    return true;
   }
 
-  /** The applied heading and tilt, in degrees (0 before a globe is connected). */
+  /** The applied heading, in degrees. */
   headingDeg(): number {
-    return this.globe?.camera.headingDeg ?? 0;
+    return this.navigation.headingDeg;
   }
 
   /** The applied tilt in degrees. */
   tiltDeg(): number {
-    return this.globe?.camera.tiltDeg ?? 0;
+    return this.navigation.tiltDeg;
   }
 
   /**
@@ -135,12 +134,9 @@ export class CameraPort {
    * the new values become the chosen ones. The tilt is clamped to [0, maxTiltDeg].
    */
   rotate(deltaHeadingDeg: number, deltaTiltDeg: number, maxTiltDeg: number): void {
-    const globe = this.globe;
-    if (!globe || (deltaHeadingDeg === 0 && deltaTiltDeg === 0)) return;
-    const camera = globe.camera;
-    const heading = (((camera.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;
-    const tilt = Math.min(Math.max(camera.tiltDeg + deltaTiltDeg, 0), maxTiltDeg);
-    if (deltaTiltDeg === 0 || tilt === camera.tiltDeg) globe.jumpTo({ headingDeg: heading });
-    else globe.jumpTo({ headingDeg: heading, tiltDeg: tilt });
+    if (deltaHeadingDeg === 0 && deltaTiltDeg === 0) return;
+    const tilt = this.navigation.tiltDeg;
+    const clamped = Math.min(Math.max(tilt + deltaTiltDeg, 0), maxTiltDeg) - tilt;
+    this.navigation.orbit(deltaHeadingDeg, deltaTiltDeg === 0 ? 0 : clamped);
   }
 }

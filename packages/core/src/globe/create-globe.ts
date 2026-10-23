@@ -9,7 +9,6 @@ import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
 import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
-import { ControlsSlot } from './controls-slot.js';
 import { imageryLayersOf } from './imagery-layers.js';
 import type { ImageryLayers } from '../imagery/imagery-stack.js';
 import type { Credit } from '../imagery/credits.js';
@@ -72,7 +71,6 @@ class GlobeEngine implements Globe {
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
-  private readonly controlsSlot = new ControlsSlot();
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
   private frames = 0;
@@ -251,7 +249,7 @@ class GlobeEngine implements Globe {
 
   /** Attaches the controls to the renderer's input element, again when a recovery replaced it (KB-020). */
   private attachControls(): void {
-    this.controlsSlot.attach(this.options.controls, this.renderer?.inputElement, this.navigation);
+    this.viewControl.slot.attach(this.options.controls, this.renderer?.inputElement, this);
   }
 
   private syncSize(): void {
@@ -318,12 +316,13 @@ class GlobeEngine implements Globe {
     // A running movement steps to this frame's time first; input the controls apply then interrupts it (ADR 0036).
     if (!this.waiting) {
       this.movements.step();
-      this.controlsSlot.controls?.update?.();
+      this.viewControl.updateControls();
       this.movements.afterInput();
       this.constraints.apply(this.cam);
     }
     this.inFrame = false;
-    this.dirty = false;
+    // A frame the controls ask for during their update is drawn next; what they applied is drawn by this one.
+    this.dirty = this.viewControl.takeUpdateRequest();
     // A frame not drawn takes no step of the manual clock (KB-058).
     if (this.waiting) return this.clock.skipped();
     this.cam.update();
@@ -453,7 +452,7 @@ class GlobeEngine implements Globe {
       this.rejectReady?.(new GlobeError('destroyed', 'The globe was destroyed before its first frame'));
     }
     if (this.frameId !== undefined) this.renderer?.host.cancelFrame(this.frameId);
-    this.controlsSlot.destroy();
+    this.viewControl.slot.destroy();
     for (const cleanup of this.cleanups) cleanup();
     this.surfaceFrame.destroy();
     this.surface?.clear();

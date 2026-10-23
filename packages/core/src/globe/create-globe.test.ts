@@ -450,6 +450,41 @@ describe('createGlobe', () => {
     expect(renderer.flush()).toBe(0);
   });
 
+  it('gives the controls orbit, the engine clock and the attitude, keeps a frame asked for in their update, and interrupts them when an API movement starts (M6 input hooks)', async () => {
+    let navigation: NavigationApi | undefined;
+    let again = false;
+    let interrupted = 0;
+    const { globe, renderer } = await started({
+      controls: (_element, api) => {
+        navigation = api;
+        return {
+          update: () => {
+            if (again) api.requestUpdate();
+          },
+          interrupt: () => void interrupted++,
+          destroy: () => undefined,
+        };
+      },
+    });
+    if (!navigation) throw new Error('no navigation');
+    navigation.orbit(30, 20);
+    renderer.flush();
+    expect(navigation.headingDeg).toBeCloseTo(30, 6);
+    expect(globe.camera.headingDeg).toBeCloseTo(30, 6);
+    expect(navigation.tiltDeg).toBeCloseTo(globe.camera.tiltDeg, 6);
+    expect(navigation.tiltDeg).toBeGreaterThan(0);
+    expect(navigation.timeMs).toBe(globe.timeMs);
+    // A request made inside update is kept: the next frame comes.
+    again = true;
+    navigation.requestUpdate();
+    expect(renderer.flush()).toBe(1);
+    again = false;
+    expect(renderer.flush()).toBe(1);
+    expect(renderer.flush()).toBe(0);
+    void globe.flyTo({ longitudeDeg: 20, latitudeDeg: 10, zoom: 3 });
+    expect(interrupted).toBe(1);
+  });
+
   it('rejects ready with a typed error when the renderer cannot start (F055)', async () => {
     const errors: string[] = [];
     const globe = createGlobe({

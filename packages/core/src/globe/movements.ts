@@ -57,6 +57,8 @@ export interface MovementHost {
   /** Shows the view at this opacity (1 opaque): a reduced-motion flight's fade (F214). */
   setOpacity(opacity: number): void;
   requestRender(): void;
+  /** An API movement starts: the controls stop their own animations (F202). */
+  interruptInput(): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -204,6 +206,7 @@ export class Movements {
     promise.cancel = () => this.finish(running, 'cancelled');
     this.running = running;
     this.moveEvent.cause = 'api';
+    this.host.interruptInput();
     this.host.emitter.emit('movestart', { cause: 'api' });
     if (signal?.aborted) this.finish(running, 'cancelled');
     else signal?.addEventListener('abort', onAbort);
@@ -449,6 +452,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     assertAlive: () => globe.assertAlive(),
     requestRender: () => globe.requestRender(),
     userInput: () => movements.userInput(),
+    timeMs: () => globe.clock.timeMs,
   });
   const movements: Movements = new Movements({
     cam: globe.cam,
@@ -462,6 +466,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
     setOpacity: (opacity) => globe.setOpacity(opacity),
     requestRender: () => globe.requestRender(),
+    interruptInput: () => viewControl.slot.controls?.interrupt?.(),
   });
   return { viewControl, movements };
 }

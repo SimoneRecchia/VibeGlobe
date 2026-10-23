@@ -244,8 +244,21 @@ export interface NavigationApi {
   dragTo(anchor: GeoPosition, point: ScreenPoint): void;
   /** Zooms by `deltaZoom` levels keeping the position under `point` fixed. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void;
-  /** Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4). */
+  /**
+   * Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4); a request
+   * made inside `update` asks for the next frame.
+   */
   requestUpdate(): void;
+  /**
+   * Turns the camera about the screen-center target by `deltaHeadingDeg` and tilts it by `deltaTiltDeg` (the new values
+   * become the chosen ones, the tilt within 0–90° and the constraints); allocation-free (F182–F185).
+   */
+  orbit(deltaHeadingDeg: number, deltaTiltDeg: number): void;
+  /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
+  readonly timeMs: number;
+  /** The applied heading and tilt, degrees. */
+  readonly headingDeg: number;
+  readonly tiltDeg: number;
 }
 
 /** An input plug-in instance. */
@@ -256,11 +269,18 @@ export interface Controls {
    * allocate when nothing is pending.
    */
   update?(): void;
+  /** Optional: an API movement (`flyTo`, `easeTo`, …) starts: inertia, smoothed zooms and held keys stop (F202). */
+  interrupt?(): void;
   destroy(): void;
 }
 
-/** Creates input handling on the renderer's input element. */
-export type ControlsFactory = (element: unknown, navigation: NavigationApi) => Controls;
+/**
+ * Creates input handling on the renderer's input element. A factory with `connect` is given the globe once it is
+ * attached (the home and view-mode keys use it).
+ */
+export type ControlsFactory = ((element: unknown, navigation: NavigationApi) => Controls) & {
+  connect?(globe: Globe): void;
+};
 
 /** The camera as the public API reports it: applied values, WGS84 degrees and meters. */
 export interface CameraState {

@@ -136,7 +136,18 @@ describe('source metadata (F220)', () => {
     expect(globe.imageryLayers.list().map((layer) => layer.id)).toEqual(['fixture']);
     // The metadata reads back through the inspection API.
     expect(globe.imageryLayers.list()[0]?.sources).toEqual([
-      { id: 'fixture', crs: 'EPSG:3857', minLevel: 0, maxLevel: 18, tileSizePx: 256, pixelRatio: 1, attribution: [] },
+      {
+        id: 'fixture',
+        crs: 'EPSG:3857',
+        minLevel: 0,
+        maxLevel: 18,
+        tileSizePx: 256,
+        pixelRatio: 1,
+        attribution: [],
+        keepInMemory: true,
+        prefetch: true,
+        authenticated: false,
+      },
     ]);
     globe.destroy();
   });

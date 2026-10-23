@@ -94,6 +94,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     // A custom transport (auth headers, sessions) is the only way to reach the tiles: a cache tier in front of the
     // source must use it rather than fetch the URLs itself (track B hook request 4, TB-01).
     ...(options.transport ? { transportRequired: true } : {}),
+    ...(options.transport || options.headers ? { authenticated: true } : {}),
     decoder: options.decoder ?? 'image',
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),

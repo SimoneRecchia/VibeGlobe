@@ -11,6 +11,7 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
+import { sourceLines } from './source-lines.js';
 import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
@@ -365,19 +366,6 @@ function startSecondGlobe(host: HTMLElement): Globe {
   host.style.width = '50%';
   host.after(second);
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
-}
-
-/** The debug overlay's lines of each imagery source's declared metadata (F220). */
-function sourceLines(globe: Globe): [string, string][] {
-  return globe.imageryLayers
-    .list()
-    .flatMap((layer) =>
-      layer.sources.map((source): [string, string] => [
-        `source-${source.id}`,
-        `source ${source.id} ${source.crs} z${source.minLevel}–${source.maxLevel} ${source.tileSizePx}px` +
-          (source.maxRequestsPerSecond ? ` ${source.maxRequestsPerSecond}/s` : ''),
-      ]),
-    );
 }
 
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {

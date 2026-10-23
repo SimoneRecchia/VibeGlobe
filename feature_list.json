@@ -2951,7 +2951,7 @@
         "Assert each invalid source is rejected with a typed, descriptive error while the engine keeps rendering the other layers",
         "Fuzz source configuration objects and assert no input crashes the engine or blanks the view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F221",

@@ -34,6 +34,8 @@ export interface TileSource {
   request(coord: TileCoord, out: TileRequest, pixelRatio?: number): TileRequest | 'noData' | 'unknown';
   /** Credits shown while the source's tiles are in view (F254). */
   readonly attribution?: readonly Attribution[];
+  /** The source's requests carry credentials (headers, tokens or a session), declared by its adapter (F220). */
+  readonly authenticated?: boolean;
   /** The provider profile's credit rules: a required credit is always shown (F255). */
   readonly profile?: CreditProfile;
   /**

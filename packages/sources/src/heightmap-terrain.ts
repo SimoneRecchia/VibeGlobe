@@ -10,7 +10,6 @@ import {
   type TileRequest,
   type TileTransport,
   type TimeoutsMs,
-  type Attribution,
   type VerticalDatum,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
@@ -35,8 +34,6 @@ export interface HeightmapTerrainOptions {
   coverage?: readonly TileRectangleRad[];
   /** The network transport; `fetchTransport()` by default. */
   transport?: TileTransport;
-  /** Credits shown while the terrain is in view (F235, F254). */
-  attribution?: readonly Attribution[];
   maxRequestsPerHost?: number;
   multiplexed?: boolean;
   timeoutsMs?: TimeoutsMs;
@@ -62,7 +59,6 @@ export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSourc
     geometricErrorMeters: (level) => heightmapGeometricErrorMeters(level, tileSizePx, equatorMeters, tiling.rootTilesX),
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
-    ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';

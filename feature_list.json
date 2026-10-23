@@ -2058,7 +2058,7 @@
         "Assert the default phase ranges match the numeric zoom or altitude ranges set in docs/plan for globe (world, continents), flattening (country), 2D map (region, city) and 3D view (neighborhood, street)",
         "Open `?scenario=zoom-globe-to-street` and assert the morph factor, tilt and relief reported per frame follow the curves"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F150",
@@ -2070,7 +2070,7 @@
         "Configure custom curves in the playground and assert the reported morph, tilt and relief follow them",
         "Change the curves at runtime and assert the view adapts without a jump (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F151",
@@ -2083,7 +2083,7 @@
         "Capture screenshots and assert the diff against the globe baseline is within the visual tolerance",
         "Assert the rendered limb matches the projected WGS84 ellipsoid silhouette within 1 px"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F152",
@@ -2096,7 +2096,7 @@
         "Assert renderer upload counters show no tile geometry re-upload caused by the sweep",
         "Assert frame differencing shows no frame-to-frame jump above the threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F153",
@@ -2108,7 +2108,7 @@
         "Assert through the public camera state: phase 2D map, morph factor 1, applied tilt 0°, relief factor within the configured 2D range",
         "Capture screenshots and assert they match a reference mosaic of the same Web Mercator tiles within the visual tolerance (parallels and meridians straight and perpendicular)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F154",
@@ -2121,7 +2121,7 @@
         "Assert the applied tilt increases monotonically to the configured automatic tilt and the relief factor reaches 1",
         "Capture screenshots at fixed zoom levels and assert the diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F155",
@@ -2133,7 +2133,7 @@
         "Zoom with Playwright wheel events through the whole flattening range with the cursor at the center, the corners and near the limb, and with non-zero heading",
         "In every frame pick the geographic coordinate under the cursor and assert it stays within 1 px of the cursor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F156",
@@ -2145,7 +2145,7 @@
         "In every frame project the start center coordinate to the screen",
         "Assert it stays within 1 px of the screen center"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F157",
@@ -2170,7 +2170,7 @@
         "Compute the geodesic distance between two picked points with the core geodesic API in each phase and assert identical results",
         "Assert no public measurement or picking API accepts or returns projected plane coordinates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F159",
@@ -2183,7 +2183,7 @@
         "Assert zero sentinel pixels and no seam (edge detection along the wrap line)",
         "Assert the reported center longitude wraps into [−180°, 180°) while the camera motion stays continuous"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F160",
@@ -2195,7 +2195,7 @@
         "Sweep the morph and the tilt while recording every frame with a sentinel clear color",
         "Assert zero sentinel pixels inside the map area and no seam at the cap boundary"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F161",
@@ -2207,7 +2207,7 @@
         "Zoom through every phase and assert the applied tilt equals the curve value in every frame",
         "After a manual tilt, select Auto and assert the tilt returns to the curve value without a jump and follows the curves again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F162",
@@ -2220,7 +2220,7 @@
         "Assert the applied tilt is 0° in every frame and the morph factor follows the zoom curve",
         "Assert rotation still works and the heading persists"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F163",
@@ -2233,7 +2233,7 @@
         "Assert the Auto control is visible next to the 2D/3D toggle and reflects the active mode",
         "Repeat through the public API and assert identical results and mode-change events"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F164",
@@ -2245,7 +2245,7 @@
         "Property test: for random sequences of zoom, pan and constraint changes, the chosen values change only on explicit user or API tilt and heading input",
         "Assert the public camera state exposes chosen and applied tilt and heading and the view mode"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F165",
@@ -2258,7 +2258,7 @@
         "Assert the camera never enters the terrain, the applied tilt is reduced only while required and returns to 70° once clear",
         "Assert the chosen tilt stays 70° throughout and every transition is free of jumps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F166",
@@ -2271,7 +2271,7 @@
         "Zoom back in and assert the applied tilt returns to 60° without a jump",
         "Assert the chosen tilt remains 60° throughout"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F167",

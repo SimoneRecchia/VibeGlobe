@@ -3468,7 +3468,7 @@
         "Pan away and back before and after expiry",
         "Assert tiles are reused from memory before expiry and requested again after expiry, with parent fallback and zero black pixels meanwhile"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F261",

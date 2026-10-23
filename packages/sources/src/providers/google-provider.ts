@@ -1,6 +1,6 @@
 import { WEB_MERCATOR_TILING, type TileCoord, type TileRequest } from '@vibeglobe/core';
 import { archiveTransport, HttpStatusError, NetworkError, readBody } from '../archive-transport.js';
-import { retryAfterMs } from '../fetch-transport.js';
+import { maxAgeOf, retryAfterMs } from '../fetch-transport.js';
 import { type Attribution, type DescribedImagerySource, type ProviderProfile, SourceConfigError } from '../metadata.js';
 
 /** The terms that apply: the customer's billing account address in the European Economic Area, or elsewhere. */
@@ -204,8 +204,13 @@ function tileReader(session: GoogleSession): Parameters<typeof archiveTransport>
     for (let attempt = 0; ; attempt++) {
       const token = await session.token();
       const response = await session.get(session.withToken(url, token), { signal });
-      if (response.ok)
-        return { bytes: await readBody(response, signal), contentType: response.headers.get('Content-Type') ?? '' };
+      if (response.ok) {
+        // Google's cache headers bound how long the engine may reuse the tile from memory (F260, ADR 0031).
+        const maxAgeMs = maxAgeOf(response.headers, Date.now());
+        const bytes = await readBody(response, signal);
+        const contentType = response.headers.get('Content-Type') ?? '';
+        return maxAgeMs === undefined ? { bytes, contentType } : { bytes, contentType, maxAgeMs };
+      }
       if (response.status === 404) return undefined;
       if ((response.status === 401 || response.status === 403) && attempt === 0) {
         await session.refused(token);

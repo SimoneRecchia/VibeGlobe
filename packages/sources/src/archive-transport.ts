@@ -26,7 +26,7 @@ export class NetworkError extends Error {
 export type TileReader = (
   url: string,
   signal: AbortSignal,
-) => Promise<{ bytes: ArrayBuffer; contentType: string } | undefined>;
+) => Promise<{ bytes: ArrayBuffer; contentType: string; maxAgeMs?: number } | undefined>;
 
 /**
  * Fetches a range of bytes with `fetchImpl`, raising {@link HttpStatusError} and {@link NetworkError} so that the
@@ -110,7 +110,13 @@ export function archiveTransport(read: TileReader): TileTransport {
           finish(
             tile === undefined
               ? { kind: 'status', status: 404, retryAfterMs: undefined }
-              : { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType },
+              : {
+                  kind: 'ok',
+                  bytes: tile.bytes,
+                  contentType: tile.contentType,
+                  // How long the reader's answer may be reused (its cache headers, F260).
+                  ...(tile.maxAgeMs === undefined ? {} : { maxAgeMs: tile.maxAgeMs }),
+                },
           ),
         )
         .catch((error: unknown) => finish(resultOf(error, reason, controller.signal.aborted)));

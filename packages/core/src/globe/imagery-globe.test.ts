@@ -101,6 +101,40 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
     globe.destroy();
   });
 
+  it('refines to full detail after a jump, drawing until the motion has settled (KB-131)', async () => {
+    const berlin = { longitudeDeg: 13.4, latitudeDeg: 52.5, zoom: 7 };
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source([])],
+      workers: instantWorkers(),
+      view: berlin,
+    });
+    const run = async (): Promise<void> => {
+      for (let frame = 0; frame < 120; frame++) {
+        await settle();
+        renderer.timers.advance(16);
+        renderer.flush();
+      }
+    };
+    await run();
+    const tiles = (): string =>
+      globe
+        .surfaceTiles()
+        .map((t) => `${t.level}/${t.x}/${t.y}`)
+        .sort()
+        .join(' ');
+    const still = tiles();
+    globe.jumpTo({ longitudeDeg: -74, latitudeDeg: 40.7, zoom: 6 });
+    await run();
+    globe.jumpTo(berlin);
+    await run();
+    expect(tiles()).toBe(still);
+    globe.destroy();
+  });
+
   it('refuses imagery without a worker pool', () => {
     const { factory } = fakeRenderer();
     expect(() =>

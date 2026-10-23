@@ -414,7 +414,7 @@ class GlobeEngine implements Globe {
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
   readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
-  readonly elevationAtAsync: Globe['elevationAtAsync'] = (position, options = {}) =>
+  readonly elevationAtAsync: Globe['elevationAtAsync'] = async (position, options = {}) =>
     this.assertAlive() ?? this.surfaceFrame.queryElevation(position, options.signal);
   readonly addModel: Globe['addModel'] = async (options) =>
     this.assertAlive() ?? addModel(this.renderer, options, () => this.requestRender());
@@ -427,7 +427,7 @@ class GlobeEngine implements Globe {
   };
   readonly addRenderExtension: Globe['addRenderExtension'] = (create) =>
     this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
-  captureFrame(): Promise<FrameCapture> {
+  async captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
     this.surfaceFrame.refuseReadback();
     return captureWhenDrawn({

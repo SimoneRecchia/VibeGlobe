@@ -384,9 +384,13 @@ export class SurfaceFrame {
     return this.imagery?.terrainStats();
   }
 
-  /** True while a tile cross-fades: the next frame changes the picture (F105). */
+  /**
+   * True while the next frame changes the picture: a tile cross-fades (F105), or the detail is still returning to full
+   * after fast motion (F288), which only frames measure (KB-131).
+   */
   get fading(): boolean {
-    return this.imagery?.fading ?? false;
+    const imagery = this.imagery;
+    return imagery !== undefined && (imagery.fading || motionOf(this).factor > 1);
   }
 
   /** True while imagery the view wants is still loading. */

@@ -116,10 +116,18 @@ export async function waitForSourceImagery(page: Page, maxLevel: number): Promis
     .toBe(true);
 }
 
-/** The mounted globe's current frame, composited over the page background. */
+/**
+ * The mounted globe's current frame, composited over the page background. The engine refuses to read back
+ * display-only content (Google, F323): the browser's own screenshot of the canvas stands in for it then.
+ */
 export async function sourceFrame(page: Page): Promise<PNG> {
   const frame = await page.evaluate(async () => {
-    const capture = await window.vibeglobeSources?.globe?.captureFrame();
+    const globe = window.vibeglobeSources?.globe;
+    const capture = await globe?.captureFrame().catch((error: unknown) => {
+      if ((error as { code?: string }).code === 'display-only') return null;
+      throw error;
+    });
+    if (capture === null) return null;
     if (!capture) throw new Error('no source globe');
     const bytes = new Uint8Array(capture.rgba.buffer, capture.rgba.byteOffset, capture.rgba.byteLength);
     let binary = '';
@@ -127,6 +135,7 @@ export async function sourceFrame(page: Page): Promise<PNG> {
       binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     return { widthPx: capture.widthPx, heightPx: capture.heightPx, base64: btoa(binary) };
   });
+  if (frame === null) return PNG.sync.read(await page.locator('.vg-source-test canvas').screenshot());
   const rgba = Buffer.from(frame.base64, 'base64');
   const image = new PNG({ width: frame.widthPx, height: frame.heightPx });
   for (let i = 0; i < rgba.length; i += 4) {

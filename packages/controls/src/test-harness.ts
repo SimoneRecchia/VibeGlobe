@@ -43,6 +43,9 @@ export class FlatCamera {
   requests = 0;
   /** The engine clock, milliseconds (advanced by the harness's frames). */
   timeMs = 0;
+  /** Camera changes made while coasting, and whether the controls are coasting now. */
+  coastingChanges = 0;
+  coasting = false;
 
   constructor(
     readonly widthPx: number,
@@ -79,6 +82,7 @@ export class FlatCamera {
       },
       dragTo: (anchor: GeoPosition, point) => {
         this.drags++;
+        if (this.coasting) this.coastingChanges++;
         const scale = 2 ** this.zoom;
         this.centerX = anchor.longitudeDeg - (point.xPx - this.widthPx / 2) / scale;
         this.centerY = anchor.latitudeDeg - (point.yPx - this.heightPx / 2) / scale;
@@ -99,6 +103,12 @@ export class FlatCamera {
       },
       get timeMs() {
         return camera.timeMs;
+      },
+      get coasting() {
+        return camera.coasting;
+      },
+      set coasting(value: boolean) {
+        camera.coasting = value;
       },
       get headingDeg() {
         return camera.headingDeg;

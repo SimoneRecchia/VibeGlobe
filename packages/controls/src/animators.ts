@@ -123,6 +123,8 @@ export class Inertia {
     const t = (this.elapsedMs += this.timeline.step(nowMs, port.previousFrameMs));
     if (t === before) return true;
     const { v, taus } = this;
+    // The engine announces these changes with the cause 'inertia' (F200).
+    port.setCoasting(true);
     const dHeading =
       inertiaOffset(v.headingDeg, taus.rotateTauMs, t) - inertiaOffset(v.headingDeg, taus.rotateTauMs, before);
     const dTilt = inertiaOffset(v.tiltDeg, taus.tiltTauMs, t) - inertiaOffset(v.tiltDeg, taus.tiltTauMs, before);
@@ -132,6 +134,7 @@ export class Inertia {
     this.pixel.yPx = this.origin.yPx + inertiaOffset(v.panYPx, taus.panTauMs, t);
     port.zoomAt(this.pixel, dZoom);
     if (this.anchor) port.dragTo(this.anchor, this.pixel);
+    port.setCoasting(false);
     if (this.resting(t)) this.stop();
     return this.active;
   }

@@ -20,7 +20,7 @@ export interface ViewHost {
   assertAlive(): void;
   requestRender(): void;
   /** The user moved the camera through an intent: it interrupts a running movement (F202, ADR 0036). */
-  userInput(): void;
+  userInput(cause: 'user' | 'inertia'): void;
   /** The engine clock's time, milliseconds. */
   timeMs(): number;
 }
@@ -34,22 +34,26 @@ export class ViewControl {
   readonly navigation: NavigationApi;
   /** `requestUpdate` was called since the last {@link ViewControl.takeUpdateRequest}. */
   private updateRequested = false;
+  /** See `NavigationApi.coasting`. */
+  private coasting = false;
   /** The input plug-in, attached to the renderer's input element; API movements interrupt it (F202). */
   readonly slot = new ControlsSlot();
 
   constructor(private readonly host: ViewHost) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the accessors below read this control
+    const control = this;
     this.navigation = {
       grab: (point) => (isScreenPoint(point) ? this.positionAt(point) : undefined),
       dragTo: (anchor, point) => {
         host.assertAlive();
         if (host.waiting()) return;
-        host.userInput();
+        host.userInput(this.coasting ? 'inertia' : 'user');
         if (dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
         if (host.waiting()) return;
-        host.userInput();
+        host.userInput(this.coasting ? 'inertia' : 'user');
         if (zoomCamera(host.cam, host.view, point, deltaZoom)) host.requestRender();
       },
       requestUpdate: () => {
@@ -57,6 +61,12 @@ export class ViewControl {
         host.requestRender();
       },
       orbit: (deltaHeadingDeg, deltaTiltDeg) => this.orbit(deltaHeadingDeg, deltaTiltDeg),
+      get coasting() {
+        return control.coasting;
+      },
+      set coasting(value: boolean) {
+        control.coasting = value === true;
+      },
       get timeMs() {
         return host.timeMs();
       },
@@ -117,7 +127,7 @@ export class ViewControl {
     host.assertAlive();
     if (host.waiting() || !(deltaHeadingDeg - deltaHeadingDeg === 0 && deltaTiltDeg - deltaTiltDeg === 0)) return;
     if (deltaHeadingDeg === 0 && deltaTiltDeg === 0) return;
-    host.userInput();
+    host.userInput(this.coasting ? 'inertia' : 'user');
     const pose = host.cam.pose;
     const heading = pose.headingRad + deltaHeadingDeg * RAD;
     pose.headingRad = heading - 2 * Math.PI * Math.floor(heading / (2 * Math.PI));

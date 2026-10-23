@@ -110,6 +110,11 @@ export class CameraPort {
     this.navigation.dragTo(anchor, point);
   }
 
+  /** Marks the camera changes that follow as the release inertia's (`NavigationApi.coasting`, F200). */
+  setCoasting(coasting: boolean): void {
+    this.navigation.coasting = coasting;
+  }
+
   /** {@link NavigationApi.zoomAt}, skipped for a zero step. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void {
     if (deltaZoom !== 0) this.navigation.zoomAt(point, deltaZoom);

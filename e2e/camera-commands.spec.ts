@@ -97,7 +97,12 @@ test('the +/- buttons zoom one level per press about the center, rapid presses a
     record.zoomFrames = [];
     globe.on('frame', () => {
       const shown = globe.geoToScreen(center);
-      record.zoomFrames.push({ zoom: globe.camera.zoom, morph: globe.camera.morphFactor, ...shown });
+      record.zoomFrames.push({
+        zoom: globe.camera.zoom,
+        morph: globe.camera.morphFactor,
+        xPx: shown?.xPx ?? Number.NaN,
+        yPx: shown?.yPx ?? Number.NaN,
+      });
     });
     return globe.camera.zoom;
   });
@@ -188,5 +193,124 @@ test('zoom is continuous and fractional: the API keeps 10.37, a trackpad pinch n
     const [before, after] = [frames[i - 1], frames[i]];
     if (!before || !after || after.zoom === before.zoom) continue;
     expect(after.metersPerPx / before.metersPerPx).toBeCloseTo(2 ** (before.zoom - after.zoom), 2);
+  }
+});
+
+test('movement promises settle as completed, interrupted or cancelled, events carry their cause, and invalid calls reject without moving (F200)', async ({
+  page,
+}) => {
+  await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=5&clockStepMs=16.666666666666668');
+  const outcomes = await page.evaluate(async () => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    const events: string[] = [];
+    globe.on('movestart', ({ cause }) => events.push(`start:${cause}`));
+    globe.on('moveend', ({ cause, outcome }) => events.push(`end:${cause}:${outcome}`));
+    const completed = [
+      await globe.flyTo({ longitudeDeg: 12, latitudeDeg: 44, zoom: 6 }, { durationMs: 300 }),
+      await globe.easeTo({ longitudeDeg: 11, latitudeDeg: 45 }, { durationMs: 300 }),
+      await globe.jumpTo({ zoom: 6.5 }),
+      await globe.tour([
+        { target: { zoom: 6 }, movement: 'ease', durationMs: 200 },
+        { target: { zoom: 5.5 }, movement: 'jump' },
+      ]),
+    ];
+    const first = globe.flyTo({ longitudeDeg: 30, latitudeDeg: 10, zoom: 4 }, { durationMs: 2000 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const second = globe.easeTo({ zoom: 5 }, { durationMs: 200 });
+    const interrupted = [await first, await second];
+    const cancelled: string[] = [];
+    const stopped: number[] = [];
+    for (const start of [
+      (signal?: AbortSignal) =>
+        globe.flyTo({ longitudeDeg: 40, latitudeDeg: 0, zoom: 3 }, { durationMs: 2000, ...(signal ? { signal } : {}) }),
+      (signal?: AbortSignal) =>
+        globe.easeTo({ longitudeDeg: 40, latitudeDeg: 0 }, { durationMs: 2000, ...(signal ? { signal } : {}) }),
+      (signal?: AbortSignal) =>
+        globe.tour(
+          [{ target: { longitudeDeg: 40, latitudeDeg: 0 }, movement: 'ease', durationMs: 2000 }],
+          signal ? { signal } : {},
+        ),
+    ]) {
+      for (const how of ['cancel', 'signal'] as const) {
+        const controller = new AbortController();
+        const movement = start(how === 'signal' ? controller.signal : undefined);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (how === 'cancel') movement.cancel();
+        else controller.abort();
+        cancelled.push(await movement);
+        const at = globe.camera.longitudeDeg;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        stopped.push(globe.camera.longitudeDeg - at);
+      }
+    }
+    const before = globe.camera.longitudeDeg;
+    const errors: string[] = [];
+    for (const call of [
+      () => globe.flyTo({ zoom: Number.NaN }),
+      () => globe.easeTo({ latitudeDeg: 200 }),
+      () => globe.jumpTo({ longitudeDeg: Number.POSITIVE_INFINITY }),
+    ]) {
+      try {
+        await call();
+        errors.push('none');
+      } catch (error) {
+        errors.push(`${(error as Error).name}:${(error as { code?: string }).code}`);
+      }
+    }
+    return { completed, interrupted, cancelled, stopped, events, errors, moved: globe.camera.longitudeDeg - before };
+  });
+  expect(outcomes.completed).toEqual(['completed', 'completed', 'completed', 'completed']);
+  expect(outcomes.interrupted).toEqual(['interrupted', 'completed']);
+  expect(outcomes.cancelled).toEqual(Array(6).fill('cancelled'));
+  for (const delta of outcomes.stopped) expect(delta).toBe(0);
+  expect(outcomes.errors).toEqual(Array(3).fill('GlobeError:invalid-coordinate'));
+  expect(outcomes.moved).toBe(0);
+  expect(outcomes.events.slice(0, 2)).toEqual(['start:api', 'end:api:completed']);
+  expect(outcomes.events.every((event) => event.includes(':api'))).toBe(true);
+});
+
+test('a drag released at speed is announced as user movement, then as inertia, with at most one move per frame (F200)', async ({
+  page,
+}) => {
+  await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=5');
+  await page.evaluate(() => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    const record = window as unknown as { moveEvents: string[] };
+    record.moveEvents = [];
+    globe.on('movestart', ({ cause }) => record.moveEvents.push(`start:${cause}`));
+    globe.on('move', ({ cause }) => record.moveEvents.push(`move:${cause}`));
+    globe.on('moveend', ({ cause }) => record.moveEvents.push(`end:${cause}`));
+    globe.on('frame', () => record.moveEvents.push('frame'));
+  });
+  const box = await page.locator('#globe').boundingBox();
+  if (!box) throw new Error('no canvas');
+  // A warm-up drag: the first one after the page load meets slow frames, which the measured one should not.
+  await page.mouse.move(box.x + 200, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 180, box.y + 120, { steps: 3 });
+  await page.waitForTimeout(500);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => ((window as unknown as { moveEvents: string[] }).moveEvents = []));
+  await page.mouse.move(box.x + 100, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 220, box.y + 120, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(2000);
+  const events = await page.evaluate(() => (window as unknown as { moveEvents: string[] }).moveEvents);
+  const bounds = events.filter((event) => !event.startsWith('move:') && event !== 'frame');
+  // User movements (a frame without a pointer move may end one, and the next move start another), then the inertia;
+  // every start has its end, with the same cause.
+  expect(bounds.slice(-2)).toEqual(['start:inertia', 'end:inertia']);
+  const user = bounds.slice(0, -2);
+  expect(user.length).toBeGreaterThan(0);
+  expect(user).toEqual(user.map((_, i) => (i % 2 === 0 ? 'start:user' : 'end:user')));
+  // Between two frames there is at most one move event.
+  let moves = 0;
+  for (const event of events) {
+    if (event === 'frame') moves = 0;
+    else if (event.startsWith('move:')) expect(++moves).toBe(1);
   }
 });

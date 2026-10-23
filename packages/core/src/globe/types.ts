@@ -254,6 +254,11 @@ export interface NavigationApi {
    * become the chosen ones, the tilt within 0–90° and the constraints); allocation-free (F182–F185).
    */
   orbit(deltaHeadingDeg: number, deltaTiltDeg: number): void;
+  /**
+   * True while the controls apply their release inertia: the camera changes made meanwhile are announced with the
+   * cause 'inertia' instead of 'user' (F200). The controls set it around their inertia step.
+   */
+  coasting: boolean;
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
   readonly timeMs: number;
   /** The applied heading and tilt, degrees. */

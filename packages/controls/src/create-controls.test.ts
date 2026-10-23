@@ -57,6 +57,9 @@ describe('inertia (F179, ADR 0009 §6)', () => {
     const steps = positions.map((p, i) => (i === 0 ? released : (positions[i - 1] ?? 0)) - p);
     for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeLessThanOrEqual((steps[i - 1] ?? 0) + 1e-9);
     expect(h.camera.centerY).toBe(0);
+    // Every inertia step is marked as coasting for the engine's move events (F200), and the mark is cleared after.
+    expect(h.camera.coastingChanges).toBeGreaterThan(10);
+    expect(h.camera.coasting).toBe(false);
   });
 
   it('does not coast after the pointer held still before the release', () => {

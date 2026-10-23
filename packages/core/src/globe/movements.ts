@@ -86,6 +86,8 @@ export class Movements {
   private readonly stepIo = new Float64Array(2);
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
+  /** What the running user movement is: input, or the controls' inertia after it (F200). */
+  private userCause: MoveCause = 'user';
   private userInputThisFrame = false;
   /**
    * The system's reduced-motion setting (F214), followed at runtime: flights then fade to their target instead of
@@ -97,7 +99,9 @@ export class Movements {
 
   /** True while a movement runs: the frame loop keeps drawing. */
   get active(): boolean {
-    return this.running !== undefined;
+    // With a moveend listener, a user movement keeps frames coming until one without input announces its end (F200);
+    // without one, frames stop with the input (F062).
+    return this.running !== undefined || (this.userMoving && this.host.emitter.has('moveend'));
   }
 
   /** Starts an ease or a flight; invalid input rejects with a GlobeError and moves nothing. */
@@ -294,13 +298,21 @@ export class Movements {
     if (this.running) this.finish(this.running, 'interrupted');
   }
 
-  /** Called by the navigation intents: user input takes over (F202) and is announced with the cause 'user'. */
-  userInput(): void {
+  /**
+   * Called by the navigation intents: user input takes over (F202) and is announced with its cause, 'user' or the
+   * controls' 'inertia'; a change of cause ends one movement and starts the next.
+   */
+  userInput(cause: 'user' | 'inertia' = 'user'): void {
     this.interrupt();
     this.userInputThisFrame = true;
+    if (this.userMoving && this.userCause !== cause) {
+      this.userMoving = false;
+      this.host.emitter.emit('moveend', { cause: this.userCause, outcome: 'completed' });
+    }
+    this.userCause = cause;
     if (!this.userMoving) {
       this.userMoving = true;
-      this.host.emitter.emit('movestart', { cause: 'user' });
+      this.host.emitter.emit('movestart', { cause });
     }
   }
 
@@ -326,11 +338,11 @@ export class Movements {
   /** Called after the controls ran in a frame: a user movement with no input this frame has ended. */
   afterInput(): void {
     if (this.userInputThisFrame) {
-      this.moveEvent.cause = 'user';
+      this.moveEvent.cause = this.userCause;
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
     } else if (this.userMoving) {
       this.userMoving = false;
-      this.host.emitter.emit('moveend', { cause: 'user', outcome: 'completed' });
+      this.host.emitter.emit('moveend', { cause: this.userCause, outcome: 'completed' });
     }
     this.userInputThisFrame = false;
   }
@@ -451,7 +463,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     waiting: () => globe.waiting(),
     assertAlive: () => globe.assertAlive(),
     requestRender: () => globe.requestRender(),
-    userInput: () => movements.userInput(),
+    userInput: (cause) => movements.userInput(cause),
     timeMs: () => globe.clock.timeMs,
   });
   const movements: Movements = new Movements({

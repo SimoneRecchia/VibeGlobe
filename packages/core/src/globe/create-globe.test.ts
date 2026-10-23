@@ -485,6 +485,39 @@ describe('createGlobe', () => {
     expect(interrupted).toBe(1);
   });
 
+  it('announces inertia from the controls with the cause inertia, after the drag that started it (F200)', async () => {
+    let navigation: NavigationApi | undefined;
+    let step: ((api: NavigationApi) => void) | undefined;
+    const { globe, renderer } = await started({
+      controls: (_element, api) => {
+        navigation = api;
+        return { update: () => step?.(api), destroy: () => undefined };
+      },
+    });
+    if (!navigation) throw new Error('no navigation');
+    const events: string[] = [];
+    globe.on('movestart', ({ cause }) => events.push(`start:${cause}`));
+    globe.on('move', ({ cause }) => events.push(`move:${cause}`));
+    globe.on('moveend', ({ cause }) => events.push(`end:${cause}`));
+    const anchor = navigation.grab({ xPx: 400, yPx: 300 });
+    if (!anchor) throw new Error('off the globe');
+    step = (api) => api.dragTo(anchor, { xPx: 420, yPx: 300 });
+    navigation.requestUpdate();
+    renderer.flush();
+    step = (api) => {
+      api.coasting = true;
+      api.dragTo(anchor, { xPx: 430, yPx: 300 });
+      api.coasting = false;
+    };
+    navigation.requestUpdate();
+    renderer.flush();
+    // The inertia's last step asks for no frame: the engine draws one more on its own, which ends the movement.
+    step = undefined;
+    renderer.flush();
+    expect(events).toEqual(['start:user', 'move:user', 'end:user', 'start:inertia', 'move:inertia', 'end:inertia']);
+    expect(renderer.flush()).toBe(0);
+  });
+
   it('rejects ready with a typed error when the renderer cannot start (F055)', async () => {
     const errors: string[] = [];
     const globe = createGlobe({

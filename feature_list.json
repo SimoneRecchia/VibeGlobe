@@ -2700,7 +2700,7 @@
         "Assert events fire in order with their cause (user, API, inertia) and that move fires at most once per frame",
         "Assert calls with invalid arguments reject with typed validation errors without moving the camera"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F201",

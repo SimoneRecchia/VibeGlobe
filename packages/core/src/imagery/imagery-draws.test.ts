@@ -138,6 +138,11 @@ describe('drawImagery', () => {
     const packaged = fakeLayer({ 8: 40 }, [], 8);
     const online = fakeLayer({ 9: 41 });
     expect(drawStack([stacked([packaged.layer, online.layer])], tile9).textures[0]).toBe(41);
+    // While the online tile loads, its ancestors at the package's levels are not requested: the package's stand in.
+    const loading = fakeLayer({});
+    const list9 = drawStack([stacked([fakeLayer({ 8: 40 }, [], 8).layer, loading.layer])], tile9);
+    expect(loading.wanted.filter((level) => level <= 8)).toEqual([]);
+    expect(list9.textures[0]).toBe(40);
     // Outside the online source's coverage its tile has no data: the package's level-8 tile is magnified.
     const outside = fakeLayer({}, [9]);
     const list = drawStack([stacked([fakeLayer({ 8: 40 }, [], 8).layer, outside.layer])], tile9);

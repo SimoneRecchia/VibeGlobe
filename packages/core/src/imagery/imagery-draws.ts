@@ -161,14 +161,17 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
  */
 function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance: number): number {
   let fallback = -1;
+  // Levels an earlier source serves are its own: a later source is asked only for finer ones (F247).
+  let floor = 0;
   for (let k = 0; k < chain.length; k++) {
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
       if (fallback < 0 && mapInto(layer.source, tile)) fallback = k;
+      if (tile.level > layer.source.maxLevel && layer.source.maxLevel + 1 > floor) floor = layer.source.maxLevel + 1;
       continue;
     }
-    if (wantLayer(layer, tile, distance) >= 0) return k;
+    if (wantLayer(layer, tile, distance, floor) >= 0) return k;
     for (let j = 0; j < chain.length; j++) {
       const standIn = chain[j];
       if (j !== k && standIn && residentLayer(standIn, tile) >= 0) return j;
@@ -176,7 +179,7 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     return -1;
   }
   const covering = chain[fallback];
-  return covering && wantLayer(covering, tile, distance) >= 0 ? fallback : -1;
+  return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }
 
 /** Maps a tile into a source's tiles at the tile's level clamped to the source's (into `mapping`); false if it cannot. */
@@ -228,15 +231,17 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 
 /**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
- * `mapping`; -1 when none is resident or the layer cannot cover the tile.
+ * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
+ * source of the chain) are neither requested nor looked up.
  */
-function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number): number {
+function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
   if (!mapInto(source, tile)) return -1;
   const wanted = mapping[MAPPING_LEVEL] ?? 0;
+  const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
-  for (let current = wanted; current >= source.minLevel; current--) {
+  for (let current = wanted; current >= lowest; current--) {
     const x = mapping[MAPPING_X] ?? 0;
     const y = mapping[MAPPING_Y] ?? 0;
     // The wanted tile and every second ancestor are requested; the others are only looked up.
@@ -249,7 +254,7 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number): n
       return handle;
     }
     if (handle === ARRIVING) arriving = true;
-    if (current > source.minLevel) mapAncestor(mapping, 0, 1);
+    if (current > lowest) mapAncestor(mapping, 0, 1);
   }
   return -1;
 }

@@ -36,8 +36,10 @@ Option 1, with two overlay slots.
 - **Chains.** Each source of a chain has its own loader. A tile comes from the first source that has it at the
   surface's level (within its levels and coverage, not missing, not backing off after a failure); while that source's
   tile loads, a resident tile of another source stands in; where no source has it, the first source that covers the
-  area shows its deepest tile magnified. A failing source is tried again after its backoff, so the layer switches back
-  when it recovers.
+  area shows its deepest tile magnified. Levels an earlier source serves are its own: a later source is asked only for
+  finer ones, and only the first source of a chain pins a base. A source has nothing outside its declared coverage, so
+  the layers below show there. A failing source is tried again after its backoff, so the layer switches back when it
+  recovers.
 
 ## Consequences
 

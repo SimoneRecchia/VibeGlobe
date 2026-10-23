@@ -1,3 +1,4 @@
+import { rgba8Bytes } from '../cache/byte-size.js';
 import type { ImagerySource } from './imagery-source.js';
 
 /** How a layer combines with the layers below it (F246). */
@@ -109,4 +110,30 @@ export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): v
 /** True when a layer covers what is below it where it has a tile: fully opaque and blended normally. */
 export function isOpaque(entry: StackEntry): boolean {
   return entry.opacity >= 1 && entry.blend === 'normal';
+}
+
+/**
+ * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
+ * the sum over every base source within 1/8 of the GPU budget (M3 plan §3, risk 8).
+ */
+export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: number): number[] {
+  const sources = entries.flatMap((entry) => entry.sources);
+  // Only the first source of a chain pins a base: the later ones serve finer levels or stand in (F247).
+  const heads = entries.flatMap((entry) => entry.sources.map((_, index) => index === 0));
+  const levels = sources.map(() => -1);
+  let used = 0;
+  for (let level = 0; level <= 25; level++) {
+    let added = false;
+    for (const [index, source] of sources.entries()) {
+      if (!heads[index] || levels[index] !== level - 1) continue;
+      const tiles = source.tiling.rootTilesX * source.tiling.rootTilesY * 4 ** level;
+      const bytes = tiles * rgba8Bytes(source.tileSizePx, source.tileSizePx);
+      if (used + bytes > gpuBudgetBytes / 8) continue;
+      used += bytes;
+      levels[index] = level;
+      added = true;
+    }
+    if (!added) break;
+  }
+  return levels;
 }

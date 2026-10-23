@@ -1,11 +1,10 @@
-import { rgba8Bytes } from '../cache/byte-size.js';
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
-import type { StackEntry } from '../imagery/imagery-stack.js';
+import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
@@ -15,7 +14,7 @@ import {
   type ImageryLoaderOptions,
   type TileMemory,
 } from '../imagery/imagery-loader.hot.js';
-import { imageryDecodeTask, type ImagerySource, type TileSource } from '../imagery/imagery-source.js';
+import { imageryDecodeTask, type TileSource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
@@ -123,29 +122,6 @@ function releaseNetworkPool(pool: NetworkPool): void {
 }
 
 /** What the runtime reports to its engine instance. */
-
-/**
- * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
- * the sum over every base source within 1/8 of the GPU budget (M3 plan §3, risk 8).
- */
-function pinnedLevels(sources: readonly ImagerySource[], gpuBudgetBytes: number): number[] {
-  const levels = sources.map(() => -1);
-  let used = 0;
-  for (let level = 0; level <= 25; level++) {
-    let added = false;
-    for (const [index, source] of sources.entries()) {
-      if (levels[index] !== level - 1) continue;
-      const tiles = source.tiling.rootTilesX * source.tiling.rootTilesY * 4 ** level;
-      const bytes = tiles * rgba8Bytes(source.tileSizePx, source.tileSizePx);
-      if (used + bytes > gpuBudgetBytes / 8) continue;
-      used += bytes;
-      levels[index] = level;
-      added = true;
-    }
-    if (!added) break;
-  }
-  return levels;
-}
 
 /** What every loader of an engine instance shares. */
 interface LoaderContext {
@@ -257,7 +233,7 @@ export class ImageryRuntime {
       },
     });
     const shared: TileMemory = { residency: this.residency, ram: this.ram, frame: () => this.frame };
-    const pinned = pinnedLevels(sources, gpuBudgetBytes);
+    const pinned = pinnedLevels(entries, gpuBudgetBytes);
     const pool = this.lease.pool;
     const context: LoaderContext = { network: this.network, pool, shared, renderer, callbacks, observability };
     const loaderOptions = (source: TileSource, index: number, pinnedLevel: number): LoaderBase =>

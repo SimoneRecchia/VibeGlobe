@@ -11,7 +11,7 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { credits, overlayLayers } from './fixture-layers.js';
+import { chainSources, credits, overlayLayers } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -196,7 +196,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [source, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
+  const chain = chainSources(params, base, session, imageryTiling, ITALY);
+  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
+  return { imagery: [layer, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
 }
 
 /**

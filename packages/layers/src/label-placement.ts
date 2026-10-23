@@ -165,12 +165,13 @@ export class LabelPlacer {
       const due = this.#forced || (this.#stale && nowMs - this.#lastPlacementMs >= this.#intervalMs);
       if (due) {
         this.#pass = this.#start(labels());
-        this.#lastPlacementMs = nowMs;
         this.#forced = false;
         this.#stale = false;
       } else if (this.#lastFrameMs !== undefined) this.#stale = true;
     }
     if (this.#pass !== undefined) ended = this.#continue(this.#pass, projector);
+    // Passes end at least the interval apart, so a label's decision never reverses within a fade (F360).
+    if (ended) this.#lastPlacementMs = nowMs;
     const elapsed = this.#lastFrameMs === undefined ? 0 : Math.max(0, nowMs - this.#lastFrameMs);
     this.#lastFrameMs = nowMs;
     const step = this.#fadeMs > 0 ? elapsed / this.#fadeMs : 1;

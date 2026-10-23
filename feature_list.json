@@ -4802,7 +4802,7 @@
         "Run temporal glitch detection and verify no label toggles visibility more than once within the fade window and none jumps more than 1 pixel between frames beyond camera motion",
         "Verify visibility changes are fades of the documented duration, not single-frame pops"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F361",

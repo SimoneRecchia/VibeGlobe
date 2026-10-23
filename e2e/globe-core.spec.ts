@@ -408,6 +408,8 @@ for (const backend of BACKENDS) {
         companionShown = next;
       }
       await page.mouse.up();
+      // The release may coast (F179): the next drag's points are picked once the globe holds still.
+      await waitForIdle(page);
     }
     await expectCompleteGlobe(page);
   });

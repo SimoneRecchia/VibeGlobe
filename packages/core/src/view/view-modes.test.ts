@@ -229,6 +229,20 @@ describe('temporary tilt clamps (F165, F166)', () => {
     expect(camera.pose.tiltRad / DEG).toBeGreaterThan(limitDeg - 0.05);
     expect(view.chosenTiltRad).toBeCloseTo(80 * DEG, 12);
   });
+
+  it('keeps the tilt when even a vertical view leaves the eye under the terrain: the target is lifted instead (KB-104)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.chooseTilt(55 * DEG);
+    const camera = new Camera();
+    camera.widthPx = 320;
+    camera.heightPx = 240;
+    camera.pose.rangeMeters = 5;
+    camera.update();
+    // A jump leaves the target on the ellipsoid under a 3,800 m mountain until the frame lifts it.
+    const mountain = { probeGround: (c: Camera): void => void (c.groundHeightMeters = 3800) };
+    view.applyTilt(camera, 2, mountain);
+    expect(camera.pose.tiltRad / DEG).toBeCloseTo(55, 9);
+  });
 });
 
 describe('view regressions of the M5 review', () => {

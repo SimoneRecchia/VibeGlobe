@@ -221,6 +221,13 @@ export class ViewState {
     const values = this.values;
     if (clears(camera, values, WANTED_TILT, ground)) return;
     values[LOW_TILT] = 0;
+    // Under the terrain even looking straight down: the target is below the surface (after a jump, before the frame
+    // lifts it), which no tilt mends, so the wanted tilt stands (KB-104).
+    if (!clears(camera, values, LOW_TILT, ground)) {
+      values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
+      clears(camera, values, WANTED_TILT, ground);
+      return;
+    }
     values[HIGH_TILT] = values[WANTED_TILT] ?? 0;
     for (let step = 0; step < PROBE_STEPS; step++) {
       values[APPLIED_TILT] = ((values[LOW_TILT] ?? 0) + (values[HIGH_TILT] ?? 0)) / 2;

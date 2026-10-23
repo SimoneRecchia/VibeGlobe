@@ -139,6 +139,12 @@ test('an exported trace holds tile states, requests with their end, cancellation
   for (const zoom of [6.5, 7.5, 5.5]) {
     await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
     await page.waitForTimeout(1500);
+    // The slow level-7 requests are in flight before the view leaves them, so leaving cancels them (on a slow renderer
+    // 1.5 s may not reach them).
+    if (zoom === 7.5)
+      await expect
+        .poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats()?.loading ?? 0))
+        .toBeGreaterThan(0);
   }
   const trace = await page.evaluate(
     () => JSON.stringify(window.vibeglobePlayground?.globe.diagnostics.stopTrace()) ?? '[]',

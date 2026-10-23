@@ -2810,7 +2810,7 @@
         "Assert the zoom never leaves the range in any frame",
         "Assert the approach to the limit decelerates smoothly with no frame-to-frame jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F210",
@@ -2822,7 +2822,7 @@
         "Assert the applied and chosen tilt never exceed the maximum in any frame",
         "Assert the approach to the limit is smooth"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F211",
@@ -2834,7 +2834,7 @@
         "Assert the view center stays inside the bounds in every frame and edge contact decelerates smoothly",
         "Repeat with bounds crossing the antimeridian and assert correct behavior on both sides"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F212",
@@ -2871,7 +2871,7 @@
         "Assert drag inertia is disabled or shortened as documented",
         "Toggle the setting at runtime and assert behavior follows without a reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F215",
@@ -2884,7 +2884,7 @@
         "Tilt again to 50° and assert the chosen tilt becomes 50°",
         "Select 2D, 3D and Auto in turn and assert each replaces the manual tilt as specified"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F216",
@@ -2896,7 +2896,7 @@
         "Zoom out to the globe and back, switch view modes, and assert the heading stays 120°",
         "Assert only an explicit user action (compass, orientation commands) or an API call that specifies a heading changes it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F217",

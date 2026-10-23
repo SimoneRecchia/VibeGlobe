@@ -1,3 +1,4 @@
+import type { Constraints } from './constraints.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js';
 import { FadeJump } from '../camera/fade-jump.js';
@@ -59,6 +60,8 @@ export interface MovementHost {
   requestRender(): void;
   /** An API movement starts: the controls stop their own animations (F202). */
   interruptInput(): void;
+  /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
+  constrainEnd(end: Float64Array): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -130,6 +133,7 @@ export class Movements {
       view.headingDeg * RAD,
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
+    this.host.constrainEnd(end);
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
     const animator =
       kind === 'fly' && this.reducedMotion
@@ -448,6 +452,7 @@ export interface ViewWiring {
   readonly view: ViewState;
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
+  readonly constraints: Constraints;
   setOpacity(opacity: number): void;
   waiting(): boolean;
   assertAlive(): void;
@@ -479,6 +484,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     setOpacity: (opacity) => globe.setOpacity(opacity),
     requestRender: () => globe.requestRender(),
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
+    constrainEnd: (end) => globe.constraints.clampEnd(end),
   });
   return { viewControl, movements };
 }

@@ -81,6 +81,18 @@ export class Constraints {
     return this.values[MAX_TILT] ?? Number.NaN;
   }
 
+  /**
+   * Moves a movement's end point (longitude and latitude, radians, in the first two entries) into the bounds, so the
+   * movement ends where the bounds let it instead of being held at their edge on the way (F211).
+   */
+  clampEnd(end: Float64Array): void {
+    const v = this.values;
+    const south = v[SOUTH] ?? Number.NaN;
+    if (south !== south) return;
+    end[0] = clampLongitude(end[0] ?? 0, v);
+    end[1] = Math.min(Math.max(end[1] ?? 0, south), v[NORTH] ?? 0);
+  }
+
   /** Clamps the camera's range to the zoom limits and its target into the bounds. Does not update the camera. */
   apply(camera: Camera): void {
     const v = this.values;
@@ -90,7 +102,7 @@ export class Constraints {
     if (south === south) {
       if (pose.targetLatitudeRad < south) pose.targetLatitudeRad = south;
       if (pose.targetLatitudeRad > (v[NORTH] ?? 0)) pose.targetLatitudeRad = v[NORTH] ?? 0;
-      clampLongitude(pose, v);
+      pose.targetLongitudeRad = clampLongitude(pose.targetLongitudeRad, v);
     }
     const minZoom = v[MIN_ZOOM] ?? Number.NaN;
     const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
@@ -106,17 +118,16 @@ export class Constraints {
   }
 }
 
-/** Clamps the target longitude into [west, east], across the antimeridian when east < west, to the nearer edge. */
-function clampLongitude(pose: Camera['pose'], v: Float64Array): void {
+/** Clamps a longitude into [west, east], across the antimeridian when east < west, to the nearer edge. */
+function clampLongitude(lon: number, v: Float64Array): number {
   const west = v[WEST] ?? 0;
   const east = v[EAST] ?? 0;
-  const lon = pose.targetLongitudeRad;
   const inside = west <= east ? lon >= west && lon <= east : lon >= west || lon <= east;
-  if (inside) return;
+  if (inside) return lon;
   // Distances to each edge, going round the shorter way.
   let toWest = Math.abs(lon - west);
   if (toWest > Math.PI) toWest = 2 * Math.PI - toWest;
   let toEast = Math.abs(lon - east);
   if (toEast > Math.PI) toEast = 2 * Math.PI - toEast;
-  pose.targetLongitudeRad = toWest < toEast ? west : east;
+  return toWest < toEast ? west : east;
 }

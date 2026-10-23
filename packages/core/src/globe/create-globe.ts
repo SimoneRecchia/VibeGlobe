@@ -122,6 +122,7 @@ class GlobeEngine implements Globe {
       view: this.surfaceFrame.view,
       emitter: this.emitter,
       clock: this.clock,
+      constraints: this.constraints,
       setOpacity: (opacity) => this.renderer?.host.setOpacity?.(opacity),
       waiting: () => this.waiting,
       assertAlive: () => this.assertAlive(),

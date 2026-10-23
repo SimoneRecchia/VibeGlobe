@@ -382,6 +382,27 @@ describe('camera constraints (F209–F211)', () => {
     globe.destroy();
   });
 
+  it('keeps the default tilt of 3D mode under the maximum tilt, and flies to a target outside the bounds without a jump (KB-123)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 10, latitudeDeg: 45, zoom: 14 });
+    globe.setConstraints({ maxTiltDeg: 30, bounds: { westDeg: 5, southDeg: 40, eastDeg: 15, northDeg: 50 } });
+    globe.setViewMode('3d');
+    ticks(1);
+    expect(globe.camera.chosenTiltDeg).toBeLessThanOrEqual(30 + 1e-9);
+    const flight = globe.flyTo({ longitudeDeg: 40, latitudeDeg: -60, zoom: 6 }, { durationMs: 800 });
+    let last = globe.camera;
+    for (let i = 0; i < 80; i++) {
+      ticks(1);
+      const now = globe.camera;
+      expect(Math.hypot(now.longitudeDeg - last.longitudeDeg, now.latitudeDeg - last.latitudeDeg)).toBeLessThan(1);
+      last = now;
+    }
+    expect(await flight).toBe('completed');
+    // At the nearest corner of the bounds.
+    expect(globe.camera.longitudeDeg).toBeCloseTo(15, 6);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(40, 6);
+    globe.destroy();
+  });
+
   it('fades a flight to its target under the reduced-motion setting, following changes at runtime (F214)', async () => {
     const { renderer, factory } = fakeRenderer();
     let setReduce: (reduce: boolean) => void = () => undefined;

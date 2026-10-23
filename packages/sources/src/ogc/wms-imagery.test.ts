@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { TileCoord, TransportResult } from '@vibeglobe/core';
+import { WEB_MERCATOR_TILING, type TileCoord, type TransportResult } from '@vibeglobe/core';
+import { transformCoordinates } from '@vibeglobe/gis';
 import { failures, runParserConformance, runTiledConformance } from '../conformance/index.js';
 import { fetchTransport } from '../fetch-transport.js';
 import { SourceConfigError } from '../metadata.js';
@@ -112,6 +113,69 @@ describe('wmsImagery (F231, F227)', () => {
       /reprojection/,
     );
     await expect(wmsImagery({ id: 'x', capabilities: SYNTHETIC, layers: ['nope'] })).rejects.toThrow(SourceConfigError);
+  });
+
+  it('reprojects a UTM-only layer on the client through the given transforms, and not one that offers EPSG:3857 (F227)', async () => {
+    const transforms = (crs: string) =>
+      crs === 'EPSG:32632'
+        ? {
+            toSource: (lon: number, lat: number): [number, number] => {
+              const p = transformCoordinates({ x: lon, y: lat }, 'EPSG:4326', crs);
+              return [p.x, p.y];
+            },
+            fromSource: (x: number, y: number): [number, number] => {
+              const p = transformCoordinates({ x, y }, crs, 'EPSG:4326');
+              return [p.x, p.y];
+            },
+          }
+        : undefined;
+    // Offered next to UTM, EPSG:3857 is requested directly even when transforms are given.
+    const direct = await urlOf({ id: 'd', capabilities: SYNTHETIC, layers: ['ortho'], transforms }, coord(8, 134, 91));
+    expect(direct.get('CRS')).toBe('EPSG:3857');
+    const urls: string[] = [];
+    const source = await wmsImagery({
+      id: 'u',
+      capabilities: SYNTHETIC,
+      layers: ['cadastre'],
+      transforms,
+      transport: fetchTransport((input) => {
+        urls.push(String(input));
+        return Promise.resolve(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }));
+      }),
+    });
+    expect([source.tiling.crs, source.transparent]).toEqual(['EPSG:3857', true]);
+    // Milan at level 8, and nothing outside the layer's bounds.
+    const c = WEB_MERCATOR_TILING.tileAt((9.19 * Math.PI) / 180, (45.46 * Math.PI) / 180, 8, coord(0, 0, 0));
+    expect(source.request(coord(8, 0, 0), blank())).toBe('noData');
+    const request = source.request(c, blank());
+    if (typeof request !== 'object') throw new Error('no request');
+    // The warp itself needs a browser (e2e reprojection.spec.ts, F226); here it settles as no data.
+    const warped = await new Promise<TransportResult>((resolve) =>
+      source.transport.start({ url: request.url, hostIndex: 0 }, { firstByteMs: 1000, totalMs: 1000 }, resolve),
+    );
+    expect(warped.kind).toBe('ok');
+    expect(urls).toHaveLength(1);
+    const params = query(urls[0] ?? '');
+    expect([params.get('CRS'), params.get('LAYERS'), params.get('MAP')]).toEqual(['EPSG:32632', 'cadastre', 'italy']);
+    // Alignment: the GetMap box, easting first, contains the tile's corners in UTM.
+    const [w, s, e, n] = params.get('BBOX')?.split(',').map(Number) ?? [];
+    const extent = WEB_MERCATOR_TILING.tileExtent(c, { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 });
+    for (const [lonRad, latRad] of [
+      [extent.westRad, extent.southRad],
+      [extent.eastRad, extent.northRad],
+      [extent.westRad, extent.northRad],
+      [extent.eastRad, extent.southRad],
+    ] as const) {
+      const p = transformCoordinates(
+        { x: (lonRad * 180) / Math.PI, y: (latRad * 180) / Math.PI },
+        'EPSG:4326',
+        'EPSG:32632',
+      );
+      expect(p.x).toBeGreaterThanOrEqual(w ?? NaN);
+      expect(p.x).toBeLessThanOrEqual(e ?? NaN);
+      expect(p.y).toBeGreaterThanOrEqual(s ?? NaN);
+      expect(p.y).toBeLessThanOrEqual(n ?? NaN);
+    }
   });
 
   it('crops the gutter and treats XML service exceptions as permanent failures', async () => {

@@ -18,6 +18,9 @@ import { coverageOf, inLevelsAndCoverage } from '../tiling.js';
 import { MERCATOR_HALF_WORLD_M, normalizeCrs, tilingOfCrs } from './crs.js';
 import { loadCapabilities } from './load.js';
 import { parseWmsCapabilities, type WmsCapabilities } from './wms-capabilities.js';
+import { reprojectedImagery } from '../reproject/reprojected-imagery.js';
+import { wmsGetMapUrl } from '../reproject/wms-get-map.js';
+import { sourceBoundsOf, type FromSource, type ToSource } from '../reproject/warp-math.js';
 import { type CropImage, cropInBrowser, wmsTransport } from './wms-transport.js';
 
 /** Options of {@link wmsImagery}. */
@@ -40,6 +43,12 @@ export interface WmsImageryOptions {
   readonly transparent?: boolean;
   /** 'EPSG:3857' (default) or 'EPSG:4326': requested directly when the service offers it (F227). */
   readonly preferredCrs?: 'EPSG:3857' | 'EPSG:4326';
+  /**
+   * Transforms for other reference systems, such as `transformCoordinates` of `@vibeglobe/gis` (F227): when the layers
+   * offer neither EPSG:3857 nor EPSG:4326, the first offered system this returns transforms for is requested and
+   * reprojected on the client (ADR 0039). Without it, such a service is refused with a `needs-reprojection` error.
+   */
+  readonly transforms?: (crs: string) => { readonly toSource: ToSource; readonly fromSource: FromSource } | undefined;
   readonly maxLevel?: number;
   readonly tileSizePx?: number;
   /**
@@ -75,6 +84,55 @@ function chooseCrs(options: WmsImageryOptions, capabilities: WmsCapabilities | u
         'they need client-side reprojection',
     );
   return chosen;
+}
+
+/**
+ * The client-side reprojection of a service whose layers offer neither EPSG:3857 nor EPSG:4326, through the first
+ * offered system the application's `transforms` know (F227, ADR 0039); undefined when a directly drawable system is
+ * offered or no transforms are given.
+ */
+function reprojectedFallback(
+  options: WmsImageryOptions,
+  capabilities: WmsCapabilities | undefined,
+  url: string,
+): DescribedImagerySource | undefined {
+  if (!capabilities || !options.transforms) return undefined;
+  const offered = options.layers.map((name) => capabilities.layers.find((l) => l.name === name)?.crs ?? []);
+  const shared = (offered[0] ?? []).filter((crs) => offered.every((list) => list.includes(crs)));
+  if (shared.some((crs) => tilingOfCrs(crs) !== undefined)) return undefined;
+  for (const crs of shared) {
+    const transforms = options.transforms(crs);
+    const lonLat = options.layers
+      .map((n) => capabilities.layers.find((l) => l.name === n)?.bounds)
+      .find((b) => b !== undefined);
+    if (!transforms || !lonLat) continue;
+    const code = requestCode(crs, options, capabilities);
+    const source = reprojectedImagery({
+      id: options.id,
+      sourceCrs: crs,
+      toSource: transforms.toSource,
+      fromSource: transforms.fromSource,
+      bounds: sourceBoundsOf(lonLat, transforms.toSource),
+      image: (bbox, widthPx, heightPx) =>
+        wmsGetMapUrl(url, {
+          layers: options.layers,
+          crs: code,
+          bbox,
+          widthPx,
+          heightPx,
+          ...(options.format ? { format: options.format } : {}),
+          ...(options.styles ? { styles: options.styles } : {}),
+          ...(options.transparent === undefined ? {} : { transparent: options.transparent }),
+        }),
+      maxLevel: options.maxLevel ?? 20,
+      ...(options.transport ? { transport: options.transport } : {}),
+      ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
+      attribution: attributionOf(options, capabilities),
+      profile: options.profile ?? CUSTOM_PROFILE,
+    });
+    return source as DescribedImagerySource;
+  }
+  return undefined;
 }
 
 /**
@@ -141,6 +199,8 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
   const url = options.url ?? capabilities?.getMapUrl;
   if (!url) throw new SourceConfigError('no-getmap-url', `WMS source '${options.id}': no GetMap URL`);
   const version = capabilities?.version ?? options.version ?? '1.3.0';
+  const reprojected = reprojectedFallback(options, capabilities, url);
+  if (reprojected) return reprojected;
   const crs = chooseCrs(options, capabilities);
   const sizePx = options.tileSizePx ?? 256;
   const gutterPx = options.gutterPx ?? 32;

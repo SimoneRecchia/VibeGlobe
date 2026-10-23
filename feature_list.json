@@ -3044,7 +3044,7 @@
         "Point them at fixture services that offer only EPSG:32632 and assert the adapter reprojects on the client with correct alignment",
         "Set a preferred reference system in the source configuration and assert it is honored"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F228",

@@ -47,8 +47,14 @@ export {
   openStreetMapImagery,
 } from './providers/openstreetmap-provider.js';
 export type { OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';
-export { reprojectedImagery, warpInBrowser } from './reproject/reprojected-imagery.js';
-export type { ReprojectedImageryOptions, WarpImage } from './reproject/reprojected-imagery.js';
+export { composeInBrowser, reprojectedImagery, warpInBrowser } from './reproject/reprojected-imagery.js';
+export type {
+  ComposeImage,
+  FetchedPart,
+  ImagePart,
+  ReprojectedImageryOptions,
+  WarpImage,
+} from './reproject/reprojected-imagery.js';
 export { wmsGetMapUrl } from './reproject/wms-get-map.js';
 export type { WmsGetMapParameters } from './reproject/wms-get-map.js';
 export { lonLatBoundsOf, planWarp, solveAffine } from './reproject/warp-math.js';

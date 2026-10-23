@@ -28,6 +28,24 @@ import {
 /** Draws a fetched source image into a tile as the plan says and encodes the tile (PNG bytes). */
 export type WarpImage = (bytes: ArrayBuffer, contentType: string, plan: WarpPlan) => Promise<ArrayBuffer>;
 
+/** One piece of a source image mosaic: a URL and where its image goes, in pixels of the composed image. */
+export interface ImagePart {
+  readonly url: string;
+  readonly xPx: number;
+  readonly yPx: number;
+  readonly widthPx: number;
+  readonly heightPx: number;
+}
+
+/** A fetched {@link ImagePart}. */
+export interface FetchedPart extends ImagePart {
+  readonly bytes: ArrayBuffer;
+  readonly contentType: string;
+}
+
+/** Composes fetched parts into one image of the given size (PNG bytes); used for tiled sources such as WMTS. */
+export type ComposeImage = (parts: readonly FetchedPart[], widthPx: number, heightPx: number) => Promise<ArrayBuffer>;
+
 /** Options of {@link reprojectedImagery}. */
 export interface ReprojectedImageryOptions {
   /** Unique per engine instance. */
@@ -40,8 +58,11 @@ export interface ReprojectedImageryOptions {
   readonly fromSource: FromSource;
   /** Where the source has data, in source units: west, south, east, north. */
   readonly bounds: SourceBbox;
-  /** The URL of a source image covering `bbox` (source units) at a pixel size, such as {@link wmsGetMapUrl}'s. */
-  readonly image: (bbox: SourceBbox, widthPx: number, heightPx: number) => string;
+  /**
+   * The URL of a source image covering `bbox` (source units) at a pixel size, such as {@link wmsGetMapUrl}'s; or the
+   * tiles that together cover it (a WMTS matrix in the source system), composed into that image before the warp.
+   */
+  readonly image: (bbox: SourceBbox, widthPx: number, heightPx: number) => string | readonly ImagePart[];
   /** Target tiling: Web Mercator XYZ (default) or the two-root geographic pyramid. */
   readonly tiling?: 'mercator' | 'geographic';
   readonly minLevel?: number;
@@ -59,6 +80,8 @@ export interface ReprojectedImageryOptions {
   readonly transport?: TileTransport;
   /** Replaces the browser warp (tests, other runtimes). */
   readonly warpImage?: WarpImage;
+  /** Replaces the browser composition of tiled source images (tests, other runtimes). */
+  readonly composeImage?: ComposeImage;
   readonly maxRequestsPerHost?: number;
   readonly timeoutsMs?: TimeoutsMs;
 }
@@ -96,12 +119,66 @@ export const warpInBrowser: WarpImage = async (bytes, contentType, plan) => {
   }
 };
 
+/** Composes in the browser: each part decoded and drawn at its place into an `OffscreenCanvas`, encoded as PNG. */
+export const composeInBrowser: ComposeImage = async (parts, widthPx, heightPx) => {
+  const canvas = new OffscreenCanvas(widthPx, heightPx);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('no 2D context');
+  for (const part of parts) {
+    const bitmap = await createImageBitmap(new Blob([part.bytes], { type: part.contentType }));
+    context.drawImage(bitmap, part.xPx, part.yPx, part.widthPx, part.heightPx);
+    bitmap.close();
+  }
+  return encodeRgbaPng(context.getImageData(0, 0, widthPx, heightPx).data, widthPx, heightPx);
+};
+
+/**
+ * Fetches every part through `base` and composes them; finishes with the first failure. Parts answered with no data
+ * stay transparent; when none has data the result is no data.
+ */
+function fetchParts(
+  parts: readonly ImagePart[],
+  plan: WarpPlan,
+  base: TileTransport,
+  timeouts: TimeoutsMs,
+  compose: ComposeImage,
+  done: (result: TransportResult) => void,
+): AbortHandle {
+  if (parts.length === 0) {
+    done({ kind: 'ok', bytes: new ArrayBuffer(0), contentType: '' });
+    return () => undefined;
+  }
+  const fetched: FetchedPart[] = [];
+  let pending = parts.length;
+  let failed = false;
+  const aborts = parts.map((part) =>
+    base.start({ url: part.url, hostIndex: 0 }, timeouts, (result) => {
+      if (failed) return;
+      if (result.kind !== 'ok' || /xml/i.test(result.contentType)) {
+        failed = true;
+        return done(result.kind === 'ok' ? { kind: 'status', status: 400, retryAfterMs: undefined } : result);
+      }
+      if (result.bytes.byteLength > 0) fetched.push({ ...part, bytes: result.bytes, contentType: result.contentType });
+      if (--pending > 0) return;
+      if (fetched.length === 0) return done({ kind: 'ok', bytes: new ArrayBuffer(0), contentType: '' });
+      compose(fetched, plan.imageWidthPx, plan.imageHeightPx).then(
+        (bytes) => done({ kind: 'ok', bytes, contentType: 'image/png' }),
+        () => done({ kind: 'ok', bytes: new ArrayBuffer(0), contentType: '' }),
+      );
+    }),
+  );
+  return () => {
+    for (const abort of aborts) abort();
+  };
+}
+
 /** The transport of a reprojected source: one source image per tile, warped into the tile. */
 function reprojectTransport(
   plan: (coord: TileCoord) => WarpPlan | undefined,
   image: ReprojectedImageryOptions['image'],
   base: TileTransport,
   warp: WarpImage,
+  compose: ComposeImage,
 ): TileTransport {
   return {
     start(request: TileRequest, timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
@@ -117,8 +194,8 @@ function reprojectTransport(
         finish({ kind: 'status', status: 404, retryAfterMs: undefined });
         return () => undefined;
       }
-      const url = image(warpPlan.imageBbox, warpPlan.imageWidthPx, warpPlan.imageHeightPx);
-      const abortBase = base.start({ url, hostIndex: 0 }, timeouts, (result) => {
+      const source = image(warpPlan.imageBbox, warpPlan.imageWidthPx, warpPlan.imageHeightPx);
+      const fetched = (result: TransportResult): void => {
         if (result.kind !== 'ok') return finish(result);
         // A WMS service exception: a permanent failure, so the tile is not asked again and its parent stays.
         if (/xml/i.test(result.contentType)) return finish({ kind: 'status', status: 400, retryAfterMs: undefined });
@@ -128,7 +205,11 @@ function reprojectTransport(
           // An image that cannot be decoded is no data, never a crash.
           () => finish({ kind: 'ok', bytes: new ArrayBuffer(0), contentType: '' }),
         );
-      });
+      };
+      const abortBase =
+        typeof source === 'string'
+          ? base.start({ url: source, hostIndex: 0 }, timeouts, fetched)
+          : fetchParts(source, warpPlan, base, timeouts, compose, fetched);
       return () => {
         if (settled) return;
         abortBase();
@@ -176,6 +257,7 @@ export function reprojectedImagery(options: ReprojectedImageryOptions): ImageryS
       options.image,
       options.transport ?? fetchTransport(),
       options.warpImage ?? warpInBrowser,
+      options.composeImage ?? composeInBrowser,
     ),
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),

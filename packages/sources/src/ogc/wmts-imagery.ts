@@ -18,6 +18,9 @@ import { coverageOf, inLevelsAndCoverage } from '../tiling.js';
 import { loadCapabilities } from './load.js';
 import { matchMatrixSet, type MatchedMatrixSet } from './tile-matrix.js';
 import { parseWmtsCapabilities, type WmtsCapabilities, type WmtsLayer } from './wmts-capabilities.js';
+import { matrixBounds, wmtsParts } from './wmts-reprojected.js';
+import { reprojectedImagery } from '../reproject/reprojected-imagery.js';
+import { sourceBoundsOf, type FromSource, type SourceBbox, type ToSource } from '../reproject/warp-math.js';
 
 /** Options of {@link wmtsImagery}. */
 export interface WmtsImageryOptions {
@@ -35,6 +38,12 @@ export interface WmtsImageryOptions {
   readonly tileMatrixSet?: string;
   /** 'EPSG:3857' (default) or 'EPSG:4326': requested directly when the service offers it (F227). */
   readonly preferredCrs?: 'EPSG:3857' | 'EPSG:4326';
+  /**
+   * Transforms for other reference systems, such as `transformCoordinates` of `@vibeglobe/gis` (F227): when no tile
+   * matrix set lines up with EPSG:3857 or EPSG:4326, the first projected set this returns transforms for is
+   * reprojected on the client, its tiles composed per engine tile (ADR 0039). Without it such a layer is refused.
+   */
+  readonly transforms?: (crs: string) => { readonly toSource: ToSource; readonly fromSource: FromSource } | undefined;
   /** Dimension values (for example `{ Time: '2024-01-01' }`); each dimension's default otherwise. */
   readonly dimensions?: Readonly<Record<string, string>>;
   /** 'RESTful' or 'KVP'; RESTful when the layer has a tile resource URL, else KVP. */
@@ -135,11 +144,79 @@ function urlBuilder(
   return (matrix, row, col) => `${prefix}&TILEMATRIX=${encodeURIComponent(matrix)}&TILEROW=${row}&TILECOL=${col}`;
 }
 
+function fixedOf(layer: WmtsLayer, options: WmtsImageryOptions, set: string): Record<string, string> {
+  const style =
+    options.style ?? layer.styles.find((s) => s.isDefault)?.identifier ?? layer.styles[0]?.identifier ?? 'default';
+  const fixed: Record<string, string> = {
+    Style: style,
+    TileMatrixSet: set,
+    Format: chooseFormat(layer, options.format),
+  };
+  for (const d of layer.dimensions) fixed[d.identifier] = options.dimensions?.[d.identifier] ?? d.defaultValue;
+  return fixed;
+}
+
+function providerAttribution(options: WmtsImageryOptions, capabilities: WmtsCapabilities): readonly Attribution[] {
+  const provider = capabilities.provider;
+  return (
+    options.attribution ??
+    (provider ? [provider.url ? { text: provider.name, url: provider.url } : { text: provider.name }] : [])
+  );
+}
+
+/**
+ * The client-side reprojection of a layer none of whose matrix sets lines up with the engine's schemes, through the
+ * first set in a system the application's `transforms` know (F227, ADR 0039); undefined otherwise.
+ */
+function reprojectedFallback(
+  capabilities: WmtsCapabilities,
+  layer: WmtsLayer,
+  options: WmtsImageryOptions,
+): DescribedImagerySource | undefined {
+  const transforms = options.transforms;
+  if (!transforms) return undefined;
+  const links = layer.tileMatrixSetLinks.filter(
+    (l) => options.tileMatrixSet === undefined || l.set === options.tileMatrixSet,
+  );
+  const sets = links.flatMap((link) => {
+    const set = capabilities.tileMatrixSets.find((s) => s.identifier === link.set);
+    return set ? [{ link, set }] : [];
+  });
+  if (sets.some(({ set }) => matchMatrixSet(set) !== undefined)) return undefined;
+  for (const { link, set } of sets) {
+    const pair = transforms(set.crs);
+    const coarsest = [...set.matrices].sort((a, b) => b.scaleDenominator - a.scaleDenominator)[0];
+    if (!pair || !coarsest) continue;
+    const url = urlBuilder(capabilities, layer, options, fixedOf(layer, options, set.identifier));
+    const extent = matrixBounds(coarsest);
+    const declared = layer.wgs84Bounds ? sourceBoundsOf(layer.wgs84Bounds, pair.toSource) : extent;
+    const bounds: SourceBbox = [
+      Math.max(extent[0], declared[0]),
+      Math.max(extent[1], declared[1]),
+      Math.min(extent[2], declared[2]),
+      Math.min(extent[3], declared[3]),
+    ];
+    return reprojectedImagery({
+      id: options.id,
+      sourceCrs: set.crs,
+      toSource: pair.toSource,
+      fromSource: pair.fromSource,
+      bounds,
+      image: (bbox, widthPx, heightPx) => wmtsParts(set.matrices, link.limits, url, bbox, widthPx, heightPx),
+      ...(options.transport ? { transport: options.transport } : {}),
+      ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
+      attribution: providerAttribution(options, capabilities),
+      profile: options.profile ?? CUSTOM_PROFILE,
+    }) as DescribedImagerySource;
+  }
+  return undefined;
+}
+
 /**
  * A WMTS imagery source (F230): reads the GetCapabilities document, picks the layer's style, format, dimensions and a
  * tile matrix set that lines up with Web Mercator or the geographic scheme (preferring `preferredCrs`, F227), and
  * builds RESTful or KVP GetTile requests; tiles outside the matrix limits or levels are no data. Matrix sets in other
- * reference systems need client-side reprojection, which the engine's layer composition provides (F226, F228).
+ * reference systems are reprojected on the client when `transforms` knows their system (F226, F227).
  */
 export async function wmtsImagery(options: WmtsImageryOptions): Promise<DescribedImagerySource> {
   const capabilities = await loadCapabilities(
@@ -155,20 +232,13 @@ export async function wmtsImagery(options: WmtsImageryOptions): Promise<Describe
       'unknown-layer',
       `WMTS source '${options.id}': no layer '${options.layer}' (offered: ${capabilities.layers.map((l) => l.identifier).join(', ')})`,
     );
+  const reprojected = reprojectedFallback(capabilities, layer, options);
+  if (reprojected) return reprojected;
   const set = chooseSet(capabilities, layer, options);
-  const style =
-    options.style ?? layer.styles.find((s) => s.isDefault)?.identifier ?? layer.styles[0]?.identifier ?? 'default';
-  const fixed: Record<string, string> = {
-    Style: style,
-    TileMatrixSet: set.identifier,
-    Format: chooseFormat(layer, options.format),
-  };
-  for (const d of layer.dimensions) fixed[d.identifier] = options.dimensions?.[d.identifier] ?? d.defaultValue;
-  const url = urlBuilder(capabilities, layer, options, fixed);
+  const url = urlBuilder(capabilities, layer, options, fixedOf(layer, options, set.identifier));
   const levels = [...set.matched.levels.keys()];
   const bounds = layer.wgs84Bounds;
   const coverage = bounds ? coverageOf(...bounds) : undefined;
-  const provider = capabilities.provider;
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const source: DescribedImagerySource = {
     id: options.id,
@@ -181,9 +251,7 @@ export async function wmtsImagery(options: WmtsImageryOptions): Promise<Describe
     decoder: 'image',
     transport: options.transport ?? fetchTransport(),
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
-    attribution:
-      options.attribution ??
-      (provider ? [provider.url ? { text: provider.name, url: provider.url } : { text: provider.name }] : []),
+    attribution: providerAttribution(options, capabilities),
     profile: options.profile ?? CUSTOM_PROFILE,
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       const matrix = set.matched.levels.get(coord.level);

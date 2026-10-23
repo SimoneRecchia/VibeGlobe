@@ -111,6 +111,29 @@ function sourceFootprint(
   return w <= e && s <= n ? [w, s, e, n] : undefined;
 }
 
+/** The box in source units enclosing a longitude-latitude rectangle (degrees), from points along its edges. */
+export function sourceBoundsOf(
+  [west, south, east, north]: readonly [number, number, number, number],
+  toSource: ToSource,
+  samples = 33,
+): SourceBbox {
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let k = 0; k < samples; k++) {
+    const t = k / (samples - 1);
+    for (const [lon, lat] of [
+      [west + (east - west) * t, south],
+      [west + (east - west) * t, north],
+      [west, south + (north - south) * t],
+      [east, south + (north - south) * t],
+    ] as const) {
+      const [x, y] = toSource(lon, lat);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
+    }
+  }
+  return [minX, minY, maxX, maxY];
+}
+
 /**
  * The longitude-latitude rectangle (radians) of a box of the source reference system, from `samples` points along
  * each edge mapped with `fromSource` (projected edges curve, so their extremes can lie between the corners).

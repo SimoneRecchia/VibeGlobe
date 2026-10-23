@@ -185,8 +185,11 @@ export class LayerBatches implements LayerRenderTarget {
   setCount(handle: BatchHandle, count: number): void {
     const batch = this.get(handle);
     if (count === batch.count) return;
+    const previous = batch.count;
     batch.count = count;
-    batch.dirty = true;
+    // Features appended within the room a quad batch reserved are written in place (F372); fewer features rebuild it.
+    if (count > previous) this.changed(batch, previous, count);
+    else batch.dirty = true;
   }
 
   /** See {@link LayerRenderTarget}. */

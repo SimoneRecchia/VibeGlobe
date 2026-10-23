@@ -2,7 +2,8 @@
  * The built-in data layer: one batch of points, markers, labels, lines, polygons or circles, styled by MapLibre
  * expressions and updated feature by feature (F369, F370, F372, F376, F377).
  */
-import type { FeatureGeometry, GeoPosition } from '@vibeglobe/core';
+import type { FeatureGeometry, GeoPosition, ScreenPoint } from '@vibeglobe/core';
+import { anchorNear, type Project } from './anchors.js';
 import { FeatureStore, type FeatureId } from './feature-store.js';
 import { ellipseGeometry } from './circle.js';
 import {
@@ -57,6 +58,8 @@ export interface DataLayerOptions {
   readonly pickable?: boolean;
   /** Whether features can be dragged with the pointer (default false, F382). */
   readonly draggable?: boolean;
+  /** Features to reserve room for, so features streamed in later are added without rebuilding the batch (F372). */
+  readonly capacity?: number;
   /** Added to the batch's draw order within the layer's band (0 to ORDER_STRIDE − 1; composite layers use it). */
   readonly orderOffset?: number;
 }
@@ -126,7 +129,7 @@ export class DataLayer implements Layer {
     this.#orderOffset = options.orderOffset ?? 0;
     this.#style = compileStyle(kind, options.style);
     this.#splitStyle();
-    this.store = new FeatureStore();
+    this.store = new FeatureStore(options.capacity);
     const data = options.data;
     if (data !== undefined && Symbol.asyncIterator in data) this.#stream = data;
     else if (data !== undefined) this.addFeatures('features' in data ? data.features : data);
@@ -271,6 +274,11 @@ export class DataLayer implements Layer {
     if (index === undefined) return undefined;
     const p = this.store.array('position');
     return { longitudeDeg: p[3 * index] ?? 0, latitudeDeg: p[3 * index + 1] ?? 0, heightMeters: p[3 * index + 2] ?? 0 };
+  }
+
+  /** Whether a feature anchor shows within `radiusPx` of `point` (a press that starts a drag, F382). */
+  anchorNear(point: ScreenPoint, radiusPx: number, project: Project): boolean {
+    return anchorNear(this.store, point, radiusPx, project, this.placement === 'clamp-to-ground');
   }
 
   /** Creates the batch and pick slot and starts reading a streamed data source. */

@@ -129,7 +129,10 @@ export class ViewState {
       throw new GlobeError('invalid-option', `A view mode is '2d', '3d' or 'auto', got ${String(mode)}`);
     if (mode === '3d') {
       this.mode = 'manual';
-      this.chosen[0] = (this.curves.autoTiltDeg * Math.PI) / 180;
+      // Within the maximum tilt of the constraints (F210).
+      const cap = this.values[TILT_CAP] ?? Number.NaN;
+      const tilt = (this.curves.autoTiltDeg * Math.PI) / 180;
+      this.chosen[0] = cap === cap && tilt > cap ? cap : tilt;
     } else this.mode = mode;
     this.easeTiltFromApplied();
   }

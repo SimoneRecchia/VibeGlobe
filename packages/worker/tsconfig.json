@@ -16,6 +16,12 @@
   "references": [
     {
       "path": "../core"
+    },
+    {
+      "path": "../sources"
+    },
+    {
+      "path": "../layers"
     }
   ]
 }

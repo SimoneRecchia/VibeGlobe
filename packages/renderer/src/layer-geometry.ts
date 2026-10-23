@@ -309,7 +309,19 @@ function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages |
     for (let c = 0; c < 4; c++) builder.add(q.lon, q.lat, q.height, q.color, q.corners[c] ?? [], undefined, q.uvs[c]);
     quadIndices(builder);
   }
+  // Room for the features the layer reserved (F372): collapsed, transparent quads at the first anchor, which features
+  // appended later overwrite in place instead of rebuilding the batch.
+  const lon = valueOf(batch, 'position', 0, 0);
+  const lat = valueOf(batch, 'position', 0, 1);
+  for (let feature = batch.count; feature < (batch.capacity ?? 0); feature++) {
+    for (let c = 0; c < 4; c++) builder.add(lon, lat, 0, HIDDEN_COLOR, HIDDEN_CORNER, undefined, HIDDEN_UV);
+    quadIndices(builder);
+  }
 }
+
+const HIDDEN_COLOR = [0, 0, 0, 0];
+const HIDDEN_CORNER = [0, 0, 2, 2];
+const HIDDEN_UV = [-1, -1];
 
 /**
  * Rewrites the vertices of features [first, end) of a quad batch in place (F376, F377); returns false when its arrays do

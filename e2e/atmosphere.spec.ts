@@ -129,6 +129,8 @@ for (const backend of BACKENDS) {
     test(`F392: the glow changes continuously from orbit to the ground, without banding (${backend})`, async ({
       page,
     }) => {
+      // 62 frames rendered and read back one by one: 30-40 s on CI's software WebGPU (CI run 636).
+      test.setTimeout(120_000);
       const steps = await frameSteps(page, flight(60), SKY);
       expect(largestJump(steps)).toBeLessThan(JUMP_LEVELS);
       // Banding: the same smooth sky gradient quantized without and with dithering.

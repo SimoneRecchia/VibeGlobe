@@ -128,6 +128,7 @@ export class SurfaceFrame {
       {
         ...callbacks,
         ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
+        ...(options.creditsElement === false ? { creditsElement: false } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
           // A source without CORS headers fails every tile the same way: one error names it (F251).

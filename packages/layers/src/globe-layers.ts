@@ -1,5 +1,9 @@
 import { GlobeError, type Globe, type ScreenPoint } from '@vibeglobe/core';
+import type { Project } from './anchors.js';
 import { InteractionController } from './interaction.js';
+
+/** How near a feature's anchor a press starts its drag, CSS pixels. */
+const DRAG_RADIUS_PX = 16;
 import { LayerStack } from './layer-stack.js';
 
 /** What {@link createGlobeLayers} returns. */
@@ -12,22 +16,32 @@ export interface GlobeLayers {
 }
 
 /** Pointer events of `element` routed to `interaction`, at CSS-pixel positions relative to it. */
-function routePointer(element: HTMLElement, interaction: InteractionController): () => void {
+function routePointer(element: HTMLElement, interaction: InteractionController, project: Project): () => void {
   const at = (event: PointerEvent): ScreenPoint => {
     const box = element.getBoundingClientRect();
     return { xPx: event.clientX - box.left, yPx: event.clientY - box.top };
   };
   const move = (event: PointerEvent): void => void interaction.pointerMove(at(event));
-  const down = (event: PointerEvent): void => void interaction.pointerDown(at(event));
+  const down = (event: PointerEvent): void => {
+    const point = at(event);
+    // A press on a draggable feature never reaches the map's controls, so the map does not pan meanwhile (F382).
+    if (interaction.pressesDraggable(point, DRAG_RADIUS_PX, project)) {
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      element.setPointerCapture?.(event.pointerId);
+    }
+    void interaction.pointerDown(point);
+  };
   const up = (event: PointerEvent): void => void interaction.pointerUp(at(event));
   const leave = (event: PointerEvent): void => interaction.pointerLeave(at(event));
   element.addEventListener('pointermove', move);
-  element.addEventListener('pointerdown', down);
+  // In the capture phase: before the controls' own listener on the same element.
+  element.addEventListener('pointerdown', down, { capture: true });
   element.addEventListener('pointerup', up);
   element.addEventListener('pointerleave', leave);
   return () => {
     element.removeEventListener('pointermove', move);
-    element.removeEventListener('pointerdown', down);
+    element.removeEventListener('pointerdown', down, { capture: true });
     element.removeEventListener('pointerup', up);
     element.removeEventListener('pointerleave', leave);
   };
@@ -41,18 +55,48 @@ function routePointer(element: HTMLElement, interaction: InteractionController):
 export function createGlobeLayers(globe: Globe, options: { readonly element?: HTMLElement } = {}): GlobeLayers {
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
-  const stack = new LayerStack(target, () => globe.requestRender());
+  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
+  let inFrame = false;
+  let detached = false;
+  let flushQueued = false;
+  // A change outside a frame (data streamed in, a style set) is written to the renderer before the next frame, so
+  // that frame shows it (F372); changes during a frame's step are drawn by the frame they ask for.
+  const flush = (): void => {
+    flushQueued = false;
+    if (detached || inFrame) return;
+    stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+  };
+  const stack = new LayerStack(target, () => {
+    if (!inFrame && !flushQueued) {
+      flushQueued = true;
+      queueMicrotask(flush);
+    }
+    globe.requestRender();
+  });
   const interaction = new InteractionController(stack, {
     pick: (point) => target.pick?.(point) ?? Promise.resolve(0),
     screenToGeo: (point) => globe.screenToGeo(point),
   });
-  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
-  const offFrame = globe.on('frame', () => stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector }));
-  const offPointer = options.element ? routePointer(options.element, interaction) : () => undefined;
+  const offFrame = globe.on('frame', () => {
+    inFrame = true;
+    try {
+      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+    } finally {
+      inFrame = false;
+    }
+  });
+  const offPointer = options.element
+    ? routePointer(options.element, interaction, (position, onGround) =>
+        globe.geoToScreen(
+          onGround ? { ...position, heightMeters: globe.elevationAt(position).heightMeters } : position,
+        ),
+      )
+    : () => undefined;
   return {
     stack,
     interaction,
     detach: () => {
+      detached = true;
       offFrame();
       offPointer();
     },

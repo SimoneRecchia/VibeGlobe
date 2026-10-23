@@ -2300,7 +2300,7 @@
         "In every frame pick the coordinate under the cursor and assert it stays within 1 px of the cursor",
         "Assert each notch animates over several frames with eased velocity, and that a wheel event over empty sky zooms toward the screen center"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F169",
@@ -2364,7 +2364,7 @@
         "Manually check on the reference tablet",
         "Pinch through the globe-to-flat morph range and assert the geographic point under the finger midpoint stays within 1 px of it in every frame"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F174",
@@ -2377,7 +2377,7 @@
         "Press five times rapidly and assert the target accumulates to five levels with continuous motion (no frame-to-frame jump)",
         "Zoom through the globe-to-flat morph range with the buttons and the keyboard and assert the geographic point at the screen center stays within 1 px of it in every frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F175",
@@ -2413,7 +2413,7 @@
         "Zoom continuously with a trackpad sequence and assert the reported zoom changes without quantization",
         "Assert the ground distance per pixel at the center changes continuously across integer zoom boundaries"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F178",
@@ -2426,7 +2426,7 @@
         "Assert the globe never flips or jumps when the drag passes near a pole",
         "Under touch emulation drag with one finger and assert the same behavior"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F179",
@@ -2477,7 +2477,7 @@
         "Assert the heading changes with horizontal motion, the tilt with vertical motion, and the center target stays fixed",
         "Assert no context menu appears and the new tilt and heading become the chosen values"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F183",
@@ -2515,7 +2515,7 @@
         "Assert pinch, twist and two-finger pan gestures do not trigger tilt",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F186",
@@ -2539,7 +2539,7 @@
         "Assert the heading changes with Left/Right and the tilt with Up/Down, eased, with no stutter",
         "Assert the resulting tilt and heading become the chosen values"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F188",
@@ -2700,7 +2700,7 @@
         "Assert events fire in order with their cause (user, API, inertia) and that move fires at most once per frame",
         "Assert calls with invalid arguments reject with typed validation errors without moving the camera"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F201",
@@ -2725,7 +2725,7 @@
         "Record the camera per frame and assert no frame-to-frame change above the jump threshold at the takeover",
         "Assert the interrupted movement's promise settles as interrupted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F203",
@@ -2737,7 +2737,7 @@
         "Assert the camera states at equal timestamps match within tolerance",
         "Inject a 250 ms stall mid-animation and assert the camera continues from the time-correct position without overshoot"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F204",
@@ -2810,7 +2810,7 @@
         "Assert the zoom never leaves the range in any frame",
         "Assert the approach to the limit decelerates smoothly with no frame-to-frame jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F210",
@@ -2822,7 +2822,7 @@
         "Assert the applied and chosen tilt never exceed the maximum in any frame",
         "Assert the approach to the limit is smooth"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F211",
@@ -2834,7 +2834,7 @@
         "Assert the view center stays inside the bounds in every frame and edge contact decelerates smoothly",
         "Repeat with bounds crossing the antimeridian and assert correct behavior on both sides"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F212",
@@ -2858,7 +2858,7 @@
         "Perform zoom in and out, pan, rotate, tilt, reset north, home and view-mode changes using only keyboard events",
         "Assert the key map is documented and that keys typed into a text input elsewhere on the page do not move the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F214",
@@ -2871,7 +2871,7 @@
         "Assert drag inertia is disabled or shortened as documented",
         "Toggle the setting at runtime and assert behavior follows without a reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F215",
@@ -2884,7 +2884,7 @@
         "Tilt again to 50° and assert the chosen tilt becomes 50°",
         "Select 2D, 3D and Auto in turn and assert each replaces the manual tilt as specified"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F216",
@@ -2896,7 +2896,7 @@
         "Zoom out to the globe and back, switch view modes, and assert the heading stays 120°",
         "Assert only an explicit user action (compass, orientation commands) or an API call that specifies a heading changes it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F217",
@@ -5078,7 +5078,7 @@
         "Verify dragged ground-clamped features stay on the terrain",
         "Verify features are not draggable unless enabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F383",

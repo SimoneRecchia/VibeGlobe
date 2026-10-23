@@ -6,6 +6,7 @@ import { dragCamera, zoomCamera } from './navigation.hot.js';
 import type { GeoPosition, GlobeEvents, NavigationApi, ScreenPoint } from './types.js';
 import { isScreenPoint } from './validation.js';
 import { positionAt } from './view-geometry.js';
+import { ControlsSlot } from './controls-slot.js';
 
 const RAD = Math.PI / 180;
 
@@ -19,7 +20,13 @@ export interface ViewHost {
   assertAlive(): void;
   requestRender(): void;
   /** The user moved the camera through an intent: it interrupts a running movement (F202, ADR 0036). */
-  userInput(): void;
+  userInput(cause: 'user' | 'inertia'): void;
+  /** The engine clock's time, milliseconds. */
+  timeMs(): number;
+  /** The part of a zoom step the zoom limits allow (KB-126). */
+  limitZoom(deltaZoom: number): number;
+  /** Stops a running API movement (KB-127). */
+  interruptMovement(): void;
 }
 
 /**
@@ -29,23 +36,56 @@ export interface ViewHost {
 export class ViewControl {
   /** Input intents for the controls plug-in: invalid input is ignored, never thrown (they run every frame). */
   readonly navigation: NavigationApi;
+  /** `requestUpdate` was called since the last {@link ViewControl.takeUpdateRequest}. */
+  private updateRequested = false;
+  /** See `NavigationApi.coasting`. */
+  private coasting = false;
+  /** The input plug-in, attached to the renderer's input element; API movements interrupt it (F202). */
+  readonly slot = new ControlsSlot();
 
   constructor(private readonly host: ViewHost) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the accessors below read this control
+    const control = this;
     this.navigation = {
       grab: (point) => (isScreenPoint(point) ? this.positionAt(point) : undefined),
       dragTo: (anchor, point) => {
         host.assertAlive();
         if (host.waiting()) return;
-        host.userInput();
+        host.userInput(this.coasting ? 'inertia' : 'user');
         if (dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
         if (host.waiting()) return;
-        host.userInput();
-        if (zoomCamera(host.cam, host.view, point, deltaZoom)) host.requestRender();
+        host.userInput(this.coasting ? 'inertia' : 'user');
+        const allowed =
+          typeof deltaZoom === 'number' && Number.isFinite(deltaZoom) ? host.limitZoom(deltaZoom) : deltaZoom;
+        if (zoomCamera(host.cam, host.view, point, allowed)) host.requestRender();
       },
-      requestUpdate: () => host.requestRender(),
+      requestUpdate: () => {
+        this.updateRequested = true;
+        host.requestRender();
+      },
+      orbit: (deltaHeadingDeg, deltaTiltDeg) => this.orbit(deltaHeadingDeg, deltaTiltDeg),
+      interruptMovement: () => {
+        host.assertAlive();
+        host.interruptMovement();
+      },
+      get coasting() {
+        return control.coasting;
+      },
+      set coasting(value: boolean) {
+        control.coasting = value === true;
+      },
+      get timeMs() {
+        return host.timeMs();
+      },
+      get headingDeg() {
+        return host.cam.pose.headingRad / RAD;
+      },
+      get tiltDeg() {
+        return host.cam.pose.tiltRad / RAD;
+      },
     };
   }
 
@@ -73,6 +113,37 @@ export class ViewControl {
   setCurves(curves: ViewCurvesInit): void {
     this.host.view.setCurves(validateViewCurves(curves));
     this.host.requestRender();
+  }
+
+  /** Runs the controls' update for this frame; a frame they ask for meanwhile is noted (M6 input hook 3). */
+  updateControls(): void {
+    this.updateRequested = false;
+    this.slot.controls?.update?.();
+  }
+
+  /**
+   * Whether the controls asked for a frame since the last call (in a frame: during their update, M6 input hook 3), and
+   * clears the request.
+   */
+  takeUpdateRequest(): boolean {
+    const requested = this.updateRequested;
+    this.updateRequested = false;
+    return requested;
+  }
+
+  /** See `NavigationApi.orbit`: invalid input is ignored. */
+  private orbit(deltaHeadingDeg: number, deltaTiltDeg: number): void {
+    const host = this.host;
+    host.assertAlive();
+    if (host.waiting() || !(deltaHeadingDeg - deltaHeadingDeg === 0 && deltaTiltDeg - deltaTiltDeg === 0)) return;
+    if (deltaHeadingDeg === 0 && deltaTiltDeg === 0) return;
+    host.userInput(this.coasting ? 'inertia' : 'user');
+    const pose = host.cam.pose;
+    const heading = pose.headingRad + deltaHeadingDeg * RAD;
+    pose.headingRad = heading - 2 * Math.PI * Math.floor(heading / (2 * Math.PI));
+    if (deltaTiltDeg !== 0) this.chooseTilt(Math.min(90, Math.max(0, pose.tiltRad / RAD + deltaTiltDeg)));
+    host.cam.update();
+    host.requestRender();
   }
 
   /** A view given with a tilt chooses it: manual mode (ADR 0034). */

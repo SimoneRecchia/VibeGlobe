@@ -420,7 +420,8 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const cache = imagery
       ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
         `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
-        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
+        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted} · bandwidth ` +
+        `${(imagery.bandwidthBitsPerSecond / 1e6).toFixed(2)} Mbps · latency ${imagery.latencyMs.toFixed(0)} ms`
       : '';
     if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
     pipelineCompiles = compiles;

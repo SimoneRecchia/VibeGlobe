@@ -86,6 +86,7 @@ export function fetchTransport(
       const firstByte = setTimeout(expire, timeouts.firstByteMs);
       const total = setTimeout(expire, timeouts.totalMs);
       const url = credentials.withSecrets(request.url);
+      const startMs = performance.now();
       const attempt = async (renewed: boolean): Promise<void> => {
         const pending = credentials.headersFor(url);
         const auth = pending instanceof Promise ? await pending : pending;
@@ -102,7 +103,7 @@ export function fetchTransport(
           await attempt(true);
           return;
         }
-        finish(await resultOf(response));
+        finish(await resultOf(response, performance.now() - startMs));
       };
       attempt(false).catch(async () => {
         if (controller.signal.aborted) return finish({ kind: reason });
@@ -119,8 +120,8 @@ export function fetchTransport(
   };
 }
 
-/** The transport result of a response: its bytes, or its status. */
-async function resultOf(response: Response): Promise<TransportResult> {
+/** The transport result of a response (its headers after `waitMs`): its bytes, or its status. */
+async function resultOf(response: Response, waitMs: number): Promise<TransportResult> {
   if (!response.ok)
     return {
       kind: 'status',
@@ -134,6 +135,7 @@ async function resultOf(response: Response): Promise<TransportResult> {
     bytes,
     contentType: response.headers.get('Content-Type') ?? '',
     ...(maxAgeMs === undefined ? {} : { maxAgeMs }),
+    waitMs,
   };
 }
 

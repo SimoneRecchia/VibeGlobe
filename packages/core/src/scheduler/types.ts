@@ -32,6 +32,8 @@ export type TransportResult =
        * only that long, in memory as on the GPU (F260).
        */
       readonly maxAgeMs?: number;
+      /** Milliseconds from the request to the response's headers, when the transport knows: the link's latency (F303). */
+      readonly waitMs?: number;
     }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
   | { readonly kind: 'timeout' | 'aborted' }

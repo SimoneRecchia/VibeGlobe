@@ -11,6 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
+import { sendOverLink, sendThrottled } from './link.ts';
 import { encodeTileImage, IMAGE_FORMATS, type ImageFormat } from './formats.ts';
 import { fixtureGeoidFile, terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
 import {
@@ -49,6 +50,11 @@ export interface FaultRule {
   retryAfterS?: number;
   /** Send the body at this rate, in bytes per second. */
   bandwidthBytesPerS?: number;
+  /**
+   * The session's link: the bodies of every matching response share this many bytes per second, one after another in
+   * 10 ms slices, as on a real link (F300–F303).
+   */
+  linkBytesPerS?: number;
   /** Send the body gzip-compressed with `Content-Encoding: gzip`. */
   gzip?: boolean;
   /** Send the body gzip-compressed without `Content-Encoding`, as `.terrain` files often are (F127). */
@@ -94,6 +100,8 @@ interface Session {
   log: RequestRecord[];
   /** The layer.json this session serves; a default with full availability when unset. */
   layer?: unknown;
+  /** When the session's link (`linkBytesPerS`) is free again, server milliseconds. */
+  linkFreeMs?: number;
 }
 
 const PATTERNS: readonly string[] = [
@@ -334,7 +342,11 @@ export class FixtureServer {
       } else if (rule?.gzipBody) {
         body = gzipSync(body);
       }
-      this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
+      // The session's link (`linkBytesPerS`): the headers now, the body sharing the link with the other responses.
+      if (rule?.linkBytesPerS) {
+        this.finish(record, res, 200, headers, Buffer.alloc(0), undefined, body.length);
+        sendOverLink(entry, rule.linkBytesPerS, res, body, () => (record.endMs = this.now()));
+      } else this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
     };
     if (rule?.latencyMs) setTimeout(() => void respond(), rule.latencyMs);
     else void respond();
@@ -435,9 +447,11 @@ export class FixtureServer {
     headers: Record<string, string>,
     body: Buffer,
     bandwidthBytesPerS?: number,
+    /** Writes only the headers of a body of this length, which the caller streams. */
+    streamedLength?: number,
   ): void {
     record.status = status;
-    record.bytes = body.length;
+    record.bytes = streamedLength ?? body.length;
     const origin = this.cors.has(res) ? this.cors.get(res) : '*';
     if (origin === undefined) res.removeHeader('Access-Control-Allow-Origin');
     res.writeHead(status, {
@@ -450,28 +464,14 @@ export class FixtureServer {
           }),
       'Timing-Allow-Origin': '*',
       'Cache-Control': 'no-store',
-      'Content-Length': String(body.length),
+      'Content-Length': String(streamedLength ?? body.length),
     });
+    if (streamedLength !== undefined) return;
     if (!bandwidthBytesPerS) {
       record.endMs = this.now();
       res.end(body);
       return;
     }
-    // A tenth of a second's worth of bytes every 100 ms.
-    const chunk = Math.max(1, Math.round(bandwidthBytesPerS / 10));
-    let offset = 0;
-    const send = (): void => {
-      if (res.destroyed) return;
-      const end = Math.min(body.length, offset + chunk);
-      res.write(body.subarray(offset, end));
-      offset = end;
-      if (offset < body.length) {
-        setTimeout(send, 100);
-      } else {
-        record.endMs = this.now();
-        res.end();
-      }
-    };
-    send();
+    sendThrottled(res, body, bandwidthBytesPerS, () => (record.endMs = this.now()));
   }
 }

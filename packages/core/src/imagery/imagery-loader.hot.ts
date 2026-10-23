@@ -4,6 +4,7 @@
  * @benchmark packages/core/src/globe/frame-allocation.test.ts
  */
 import type { RamTier } from '../cache/ram-tier.js';
+import { SLOW_LINK_BPS } from '../scheduler/bandwidth.js';
 import type { Residency } from '../cache/residency.hot.js';
 import { UPLOAD_REFUSED, UploadQueue } from '../cache/upload-queue.hot.js';
 import {
@@ -198,9 +199,12 @@ export class ImageryLoader implements NetworkPoolClient {
     this.removeClient = options.network.addClient(this);
   }
 
-  /** Whether the source prefetches now (`loadingFlags`): tiles beyond the view load only when it does (F284, F285). */
+  /**
+   * Whether the source prefetches now: its `loadingFlags` allow it (F284, F285) and the link is not slow, so prefetch
+   * never holds back visible tiles there (F302); tiles beyond the view load only then.
+   */
   get prefetching(): boolean {
-    return (this.flags & LOAD_PREFETCH) !== 0;
+    return (this.flags & LOAD_PREFETCH) !== 0 && !(this.options.network.bandwidth.bitsPerSecond < SLOW_LINK_BPS);
   }
 
   /** True once every pinned tile is on the GPU or known to have no data: refinement may begin (F084). */
@@ -342,7 +346,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Drops what the frame no longer wants and starts the best queued requests (the scheduling phase, F118). */
   scheduleRequests(): void {
-    if (this.options.prefetchRing === true && (this.flags & LOAD_PREFETCH) !== 0) this.prefetchRing();
+    if (this.options.prefetchRing === true && this.prefetching) this.prefetchRing();
     this.dropUnwanted();
     while (this.heap.size > 0 && this.dispatchOne() !== 0);
   }

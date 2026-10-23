@@ -12,6 +12,7 @@
  * its slot exactly once, in {@link NetworkPool} itself: consumers never touch the counters.
  */
 import { FAILURE_ABORTED, FAILURE_TRANSIENT, classifyTransportResult, isRateLimited } from './failure-policy.js';
+import { BandwidthEstimator } from './bandwidth.js';
 import { rateRing, rateWaitMs, recordStart, type RateRing } from './rate-ring.js';
 import type { AbortHandle, TileRequest, TileTransport, TimeoutsMs, TransportResult } from './types.js';
 
@@ -100,6 +101,8 @@ export interface NetworkPoolOptions {
   readonly timeouts?: TimeoutsMs;
   /** Receives the bytes of a request that completed while nobody wanted it, so they can enter the RAM tier. */
   readonly onUnclaimedResult?: (key: RequestKey, result: TransportResult) => void;
+  /** Hosts get only the requests in flight the measured link supports, within their limits (F303). */
+  readonly adaptive?: boolean;
 }
 
 interface Host {
@@ -126,6 +129,7 @@ interface Flight {
   unwantedSinceMs: number;
   graceTimer: unknown;
   safetyTimer: unknown;
+  readonly startMs: number;
 }
 
 const NO_TIMER: unknown = undefined;
@@ -158,6 +162,8 @@ export class NetworkPool {
   private refillPending = false;
   private rateTimerArmed = false;
   private disposed = false;
+  /** Throughput and latency of the pool's downloads (F300). */
+  readonly bandwidth = new BandwidthEstimator();
 
   constructor(options: NetworkPoolOptions) {
     this.options = options;
@@ -166,6 +172,7 @@ export class NetworkPool {
     this.timeoutSlackMs = options.timeoutSlackMs ?? DEFAULT_TIMEOUT_SLACK_MS;
     this.defaultTimeouts = options.timeouts ?? DEFAULT_TIMEOUTS_MS;
     this.queueTask = options.queueTask ?? ((callback) => void Promise.resolve().then(callback));
+    this.bandwidth.adaptive = options.adaptive === true;
   }
 
   /**
@@ -211,7 +218,8 @@ export class NetworkPool {
   /** The current limit of a host: its configured limit, halved after 429 responses, 1 while probing. */
   hostLimit(hostIndex: number): number {
     const host = this.host(hostIndex);
-    return host.consecutiveTransient >= PROBE_AFTER_TRANSIENT_FAILURES ? 1 : host.throttledLimit;
+    const limit = Math.min(host.throttledLimit, this.bandwidth.requestsPerHost());
+    return host.consecutiveTransient >= PROBE_AFTER_TRANSIENT_FAILURES ? 1 : limit;
   }
 
   /** Requests in flight to a host. */
@@ -306,6 +314,7 @@ export class NetworkPool {
       unwantedSinceMs: 0,
       graceTimer: NO_TIMER,
       safetyTimer: NO_TIMER,
+      startMs: this.bandwidth.started(this.options.now()),
     };
     const id = this.attach(flight, consumer);
     this.flights.set(key, flight);
@@ -425,6 +434,7 @@ export class NetworkPool {
     if (this.flights.get(flight.key) === flight) this.flights.delete(flight.key);
     flight.host.inFlight--;
     this.counters.inFlight--;
+    this.bandwidth.ended(this.options.now(), flight.startMs, result);
     this.recordOutcome(flight.host, result);
     for (const id of flight.consumerIds) this.consumerFlights.delete(id);
     this.scheduleRefill();

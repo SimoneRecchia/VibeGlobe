@@ -474,6 +474,10 @@ export interface ImageryStats {
   /** GPU evictions, and uploads refused because nothing could be evicted. */
   readonly evicted: number;
   readonly refused: number;
+  /** Throughput measured from the page's tile downloads, bits per second; NaN until measured (F300). */
+  readonly bandwidthBitsPerSecond: number;
+  /** The shortest recent wait for a response's headers, milliseconds; NaN until measured (F303). */
+  readonly latencyMs: number;
 }
 
 /** Events and their payloads. */

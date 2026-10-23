@@ -105,6 +105,7 @@ function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
       now: () => host.now(),
       setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
       clearTimer: (handle) => host.clearTimer(handle),
+      adaptive: true,
     }),
     users: 0,
   };
@@ -465,6 +466,8 @@ export class ImageryRuntime {
       ramMisses: this.ram.misses,
       evicted: this.residency.evictedCount,
       refused: this.residency.refusedCount,
+      bandwidthBitsPerSecond: this.network.bandwidth.bitsPerSecond,
+      latencyMs: this.network.bandwidth.latencyMs,
     };
   }
 

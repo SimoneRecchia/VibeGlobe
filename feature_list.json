@@ -4461,7 +4461,7 @@
         "Verify license identifier, attribution text, source links, data year, configuration version and pipeline version are present",
         "Load the output in the playground and verify the attribution shows the recorded text while its tiles are visible"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F338",

@@ -41,3 +41,10 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Composite style expressions on the GPU:** zoom-and-feature expressions are re-evaluated per feature on every zoom change; MapLibre evaluates both bracketing stops and interpolates in the shader. Worth it if F370's frame times show the cost on large layers.
 - **Incremental cluster updates for live feeds:** supercluster cannot update in place; a clustered live layer rebuilds its index (throttled) through `setData`.
 - **Cluster bounds across the antimeridian:** `boundsOf` returns west–east in degrees without wrapping, so a cluster straddling ±180° reports bounds spanning the world.
+
+## Atmosphere track (`packages/renderer/src/atmosphere/`)
+
+- Hillaire-style transmittance and sky-view LUTs behind the same `Atmosphere` interface, if the per-pixel march misses the tablet budget (ADR 0040).
+- A sun disk and halo in the sky when sun lighting is on (Filament's analytic disk); stars on the night side.
+- Multiple scattering and ozone absorption for brighter, bluer twilight (single scattering only today).
+- Night lights texture on the dark side, faded with altitude (OpenGlobus).

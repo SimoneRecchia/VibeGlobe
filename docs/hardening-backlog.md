@@ -21,3 +21,12 @@ perfection in edge cases.
 | F361  | M10       | glTF 2.0 models (`Globe.addModel`) at their coordinates with heading, pitch, roll and scale on the local axes, PBR base color and textures drawn unlit with a fixed shade; corrupt files rejected (`e2e/data-layers.spec.ts`)  | Draco and KTX2 (decoder assets hosted by the consumer, ADR 0015), the Khronos sample models and their conformance suite, reference renderings; lit PBR comes with M11                              |
 | F366  | M10       | Points, a line, a polygon, a label and a model stay on their positions at seven zooms from the globe to the tilted street view (`e2e/data-layers.spec.ts`)                                                                     | Every frame of a continuous zoom recorded and compared within 1 px                                                                                                                                 |
 | F379  | M10       | Hover enter and leave once each, in order, with feature, layer and coordinates, on every primitive and on glTF models (`ModelLayer`), and the hover style applied and removed in the next frame (`e2e/data-selection.spec.ts`) | The per-frame budget of hover picks on a 100,000-point layer: the CPU pick projects every feature (20–40 ms measured on the software GPU); a spatial index around the pointer's position is needed |
+
+## Atmosphere track (M11)
+
+| Entry      | Step                               | What remains                                                                                                                             |
+| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| F391–F396  | Real GPUs and the reference tablet | The sky and haze march (ADR 0040) timed on the reference desktop and tablet within the GPU budget; Hillaire LUTs if the tablet misses it |
+| F391, F393 | Firefox and Safari                 | The harness checks in the cross-browser job once the engine draws the atmosphere (the container has Chromium only)                       |
+| F392       | Banding on large real displays     | The dithering checked by eye on an 8-bit desktop monitor at 4K; the automated measure runs at 480 × 320 on SwiftShader                   |
+| F394       | Edge cases                         | Haze over high mountains seen from below their summits (ground below the eye's horizon), polar views                                     |

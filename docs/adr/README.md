@@ -50,3 +50,4 @@ Conventions:
 | [0037](0037-drawing-data-layers.md)                 | Drawing data layers in the renderer                                                                         | Accepted (decided by agent; owner may revisit)                    |
 | [0038](0038-imagery-layer-stack.md)                 | The imagery layer stack                                                                                     | Accepted (decided by agent; owner may revisit)                    |
 | [0039](0039-reprojection-and-tone-harmonization.md) | Client-side raster reprojection and tone harmonization between chained sources                              | Accepted (decided by agent; owner may revisit)                    |
+| [0040](0040-atmosphere.md)                          | Atmosphere: one single-scattering model for sky and haze, analytic light paths, fog-aware detail            | Accepted                                                          |

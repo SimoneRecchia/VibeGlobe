@@ -946,7 +946,7 @@
         "text-font": ["Inter Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 18, 14],
         "symbol-spacing": 250,
-        "text-max-angle": 30
+        "text-max-angle": 60
       },
       "paint": {
         "text-color": "#333333",

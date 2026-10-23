@@ -5925,7 +5925,7 @@
         "Assert road labels follow curved lines and are not duplicated where a road crosses a tile boundary",
         "Record frames during slow pan, zoom, rotate and tilt and assert labels fade in and out with no flicker (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F450",

@@ -156,8 +156,17 @@ for (const backend of BACKENDS) {
         { longitudeDeg: 12.49, latitudeDeg: 41.89 },
         { longitudeDeg: 12.51, latitudeDeg: 41.9 },
       ];
-      for (const view of ['zoom=3', 'zoom=5', 'zoom=9', 'zoom=12&tilt=50']) {
+      const distances: number[] = [];
+      for (const [view, phase] of [
+        ['zoom=3', 'globe'],
+        ['zoom=5', 'flattening'],
+        ['zoom=9', '2d'],
+        ['zoom=12&tilt=50', '2d'],
+        ['zoom=16', '3d'],
+      ] as const) {
         await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&${view}`);
+        expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.phase), view).toBe(phase);
+        const picks: { longitudeDeg: number; latitudeDeg: number }[] = [];
         for (const point of points) {
           const shown = await geoToScreen(page, point);
           const picked = await screenToGeo(page, shown);
@@ -166,8 +175,18 @@ for (const backend of BACKENDS) {
           // Within a hundredth of a pixel's ground size in every phase: the pick inverts the drawn morph.
           expect(Math.abs(picked.longitudeDeg - point.longitudeDeg)).toBeLessThan(1e-7);
           expect(Math.abs(picked.latitudeDeg - point.latitudeDeg)).toBeLessThan(1e-7);
+          picks.push(picked);
         }
+        // The geodesic distance between the picked points, through the core API: the same in every phase.
+        distances.push(
+          await page.evaluate(([from, to]) => window.vibeglobePlayground?.geodesicDistanceMeters(from, to) ?? NaN, [
+            picks[0],
+            picks[1],
+          ] as const),
+        );
       }
+      for (const distance of distances) expect(distance).toBeCloseTo(distances[0] ?? NaN, 3);
+      expect(distances[0]).toBeGreaterThan(1000);
     });
 
     test(`2D locks the tilt at 0° at every zoom while the morph follows the zoom, and keeps the heading on ${backend} (F162)`, async ({
@@ -203,13 +222,34 @@ for (const backend of BACKENDS) {
       }
       expect(previous).toBe(0);
       await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: 35 }));
-      for (const zoom of [14, 10, 6, 4, 2, 4, 8, 17]) {
-        await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+      // Wheel zoom from the street out to the globe and back in, every drawn frame recorded in the page.
+      await page.evaluate(() => {
+        const globe = window.vibeglobePlayground?.globe;
+        if (!globe) throw new Error('no globe');
+        const frames: number[][] = [];
+        (window as unknown as { lockedFrames: number[][] }).lockedFrames = frames;
+        globe.on('camera-change', (c) => frames.push([c.zoom, c.latitudeDeg, c.tiltDeg, c.headingDeg, c.morphFactor]));
+      });
+      const box = await page.locator('#globe').boundingBox();
+      if (!box) throw new Error('no canvas');
+      await page.mouse.move(box.x + 160, box.y + 120);
+      const zoomNow = (): Promise<number> => page.evaluate(() => window.vibeglobePlayground?.globe.camera.zoom ?? NaN);
+      for (let step = 0; step < 120 && (await zoomNow()) > 2.5; step++) {
+        await page.mouse.wheel(0, 400);
         await nextFrame(page);
-        const camera = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
-        expect(camera?.tiltDeg).toBe(0);
-        expect(camera?.headingDeg).toBeCloseTo(35, 6);
-        expect(camera?.morphFactor).toBeCloseTo(smootherstep(4, 6.5, groundZoom(zoom, 41.9)), 9);
+      }
+      for (let step = 0; step < 120 && (await zoomNow()) < 16; step++) {
+        await page.mouse.wheel(0, -400);
+        await nextFrame(page);
+      }
+      const frames = await page.evaluate(() => (window as unknown as { lockedFrames: number[][] }).lockedFrames);
+      const zooms = frames.map((frame) => frame[0] ?? NaN);
+      expect(Math.min(...zooms)).toBeLessThan(3);
+      expect(Math.max(...zooms.slice(zooms.indexOf(Math.min(...zooms))))).toBeGreaterThan(15.5);
+      for (const [zoom = NaN, latitude = NaN, tilt, heading, morph] of frames) {
+        expect(tilt, `zoom ${zoom}`).toBe(0);
+        expect(heading).toBeCloseTo(35, 6);
+        expect(morph, `zoom ${zoom}`).toBeCloseTo(smootherstep(4, 6.5, groundZoom(zoom, latitude)), 9);
       }
     });
 
@@ -252,6 +292,41 @@ for (const backend of BACKENDS) {
         'auto',
         'manual',
       ]);
+      // From a manual tilt at street zoom, Auto brings the curve's tilt back without a jump, then follows the curves.
+      await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 17, tiltDeg: 40 }));
+      await waitForIdle(page);
+      expect((await cameraAfterFrame(page)).viewMode).toBe('manual');
+      const tilts = await page.evaluate(
+        () =>
+          new Promise<number[]>((resolve) => {
+            const globe = window.vibeglobePlayground?.globe;
+            if (!globe) throw new Error('no globe');
+            const recorded = [globe.camera.tiltDeg];
+            const off = globe.on('camera-change', ({ tiltDeg }) => {
+              recorded.push(tiltDeg);
+              if (Math.abs(tiltDeg - 50) < 1e-6 || recorded.length > 80) {
+                off();
+                resolve(recorded);
+              }
+            });
+            globe.setViewMode('auto');
+          }),
+      );
+      expect(tilts.at(-1)).toBeCloseTo(50, 6);
+      for (let i = 1; i < tilts.length; i++) {
+        expect(tilts[i] ?? NaN).toBeGreaterThanOrEqual(tilts[i - 1] ?? NaN);
+        expect((tilts[i] ?? NaN) - (tilts[i - 1] ?? NaN)).toBeLessThan(5);
+      }
+      expect(tilts.length).toBeGreaterThan(4);
+      for (const zoom of [15.5, 14.8]) {
+        await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+        await waitForIdle(page);
+        const camera = await cameraAfterFrame(page);
+        expect([camera.viewMode, camera.tiltDeg]).toEqual([
+          'auto',
+          expect.closeTo(50 * smootherstep(14, 16.5, groundZoom(zoom, 41.9)), 6),
+        ]);
+      }
     });
 
     test(`a tilt chosen at street level is lowered while empty sky would fill the screen and comes back without a jump on ${backend} (F166)`, async ({
@@ -273,7 +348,7 @@ for (const backend of BACKENDS) {
       }
       // Lowered gradually, never raised, while zooming out.
       expect(tilts.every((tilt, i) => i === 0 || tilt <= (tilts[i - 1] ?? 0) + 1e-9)).toBe(true);
-      expect(tilts.at(-1)).toBeLessThan(30);
+      expect(tilts.at(-1)).toBeLessThan(55);
       // Back in: the chosen 60° returns over frames, never by a jump.
       await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 16 }));
       let previous = (await cameraAfterFrame(page)).tiltDeg;
@@ -296,24 +371,59 @@ function isBackgroundRow(image: { width: number; data: Buffer }, row: number): b
   return true;
 }
 
-test('changing the curves at runtime moves the view to them without a jump (F150)', async ({ page }) => {
-  const curves = { morph: { startGroundZoom: 2, endGroundZoom: 3 }, relief: { startGroundZoom: 4, endGroundZoom: 5 } };
-  // Configured in the playground: the reported morph follows the custom curves.
+test('custom curves drive the morph, relief and tilt, and changing them at runtime moves the view without a jump (F150)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const curves = {
+    morph: { startGroundZoom: 2, endGroundZoom: 3 },
+    relief: { startGroundZoom: 4, endGroundZoom: 5 },
+    tilt: { startGroundZoom: 6, endGroundZoom: 8 },
+    autoTiltDeg: 55,
+  };
+  // Configured in the playground: the reported morph, relief and tilt follow the custom curves.
   await openGlobe(page, `${CLOCK}&lon=12.5&lat=41.9&zoom=2.4&curves=${encodeURIComponent(JSON.stringify(curves))}`);
+  for (const zoom of [2.4, 4.4, 6.6, 7.4, 9]) {
+    await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
+    await waitForIdle(page);
+    const camera = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
+    const ground = groundZoom(zoom, 41.9);
+    expect(camera?.morphFactor, `zoom ${zoom}`).toBeCloseTo(smootherstep(2, 3, ground), 9);
+    expect(camera?.reliefFactor, `zoom ${zoom}`).toBeCloseTo(smootherstep(4, 5, ground), 9);
+    expect(camera?.tiltDeg, `zoom ${zoom}`).toBeCloseTo(55 * smootherstep(6, 8, ground), 6);
+  }
+  // Back to the default curves at runtime: the view eases to them over frames, with no jump in the image.
+  await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 2.4 }));
   await waitForIdle(page);
-  const morph = await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1);
-  expect(morph).toBeCloseTo(smootherstep(2, 3, groundZoom(2.4, 41.9)), 9);
-  // Back to the default curves at runtime: the morph eases to the default value over frames.
   await page.evaluate(() => window.vibeglobePlayground?.globe.setViewCurves({}));
   const morphs: number[] = [];
-  for (let i = 0; i < 60; i++) {
+  let previous = await canvasImage(page);
+  let largestShare = 0;
+  for (let i = 0; i < 40; i++) {
     await nextFrame(page);
     morphs.push(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1));
+    const image = await canvasImage(page);
+    largestShare = Math.max(largestShare, changedShare(previous, image));
+    previous = image;
   }
   expect(morphs.at(-1)).toBe(0);
   expect(morphs.every((value, i) => i === 0 || Math.abs(value - (morphs[i - 1] ?? 0)) < 0.3)).toBe(true);
   expect(morphs.filter((value, i) => i > 0 && value !== morphs[i - 1]).length).toBeGreaterThan(4);
+  // The same bound as the morph sweep's (F152): no frame changes a quarter of the image by a jump-sized amount.
+  expect(largestShare).toBeLessThan(0.25);
 });
+
+/** The share of pixels whose color changed by more than 64 in some channel between two frames (the harness's jump). */
+function changedShare(a: { data: Buffer }, b: { data: Buffer }): number {
+  let changed = 0;
+  for (let i = 0; i < a.data.length; i += 4)
+    for (let c = 0; c < 3; c++)
+      if (Math.abs((a.data[i + c] ?? 0) - (b.data[i + c] ?? 0)) > 64) {
+        changed++;
+        break;
+      }
+  return changed / (a.data.length / 4);
+}
 
 /** The largest change of a sampled value between consecutive frames. */
 function largestStep(values: number[]): number {

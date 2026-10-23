@@ -49,7 +49,8 @@ function markerCentroid(
       sy += (y + 0.5) * w;
       total += w;
     }
-  if (total < 20) return undefined;
+  // A marker shows 4 to 9 px wide, as the warped tiles are drawn at about their own resolution.
+  if (total < 3) return undefined;
   return { xPx: sx / total, yPx: sy / total };
 }
 

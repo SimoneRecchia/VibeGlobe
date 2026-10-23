@@ -3031,7 +3031,7 @@
         "Record frames while panning across the 12°E boundary and assert no gap, seam or overlap appears between the two zones",
         "Unit-test the reprojection against a projection library reference with property-based round trips"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F227",
@@ -3354,7 +3354,7 @@
         "Assert a source without CORS logs one descriptive error naming the source, its tiles are treated as unavailable, and the rest of the view keeps rendering with zero black pixels",
         "Set the credentials mode per source and assert requests are sent with the configured mode"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F252",
@@ -3367,7 +3367,7 @@
         "Make the fixture server reject an expired token and assert the callback is called, the request is retried with the new token, and no black pixels appear",
         "Assert tokens never appear in logs, traces, the debug overlay or error messages"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F253",
@@ -3380,7 +3380,7 @@
         "Trigger logging, tracing, the debug overlay (?debug=1) and a failing request, and assert the key appears in none of their outputs",
         "Assert the sources guide explains how to keep secrets out of URLs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F254",

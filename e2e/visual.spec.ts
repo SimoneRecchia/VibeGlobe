@@ -56,6 +56,19 @@ const VIEWS: readonly {
     imagery: true,
     crossBackend: false,
   },
+  // Inside the tilt band, where tilt and relief are still rising (F154).
+  {
+    name: 'street-tilt-15',
+    query: 'scenario=zoom-city-to-street&zoom=15&session=visual',
+    imagery: true,
+    crossBackend: false,
+  },
+  {
+    name: 'street-tilt-16',
+    query: 'scenario=zoom-city-to-street&zoom=16&session=visual',
+    imagery: true,
+    crossBackend: false,
+  },
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });

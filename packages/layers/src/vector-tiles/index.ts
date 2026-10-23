@@ -69,5 +69,37 @@ export {
   toTargetTile,
 } from './tile-pyramid.js';
 export type { OverzoomTransform, SourceCoverage, TileDraw, TileId } from './tile-pyramid.js';
-export { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile, VECTOR_TILE_TASKS } from './layout-tile.js';
+export { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile, SIDE_STEP_UNITS, VECTOR_TILE_TASKS } from './layout-tile.js';
 export type { Bucket, BucketFeature, BucketGeometry, BucketLabel, LayoutInput } from './layout-tile.js';
+export {
+  densifyLine,
+  globeVertices,
+  maxEdgeUnits,
+  subdividedFill,
+  tileOrigin,
+  tileToLonLat,
+} from './globe-vertices.js';
+export type { GlobeVertices } from './globe-vertices.js';
+export { addVectorTiles } from './vector-tile-layer.js';
+export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-layer.js';
+export { VectorTileLoader } from './tile-loader.js';
+export type { LoadedTile, TileLoaderOptions, WantedTile } from './tile-loader.js';
+export { meshGeometry } from './tile-meshes.js';
+export type { MeshGeometry } from './tile-meshes.js';
+export { linearColor, meshKindOf, meshPaint, zoomBracket } from './vector-paint.js';
+export type { MeshPaint } from './vector-paint.js';
+export { viewTargets } from './view-tiles.js';
+export type { SurfaceTileRef } from './view-tiles.js';
+export type {
+  AtlasRect,
+  LabelQuads,
+  RasterizedGlyph,
+  VectorAtlas,
+  VectorDraw,
+  VectorLayerDraws,
+  VectorMesh,
+  VectorMeshData,
+  VectorMeshKind,
+  VectorMeshUpdate,
+  VectorTileTarget,
+} from './vector-target.js';

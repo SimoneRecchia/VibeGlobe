@@ -473,6 +473,7 @@ if (params.get('experiment') === 'gpu-probes') {
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
+  if (/=mvt-|vectorStyle=/.test(location.search)) void import('./vector-tiles-demo.js').then((m) => m.show(globe));
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;

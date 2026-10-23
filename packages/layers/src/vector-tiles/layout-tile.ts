@@ -10,9 +10,10 @@ import { decodeMvt, type MvtFeature, type MvtLayer } from '@vibeglobe/sources/ve
 import { buildingHeight, extrudeBuilding, resolveBuildingParts, type BuildingFeature } from './buildings.js';
 import { tessellateFill, tileClipRect, type ClipRect, type TilePoint } from './fill-tessellate.js';
 import { glyphRanges } from './glyphs.js';
+import { densifyLine, globeVertices, maxEdgeUnits, subdividedFill, type GlobeVertices } from './globe-vertices.js';
 import { clipLine, tessellateLine, type LineCap, type LineJoin } from './line-tessellate.js';
 import { StyleLayer, type StyleLayerJson } from './style-layer.js';
-import { toTargetTile, type OverzoomTransform } from './tile-pyramid.js';
+import { toTargetTile, type OverzoomTransform, type TileId } from './tile-pyramid.js';
 
 /** Extent every bucket is expressed in, whatever the source layer's extent. */
 export const BUCKET_EXTENT = 4096;
@@ -36,6 +37,10 @@ export interface BucketGeometry {
   readonly extrusions?: Float32Array;
   readonly distances?: Float32Array;
   readonly normals?: Float32Array;
+  /** With `LayoutInput.tile`: each vertex placed on the globe and the flat map, relative to the tile's origin. */
+  readonly globe?: GlobeVertices;
+  /** Lines with `LayoutInput.tile`: the point a short step along each vertex's extrusion, for its screen direction. */
+  readonly side?: GlobeVertices;
 }
 
 /** A label to place, before shaping (glyphs arrive separately). */
@@ -67,7 +72,15 @@ export interface LayoutInput {
   readonly zoom: number;
   /** Present when the tile is read from a lower-zoom source tile. */
   readonly overzoom?: OverzoomTransform;
+  /**
+   * The target tile: when given, long edges are split to follow the globe and every vertex gets its globe attributes
+   * (`BucketGeometry.globe`, ADR 0131), so the main thread only uploads.
+   */
+  readonly tile?: TileId;
 }
+
+/** The step along a line vertex's extrusion whose screen projection gives the extrusion's screen direction. */
+export const SIDE_STEP_UNITS = 4;
 
 type Geometry = readonly (readonly TilePoint[])[];
 
@@ -145,10 +158,17 @@ function layoutFill(
   features: readonly MvtFeature[],
   geometry: (f: MvtFeature) => Geometry,
   clip: ClipRect,
+  cellUnits: number,
 ): BucketGeometry {
   const writer = new GeometryWriter();
   features.forEach((feature, index) => {
-    if (feature.type === 'Polygon') writer.append(index, 2, tessellateFill(geometry(feature), clip));
+    if (feature.type !== 'Polygon') return;
+    const rings = geometry(feature);
+    writer.append(
+      index,
+      2,
+      Number.isFinite(cellUnits) ? subdividedFill(rings, clip, cellUnits) : tessellateFill(rings, clip),
+    );
   });
   return writer.build();
 }
@@ -159,6 +179,7 @@ function layoutLine(
   features: readonly MvtFeature[],
   geometry: (f: MvtFeature) => Geometry,
   clip: ClipRect,
+  maxEdge: number,
 ): BucketGeometry {
   const writer = new GeometryWriter();
   features.forEach((feature, index) => {
@@ -169,7 +190,8 @@ function layoutLine(
       miterLimit: Number(layer.layout('line-miter-limit', zoom, feature)),
     };
     for (const part of geometry(feature)) {
-      for (const clipped of clipLine(part, clip)) writer.append(index, 2, tessellateLine(clipped, options, clip));
+      for (const clipped of clipLine(densifyLine(part, maxEdge), clip))
+        writer.append(index, 2, tessellateLine(clipped, options, clip));
     }
   });
   return writer.build();
@@ -248,11 +270,12 @@ function layoutLayer(layer: StyleLayer, source: MvtLayer, input: LayoutInput, cl
   const geometry = (f: MvtFeature) => scaled(f, source.extent, input.overzoom);
   const kept = features.map((f) => ({ id: f.id, type: f.type, properties: f.properties }));
   const base = { layerId: layer.id, type: layer.type, features: kept };
+  const maxEdge = input.tile === undefined ? Infinity : maxEdgeUnits(input.tile.z, BUCKET_EXTENT);
   switch (layer.type) {
     case 'fill':
-      return { ...base, geometry: layoutFill(features, geometry, clip) };
+      return { ...base, geometry: layoutFill(features, geometry, clip, maxEdge) };
     case 'line':
-      return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip) };
+      return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip, maxEdge) };
     case 'fill-extrusion':
       return { ...base, geometry: layoutExtrusion(features, geometry, clip) };
     case 'circle':
@@ -276,9 +299,28 @@ export function layoutVectorTile(input: LayoutInput): Bucket[] {
     // Hidden layers are laid out too, so showing them again needs no new layout (F447, F450).
     const source = tile.layers.find((l) => l.name === layer.sourceLayer);
     if (source === undefined) continue;
-    buckets.push(layoutLayer(layer, source, input, clip));
+    const bucket = layoutLayer(layer, source, input, clip);
+    buckets.push(input.tile === undefined ? bucket : placed(bucket, input.tile));
   }
   return buckets;
+}
+
+/** Adds the globe attributes of a bucket's vertices (and of the lines' side points). */
+function placed(bucket: Bucket, tile: TileId): Bucket {
+  const g = bucket.geometry;
+  if (g === undefined || g.featureIndex.length === 0) return bucket;
+  const stride = bucket.type === 'fill-extrusion' ? 3 : 2;
+  const globe = globeVertices(tile, BUCKET_EXTENT, g.positions, stride);
+  if (bucket.type !== 'line' || g.extrusions === undefined) return { ...bucket, geometry: { ...g, globe } };
+  const sides = new Float32Array(g.positions.length);
+  for (let i = 0; i < sides.length; i += 2) {
+    const ex = g.extrusions[i] ?? 0;
+    const ey = g.extrusions[i + 1] ?? 0;
+    const k = SIDE_STEP_UNITS / (Math.hypot(ex, ey) || 1);
+    sides[i] = (g.positions[i] ?? 0) + ex * k;
+    sides[i + 1] = (g.positions[i + 1] ?? 0) + ey * k;
+  }
+  return { ...bucket, geometry: { ...g, globe, side: globeVertices(tile, BUCKET_EXTENT, sides, 2) } };
 }
 
 function transfers(buckets: readonly Bucket[]): ArrayBuffer[] {
@@ -292,6 +334,7 @@ function transfers(buckets: readonly Bucket[]): ArrayBuffer[] {
       geometry.extrusions,
       geometry.distances,
       geometry.normals,
+      ...[geometry.globe, geometry.side].flatMap((v) => (v === undefined ? [] : [v.positions, v.normals, v.planes])),
     ]) {
       if (array !== undefined) out.push(array.buffer as ArrayBuffer);
     }

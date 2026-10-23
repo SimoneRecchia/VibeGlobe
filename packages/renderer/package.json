@@ -15,6 +15,11 @@
       "types": "./dist/gltf.d.ts",
       "source": "./src/gltf.ts",
       "default": "./dist/gltf.js"
+    },
+    "./vector-tiles": {
+      "types": "./dist/vector-tiles/index.d.ts",
+      "source": "./src/vector-tiles/index.ts",
+      "default": "./dist/vector-tiles/index.js"
     }
   },
   "files": [

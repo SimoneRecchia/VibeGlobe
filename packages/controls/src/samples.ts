@@ -40,17 +40,22 @@ export class SampleRing {
 
   /**
    * Velocity per millisecond of each channel over the samples within the window of the latest one, written to `out`,
-   * for a release at `releaseMs`. The window is `windowMs`, stretched to twice the interval between the last two
-   * samples when events come slower (a busy main thread, a slow device; at most 300 ms), so the drag is still measured
-   * (KB-121). A release more than the window after the latest sample, or fewer than two samples in it, give zero: a
-   * release after holding still does not coast. The window ends at the latest motion, not at the release.
+   * for a release at `releaseMs`. The window is `windowMs`, stretched to twice the longest of the last three intervals
+   * between samples when events come slower (a busy main thread, a slow device; at most 300 ms), so the drag is still
+   * measured (KB-121). A release more than the window after the latest sample, or fewer than two samples in it, give
+   * zero: a release after holding still does not coast. The window ends at the latest motion, not at the release.
    */
   velocity(windowMs: number, out: Float64Array, releaseMs: number): void {
     out.fill(0);
     if (this.count < 2) return;
     const last = (this.head - 1 + CAPACITY) % CAPACITY;
     const lastTime = this.times[last] ?? 0;
-    const cadenceMs = lastTime - (this.times[(last - 1 + CAPACITY) % CAPACITY] ?? 0);
+    // The longest of the last three intervals: one quick pair of events does not hide a slow cadence.
+    let cadenceMs = 0;
+    for (let n = 1; n <= 3 && n < this.count; n++) {
+      const newer = this.times[(last - n + 1 + CAPACITY) % CAPACITY] ?? 0;
+      cadenceMs = Math.max(cadenceMs, newer - (this.times[(last - n + CAPACITY) % CAPACITY] ?? 0));
+    }
     windowMs = Math.max(windowMs, Math.min(2 * cadenceMs, MAX_WINDOW_MS));
     if (releaseMs - lastTime > windowMs) return;
     let first = last;

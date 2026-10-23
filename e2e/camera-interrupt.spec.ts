@@ -102,13 +102,15 @@ test('wheel, drag, touch and keyboard input interrupt flights, eases, tours, orb
       });
       if (movement !== 'inertia' && outcome !== 'interrupted')
         failures.push(`${movement}/${input}: outcome ${outcome}`);
-      // Frame-to-frame changes around the takeover: a jump to the target or back to an earlier state would be degrees.
+      // Frame-to-frame changes around the takeover, in screen pixels at the frame's zoom (256 px per 360° at zoom 0): a
+      // jump to the target or back to an earlier state is hundreds; a fast frame of inertia on a slow machine, tens.
       for (let i = Math.max(1, takeover - 2); i < poses.length; i++) {
         const [a, b] = [poses[i - 1], poses[i]];
         if (!a || !b) continue;
         const dLon = Math.abs((((b.lon - a.lon + 540) % 360) - 180) * Math.cos((a.lat * Math.PI) / 180));
+        const stepPx = ((Math.hypot(dLon, b.lat - a.lat) * 256) / 360) * 2 ** Math.max(a.zoom, b.zoom);
         const dHeading = Math.abs(((b.heading - a.heading + 540) % 360) - 180);
-        if (Math.hypot(dLon, b.lat - a.lat) > 3 || Math.abs(b.zoom - a.zoom) > 0.5 || dHeading > 10)
+        if (stepPx > 60 || Math.abs(b.zoom - a.zoom) > 0.5 || dHeading > 10)
           failures.push(`${movement}/${input}: jump at frame ${i} ${JSON.stringify([a, b])}`);
       }
       await page.evaluate(() => ((window as unknown as { poses: Pose[] }).poses = []));

@@ -356,6 +356,7 @@ function syncLayers(): DataLayer[] {
 }
 
 export function showDataScenario(globe: Globe, name: string): void {
+  if (name === 'data-formats') return void import('./layers-formats.js').then((module) => module.showFormats(globe));
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (['data-markers', 'data-styled', 'data-select', 'data-altitudes-all', 'data-drag'].includes(name))

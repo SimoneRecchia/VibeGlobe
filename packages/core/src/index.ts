@@ -173,6 +173,14 @@ export type {
   TransportResult,
 } from './scheduler/types.js';
 export { serializeTaskError, WORKER_PROTOCOL_VERSION } from './scheduler/worker-protocol.js';
+export { acquireWorkerPool } from './scheduler/worker-pool.js';
+export type {
+  WorkerPool,
+  WorkerPoolLease,
+  WorkerPoolOptions,
+  WorkerTaskOutcome,
+  WorkerTaskRequest,
+} from './scheduler/worker-pool-types.js';
 export type {
   SerializedTaskError,
   TaskContext,

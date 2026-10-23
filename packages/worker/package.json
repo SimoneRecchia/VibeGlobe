@@ -24,6 +24,7 @@
     "wasm/third-party.json"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0"
+    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/sources": "0.0.0"
   }
 }

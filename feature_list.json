@@ -4739,7 +4739,7 @@
         "Verify walls and roofs are shaded, faces occlude correctly, and frame differencing shows no z-fighting shimmer at the ground or between touching walls",
         "Verify extrusion heights match the configured values within 1% when measured through picking"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F356",

@@ -6262,7 +6262,7 @@
         "Assert reactive updates are batched to at most one per frame",
         "Profile a 30-second flight and assert the frame budget still holds with the composables in use"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F476",

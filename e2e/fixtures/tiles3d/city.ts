@@ -7,6 +7,7 @@
  * and 3 are 1.1 `glb` with `EXT_mesh_features` and an `EXT_structural_metadata` property table. Variants compress the
  * geometry with Draco or meshopt, or texture the ground with KTX2. Test code only.
  */
+import { fixtureHeightMeters } from '../../../scripts/fixtures/tiles/terrain.ts';
 import { writeGlb, type Compression, type PrimitiveData } from './glb-writer.ts';
 
 /** The city's center. */
@@ -22,7 +23,19 @@ const GROUND_HEIGHT = 1;
 export const CITY_COPYRIGHT = 'VibeGlobe fixture city';
 
 /** Fixture variants. */
-export type CityVariant = 'plain' | 'draco' | 'meshopt' | 'ktx2';
+export type CityVariant = 'plain' | 'draco' | 'meshopt' | 'ktx2' | 'terrain';
+
+/**
+ * The ground's height under a point of the city (meters east and north of its center): the plate 1 m above the
+ * ellipsoid, or for the `terrain` variant the fixture server's analytic terrain (F467), which the ground then follows.
+ */
+type GroundHeight = (east: number, north: number) => number;
+const flatGround: GroundHeight = () => GROUND_HEIGHT;
+const terrainGround: GroundHeight = (east, north) => {
+  const lat = (CITY_CENTER.latitudeDeg + north / 110_950) * (Math.PI / 180);
+  const lon = (CITY_CENTER.longitudeDeg + east / (111_320 * Math.cos(lat))) * (Math.PI / 180);
+  return fixtureHeightMeters(lon, lat);
+};
 
 /** The deterministic height of the building in grid cell (i, j), in meters. */
 export function buildingHeight(i: number, j: number): number {
@@ -72,13 +85,13 @@ class Shapes {
     this.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
-  /** A box from the ground plate up to `height`, centered at (east, north) with a square footprint. */
-  box(east: number, north: number, half: number, height: number, id: number): void {
+  /** A box from `base` up to `height`, centered at (east, north) with a square footprint. */
+  box(east: number, north: number, half: number, base: number, height: number, id: number): void {
     const x0 = east - half;
     const x1 = east + half;
     const z0 = -(north + half);
     const z1 = -(north - half);
-    const y0 = GROUND_HEIGHT;
+    const y0 = base;
     const y1 = height;
     this.quad(
       [
@@ -146,7 +159,7 @@ class Shapes {
 }
 
 /** The buildings or blocks of a tile and their geometry. */
-function tileShapes(level: number, x: number, y: number, image?: PrimitiveData['image']) {
+function tileShapes(level: number, x: number, y: number, ground: GroundHeight, image?: PrimitiveData['image']) {
   const size = CITY_SIZE_METERS / 2 ** level;
   const west = -CITY_SIZE_METERS / 2 + x * size;
   const south = -CITY_SIZE_METERS / 2 + y * size;
@@ -164,27 +177,48 @@ function tileShapes(level: number, x: number, y: number, image?: PrimitiveData['
         for (let j = j0; j < j0 + cells; j++) height = Math.max(height, buildingHeight(i, j));
       const name = cells === 1 ? buildingName(i0, j0) : `block-${level}-${i0}-${j0}`;
       const half = (block - (CELL - FOOTPRINT)) / 2;
-      buildings.box(west + (bi + 0.5) * block, south + (bj + 0.5) * block, half, height, features.length);
+      const east = west + (bi + 0.5) * block;
+      const north = south + (bj + 0.5) * block;
+      // On flat ground the roof is at the building's height; on terrain, that far above the ground at its center.
+      const base = ground(east, north);
+      const roof = ground === flatGround ? height : base + height;
+      buildings.box(east, north, half, ground === flatGround ? GROUND_HEIGHT : base - 2, roof, features.length);
       features.push({ name, height });
     }
-  const ground = new Shapes();
-  const [e0, e1, n0, n1] = [west, west + size, south, south + size];
-  const corners = [
-    [e0, GROUND_HEIGHT, -n0],
-    [e1, GROUND_HEIGHT, -n0],
-    [e1, GROUND_HEIGHT, -n1],
-    [e0, GROUND_HEIGHT, -n1],
-  ];
-  ground.quad(corners, [0, 1, 0], features.length, [
-    [0, 1],
-    [1, 1],
-    [1, 0],
-    [0, 0],
-  ]);
+  const plate = new Shapes();
+  // The ground: one quad on flat ground; a grid following the terrain, 8 cells a side.
+  const cellsPerSide = ground === flatGround ? 1 : 8;
+  const cell = size / cellsPerSide;
+  for (let ci = 0; ci < cellsPerSide; ci++)
+    for (let cj = 0; cj < cellsPerSide; cj++) {
+      const [e0, e1, n0, n1] = [west + ci * cell, west + (ci + 1) * cell, south + cj * cell, south + (cj + 1) * cell];
+      const u = (e: number) => (e - west) / size;
+      const v = (n: number) => 1 - (n - south) / size;
+      plate.quad(
+        [
+          [e0, ground(e0, n0), -n0],
+          [e1, ground(e1, n0), -n0],
+          [e1, ground(e1, n1), -n1],
+          [e0, ground(e0, n1), -n1],
+        ],
+        [0, 1, 0],
+        features.length,
+        [
+          [u(e0), v(n0)],
+          [u(e1), v(n0)],
+          [u(e1), v(n1)],
+          [u(e0), v(n1)],
+        ],
+      );
+    }
   features.push({ name: 'ground', height: GROUND_HEIGHT });
   return {
     features,
-    primitives: [buildings.data([0.86, 0.74, 0.58, 1]), ground.data([0.5, 0.56, 0.46, 1], image)],
+    primitives: [
+      buildings.data([0.86, 0.74, 0.58, 1]),
+      // On terrain the ground is purple, so terrain or imagery showing through it stands out (F467).
+      plate.data(ground === flatGround ? [0.5, 0.56, 0.46, 1] : [0.55, 0.3, 0.62, 1], image),
+    ],
   };
 }
 
@@ -242,7 +276,7 @@ function propertyTable(features: readonly Feature[], view: (bytes: Uint8Array) =
   };
 }
 
-function tileJson(level: number, x: number, y: number): Record<string, unknown> {
+function tileJson(level: number, x: number, y: number, bottom: number, top: number): Record<string, unknown> {
   const size = CITY_SIZE_METERS / 2 ** level;
   const cx = -CITY_SIZE_METERS / 2 + (x + 0.5) * size;
   const cy = -CITY_SIZE_METERS / 2 + (y + 0.5) * size;
@@ -255,9 +289,9 @@ function tileJson(level: number, x: number, y: number): Record<string, unknown> 
       [0, 1],
       [1, 1],
     ] as const)
-      children.push(tileJson(level + 1, 2 * x + dx, 2 * y + dy));
+      children.push(tileJson(level + 1, 2 * x + dx, 2 * y + dy, bottom, top));
   return {
-    boundingVolume: { box: [cx, cy, 31, size / 2, 0, 0, 0, size / 2, 0, 0, 0, 31] },
+    boundingVolume: { box: [cx, cy, (bottom + top) / 2, size / 2, 0, 0, 0, size / 2, 0, 0, 0, (top - bottom) / 2] },
     geometricError: leaf ? 0 : 64 / 2 ** level,
     refine: 'REPLACE',
     content: { uri: `tiles/${level}/${x}/${y}.${level < 2 ? 'b3dm' : 'glb'}` },
@@ -268,7 +302,16 @@ function tileJson(level: number, x: number, y: number): Record<string, unknown> 
 /** Every file of a variant of the city by its path relative to the tileset: `tileset.json` and the tiles. */
 export async function cityFiles(variant: CityVariant, ktx2Image?: Uint8Array): Promise<Map<string, Uint8Array>> {
   const files = new Map<string, Uint8Array>();
-  const root = { ...tileJson(0, 0, 0), transform: cityTransform() };
+  const ground = variant === 'terrain' ? terrainGround : flatGround;
+  let bottom = Infinity;
+  let top = -Infinity;
+  for (let e = -CITY_SIZE_METERS / 2; e <= CITY_SIZE_METERS / 2; e += 16)
+    for (let n = -CITY_SIZE_METERS / 2; n <= CITY_SIZE_METERS / 2; n += 16) {
+      bottom = Math.min(bottom, ground(e, n) - 2);
+      top = Math.max(top, ground(e, n) + 62);
+    }
+  if (ground === flatGround) [bottom, top] = [0, 62];
+  const root = { ...tileJson(0, 0, 0, bottom, top), transform: cityTransform() };
   const tileset = { asset: { version: '1.1' }, geometricError: 128, root };
   files.set('tileset.json', encoder.encode(JSON.stringify(tileset, null, 1)));
   const compression: Compression = variant === 'draco' || variant === 'meshopt' ? variant : 'none';
@@ -276,7 +319,7 @@ export async function cityFiles(variant: CityVariant, ktx2Image?: Uint8Array): P
   for (let level = 0; level < CITY_LEVELS; level++)
     for (let x = 0; x < 2 ** level; x++)
       for (let y = 0; y < 2 ** level; y++) {
-        const { features, primitives } = tileShapes(level, x, y, image);
+        const { features, primitives } = tileShapes(level, x, y, ground, image);
         const legacy = level < 2;
         const glb = await writeGlb({
           primitives,

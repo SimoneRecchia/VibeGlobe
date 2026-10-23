@@ -20,11 +20,12 @@ declare global {
 export const CITY = { longitudeDeg: 12.4922, latitudeDeg: 41.8902, halfMeters: 512 } as const;
 
 /**
- * Opens the scenario and waits for the tileset JSON. Tiled fixture imagery (`imagery=world`) gives the globe its
+ * Opens the scenario (`3dtiles-city` unless the query names one) and waits for the tileset JSON. Tiled fixture imagery (`imagery=world`) gives the globe its
  * request pool and worker pool, which render extensions receive (`context.network`, `context.workers`).
  */
 export async function openCity(page: Page, query: string): Promise<void> {
-  await openGlobe(page, `scenario=3dtiles-city&${query.includes('imagery=') ? '' : 'imagery=world&'}${query}`);
+  const scenario = query.includes('scenario=') ? '' : 'scenario=3dtiles-city&';
+  await openGlobe(page, `${scenario}${query.includes('imagery=') ? '' : 'imagery=world&'}${query}`);
   await page.waitForFunction(() => window.vibeglobeTiles3d?.extension.stats().ready === true, undefined, {
     timeout: 30_000,
   });

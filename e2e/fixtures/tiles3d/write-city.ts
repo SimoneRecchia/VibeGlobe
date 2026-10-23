@@ -22,7 +22,7 @@ function checker(sizePx: number): Uint8Array {
 }
 
 const ktx2 = new Uint8Array(await encodeKtx2(checker(64), 64, 64, 'etc1s'));
-for (const variant of ['plain', 'draco', 'meshopt', 'ktx2'] as const satisfies readonly CityVariant[]) {
+for (const variant of ['plain', 'draco', 'meshopt', 'ktx2', 'terrain'] as const satisfies readonly CityVariant[]) {
   const dir = join(OUT, `city-${variant}`);
   rmSync(dir, { recursive: true, force: true });
   for (const [path, bytes] of await cityFiles(variant, ktx2)) {

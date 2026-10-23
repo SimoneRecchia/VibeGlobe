@@ -1,6 +1,18 @@
 import type { DepthPath } from '@vibeglobe/core';
 import type { ModelAttribute, ModelDescription, ModelImage, ModelMaterial, ModelPrimitive } from '@vibeglobe/models';
-import { cameraNear, max, normalView, positionView, texture, uv, varying, vec3, vec4 } from 'three/tsl';
+import {
+  cameraNear,
+  cameraProjectionMatrix,
+  max,
+  modelViewMatrix,
+  normalView,
+  positionLocal,
+  texture,
+  uv,
+  varying,
+  vec3,
+  vec4,
+} from 'three/tsl';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -72,6 +84,13 @@ const WRAPPING: Readonly<Record<number, Wrapping>> = {
   33648: MirroredRepeatWrapping,
   10497: RepeatWrapping,
 };
+
+/**
+ * The share of its distance by which every vertex is drawn nearer the eye, along its own line of sight: the picture
+ * stays where it is, only its depth moves. Where content lies on the engine's terrain (photogrammetry, a tileset's
+ * ground), it then wins the depth test everywhere instead of fighting the surface (F467): 0.1%, 16 cm at 160 m.
+ */
+export const DEPTH_PULL = 1e-3;
 
 /** The light direction in view space: from above and a little behind the eye (as the data layers' models, ADR 0037). */
 const LIGHT = vec3(0.3, 0.8, 0.5).normalize();
@@ -157,8 +176,10 @@ function materialOf(
   out.transparent = alphaMode === 'BLEND';
   if (alphaMode === 'MASK') out.alphaTest = material?.alphaCutoff ?? 0.5;
   out.side = material?.doubleSided ? DoubleSide : FrontSide;
+  const pulled = modelViewMatrix.mul(vec4(positionLocal, 1)).xyz.mul(1 - DEPTH_PULL);
+  out.vertexNode = cameraProjectionMatrix.mul(vec4(pulled, 1));
   if (options.depthPath === 'fragment') {
-    out.depthNode = cameraNear.div(varying(positionView.z.negate()));
+    out.depthNode = cameraNear.div(varying(pulled.z.negate()));
     out.depthFunc = GreaterEqualDepth;
   }
   return out;

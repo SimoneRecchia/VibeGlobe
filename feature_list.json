@@ -6156,7 +6156,7 @@
         "Record frames while orbiting at street level and assert no shimmer where the tileset meets the terrain (temporal z-fighting analysis)",
         "Assert terrain does not show through the tileset surface in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F468",

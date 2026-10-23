@@ -6094,7 +6094,7 @@
         "Run 10 minutes of randomized navigation and assert GPU and RAM use stay within the configured budgets",
         "Assert evicted tiles reload correctly when revisited"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F463",
@@ -6120,7 +6120,7 @@
         "Assert surveyed reference points in the tileset project onto the same pixels as markers placed at their WGS84 coordinates",
         "Repeat on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F465",
@@ -6144,7 +6144,7 @@
         "Assert the click event carries the expected feature properties",
         "Assert the reported coordinates and height match the fixture's known positions within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F467",

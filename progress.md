@@ -1,5 +1,27 @@
 # Progress
 
+## Handoff (2026-10-23 ~21:15 UTC, main session moving to another account)
+
+Branch `claude/happy-galileo-b07j98`; pull request SimoneRecchia/VibeGlobe#25 (into `main`, squash only) is **open, not merged**: Fast checks on bbf4758 failed in one of two runs on `packages/core/src/globe/terrain-globe.test.ts:669` (F126, "selects the stored set of terrain tiles for scripted cameras"). The test passed alone locally and failed once before under parallel load; whether the motion-detail changes of today make it flaky is not yet known.
+
+What I was doing: closing the regressions of the full CI runs after today's adaptive-loading work (motion-aware detail, flight settle, Resource Timing bandwidth estimate), then picking the next M10/M12/M14 entries. The last full CI run (workflow_dispatch on bbf4758, run 40021954210) was still running.
+
+Next steps, in order:
+
+1. Investigate `terrain-globe.test.ts:669` (F126): run it 10 times alone and under `npx vitest run packages/core`; if it fails, compare with the commit before 2844131 (motion hold) and bbf4758 (`jumpTo` announces jumps via `MovementsHost.cameraJumped`, `MotionDetail.jumped`). Fix with a regression test first if it is a bug.
+2. Read the result of the full CI run 40021954210 (or start a new `workflow_dispatch` of `ci.yml` on the branch). Expected failure: F287 only (a failing entry, docs/hardening-backlog.md). Earlier runs today also showed F322 and F090 (fixed since), F413/F426 (timeouts raised).
+3. Once Fast checks are green, merge #25 into `main` (squash), then run `npx tsc -b --force`. Tracks D, E and F of round 3 start from `main` after this merge (the owner was waiting for it).
+4. Continue the entries: F416 (`Globe.captureView` larger than the canvas: off-screen tiled rendering with a view-offset camera; the UI's screenshot control uses it, hook A (4)); C (3) `Globe.setQualitySettings` and C (4) the quality page (M11, unblocks F399 and the Vue `qualityPreset` prop of F474); M11 atmosphere wiring (docs/parallel-tracks.md "Atmosphere hook"); F358 data-layer labels with track D's SDF atlas once it lands; F374 marker level of detail; C (1) `parse-model` in the worker program (needs a meshopt WebAssembly loader of our own without Blob workers, F100); KB-132 (allocation test flaky about 1 in 10).
+5. At the end of each milestone: fresh-context review (correctness only), full CI run, `progress.md` hours and Monday estimate.
+
+Render-extension hook (on the branch, not yet on `main`): `Globe.addRenderExtension(create)` (core `render-extensions.ts`); the context gives `renderer` (three.js `ThreeExtensionContext` from `@vibeglobe/renderer`: `scene`, `depthPath()`), `requestRender`, `network` (the page's `NetworkPool`) and `workers`; `frame(view)` runs before every draw, `dispose()` on destroy. Worker program tasks: `layout-vector-tile` registered; `parse-model` removed again (C (1) reopened, see docs/parallel-tracks.md).
+
+Next round of parallel tracks (docs/parallel-tracks.md, "Candidate tracks ... round 3"), confirmed to the owner, to start once #25 is merged: D vector tile rendering (F440–F459; also exports its SDF atlas and text material for F358), E 3D Tiles (F461–F471; its Google data access must use `refuseDisplayOnly`, F323), F network simulation suite (F315, F329's scenario specs; owns `scripts/fixtures/tiles/link.ts`, which this session rewrote as a round-robin queue).
+
+Open pull requests: SimoneRecchia/VibeGlobe#25 (this branch).
+
+Pending owner steps: docs/open-questions.md (2 and 13–17): reference desktop and tablet (frame-time budgets: F167, F378, F389, F399–F403, F438's manual step, the hardening-backlog rows), real dataset downloads (F339, F551, F554), EGM2008 grid (F133), npm publishing (F555), the live OpenStreetMap run (F264 step 4, `test:live-sources` workflow), Google API key runs, KB-110 (F137 and F148: ask the owner, as directed at the end of M5).
+
 ## Current state
 
 - **M2 Globe core complete** (F078 passing, 2026-10-21: the full CI suite green on 9679fe0, reviews closed by ADR 0021, no open bug). Passing in M2: F042–F064, F066–F074, F076–F078; pending owner steps: F065, F075.

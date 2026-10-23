@@ -389,7 +389,7 @@ class GlobeEngine implements Globe {
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
-    return this.viewControl.positionAt(validateScreenPoint(point));
+    return this.viewControl.positionAt(validateScreenPoint(point), (λ, φ) => this.surfaceFrame.terrainHeightRad(λ, φ));
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {

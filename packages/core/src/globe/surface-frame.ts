@@ -49,6 +49,9 @@ const MAX_LEVEL = 25;
 /** A lift change smaller than this, meters, is rounding, not motion (KB-089). */
 const LIFT_SETTLED_METERS = 1e-3;
 
+/** The sample `terrainHeightRad` writes. */
+const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
+
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
  * draw list the renderer draws, reusing every array (ADR 0018). Keeps what the last drawn frame selected for the
@@ -294,6 +297,15 @@ export class SurfaceFrame {
     out.level = -1;
     out.noData = true;
     return out;
+  }
+
+  /** The height of the terrain in memory at a position in radians (F383), NaN without terrain. */
+  terrainHeightRad(longitudeRad: number, latitudeRad: number): number {
+    const heights = this.imagery?.heights;
+    if (!heights) return Number.NaN;
+    this.queryRad[0] = longitudeRad;
+    this.queryRad[1] = latitudeRad;
+    return heights.sampleAt(this.queryRad, terrainSample).heightMeters;
   }
 
   /** The height at a WGS84 position from the finest terrain the source delivers (F145). */

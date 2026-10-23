@@ -6,7 +6,7 @@ import { wrapDegrees } from './camera-state.js';
 import type { GeoPosition, ScreenPoint } from './types.js';
 import type { ValidView } from './validation.js';
 import { morphPointInto, type MorphFrame } from '../view/morph.js';
-import { pickMorphedAt } from '../view/pick.js';
+import { pickMorphedAt, pickTerrainAt } from '../view/pick.js';
 import type { ViewState } from '../view/view-state.js';
 
 const DEG = 180 / Math.PI;
@@ -19,15 +19,29 @@ const geodetic = new Float64Array(3);
 
 /**
  * The position under a screen point as the frame shows it (ADR 0008: on the morphed surface, measured on the
- * ellipsoid), after bringing the camera and view state up to date, or undefined off the surface.
+ * ellipsoid; on the terrain drawn, with its height, when `heightAt` gives heights, F383), after bringing the camera and
+ * view state up to date, or undefined off the surface.
  */
-export function positionAt(camera: Camera, view: ViewState, point: ScreenPoint): GeoPosition | undefined {
+export function positionAt(
+  camera: Camera,
+  view: ViewState,
+  point: ScreenPoint,
+  heightAt?: (longitudeRad: number, latitudeRad: number) => number,
+): GeoPosition | undefined {
   camera.update();
   view.update(camera);
   pixel[0] = point.xPx;
   pixel[1] = point.yPx;
-  if (!pickMorphedAt(camera, view.morph, pixel, pick)) return undefined;
-  return { longitudeDeg: wrapDegrees(pick.longitudeRad * DEG), latitudeDeg: pick.latitudeRad * DEG, heightMeters: 0 };
+  pick.heightMeters = 0;
+  const hit = heightAt
+    ? pickTerrainAt(camera, view.morph, pixel, heightAt, pick)
+    : pickMorphedAt(camera, view.morph, pixel, pick);
+  if (!hit) return undefined;
+  return {
+    longitudeDeg: wrapDegrees(pick.longitudeRad * DEG),
+    latitudeDeg: pick.latitudeRad * DEG,
+    heightMeters: pick.heightMeters,
+  };
 }
 
 /** The screen point showing a position as the frame draws it (camera and view brought up to date), or undefined behind it. */

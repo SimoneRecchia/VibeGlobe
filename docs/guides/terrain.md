@@ -64,3 +64,14 @@ Every frame, the camera keeps the eye `terrainClearanceMeters` (default 10 m) ab
 
 - `globe.surfaceTiles()`: each tile's `terrainLevel` (an ancestor's while its own loads) and `terrainErrorPx`, which the selection keeps at or below 2 px (τ_terrain) above the source's last level (F126).
 - `globe.terrainStats()`: the terrain loader's counters, the bytes uploaded in the last frame against `uploadBudgetBytes`, and `msLastFrame`, the main-thread time the last frame spent on terrain (budget in `docs/plan/quality.md`, F134).
+
+## Picking terrain
+
+`globe.screenToGeo(point)` returns the point of the terrain drawn under a screen point, with its height (F383). The pixel's
+ray is intersected with the surface as the frame draws it (the globe-to-map morph and the relief scale included), then
+moved to where the terrain's height meets it. Accuracy, as `e2e/terrain-picking.spec.ts` checks it in the globe, flat
+and tilted views: the position lies within one screen pixel's size on the ground of the point drawn there, and the
+height within 2 m plus one pixel of 45° slope of `globe.elevationAt` at that position. Heights come from the terrain in
+memory: where the view draws no relief (the whole globe, the flat map) the terrain stays coarse, so the height is the
+coarse level's; `globe.elevationAtAsync` loads the finest level first. Data-layer events (`click`, `hover-enter`)
+carry the same position.

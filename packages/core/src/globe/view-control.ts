@@ -49,9 +49,15 @@ export class ViewControl {
     };
   }
 
-  /** The position under a valid screen point as the frame shows it; none before the viewport has a size. */
-  positionAt(point: ScreenPoint): GeoPosition | undefined {
-    return this.host.waiting() ? undefined : positionAt(this.host.cam, this.host.view, point);
+  /**
+   * The position under a valid screen point as the frame shows it, on the terrain drawn when `heightAt` gives heights
+   * (F383); none before the viewport has a size.
+   */
+  positionAt(
+    point: ScreenPoint,
+    heightAt?: (longitudeRad: number, latitudeRad: number) => number,
+  ): GeoPosition | undefined {
+    return this.host.waiting() ? undefined : positionAt(this.host.cam, this.host.view, point, heightAt);
   }
 
   /** Sets the view mode (F163), announcing a change. */

@@ -765,8 +765,9 @@ export interface Globe {
    */
   setViewCurves(curves: ViewCurvesInit): void;
   /**
-   * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. A point
-   * without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').
+   * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. Over
+   * terrain it is the point of the terrain drawn there, with its height from the terrain in memory (F383); without
+   * terrain, the ellipsoid's, height 0. A point without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').
    */
   screenToGeo(point: ScreenPoint): GeoPosition | undefined;
   /**

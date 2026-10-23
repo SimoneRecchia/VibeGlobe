@@ -5090,7 +5090,7 @@
         "Verify coordinates match the expected location within the size of one screen pixel on the ground",
         "Verify the elevation matches the best available terrain height within the documented tolerance on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F384",

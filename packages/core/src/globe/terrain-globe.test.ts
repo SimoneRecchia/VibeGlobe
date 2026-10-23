@@ -334,6 +334,36 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('picks the point of the drawn terrain under a pixel, with its height, in a tilted view (F383)', async () => {
+    const { globe } = await terrainGlobe(terrain([]), 30, terrainWorkers(), {
+      longitudeDeg: 7,
+      latitudeDeg: 46,
+      zoom: 11,
+      tiltDeg: 60,
+    });
+    let moved = 0;
+    for (const [xPx, yPx] of [
+      [400, 300],
+      [100, 450],
+      [700, 200],
+      [400, 120],
+    ] as const) {
+      const picked = globe.screenToGeo({ xPx, yPx });
+      if (!picked) throw new Error('missed');
+      const ground = globe.elevationAt(picked);
+      expect(ground.noData).toBe(false);
+      // On the terrain: its height there, and drawn at the pixel picked.
+      expect(Math.abs((picked.heightMeters ?? 0) - ground.heightMeters)).toBeLessThan(0.1);
+      const shown = globe.geoToScreen(picked);
+      expect(Math.hypot((shown?.xPx ?? NaN) - xPx, (shown?.yPx ?? NaN) - yPx)).toBeLessThan(0.05);
+      // Not where the ray meets the ellipsoid: the terrain stands 1,000 m or more above it.
+      const onEllipsoid = globe.geoToScreen({ ...picked, heightMeters: 0 });
+      moved = Math.max(moved, Math.hypot((onEllipsoid?.xPx ?? 0) - xPx, (onEllipsoid?.yPx ?? 0) - yPx));
+    }
+    expect(moved).toBeGreaterThan(5);
+    globe.destroy();
+  });
+
   it('answers 10,000 queries at random positions without allocating (F144)', async () => {
     const { globe } = await terrainGlobe(terrain([]));
     const out = { heightMeters: 0, level: 0, noData: true };

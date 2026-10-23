@@ -85,6 +85,38 @@ export function pickMorphedAt(camera: Camera, frame: MorphFrame, pixel: Float64A
 }
 
 /**
+ * The point under a CSS pixel on the drawn terrain (F383): the surface hit of {@link pickMorphedAt}, then moved along
+ * the ray to where the terrain's height at it (`heightAt`, radians in, meters out, NaN without terrain) meets it, the
+ * height scaled by the frame's relief as drawn. A fixed-point iteration, damped after four steps, until the height
+ * changes by less than 5 cm. Writes the position with its terrain height; false when the ray misses the surface.
+ */
+export function pickTerrainAt(
+  camera: Camera,
+  frame: MorphFrame,
+  pixel: Float64Array,
+  heightAt: (longitudeRad: number, latitudeRad: number) => number,
+  out: GeodeticRad,
+): boolean {
+  if (!pickMorphedAt(camera, frame, pixel, out)) return false;
+  let height = heightAt(out.longitudeRad, out.latitudeRad);
+  if (Number.isNaN(height)) return true;
+  camera.rayDirectionAt(pixel, direction);
+  for (let step = 0; step < 12; step++) {
+    geodetic[0] = out.longitudeRad;
+    geodetic[1] = out.latitudeRad;
+    geodetic[2] = height;
+    if (!solveOnRay(frame, camera.eyeEcef, out)) return false;
+    const next = heightAt(out.longitudeRad, out.latitudeRad);
+    const target = step < 4 ? next : (height + next) / 2;
+    const settled = Math.abs(target - height) < 0.05;
+    height = target;
+    if (settled) break;
+  }
+  out.heightMeters = height;
+  return true;
+}
+
+/**
  * Newton's method from the guess in `geodetic` (ADR 0008): moves the longitude and latitude until the morphed point
  * lies on the ray from `eye` along `direction`; writes it to `out` and returns true, or false when it does not converge.
  */

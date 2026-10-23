@@ -225,11 +225,11 @@ class OfflineEngine implements Offline {
     }
     this.registerEndpoint(source);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
-    const own = (source as { attribution?: readonly Attribution[] }).attribution ?? [];
-    // Read whenever the engine lists credits: the source's own, then each package its tiles came from (F306).
+    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
+    // package its tiles came from (F306).
     Object.defineProperty(wrapped, 'attribution', {
       enumerable: true,
-      get: () => this.creditsOf(source.id, own),
+      get: () => this.creditsOf(source.id, (source as { attribution?: readonly Attribution[] }).attribution ?? []),
     });
     return wrapped as S;
   }

@@ -206,9 +206,7 @@ test.describe('the Google logo and credits (F259)', () => {
     }
 
   test('stay visible when configuration or the page CSS tries to hide or cover them', async ({ page }) => {
-    // TB-02 (docs/known-bugs.md): the logo inside the engine's credits element is not pinned against page CSS; the
-    // renderer's fix (hook request 5 of track B) turns this regression test green, and this annotation is removed.
-    test.fail();
+    // The regression test of TB-02 (docs/known-bugs.md): the logo inside the credits element stays pinned.
     await page.setViewportSize({ width: 800, height: 600 });
     await mountGoogle(page, ['google']);
     await expect.poll(() => googleCredits(page)).toContainEqual({ text: 'Google', shown: true, logo: 'shown' });
@@ -280,4 +278,58 @@ test('the OpenStreetMap public profile: the linked credit while its tiles show, 
   } finally {
     server.close();
   }
+});
+
+test('the Google copyrights of each settled view are requested once and shown, following the view (F258)', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const server = googleFixture(tilePng);
+  await page.route('https://tile.googleapis.com/**', (route) => fulfillFrom(route, server.fetch));
+  await openSources(page, 'lon=12.5&lat=41.9&zoom=4');
+  await mountSource(
+    page,
+    `async (s, key) => {
+      const source = await s.googleImagery({ id: 'google', apiKey: key, billingRegion: 'eea', mapType: 'roadmap' });
+      window.googleSource = source;
+      return source;
+    }`,
+    GOOGLE_FIXTURE_KEY,
+  );
+  await page.evaluate(() => {
+    const handle = window.vibeglobeSources;
+    const source = (
+      window as unknown as {
+        googleSource: Parameters<NonNullable<typeof handle>['sources']['followGoogleCopyrights']>[1];
+      }
+    ).googleSource;
+    const globe = handle?.globe;
+    if (!handle || !globe) throw new Error('no globe');
+    const counters = { idle: 0 };
+    (window as unknown as { counters: typeof counters }).counters = counters;
+    globe.on('idle', () => counters.idle++);
+    handle.sources.followGoogleCopyrights(globe, source);
+  });
+  const shown = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.vg-credits .vg-credit')].map((e) => e.textContent?.trim()),
+    );
+  const viewportRequests = () => server.requests.filter((r) => r.url.includes('/tile/v1/viewport')).length;
+  const frames = () => page.evaluate(() => window.vibeglobeSources?.globe?.frameNumber ?? 0);
+  const firstFrame = await frames();
+  // East of 0° the fixture's data come from the eastern provider, west of it from the western one.
+  for (const [view, provider] of [
+    [{ longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 }, 'Map data ©2026 Eastern Provider'],
+    [{ longitudeDeg: -74, latitudeDeg: 40.7, zoom: 6 }, 'Map data ©2026 Western Provider'],
+    [{ longitudeDeg: 13.4, latitudeDeg: 52.5, zoom: 7 }, 'Map data ©2026 Eastern Provider'],
+  ] as const) {
+    await jump(page, view);
+    await expectNoEmptyPixels(page, await settledSourceFrame(page, 18));
+    await expect.poll(shown).toEqual(['Google', provider]);
+  }
+  const idle = await page.evaluate(() => (window as unknown as { counters: { idle: number } }).counters.idle);
+  // One request per settled view (and the first view), never one per drawn frame.
+  expect(viewportRequests()).toBeLessThanOrEqual(idle + 1);
+  expect(viewportRequests()).toBeGreaterThanOrEqual(3);
+  expect((await frames()) - firstFrame).toBeGreaterThan(viewportRequests() * 3);
 });

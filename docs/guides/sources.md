@@ -282,7 +282,7 @@ const copyright = await google.viewportCopyright({
 });
 ```
 
-The adapter creates and renews Map Tiles API sessions itself. The Google profile forbids the persistent cache, prefetch and offline packaging, reuses tiles in memory only while Google's cache headers allow it, and requires Google's logo and the viewport's copyrights to stay visible ([ADR 0031](../adr/0031-google-maps-platform-terms.md)). `googleStreetView` reads Street View metadata and panorama tiles under the same profile.
+The adapter creates and renews Map Tiles API sessions itself. `followGoogleCopyrights(globe, google)` keeps the credits on the copyrights Google returns for each settled view: one viewport request per settled view, never per frame, shown after the logo through `globe.refreshCredits()`. The Google profile forbids the persistent cache, prefetch and offline packaging, reuses tiles in memory only while Google's cache headers allow it, and requires Google's logo and the viewport's copyrights to stay visible ([ADR 0031](../adr/0031-google-maps-platform-terms.md)). `googleStreetView` reads Street View metadata and panorama tiles under the same profile.
 
 ### OpenStreetMap public servers
 

@@ -3443,7 +3443,7 @@
         "Assert the viewport information request is made for each settled view and not on every frame",
         "Assert the displayed attribution always matches the copyrights returned for the current viewport"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F259",
@@ -3456,7 +3456,7 @@
         "Assert through element hit-testing that the logo and attribution are fully visible and no other element overlaps them",
         "Try to hide or cover them through configuration and app CSS and assert they stay visible"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F260",

@@ -282,6 +282,9 @@ for (const backend of BACKENDS) {
   });
 
   test(`navigation compiles no pipeline after the start-up warm-up on ${backend} (ADR 0010 §4)`, async ({ page }) => {
+    // A small viewport: the wheel zooms from 3 to 23 through every phase, and a software GPU draws each of the frames
+    // on the way at a fraction of the cost of a full-size canvas.
+    await page.setViewportSize({ width: 480, height: 360 });
     await openGlobe(page, `backend=${backend}&debug=1&zoom=3`);
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
@@ -345,6 +348,8 @@ for (const backend of BACKENDS) {
   test(`dragging keeps the grabbed point under the cursor, also near the edge and over a pole, on ${backend} (F060)`, async ({
     page,
   }) => {
+    // A smaller viewport: each step waits for a frame, which a software GPU draws in proportion to the canvas size.
+    await page.setViewportSize({ width: 640, height: 480 });
     await openGlobe(page, `backend=${backend}&lon=10&lat=60&zoom=2`);
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');

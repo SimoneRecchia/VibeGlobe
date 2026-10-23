@@ -92,6 +92,7 @@ export function openStreetMapImagery(options: OpenStreetMapImageryOptions): Desc
     ...source,
     attribution: [OSM_PUBLIC_PROFILE.requiredAttribution ?? { text: '' }],
     profile: OSM_PUBLIC_PROFILE,
+    transportRequired: true,
   };
 }
 

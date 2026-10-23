@@ -4222,7 +4222,7 @@
         "Try to switch on persistent cache for the restricted source globally and per source, and assert it stays off and a warning names the profile rule",
         "Unit-test the effective-settings resolution for every combination of global setting, per-source setting and profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F321",
@@ -4234,7 +4234,7 @@
         "Inspect browser storage and assert no Google tile is persisted beyond what the Google terms ADR allows",
         "Request an offline package with the Google source and assert it is refused with an error naming the Google profile"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F322",
@@ -4246,7 +4246,7 @@
         "Assert through request interception that Google tiles are requested only within the limits recorded in the Google terms ADR",
         "Assert other sources in the same view still prefetch and preload normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F323",
@@ -4269,7 +4269,7 @@
         "Run a pan and a long flight scenario and assert prefetch and flight preloading of its tiles stay within the limits recorded in the OpenStreetMap terms ADR (no bulk prefetch)",
         "Request an offline package with the source and assert it is refused with an error naming the profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F325",
@@ -4281,7 +4281,7 @@
         "Assert '© OpenStreetMap contributors' with ODbL licensing is shown whenever its tiles are visible",
         "Configure the same data through a fixture provider profile with its own restrictions and assert both the ODbL attribution and the provider's rules apply"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F326",
@@ -4293,7 +4293,7 @@
         "Run the shared conformance suite's profile-enforcement checks against it",
         "Assert each declared rule is enforced in the playground exactly as for the built-in profiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F327",

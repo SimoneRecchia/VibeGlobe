@@ -1,4 +1,4 @@
-import type { AbortHandle, ImagerySource, TileCoord, TileRequest, TimeoutsMs, TransportResult } from '@vibeglobe/core';
+import type { AbortHandle, TileSource, TileCoord, TileRequest, TimeoutsMs, TransportResult } from '@vibeglobe/core';
 import { freshnessOf, type SourceCachePolicy } from './cache-policy.js';
 import { endpointOf } from './connectivity.js';
 import { fetchTile, type FetchOutcome } from './network-fetch.js';
@@ -66,6 +66,8 @@ const FAILED_TIMEOUT: TransportResult = { kind: 'timeout' };
 /** How long a failed download waits for the health check it triggered before the failure counts. */
 const CHECK_WAIT_MS = 3000;
 
+const NO_HEADERS = { cacheControl: null, expires: null, date: null, etag: null, lastModified: null };
+
 const NOT_FOUND: TransportResult = { kind: 'status', status: 404, retryAfterMs: undefined };
 
 let wrapperCount = 0;
@@ -75,11 +77,7 @@ let wrapperCount = 0;
  * packages, then the network, each allowed or not by the policy; downloads fill the persistent cache (F272). The engine's
  * own GPU and RAM tiers sit above, unchanged. The source keeps its id, levels and coverage.
  */
-export function tieredSource(
-  source: ImagerySource,
-  context: TierContext,
-  options: TieredSourceOptions = {},
-): ImagerySource {
+export function tieredSource(source: TileSource, context: TierContext, options: TieredSourceOptions = {}): TileSource {
   const prefix = `vibeglobe-tile:${++wrapperCount}/`;
   const layerId = options.layerId ?? source.id;
   const scratch: TileRequest = { url: '', hostIndex: 0 };
@@ -117,7 +115,7 @@ export function tieredSource(
 
 class TileLoader {
   constructor(
-    private readonly source: ImagerySource,
+    private readonly source: TileSource,
     private readonly context: TierContext,
     private readonly options: TieredSourceOptions,
     private readonly layerId: string,
@@ -165,13 +163,9 @@ class TileLoader {
     const endpoint = endpointOf(url);
     if (decision.useNetwork) this.context.addEndpoint(endpoint, url);
     if (decision.useNetwork && this.context.reachable(endpoint)) {
-      const outcome = await fetchTile(
-        this.context.fetch,
-        url,
-        timeouts,
-        signal,
-        this.conditional(url) ? stored : undefined,
-      );
+      const outcome = this.ownTransport(url)
+        ? await this.viaTransport(url, timeouts, signal)
+        : await fetchTile(this.context.fetch, url, timeouts, signal, this.conditional(url) ? stored : undefined);
       const result = this.afterFetch(outcome, key, stored, decision, endpoint, coord);
       if (result !== FAILED_NETWORK && result !== FAILED_TIMEOUT) return result;
       // No usable answer: wait for the health check this triggered. An outage then never reaches the engine as a
@@ -188,6 +182,25 @@ class TileLoader {
       return okOf(stored);
     }
     return this.miss(decision);
+  }
+
+  /**
+   * True when tiles must be downloaded by the adapter's own transport (TB-01): it signs requests or holds a session
+   * (`transportRequired`), or its URLs are not plain HTTP (archive pseudo URLs). Its answers carry no cache headers.
+   */
+  private ownTransport(url: string): boolean {
+    return (this.source as { transportRequired?: boolean }).transportRequired === true || !/^https?:/.test(url);
+  }
+
+  /** Downloads through the adapter's transport, as a fetch outcome without headers. */
+  private viaTransport(url: string, timeouts: TimeoutsMs, signal: AbortSignal): Promise<FetchOutcome> {
+    return new Promise((resolve) => {
+      const abort = this.source.transport.start({ url, hostIndex: 0 }, timeouts, (result) => {
+        signal.removeEventListener('abort', abort);
+        resolve(result.kind === 'ok' ? { ...result, headers: NO_HEADERS } : result);
+      });
+      signal.addEventListener('abort', abort, { once: true });
+    });
   }
 
   /** Fresh by its headers and by the source's own limit, which applies to tiles stored before it was set (F277). */

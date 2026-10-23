@@ -48,6 +48,11 @@ export interface DescribedSource {
 export interface DescribedImagerySource extends ImagerySource {
   readonly attribution: readonly Attribution[];
   readonly profile: ProviderProfile;
+  /**
+   * Tiles must be downloaded by the source's own transport (sessions, signed or cropped requests, archives): a cache
+   * tier in front of it (`@vibeglobe/offline`) never fetches its URLs directly (TB-01).
+   */
+  readonly transportRequired?: boolean;
 }
 
 /** The profile of sources whose owner set no provider rules: everything enabled. */

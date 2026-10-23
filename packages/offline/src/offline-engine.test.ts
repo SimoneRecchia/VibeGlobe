@@ -260,3 +260,113 @@ describe('offline engine endpoints', () => {
     await expect.poll(() => offline.connectivity).toBe('degraded');
   });
 });
+
+describe('provider profiles (F320)', () => {
+  const NAMES = ['persistentCache', 'memoryReuse', 'prefetch', 'offlinePackaging'] as const;
+
+  it('resolves every combination of global, per-source and per-layer setting and profile rule', () => {
+    const settings = [undefined, true, false] as const;
+    for (const name of NAMES)
+      for (const global of settings)
+        for (const perSource of settings)
+          for (const perLayer of settings)
+            for (const forbidden of [false, true]) {
+              const offline = engine({});
+              offline.source(fixture('s'), {
+                layerId: 'l',
+                rules: { id: 'p', forbids: new Set(forbidden ? [name] : []), respectCacheHeaders: true },
+              });
+              if (global !== undefined) offline.setSwitches({ [name]: global });
+              if (perSource !== undefined) offline.setSwitches({ [name]: perSource }, { sourceId: 's' });
+              if (perLayer !== undefined) offline.setSwitches({ [name]: perLayer }, { layerId: 'l' });
+              const expected = global !== false && perSource !== false && perLayer !== false && !forbidden;
+              expect(
+                offline.effectiveSwitches('s', 'l')[name],
+                `${name} ${global} ${perSource} ${perLayer} ${forbidden}`,
+              ).toBe(expected);
+              // Every other switch stays on: a profile and a setting only touch their own feature.
+              for (const other of NAMES.filter((n) => n !== name))
+                expect(offline.effectiveSwitches('s', 'l')[other]).toBe(true);
+              offline.destroy();
+            }
+  });
+
+  it('keeps a forbidden feature off when switched on globally or per source, and warns once naming the profile', () => {
+    const warnings: string[] = [];
+    const offline = engine({ switches: { persistentCache: true } });
+    offline.on('warning', (w) => warnings.push(`${w.code}: ${w.message}`));
+    offline.source(fixture('strict'), {
+      rules: { id: 'strict-provider', forbids: new Set(['persistentCache', 'prefetch']), respectCacheHeaders: true },
+    });
+    offline.source(fixture('open'));
+    offline.setSwitches({ persistentCache: true }, { sourceId: 'strict' });
+    offline.setSwitches({ prefetch: true });
+    expect(offline.effectiveSwitches('strict')).toEqual({
+      persistentCache: false,
+      memoryReuse: true,
+      prefetch: false,
+      offlinePackaging: true,
+    });
+    expect(offline.effectiveSwitches('open')).toEqual({
+      persistentCache: true,
+      memoryReuse: true,
+      prefetch: true,
+      offlinePackaging: true,
+    });
+    expect(warnings).toEqual([
+      "profile-rule: persistentCache stays off for source 'strict': its provider profile 'strict-provider' forbids it",
+      "profile-rule: prefetch stays off for source 'strict': its provider profile 'strict-provider' forbids it",
+    ]);
+  });
+});
+
+describe('sources that need their own transport (TB-01)', () => {
+  it('downloads through the adapter transport, never fetching its URLs directly', async () => {
+    const network = fakeNetwork(() => ({ body: 'direct' }));
+    const offline = engine({ fetch: network.fetchImpl, store: memoryStore() });
+    const signed: string[] = [];
+    const base = fixture('session');
+    // A session-based adapter: its transport signs each URL, which is not fetchable as written.
+    const source = {
+      ...base,
+      transportRequired: true,
+      transport: {
+        start(request: { url: string }, _timeouts: unknown, done: (result: TransportResult) => void) {
+          signed.push(`${request.url}?session=1`);
+          queueMicrotask(() =>
+            done({ kind: 'ok', bytes: new TextEncoder().encode('signed').buffer, contentType: 'image/png' }),
+          );
+          return () => undefined;
+        },
+      },
+    };
+    const wrapped = offline.source(source);
+    expect(text(await load(wrapped, tile(3, 1, 2)))).toBe('signed');
+    expect(signed).toEqual(['https://tiles.test/3/1/2.png?session=1']);
+    expect(network.requests.filter((r) => r.url.includes('tiles.test'))).toEqual([]);
+  });
+
+  it('reads archive pseudo URLs through the adapter transport', async () => {
+    const network = fakeNetwork(() => ({ body: 'direct' }));
+    const offline = engine({ fetch: network.fetchImpl });
+    const base = fixture('archive');
+    const source: ImagerySource = {
+      ...base,
+      request(coord, out) {
+        out.url = `archive.pmtiles#${coord.level}/${coord.x}/${coord.y}`;
+        out.hostIndex = 0;
+        return out;
+      },
+      transport: {
+        start(_request, _timeouts, done) {
+          queueMicrotask(() =>
+            done({ kind: 'ok', bytes: new TextEncoder().encode('archived').buffer, contentType: 'image/png' }),
+          );
+          return () => undefined;
+        },
+      },
+    };
+    expect(text(await load(offline.source(source), tile(2, 1, 1)))).toBe('archived');
+    expect(network.requests).toEqual([]);
+  });
+});

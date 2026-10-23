@@ -2,7 +2,7 @@
 // @vibeglobe/offline, driven by the offline track's end-to-end tests through `window.offlineHarness`. It uses the
 // engine's public API only and runs on the playground's dev server, which serves the fixture tiles.
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, type Globe, type ViewInit } from '@vibeglobe/core';
+import { createGlobe, type Globe, type ImagerySource, type ViewInit } from '@vibeglobe/core';
 import {
   type ArchiveAdapters,
   createOffline,
@@ -22,7 +22,16 @@ import {
 import { createRenderer } from '@vibeglobe/renderer';
 import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
-import { pmtilesImagery, xyzImagery } from '@vibeglobe/sources';
+import {
+  googleImagery,
+  openStreetMapHostedImagery,
+  openStreetMapImagery,
+  pmtilesImagery,
+  withProfile,
+  xyzImagery,
+  type Attribution,
+  type ProviderProfile,
+} from '@vibeglobe/sources';
 import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
 import { createWorkers } from '@vibeglobe/worker';
 
@@ -43,6 +52,23 @@ interface HarnessSource {
     readonly respectCacheHeaders: boolean;
   };
   readonly cachePolicy?: SourceCachePolicy;
+  /**
+   * A provider adapter instead of the plain XYZ one: Google 2D tiles (the test routes tile.googleapis.com to its
+   * fixture), the OpenStreetMap public servers or self-hosted OpenStreetMap tiles (both at `url` or the fixture tiles).
+   */
+  readonly provider?: 'google' | 'osm-public' | 'osm-hosted';
+  /** A profile the source declares (F326), or the commercial provider's profile of `osm-hosted` (F325). */
+  readonly profile?: {
+    readonly id: string;
+    readonly forbids: readonly (keyof LoadingSwitches)[];
+    readonly respectCacheHeaders: boolean;
+    readonly maxConcurrentRequests?: number;
+    readonly requiredAttribution?: Attribution;
+  };
+  /** Credits the source declares. */
+  readonly attribution?: readonly Attribution[];
+  /** The license recorded when the source is packaged (default CC-BY-4.0). */
+  readonly license?: string;
 }
 
 /** What a test starts. */
@@ -133,25 +159,59 @@ async function loadPlugin(): Promise<ReturnType<typeof PluginModule.createPlugin
   return plugin;
 }
 
-function sourcesOf(offline: Offline, current: HarnessConfig): ReturnType<typeof xyzImagery>[] {
-  return current.sources.map((s) => {
-    const url = s.url ?? `/fixture-tiles/${s.session ?? 'offline'}/${s.pattern ?? 'world'}/mercator/{z}/{x}/{y}.png`;
-    const source = xyzImagery({
-      id: s.id,
-      url: url.startsWith('/') ? `${location.origin}${url}` : url,
-      minLevel: s.minLevel ?? 0,
-      maxLevel: s.maxLevel ?? 18,
-    });
-    const rules: ProviderRules | undefined = s.rules ? { ...s.rules, forbids: new Set(s.rules.forbids) } : undefined;
-    return offline.source(source, {
-      ...(s.layerId ? { layerId: s.layerId } : {}),
-      ...(rules ? { rules } : {}),
-      ...(s.cachePolicy ? { cachePolicy: s.cachePolicy } : {}),
-    });
-  });
+/** The fixture tile URL of a harness source. */
+function urlOf(s: HarnessSource): string {
+  const url = s.url ?? `/fixture-tiles/${s.session ?? 'offline'}/${s.pattern ?? 'world'}/mercator/{z}/{x}/{y}.png`;
+  return url.startsWith('/') ? `${location.origin}${url}` : url;
 }
 
-function createGlobeFor(offline: Offline, current: HarnessConfig): Globe {
+function profileOf(s: HarnessSource): ProviderProfile | undefined {
+  return s.profile ? { ...s.profile, forbids: new Set(s.profile.forbids) } : undefined;
+}
+
+/** The adapter of a harness source, before the offline engine wraps it. */
+async function adapterOf(s: HarnessSource): Promise<ImagerySource & { readonly profile?: ProviderProfile }> {
+  const levels = { minLevel: s.minLevel ?? 0, maxLevel: s.maxLevel ?? 18 };
+  const profile = profileOf(s);
+  if (s.provider === 'google')
+    return googleImagery({
+      id: s.id,
+      apiKey: 'fixture-key',
+      billingRegion: 'eea',
+      mapType: 'roadmap',
+      maxLevel: levels.maxLevel,
+    });
+  if (s.provider === 'osm-public')
+    return openStreetMapImagery({ id: s.id, appName: 'VibeGlobe tests', appUrl: location.origin, url: urlOf(s) });
+  if (s.provider === 'osm-hosted')
+    return openStreetMapHostedImagery({
+      id: s.id,
+      url: urlOf(s),
+      ...levels,
+      ...(profile ? { provider: profile } : {}),
+      ...(s.attribution ? { attribution: s.attribution } : {}),
+    });
+  const source = xyzImagery({ id: s.id, url: urlOf(s), ...levels });
+  return withProfile(source, profile ?? CUSTOM, s.attribution ?? []);
+}
+
+const CUSTOM: ProviderProfile = { id: 'custom', forbids: new Set(), respectCacheHeaders: true };
+
+async function sourcesOf(offline: Offline, current: HarnessConfig): Promise<ImagerySource[]> {
+  return Promise.all(
+    current.sources.map(async (s) => {
+      const source = await adapterOf(s);
+      const rules: ProviderRules | undefined = s.rules ? { ...s.rules, forbids: new Set(s.rules.forbids) } : undefined;
+      return offline.source(source, {
+        ...(s.layerId ? { layerId: s.layerId } : {}),
+        ...(rules ? { rules } : {}),
+        ...(s.cachePolicy ? { cachePolicy: s.cachePolicy } : {}),
+      });
+    }),
+  );
+}
+
+async function createGlobeFor(offline: Offline, current: HarnessConfig): Promise<Globe> {
   if (!canvas || !container) throw new Error('no canvas');
   const globe = createGlobe({
     container,
@@ -159,7 +219,7 @@ function createGlobeFor(offline: Offline, current: HarnessConfig): Globe {
     controls: createControls(),
     baseImageryUrl: '/imagery/natural-earth-4096.jpg',
     view: current.view ?? {},
-    imagery: sourcesOf(offline, current),
+    imagery: await sourcesOf(offline, current),
     workers: createWorkers(),
     ...(current.clockStepMs === undefined ? {} : { manualClockStepMs: current.clockStepMs }),
   });
@@ -200,14 +260,14 @@ const harness: OfflineHarness = {
     });
     await manager.ready;
     for (const url of next.served ?? []) await manager.addServedPackage(url);
-    Object.assign(harness, { offline, manager, globe: createGlobeFor(offline, next) });
+    Object.assign(harness, { offline, manager, globe: await createGlobeFor(offline, next) });
     if (next.awaitReady !== false) await harness.globe?.ready;
   },
   async restartGlobe() {
     if (!config || !harness.offline) throw new Error('not started');
     harness.globe?.destroy();
     harness.served.length = 0;
-    Object.assign(harness, { globe: createGlobeFor(harness.offline, config) });
+    Object.assign(harness, { globe: await createGlobeFor(harness.offline, config) });
     if (config.awaitReady !== false) await harness.globe?.ready;
   },
   async installFixture(spec) {
@@ -230,15 +290,19 @@ const harness: OfflineHarness = {
     try {
       const installed = await harness.manager.install({
         ...request,
-        sources: request.sources.map((s) => ({
-          source: xyzImagery({
-            id: s.id,
-            url: `${location.origin}/fixture-tiles/${s.session ?? 'offline'}/${s.pattern ?? 'world'}/mercator/{z}/{x}/{y}.png`,
+        sources: await Promise.all(
+          request.sources.map(async (s) => {
+            const source = await adapterOf(s);
+            const profile = source.profile;
+            const rules = s.rules ? { ...s.rules, forbids: new Set(s.rules.forbids) } : profile;
+            return {
+              source,
+              ...(rules ? { rules } : {}),
+              license: s.license ?? 'CC-BY-4.0',
+              attribution: s.attribution?.[0] ?? { text: `Fixture ${s.pattern ?? 'world'}` },
+            };
           }),
-          ...(s.rules ? { rules: { ...s.rules, forbids: new Set(s.rules.forbids) } } : {}),
-          license: 'CC-BY-4.0',
-          attribution: { text: `Fixture ${s.pattern ?? 'world'}` },
-        })),
+        ),
       });
       return { ...(installed.report ? { report: installed.report } : {}), tiles: installed.report?.tiles ?? 0 };
     } catch (error) {

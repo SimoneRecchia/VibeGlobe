@@ -263,6 +263,15 @@ async function profileChecks(subject: AnySubject): Promise<CheckResult[]> {
         (source.attribution ?? []).some((a) => a.text.includes(required)),
       ),
     );
+    const logo = profile.requiredAttribution.logo;
+    if (logo)
+      out.push(
+        check(
+          'provider profile',
+          'shows the logo the profile requires',
+          (source.attribution ?? []).some((a) => a.logo?.src === logo.src),
+        ),
+      );
   }
   for (const rule of subject.profileChecks ?? []) {
     const failure = rule(source, requests);

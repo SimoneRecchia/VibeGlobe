@@ -241,6 +241,7 @@ export async function googleImagery(options: GoogleImageryOptions): Promise<Goog
     tileSizePx: 256,
     pixelRatio: options.pixelRatio ?? 1,
     decoder: 'image',
+    transportRequired: true,
     transport: archiveTransport(tileReader(session)),
     attribution,
     profile,

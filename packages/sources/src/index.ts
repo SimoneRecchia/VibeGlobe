@@ -19,7 +19,9 @@ export type {
   LoadingSwitches,
   ProviderProfile,
 } from './metadata.js';
-export { pmtilesImagery } from './pmtiles-imagery.js';
+export { pmtilesArchive, pmtilesImagery, pmtilesTerrain, pmtilesVector } from './pmtiles-imagery.js';
+export type { ArchiveContent } from './pmtiles-imagery.js';
+export type { ArchiveTerrainEncoding, ArchiveTerrainOptions, VectorTileSource } from './archive-sources.js';
 export type { PmtilesImageryOptions } from './pmtiles-imagery.js';
 export { wmtsImagery } from './ogc/wmts-imagery.js';
 export type { WmtsImageryOptions } from './ogc/wmts-imagery.js';

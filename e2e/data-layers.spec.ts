@@ -454,3 +454,64 @@ for (const backend of BACKENDS) {
     for (const { screen } of inView) if (screen) expect(near(image, screen.xPx, screen.yPx, 1, isRed)).toBe(true);
   });
 }
+
+/** Waits until no terrain tile is queued, loading, decoding or waiting for its upload, then for an idle frame. */
+async function waitForTerrain(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const stats = window.vibeglobePlayground?.globe.terrainStats();
+          return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : -1;
+        }),
+      { timeout: 90_000 },
+    )
+    .toBe(0);
+  await page.waitForTimeout(300);
+  await waitForIdle(page);
+}
+
+/** Screen positions of positions (degrees) at the height of the terrain under them, inside the canvas only. */
+async function onTerrain(page: Page, positions: readonly (readonly [number, number])[]) {
+  return page.evaluate((list) => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    return list.flatMap(([lon = 0, lat = 0]) => {
+      const position = { longitudeDeg: lon, latitudeDeg: lat };
+      const point = globe.geoToScreen({ ...position, heightMeters: globe.elevationAt(position).heightMeters });
+      return point && point.xPx > 3 && point.yPx > 3 && point.xPx < 477 && point.yPx < 357 ? [point] : [];
+    });
+  }, positions);
+}
+
+for (const backend of BACKENDS) {
+  test(`lines and polygons draped over the fixture peak follow its relief in the tilted view on ${backend} (F364, F365)`, async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    const view = 'lon=6.86&lat=45.7&zoom=10&tilt=55';
+    await openGlobe(page, `backend=${backend}&terrain=terrarium&scenario=draped-lines&${view}`);
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await waitForTerrain(page);
+    const line = await canvasImage(page);
+    const along: [number, number][] = [];
+    for (let lon = 6.55; lon <= 7.15; lon += 0.04) along.push([lon, 45.83]);
+    const lineScreen = await onTerrain(page, along);
+    expect(lineScreen.length).toBeGreaterThan(8);
+    for (const point of lineScreen) expect(near(line, point.xPx, point.yPx, 2, isBlue)).toBe(true);
+    // From higher up: at 55° the peak hides part of its far slope.
+    await openGlobe(
+      page,
+      `backend=${backend}&terrain=terrarium&scenario=draped-polygons&lon=6.86&lat=45.8&zoom=10&tilt=25`,
+    );
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await waitForTerrain(page);
+    const fill = await canvasImage(page);
+    const inside: [number, number][] = [];
+    for (let lon = 6.73; lon <= 6.97; lon += 0.04)
+      for (let lat = 45.75; lat <= 45.92; lat += 0.04) inside.push([lon, lat]);
+    const fillScreen = await onTerrain(page, inside);
+    expect(fillScreen.length).toBeGreaterThan(10);
+    for (const point of fillScreen) expect(near(fill, point.xPx, point.yPx, 1, isGreen)).toBe(true);
+  });
+}

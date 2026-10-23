@@ -238,6 +238,27 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
       ),
       style: { 'circle-color': '#ff2020', 'circle-radius': 4 },
     }),
+  // A line and a polygon draped over the fixture's peak, with `&terrain=terrarium` (F364, F365).
+  'draped-lines': () =>
+    new DataLayer('polyline', {
+      id: 'draped-line',
+      data: [
+        feature('ridge', {
+          type: 'LineString',
+          coordinates: [
+            [6.5, 45.83],
+            [7.2, 45.83],
+          ],
+        }),
+      ],
+      style: { 'line-color': '#2050ff', 'line-width': 5 },
+    }),
+  'draped-polygons': () =>
+    new DataLayer('polygon', {
+      id: 'draped-polygon',
+      data: [feature('summit', { type: 'Polygon', coordinates: [rectangle(6.7, 45.72, 7.0, 45.95)] })],
+      style: { 'fill-color': '#20c040', 'fill-opacity': 0.9 },
+    }),
   // Images with several anchors, sizes and rotations (F352).
   'data-markers': () =>
     new DataLayer('marker', {

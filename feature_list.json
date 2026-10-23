@@ -5938,7 +5938,7 @@
         "Assert from the request log that no tile is downloaded again",
         "Assert no recorded frame during the changes contains black or empty pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F451",

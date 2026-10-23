@@ -39,6 +39,7 @@ export function capture(page: Page): Promise<PNG> {
 
 /** The RGB of a pixel. */
 export function rgbAt(image: PNG, x: number, y: number): [number, number, number] {
+  if (!(x >= 0 && y >= 0 && x < image.width && y < image.height)) throw new Error(`(${x}, ${y}) is outside the image`);
   const i = (Math.round(y) * image.width + Math.round(x)) * 4;
   return [image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0];
 }

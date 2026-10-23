@@ -19,9 +19,12 @@ declare global {
 /** The fixture city (`e2e/fixtures/tiles3d/city.ts`): center and half size in meters. */
 export const CITY = { longitudeDeg: 12.4922, latitudeDeg: 41.8902, halfMeters: 512 } as const;
 
-/** Opens the scenario and waits for the tileset JSON. */
+/**
+ * Opens the scenario and waits for the tileset JSON. Tiled fixture imagery (`imagery=world`) gives the globe its
+ * request pool and worker pool, which render extensions receive (`context.network`, `context.workers`).
+ */
 export async function openCity(page: Page, query: string): Promise<void> {
-  await openGlobe(page, `scenario=3dtiles-city&${query}`);
+  await openGlobe(page, `scenario=3dtiles-city&${query.includes('imagery=') ? '' : 'imagery=world&'}${query}`);
   await page.waitForFunction(() => window.vibeglobeTiles3d?.extension.stats().ready === true, undefined, {
     timeout: 30_000,
   });
@@ -63,39 +66,29 @@ export async function startCoverage(page: Page, step = 24, insetM = 12): Promise
       if (!hooks || !globe) throw new Error('no 3D Tiles scenario');
       const cos = Math.cos((city.latitudeDeg * Math.PI) / 180);
       const half = city.halfMeters - insetM;
-      const corner = (e: number, n: number) =>
-        globe.geoToScreen({
-          longitudeDeg: city.longitudeDeg + (e * half) / (111_320 * cos),
-          latitudeDeg: city.latitudeDeg + (n * half) / 110_950,
-          heightMeters: 1,
-        });
       const record: { frames: number; holes: number; samples: number; worst: [number, number][] } = {
         frames: 0,
         holes: 0,
         samples: 0,
         worst: [],
       };
-      const inside = (poly: { xPx: number; yPx: number }[], x: number, y: number): boolean => {
-        let odd = false;
-        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-          const a = poly[i];
-          const b = poly[j];
-          if (!a || !b) continue;
-          if (a.yPx > y !== b.yPx > y && x < ((b.xPx - a.xPx) * (y - a.yPx)) / (b.yPx - a.yPx) + a.xPx) odd = !odd;
-        }
-        return odd;
+      // A canvas point is in the footprint when the ground it shows is inside the city's square.
+      const inside = (x: number, y: number): boolean => {
+        const ground = globe.screenToGeo({ xPx: x, yPx: y });
+        if (!ground) return false;
+        const east = (ground.longitudeDeg - city.longitudeDeg) * 111_320 * cos;
+        const north = (ground.latitudeDeg - city.latitudeDeg) * 110_950;
+        return Math.abs(east) < half && Math.abs(north) < half;
       };
       const off = globe.on('frame', () => {
         if (!hooks.extension.stats().drawn) return;
-        const poly = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
-        if (poly.some((p) => p === undefined)) return;
         const canvas = document.querySelector('canvas');
         const width = canvas?.clientWidth ?? 0;
         const height = canvas?.clientHeight ?? 0;
         record.frames++;
         for (let y = step / 2; y < height; y += step)
           for (let x = step / 2; x < width; x += step) {
-            if (!inside(poly as { xPx: number; yPx: number }[], x, y)) continue;
+            if (!inside(x, y)) continue;
             record.samples++;
             if (hooks.extension.pick(x, y) === undefined) {
               record.holes++;
@@ -110,6 +103,17 @@ export async function startCoverage(page: Page, step = 24, insetM = 12): Promise
     },
     { city: CITY, step, insetM },
   );
+}
+
+/** Draws one more frame of the current view (a jump to where the camera is). */
+export async function redraw(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) return;
+    const { longitudeDeg, latitudeDeg, zoom, headingDeg, tiltDeg } = globe.camera;
+    await globe.jumpTo({ longitudeDeg: longitudeDeg + 1e-9, latitudeDeg, zoom, headingDeg, tiltDeg });
+  });
+  await waitForIdle(page);
 }
 
 /** Stops recording and returns what {@link startCoverage} counted. */

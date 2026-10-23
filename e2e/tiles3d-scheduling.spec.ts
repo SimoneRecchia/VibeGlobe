@@ -3,7 +3,7 @@
 // LRU eviction during randomized navigation, evicted tiles loading again on return. The navigation runs
 // `TILES3D_NAVIGATION_S` seconds (default 60; the 10-minute run is in docs/hardening-backlog.md).
 import { expect, test, type Page } from '@playwright/test';
-import { CITY, cityPoint, openCity, settleTiles, startCoverage, stopCoverage } from './support/tiles3d.ts';
+import { CITY, cityPoint, openCity, redraw, settleTiles, startCoverage, stopCoverage } from './support/tiles3d.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
@@ -118,8 +118,7 @@ test('randomized navigation keeps content within its budget, and evicted tiles l
   }, CITY);
   await settleTiles(page);
   await startCoverage(page);
-  await page.evaluate(() => window.vibeglobePlayground?.globe.requestRender());
-  await settleTiles(page);
+  await redraw(page);
   const coverage = await stopCoverage(page);
   expect(coverage.holes).toBe(0);
   expect(

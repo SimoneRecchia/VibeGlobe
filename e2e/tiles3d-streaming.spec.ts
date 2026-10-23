@@ -35,7 +35,10 @@ for (const backend of ['webgl2', 'webgpu'] as const)
     });
 
 test("the debug overlay shows each drawn tile's level and screen-space error (F461)", async ({ page }) => {
-  await openCity(page, `backend=webgl2&debug3dtiles&lon=${CITY.longitudeDeg}&lat=${CITY.latitudeDeg}&zoom=16.5&tilt=60`);
+  await openCity(
+    page,
+    `backend=webgl2&debug3dtiles&lon=${CITY.longitudeDeg}&lat=${CITY.latitudeDeg}&zoom=16.5&tilt=60`,
+  );
   await settleTiles(page);
   const drawn = await page.evaluate(() => window.vibeglobeTiles3d?.extension.debugTiles() ?? []);
   const labels = await page.$$eval('.vg-tiles3d-tile', (els) =>

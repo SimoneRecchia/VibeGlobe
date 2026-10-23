@@ -67,7 +67,16 @@ export async function expectMatchesBaseline(page: Page, testInfo: TestInfo, name
     testInfo.annotations.push({ type: 'advisory', description: `no baseline for ${name} on this browser build` });
     return;
   }
-  const result = compareImages(PNG.sync.read(readFileSync(path)), image, SAME_BACKEND.threshold);
+  const expected = PNG.sync.read(readFileSync(path));
+  // Another browser build can lay text out at another width: in advisory mode a size difference is reported too.
+  if (advisory && (expected.width !== image.width || expected.height !== image.height)) {
+    testInfo.annotations.push({
+      type: 'advisory',
+      description: `${name}: ${image.width}×${image.height} on ${browser}, baseline ${expected.width}×${expected.height} from another build`,
+    });
+    return;
+  }
+  const result = compareImages(expected, image, SAME_BACKEND.threshold);
   if (result.ratio > SAME_BACKEND.maxDiffRatio) {
     await testInfo.attach(`${name}-actual`, { body: PNG.sync.write(image), contentType: 'image/png' });
     await testInfo.attach(`${name}-diff`, { body: PNG.sync.write(result.diff), contentType: 'image/png' });

@@ -70,7 +70,8 @@ export class MinimapControl implements UiControl {
   readonly #samples: number;
   #context: ControlContext | undefined;
   #canvas: HTMLCanvasElement | undefined;
-  #image: HTMLImageElement | undefined;
+  /** The world image scaled once to the minimap's size, so an update copies pixels instead of resampling it. */
+  #world: HTMLCanvasElement | undefined;
   #stop: (() => void) | undefined;
   #footprint: GeoPosition[] = [];
   #lastUpdateMs = 0;
@@ -109,9 +110,15 @@ export class MinimapControl implements UiControl {
     frame.append(canvas);
     this.#canvas = canvas;
     const image = new Image();
-    image.onload = () => this.update();
+    image.onload = () => {
+      const world = document.createElement('canvas');
+      world.width = canvas.width;
+      world.height = canvas.height;
+      world.getContext('2d')?.drawImage(image, 0, 0, world.width, world.height);
+      this.#world = world;
+      this.update();
+    };
     image.src = this.#imageUrl;
-    this.#image = image;
     this.#stop = context.globe.on('camera-change', () => this.update());
     queueMicrotask(() => this.update());
     return frame;
@@ -135,8 +142,7 @@ export class MinimapControl implements UiControl {
     this.#footprint = edges.length === 4 * this.#samples ? edges : horizonCircle(globe.camera);
     const { width, height } = canvas;
     draw.clearRect(0, 0, width, height);
-    if (this.#image?.complete === true && this.#image.naturalWidth > 0)
-      draw.drawImage(this.#image, 0, 0, width, height);
+    if (this.#world !== undefined) draw.drawImage(this.#world, 0, 0);
     const points = this.#footprint;
     if (points.length >= 2) {
       // Longitudes unwrapped around the first point, so a footprint across the antimeridian stays one shape.

@@ -4751,7 +4751,7 @@
         "Verify sampled outline points lie at the configured geodesic distance from the center within 0.1% using the geodesic utilities",
         "Capture screenshots in the globe, 2D and tilted 3D phases on WebGPU and forced WebGL2 and compare against baselines within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F357",
@@ -4790,7 +4790,7 @@
         "Verify that whenever two labels collide, the one with higher priority is the one shown",
         "Zoom in and verify hidden labels appear as space frees up, with collision work staying within the per-frame budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F360",

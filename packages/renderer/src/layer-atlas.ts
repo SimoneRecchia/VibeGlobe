@@ -54,6 +54,8 @@ export class LayerAtlas {
   private x = GAP;
   private y = GAP;
   private rowHeight = 0;
+  /** The font last set for measuring (drawing sets its own). */
+  private measureFont = '';
   /** Increased when the atlas starts over: entries handed out before are stale. */
   generation = 0;
 
@@ -96,7 +98,7 @@ export class LayerAtlas {
     const context = this.context;
     const scale = this.pixelRatio;
     const font = `${String(sizePx * scale)}px ${style.font ? `${style.font}, ` : ''}${FONT}`;
-    context.font = font;
+    context.font = this.measureFont = font;
     const halo = Math.max(0, style.haloPx) * scale;
     const pad = Math.ceil(halo) + scale;
     const width = Math.ceil(context.measureText(text).width + 2 * pad);
@@ -113,6 +115,19 @@ export class LayerAtlas {
     context.fillStyle = style.fill;
     context.fillText(text, at.x + pad, at.y + height / 2);
     return this.remember(key, at.x, at.y, width, height, scale);
+  }
+
+  /** The size in CSS pixels {@link text} draws a text at in a style, without drawing it (label collision, F359). */
+  measure(text: string, sizePx: number, style: TextStyle = DEFAULT_TEXT): { widthPx: number; heightPx: number } {
+    const scale = this.pixelRatio;
+    const font = `${String(sizePx * scale)}px ${style.font ? `${style.font}, ` : ''}${FONT}`;
+    // Parsing a font is slower than measuring: labels of one layer share theirs.
+    if (font !== this.measureFont) this.context.font = this.measureFont = font;
+    const pad = Math.ceil(Math.max(0, style.haloPx) * scale) + scale;
+    return {
+      widthPx: Math.ceil(this.context.measureText(text).width + 2 * pad) / scale,
+      heightPx: Math.ceil(sizePx * 1.3 * scale + 2 * pad) / scale,
+    };
   }
 
   /** The entry of a registered image at its natural size, or undefined when none has that name. */

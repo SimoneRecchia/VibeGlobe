@@ -29,6 +29,15 @@ describe('source metadata validation (F220)', () => {
     for (const [change, message] of cases) expect(sourceProblem({ ...valid, ...change })).toContain(message);
   });
 
+  it('refuses a source whose id cannot be turned into text instead of throwing (KB-118)', () => {
+    const fuzzed = { ...valid, id: { toString: false } } as unknown as ImagerySource;
+    const refused: string[] = [];
+    expect(validStack([valid, { id: 'other', sources: [fuzzed] }], (m) => refused.push(m)).map((e) => e.id)).toEqual([
+      'valid',
+    ]);
+    expect(refused).toHaveLength(1);
+  });
+
   test.prop([fc.anything(), fc.anything(), fc.anything(), fc.anything()])(
     'never throws on arbitrary configuration objects, and keeps every valid layer',
     (id, levels, tileSize, coverage) => {

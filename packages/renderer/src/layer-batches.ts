@@ -237,6 +237,11 @@ export class LayerBatches implements LayerRenderTarget {
     for (const batch of this.batches.values()) if (batch.kind === 'marker') batch.dirty = true;
   }
 
+  /** See {@link LayerRenderTarget}: measured as the atlas draws labels. */
+  measureText(text: string, sizePx: number): { widthPx: number; heightPx: number } {
+    return this.atlas.measure(text, sizePx);
+  }
+
   /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame, features before models. */
   pick(point: { readonly xPx: number; readonly yPx: number }): Promise<number> {
     const view = this.lastView;

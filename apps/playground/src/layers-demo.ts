@@ -6,6 +6,7 @@ import { antimeridianLayers } from './layers-world.js';
 import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { selectLayers, selectModels } from './layers-select.js';
 import type { ModelLayer } from '@vibeglobe/layers/models';
+import { denseLabels } from './layers-dense.js';
 import { labelsLayer, styledLayers, zoomLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
@@ -184,6 +185,7 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
       style: { 'fill-color': '#20c040', 'fill-opacity': 0.9 },
     }),
   'data-labels': labelsLayer,
+  'data-labels-dense': denseLabels,
   // Circles and an ellipse at the equator, at 60° and near a pole, radii in meters (F356).
   'data-circles': () =>
     new DataLayer('circle', {

@@ -81,6 +81,7 @@ export function requestingTarget(
     ...(target.pick ? { pick: target.pick.bind(target) } : {}),
     ...(target.stats ? { stats: target.stats.bind(target) } : {}),
     ...(target.addImage ? { addImage: after(target.addImage.bind(target)) } : {}),
+    ...(target.measureText ? { measureText: target.measureText.bind(target) } : {}),
     ...(target.models ? { models: requestingModels(target.models, after) } : {}),
   };
 }

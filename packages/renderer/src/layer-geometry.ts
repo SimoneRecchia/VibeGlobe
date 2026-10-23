@@ -1,15 +1,15 @@
 import {
-  ATTRIBUTE_COMPONENTS,
   layerOrigin,
   writeLayerVertex,
   type BatchAttribute,
-  type BatchKind,
-  type BatchStringChannel,
   type FeatureGeometry,
   type LayerGround,
   type LayerOrigin,
 } from '@vibeglobe/core';
 import earcut from 'earcut';
+import { valueOf, type BatchContents } from './layer-contents.js';
+
+export { valueOf, type BatchContents } from './layer-contents.js';
 import {
   DRAPE_STEP_DEG,
   extentOf,
@@ -23,16 +23,6 @@ import {
 } from './layer-subdivision.js';
 import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
 import type { TextStyle } from './layer-atlas.js';
-
-/** What a batch holds on the CPU: per-feature attributes, uniform overrides, strings and geometry (ADR 0037). */
-export interface BatchContents {
-  readonly kind: BatchKind;
-  count: number;
-  readonly attributes: Map<BatchAttribute, Float64Array>;
-  readonly uniforms: Map<BatchAttribute, Float64Array>;
-  readonly strings: Map<BatchStringChannel, string[]>;
-  readonly geometry: Map<number, FeatureGeometry>;
-}
 
 /** The vertex arrays of a layer mesh, sized for its vertices (ADR 0037). */
 export interface LayerArrays {
@@ -49,27 +39,6 @@ export interface LayerArrays {
   readonly indices: Uint32Array;
   /** Lines only: the other endpoint of each vertex's segment. */
   readonly other?: { positions: Float32Array; normals: Float32Array; planes: Float32Array; heights: Float32Array };
-}
-
-/** Defaults of attributes a layer did not write. */
-const DEFAULTS: Partial<Record<BatchAttribute, readonly number[]>> = {
-  color: [1, 1, 1, 1],
-  sizePx: [8],
-  widthPx: [2],
-  opacity: [1],
-  visible: [1],
-  offsetPx: [0, 0],
-  heightMeters: [0],
-  baseMeters: [0],
-};
-
-/** Component `component` of a feature's attribute: its uniform override, its own value, or the default. */
-export function valueOf(batch: BatchContents, attribute: BatchAttribute, feature: number, component = 0): number {
-  const uniform = batch.uniforms.get(attribute);
-  if (uniform) return uniform[component] ?? 0;
-  const values = batch.attributes.get(attribute);
-  const own = values?.[feature * ATTRIBUTE_COMPONENTS[attribute] + component];
-  return own ?? DEFAULTS[attribute]?.[component] ?? 0;
 }
 
 /** A feature's straight RGBA with its opacity and visibility applied to alpha. */
@@ -249,6 +218,10 @@ function boxOf(
   // Points: `sizePx` is the radius (MapLibre `circle-radius`).
   if (batch.kind === 'point') return { w: size, h: size, rect: undefined };
   if (batch.kind === 'label') {
+    // A label hidden by collision takes no atlas space (10,000 labels would overflow it); it is drawn into the atlas
+    // when its fade-in starts, which rewrites its quad (F359).
+    if (valueOf(batch, 'opacity', feature) * valueOf(batch, 'visible', feature) <= 0)
+      return { w: 0, h: 0, rect: undefined };
     const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size, textStyleOf(batch, feature));
     return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: size / 2, h: size / 2, rect };
   }

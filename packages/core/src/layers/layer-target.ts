@@ -144,6 +144,11 @@ export interface LayerRenderTarget {
    */
   addImage?(name: string, image: unknown): void;
   /**
+   * Optional: the size in CSS pixels a label of this text and size is drawn at, from the renderer's own glyph metrics
+   * (label collision boxes, F359).
+   */
+  measureText?(text: string, sizePx: number): { readonly widthPx: number; readonly heightPx: number };
+  /**
    * Optional instrumentation (F372, F376, F377): batches rebuilt whole, and feature ranges and vertices uploaded in
    * place, since the target was created.
    */

@@ -121,9 +121,10 @@
     }
   },
   "dataLayers": {
-    "_comment": "Per-feature updates of a 100,000-point layer (F376, F377): the CPU time of one update call, and the vertices uploaded per changed point (one quad). A marker layer's images share one atlas, so the layer is one draw call (F352).",
+    "_comment": "Per-feature updates of a 100,000-point layer (F376, F377): the CPU time of one update call, and the vertices uploaded per changed point (one quad). A marker layer's images share one atlas, so the layer is one draw call (F352). Label collision of 10,000 labels is sliced across frames: the p95 of its per-frame work while zooming (F359), within a quarter of a 60 Hz frame plus the sort.",
     "featureUpdateP95Ms": 1,
     "uploadedVerticesPerFeature": 4,
-    "markerDrawCallsPerLayer": 1
+    "markerDrawCallsPerLayer": 1,
+    "labelCollisionFrameP95Ms": 6
   }
 }

@@ -3,6 +3,7 @@ import { flatProjector, frameAt, point } from './__fixtures__/test-support.js';
 import type { Feature } from './geojson.js';
 import { LabelLayer } from './label-layer.js';
 import { LabelPlacer, type CollisionBox, type PlacementInput } from './label-placement.js';
+import type { FrameContext } from './layer.js';
 import { LayerStack } from './layer-stack.js';
 import { estimatedTextMeasurer } from './render-target.js';
 import { RecordingRenderTarget } from './testing.js';
@@ -18,6 +19,19 @@ function overlaps(a: { minX: number; minY: number; maxX: number; maxY: number },
   return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
 }
 
+/** Draws frames 16 ms apart from `t0` until the layer's next placement pass ends (a pass is sliced across frames). */
+function framesUntilPlaced(
+  stack: LayerStack,
+  layer: LabelLayer,
+  t0: number,
+  frame: (t: number) => FrameContext,
+): number {
+  const passes = layer.placer.passes;
+  let t = t0;
+  for (; layer.placer.passes === passes; t += 16) stack.frame(frame(t));
+  return t;
+}
+
 describe('label placement and collision', () => {
   it('shows no overlapping labels and keeps the higher priority one on every collision (F359)', () => {
     const layer = new LabelLayer({
@@ -26,7 +40,7 @@ describe('label placement and collision', () => {
     });
     const stack = new LayerStack(new RecordingRenderTarget());
     stack.add(layer);
-    stack.frame(frameAt(0, 8, flatProjector(40)));
+    framesUntilPlaced(stack, layer, 0, (t) => frameAt(t, 8, flatProjector(40)));
     const boxes = layer.collisionBoxes;
     const placed = boxes.filter((b) => b.placed);
     expect(placed.length).toBeGreaterThan(50);
@@ -51,9 +65,9 @@ describe('label placement and collision', () => {
     });
     const stack = new LayerStack(new RecordingRenderTarget());
     stack.add(layer);
-    stack.frame(frameAt(0, 6, flatProjector(20)));
+    const t = framesUntilPlaced(stack, layer, 0, (t) => frameAt(t, 6, flatProjector(20)));
     const before = layer.collisionBoxes.filter((b) => b.placed).length;
-    stack.frame(frameAt(16, 9, flatProjector(160)));
+    framesUntilPlaced(stack, layer, t, (t) => frameAt(t, 9, flatProjector(160)));
     expect(layer.collisionBoxes.filter((b) => b.placed).length).toBeGreaterThan(before * 4);
   });
 
@@ -74,7 +88,7 @@ describe('label placement and collision', () => {
     inputs.push({ ...(inputs[0] as PlacementInput), id: 'far', longitudeDeg: 170 });
     const placedIds = (order: PlacementInput[]): string[] => {
       const placer = new LabelPlacer(estimatedTextMeasurer);
-      placer.update(0, flatProjector(10), () => order);
+      for (let t = 0; placer.passes === 0; t += 16) placer.update(t, flatProjector(10), () => order);
       return order
         .filter((l) => placer.isPlaced(l.id))
         .map((l) => String(l.id))
@@ -129,5 +143,25 @@ describe('label placement and collision', () => {
     layer.removeFeature('a');
     stack.frame(frameAt(166, 5));
     expect(target.state({ id: 1 }).count).toBe(0);
+  });
+
+  it('asks for frames until placement catches up with a view change, then stops (KB-117, F359)', () => {
+    const layer = new LabelLayer({ data: denseLabels(10_000), style: { 'text-field': ['get', 'name'] } });
+    let requests = 0;
+    const stack = new LayerStack(new RecordingRenderTarget(), () => requests++);
+    stack.add(layer);
+    // The host draws one frame, then only the frames the layers ask for (a globe draws only when asked).
+    let now = 0;
+    for (const zoom of [8, 9]) {
+      const passes = layer.placer.passes;
+      requests = 0;
+      stack.frame(frameAt((now += 16), zoom, flatProjector(zoom * 20)));
+      for (let frames = 0; frames < 1000 && requests > 0; frames++) {
+        requests = 0;
+        stack.frame(frameAt((now += 16), zoom, flatProjector(zoom * 20)));
+      }
+      expect(layer.placer.passes, `zoom ${zoom}`).toBeGreaterThan(passes);
+      expect(requests, `zoom ${zoom}: settled`).toBe(0);
+    }
   });
 });

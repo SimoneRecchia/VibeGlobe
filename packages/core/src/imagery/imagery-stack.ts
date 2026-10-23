@@ -199,6 +199,15 @@ const SUPPORTED_CRS = new Set(['EPSG:3857', 'EPSG:4326']);
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isPositiveInteger = (value: unknown): boolean => Number.isInteger(value) && (value as number) > 0;
 
+/** A configuration value as text for a message, whatever it is (an object without a usable `toString` included). */
+function shown(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return Object.prototype.toString.call(value);
+  }
+}
+
 /**
  * What is wrong with a source's metadata (F220), or undefined when it is valid: its reference system, level range,
  * tile size and pixel ratio, coverage rectangles, request limits and time limits, and its credits.
@@ -206,32 +215,32 @@ const isPositiveInteger = (value: unknown): boolean => Number.isInteger(value) &
 export function sourceProblem(source: ImagerySource): string | undefined {
   const { id, tiling, minLevel, maxLevel } = source as Partial<ImagerySource>;
   if (typeof id !== 'string' || id.length === 0) return 'has no id';
-  if (typeof tiling !== 'object' || !SUPPORTED_CRS.has(String(tiling.crs)))
-    return `uses the unknown reference system ${String((tiling as { crs?: unknown } | undefined)?.crs)}`;
+  if (typeof tiling !== 'object' || !SUPPORTED_CRS.has(shown(tiling.crs)))
+    return `uses the unknown reference system ${shown((tiling as { crs?: unknown } | undefined)?.crs)}`;
   if (
     !Number.isInteger(minLevel) ||
     !Number.isInteger(maxLevel) ||
     (minLevel as number) < 0 ||
     (maxLevel as number) > 30
   )
-    return `has levels ${String(minLevel)} to ${String(maxLevel)}: they must be integers from 0 to 30`;
+    return `has levels ${shown(minLevel)} to ${shown(maxLevel)}: they must be integers from 0 to 30`;
   if ((minLevel as number) > (maxLevel as number))
-    return `has a minimum level ${String(minLevel)} above its maximum ${String(maxLevel)}`;
-  if (!isPositiveInteger(source.tileSizePx)) return `has a tile size of ${String(source.tileSizePx)} pixels`;
+    return `has a minimum level ${shown(minLevel)} above its maximum ${shown(maxLevel)}`;
+  if (!isPositiveInteger(source.tileSizePx)) return `has a tile size of ${shown(source.tileSizePx)} pixels`;
   if (!isFiniteNumber(source.pixelRatio) || source.pixelRatio < 1)
-    return `has a pixel ratio of ${String(source.pixelRatio)}`;
+    return `has a pixel ratio of ${shown(source.pixelRatio)}`;
   for (const area of source.coverage ?? []) {
     const { westRad, southRad, eastRad, northRad } = area;
     if (![westRad, southRad, eastRad, northRad].every(isFiniteNumber) || southRad >= northRad || westRad === eastRad)
       return 'has a coverage rectangle that is empty, inverted or not finite';
   }
   if (source.maxRequestsPerHost !== undefined && !isPositiveInteger(source.maxRequestsPerHost))
-    return `allows ${String(source.maxRequestsPerHost)} requests per host`;
+    return `allows ${shown(source.maxRequestsPerHost)} requests per host`;
   if (
     source.maxRequestsPerSecond !== undefined &&
     !(isFiniteNumber(source.maxRequestsPerSecond) && source.maxRequestsPerSecond >= 1)
   )
-    return `declares a rate limit of ${String(source.maxRequestsPerSecond)} requests per second`;
+    return `declares a rate limit of ${shown(source.maxRequestsPerSecond)} requests per second`;
   const timeouts = source.timeoutsMs;
   if (
     timeouts &&
@@ -260,7 +269,7 @@ export function validStack(inputs: readonly ImageryLayerInput[], refused: (messa
     else
       for (const [source, problem] of problems)
         refused(
-          `Imagery source "${String((source as Partial<ImagerySource>).id)}" ${String(problem)}; its layer "${entry.id}" is left out`,
+          `Imagery source "${shown((source as Partial<ImagerySource>).id)}" ${shown(problem)}; its layer "${entry.id}" is left out`,
         );
   }
   return entries;

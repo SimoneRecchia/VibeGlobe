@@ -7,5 +7,10 @@
     "types": [],
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../core"
+    }
+  ]
 }

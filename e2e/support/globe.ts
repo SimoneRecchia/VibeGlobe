@@ -47,6 +47,10 @@ declare global {
       showHud(on: boolean): void;
       loggedLevels(): string[];
       clearLog(): void;
+      geodesicDistanceMeters(
+        from: { longitudeDeg: number; latitudeDeg: number },
+        to: { longitudeDeg: number; latitudeDeg: number },
+      ): number;
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };

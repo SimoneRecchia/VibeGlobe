@@ -1,4 +1,11 @@
-import type { Globe, GlobeEvents, LogEntry, WorkerEndpoint, WorkerMessage } from '@vibeglobe/core';
+import {
+  geodesicInverse,
+  type Globe,
+  type GlobeEvents,
+  type LogEntry,
+  type WorkerEndpoint,
+  type WorkerMessage,
+} from '@vibeglobe/core';
 import { createWorkers } from '@vibeglobe/worker';
 import type { ScenarioReport } from './scenario-harness.js';
 import type { FrameLoop } from './frame-loop.js';
@@ -52,6 +59,11 @@ interface PlaygroundTestHooks {
   loggedLevels(): string[];
   /** Forgets the collected log messages. */
   clearLog(): void;
+  /** The geodesic distance between two positions through core's geodesic API (F158). */
+  geodesicDistanceMeters(
+    from: { longitudeDeg: number; latitudeDeg: number },
+    to: { longitudeDeg: number; latitudeDeg: number },
+  ): number;
 }
 
 /** Playground parts the hooks reach. */
@@ -130,6 +142,8 @@ export function exposeTestHooks(
     showHud: parts.showHud,
     loggedLevels: () => parts.logEntries.map((entry) => entry.level),
     clearLog: () => void (parts.logEntries.length = 0),
+    geodesicDistanceMeters: (from, to) =>
+      geodesicInverse(from.longitudeDeg, from.latitudeDeg, to.longitudeDeg, to.latitudeDeg).distanceMeters,
     async recordScenario(name, darkBelow) {
       const { recordScenario } = await import('./scenario-harness.js');
       return recordScenario(globe, globeSize(), name, darkBelow);

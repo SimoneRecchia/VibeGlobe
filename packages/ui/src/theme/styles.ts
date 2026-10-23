@@ -157,6 +157,11 @@ export const RULES_CSS = `
 .vg-ui__bookmarks-empty{color:var(--vg-ui-muted-color)}
 .vg-ui__minimap{overflow:hidden}
 .vg-ui__minimap-canvas{display:block;border-radius:var(--vg-ui-border-radius)}
+.vg-ui__draw-cursor{position:absolute;width:var(--vg-ui-button-size);height:var(--vg-ui-button-size);margin:calc(var(--vg-ui-button-size) / -2) 0 0 calc(var(--vg-ui-button-size) / -2);border-radius:50%;pointer-events:none;background:linear-gradient(var(--vg-ui-color),var(--vg-ui-color)) center / var(--vg-ui-border-width) 100% no-repeat,linear-gradient(var(--vg-ui-color),var(--vg-ui-color)) center / 100% var(--vg-ui-border-width) no-repeat}
+.vg-ui__draw-cursor:not(:focus-visible){opacity:0}
+.vg-ui__measure-tools{border:0;box-shadow:none}
+.vg-ui__measure-readout{padding:0 var(--vg-ui-spacing);font-variant-numeric:tabular-nums}
+.vg-ui__measure-readout:empty{display:none}
 .vg-ui__status{padding:0 var(--vg-ui-spacing);color:var(--vg-ui-muted-color);max-width:var(--vg-ui-panel-width)}
 .vg-ui__status:empty{display:none}
 @media (pointer: coarse){.vg-ui__button,.vg-ui__search-option,.vg-ui__search-input,.vg-ui__tilt-track,.vg-ui__layers-item,.vg-ui__credit a,.vg-ui__scale,.vg-ui__text-input{min-width:var(--vg-ui-touch-size);min-height:var(--vg-ui-touch-size)}.vg-ui__credit a{display:inline-flex;align-items:center}}

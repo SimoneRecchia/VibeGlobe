@@ -5379,7 +5379,7 @@
         "Using only the keyboard, switch format between decimal degrees, DMS and UTM and verify the readout reports the view center while navigating by keyboard",
         "Verify the readout updates within one frame and costs no more than its per-frame budget"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F407",
@@ -5391,7 +5391,7 @@
         "Verify drawn points appear at the expected coordinates, ground-clamped, and are returned through the API and events",
         "Verify placing a point never pans or zooms the map by accident"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F408",
@@ -5403,7 +5403,7 @@
         "Verify the line preview follows the pointer while drawing and the final line drapes on the terrain",
         "Verify the resulting geometry is returned through the API and events with the expected coordinates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F409",
@@ -5415,7 +5415,7 @@
         "Verify the preview, the closed draped polygon and the geometry returned through the API and events",
         "Verify self-intersecting input is reported to the application through a validation event"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F410",
@@ -5427,7 +5427,7 @@
         "Repeat with touch emulation and with the keyboard only; manually verify on the reference tablet",
         "Verify change events carry the updated geometry after each edit and shapes stay draped on terrain"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F411",
@@ -5439,7 +5439,7 @@
         "Verify the live readout values match the geodesic utilities within display precision and update while drawing and editing",
         "Verify units scale automatically (meters to kilometers, square meters to square kilometers) and labels are translated in English and Italian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F412",

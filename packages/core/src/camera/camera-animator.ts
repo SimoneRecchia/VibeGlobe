@@ -175,7 +175,8 @@ export class CameraAnimator {
     const b = this.b;
     let wa = 1 - f;
     let wb = f;
-    if (angle > Math.PI - 1e-9) {
+    // acos resolves angles near π only to about 1.5e-8: wider than that, so every antipodal pair takes this branch.
+    if (angle > Math.PI - 1e-6) {
       // Antipodal ends: every great circle joins them; take the one through the north of the start (KB-128).
       const ax = a[0] ?? 0;
       const ay = a[1] ?? 0;

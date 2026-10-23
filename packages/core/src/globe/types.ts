@@ -391,6 +391,12 @@ export interface GlobeOptions {
    */
   readonly hiddenCredits?: readonly string[];
   /**
+   * `false` leaves the credits to the application's own attribution control (a UI package's), which must then show
+   * every credit `Globe.credits()` and `credits-change` report, required ones included: the engine draws no credits
+   * element (F255). Default true.
+   */
+  readonly creditsElement?: boolean;
+  /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
    */
@@ -732,6 +738,8 @@ export interface Globe {
     readonly degreesPerSecond?: number;
     readonly signal?: AbortSignalLike;
   }): CameraMovement;
+  /** The camera constraints in force (F209–F211), as last set; `{}` without any. */
+  readonly constraints: CameraConstraints;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
   /**
@@ -801,6 +809,11 @@ export interface Globe {
   layerTarget(): LayerRenderTarget | undefined;
   /** The credits of the imagery and terrain sources the last frame showed, deduplicated, required ones first (F254). */
   credits(): readonly Credit[];
+  /**
+   * Reads the visible sources' `attribution` again, for a source whose credits change at runtime (a provider's
+   * copyrights of the settled view, F258), and emits `credits-change` when the list changed.
+   */
+  refreshCredits(): void;
   /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
   readonly imageryLayers: ImageryLayers;
   /**

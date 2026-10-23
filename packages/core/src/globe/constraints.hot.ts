@@ -59,10 +59,13 @@ export function validateConstraints(constraints: unknown): CameraConstraints {
  * held for every input and movement by clamping the pose each frame, so a limit stops the camera without overshoot.
  */
 export class Constraints {
+  /** The constraints as last set, validated (`Globe.constraints`). */
+  settings: CameraConstraints = {};
   readonly values = new Float64Array(9).fill(Number.NaN);
 
-  /** Replaces the constraints (validated). */
-  set(constraints: CameraConstraints): void {
+  /** Replaces the constraints (validated), passing the maximum tilt on to `view` when given. */
+  set(constraints: CameraConstraints, view?: { setMaxTilt(maxTiltRad: number): void }): void {
+    this.settings = constraints;
     const v = this.values;
     v.fill(Number.NaN);
     v[MIN_ZOOM] = constraints.minZoom ?? Number.NaN;
@@ -74,6 +77,7 @@ export class Constraints {
       v[EAST] = constraints.bounds.eastDeg * RAD;
       v[NORTH] = constraints.bounds.northDeg * RAD;
     }
+    view?.setMaxTilt(this.maxTiltRad);
   }
 
   /** The maximum tilt in radians, NaN when unconstrained: the view state caps applied and chosen tilts with it. */

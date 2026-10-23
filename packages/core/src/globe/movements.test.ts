@@ -357,6 +357,8 @@ describe('camera constraints (F209–F211)', () => {
       maxTiltDeg: 30,
       bounds: { westDeg: 170, southDeg: -50, eastDeg: -170, northDeg: 50 },
     });
+    // Readable back, for controls that disable their buttons at the limits (track A hook request 3).
+    expect(globe.constraints).toMatchObject({ minZoom: 5, maxZoom: 12, maxTiltDeg: 30 });
     ticks(2);
     // The center moves into the bounds across the antimeridian, to the nearer edge.
     expect(Math.abs(globe.camera.longitudeDeg)).toBeGreaterThanOrEqual(170 - 1e-9);

@@ -60,20 +60,26 @@ describe('camera animations (F195, F198, F203)', () => {
   });
 
   it('flies between antipodal points along a great circle, without a jump at mid-path (KB-128)', () => {
-    const camera = cameraAt(0, 0, 2000);
-    const animator = new CameraAnimator('fly', camera, target(180, 0, 2000, 0), 0, 4000);
-    let last = { lon: 0, lat: 0 };
-    for (let ms = 5; ms <= 4000; ms += 5) {
-      at(animator, camera, ms);
-      const now = { lon: camera.pose.targetLongitudeRad / DEG, lat: camera.pose.targetLatitudeRad / DEG };
-      // The great-circle angle between consecutive targets: the fast middle of a flight moves far, a jump 180°.
-      const cosAngle =
-        Math.sin(now.lat * DEG) * Math.sin(last.lat * DEG) +
-        Math.cos(now.lat * DEG) * Math.cos(last.lat * DEG) * Math.cos((now.lon - last.lon) * DEG);
-      expect(Math.acos(Math.min(1, cosAngle)) / DEG).toBeLessThan(20);
-      last = now;
+    // Exactly antipodal, and antipodal where acos rounds the angle to π − 1.5e-8.
+    for (const [lon, lat] of [
+      [0, 0],
+      [37, -55],
+    ] as const) {
+      const camera = cameraAt(lon, lat, 2000);
+      const animator = new CameraAnimator('fly', camera, target(lon - 180, -lat, 2000, 0), 0, 4000);
+      let last: { lon: number; lat: number } = { lon, lat };
+      for (let ms = 5; ms <= 4000; ms += 5) {
+        at(animator, camera, ms);
+        const now = { lon: camera.pose.targetLongitudeRad / DEG, lat: camera.pose.targetLatitudeRad / DEG };
+        // The great-circle angle between consecutive targets: the fast middle of a flight moves far, a jump 180°.
+        const cosAngle =
+          Math.sin(now.lat * DEG) * Math.sin(last.lat * DEG) +
+          Math.cos(now.lat * DEG) * Math.cos(last.lat * DEG) * Math.cos((now.lon - last.lon) * DEG);
+        expect(Math.acos(Math.min(1, cosAngle)) / DEG).toBeLessThan(20);
+        last = now;
+      }
+      expect(camera.pose.targetLatitudeRad / DEG).toBeCloseTo(-lat, 9);
     }
-    expect(Math.abs(camera.pose.targetLongitudeRad / DEG)).toBeCloseTo(180, 9);
   });
 
   it('flies high between distant places and lands at street scale (F195, F196)', () => {

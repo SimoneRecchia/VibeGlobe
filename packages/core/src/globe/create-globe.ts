@@ -67,7 +67,7 @@ class GlobeEngine implements Globe {
   readonly navigation: NavigationApi;
   private readonly viewControl: ViewControl;
   private readonly movements: Movements;
-  private readonly constraints = new Constraints();
+  private readonly limits = new Constraints();
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
@@ -123,7 +123,7 @@ class GlobeEngine implements Globe {
       view: this.surfaceFrame.view,
       emitter: this.emitter,
       clock: this.clock,
-      constraints: this.constraints,
+      constraints: this.limits,
       setOpacity: (opacity) => this.renderer?.host.setOpacity?.(opacity),
       waiting: () => this.waiting,
       assertAlive: () => this.assertAlive(),
@@ -161,6 +161,10 @@ class GlobeEngine implements Globe {
     return this.pendingView ? requestedCameraState(this.pendingView, view) : readCameraState(this.cam, view);
   }
 
+  get constraints(): Globe['constraints'] {
+    return this.limits.settings;
+  }
+
   get reducedMotion(): boolean {
     return this.movements.reducedMotion;
   }
@@ -172,9 +176,8 @@ class GlobeEngine implements Globe {
   readonly setViewMode: Globe['setViewMode'] = (mode) => this.assertAlive() ?? this.viewControl.setMode(mode);
   readonly setViewCurves: Globe['setViewCurves'] = (curves) => this.assertAlive() ?? this.viewControl.setCurves(curves);
 
-  credits(): readonly Credit[] {
-    return this.surfaceFrame.imagery?.credits.list() ?? [];
-  }
+  readonly credits = (): readonly Credit[] => this.surfaceFrame.imagery?.credits.list() ?? [];
+  readonly refreshCredits = (): void => this.assertAlive() ?? this.surfaceFrame.imagery?.credits.refresh();
 
   get imageryLayers(): ImageryLayers {
     return imageryLayersOf(this.surfaceFrame);
@@ -320,7 +323,7 @@ class GlobeEngine implements Globe {
       this.movements.step();
       this.viewControl.updateControls();
       this.movements.afterInput();
-      this.constraints.apply(this.cam);
+      this.limits.apply(this.cam);
     }
     this.inFrame = false;
     // A frame the controls ask for during their update is drawn next; what they applied is drawn by this one.
@@ -379,11 +382,8 @@ class GlobeEngine implements Globe {
   readonly orbit: Globe['orbit'] = (options) => this.movements.orbit(options);
   readonly rotateTo: Globe['rotateTo'] = (heading, options) => this.movements.rotateTo(heading, options);
   readonly tiltTo: Globe['tiltTo'] = (tilt, options) => this.movements.start('ease', { tiltDeg: tilt }, options);
-  readonly setConstraints: Globe['setConstraints'] = (constraints) => {
-    this.constraints.set(validateConstraints(constraints));
-    this.surfaceFrame.view.setMaxTilt(this.constraints.maxTiltRad);
-    this.requestRender();
-  };
+  readonly setConstraints: Globe['setConstraints'] = (constraints) =>
+    this.limits.set(validateConstraints(constraints), this.surfaceFrame.view) ?? this.requestRender();
   readonly resetToGlobe: Globe['resetToGlobe'] = (options) => this.movements.resetToGlobe(options);
   readonly goHome: Globe['goHome'] = (options) =>
     this.movements.goHome(this.options.home ?? this.options.view ?? DEFAULT_VIEW, options);

@@ -5078,7 +5078,7 @@
         "Verify dragged ground-clamped features stay on the terrain",
         "Verify features are not draggable unless enabled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F383",

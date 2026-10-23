@@ -107,3 +107,45 @@ export function selectModels(baseUrl: string): ModelLayer {
     ],
   });
 }
+
+/**
+ * `?scenario=data-drag` (F382), with `&terrain=terrarium`, around the fixture's peak at (6.86°, 45.83°): a draggable
+ * ground-clamped point, a draggable marker, a draggable glTF model, and a point that is not draggable.
+ */
+export function dragLayers(): DataLayer[] {
+  return [
+    new DataLayer('point', {
+      id: 'drag-point',
+      draggable: true,
+      data: [feature('dp', { type: 'Point', coordinates: [6.7, 45.85] })],
+      style: { 'circle-color': '#ff2020', 'circle-radius': 7 },
+    }),
+    new DataLayer('marker', {
+      id: 'drag-marker',
+      draggable: true,
+      data: [feature('dm', { type: 'Point', coordinates: [7.0, 45.85] })],
+      style: { 'icon-image': 'square', 'icon-size': 24 },
+    }),
+    new DataLayer('point', {
+      id: 'fixed-point',
+      data: [feature('fx', { type: 'Point', coordinates: [6.86, 45.7] })],
+      style: { 'circle-color': '#2050ff', 'circle-radius': 7 },
+    }),
+  ];
+}
+
+/** The draggable glTF model of `?scenario=data-drag`: the fixture pyramid, 600 m across, at 3,000 m (absolute). */
+export function dragModels(baseUrl: string): ModelLayer {
+  return new ModelLayer({
+    id: 'drag-model',
+    draggable: true,
+    models: [
+      {
+        id: 'dg',
+        url: `${baseUrl}models/pyramid.gltf`,
+        position: { longitudeDeg: 6.7, latitudeDeg: 45.7 },
+        scale: 300,
+      },
+    ],
+  });
+}

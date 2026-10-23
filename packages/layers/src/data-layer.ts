@@ -2,7 +2,8 @@
  * The built-in data layer: one batch of points, markers, labels, lines, polygons or circles, styled by MapLibre
  * expressions and updated feature by feature (F369, F370, F372, F376, F377).
  */
-import type { FeatureGeometry, GeoPosition } from '@vibeglobe/core';
+import type { FeatureGeometry, GeoPosition, ScreenPoint } from '@vibeglobe/core';
+import { anchorNear, type Project } from './anchors.js';
 import { FeatureStore, type FeatureId } from './feature-store.js';
 import { ellipseGeometry } from './circle.js';
 import {
@@ -271,6 +272,11 @@ export class DataLayer implements Layer {
     if (index === undefined) return undefined;
     const p = this.store.array('position');
     return { longitudeDeg: p[3 * index] ?? 0, latitudeDeg: p[3 * index + 1] ?? 0, heightMeters: p[3 * index + 2] ?? 0 };
+  }
+
+  /** Whether a feature anchor shows within `radiusPx` of `point` (a press that starts a drag, F382). */
+  anchorNear(point: ScreenPoint, radiusPx: number, project: Project): boolean {
+    return anchorNear(this.store, point, radiusPx, project, this.placement === 'clamp-to-ground');
   }
 
   /** Creates the batch and pick slot and starts reading a streamed data source. */

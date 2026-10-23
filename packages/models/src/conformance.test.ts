@@ -1,7 +1,7 @@
 // The glTF conformance suite (F361): the Khronos sample models in every committed variant, read by parseModel.
 import { describe, expect, it } from 'vitest';
 import { componentValue } from './accessors.js';
-import { allSamples, sample } from './__fixtures__/khronos.js';
+import { allSamples, meshopt, sample } from './__fixtures__/khronos.js';
 import {
   loadDraco3d,
   nodeMatrix,
@@ -15,7 +15,7 @@ const draco = loadDraco3d();
 
 async function load(model: string, variant: string): Promise<ModelDescription> {
   const { bytes, resources } = sample(model, variant);
-  return parseModel(bytes, { resources, draco });
+  return parseModel(bytes, { resources, draco, meshopt });
 }
 
 /** Expected counters of each sample: meshes, instances, vertices and triangles over every instance. */

@@ -6,6 +6,10 @@ import { decodeImage } from './decode-image.js';
 import { decodeTerrain } from './decode-terrain.js';
 import type { TaskFunction, TaskTable } from './protocol.js';
 import { transcodeKtx2 } from './transcode-ktx2.js';
+import { compileWasm } from './wasm.js';
+
+/** meshoptimizer's decoder module, shipped next to the worker program without its JavaScript (F100). */
+const MESHOPT_URL = new URL('../wasm/meshopt-decoder.wasm', import.meta.url);
 
 let vectorTasks: Promise<TaskTable> | undefined;
 let clusterTasks: Promise<TaskTable> | undefined;
@@ -36,7 +40,7 @@ function clusterTask(name: string): TaskFunction {
 
 /**
  * A task of a table another package provides, imported on its first use in its own chunk: vector-tile layout of
- * `@vibeglobe/layers/vector-tiles` (M13).
+ * `@vibeglobe/layers/vector-tiles` (M13), glTF parsing of `@vibeglobe/models` (F361, M13).
  */
 function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): TaskFunction {
   return async (input, context) => {
@@ -66,5 +70,14 @@ export const TASKS: TaskTable = Object.freeze({
     'vector-tile',
     () => import('@vibeglobe/layers/vector-tiles').then((module) => module.VECTOR_TILE_TASKS),
     'layout-vector-tile',
+  ),
+  // Draco and meshopt decode in the task: meshopt through the module above, Draco from the input's `dracoWasmUrl`.
+  'parse-model': lazyTask(
+    'models',
+    () =>
+      import('@vibeglobe/models').then((module) =>
+        module.createModelTasks({ meshopt: module.meshoptWasmDecoder(() => compileWasm(MESHOPT_URL)) }),
+      ),
+    'parse-model',
   ),
 });

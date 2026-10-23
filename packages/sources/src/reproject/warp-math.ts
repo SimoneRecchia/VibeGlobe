@@ -93,7 +93,7 @@ function project(toSource: ToSource, lonDeg: number, latDeg: number): readonly [
  * The bounding box in source units of a tile's footprint, from `samples` × `samples` points of the tile mapped with
  * `toSource`; undefined when no point maps.
  */
-export function sourceFootprint(
+function sourceFootprint(
   extent: TileRectangleRad,
   tiling: TargetTiling,
   toSource: ToSource,

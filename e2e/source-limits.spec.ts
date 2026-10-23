@@ -79,6 +79,9 @@ test('a source declaring 10 requests per second never gets more in any second, a
   page,
 }) => {
   test.setTimeout(240_000);
+  // A larger view: each jump asks for dozens of tiles of each source, so an unthrottled source shows its burst even
+  // where frames are slow (CI's software GPU).
+  await page.setViewportSize({ width: 800, height: 600 });
   const session = await fixtureSession(page);
   await openGlobe(
     page,

@@ -12,7 +12,6 @@ import {
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
 import { chainSources, credits, overlayLayers } from './fixture-layers.js';
-import { utmLayers } from './reprojected-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -28,6 +27,8 @@ const OVERLAY_REFRESH_MS = 250;
 const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
+// `?utm=` layers need the gis package and proj4: loaded only then, so the engine alone loads neither (F418).
+const reprojected = params.has('utm') ? await import('./reprojected-layers.js') : undefined;
 
 /**
  * Terrain scenarios (M4): URL parameters each one sets unless the URL gives them, over the fixture server's analytic
@@ -202,7 +203,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const chain = chainSources(params, base, session, imageryTiling, ITALY);
   const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
   // `?utm=32632,32633` adds fixture rasters served in those UTM zones, reprojected on the client (F226).
-  const utm = utmLayers(params, base, session);
+  const utm = reprojected?.utmLayers(params, base, session) ?? [];
   return { imagery: [layer, ...utm, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
 }
 

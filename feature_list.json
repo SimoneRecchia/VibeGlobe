@@ -4700,7 +4700,7 @@
         "Rotate and tilt the camera and verify billboards keep facing the screen and the anchor stays on the coordinate within 1 pixel",
         "Verify marker images share a texture atlas so draw calls stay within the documented budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F353",
@@ -4764,7 +4764,7 @@
         "Verify text with accented Latin, Greek and Cyrillic characters renders with the correct glyphs, and CJK text renders through a fallback font",
         "Verify the label anchor stays on its coordinate within 1 pixel while panning and zooming"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F358",

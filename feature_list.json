@@ -4917,7 +4917,7 @@
         "Change a feature property through a live update and verify its style updates in the next frame without rebuilding the layer",
         "Feed malformed style expressions and verify they are rejected at the API boundary with a clear error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F370",

@@ -1,5 +1,7 @@
 import type { Globe } from '@vibeglobe/core';
 import { manyPointsLayer } from './layers-many.js';
+import { styledLayers } from './layers-styled.js';
+import { markerImages } from './marker-images.js';
 import {
   createGlobeLayers,
   DataLayer,
@@ -272,34 +274,6 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
     }),
 };
 
-/** The marker images of `data-markers`: a red pin and a blue square, drawn on canvases. */
-function markerImages(): Record<string, HTMLCanvasElement> {
-  const pin = document.createElement('canvas');
-  pin.width = 24;
-  pin.height = 32;
-  const p = pin.getContext('2d');
-  if (p) {
-    p.fillStyle = '#e02020';
-    p.beginPath();
-    p.arc(12, 11, 10, 0, 2 * Math.PI);
-    p.fill();
-    p.beginPath();
-    p.moveTo(4, 16);
-    p.lineTo(12, 32);
-    p.lineTo(20, 16);
-    p.fill();
-  }
-  const square = document.createElement('canvas');
-  square.width = 32;
-  square.height = 32;
-  const q = square.getContext('2d');
-  if (q) {
-    q.fillStyle = '#2040e0';
-    q.fillRect(0, 0, 32, 32);
-  }
-  return { pin, square };
-}
-
 /**
  * `?scenario=data-points`, `data-lines` and `data-polygons` (F351, F353, F354): the data layers' test scenes, drawn
  * through the layers package's public API.
@@ -366,7 +340,7 @@ function syncLayers(): DataLayer[] {
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
-  if (name === 'data-markers')
+  if (name === 'data-markers' || name === 'data-styled')
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
   const scene = name === 'data-points-100k' ? manyPointsLayer : DATA_SCENES[name];
   const added = scene
@@ -375,7 +349,9 @@ export function showDataScenario(globe: Globe, name: string): void {
       ? altitudeLayers()
       : name === 'data-sync'
         ? syncLayers()
-        : [];
+        : name === 'data-styled'
+          ? styledLayers()
+          : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
   if (name === 'data-models' || name === 'data-sync') {
     const models =

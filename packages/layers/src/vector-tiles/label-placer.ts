@@ -4,7 +4,7 @@
  * road (upright on screen), runs collision in priority order (higher style layers, then `symbol-sort-key`), fades
  * labels in and out on the engine clock, and writes the quads of the visible glyphs for the target's text material.
  */
-import { geodeticToEcef, type FrameView } from '@vibeglobe/core';
+import { geodeticToEcef, type ElevationSample, type FrameView, type GeoPosition } from '@vibeglobe/core';
 import { tileToLonLat } from './globe-vertices.js';
 import { GlyphSource } from './glyph-source.js';
 import { labelAnchors, UNITS_PER_PX, type LabelAnchor } from './label-anchors.js';
@@ -45,6 +45,8 @@ export interface LabelView {
     heightMeters?: number;
   }): { xPx: number; yPx: number } | undefined;
   readonly camera: { readonly morphFactor: number };
+  /** Terrain heights, so labels stand on the relief. */
+  elevationAt?(position: GeoPosition, out?: ElevationSample): ElevationSample;
 }
 
 /** A placed label, for the debug API (F449). */
@@ -116,6 +118,16 @@ export class LabelPlacer {
     private readonly stateOf: (source: string, id: number) => Readonly<Record<string, unknown>> | undefined = () =>
       undefined,
   ) {}
+
+  /** The screen point of a position on the ground (on the terrain where there is some, F452). */
+  private project(longitudeDeg: number, latitudeDeg: number): { xPx: number; yPx: number } | undefined {
+    const position = { longitudeDeg, latitudeDeg, heightMeters: 0 };
+    if (this.view.elevationAt !== undefined)
+      position.heightMeters = this.view.elevationAt(position, this.sample).heightMeters;
+    return this.view.geoToScreen(position);
+  }
+
+  private readonly sample = { heightMeters: 0, level: -1, noData: true };
 
   /** The labels placed by the last frame. */
   placed(): readonly PlacedLabel[] {
@@ -209,7 +221,7 @@ export class LabelPlacer {
       if (label === undefined) continue;
       const [lon, lat] = tileToLonLat(tile, BUCKET_EXTENT, anchor.x, anchor.y);
       if (!facing(lon ?? 0, lat ?? 0, view, morph)) continue;
-      const screen = this.view.geoToScreen({ longitudeDeg: lon ?? 0, latitudeDeg: lat ?? 0 });
+      const screen = this.project(lon ?? 0, lat ?? 0);
       if (screen === undefined) continue;
       const feature = bucket.features[label.feature];
       const shaping = this.shaping(source, anchor.label, zoom, anchor.onLine !== undefined);
@@ -295,7 +307,7 @@ export class LabelPlacer {
     const offsets = shaping.glyphs.map((g) => (g.x + g.glyph.advance / 2) * style.scale * unitsPerPx);
     const project = (x: number, y: number) => {
       const [lon, lat] = tileToLonLat(source.tile, BUCKET_EXTENT, x, y);
-      return this.view.geoToScreen({ longitudeDeg: lon ?? 0, latitudeDeg: lat ?? 0 });
+      return this.project(lon ?? 0, lat ?? 0);
     };
     // Upright on screen: the label runs left to right whatever the heading.
     const a = project(onLine.anchor.x, onLine.anchor.y);

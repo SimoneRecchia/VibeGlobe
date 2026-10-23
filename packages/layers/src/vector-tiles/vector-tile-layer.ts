@@ -11,6 +11,7 @@ import type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
 import { VectorInteraction, type VectorFeatureEvent } from './vector-interaction.js';
 import { pickVectorFeatures, type DrawnTile, type PickedVectorFeature } from './vector-picking.js';
 import { fetchTransport } from '@vibeglobe/sources';
+import { TileGrounds } from './drape.js';
 import { GlyphSource } from './glyph-source.js';
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
@@ -45,6 +46,10 @@ interface TileMesh {
   readonly bucket: Bucket;
   paint: MeshPaint;
   paintKey: string;
+  /** Tile units of the vertices and their draped heights, with the terrain grid version they were draped from. */
+  readonly tileXY: Float32Array;
+  readonly ground: Float32Array;
+  groundVersion: number;
 }
 
 /** Logs a problem the way the engine's log does (until extensions can use it: hook request D (1)). */
@@ -88,6 +93,8 @@ class Runtime implements VectorTileLayer {
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
   private placer: LabelPlacer | undefined;
+  private readonly grounds: TileGrounds;
+  private drapePending = false;
   private drawnTilesWithBuckets: DrawnTile[] = [];
   private readonly interaction = new VectorInteraction(
     (point) => this.queryRenderedFeatures(point),
@@ -102,7 +109,9 @@ class Runtime implements VectorTileLayer {
     private readonly options: VectorTilesOptions,
     readonly style: VectorStyle,
     private readonly resolved: ReadonlyMap<string, SourceInfo | undefined>,
-  ) {}
+  ) {
+    this.grounds = new TileGrounds(globe);
+  }
 
   start(): this {
     if (this.options.element !== undefined) this.detachPointer = this.interaction.attach(this.options.element);
@@ -210,6 +219,8 @@ class Runtime implements VectorTileLayer {
     if (target === undefined) return;
     const zoom = this.globe.camera.zoom;
     const draws = this.sourceDraws(view);
+    this.grounds.frame();
+    this.drapePending = false;
     const fades = this.fader.update(this.globe.timeMs, zoom, this.style.layers);
     let animating = false;
     const layerDraws: VectorLayerDraws[] = [];
@@ -223,7 +234,7 @@ class Runtime implements VectorTileLayer {
     const labels = this.placer?.frame(this.labelSources(fades, draws), view, zoom, this.globe.timeMs);
     target.setLabels(labels?.quads);
     target.draw(layerDraws, view);
-    if (animating || labels?.animating === true) context.requestRender();
+    if (animating || this.drapePending || labels?.animating === true) context.requestRender();
   }
 
   /** The symbol buckets of the drawn tiles, with their layer's fade. */
@@ -332,8 +343,19 @@ class Runtime implements VectorTileLayer {
       const geometry = meshGeometry(kind, bucket, tileOrigin(tile));
       if (geometry === undefined) return undefined;
       const paint = meshPaint(layer, bucket, geometry.featureIndex, zoomA, (f) => this.stateOf(source?.id ?? '', f.id));
-      const mesh = target.createMesh({ ...geometry.data, ...paint });
-      entry = { mesh, featureIndex: geometry.featureIndex, bucket, paint, paintKey };
+      const groundVersion = this.grounds.version;
+      const ground = this.grounds.heights(tile, geometry.data.tile, geometry.data.ground);
+      const mesh = target.createMesh({ ...geometry.data, ...paint, ground });
+      entry = {
+        mesh,
+        featureIndex: geometry.featureIndex,
+        bucket,
+        paint,
+        paintKey,
+        tileXY: geometry.data.tile,
+        ground,
+        groundVersion,
+      };
       this.meshes.set(key, entry);
     } else if (entry.paintKey !== paintKey) {
       meshPaint(
@@ -346,6 +368,12 @@ class Runtime implements VectorTileLayer {
       );
       entry.mesh.update(entry.paint);
       entry.paintKey = paintKey;
+    }
+    if (entry.groundVersion !== this.grounds.version && this.grounds.active) {
+      if (this.grounds.canDrape) {
+        entry.groundVersion = this.grounds.version;
+        entry.mesh.update({ ground: this.grounds.heights(tile, entry.tileXY, entry.ground) });
+      } else this.drapePending = true;
     }
     (entry as { usedAt?: number }).usedAt = this.globe.frameNumber;
     return entry;

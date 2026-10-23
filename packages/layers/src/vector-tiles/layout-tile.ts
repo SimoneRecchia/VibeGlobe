@@ -79,6 +79,9 @@ export interface LayoutInput {
   readonly tile?: TileId;
 }
 
+/** The longest straight piece of a line drawn on the globe, in tile units, so draped lines follow the relief. */
+export const DRAPE_EDGE_UNITS = 256;
+
 /** The step along a line vertex's extrusion whose screen projection gives the extrusion's screen direction. */
 export const SIDE_STEP_UNITS = 4;
 
@@ -271,11 +274,13 @@ function layoutLayer(layer: StyleLayer, source: MvtLayer, input: LayoutInput, cl
   const kept = features.map((f) => ({ id: f.id, type: f.type, properties: f.properties }));
   const base = { layerId: layer.id, type: layer.type, features: kept };
   const maxEdge = input.tile === undefined ? Infinity : maxEdgeUnits(input.tile.z, BUCKET_EXTENT);
+  // Draped on terrain, lines and fills also need vertices often enough to follow the relief (F452).
+  const draped = input.tile === undefined ? Infinity : DRAPE_EDGE_UNITS;
   switch (layer.type) {
     case 'fill':
-      return { ...base, geometry: layoutFill(features, geometry, clip, maxEdge) };
+      return { ...base, geometry: layoutFill(features, geometry, clip, Math.min(maxEdge, 2 * draped)) };
     case 'line':
-      return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip, maxEdge) };
+      return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip, Math.min(maxEdge, draped)) };
     case 'fill-extrusion':
       return { ...base, geometry: layoutExtrusion(features, geometry, clip) };
     case 'circle':

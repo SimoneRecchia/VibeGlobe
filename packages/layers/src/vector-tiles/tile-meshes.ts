@@ -5,7 +5,7 @@
  */
 import type { LayerOrigin } from '@vibeglobe/core';
 import { globeVertices, maxEdgeUnits } from './globe-vertices.js';
-import { BUCKET_BUFFER, BUCKET_EXTENT, type Bucket } from './layout-tile.js';
+import { BUCKET_BUFFER, BUCKET_EXTENT, DRAPE_EDGE_UNITS, type Bucket } from './layout-tile.js';
 import type { TileId } from './tile-pyramid.js';
 import type { MeshPaint } from './vector-paint.js';
 import type { VectorMeshData, VectorMeshKind } from './vector-target.js';
@@ -130,16 +130,19 @@ export function meshGeometry(kind: VectorMeshKind, bucket: Bucket, origin: Layer
  * globe's curvature like fills do.
  */
 export function backgroundBucket(tile: TileId, layerId: string): Bucket {
-  const cells = Number.isFinite(maxEdgeUnits(tile.z, BUCKET_EXTENT))
-    ? Math.ceil(BUCKET_EXTENT / maxEdgeUnits(tile.z, BUCKET_EXTENT))
-    : 1;
-  // The grid reaches past the square by a buffer, as laid-out fills do, so the draw's clip alone decides each pixel.
-  const from = -BUCKET_BUFFER;
-  const step = (BUCKET_EXTENT + 2 * BUCKET_BUFFER) / cells;
-  const side = cells + 1;
+  // As fine as fills: following the globe's curvature, and the relief when draped. Grid lines fall on the tile's
+  // edges (draped neighbors share those vertices exactly), with one more line a buffer beyond each edge.
+  const inner = Math.ceil(BUCKET_EXTENT / Math.min(maxEdgeUnits(tile.z, BUCKET_EXTENT), 2 * DRAPE_EDGE_UNITS));
+  const lines = [
+    -BUCKET_BUFFER,
+    ...Array.from({ length: inner + 1 }, (_, i) => (i * BUCKET_EXTENT) / inner),
+    BUCKET_EXTENT + BUCKET_BUFFER,
+  ];
+  const cells = lines.length - 1;
+  const side = lines.length;
   const positions = new Float32Array(side * side * 2);
   for (let j = 0; j < side; j++)
-    for (let i = 0; i < side; i++) positions.set([from + i * step, from + j * step], (j * side + i) * 2);
+    for (let i = 0; i < side; i++) positions.set([lines[i] ?? 0, lines[j] ?? 0], (j * side + i) * 2);
   const indices = new Uint32Array(cells * cells * 6);
   for (let j = 0; j < cells; j++) {
     for (let i = 0; i < cells; i++) {

@@ -50,8 +50,11 @@ export interface VectorDrawUniforms {
   readonly tile: Vector4;
 }
 
-/** Share of its distance by which a draped vertex is pulled toward the eye, as data layers do (ADR 0037). */
-const DEPTH_PULL = 2e-4;
+/**
+ * Share of its distance by which a draped vertex is pulled toward the eye (ADR 0037's method): 10 m at 10 km, so fills
+ * stay in front of the surface along its tile edges and between terrain vertices (measured on the fixture terrain).
+ */
+const DEPTH_PULL = 1e-3;
 /** Pull of circles, which span pixels around their anchor where the curved surface may lie nearer. */
 const CIRCLE_DEPTH_PULL = 3e-3;
 

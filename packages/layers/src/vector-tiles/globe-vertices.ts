@@ -99,6 +99,11 @@ function bounds(rings: readonly TileRing[]): ClipRect {
   return { minX, minY, maxX, maxY };
 }
 
+/** The `i`-th grid line of cells `cellUnits` wide, a whole division of the tile extent: computed exactly. */
+function edge(i: number, cellUnits: number): number {
+  return (i * 4096) / Math.round(4096 / cellUnits);
+}
+
 /**
  * Fill triangles clipped to `clip` and to a grid of `cellUnits` squares (aligned on the tile's origin), so that no
  * triangle is larger than a cell. Cells share their clipped edges exactly, so the pieces meet without cracks.
@@ -114,11 +119,12 @@ export function subdividedFill(rings: readonly TileRing[], clip: ClipRect, cellU
   const y1 = Math.ceil(Math.min(box.maxY, clip.maxY) / cellUnits);
   for (let cy = y0; cy < y1; cy++) {
     for (let cx = x0; cx < x1; cx++) {
+      // Bounds computed the same way in every tile, so cells meet exactly at the tile edges.
       const cell = {
-        minX: Math.max(clip.minX, cx * cellUnits),
-        minY: Math.max(clip.minY, cy * cellUnits),
-        maxX: Math.min(clip.maxX, (cx + 1) * cellUnits),
-        maxY: Math.min(clip.maxY, (cy + 1) * cellUnits),
+        minX: Math.max(clip.minX, edge(cx, cellUnits)),
+        minY: Math.max(clip.minY, edge(cy, cellUnits)),
+        maxX: Math.min(clip.maxX, edge(cx + 1, cellUnits)),
+        maxY: Math.min(clip.maxY, edge(cy + 1, cellUnits)),
       };
       const piece = tessellateFill(rings, cell);
       const base = positions.length / 2;

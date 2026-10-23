@@ -51,3 +51,6 @@ Option 2.
   in every phase.
 - Per-frame cost is one draw per visible batch; writes upload only the changed ranges (F376, F377).
 - Polygon triangulation runs on the calling thread until the worker program registers it (a hook already recorded).
+- glTF models load with three.js's glTF loader, which shows images embedded in a model's buffers through `blob:` image
+  URLs: a page with a strict Content Security Policy that loads such models adds `blob:` to `img-src`. They are images,
+  not code, so F100's rule (no generated code) holds; models with external or `data:` images need nothing more.

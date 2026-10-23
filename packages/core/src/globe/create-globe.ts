@@ -1,4 +1,5 @@
 import { requestingTarget } from '../layers/layer-geometry.js';
+import { addExtension } from './render-extensions.js';
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
@@ -74,7 +75,8 @@ class GlobeEngine implements Globe {
   private surface: SurfaceCache | undefined;
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
-  private frames = 0;
+  /** Frames drawn so far (`Globe.frameNumber`). */
+  frameNumber = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
   private readonly idlePayload = { frameNumber: 0 };
   /** The debug quads, kept for a renderer that does not exist yet. */
@@ -120,7 +122,7 @@ class GlobeEngine implements Globe {
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     ({ viewControl: this.viewControl, movements: this.movements } = wireView({
       cam: this.cam,
-      view: this.surfaceFrame.view,
+      surface: this.surfaceFrame,
       emitter: this.emitter,
       clock: this.clock,
       constraints: this.limits,
@@ -183,10 +185,6 @@ class GlobeEngine implements Globe {
     return imageryLayersOf(this.surfaceFrame);
   }
 
-  get frameNumber(): number {
-    return this.frames;
-  }
-
   get timeMs(): number {
     return this.clock.timeMs;
   }
@@ -225,6 +223,7 @@ class GlobeEngine implements Globe {
       requestFrame: () => this.destroyed || this.requestRender(),
       tileError: (event) => this.emitter.emit('tile-error', event),
       creditsChange: (credits) => this.emitter.emit('credits-change', { credits }),
+      layersChange: () => this.emitter.emit('imagery-layers-change', { layers: this.imageryLayers.list() }),
       sourceError: (error) => this.emitter.emit('error', error),
     });
     // After the terrain starts: its errors set the skirt depths.
@@ -338,10 +337,10 @@ class GlobeEngine implements Globe {
     if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
-    this.frames++;
+    this.frameNumber++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
-      this.framePayload.frameNumber = this.frames;
+      this.framePayload.frameNumber = this.frameNumber;
       this.framePayload.tiles = count;
       this.emitter.emit('frame', this.framePayload);
     }
@@ -357,7 +356,7 @@ class GlobeEngine implements Globe {
     if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing || this.movements.active)
       this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
-      this.idlePayload.frameNumber = this.frames;
+      this.idlePayload.frameNumber = this.frameNumber;
       this.emitter.emit('idle', this.idlePayload);
     }
   }
@@ -415,27 +414,29 @@ class GlobeEngine implements Globe {
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
   readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
-  readonly elevationAtAsync: Globe['elevationAtAsync'] = (position, options = {}) =>
+  readonly elevationAtAsync: Globe['elevationAtAsync'] = async (position, options = {}) =>
     this.assertAlive() ?? this.surfaceFrame.queryElevation(position, options.signal);
   readonly addModel: Globe['addModel'] = async (options) =>
     this.assertAlive() ?? addModel(this.renderer, options, () => this.requestRender());
   readonly layerTarget: Globe['layerTarget'] = () =>
     this.assertAlive() ?? requestingTarget(this.renderer?.layers, () => this.requestRender());
-  setDebugShapes(shapes: readonly DebugShape[]): void {
-    this.assertAlive();
-    this.debugMeshes = debugMeshesOf(shapes);
+  readonly setDebugShapes = (shapes: readonly DebugShape[]): void => {
+    this.debugMeshes = this.assertAlive() ?? debugMeshesOf(shapes);
     this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
-  }
-  captureFrame(): Promise<FrameCapture> {
+  };
+  readonly addRenderExtension: Globe['addRenderExtension'] = (create) =>
+    this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
+  async captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
+    this.surfaceFrame.refuseReadback();
     return captureWhenDrawn({
       ready: this.ready,
       waits: this.captureWaits,
       state: () => ({
         renderer: this.destroyed ? undefined : this.renderer,
         failure: this.failure,
-        frames: this.frames,
+        frames: this.frameNumber,
       }),
       draw: (renderer) => this.drawNow(renderer),
     });

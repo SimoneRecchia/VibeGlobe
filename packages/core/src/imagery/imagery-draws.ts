@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { MAX_OVERLAYS, type DrawList } from './draw-list.js';
-import { ARRIVING, PREFETCH_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -162,8 +162,9 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      if (fallback < 0 && mapInto(layer.source, tile)) fallback = k;
-      if (tile.level > layer.source.maxLevel && layer.source.maxLevel + 1 > floor) floor = layer.source.maxLevel + 1;
+      if (fallback < 0 && mapInto(layer, tile)) fallback = k;
+      const top = topLevel(layer);
+      if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
     }
     if (wantLayer(layer, tile, distance, floor) >= 0) return k;
@@ -177,11 +178,21 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }
 
-/** Maps a tile into a source's tiles at the tile's level clamped to the source's (into `mapping`); false if it cannot. */
-function mapInto(source: ImagerySource, tile: QuadtreeTile): boolean {
+/** The finest surface level a layer's source serves: its finest level, deeper by the layer's level shift (F240). */
+function topLevel(layer: ImageryLayer): number {
+  return layer.source.maxLevel + layer.loader.levelShift;
+}
+
+/**
+ * Maps a tile into a source's tiles (into `mapping`) at the tile's level less the layer's level shift (a 512-texel
+ * tile serves the next finer surface level, F240, F241), clamped to the source's levels; false if it cannot.
+ */
+function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
+  const source = layer.source;
   // Outside its coverage a source has nothing, not even its coarse ancestors magnified: the layers below show (F094).
   if (source.coverage && !inCoverage(source.coverage, tile)) return false;
-  const level = tile.level < source.maxLevel ? tile.level : source.maxLevel;
+  const shifted = tile.level - layer.loader.levelShift;
+  const level = shifted < 0 ? 0 : shifted < source.maxLevel ? shifted : source.maxLevel;
   if (source.tiling.crs === 'EPSG:3857') return tile.root === MERCATOR_ROOT && mapMercator(tile, level, mapping, 0);
   return mapGeographic(tile, level, mapping, 0);
 }
@@ -189,7 +200,7 @@ function mapInto(source: ImagerySource, tile: QuadtreeTile): boolean {
 /** True when a source can give the tile at the surface's level now: within its levels, mapped, and not missing or failing. */
 function hasTile(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const source = layer.source;
-  if (tile.level > source.maxLevel || !mapInto(source, tile)) return false;
+  if (tile.level > topLevel(layer) || !mapInto(layer, tile)) return false;
   const level = mapping[MAPPING_LEVEL] ?? 0;
   if (level < source.minLevel) return false;
   return !layer.loader.unavailable(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
@@ -198,7 +209,7 @@ function hasTile(layer: ImageryLayer, tile: QuadtreeTile): boolean {
 /** The deepest resident tile of a source for a tile, without requesting any (handle in `mapping`), or -1. */
 function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
   const source = layer.source;
-  if (!mapInto(source, tile)) return -1;
+  if (!mapInto(layer, tile)) return -1;
   for (let current = mapping[MAPPING_LEVEL] ?? 0; current >= source.minLevel; current--) {
     const handle = layer.loader.readyHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
     if (handle >= 0) {
@@ -215,8 +226,7 @@ function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
  * tile's imagery, at ADR 0007's prefetch class, after every visible tile (F088).
  */
 function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: number): void {
-  const source = layer.source;
-  if (tile.level >= source.maxLevel || !mapInto(source, tile)) return;
+  if (tile.level >= topLevel(layer) || !mapInto(layer, tile)) return;
   const level = mapping[MAPPING_LEVEL] ?? 0;
   const x = 2 * (mapping[MAPPING_X] ?? 0);
   const y = 2 * (mapping[MAPPING_Y] ?? 0);
@@ -231,7 +241,7 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
  */
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
-  if (!mapInto(source, tile)) return -1;
+  if (!mapInto(layer, tile)) return -1;
   const wanted = mapping[MAPPING_LEVEL] ?? 0;
   const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
@@ -264,4 +274,28 @@ export function screenDistance(tile: QuadtreeTile, camera: Camera): number {
   const dy = ((screen[1] ?? 0) - halfHeight) / halfHeight;
   const d = Math.sqrt((dx * dx + dy * dy) / 2);
   return d < 1 ? d : 1;
+}
+
+/**
+ * Wants, from every visible layer, the tiles of a flight's destination (F286): each surface tile's imagery at its own
+ * level from the first source of the chain that has it, at the preload class (after every visible tile, before
+ * prefetch). Sources whose loading flags forbid prefetch load nothing ahead. Allocates nothing.
+ */
+export function preloadImagery(stack: readonly StackLayer[], tiles: readonly QuadtreeTile[], count: number): void {
+  for (let index = 0; index < count; index++) {
+    const tile = tiles[index];
+    if (!tile) continue;
+    for (let s = 0; s < stack.length; s++) {
+      const layer = stack[s];
+      if (!layer || !layer.entry.visible || layer.entry.opacity <= 0) continue;
+      for (let k = 0; k < layer.chain.length; k++) {
+        const source = layer.chain[k];
+        if (!source || !hasTile(source, tile)) continue;
+        const level = mapping[MAPPING_LEVEL] ?? 0;
+        if (source.loader.preloading)
+          source.loader.want(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0, PRELOAD_CLASS + level);
+        break;
+      }
+    }
+  }
 }

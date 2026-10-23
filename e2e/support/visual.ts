@@ -8,7 +8,7 @@ import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
 import { canvasImage } from './globe.ts';
 
 /** Tolerances from ADR 0012. */
-const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
+export const SAME_BACKEND = { threshold: 0.05, maxDiffRatio: 0.0001 } as const;
 /** Tolerances from ADR 0012. */
 export const CROSS_BACKEND = { threshold: 0.1, maxDiffRatio: 0.001 } as const;
 

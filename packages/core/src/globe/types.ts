@@ -1,6 +1,7 @@
 import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
 import type { LayerRenderTarget } from '../layers/layer-target.js';
-import type { ImageryLayerInput, ImageryLayers } from '../imagery/imagery-stack.js';
+import type { ImageryLayerInput, ImageryLayers, ImageryLayerState } from '../imagery/imagery-stack.js';
+import type { RenderExtension, RenderExtensionContext } from './render-extensions.js';
 import type { Credit } from '../imagery/credits.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -205,6 +206,11 @@ export interface RendererBackend {
   readonly layers?: LayerRenderTarget;
   /** Optional: glTF models (F361, ADR 0037). */
   readonly models?: ModelRenderer;
+  /**
+   * Optional: render extensions (M13): `context` is what they receive as `context.renderer` (the three.js renderer's
+   * `ThreeExtensionContext`), and `add` draws one from the next frame on, returning the function that removes it.
+   */
+  readonly extensions?: { readonly context: unknown; add(extension: RenderExtension): () => void };
   /** Uploads a surface tile mesh; returns false while the renderer cannot accept it. */
   addMesh(mesh: TileMeshData): void;
   removeMesh(key: number): void;
@@ -397,6 +403,12 @@ export interface GlobeOptions {
    */
   readonly creditsElement?: boolean;
   /**
+   * Requests in flight follow the link measured from the downloads (default true, F303): two per host on a slow link,
+   * each host's limit otherwise. False keeps every host at its own limit. The page's requests share one pool: the
+   * last globe started sets it.
+   */
+  readonly adaptiveRequests?: boolean;
+  /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
    */
@@ -443,38 +455,8 @@ export interface TerrainStats {
   readonly msLastFrame: number;
 }
 
-/** Counters of the imagery streaming of one engine instance (`Globe.imageryStats()`). */
-export interface ImageryStats {
-  /** Tiles waiting for a request slot, in flight, being decoded, on the GPU, failed, without data. */
-  readonly queued: number;
-  readonly loading: number;
-  readonly decoding: number;
-  readonly ready: number;
-  readonly failed: number;
-  readonly noData: number;
-  /** Requests started so far. */
-  readonly requested: number;
-  /** Texture uploads so far, and the time and bytes the last frame spent uploading (F101, F102). */
-  readonly uploads: number;
-  readonly uploadMsLastFrame: number;
-  readonly uploadBytesLastFrame: number;
-  /** Decoded tiles still waiting for their upload after the last frame. */
-  readonly uploadsPending: number;
-  /** Pinned base tiles resident (or without data) and in all (F084). */
-  readonly pinnedSettled: number;
-  readonly pinnedTotal: number;
-  /** GPU and RAM usage and budgets, in bytes (F098). */
-  readonly gpuBytes: number;
-  readonly gpuBudgetBytes: number;
-  readonly ramBytes: number;
-  readonly ramBudgetBytes: number;
-  /** Tiles found and not found in the RAM tier (F097). */
-  readonly ramHits: number;
-  readonly ramMisses: number;
-  /** GPU evictions, and uploads refused because nothing could be evicted. */
-  readonly evicted: number;
-  readonly refused: number;
-}
+import type { ImageryStats } from './imagery-stats.js';
+export type { ImageryStats };
 
 /** Events and their payloads. */
 export interface GlobeEvents {
@@ -498,6 +480,8 @@ export interface GlobeEvents {
   'tile-error': TileErrorEvent;
   /** The credits of the sources in view changed (F254): the new list, as {@link Globe.credits} returns it. */
   'credits-change': { readonly credits: readonly Credit[] };
+  /** Imagery layers were added, removed or moved (`Globe.imageryLayers`): the new list, bottom first. */
+  'imagery-layers-change': { readonly layers: readonly ImageryLayerState[] };
   /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
   'view-mode-change': { readonly mode: ViewMode };
   /** A camera movement began (F200, ADR 0036). */
@@ -802,6 +786,13 @@ export interface Globe {
   elevationAtAsync(position: GeoPosition, options?: { signal?: AbortSignalLike }): Promise<ElevationSample>;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;
+  /**
+   * Adds a renderer subsystem built outside the engine's core loop, such as vector tiles or 3D Tiles (M13): `create`
+   * receives the renderer's context (for the three.js renderer a `ThreeExtensionContext` of `@vibeglobe/renderer`:
+   * its scene and depth path) and `requestRender`; the extension places its objects in `frame` before every draw.
+   * Returns the function that removes and disposes it. Throws a GlobeError before `ready`.
+   */
+  addRenderExtension(create: (context: RenderExtensionContext) => RenderExtension): () => void;
   /**
    * Where data layers draw (ADR 0037): the renderer's batches, each change shown on the next frame. Undefined until the
    * renderer has started (after `ready`) or when it draws no layers.

@@ -2,7 +2,7 @@
  * Geodesic measurement on the WGS84 ellipsoid, built on core's geodesics (Karney), and the readout text of lengths and
  * areas with automatic unit scaling.
  */
-import { geodesicInverse, geodesicPathLengthMeters, geodesicPolygonArea } from '@vibeglobe/core';
+import { geodesicInverse, geodesicPathLengthMeters, geodesicPolygonArea } from '@vibeglobe/core/geodesy';
 import type { LonLat } from './format.js';
 
 /** Distance and bearings between two points. */

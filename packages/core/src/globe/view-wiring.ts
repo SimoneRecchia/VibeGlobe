@@ -11,7 +11,12 @@ import { ViewControl } from './view-control.js';
 /** What {@link wireView} needs from its globe. */
 export interface ViewWiring {
   readonly cam: Camera;
-  readonly view: ViewState;
+  /** The surface: its view state, and the tiles a flight's destination needs (F286). */
+  readonly surface: {
+    readonly view: ViewState;
+    preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
+    cameraJumped(): void;
+  };
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
   readonly constraints: Constraints;
@@ -25,7 +30,7 @@ export interface ViewWiring {
 export function wireView(globe: ViewWiring): { viewControl: ViewControl; movements: Movements } {
   const viewControl: ViewControl = new ViewControl({
     cam: globe.cam,
-    view: globe.view,
+    view: globe.surface.view,
     emitter: globe.emitter,
     waiting: () => globe.waiting(),
     assertAlive: () => globe.assertAlive(),
@@ -37,18 +42,20 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
   });
   const movements: Movements = new Movements({
     cam: globe.cam,
-    view: globe.view,
+    view: globe.surface.view,
     assertAlive: () => globe.assertAlive(),
     emitter: globe.emitter,
     timeMs: () => globe.clock.timeMs,
     currentView: () => currentView(globe.cam),
     chooseTilt: (tiltDeg) => viewControl.chooseTilt(tiltDeg),
     setMode: (mode) => viewControl.setMode(mode),
-    animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
+    animateTilt: (tiltRad) => globe.surface.view.chooseTilt(tiltRad),
     setOpacity: (opacity) => globe.setOpacity(opacity),
     requestRender: () => globe.requestRender(),
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
     constrainEnd: (end) => globe.constraints.clampEnd(end),
+    preloadView: (end, flight) => globe.surface.preloadView(end, globe.cam, flight),
+    cameraJumped: () => globe.surface.cameraJumped(),
   });
   return { viewControl, movements };
 }

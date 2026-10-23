@@ -2951,7 +2951,7 @@
         "Assert each invalid source is rejected with a typed, descriptive error while the engine keeps rendering the other layers",
         "Fuzz source configuration objects and assert no input crashes the engine or blanks the view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F221",
@@ -3004,7 +3004,7 @@
         "Assert grid lines land within half a pixel of their projected positions",
         "Unit-test tile-to-bounds and bounds-to-tile conversions with property-based round trips"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F225",
@@ -3017,7 +3017,7 @@
         "Assert grid lines are within half a pixel of their expected positions and zero black pixels appear at the antimeridian and the poles",
         "Stack it above a Web Mercator layer and assert both align at test markers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F226",
@@ -3070,7 +3070,7 @@
         "Show both fixtures in the playground and assert tiles land at the correct positions within half a pixel on both backends",
         "Fuzz URL templates and assert invalid templates are rejected with a descriptive error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F230",
@@ -3211,7 +3211,7 @@
         "Assert the pixel difference between the two is within the visual-test tolerance and on-screen texel density matches within 10%",
         "Assert the 512-pixel source requests about one quarter as many tiles for the same view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F241",
@@ -3224,7 +3224,7 @@
         "Assert @2x tiles are requested only at device pixel ratio 2 and that fixture labels appear at the same CSS size in both screenshots",
         "Assert changing the resolution scale setting changes which variant is requested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F242",
@@ -3237,7 +3237,7 @@
         "Assert transparent PNG and WebP areas show the layer below",
         "Force AVIF decoding to fail and assert those tiles fall back to the parent or the layer below with zero black pixels and a logged warning"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F243",
@@ -3341,7 +3341,7 @@
         "Assert markers align within half a pixel in every phase and mean colors differ by less than the visual-test tolerance",
         "Assert attribution and request patterns are the same in every phase"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F251",
@@ -3468,7 +3468,7 @@
         "Pan away and back before and after expiry",
         "Assert tiles are reused from memory before expiry and requested again after expiry, with parent fallback and zero black pixels meanwhile"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F261",
@@ -3790,7 +3790,7 @@
         "Assert every request is for a tile that was visible when requested",
         "Switch them off for one source only and assert the other sources still prefetch"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F286",
@@ -4002,7 +4002,7 @@
         "Assert the number of prefetched tiles is larger on the fast link",
         "Assert on the slow link visible tiles are never queued behind prefetch requests"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F303",
@@ -4014,7 +4014,7 @@
         "Log concurrent requests per host and assert concurrency adapts to each link and never exceeds the host or profile limits",
         "Assert the time to a complete view is no worse than with the best fixed concurrency for that link by more than 10%"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F304",
@@ -4461,7 +4461,7 @@
         "Verify license identifier, attribution text, source links, data year, configuration version and pipeline version are present",
         "Load the output in the playground and verify the attribution shows the recorded text while its tiles are visible"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F338",
@@ -4739,7 +4739,7 @@
         "Verify walls and roofs are shaded, faces occlude correctly, and frame differencing shows no z-fighting shimmer at the ground or between touching walls",
         "Verify extrusion heights match the configured values within 1% when measured through picking"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F356",
@@ -4892,7 +4892,7 @@
         "Zoom to about 1 m above the ground and record frames while making sub-meter camera moves",
         "Verify by frame analysis that no primitive vertex moves relative to the ground by more than 1 pixel beyond camera motion on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F368",
@@ -6275,7 +6275,7 @@
         "Assert each addition, update and removal appears on screen and in the engine's layer and control lists",
         "Assert removed components release their engine resources"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F477",

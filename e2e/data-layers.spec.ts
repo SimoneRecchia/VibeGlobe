@@ -33,7 +33,7 @@ async function openScenario(page: Page, backend: string, scenario: string): Prom
 /** A view in one phase, with the view mode to set first. */
 interface PhaseView {
   readonly name: string;
-  readonly view: { longitudeDeg: number; latitudeDeg: number; zoom: number; tiltDeg?: number };
+  readonly view: { longitudeDeg: number; latitudeDeg: number; zoom: number; tiltDeg?: number; headingDeg?: number };
   readonly mode: 'auto' | '2d' | 'manual';
 }
 
@@ -472,6 +472,119 @@ for (const backend of BACKENDS) {
       );
       expect(inView.length, phase.name).toBeGreaterThanOrEqual(2);
       for (const point of inView) if (point) expect(near(shot, point.xPx, point.yPx, 1, isRed), phase.name).toBe(true);
+    }
+  });
+}
+
+/** The id of the data feature picked at a screen point, or 'nothing'. */
+async function pickedAt(page: Page, at: { xPx: number; yPx: number } | undefined): Promise<string> {
+  return page.evaluate(async (point) => {
+    if (!point) return 'off screen';
+    const hit = window.vibeglobeLayers?.stack.resolvePick(
+      (await window.vibeglobePlayground?.globe.layerTarget()?.pick?.(point)) ?? 0,
+    );
+    return hit ? String(hit.feature.id) : 'nothing';
+  }, at);
+}
+
+/** Share of pixels that differ by more than 24 in a channel between two frames. */
+function changedShare(a: PNG, b: PNG): number {
+  let count = 0;
+  for (let i = 0; i < a.data.length; i += 4)
+    if ([0, 1, 2].some((c) => Math.abs((a.data[i + c] ?? 0) - (b.data[i + c] ?? 0)) > 24)) count++;
+  return count / (a.width * a.height);
+}
+
+for (const backend of BACKENDS) {
+  test(`extrusions: roofs at their heights within 1%, steady faces while orbiting, walls on sloped terrain, on ${backend} (F355)`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await openScenario(page, backend, 'data-extrusions');
+    // Heights through picking: seen from the south, a roof's far edge at its height. 1% below it shows the roof,
+    // 1% above it the ground beyond.
+    // The roof's fill color, or its walls' (80% of it).
+    const block = ([r, g, b]: Rgb): boolean =>
+      [1, 0.8].some((k) => Math.abs(r - 192 * k) + Math.abs(g - 160 * k) + Math.abs(b - 128 * k) < 30);
+    for (const [id, lon, top, centerLat] of [
+      ['high', 12.4975, 300, 41.897],
+      ['floating', 12.5025, 400, 41.897],
+    ] as const) {
+      const shot = await showPhase(page, {
+        name: id,
+        view: { longitudeDeg: lon, latitudeDeg: centerLat, zoom: 14.8, tiltDeg: 60 },
+        mode: 'manual',
+      });
+      const [below, above] = await page.evaluate(
+        ({ longitudeDeg, h }) =>
+          [0.99, 1.01].map((f) =>
+            window.vibeglobePlayground?.globe.geoToScreen({ longitudeDeg, latitudeDeg: 41.895, heightMeters: h * f }),
+          ),
+        { longitudeDeg: lon, h: top },
+      );
+      console.log(
+        `[F355] ${id}`,
+        JSON.stringify([below, above]),
+        below && pixel(shot, below.xPx, below.yPx),
+        above && pixel(shot, above.xPx, above.yPx),
+      );
+      expect(below && block(pixel(shot, below.xPx, below.yPx)), `${id} drawn 1% below its height`).toBe(true);
+      expect(above && block(pixel(shot, above.xPx, above.yPx)), `${id} not drawn 1% above its height`).toBe(false);
+      expect(await pickedAt(page, below), `${id} picked 1% below its height`).toBe(id);
+    }
+    // Orbiting the tilted view: consecutive frames half a degree apart change only where the blocks move, and the
+    // same view drawn twice is the same picture (no z-fighting between touching walls or at the ground).
+    const frames: PNG[] = [];
+    for (let step = 0; step <= 8; step++)
+      frames.push(
+        await showPhase(page, {
+          name: `orbit ${String(step)}`,
+          view: { longitudeDeg: 12.5, latitudeDeg: 41.8925, zoom: 14.5, tiltDeg: 50, headingDeg: step * 0.5 },
+          mode: 'manual',
+        }),
+      );
+    const shares = frames.slice(1).map((frame, i) => changedShare(frames[i] as PNG, frame));
+    console.log(`[F355] ${backend} orbit changes: ${shares.map((x) => x.toFixed(4)).join(' ')}`);
+    for (const share of shares) expect(share).toBeLessThan(0.05);
+    await page.evaluate(() => window.vibeglobePlayground?.globe.requestRender());
+    await waitForIdle(page);
+    expect(changedShare(frames.at(-1) as PNG, await canvasImage(page))).toBe(0);
+    // On the slope of the fixture's peak: roofs at the terrain under them plus their height, walls from the ground.
+    await openGlobe(
+      page,
+      `backend=${backend}&terrain=terrarium&scenario=data-extrusions&lon=6.81&lat=45.81&zoom=13&tilt=50`,
+    );
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const stats = window.vibeglobePlayground?.globe.terrainStats();
+            return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : -1;
+          }),
+        { timeout: 90_000 },
+      )
+      .toBe(0);
+    await page.waitForTimeout(300);
+    await waitForIdle(page);
+    for (const [id, lon, h] of [
+      ['slope-a', 6.805, 300],
+      ['slope-b', 6.815, 150],
+    ] as const) {
+      const [roof, wallFoot] = await page.evaluate(
+        ({ longitudeDeg, height }) => {
+          const globe = window.vibeglobePlayground?.globe;
+          if (!globe) throw new Error('no globe');
+          const ground = (latitudeDeg: number): number => globe.elevationAt({ longitudeDeg, latitudeDeg }).heightMeters;
+          return [
+            globe.geoToScreen({ longitudeDeg, latitudeDeg: 45.83, heightMeters: ground(45.83) + height }),
+            globe.geoToScreen({ longitudeDeg, latitudeDeg: 45.825, heightMeters: ground(45.825) + 5 }),
+          ];
+        },
+        { longitudeDeg: lon, height: h },
+      );
+      expect(await pickedAt(page, roof), `${id} roof`).toBe(id);
+      expect(await pickedAt(page, wallFoot), `${id} wall at the ground`).toBe(id);
     }
   });
 }

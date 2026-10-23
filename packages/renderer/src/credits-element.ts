@@ -5,9 +5,6 @@ const PINNED = [
   ['display', 'flex'],
   ['visibility', 'visible'],
   ['opacity', '1'],
-  ['position', 'absolute'],
-  ['right', '0'],
-  ['bottom', '0'],
   ['z-index', '2147483647'],
   ['transform', 'none'],
   ['clip-path', 'none'],
@@ -31,11 +28,17 @@ function pinItem(element: HTMLElement, display: string): void {
  * The engine's minimal attribution element (F255): the credits of the sources in view, with their links and logos,
  * at the bottom right of the container, above everything else in it. Its look is pinned with inline `!important`
  * declarations and restored if a script changes them, so required credits stay visible; an application that shows
- * the credits itself hides the optional ones with `GlobeOptions.hiddenCredits`.
+ * the credits itself hides the optional ones with `GlobeOptions.hiddenCredits`. Where the browser has popovers, the
+ * element lives in the top layer, placed over the container's corner, so no page element covers it whatever its
+ * z-index (F259).
  */
 export class CreditsElement {
   private element: HTMLElement | undefined;
   private observer: MutationObserver | undefined;
+  private resize: ResizeObserver | undefined;
+  private readonly place = (): void => {
+    if (this.element) this.pin(this.element);
+  };
 
   constructor(private readonly container: HTMLElement) {}
 
@@ -49,15 +52,46 @@ export class CreditsElement {
     const element = this.element ?? this.create(document);
     this.observer?.disconnect();
     element.replaceChildren(...credits.map((credit) => creditNode(document, credit)));
-    pin(element);
-    this.observer?.observe(element, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+    this.pin(element);
+    this.observer?.observe(element, { attributes: true, attributeFilter: ['style', 'class', 'hidden', 'popover'] });
   }
 
   /** Removes the element. */
   destroy(): void {
     this.observer?.disconnect();
+    this.resize?.disconnect();
+    const view = this.container.ownerDocument.defaultView;
+    view?.removeEventListener('scroll', this.place, true);
+    view?.removeEventListener('resize', this.place);
     this.element?.remove();
     this.element = undefined;
+  }
+
+  /** Pins the look and places the element: in the top layer over the container's bottom right, or inside it. */
+  private pin(element: HTMLElement): void {
+    pin(element);
+    const view = this.container.ownerDocument.defaultView;
+    if (!view || typeof element.showPopover !== 'function') {
+      for (const [name, value] of [
+        ['position', 'absolute'],
+        ['right', '0'],
+        ['bottom', '0'],
+      ] as const)
+        element.style.setProperty(name, value, 'important');
+      return;
+    }
+    const box = this.container.getBoundingClientRect();
+    for (const [name, value] of [
+      ['position', 'fixed'],
+      ['inset', 'auto'],
+      ['right', `${view.innerWidth - box.right}px`],
+      ['bottom', `${view.innerHeight - box.bottom}px`],
+      ['margin', '0'],
+      ['border', '0'],
+      ['overflow', 'visible'],
+    ] as const)
+      element.style.setProperty(name, value, 'important');
+    if (!element.matches(':popover-open') && element.isConnected) element.showPopover();
   }
 
   private create(document: Document): HTMLElement {
@@ -70,13 +104,28 @@ export class CreditsElement {
     if (this.container.ownerDocument.defaultView?.getComputedStyle(this.container).position === 'static')
       this.container.style.position = 'relative';
     const view = document.defaultView;
+    if (typeof element.showPopover === 'function') {
+      element.popover = 'manual';
+      // A page that closes the popover sees it open again; it follows the container as it moves or resizes.
+      element.addEventListener('toggle', () => queueMicrotask(this.place));
+      view?.addEventListener('scroll', this.place, true);
+      view?.addEventListener('resize', this.place);
+      if (view && 'ResizeObserver' in view) {
+        this.resize = new view.ResizeObserver(this.place);
+        this.resize.observe(this.container);
+      }
+    }
     if (view && 'MutationObserver' in view) {
       this.observer = new view.MutationObserver(() => {
         this.observer?.disconnect();
         element.removeAttribute('hidden');
         element.className = 'vg-credits';
-        pin(element);
-        this.observer?.observe(element, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+        if (typeof element.showPopover === 'function') element.popover = 'manual';
+        this.pin(element);
+        this.observer?.observe(element, {
+          attributes: true,
+          attributeFilter: ['style', 'class', 'hidden', 'popover'],
+        });
       });
     }
     this.element = element;

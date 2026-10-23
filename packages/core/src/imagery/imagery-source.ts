@@ -29,11 +29,13 @@ export interface TileSource {
    * Writes the URL and host of a tile into `out` and returns it, or returns 'noData' for a tile the source has no
    * data for (outside its levels or coverage), which the engine then never requests (F093, F094), or 'unknown' while
    * the source cannot tell yet (availability declared by an ancestor tile not loaded yet, F128): the engine asks
-   * again when it wants the tile again.
+   * again when it wants the tile again. `pixelRatio` is 2 when a source with `highDpi` should return its `@2x` tile.
    */
-  request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown';
+  request(coord: TileCoord, out: TileRequest, pixelRatio?: number): TileRequest | 'noData' | 'unknown';
   /** Credits shown while the source's tiles are in view (F254). */
   readonly attribution?: readonly Attribution[];
+  /** The source's requests carry credentials (headers, tokens or a session), declared by its adapter (F220). */
+  readonly authenticated?: boolean;
   /** The provider profile's credit rules: a required credit is always shown (F255). */
   readonly profile?: CreditProfile;
   /**
@@ -59,6 +61,12 @@ export interface ImagerySource extends TileSource {
   /** Tile edge in pixels (256, 512, …); with `pixelRatio` 2 a texel covers half the ground. */
   readonly tileSizePx: number;
   readonly pixelRatio: number;
+  /**
+   * The source also serves high-DPI tiles with twice the pixels (`@2x`): on a canvas of more than one render-target
+   * pixel per CSS pixel the engine asks `request` for those and judges their texels at twice the density, so they cover
+   * the same ground and look the same size (F241).
+   */
+  readonly highDpi?: boolean;
   /**
    * True when the tiles have transparent areas (PNG or WebP with alpha, reprojected rasters): the layers below show
    * through them, so the layer is composed like a translucent one (F242, ADR 0038).

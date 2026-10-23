@@ -11,7 +11,8 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { chainSources, credits, overlayLayers } from './fixture-layers.js';
+import { sourceLines } from './source-lines.js';
+import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -164,12 +165,11 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `?tileBase=` serves the tiles from another fixture server (for example `http://{s}:5177/` with
   // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
   const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
-  // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
-  const ktx2 = params.get('ktx2');
-  const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
+  const extension = imageExtension(params);
   // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
   const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
-  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}.${extension}`;
+  const { tileSizePx, variant, rows } = tileVariant(params);
+  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}${rows}${variant}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -178,6 +178,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     id: `fixture-${pattern}`,
     url,
     tiling: imageryTiling,
+    tileSizePx,
     minLevel: number('imageryMin') ?? 0,
     maxLevel: number('imageryMax') ?? 18,
     ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
@@ -188,9 +189,11 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
-    ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
+    ...(extension.endsWith('ktx2') ? { decoder: 'ktx2' as const } : {}),
     ...credits(params, `fixture-${pattern}`, pattern),
   });
+  // `?prefetch=0` turns prefetch and flight preloading off for this source only (F285).
+  if (params.get('prefetch') === '0') Object.assign(source, { loadingFlags: () => 1 });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
     params.has(name) ? Math.round(Number(params.get(name)) * 1024 * 1024) : undefined;
@@ -300,6 +303,8 @@ function startGlobe(
     // (scenario tests, F105; `fadeMs=0` is their injected pop).
     ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?adaptive=0` keeps every host at its own request limit, whatever the link (F303).
+    ...(params.get('adaptive') === '0' ? { adaptiveRequests: false } : {}),
     // `?hiddenCredits=<source id>,…` leaves those sources' optional credits out (F255).
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
@@ -367,19 +372,6 @@ function startSecondGlobe(host: HTMLElement): Globe {
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
 }
 
-/** The debug overlay's lines of each imagery source's declared metadata (F220). */
-function sourceLines(globe: Globe): [string, string][] {
-  return globe.imageryLayers
-    .list()
-    .flatMap((layer) =>
-      layer.sources.map((source): [string, string] => [
-        `source-${source.id}`,
-        `source ${source.id} ${source.crs} z${source.minLevel}–${source.maxLevel} ${source.tileSizePx}px` +
-          (source.maxRequestsPerSecond ? ` ${source.maxRequestsPerSecond}/s` : ''),
-      ]),
-    );
-}
-
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
   // Loaded on demand so the overlay code is not part of the default page.
   const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
@@ -432,7 +424,8 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const cache = imagery
       ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
         `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
-        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted}`
+        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted} · bandwidth ` +
+        `${(imagery.bandwidthBitsPerSecond / 1e6).toFixed(2)} Mbps · latency ${imagery.latencyMs.toFixed(0)} ms`
       : '';
     if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
     pipelineCompiles = compiles;

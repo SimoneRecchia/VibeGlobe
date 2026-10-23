@@ -1,4 +1,6 @@
 import type { LayerGround } from '../layers/layer-target.js';
+import { refuseDisplayOnly } from './display-only.js';
+import { motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -51,6 +53,9 @@ const LIFT_SETTLED_METERS = 1e-3;
 
 /** The sample `terrainHeightRad` writes. */
 const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
+
+/** During a flight a visible tile loads once wanted this long: the moving view would show it only for a moment (F287). */
+const FLIGHT_SETTLE_MS = 400;
 
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
@@ -129,6 +134,7 @@ export class SurfaceFrame {
         ...callbacks,
         ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
         ...(options.creditsElement === false ? { creditsElement: false } : {}),
+        ...(options.adaptiveRequests === false ? { adaptiveRequests: false } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
           // A source without CORS headers fails every tile the same way: one error names it (F251).
@@ -144,6 +150,7 @@ export class SurfaceFrame {
       terrain,
     );
     this.imagery = imagery;
+    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / motionOf(this).baseTexelErrorPx);
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
@@ -235,6 +242,17 @@ export class SurfaceFrame {
     const imagery = this.imagery;
     const timed = imagery?.heights !== undefined;
     const selectionStart = timed ? imagery.now() : 0;
+    // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
+    motionOf(this).flying = imagery?.preload.flying === true;
+    const motion = motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    // Written only when it changes: a new double in the options' field would allocate every frame (F064).
+    const texelErrorPx = motionOf(this).baseTexelErrorPx * motion;
+    if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
+    if (imagery)
+      for (const layer of imagery.layers) {
+        layer.loader.prefetchPaused = motion > 1 || imagery.preload.flying;
+        layer.loader.settleMs = imagery.preload.flying ? FLIGHT_SETTLE_MS : 0;
+      }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
     this.draws.reserve(count);
@@ -260,12 +278,38 @@ export class SurfaceFrame {
     this.observability.tracer.record('camera', 'move', subject);
   }
 
+  /** Loads a movement's destination tiles ahead while it runs (F286), or stops (undefined). */
+  preloadView(end: Float64Array | undefined, camera: Camera, flight = false): void {
+    if (!this.imagery) return;
+    this.imagery.preload.flying = end !== undefined && flight;
+    if (end) this.imagery.preload.select(camera, end, this.selection);
+    else this.imagery.preload.clear();
+  }
+
+  /** The camera jumped: no motion for motion-aware detail (F085). */
+  cameraJumped(): void {
+    motionOf(this).jumped();
+  }
+
+  /** The layers' tile sizes and levels changed (a layer was added or removed): the selection reads them again. */
+  imageryChanged(): void {
+    if (!this.imagery) return;
+    this.selection.imageryTexelsPerTile = this.imagery.texelsPerTile;
+    this.selection.imageryMaxLevel = this.imagery.maxLevel;
+  }
+
   /**
    * Sets render-target pixels per CSS pixel (device pixel ratio × resolution scale): imagery texels are judged in
    * render-target pixels, so a sharper canvas gets finer imagery (F109, M3 plan §2.5).
    */
   setPixelRatio(pixelRatio: number): void {
     this.selection.maxTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    motionOf(this).baseTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    // High-DPI sources switch to their `@2x` tiles (F241).
+    if (this.imagery) {
+      this.imagery.setPixelRatio(pixelRatio);
+      this.imageryChanged();
+    }
   }
 
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */
@@ -277,7 +321,7 @@ export class SurfaceFrame {
   layerGround(): LayerGround {
     const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
     return {
-      heightAt: (longitudeDeg, latitudeDeg) => this.elevationAt({ longitudeDeg, latitudeDeg }, sample).heightMeters,
+      heightAt: (longitudeDeg, latitudeDeg) => this.sampleElevation({ longitudeDeg, latitudeDeg }, sample).heightMeters,
       version: () => this.imagery?.terrainUploads() ?? 0,
     };
   }
@@ -287,6 +331,12 @@ export class SurfaceFrame {
    * Throws a GlobeError ('invalid-coordinate') for an invalid position.
    */
   elevationAt(position: GeoPosition, out: ElevationSample): ElevationSample {
+    refuseDisplayOnly(this.imagery, 'elevationAt', 'terrain');
+    return this.sampleElevation(position, out);
+  }
+
+  /** {@link SurfaceFrame.elevationAt} for the engine's own use (clamping layers): no data-access rules apply. */
+  private sampleElevation(position: GeoPosition, out: ElevationSample): ElevationSample {
     validatePosition(position);
     const heights = this.imagery?.heights;
     if (heights) {
@@ -311,11 +361,17 @@ export class SurfaceFrame {
 
   /** The height at a WGS84 position from the finest terrain the source delivers (F145). */
   queryElevation(position: GeoPosition, signal?: AbortSignalLike): Promise<ElevationSample> {
+    refuseDisplayOnly(this.imagery, 'elevationAtAsync', 'terrain');
     validatePosition(position);
     const imagery = this.imagery;
     if (imagery?.heights)
       return imagery.queryElevation(position.longitudeDeg * DEG_TO_RAD, position.latitudeDeg * DEG_TO_RAD, signal);
     return Promise.resolve({ heightMeters: 0, level: -1, noData: true });
+  }
+
+  /** Throws when a drawn layer's source is display only: its pixels may not be read back (F323). */
+  refuseReadback(): void {
+    refuseDisplayOnly(this.imagery, 'captureFrame', 'imagery');
   }
 
   /** The imagery counters, if there is imagery. */
@@ -333,9 +389,13 @@ export class SurfaceFrame {
     return this.imagery?.terrainStats();
   }
 
-  /** True while a tile cross-fades: the next frame changes the picture (F105). */
+  /**
+   * True while the next frame changes the picture: a tile cross-fades (F105), or the detail is still returning to full
+   * after fast motion (F288), which only frames measure (KB-131).
+   */
   get fading(): boolean {
-    return this.imagery?.fading ?? false;
+    const imagery = this.imagery;
+    return imagery !== undefined && (imagery.fading || motionOf(this).factor > 1);
   }
 
   /** True while imagery the view wants is still loading. */

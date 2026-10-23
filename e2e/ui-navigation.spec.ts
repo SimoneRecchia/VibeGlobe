@@ -424,6 +424,9 @@ test.describe('geolocation (F413)', () => {
     page,
     context,
   }) => {
+    // Three flights: on a software GPU frames come about four a second, and the engine clock advances at most 100 ms
+    // a frame, so each flight lasts about twice its duration.
+    test.setTimeout(90_000);
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 45.07, longitude: 7.69, accuracy: 300 });
     await openUi(page, { defaults: 'all', query: 'backend=webgl2&lon=0&lat=20&zoom=3&tilt=30' });

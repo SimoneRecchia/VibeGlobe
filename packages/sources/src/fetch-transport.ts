@@ -1,4 +1,5 @@
 import type { AbortHandle, TileRequest, TileTransport, TimeoutsMs, TransportResult } from '@vibeglobe/core';
+import { expectTiming, takeTiming } from './resource-timing.js';
 
 /** Reads a Retry-After header (seconds or an HTTP date) as milliseconds from now. */
 export function retryAfterMs(header: string | null, nowMs: number): number | undefined {
@@ -77,6 +78,7 @@ export function fetchTransport(
         settled = true;
         clearTimeout(firstByte);
         clearTimeout(total);
+        if (timed) takeTiming(url);
         done(result);
       };
       const expire = (): void => {
@@ -86,6 +88,8 @@ export function fetchTransport(
       const firstByte = setTimeout(expire, timeouts.firstByteMs);
       const total = setTimeout(expire, timeouts.totalMs);
       const url = credentials.withSecrets(request.url);
+      const startMs = performance.now();
+      const timed = expectTiming(url);
       const attempt = async (renewed: boolean): Promise<void> => {
         const pending = credentials.headersFor(url);
         const auth = pending instanceof Promise ? await pending : pending;
@@ -102,7 +106,7 @@ export function fetchTransport(
           await attempt(true);
           return;
         }
-        finish(await resultOf(response));
+        finish(await resultOf(response, performance.now() - startMs, timed ? url : undefined));
       };
       attempt(false).catch(async () => {
         if (controller.signal.aborted) return finish({ kind: reason });
@@ -119,8 +123,11 @@ export function fetchTransport(
   };
 }
 
-/** The transport result of a response: its bytes, or its status. */
-async function resultOf(response: Response): Promise<TransportResult> {
+/**
+ * The transport result of a response (its headers after `waitMs`): its bytes, or its status. With `timedUrl`, the
+ * network timings of the response replace the main thread's once their entry arrives, a task later (F300).
+ */
+async function resultOf(response: Response, waitMs: number, timedUrl?: string): Promise<TransportResult> {
   if (!response.ok)
     return {
       kind: 'status',
@@ -128,7 +135,36 @@ async function resultOf(response: Response): Promise<TransportResult> {
       retryAfterMs: retryAfterMs(response.headers.get('Retry-After'), Date.now()),
     };
   const bytes = await response.arrayBuffer();
-  return { kind: 'ok', bytes, contentType: response.headers.get('Content-Type') ?? '' };
+  const maxAgeMs = maxAgeOf(response.headers, Date.now());
+  if (timedUrl !== undefined) await new Promise((resolve) => setTimeout(resolve, 0));
+  const timing = timedUrl === undefined ? undefined : takeTiming(timedUrl);
+  return {
+    kind: 'ok',
+    bytes,
+    contentType: response.headers.get('Content-Type') ?? '',
+    ...(maxAgeMs === undefined ? {} : { maxAgeMs }),
+    ...(timing
+      ? { waitMs: timing.waitMs, transferMs: timing.transferMs, endAgoMs: timing.endAgoMs, cached: timing.cached }
+      : { waitMs }),
+  };
+}
+
+/**
+ * How long a response may be reused (F260): none with `no-store` or `no-cache`, `max-age`, else `Expires` less the
+ * response's `Date` (or now); undefined without cache headers.
+ */
+export function maxAgeOf(headers: Headers, nowMs: number): number | undefined {
+  const control = (headers.get('Cache-Control') ?? '').toLowerCase();
+  if (/(^|[,\s])(no-store|no-cache)($|[,\s=])/.test(control)) return 0;
+  const maxAge = /(^|[,\s])max-age\s*=\s*"?(\d+)/.exec(control)?.[2];
+  if (maxAge !== undefined) return Number(maxAge) * 1000;
+  const expires = headers.get('Expires');
+  if (expires === null) return undefined;
+  // An invalid date, such as the common `Expires: 0`, means already expired (RFC 9111 §5.3).
+  const expiresMs = /[a-z]/i.test(expires) ? Date.parse(expires) : NaN;
+  if (Number.isNaN(expiresMs)) return 0;
+  const dateMs = Date.parse(headers.get('Date') ?? '');
+  return Math.max(0, expiresMs - (Number.isNaN(dateMs) ? nowMs : dateMs));
 }
 
 /** A source's credentials and secret query parameters (F252, F253). */

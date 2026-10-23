@@ -40,6 +40,23 @@ interface Transition {
 }
 
 const WORLD_PX = 512;
+/**
+ * Cluster items added or removed per frame (F375): a zoom change over hundreds of thousands of points changes tens of
+ * thousands of items, which in one frame would be a long task; the new zoom shows once the last slice is applied.
+ */
+const CLUSTER_APPLY_SLICE = 5000;
+
+/** A zoom's items being applied, a slice per frame. */
+interface ApplyJob {
+  readonly zoom: number;
+  readonly added: readonly ClusterItem[];
+  readonly removed: readonly ClusterItem[];
+  readonly animate: boolean;
+  readonly towardOld: NearestGrid | undefined;
+  readonly towardNew: NearestGrid | undefined;
+  /** How many of `added`, then of `removed`, are done. */
+  done: number;
+}
 
 function mercator(lonDeg: number, latDeg: number): [number, number] {
   const sin = Math.min(0.9999, Math.max(-0.9999, Math.sin((latDeg * Math.PI) / 180)));
@@ -101,6 +118,7 @@ export class ClusterLayer extends DataLayer {
   readonly #opacity = new Map<string, number>();
   #transitions: Transition[] = [];
   #transitionStartMs = 0;
+  #job: ApplyJob | undefined;
 
   constructor(options: ClusterLayerOptions = {}) {
     const { data, cluster, engine, kind, ...rest } = options;
@@ -123,6 +141,7 @@ export class ClusterLayer extends DataLayer {
     for (const key of [...this.#shown.keys()]) this.#removeItem(key);
     this.#shownZoom = undefined;
     this.#pending = undefined;
+    this.#job = undefined;
     this.#points = features;
     this.#lonLat = lonLat;
     this.#generation++;
@@ -206,10 +225,11 @@ export class ClusterLayer extends DataLayer {
   protected override beforeFlush(frame: FrameContext): void {
     const zoom = Math.max(0, Math.floor(frame.zoom));
     if (zoom !== this.#requestedZoom) this.#request(zoom);
-    if (this.#pending !== undefined) {
-      this.#apply(this.#pending.zoom, this.#pending.items, frame.nowMs);
+    if (this.#job === undefined && this.#pending !== undefined) {
+      this.#job = this.#startApply(this.#pending.zoom, this.#pending.items);
       this.#pending = undefined;
     }
+    if (this.#job !== undefined) this.#continueApply(this.#job, frame.nowMs);
     this.#animate(frame.nowMs);
   }
 
@@ -227,36 +247,53 @@ export class ClusterLayer extends DataLayer {
       .catch((cause: unknown) => this.emit('error', { message: `clustering failed: ${String(cause)}`, cause }));
   }
 
-  #apply(zoom: number, items: readonly ClusterItem[], nowMs: number): void {
+  /** Starts applying a zoom's items: what is new and what goes, with where each one animates from or to. */
+  #startApply(zoom: number, items: readonly ClusterItem[]): ApplyJob {
     this.#finishTransitions();
-    const previous = new Map(this.#shown);
+    const previous = this.#shown;
     const next = new Map(items.map((item) => [item.key, item]));
     const zoomingIn = this.#shownZoom === undefined || zoom > this.#shownZoom;
     const animate = this.#shownZoom !== undefined && (this.#options.transitionMs ?? 300) > 0;
     const coarser = zoomingIn ? (this.#shownZoom ?? zoom) : zoom;
     const cell = (this.#options.radiusPx ?? 50) / (WORLD_PX * 2 ** coarser);
-    const towardOld = animate && zoomingIn ? new NearestGrid(previous.values(), cell) : undefined;
-    const towardNew = animate && !zoomingIn ? new NearestGrid(next.values(), cell) : undefined;
+    return {
+      zoom,
+      added: items.filter((item) => !previous.has(item.key)),
+      removed: [...previous.values()].filter((item) => !next.has(item.key)),
+      animate,
+      towardOld: animate && zoomingIn ? new NearestGrid(previous.values(), cell) : undefined,
+      towardNew: animate && !zoomingIn ? new NearestGrid(next.values(), cell) : undefined,
+      done: 0,
+    };
+  }
+
+  /** Applies the next slice of a job; once the last is in, the zoom shows and the transitions start. */
+  #continueApply(job: ApplyJob, nowMs: number): void {
+    const end = Math.min(job.added.length + job.removed.length, job.done + CLUSTER_APPLY_SLICE);
     const added: Feature[] = [];
-    for (const [key, item] of next) {
-      if (previous.has(key)) continue;
-      added.push(this.#itemFeature(item));
-      if (!animate) continue;
-      const origin = towardOld?.nearest(item);
-      this.#transitions.push(this.#transition(item, origin ?? item, item, 0, 1, false));
-    }
-    for (const [key, item] of previous) {
-      if (next.has(key)) continue;
-      if (!animate) {
-        this.#removeItem(key);
+    for (; job.done < end; job.done++) {
+      if (job.done < job.added.length) {
+        const item = job.added[job.done] as ClusterItem;
+        added.push(this.#itemFeature(item));
+        if (job.animate)
+          this.#transitions.push(this.#transition(item, job.towardOld?.nearest(item) ?? item, item, 0, 1, false));
         continue;
       }
-      const destination = towardNew?.nearest(item);
-      this.#transitions.push(this.#transition(item, item, destination ?? item, 1, 0, true));
-      this.#shown.delete(key);
+      const item = job.removed[job.done - job.added.length] as ClusterItem;
+      if (!job.animate) {
+        this.#removeItem(item.key);
+        continue;
+      }
+      this.#transitions.push(this.#transition(item, item, job.towardNew?.nearest(item) ?? item, 1, 0, true));
+      this.#shown.delete(item.key);
     }
     this.addFeatures(added);
-    this.#shownZoom = zoom;
+    if (job.done < job.added.length + job.removed.length) {
+      this.context?.requestFrame();
+      return;
+    }
+    this.#job = undefined;
+    this.#shownZoom = job.zoom;
     this.#transitionStartMs = nowMs;
   }
 

@@ -10,6 +10,7 @@ import {
   VibeControl,
   VibeDataLayer,
   VibeGlobe,
+  VibeImageryLayer,
   VibeMarker,
   type GlobeExtras,
   type LayerLook,
@@ -32,7 +33,10 @@ const layers = ref<LayerLook[]>([
   { id: 'levels', visible: true, opacity: 0.5 },
 ]);
 const networkMode = ref<NetworkMode>('hybrid');
-const children = reactive({ points: false, marker: false, zoom: false, scale: false });
+const children = reactive({ points: false, marker: false, zoom: false, scale: false, overlay: false });
+// A green overlay added at runtime on top of the globe's imagery (F476).
+const overlaySource = xyzImagery({ id: 'overlay', url: fixtureTiles('green'), maxLevel: 18 });
+const overlay = reactive({ opacity: 1, visible: true });
 const points = ref<Feature[]>([]);
 const marker = reactive({ longitudeDeg: 12.5, latitudeDeg: 41.9, color: '#1a73e8' });
 const zoomControl = shallowRef(new ZoomControl());
@@ -51,6 +55,7 @@ const live = {
     children?: Partial<typeof children>;
     points?: Feature[];
     marker?: Partial<typeof marker>;
+    overlay?: Partial<typeof overlay>;
   }) {
     if (changes.view) Object.assign(view, changes.view);
     if (changes.viewMode) viewMode.value = changes.viewMode;
@@ -59,6 +64,7 @@ const live = {
     if (changes.children) Object.assign(children, changes.children);
     if (changes.points) points.value = changes.points;
     if (changes.marker) Object.assign(marker, changes.marker);
+    if (changes.overlay) Object.assign(overlay, changes.overlay);
     await nextTick();
   },
   replaceZoomControl() {
@@ -106,6 +112,12 @@ window.adapterExample = {
         :longitude-deg="marker.longitudeDeg"
         :latitude-deg="marker.latitudeDeg"
         :color="marker.color"
+      />
+      <VibeImageryLayer
+        v-if="children.overlay"
+        :source="overlaySource"
+        :opacity="overlay.opacity"
+        :visible="overlay.visible"
       />
       <VibeControl v-if="children.zoom" :control="zoomControl" />
       <VibeControl v-if="children.scale" :control="scaleControl" />

@@ -59,6 +59,9 @@ test.describe('the search box (F426)', () => {
   test('lists a mock geocoder’s results, chosen with arrows and Enter, a click or a tap, and flies there', async ({
     page,
   }) => {
+    // Three flights: on a software GPU frames come about four a second, and the engine clock advances at most 100 ms
+    // a frame, so each flight lasts about twice its duration.
+    test.setTimeout(90_000);
     await openUi(page, { query: 'backend=webgl2&zoom=2' });
     await page.evaluate(() => {
       const handle = window.vibeglobeUi;

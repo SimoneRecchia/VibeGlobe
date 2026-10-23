@@ -11,6 +11,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
+import { sendOverLink, sendThrottled } from './link.ts';
+import { encodeTileImage, IMAGE_FORMATS, type ImageFormat } from './formats.ts';
 import { fixtureGeoidFile, terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
 import {
   encodeTilePng,
@@ -48,6 +50,11 @@ export interface FaultRule {
   retryAfterS?: number;
   /** Send the body at this rate, in bytes per second. */
   bandwidthBytesPerS?: number;
+  /**
+   * The session's link: the bodies of every matching response share this many bytes per second, one after another in
+   * 10 ms slices, as on a real link (F300–F303).
+   */
+  linkBytesPerS?: number;
   /** Send the body gzip-compressed with `Content-Encoding: gzip`. */
   gzip?: boolean;
   /** Send the body gzip-compressed without `Content-Encoding`, as `.terrain` files often are (F127). */
@@ -93,6 +100,8 @@ interface Session {
   log: RequestRecord[];
   /** The layer.json this session serves; a default with full availability when unset. */
   layer?: unknown;
+  /** When the session's link (`linkBytesPerS`) is free again, server milliseconds. */
+  linkFreeMs?: number;
 }
 
 const PATTERNS: readonly string[] = [
@@ -103,14 +112,17 @@ const PATTERNS: readonly string[] = [
   'tiles',
   'stripes',
   'patches',
+  'checker',
+  'holes',
   'red',
   'green',
   'blue',
   'shade',
 ];
-const SCHEMES: readonly string[] = ['mercator', 'geographic'];
+// `mercator-tms`: the Web Mercator tiles with TMS rows, counted from the south (F229).
+const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms'];
 const TILE_PATH =
-  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
+  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|jpg|webp|avif|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
 const WMS_UTM_PATH = /^\/fixture-tiles\/([\w-]+)\/wms-utm$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
@@ -124,6 +136,9 @@ const TERRAIN: Readonly<Record<string, TerrainEncoding>> = {
 };
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+  avif: 'image/avif',
   'terrarium.png': 'image/png',
   'terrain-rgb.png': 'image/png',
   terrain: 'application/vnd.quantized-mesh',
@@ -280,10 +295,12 @@ export class FixtureServer {
     const entry = this.session(id);
     const tile: FixtureTile = {
       pattern: source as FixturePattern,
-      scheme: scheme as FixtureScheme,
+      scheme: (scheme === 'mercator-tms' ? 'mercator' : scheme) as FixtureScheme,
       level: Number(z),
       x: Number(x),
-      y: Number(y),
+      y: scheme === 'mercator-tms' ? 2 ** Number(z) - 1 - Number(y) : Number(y),
+      // `{y}@2x.png`: the same tile at 512 pixels, a high-DPI variant or a 512-pixel pyramid (F240, F241).
+      ...(path.includes('@2x.') ? { sizePx: 512 } : {}),
     };
     const record = this.recordOf(path, query, source, tile, req);
     entry.log.push(record);
@@ -325,7 +342,11 @@ export class FixtureServer {
       } else if (rule?.gzipBody) {
         body = gzipSync(body);
       }
-      this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
+      // The session's link (`linkBytesPerS`): the headers now, the body sharing the link with the other responses.
+      if (rule?.linkBytesPerS) {
+        this.finish(record, res, 200, headers, Buffer.alloc(0), undefined, body.length);
+        sendOverLink(entry, rule.linkBytesPerS, res, body, () => (record.endMs = this.now()));
+      } else this.finish(record, res, 200, headers, body, rule?.bandwidthBytesPerS);
     };
     if (rule?.latencyMs) setTimeout(() => void respond(), rule.latencyMs);
     else void respond();
@@ -398,7 +419,7 @@ export class FixtureServer {
     meshExtensions: QuantizedMeshExtensions = {},
   ): Promise<Buffer> {
     const variant = JSON.stringify(meshExtensions);
-    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}${variant}`;
+    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}@${tile.sizePx ?? 256}.${extension}${variant}`;
     let body = this.cache.get(key);
     if (!body) {
       const encoding = TERRAIN[extension];
@@ -408,7 +429,9 @@ export class FixtureServer {
           ? terrainTile(tile, encoding, 256, 32, meshExtensions, tile.pattern === ('terrain-geoid' as FixturePattern))
           : extension === 'png'
             ? encodeTilePng(tile)
-            : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
+            : IMAGE_FORMATS.includes(extension)
+              ? await encodeTileImage(tile, extension as ImageFormat)
+              : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
       this.cache.set(key, body);
     }
     if (rule?.randomBytes !== undefined) {
@@ -424,9 +447,11 @@ export class FixtureServer {
     headers: Record<string, string>,
     body: Buffer,
     bandwidthBytesPerS?: number,
+    /** Writes only the headers of a body of this length, which the caller streams. */
+    streamedLength?: number,
   ): void {
     record.status = status;
-    record.bytes = body.length;
+    record.bytes = streamedLength ?? body.length;
     const origin = this.cors.has(res) ? this.cors.get(res) : '*';
     if (origin === undefined) res.removeHeader('Access-Control-Allow-Origin');
     res.writeHead(status, {
@@ -439,28 +464,19 @@ export class FixtureServer {
           }),
       'Timing-Allow-Origin': '*',
       'Cache-Control': 'no-store',
-      'Content-Length': String(body.length),
+      'Content-Length': String(streamedLength ?? body.length),
     });
+    // Streamed bodies: the headers leave now, not with the first slice of the body, as on a real link (F300).
+    if (streamedLength !== undefined) {
+      // Without Nagle, the body is not held until the headers are acknowledged (40 ms and more on loopback).
+      res.socket?.setNoDelay(true);
+      return void res.flushHeaders();
+    }
     if (!bandwidthBytesPerS) {
       record.endMs = this.now();
       res.end(body);
       return;
     }
-    // A tenth of a second's worth of bytes every 100 ms.
-    const chunk = Math.max(1, Math.round(bandwidthBytesPerS / 10));
-    let offset = 0;
-    const send = (): void => {
-      if (res.destroyed) return;
-      const end = Math.min(body.length, offset + chunk);
-      res.write(body.subarray(offset, end));
-      offset = end;
-      if (offset < body.length) {
-        setTimeout(send, 100);
-      } else {
-        record.endMs = this.now();
-        res.end();
-      }
-    };
-    send();
+    sendThrottled(res, body, bandwidthBytesPerS, () => (record.endMs = this.now()));
   }
 }

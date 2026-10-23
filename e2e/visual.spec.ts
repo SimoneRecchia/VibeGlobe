@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { openGlobe, waitForIdle } from './support/globe.ts';
-import { waitForImagery } from './support/imagery.ts';
+import { waitForImagery, waitForStreaming } from './support/imagery.ts';
 import { captureCanvas, compareImages, CROSS_BACKEND, expectMatchesBaseline, viewName } from './support/visual.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
@@ -19,6 +19,8 @@ const VIEWS: readonly {
   slow?: true;
   /** Device pixel ratio of the capture (default 1). */
   dpr?: number;
+  /** Waits for every request to settle instead: geographic imagery shows other levels than the surface tiles'. */
+  streaming?: true;
 }[] = [
   { name: 'orbit', query: 'lon=-30&lat=20&zoom=1.5' },
   { name: 'europe', query: 'lon=12&lat=45&zoom=4' },
@@ -93,6 +95,22 @@ const VIEWS: readonly {
     query: 'scenario=data-circles&viewMode=3d&lon=10&lat=60&zoom=5.2&tilt=40',
     crossBackend: false,
   },
+  // Tile placement of both tiling schemes (F224, F225): the views of e2e/imagery-tiling.spec.ts, whose grid lines
+  // land within half a pixel of their projected positions. Grid lines on tile seams differ across backends.
+  ...[
+    ['mercator-globe', 'mercator', 'lon=10&lat=30&zoom=2&imageryMax=2&level=4'],
+    ['mercator-2d', 'mercator', 'viewMode=2d&lon=10&lat=50&zoom=5&imageryMax=5'],
+    ['mercator-3d', 'mercator', 'viewMode=3d&lon=10&lat=45&zoom=6&tilt=40&imageryMax=5'],
+    ['geographic-antimeridian', 'geographic', 'lon=180&lat=10&zoom=2.3&imageryMax=1&level=4'],
+    ['geographic-north', 'geographic', 'lon=30&lat=88&zoom=2.3&imageryMax=1&level=4'],
+    ['geographic-south', 'geographic', 'lon=-150&lat=-88&zoom=2.3&imageryMax=1&level=4'],
+    ['geographic-2d', 'geographic', 'viewMode=2d&lon=180&lat=40&zoom=5.3'],
+  ].map(([name, tiling, query]) => ({
+    name: `tiling-${name}`,
+    query: `imagery=world&imageryTiling=${tiling}&session=visual&${query}`,
+    crossBackend: false as const,
+    streaming: true as const,
+  })),
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
@@ -107,7 +125,7 @@ for (const backend of BACKENDS) {
   for (const view of VIEWS) {
     test(`canonical view ${view.name} matches its baseline on ${backend} (F072, F074)`, async ({ page }, testInfo) => {
       // Tiled imagery streams about 120 tiles before the capture, beyond 30 s on CI's software WebGPU.
-      if (view.imagery) test.setTimeout(view.slow ? 180_000 : 90_000);
+      if (view.imagery || view.streaming) test.setTimeout(view.slow ? 180_000 : 90_000);
       const stages = stageLog(`${backend} ${view.name}`);
       if (view.dpr !== undefined)
         await (
@@ -128,6 +146,7 @@ for (const backend of BACKENDS) {
       }
       // Tiled imagery streams in after the first idle frame: capture only once every tile shows its own level.
       if (view.imagery) await waitForImagery(page, view.slow ? 150_000 : 60_000);
+      if (view.streaming) await waitForStreaming(page);
       stages('imagery');
       await waitForIdle(page);
       stages('idle');

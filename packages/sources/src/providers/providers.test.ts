@@ -72,6 +72,13 @@ describe('googleImagery (F257, F258)', () => {
     ).rejects.toThrow(/session/);
   });
 
+  it("reports how long Google's cache headers let the engine reuse a tile (F260)", async () => {
+    const server = googleFixture(tileBytes);
+    const source = await googleImagery({ ...base, id: 'g', mapType: 'roadmap', fetch: server.fetch });
+    const tile = await fetchVia(source, coord(3, 4, 2));
+    expect(tile !== 'noData' && tile.kind === 'ok' && tile.maxAgeMs).toBe(300_000);
+  });
+
   it('renews an expired session transparently, once, and keeps delivering tiles', async () => {
     const server = googleFixture(tileBytes);
     const source = await googleImagery({ ...base, id: 'g', mapType: 'roadmap', fetch: server.fetch });

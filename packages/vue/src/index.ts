@@ -9,7 +9,7 @@ export { VibeGlobe } from './vibe-globe.js';
 export { useCamera, useGlobe, useLoading, useViewMode } from './composables.js';
 export type { ViewMode } from './composables.js';
 export type { GlobeClickEvent, GlobeExtraOptions } from './globe-config.js';
-export { VibeControl, VibeDataLayer, VibeMarker } from './children.js';
+export { VibeControl, VibeDataLayer, VibeImageryLayer, VibeMarker } from './children.js';
 export type { DataLayerKind } from './children.js';
 export type { LayerLook, NetworkMode, NetworkModeTarget, ToggleMode } from './vibe-globe.js';
 export type { GlobeExtras } from './context.js';

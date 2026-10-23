@@ -1,4 +1,4 @@
-import { geodesicInverse } from '@vibeglobe/core';
+import { geodesicInverse } from '@vibeglobe/core/geodesy';
 import { describe, expect, it } from 'vitest';
 import { ellipseGeometry } from './circle.js';
 

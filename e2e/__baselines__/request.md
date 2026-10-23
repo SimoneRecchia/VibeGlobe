@@ -16,3 +16,4 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-22T17:15:33Z: the four terrain views again after KB-090 and KB-092 (Mercator terrain error scaled with latitude, at most two levels per morph)
 - 2026-10-23T06:15:46Z: data-layer circles and an ellipse in the globe, 2D and tilted phases (M10, F356)
 - 2026-10-23T08:28:26Z: data-layer markers at device pixel ratios 1 and 2 and labels in several scripts, fonts, halos and offsets (M10, F352, F357)
+- 2026-10-23T13:56:15Z: tile placement of both tiling schemes in globe, 2D, tilted and polar views (M7, F224, F225)

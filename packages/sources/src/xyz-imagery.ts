@@ -12,14 +12,15 @@ import {
   type CreditProfile,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
+import { SourceConfigError } from './metadata.js';
 
 /** Options of {@link xyzImagery}. */
 export interface XyzImageryOptions {
   /** Unique per engine instance. */
   id: string;
   /**
-   * URL template with `{z}`, `{x}` and `{y}`, `{-y}` for TMS rows counted from the south, and `{s}` for a host from
-   * `subdomains`.
+   * URL template with `{z}`, `{x}` and `{y}`, `{-y}` for TMS rows counted from the south, `{s}` for a host from
+   * `subdomains`, and `{r}`, which becomes `@2x` on high-DPI canvases and nothing elsewhere (F241).
    */
   url: string;
   /** Tiling scheme: Web Mercator XYZ (default) or the two-root geographic pyramid. */
@@ -31,6 +32,8 @@ export interface XyzImageryOptions {
   transparent?: boolean;
   /** 2 for high-DPI (`@2x`) tiles. */
   pixelRatio?: number;
+  /** Headers sent with every tile request by the default transport (F229); a custom `transport` sets its own. */
+  headers?: Readonly<Record<string, string>>;
   /** Values for `{s}`, spread over tiles so several hosts share the load (F089). */
   subdomains?: readonly string[];
   /** The areas with data, radians; tiles outside are never requested (F094). */
@@ -52,8 +55,28 @@ export interface XyzImageryOptions {
   profile?: CreditProfile;
 }
 
-/** A tiled imagery source from an XYZ or TMS URL template. */
+/** The fields a URL template may hold. */
+const TEMPLATE_FIELDS = new Set(['z', 'x', 'y', '-y', 's', 'r']);
+
+/**
+ * Checks a URL template (F229): every `{…}` is a known field, braces pair up, `{z}`, `{x}` and `{y}` or `{-y}` appear,
+ * and `{s}` comes with subdomains. Throws a `SourceConfigError` that names the problem.
+ */
+function checkUrlTemplate(url: string, subdomains: readonly string[]): void {
+  const fail = (problem: string): never => {
+    throw new SourceConfigError('invalid-url-template', `The URL template ${JSON.stringify(url)} ${problem}.`);
+  };
+  const fields = [...url.matchAll(/\{([^{}]*)\}/g)].map((match) => match[1] ?? '');
+  if (/[{}]/.test(url.replace(/\{[^{}]*\}/g, ''))) fail('has an unpaired brace');
+  for (const field of fields) if (!TEMPLATE_FIELDS.has(field)) fail(`has an unknown field {${field}}`);
+  for (const field of ['z', 'x']) if (!fields.includes(field)) fail(`must contain {${field}}`);
+  if (!fields.includes('y') && !fields.includes('-y')) fail('must contain {y} (rows from the north) or {-y} (TMS)');
+  if (fields.includes('s') && subdomains.length === 0) fail('uses {s} without subdomains');
+}
+
+/** A tiled imagery source from an XYZ or TMS URL template; an invalid template throws a `SourceConfigError`. */
 export function xyzImagery(options: XyzImageryOptions): ImagerySource {
+  checkUrlTemplate(options.url, options.subdomains ?? []);
   const tiling = options.tiling === 'geographic' ? GEOGRAPHIC_TILING : WEB_MERCATOR_TILING;
   const minLevel = options.minLevel ?? 0;
   const maxLevel = options.maxLevel ?? 19;
@@ -67,10 +90,11 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     tileSizePx: options.tileSizePx ?? 256,
     pixelRatio: options.pixelRatio ?? 1,
     ...(options.coverage ? { coverage: options.coverage } : {}),
-    transport: options.transport ?? fetchTransport(),
+    transport: options.transport ?? fetchTransport(undefined, options.headers),
     // A custom transport (auth headers, sessions) is the only way to reach the tiles: a cache tier in front of the
     // source must use it rather than fetch the URLs itself (track B hook request 4, TB-01).
-    ...(options.transport ? { transportRequired: true } : {}),
+    ...(options.transport || options.headers ? { transportRequired: true } : {}),
+    ...(options.transport || options.headers ? { authenticated: true } : {}),
     decoder: options.decoder ?? 'image',
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
@@ -79,17 +103,19 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.transparent ? { transparent: true } : {}),
     ...(options.profile ? { profile: options.profile } : {}),
-    request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
+    ...(options.url.includes('{r}') ? { highDpi: true } : {}),
+    request(coord: TileCoord, out: TileRequest, pixelRatio = 1): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';
       const rows = tiling.rootTilesY * 2 ** coord.level;
       const hostIndex = subdomains.length > 0 ? (coord.x + coord.y) % subdomains.length : 0;
       out.url = options.url
-        .replace('{z}', String(coord.level))
-        .replace('{x}', String(coord.x))
-        .replace('{-y}', String(rows - 1 - coord.y))
-        .replace('{y}', String(coord.y))
-        .replace('{s}', subdomains[hostIndex] ?? '');
+        .replaceAll('{z}', String(coord.level))
+        .replaceAll('{x}', String(coord.x))
+        .replaceAll('{-y}', String(rows - 1 - coord.y))
+        .replaceAll('{y}', String(coord.y))
+        .replaceAll('{s}', subdomains[hostIndex] ?? '')
+        .replaceAll('{r}', pixelRatio > 1 ? '@2x' : '');
       out.hostIndex = hostIndex;
       return out;
     },

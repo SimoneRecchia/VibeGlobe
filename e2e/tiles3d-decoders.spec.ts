@@ -1,6 +1,6 @@
 // Compressed 3D Tiles content (F463): the fixture city compressed with Draco and meshopt and textured with KTX2
 // (ETC1S) draws without holes; decoder files load only when a tileset needs them, from the URL the page configures;
-// decoding runs on workers.
+// models decode in workers (the main thread's frame budget on a real GPU is in docs/hardening-backlog.md).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -62,13 +62,14 @@ test('the Draco decoder loads from the URL the page configures (F463)', async ({
   expect(await page.evaluate(() => window.vibeglobeTiles3d?.extension.stats().failed)).toBe(0);
 });
 
-test('models decode on the engine workers, never on the main thread (F463)', async ({ page }) => {
-  // Fails until the worker program registers parse-model (docs/parallel-tracks.md, hook request E (1)): meanwhile
-  // the loader decodes with its own task table on the main thread (KTX2 already transcodes on the workers).
-  test.fail();
+test('models decode in workers, never on the main thread (F463)', async ({ page }) => {
+  // On the scenario's own model worker until the engine's worker program registers parse-model (hook request E (1));
+  // KTX2 textures transcode on the engine's workers.
   await openCity(page, `backend=webgl2&tiles3d=draco&${VIEW}`);
   await settleTiles(page);
   const stats = await page.evaluate(() => window.vibeglobeTiles3d?.extension.stats());
-  expect(stats?.decodedInWorkers).toBeGreaterThan(0);
+  expect(stats?.decodedInWorkers).toBeGreaterThan(10);
   expect(stats?.decodedInline).toBe(0);
+  // No decode is measured in the main thread's timeline: they are in the worker's.
+  expect(await page.evaluate(() => performance.getEntriesByName('vibeglobe:parse-model').length)).toBe(0);
 });

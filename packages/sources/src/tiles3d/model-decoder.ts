@@ -1,8 +1,9 @@
 /**
  * glTF decoding of 3D Tiles content (F463; ADR 0141): the `parse-model` task of `@vibeglobe/models` on the engine's
  * worker pool (Draco, meshopt; their decoders load in the worker on the first content that needs them). While the
- * worker program does not register the task (hook request E (1)), the loader's own task table runs it on the main
- * thread, once the pool has answered `unknown-task`.
+ * worker program does not register the task (hook request E (1)), the loader's own model worker runs it (a module
+ * worker the application starts with `createModelTasks()`), else its own task table on the main thread, once the pool
+ * has answered `unknown-task`.
  */
 import type { TaskTable, WorkerPool, WorkerTaskOutcome } from '@vibeglobe/core';
 
@@ -11,6 +12,11 @@ export interface DecodeJob {
   readonly cancelled: boolean;
   /** Ids of the worker tasks running for the job, for cancellation and reprioritization. */
   readonly tasks: Set<number>;
+}
+
+/** A worker of the application's own that runs `parse-model` (`ParseModelTaskInput` in, `ModelDescription` out). */
+export interface ModelWorker {
+  decode(bytes: ArrayBuffer): Promise<unknown>;
 }
 
 /** Thrown when the job was cancelled while decoding. */
@@ -23,6 +29,7 @@ export class ModelDecoder {
   constructor(
     private readonly workers: WorkerPool | undefined,
     private readonly fallback: TaskTable | undefined,
+    private readonly ownWorker: ModelWorker | undefined = undefined,
   ) {}
 
   /** Decodes a GLB; `inWorker` tells where it ran. */
@@ -34,6 +41,11 @@ export class ModelDecoder {
       if (job.cancelled || code === 'cancelled' || code === 'aborted') throw new DecodeCancelled();
       if (taskCode !== 'unknown-task') throw new Error(`parse-model: ${message}`);
       this.workersHaveTask = false;
+    }
+    if (this.ownWorker) {
+      const model = await this.ownWorker.decode(glb.slice().buffer);
+      if (job.cancelled) throw new DecodeCancelled();
+      return { model, inWorker: true };
     }
     const task = this.fallback?.['parse-model'];
     if (!task) throw new Error('no parse-model task: the worker program lacks it and no modelTasks were given');

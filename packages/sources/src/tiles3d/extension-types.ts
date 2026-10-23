@@ -1,6 +1,7 @@
 /** Public types of the 3D Tiles render extension (ADR 0141). */
 import type { CreditProfile, RenderExtension, RenderExtensionContext, TaskTable, TileTransport } from '@vibeglobe/core';
 import type { RequestEvent } from './fetcher.js';
+import type { ModelWorker } from './model-decoder.js';
 import type { Tileset } from './tileset.js';
 
 /** A ray hit on the meshes, as the renderer reports it. */
@@ -43,6 +44,8 @@ export interface Tiles3DOptions {
    * engine's worker program does not register the task yet (hook request E (1)); without it such tiles fail.
    */
   readonly modelTasks?: TaskTable;
+  /** A worker of the application's own running `parse-model`, used before `modelTasks` (hook request E (1)). */
+  readonly modelWorker?: ModelWorker;
   /** The provider profile: `displayOnly` refuses picking and every data access (F323, ADR 0031). */
   readonly profile?: CreditProfile;
   /** Contents loading at once, at most; default 32. */

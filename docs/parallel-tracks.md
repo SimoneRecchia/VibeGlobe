@@ -643,7 +643,7 @@ meshopt, KTX2 and on terrain). Hook requests E (1)–(5) above.
 | ----- | ------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | F461  | passing | `e2e/tiles3d-streaming.spec.ts` (both backends, normal and slow link), `tiles3d.test.ts`         | —                                                                                             |
 | F462  | passing | `e2e/tiles3d-scheduling.spec.ts` (the 10-minute navigation ran once: 648 stops, 1,003 evictions) | —                                                                                             |
-| F463  | failing | `e2e/tiles3d-decoders.spec.ts`: Draco, meshopt, KTX2; lazy decoders from a configured URL        | Hook E (1): `parse-model` in the worker program (models decode on the main thread meanwhile)  |
+| F463  | failing | `e2e/tiles3d-decoders.spec.ts`: Draco, meshopt, KTX2; lazy decoders; models decode in workers    | The main thread's frame budget on a real GPU; hook E (1) (docs/hardening-backlog.md)          |
 | F464  | passing | `e2e/tiles3d-precision.spec.ts` (both backends)                                                  | —                                                                                             |
 | F465  | passing | `e2e/tiles3d-phases.spec.ts`, `view-frame.test.ts`                                               | —                                                                                             |
 | F466  | passing | `e2e/tiles3d-picking.spec.ts`, `tiles3d.test.ts`                                                 | —                                                                                             |
@@ -653,8 +653,9 @@ meshopt, KTX2 and on terrain). Hook requests E (1)–(5) above.
 | F470  | failing | `e2e/tiles3d-google.spec.ts`: copyrights by area, uncovered logo, display only, nothing stored   | Hook E (2): extension credits in the engine's attribution (the scenario shows them meanwhile) |
 | F471  | failing | `e2e/tiles3d-performance.spec.ts`: no hole, no black pixel; frame time gated on real GPUs only   | Reference desktop and tablet (question 2); hook E (5): the benchmark scenario and history     |
 
-Until hook E (1) lands, the playground decodes 3D Tiles content only on its development server (the fallback task
-table brings meshoptimizer's Blob-worker code, which production bundles refuse, F100).
+Until hook E (1) lands, the playground decodes 3D Tiles content in a module worker of its own
+(`apps/playground/src/tiles3d-model-worker.ts`), on its development server only (the worker bundles meshoptimizer's
+Blob-worker code, which production bundles refuse, F100).
 
 F323: the 3D Tiles part is done (picking and `tileset()` of a display-only source throw `GlobeError` 'display-only'
 naming the profile; `tiles3d.test.ts`, `e2e/tiles3d-google.spec.ts`).

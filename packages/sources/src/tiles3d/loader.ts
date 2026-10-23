@@ -44,6 +44,7 @@ import {
   worldToEcef,
   type ViewFrame,
 } from './view-frame.js';
+import { refuseDisplayOnly } from './display-only.js';
 import { DecodeCancelled, ModelDecoder } from './model-decoder.js';
 import { gltfParts } from './content-parts.js';
 import { multiply, type Mat4 } from './volumes.js';
@@ -109,7 +110,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   ) {
     this.meshes = options.meshes(context);
     this.workers = context.workers;
-    this.decoder = new ModelDecoder(context.workers, options.modelTasks);
+    this.decoder = new ModelDecoder(context.workers, options.modelTasks, options.modelWorker);
     this.fetcher = new TileFetcher(options.transport ?? fetchTransport(), context.network, options.onRequest);
     this.cache = new TileContentCache(options.memoryBudgetBytes ?? DEFAULT_BUDGET_BYTES, (tile) => this.release(tile));
     this.loaded = this.loadRoot();
@@ -329,18 +330,8 @@ class Tiles3DLoader implements Tiles3DExtension {
     this.data.delete(tile);
   }
 
-  private refuseData(api: string): void {
-    const profile = this.options.profile;
-    if (profile?.displayOnly !== true) return;
-    const rule = profile.id === undefined ? 'its provider profile' : `the '${profile.id}' profile`;
-    throw new GlobeError(
-      'display-only',
-      `${api} is refused: source '${this.name}' is display only under ${rule} (profile.displayOnly; ADR 0031)`,
-    );
-  }
-
   pick = (xPx: number, yPx: number): Tiles3DPick | undefined => {
-    this.refuseData('pick');
+    refuseDisplayOnly('pick', { id: this.name, ...(this.options.profile ? { profile: this.options.profile } : {}) });
     const view = this.lastView;
     if (!view) return undefined;
     const ray = screenRay(view, xPx, yPx);
@@ -383,7 +374,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   };
 
   tileset = (): Tileset | undefined => {
-    this.refuseData('tileset');
+    refuseDisplayOnly('tileset', { id: this.name, ...(this.options.profile ? { profile: this.options.profile } : {}) });
     return this.root;
   };
 

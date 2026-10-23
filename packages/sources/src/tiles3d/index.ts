@@ -15,6 +15,7 @@ export type {
   Tiles3DStats,
 } from './extension-types.js';
 export type { RequestEvent } from './fetcher.js';
+export type { ModelWorker } from './model-decoder.js';
 export { gltfInfo } from './gltf-info.js';
 export type { GltfInfo } from './gltf-info.js';
 export { tiles3d } from './loader.js';

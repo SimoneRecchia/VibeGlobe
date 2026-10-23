@@ -2924,7 +2924,7 @@
         "Confirm it lists how those projects test their adapters (fixtures, live endpoints, conformance suites)",
         "Confirm it states the chosen approach and why, links the ADRs that record the decisions, and states that no code was copied and only open-source projects were studied"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F219",

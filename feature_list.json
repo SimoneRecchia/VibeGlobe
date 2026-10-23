@@ -5899,7 +5899,7 @@
         "Record frames while zooming across each minzoom and maxzoom and assert frame differences show a fade, not a single-frame pop",
         "Toggle visibility at runtime and assert the layer hides and shows without reloading tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F448",

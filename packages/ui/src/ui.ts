@@ -103,7 +103,7 @@ function createLayer(container: HTMLElement): { element: HTMLElement; corners: M
 
 /**
  * Keeps the bottom corners above the engine's own attribution element (`.vg-credits`, F255), which the engine pins to
- * the container's bottom right: its height becomes `--vg-ui-credits-height` on the layer, so no control covers it.
+ * the container's bottom right: its height becomes `--vg-credits-height` on the layer, so no control covers it.
  */
 function keepClearOfCredits(container: HTMLElement, layer: HTMLElement): () => void {
   let observed: Element | undefined;
@@ -115,7 +115,7 @@ function keepClearOfCredits(container: HTMLElement, layer: HTMLElement): () => v
       observed = credits;
     }
     const height = credits?.getBoundingClientRect().height ?? 0;
-    layer.style.setProperty('--vg-ui-credits-height', `${height}px`);
+    layer.style.setProperty('--vg-credits-height', `${height}px`);
   };
   const resize = new ResizeObserver(measure);
   const children = new MutationObserver(measure);

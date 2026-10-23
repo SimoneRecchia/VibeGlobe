@@ -57,7 +57,7 @@ export const IT: Readonly<Record<TranslationKey, string>> = {
   'home.globe': 'Mostra tutto il globo',
   'home.home': 'Vai alla vista iniziale',
   'scale.label': 'Scala della mappa: la barra misura {length}',
-  'attribution.label': 'Crediti dei dati della mappa',
+  'attribution.label': 'Tutti i crediti dei dati della mappa',
   'attribution.expand': 'Mostra tutti i crediti',
   'attribution.collapse': 'Nascondi i crediti',
   'layers.label': 'Livelli',

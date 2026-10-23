@@ -72,7 +72,7 @@ export class TiltControl implements UiControl {
     if (globe === undefined || !Number.isFinite(tiltDeg)) return;
     const tilt = Math.min(this.#maxTiltDeg, Math.max(0, tiltDeg));
     this.#target = tilt;
-    void globe.tiltTo(tilt, immediate ? { durationMs: 0 } : {}).then(() => {
+    void globe.tiltTo(tilt, immediate || this.#context?.reducedMotion() === true ? { durationMs: 0 } : {}).then(() => {
       if (this.#target === tilt) this.#target = undefined;
     });
   }

@@ -55,7 +55,7 @@ export const EN = {
   'home.globe': 'Show the whole globe',
   'home.home': 'Go to the home view',
   'scale.label': 'Map scale: the bar is {length} long',
-  'attribution.label': 'Map data credits',
+  'attribution.label': 'All map data credits',
   'attribution.expand': 'Show all credits',
   'attribution.collapse': 'Hide the credits',
   'layers.label': 'Layers',

@@ -5607,7 +5607,7 @@
         "Verify a collapsed attribution on small screens still shows required logos and can be expanded with mouse, touch and keyboard",
         "Verify attribution links are keyboard-focusable and announced by screen readers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F425",
@@ -5730,7 +5730,7 @@
         "Verify zero violations",
         "Verify state changes (mode toggle, fullscreen, layer visibility) update ARIA states"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F435",
@@ -5754,7 +5754,7 @@
         "Activate every control that animates and verify no UI animation plays and camera flights become quick fades",
         "Verify behavior returns to normal when the setting is off"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F437",
@@ -5767,7 +5767,7 @@
         "Verify every interactive element on touch devices has a target of at least 44 by 44 CSS pixels",
         "At phone viewport sizes in both orientations, verify the attribution and every required logo stay fully visible and uncovered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F438",

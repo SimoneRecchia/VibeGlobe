@@ -436,6 +436,22 @@ for (const backend of BACKENDS) {
     ]);
     const high = roofs[1];
     if (wall && high) expect(tan(pixel(image, wall.xPx, wall.yPx))).toBeLessThan(tan(pixel(image, high.xPx, high.yPx)));
+    // Roofs and walls are picked where they are drawn, not only the footprint on the ground (KB-120).
+    for (const [point, id] of [
+      [roofs[0], 'low'],
+      [roofs[1], 'high'],
+      [roofs[2], 'floating'],
+      [wall, 'high'],
+    ] as const) {
+      const picked = await page.evaluate(async (at) => {
+        if (!at) return 'off screen';
+        const hit = window.vibeglobeLayers?.stack.resolvePick(
+          (await window.vibeglobePlayground?.globe.layerTarget()?.pick?.(at)) ?? 0,
+        );
+        return hit ? String(hit.feature.id) : 'nothing';
+      }, point);
+      expect(picked, `pick at ${id}`).toBe(id);
+    }
     await openScenario(page, backend, 'data-altitudes');
     for (const phase of [
       { name: 'globe', view: { longitudeDeg: 12.55, latitudeDeg: 41.9, zoom: 4 }, mode: 'auto' },

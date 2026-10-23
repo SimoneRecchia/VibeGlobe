@@ -229,6 +229,7 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
     pixelRatio: 1,
     ...(coverage ? { coverage: [coverage] } : {}),
     decoder: 'image',
+    transportRequired: true,
     transport: wmsTransport(
       options.transport ?? fetchTransport(),
       gutterPx,

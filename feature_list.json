@@ -3057,7 +3057,7 @@
         "Assert ground control markers align within half a pixel and no seam appears between neighboring tiles or levels",
         "Unit-test that the level chosen for a view follows the screen-space-error rule with the custom resolutions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F229",
@@ -3135,7 +3135,7 @@
         "Load an image larger than the device's maximum texture size and assert it displays completely with no seams",
         "Fuzz the world-file and GeoTIFF parsers and assert malformed files never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F235",
@@ -3147,7 +3147,7 @@
         "Assert metadata, tile addressing, coverage, zoom range, error handling, cancellation and attribution checks pass for each",
         "Assert heights decoded at test coordinates match the fixture reference values within the encoding's precision"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F236",
@@ -3443,7 +3443,7 @@
         "Assert the viewport information request is made for each settled view and not on every frame",
         "Assert the displayed attribution always matches the copyrights returned for the current viewport"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F259",
@@ -3456,7 +3456,7 @@
         "Assert through element hit-testing that the logo and attribution are fully visible and no other element overlaps them",
         "Try to hide or cover them through configuration and app CSS and assert they stay visible"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F260",
@@ -3579,7 +3579,7 @@
         "Run the guide's code examples as tests and assert they pass",
         "Confirm it explains that Apple map data may only be used through Apple's own MapKit and is therefore not offered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F269",
@@ -3619,7 +3619,7 @@
         "Read the effective settings through the public API and assert the network mode is hybrid and every loading feature is on",
         "Navigate the playground and assert tiles are persisted, reused from memory, prefetched around the view and packageable"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F272",
@@ -3632,7 +3632,7 @@
         "Assert each revisit is served by the expected tier and makes no request to a lower tier",
         "Assert no tile is ever downloaded twice while a higher tier still holds it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F273",
@@ -3852,7 +3852,7 @@
         "Assert each change takes effect within one frame for new requests, as observed through request interception and storage inspection",
         "Record frames during each toggle and assert zero black pixels and no flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F291",
@@ -3877,7 +3877,7 @@
         "Assert zero network requests are made, health checks included",
         "Assert full navigation works from packages and caches with zero black pixels inside package coverage"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F293",
@@ -3927,7 +3927,7 @@
         "Reload the playground and run zoom, pan and flight scenarios",
         "Assert full navigation within package coverage with zero black pixels and no failed requests visible to the user"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F297",
@@ -3953,7 +3953,7 @@
         "Assert pending requests are cancelled and no retries are made until a health check succeeds",
         "Assert a connectivity event reports the change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F299",
@@ -4050,7 +4050,7 @@
         "Assert the package metadata lists each source's license and attribution",
         "Load it in the playground and assert the attribution shown matches the package metadata for the visible tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F307",
@@ -4146,7 +4146,7 @@
         "Assert requests, storage reads and writes, memory residency and packaging behavior match the specification and the profile rules for every combination",
         "Assert zero black pixels after the base has loaded in every combination where the base is reachable"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F315",
@@ -4171,7 +4171,7 @@
         "Assert every request targets a configured source, package or health-check endpoint, or a configured worker or asset URL",
         "Assert no request carries data about the user or the view beyond what a tile request needs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F317",
@@ -4222,7 +4222,7 @@
         "Try to switch on persistent cache for the restricted source globally and per source, and assert it stays off and a warning names the profile rule",
         "Unit-test the effective-settings resolution for every combination of global setting, per-source setting and profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F321",
@@ -4234,7 +4234,7 @@
         "Inspect browser storage and assert no Google tile is persisted beyond what the Google terms ADR allows",
         "Request an offline package with the Google source and assert it is refused with an error naming the Google profile"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F322",
@@ -4246,7 +4246,7 @@
         "Assert through request interception that Google tiles are requested only within the limits recorded in the Google terms ADR",
         "Assert other sources in the same view still prefetch and preload normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F323",
@@ -4269,7 +4269,7 @@
         "Run a pan and a long flight scenario and assert prefetch and flight preloading of its tiles stay within the limits recorded in the OpenStreetMap terms ADR (no bulk prefetch)",
         "Request an offline package with the source and assert it is refused with an error naming the profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F325",
@@ -4281,7 +4281,7 @@
         "Assert '© OpenStreetMap contributors' with ODbL licensing is shown whenever its tiles are visible",
         "Configure the same data through a fixture provider profile with its own restrictions and assert both the ODbL attribution and the provider's rules apply"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F326",
@@ -4293,7 +4293,7 @@
         "Run the shared conformance suite's profile-enforcement checks against it",
         "Assert each declared rule is enforced in the playground exactly as for the built-in profiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F327",
@@ -4318,7 +4318,7 @@
         "Navigate the playground offline over the package area and assert terrain relief appears with zero black pixels",
         "Assert terrain and vector tiles are written to and read from the persistent cache like imagery tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F550",

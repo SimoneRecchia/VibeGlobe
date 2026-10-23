@@ -1,4 +1,10 @@
-import { WEB_MERCATOR_TILING, type TileCoord, type TileRectangleRad, type TileRequest } from '@vibeglobe/core';
+import {
+  type TerrainSource,
+  WEB_MERCATOR_TILING,
+  type TileCoord,
+  type TileRectangleRad,
+  type TileRequest,
+} from '@vibeglobe/core';
 import type { Database } from 'sql.js';
 import { archiveTransport, HttpStatusError, NetworkError, tileOfUrl } from './archive-transport.js';
 import { retryAfterMs } from './fetch-transport.js';
@@ -6,10 +12,17 @@ import {
   type Attribution,
   CUSTOM_PROFILE,
   type DescribedImagerySource,
+  type DescribedSource,
   type ProviderProfile,
   SourceConfigError,
 } from './metadata.js';
 import { coverageOf, inLevelsAndCoverage } from './tiling.js';
+import {
+  type ArchiveTerrainOptions,
+  terrainFromArchive,
+  vectorFromArchive,
+  type VectorTileSource,
+} from './archive-sources.js';
 
 /** Options of {@link mbtilesImagery}. */
 export interface MbtilesImageryOptions {
@@ -39,6 +52,12 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   avif: 'image/avif',
+};
+
+/** Content types of the non-raster formats packages of terrain and vector tiles declare (F328). */
+const OTHER_TYPES: Readonly<Record<string, string>> = {
+  pbf: 'application/vnd.mapbox-vector-tile',
+  mvt: 'application/vnd.mapbox-vector-tile',
 };
 
 async function packageBytes(options: MbtilesImageryOptions): Promise<Uint8Array> {
@@ -112,7 +131,7 @@ function attributionOf(metadata: Map<string, string>): Attribution[] {
 }
 
 /** Opens the package and reads what the source needs, or refuses it with a descriptive error. */
-async function openPackage(options: MbtilesImageryOptions) {
+async function openPackage(options: MbtilesImageryOptions, content: 'raster' | 'any') {
   let bytes: Uint8Array;
   try {
     bytes = await packageBytes(options);
@@ -127,7 +146,8 @@ async function openPackage(options: MbtilesImageryOptions) {
     const query = tileQuery(db);
     const metadata = readMetadata(db);
     const format = (metadata.get('format') ?? 'png').toLowerCase();
-    const contentType = CONTENT_TYPES[format];
+    const contentType =
+      CONTENT_TYPES[format] ?? (content === 'any' ? (OTHER_TYPES[format] ?? 'application/octet-stream') : undefined);
     if (contentType === undefined) throw new Error(`format '${format}' is not a raster image format`);
     const [minLevel, maxLevel] = levelRange(db, query, metadata);
     if (minLevel > maxLevel) throw new Error('minimum zoom above maximum zoom');
@@ -147,8 +167,16 @@ async function openPackage(options: MbtilesImageryOptions) {
  * static server that is downloaded once. Rows are TMS-ordered as the specification requires; the plain `tiles` table
  * and the deduplicated `map` and `images` schema both work. Resolves once the metadata is read.
  */
-export async function mbtilesImagery(options: MbtilesImageryOptions): Promise<DescribedImagerySource> {
-  const opened = await openPackage(options);
+export function mbtilesImagery(options: MbtilesImageryOptions): Promise<DescribedImagerySource> {
+  return mbtilesArchive(options, 'raster');
+}
+
+/** {@link mbtilesImagery} for any content; terrain and vector packages reuse its addressing and transport (F328). */
+export async function mbtilesArchive(
+  options: MbtilesImageryOptions,
+  content: 'raster' | 'any',
+): Promise<DescribedImagerySource> {
+  const opened = await openPackage(options, content);
   const statement = opened.db.prepare(opened.query);
   const base = typeof options.package === 'string' ? options.package : `blob-package://${options.id}`;
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
@@ -163,6 +191,7 @@ export async function mbtilesImagery(options: MbtilesImageryOptions): Promise<De
     decoder: 'image',
     attribution: options.attribution ?? opened.attribution,
     profile: options.profile ?? CUSTOM_PROFILE,
+    transportRequired: true,
     transport: archiveTransport((url) => {
       const tile = tileOfUrl(url);
       if (!tile) return Promise.resolve(undefined);
@@ -181,4 +210,16 @@ export async function mbtilesImagery(options: MbtilesImageryOptions): Promise<De
     },
   };
   return source;
+}
+
+/** Terrain tiles (Terrarium, Terrain-RGB or quantized-mesh) from an MBTiles package (F328). */
+export async function mbtilesTerrain(
+  options: MbtilesImageryOptions & ArchiveTerrainOptions,
+): Promise<TerrainSource & DescribedSource> {
+  return terrainFromArchive(await mbtilesArchive(options, 'any'), options);
+}
+
+/** Mapbox Vector Tiles from an MBTiles package (F328). */
+export async function mbtilesVector(options: MbtilesImageryOptions): Promise<VectorTileSource> {
+  return vectorFromArchive(await mbtilesArchive(options, 'any'));
 }

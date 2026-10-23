@@ -1,5 +1,5 @@
-import type { ImagerySource, TileCoord, TransportResult } from '@vibeglobe/core';
-import type { DescribedImagerySource } from '../metadata.js';
+import type { ImagerySource, TileCoord, TileSource, TransportResult } from '@vibeglobe/core';
+import type { DescribedSource, ProviderProfile } from '../metadata.js';
 import { type CheckResult, check, faultyFetch, type FaultMode, sameBytes } from './support.js';
 
 /**
@@ -7,11 +7,11 @@ import { type CheckResult, check, faultyFetch, type FaultMode, sameBytes } from 
  * handling (404, 500, timeouts, corrupted payloads), cancellation, attribution and provider-profile enforcement. It
  * needs no test framework: a test (or a custom adapter package) runs it and asserts every check passed.
  */
-export interface TiledConformanceSubject {
+export interface TiledConformanceSubject<S extends TileSource = ImagerySource> {
   /** Names the subject in the report. */
   readonly name: string;
   /** Builds the source on top of `fetchImpl`, which serves the recorded fixture (with faults when a check asks). */
-  create(fetchImpl: typeof fetch): ImagerySource | Promise<ImagerySource>;
+  create(fetchImpl: typeof fetch): S | Promise<S>;
   /** Serves the recorded fixture of the service. */
   readonly fixture: typeof fetch;
   /** Tiles the fixture has, with their expected bytes when the adapter passes them through unchanged. */
@@ -27,17 +27,20 @@ export interface TiledConformanceSubject {
   readonly outside?: readonly TileCoord[];
   /** Extra provider-profile checks: each returns a failure message, or undefined when the rule holds. */
   readonly profileChecks?: readonly ((
-    source: DescribedImagerySource,
+    source: S & DescribedSource,
     requests: readonly string[],
   ) => string | undefined)[];
 }
+
+/** Any subject of the tiled checks. */
+type AnySubject = TiledConformanceSubject<TileSource>;
 
 const TIMEOUTS = { firstByteMs: 2_000, totalMs: 4_000 };
 const SHORT_TIMEOUTS = { firstByteMs: 40, totalMs: 80 };
 
 /** Runs one request through the source's own transport; resolves once `done` was called, and counts the calls. */
-async function fetchTile(
-  source: ImagerySource,
+export async function fetchTile(
+  source: TileSource,
   coord: TileCoord,
   timeouts = TIMEOUTS,
   abortAfterMs?: number,
@@ -70,15 +73,22 @@ async function fetchTile(
 }
 
 function metadataChecks(source: ImagerySource): CheckResult[] {
-  const described = source as Partial<DescribedImagerySource>;
+  return [
+    ...sourceMetadataChecks(source),
+    check('metadata', 'declares a positive tile size', source.tileSizePx > 0, String(source.tileSizePx)),
+    check('metadata', 'declares a pixel ratio of 1 or 2', source.pixelRatio === 1 || source.pixelRatio === 2),
+  ];
+}
+
+/** The metadata checks every tiled source passes, imagery or terrain. */
+export function sourceMetadataChecks(source: TileSource): CheckResult[] {
+  const described = source as TileSource & Partial<DescribedSource>;
   const levelsOk =
     Number.isInteger(source.minLevel) && Number.isInteger(source.maxLevel) && source.minLevel <= source.maxLevel;
   return [
     check('metadata', 'has a non-empty id', source.id.length > 0),
     check('metadata', 'declares a tiling scheme and reference system', source.tiling.crs.length > 0),
     check('zoom range', 'declares integer levels with min ≤ max', levelsOk, `${source.minLevel}–${source.maxLevel}`),
-    check('metadata', 'declares a positive tile size', source.tileSizePx > 0, String(source.tileSizePx)),
-    check('metadata', 'declares a pixel ratio of 1 or 2', source.pixelRatio === 1 || source.pixelRatio === 2),
     check(
       'attribution',
       'declares its attribution',
@@ -88,7 +98,7 @@ function metadataChecks(source: ImagerySource): CheckResult[] {
   ];
 }
 
-function rangeChecks(source: ImagerySource, subject: TiledConformanceSubject): CheckResult[] {
+function rangeChecks(source: TileSource, subject: AnySubject): CheckResult[] {
   const sample = subject.tiles[0]?.coord ?? { root: 0, level: source.minLevel, x: 0, y: 0 };
   const deeper = { ...sample, level: source.maxLevel + 1, x: sample.x * 2, y: sample.y * 2 };
   const out: CheckResult[] = [
@@ -115,7 +125,7 @@ function rangeChecks(source: ImagerySource, subject: TiledConformanceSubject): C
   return out;
 }
 
-async function addressingChecks(source: ImagerySource, subject: TiledConformanceSubject): Promise<CheckResult[]> {
+async function addressingChecks(source: TileSource, subject: AnySubject): Promise<CheckResult[]> {
   const out: CheckResult[] = [];
   for (const tile of subject.tiles) {
     const { result, calls } = await fetchTile(source, tile.coord);
@@ -138,7 +148,7 @@ async function addressingChecks(source: ImagerySource, subject: TiledConformance
 }
 
 /** For sources that download their data when they open: each fault makes opening fail with a descriptive error. */
-async function openFaultChecks(subject: TiledConformanceSubject): Promise<CheckResult[]> {
+async function openFaultChecks(subject: AnySubject): Promise<CheckResult[]> {
   const out: CheckResult[] = [];
   for (const mode of ['404', '500', 'hang', 'corrupt'] as const) {
     let outcome: string;
@@ -161,7 +171,7 @@ async function openFaultChecks(subject: TiledConformanceSubject): Promise<CheckR
 }
 
 /** Faults and cancellation of a source that talks to the network only while it opens. */
-async function onOpenChecks(subject: TiledConformanceSubject, coord: TileCoord): Promise<CheckResult[]> {
+async function onOpenChecks(subject: AnySubject, coord: TileCoord): Promise<CheckResult[]> {
   const source = await subject.create(subject.fixture);
   const aborted = await fetchTile(source, coord, TIMEOUTS, 0);
   const cancelled = aborted.result !== 'noData' && aborted.result.kind === 'aborted';
@@ -176,7 +186,7 @@ async function onOpenChecks(subject: TiledConformanceSubject, coord: TileCoord):
   ];
 }
 
-async function faultChecks(subject: TiledConformanceSubject): Promise<CheckResult[]> {
+async function faultChecks(subject: AnySubject): Promise<CheckResult[]> {
   const coord = subject.tiles[0]?.coord;
   if (!coord) return [check('error handling', 'has a fixture tile to test faults with', false)];
   if (subject.network === 'on-open') return onOpenChecks(subject, coord);
@@ -227,15 +237,15 @@ async function faultChecks(subject: TiledConformanceSubject): Promise<CheckResul
   return out;
 }
 
-async function profileChecks(subject: TiledConformanceSubject): Promise<CheckResult[]> {
+async function profileChecks(subject: AnySubject): Promise<CheckResult[]> {
   const requests: string[] = [];
   const recording: typeof fetch = (input, init) => {
     requests.push(input instanceof Request ? input.url : String(input));
     return subject.fixture(input, init);
   };
-  const source = (await subject.create(recording)) as DescribedImagerySource;
+  const source = (await subject.create(recording)) as TileSource & DescribedSource;
   for (const tile of subject.tiles) await fetchTile(source, tile.coord);
-  const profile = source.profile as DescribedImagerySource['profile'] | undefined;
+  const profile = source.profile as ProviderProfile | undefined;
   // A source without a profile already failed the metadata check.
   if (!profile) return [];
   const out: CheckResult[] = [];
@@ -253,6 +263,15 @@ async function profileChecks(subject: TiledConformanceSubject): Promise<CheckRes
         (source.attribution ?? []).some((a) => a.text.includes(required)),
       ),
     );
+    const logo = profile.requiredAttribution.logo;
+    if (logo)
+      out.push(
+        check(
+          'provider profile',
+          'shows the logo the profile requires',
+          (source.attribution ?? []).some((a) => a.logo?.src === logo.src),
+        ),
+      );
   }
   for (const rule of subject.profileChecks ?? []) {
     const failure = rule(source, requests);
@@ -264,8 +283,19 @@ async function profileChecks(subject: TiledConformanceSubject): Promise<CheckRes
 /** Runs the tiled-source suite against a subject and returns every check with its outcome. */
 export async function runTiledConformance(subject: TiledConformanceSubject): Promise<CheckResult[]> {
   const source = await subject.create(subject.fixture);
+  return runSharedChecks(subject, source, metadataChecks(source));
+}
+
+/** The checks of every tiled source after its kind's metadata checks: range, addressing, faults, profile. */
+export async function runSharedChecks<S extends TileSource>(
+  typed: TiledConformanceSubject<S>,
+  source: S,
+  metadata: readonly CheckResult[],
+): Promise<CheckResult[]> {
+  // The checks read only what every tiled source has; the profile rules receive the subject's own source.
+  const subject = typed as unknown as AnySubject;
   const results = [
-    ...metadataChecks(source),
+    ...metadata,
     ...rangeChecks(source, subject),
     ...(await addressingChecks(source, subject)),
     ...(await faultChecks(subject)),
@@ -292,7 +322,8 @@ function isNoData(result: TransportResult | 'noData'): boolean {
   return result.kind === 'status' && (result.status === 404 || result.status === 410 || result.status === 204);
 }
 
-function describe(result: TransportResult | 'noData'): string {
+/** A transport result in a few words, for check details. */
+export function describe(result: TransportResult | 'noData'): string {
   if (result === 'noData') return 'noData';
   if (result.kind === 'ok') return `ok ${result.bytes.byteLength} bytes`;
   return result.kind === 'status' ? `status ${result.status}` : result.kind;

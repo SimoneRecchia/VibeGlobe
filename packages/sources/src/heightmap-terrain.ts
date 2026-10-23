@@ -13,6 +13,7 @@ import {
   type VerticalDatum,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
+import { type Attribution, CUSTOM_PROFILE, type DescribedSource, type ProviderProfile } from './metadata.js';
 
 /** Options of {@link heightmapTerrain}. */
 export interface HeightmapTerrainOptions {
@@ -37,10 +38,14 @@ export interface HeightmapTerrainOptions {
   maxRequestsPerHost?: number;
   multiplexed?: boolean;
   timeoutsMs?: TimeoutsMs;
+  /** Credits shown while the terrain is in view (F254); none by default. */
+  attribution?: readonly Attribution[];
+  /** The provider's rules; everything enabled by default. */
+  profile?: ProviderProfile;
 }
 
 /** A heightmap terrain source (Terrarium or Terrain-RGB PNG tiles) from an XYZ or TMS URL template. */
-export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSource {
+export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSource & DescribedSource {
   const tiling = options.tiling === 'geographic' ? GEOGRAPHIC_TILING : WEB_MERCATOR_TILING;
   const minLevel = options.minLevel ?? 0;
   const maxLevel = options.maxLevel ?? 15;
@@ -55,6 +60,8 @@ export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSourc
     ...(options.coverage ? { coverage: options.coverage } : {}),
     transport: options.transport ?? fetchTransport(),
     decoder: { kind: options.encoding },
+    attribution: options.attribution ?? [],
+    profile: options.profile ?? CUSTOM_PROFILE,
     datum: options.datum ?? { kind: 'ellipsoid' },
     geometricErrorMeters: (level) => heightmapGeometricErrorMeters(level, tileSizePx, equatorMeters, tiling.rootTilesX),
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),

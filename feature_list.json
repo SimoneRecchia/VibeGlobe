@@ -2377,7 +2377,7 @@
         "Press five times rapidly and assert the target accumulates to five levels with continuous motion (no frame-to-frame jump)",
         "Zoom through the globe-to-flat morph range with the buttons and the keyboard and assert the geographic point at the screen center stays within 1 px of it in every frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F175",

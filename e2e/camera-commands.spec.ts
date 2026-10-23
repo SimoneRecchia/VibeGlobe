@@ -83,3 +83,53 @@ test('the tilt control, the orientation buttons, reset to the globe and home mov
   expect(home.latitudeDeg).toBeCloseTo(41.9, 9);
   expect(home.zoom).toBeCloseTo(15, 6);
 });
+
+test('the +/- buttons zoom one level per press about the center, rapid presses accumulating through the globe-to-flat morph (F174)', async ({
+  page,
+}) => {
+  await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=3.5');
+  const start = await page.evaluate(() => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    const center = globe.screenToGeo({ xPx: 160, yPx: 120 });
+    if (!center) throw new Error('center off the globe');
+    const record = window as unknown as { zoomFrames: { zoom: number; morph: number; xPx: number; yPx: number }[] };
+    record.zoomFrames = [];
+    globe.on('frame', () => {
+      const shown = globe.geoToScreen(center);
+      record.zoomFrames.push({ zoom: globe.camera.zoom, morph: globe.camera.morphFactor, ...shown });
+    });
+    return globe.camera.zoom;
+  });
+  for (let i = 0; i < 5; i++) await page.locator('[data-command="zoom-in"]').click();
+  const settled = (): Promise<number> =>
+    page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const globe = window.vibeglobePlayground?.globe;
+          let last = Number.NaN;
+          const check = (): void => {
+            const zoom = globe?.camera.zoom ?? Number.NaN;
+            if (zoom === last) resolve(zoom);
+            else {
+              last = zoom;
+              setTimeout(check, 500);
+            }
+          };
+          check();
+        }),
+    );
+  expect((await settled()) - start).toBeCloseTo(5, 6);
+  const frames = await page.evaluate(
+    () => (window as unknown as { zoomFrames: { zoom: number; morph: number; xPx: number; yPx: number }[] }).zoomFrames,
+  );
+  // The morph is crossed on the way, the center fixed within 1 px and no frame jumps the whole way.
+  expect(frames.some((frame) => frame.morph > 0.05 && frame.morph < 0.95)).toBe(true);
+  for (const frame of frames) expect(Math.hypot(frame.xPx - 160, frame.yPx - 120)).toBeLessThan(1);
+  const steps = frames.map((frame, i) => frame.zoom - (frames[i - 1]?.zoom ?? start));
+  expect(Math.max(...steps)).toBeLessThan(2);
+  expect(steps.filter((step) => step > 0).length).toBeGreaterThan(5);
+  await page.locator('[data-command="zoom-out"]').click();
+  await page.locator('[data-command="zoom-out"]').click();
+  expect((await settled()) - start).toBeCloseTo(3, 6);
+});

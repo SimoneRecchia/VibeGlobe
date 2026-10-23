@@ -20,6 +20,7 @@ import {
   type SourceCachePolicy,
 } from '@vibeglobe/offline';
 import { createRenderer } from '@vibeglobe/renderer';
+import { createDebugOverlay, type DebugOverlay } from '@vibeglobe/ui';
 import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
 import {
@@ -96,6 +97,10 @@ export interface HarnessConfig {
    * only once connectivity returns (docs/parallel-tracks.md, hook requests).
    */
   readonly awaitReady?: boolean;
+  /** Memory budgets of the engine's GPU and RAM tiers. */
+  readonly memory?: { readonly gpuBudgetBytes?: number; readonly ramBudgetBytes?: number };
+  /** Shows the debug overlay with the counters of every tier (F272), like the playground's `?debug=1`. */
+  readonly debug?: boolean;
   /** Fixture Terrarium terrain wrapped by the offline engine like the imagery (F328). */
   readonly terrain?: { readonly id: string; readonly session: string; readonly maxLevel?: number };
   /** Uses the custom cache store and network policy of `e2e/fixtures/offline-plugin` (F327). */
@@ -236,11 +241,33 @@ async function createGlobeFor(offline: Offline, current: HarnessConfig): Promise
         }
       : {}),
     workers: createWorkers(),
+    ...(current.memory ? { memory: current.memory } : {}),
     ...(current.clockStepMs === undefined ? {} : { manualClockStepMs: current.clockStepMs }),
   });
+  if (current.debug) showTiers(globe, offline);
   // The shared end-to-end helpers (waitForIdle, canvasImage) read the playground's hook names.
   (window as unknown as { vibeglobePlayground: unknown }).vibeglobePlayground = { globe, globes: [globe], events: [] };
   return globe;
+}
+
+let overlay: DebugOverlay | undefined;
+
+/** The debug overlay's rows: where tiles came from, tier by tier, top tier first (F272). */
+function showTiers(globe: Globe, offline: Offline): void {
+  overlay?.destroy();
+  const panel = createDebugOverlay(container ?? document.body, 'Tile tiers');
+  overlay = panel;
+  globe.on('frame', () => {
+    const imagery = globe.imageryStats();
+    const tiers = offline.stats();
+    panel.setInfo([
+      ['tier-gpu', `GPU tiles ${String(imagery?.ready ?? 0)}`],
+      ['tier-ram', `RAM hits ${String(imagery?.ramHits ?? 0)}`],
+      ['tier-persistent', `persistent ${String(tiers.persistent + tiers.revalidated)}`],
+      ['tier-package', `package ${String(tiers.package)}`],
+      ['tier-network', `network ${String(tiers.network)}`],
+    ]);
+  });
 }
 
 const harness: OfflineHarness = {
@@ -281,6 +308,8 @@ const harness: OfflineHarness = {
   async restartGlobe() {
     if (!config || !harness.offline) throw new Error('not started');
     harness.globe?.destroy();
+    overlay?.destroy();
+    overlay = undefined;
     harness.served.length = 0;
     Object.assign(harness, { globe: await createGlobeFor(harness.offline, config) });
     if (config.awaitReady !== false) await harness.globe?.ready;
@@ -325,6 +354,8 @@ const harness: OfflineHarness = {
     }
   },
   stop() {
+    overlay?.destroy();
+    overlay = undefined;
     harness.globe?.destroy();
     harness.manager?.destroy();
     harness.offline?.destroy();

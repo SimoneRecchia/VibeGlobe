@@ -37,3 +37,9 @@ perfection in edge cases.
 | ----- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | F462  | 10 minutes of randomized navigation in a browser within the GPU and RAM budgets | `tiles3d.test.ts`: 600 frames of random cameras keep `TileContentCache` within its budget (overflow only for tiles in view) |
 | F451  | Style fuzzing with the view never blank (rendered frames)                       | `vector-style.test.ts`: randomly mutated styles load without an exception and keep evaluable layers                         |
+
+## Track B, source adapters and offline (M7, M8)
+
+| Entry | Built and checked                                                                                                                                     | Remaining hardening step                                                                                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F293  | Hybrid mode: coarse levels from the package, finer ones from the network, through zoom and a flight with no black pixel (`e2e/offline-modes.spec.ts`) | Frame times within budget during those scenarios, measured on the reference desktop and tablet (the container's software GPU does not measure them) |

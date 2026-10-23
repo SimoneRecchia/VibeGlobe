@@ -3619,7 +3619,7 @@
         "Read the effective settings through the public API and assert the network mode is hybrid and every loading feature is on",
         "Navigate the playground and assert tiles are persisted, reused from memory, prefetched around the view and packageable"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F272",
@@ -3632,7 +3632,7 @@
         "Assert each revisit is served by the expected tier and makes no request to a lower tier",
         "Assert no tile is ever downloaded twice while a higher tier still holds it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F273",
@@ -3852,7 +3852,7 @@
         "Assert each change takes effect within one frame for new requests, as observed through request interception and storage inspection",
         "Record frames during each toggle and assert zero black pixels and no flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F291",
@@ -3877,7 +3877,7 @@
         "Assert zero network requests are made, health checks included",
         "Assert full navigation works from packages and caches with zero black pixels inside package coverage"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F293",
@@ -3927,7 +3927,7 @@
         "Reload the playground and run zoom, pan and flight scenarios",
         "Assert full navigation within package coverage with zero black pixels and no failed requests visible to the user"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F297",
@@ -3953,7 +3953,7 @@
         "Assert pending requests are cancelled and no retries are made until a health check succeeds",
         "Assert a connectivity event reports the change"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F299",

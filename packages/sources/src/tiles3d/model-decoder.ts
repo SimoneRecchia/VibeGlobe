@@ -1,0 +1,63 @@
+/**
+ * glTF decoding of 3D Tiles content (F463; ADR 0141): the `parse-model` task of `@vibeglobe/models` on the engine's
+ * worker pool (Draco, meshopt; their decoders load in the worker on the first content that needs them). While the
+ * worker program does not register the task (hook request E (1)), the loader's own task table runs it on the main
+ * thread, once the pool has answered `unknown-task`.
+ */
+import type { TaskTable, WorkerPool, WorkerTaskOutcome } from '@vibeglobe/core';
+
+/** A decode the caller may cancel. */
+export interface DecodeJob {
+  readonly cancelled: boolean;
+  /** Ids of the worker tasks running for the job, for cancellation and reprioritization. */
+  readonly tasks: Set<number>;
+}
+
+/** Thrown when the job was cancelled while decoding. */
+export class DecodeCancelled extends Error {}
+
+/** Decodes GLB bytes into a `ModelDescription`. */
+export class ModelDecoder {
+  private workersHaveTask = true;
+
+  constructor(
+    private readonly workers: WorkerPool | undefined,
+    private readonly fallback: TaskTable | undefined,
+  ) {}
+
+  /** Decodes a GLB; `inWorker` tells where it ran. */
+  async decode(glb: Uint8Array, priority: number, job: DecodeJob): Promise<{ model: unknown; inWorker: boolean }> {
+    if (this.workers && this.workersHaveTask) {
+      const outcome = await this.runOnWorkers(this.workers, glb.slice().buffer, priority, job);
+      if (outcome.ok) return { model: outcome.output, inWorker: true };
+      const { code, taskCode, message } = outcome.error;
+      if (job.cancelled || code === 'cancelled' || code === 'aborted') throw new DecodeCancelled();
+      if (taskCode !== 'unknown-task') throw new Error(`parse-model: ${message}`);
+      this.workersHaveTask = false;
+    }
+    const task = this.fallback?.['parse-model'];
+    if (!task) throw new Error('no parse-model task: the worker program lacks it and no modelTasks were given');
+    const output = await task({ bytes: glb.slice().buffer }, { isCancelled: () => job.cancelled });
+    if (job.cancelled) throw new DecodeCancelled();
+    return { model: output.output, inWorker: false };
+  }
+
+  private runOnWorkers(
+    workers: WorkerPool,
+    buffer: ArrayBuffer,
+    priority: number,
+    job: DecodeJob,
+  ): Promise<WorkerTaskOutcome> {
+    return new Promise((resolve) => {
+      let id = -1;
+      id = workers.run(
+        { task: 'parse-model', input: { bytes: buffer }, transfer: [buffer], priority, timeoutMs: 30_000 },
+        (outcome) => {
+          job.tasks.delete(id);
+          resolve(outcome);
+        },
+      );
+      job.tasks.add(id);
+    });
+  }
+}

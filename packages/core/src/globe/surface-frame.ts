@@ -370,8 +370,8 @@ export class SurfaceFrame {
   }
 
   /** Throws when a drawn layer's source is display only: its pixels may not be read back (F323). */
-  refuseReadback(): void {
-    refuseDisplayOnly(this.imagery, 'captureFrame', 'imagery');
+  refuseReadback(api: 'captureFrame' | 'captureView' = 'captureFrame'): void {
+    refuseDisplayOnly(this.imagery, api, 'imagery');
   }
 
   /** The imagery counters, if there is imagery. */

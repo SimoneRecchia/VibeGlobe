@@ -9,7 +9,8 @@ import { GlobeError } from './errors.js';
 import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
-import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
+import { FrameWaits } from './frame-waits.js';
+import { ViewCaptures } from './capture-view.js';
 import { imageryLayersOf } from './imagery-layers.js';
 import type { ImageryLayers } from '../imagery/imagery-stack.js';
 import type { Credit } from '../imagery/credits.js';
@@ -427,20 +428,19 @@ class GlobeEngine implements Globe {
   };
   readonly addRenderExtension: Globe['addRenderExtension'] = (create) =>
     this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
-  async captureFrame(): Promise<FrameCapture> {
-    this.assertAlive();
-    this.surfaceFrame.refuseReadback();
-    return captureWhenDrawn({
-      ready: this.ready,
-      waits: this.captureWaits,
-      state: () => ({
-        renderer: this.destroyed ? undefined : this.renderer,
-        failure: this.failure,
-        frames: this.frameNumber,
-      }),
-      draw: (renderer) => this.drawNow(renderer),
-    });
-  }
+  readonly captureFrame = (): Promise<FrameCapture> => this.captures.frame();
+  readonly captureView: Globe['captureView'] = (size) => this.captures.view(size);
+  private readonly captures = new ViewCaptures({
+    globe: this,
+    check: (api) => (this.assertAlive(), this.surfaceFrame.refuseReadback(api)),
+    waits: () => this.captureWaits,
+    renderer: () => (this.destroyed ? undefined : this.renderer),
+    failure: () => this.failure,
+    draw: (renderer) => this.drawNow(renderer),
+    camera: () => this.cam,
+    frameView: () => this.frameView,
+    surface: () => this.surfaceFrame,
+  });
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */
   private get waiting(): boolean {
     return this.pendingView !== undefined || this.collapsed;

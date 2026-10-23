@@ -825,6 +825,15 @@ export interface Globe {
    * engine, never from page screenshots). Resolves after `ready`; rejects with 'destroyed' after `destroy()`.
    */
   captureFrame(): Promise<FrameCapture>;
+  /**
+   * The current view as an image of `size` in pixels, larger than the canvas if asked (F416): the view covers the
+   * image (another aspect ratio crops its sides, or its top and bottom), with tiles at the image's resolution. The live
+   * view keeps rendering while they load; once nothing is loading, one frame is drawn at the image's scale and read.
+   * Credits are not drawn: the caller adds them (the UI's screenshot control does). Rejects with 'display-only' while a
+   * display-only source is drawn (ADR 0031), 'invalid-option' for a size that is not positive integers or exceeds the
+   * GPU's largest texture, and 'destroyed' after `destroy()`.
+   */
+  captureView(size: { readonly widthPx: number; readonly heightPx: number }): Promise<FrameCapture>;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */
   destroy(): void;
 }

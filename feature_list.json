@@ -5834,7 +5834,7 @@
         "Assert no frame shows an empty area where vector content exists at a coarser level",
         "Assert out-of-coverage vector tiles are never requested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F443",

@@ -62,3 +62,23 @@ export function hex(color: string): [number, number, number] {
   const v = Number.parseInt(color.slice(1), 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
+
+/**
+ * Counts the pixels whose whole 3 × 3 neighborhood is within `tolerance` of a color: areas of it (holes), not the
+ * anti-aliased edges of other colors that pass through it.
+ */
+export function countArea(image: PNG, rgb: readonly number[], tolerance = 8): number {
+  const match = (x: number, y: number) => {
+    const i = (y * image.width + x) * 4;
+    return near([image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0], rgb, tolerance);
+  };
+  let n = 0;
+  for (let y = 1; y < image.height - 1; y++) {
+    for (let x = 1; x < image.width - 1; x++) {
+      let all = true;
+      for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1 && all; dx++) all = match(x + dx, y + dy);
+      if (all) n++;
+    }
+  }
+  return n;
+}

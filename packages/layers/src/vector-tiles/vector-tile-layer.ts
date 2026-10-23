@@ -19,7 +19,7 @@ import { localizedTextField } from './osm.js';
 import { tileOrigin } from './globe-vertices.js';
 import { VectorTileLoader } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
-import { retainedTiles, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
+import { ancestorAt, retainedTiles, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
 import { meshKindOf, meshPaint, zoomBracket, type MeshPaint } from './vector-paint.js';
 import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
 import { json, resolveSource, tileUrl, type SourceInfo } from './style-sources.js';
@@ -285,11 +285,7 @@ class Runtime implements VectorTileLayer {
       source.loader.setLayers(layers, this.layoutVersion);
       const isReady = (tile: TileId) => source.loader.get(tile) !== undefined;
       const sourceDraws = tilesToDraw(targets, source.coverage, isReady);
-      const wanted = tilesToRequest(targets, source.coverage).map((tile, i) => ({
-        tile,
-        url: tileUrl(source, tile),
-        priority: i,
-      }));
+      const wanted = wantedTiles(source, targets).map((tile, i) => ({ tile, url: tileUrl(source, tile), priority: i }));
       source.loader.update(wanted, retainedTiles(sourceDraws));
       draws.set(
         source.id,
@@ -409,6 +405,21 @@ class Runtime implements VectorTileLayer {
       }
     }
   }
+}
+
+/**
+ * The tiles to request for the targets: their source tiles, and for a tile the source does not have (404), its nearest
+ * ancestor the source may have, so a stand-in exists (F442).
+ */
+function wantedTiles(source: ResolvedSource, targets: readonly TileId[]): TileId[] {
+  const out = new Map<string, TileId>();
+  for (const tile of tilesToRequest(targets, source.coverage)) {
+    let t: TileId | undefined = tile;
+    while (t !== undefined && source.loader.isMissing(t))
+      t = t.z > source.coverage.minzoom ? ancestorAt(t, t.z - 1) : undefined;
+    if (t !== undefined) out.set(tileKey(t), t);
+  }
+  return [...out.values()];
 }
 
 /** The square of `target` in the units of `tile` (its ancestor or itself). */

@@ -4829,7 +4829,7 @@
         "Verify their screen positions match the projection of their ellipsoidal coordinates within 1 pixel in the globe, 2D and tilted 3D phases",
         "Verify on the flat plane that altitude is scaled consistently with the terrain relief scaling, so objects stay at the same height relative to the terrain"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F363",

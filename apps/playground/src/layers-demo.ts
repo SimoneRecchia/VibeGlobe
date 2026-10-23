@@ -1,4 +1,5 @@
 import type { Globe } from '@vibeglobe/core';
+import { allAltitudeLayers, altitudeModels } from './layers-altitudes.js';
 import { fitLayers } from './layers-fit.js';
 import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { selectLayers, selectModels } from './layers-select.js';
@@ -349,24 +350,26 @@ function syncLayers(): DataLayer[] {
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
-  if (name === 'data-markers' || name === 'data-styled' || name === 'data-select')
+  if (['data-markers', 'data-styled', 'data-select', 'data-altitudes-all'].includes(name))
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
   const scene = name === 'data-points-100k' ? manyPointsLayer : DATA_SCENES[name];
   const added = scene
     ? [scene()]
     : name === 'data-altitudes'
       ? altitudeLayers()
-      : name === 'data-sync'
-        ? syncLayers()
-        : name === 'data-styled'
-          ? styledLayers()
-          : name === 'data-select'
-            ? selectLayers()
-            : name === 'data-pick'
-              ? pickLayers()
-              : name === 'data-fit'
-                ? fitLayers(globe)
-                : [];
+      : name === 'data-altitudes-all'
+        ? allAltitudeLayers()
+        : name === 'data-sync'
+          ? syncLayers()
+          : name === 'data-styled'
+            ? styledLayers()
+            : name === 'data-select'
+              ? selectLayers()
+              : name === 'data-pick'
+                ? pickLayers()
+                : name === 'data-fit'
+                  ? fitLayers(globe)
+                  : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
   if (name === 'data-models' || name === 'data-sync') {
     const models =
@@ -380,8 +383,8 @@ export function showDataScenario(globe: Globe, name: string): void {
     void models.then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
     return;
   }
-  if (name === 'data-select') {
-    const models = stack.add(selectModels(import.meta.env.BASE_URL));
+  if (name === 'data-select' || name === 'data-altitudes-all') {
+    const models = stack.add(name === 'data-select' ? selectModels(import.meta.env.BASE_URL) : altitudeModels());
     void models.ready.then(() => (window.vibeglobeLayers = { stack, layers, interaction, models }));
     return;
   }

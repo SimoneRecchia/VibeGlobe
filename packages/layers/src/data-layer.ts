@@ -431,7 +431,9 @@ export class DataLayer implements Layer {
   ): FeatureGeometry | undefined {
     if (this.kind === 'circle' && geometry.type === 'Point')
       return ellipseGeometry(geometry.coordinates, properties ?? {});
-    return toFeatureGeometry(geometry);
+    // Vertices without their own height take the layer's absolute altitude (F362), as anchors do.
+    const altitude = typeof this.placement === 'object' ? this.placement.absoluteAltitudeMeters : undefined;
+    return toFeatureGeometry(altitude === undefined ? geometry : (atAltitude(geometry, altitude) as Geometry));
   }
 
   #geometryType(index: number): string {
@@ -473,4 +475,14 @@ export class DataLayer implements Layer {
     this.store.setScalar('pickId', index, this.#slot === 0 ? 0 : packPickId(this.#slot, index));
     this.writeVisibility(index, this.featureVisibility(index));
   }
+}
+
+/** Coordinates with `heightMeters` added where a position has none. */
+function atAltitude(value: unknown, heightMeters: number): unknown {
+  if (!Array.isArray(value)) {
+    const geometry = value as { coordinates?: unknown };
+    return { ...geometry, coordinates: atAltitude(geometry.coordinates, heightMeters) };
+  }
+  if (typeof value[0] === 'number') return value.length >= 3 ? value : [value[0], value[1], heightMeters];
+  return value.map((item: unknown) => atAltitude(item, heightMeters));
 }

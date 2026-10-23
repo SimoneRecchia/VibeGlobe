@@ -69,6 +69,18 @@ const VIEWS: readonly {
     imagery: true,
     crossBackend: false,
   },
+  // Geodesic circles and an ellipse from the data layers in each phase (F356); edges are antialiased per backend.
+  { name: 'data-circles-globe', query: 'scenario=data-circles&lon=15&lat=40&zoom=1.5', crossBackend: false },
+  {
+    name: 'data-circles-2d',
+    query: 'scenario=data-circles&viewMode=2d&lon=10&lat=60&zoom=5.2',
+    crossBackend: false,
+  },
+  {
+    name: 'data-circles-tilted',
+    query: 'scenario=data-circles&viewMode=3d&lon=10&lat=60&zoom=5.2&tilt=40',
+    crossBackend: false,
+  },
 ];
 
 test.use({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });

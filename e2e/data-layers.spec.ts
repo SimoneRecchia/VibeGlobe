@@ -358,6 +358,54 @@ for (const backend of BACKENDS) {
       if (inside) expect(orange(pixel(image, inside.xPx, inside.yPx)), `${phase.name}: inside`).toBe(true);
       if (outside) expect(orange(pixel(image, outside.xPx, outside.yPx)), `${phase.name}: outside`).toBe(false);
     }
+    // The equator circle (500 km, about 4.5°), the polar one (300 km around 87°N, short of the pole; seen from 80°N in the globe phase) and the
+    // ellipse (600 km along its 45° axis, 200 km across it), seen from above each.
+    for (const { view, inside, outside } of [
+      {
+        view: { longitudeDeg: 10, latitudeDeg: 0, zoom: 4 },
+        inside: [
+          [10, 0],
+          [13.5, 0],
+          [10, -3.5],
+        ],
+        outside: [
+          [15.5, 0],
+          [10, 5.5],
+        ],
+      },
+      {
+        view: { longitudeDeg: 0, latitudeDeg: 80, zoom: 1 },
+        inside: [
+          [0, 87],
+          [0, 85],
+          [20, 87],
+        ],
+        outside: [
+          [0, 82],
+          [90, 85],
+        ],
+      },
+      // 400 km to the north-east is inside, 400 km to the north-west outside.
+      {
+        view: { longitudeDeg: 40, latitudeDeg: 30, zoom: 4 },
+        inside: [
+          [40, 30],
+          [42.98, 32.54],
+        ],
+        outside: [
+          [37.02, 32.54],
+          [44, 26],
+        ],
+      },
+    ] as const) {
+      const image = await showPhase(page, { name: 'globe', view, mode: 'auto' });
+      const shown = await project(page, [...inside, ...outside]);
+      shown.forEach((point, i) => {
+        const where = `${view.latitudeDeg}°: ${String([...inside, ...outside][i])}`;
+        if (!point) throw new Error(`${where} out of view`);
+        expect(orange(pixel(image, point.xPx, point.yPx)), where).toBe(i < inside.length);
+      });
+    }
   });
 }
 

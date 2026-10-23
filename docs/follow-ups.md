@@ -53,3 +53,7 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 
 - **Right-to-left and complex scripts in labels:** the shaper lays glyphs out left to right from their advances (ADR 0041). Arabic, Hebrew and Indic scripts need bidi reordering and contextual shaping (MapLibre loads an RTL plugin for this; HarfBuzz in WebAssembly is the complete option).
 - **Balanced line breaking:** labels break greedily at `text-max-width`; MapLibre balances line lengths, which looks better for two-line place names.
+
+## Sources (M7)
+
+- **Crop rectangle in the imagery decode task:** WMS adapters request a gutter around each tile and crop it in their transport by re-encoding the image (F231 works this way). An optional crop rectangle in the decoder description would crop in the worker's decode instead and save the re-encode (track B hook request, 2026-10-22).

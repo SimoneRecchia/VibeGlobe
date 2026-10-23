@@ -6132,7 +6132,7 @@
         "Assert by frame differencing that tileset geometry does not jump during the morph",
         "Capture the same view in each phase and compare positions and colors within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F466",

@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage, openGlobe } from './support/globe.ts';
-import { waitForStreaming } from './support/imagery.ts';
+import { fixtureSession, requestLog, waitForStreaming } from './support/imagery.ts';
+import { worldColor } from '../scripts/fixtures/tiles/generate.ts';
 
 /**
  * Tile placement of both tiling schemes (F224, F225): the fixture `world` imagery draws a dark one-texel grid line
@@ -274,6 +275,63 @@ for (const backend of BACKENDS) {
           }
         }
       expect(differing / (stacked.width * stacked.height)).toBeLessThan(0.002);
+    });
+
+    test(`a source shows the same placement, colors, credits and requests at the end of the globe phase, in 2D and in 3D on ${backend} (F250)`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      const phases = [
+        { phase: 'globe', query: 'zoom=3.7&imageryMax=4&level=4' },
+        { phase: '2d', query: 'zoom=7&imageryMax=7' },
+        { phase: '3d', query: 'zoom=16.8&imageryMax=16' },
+      ];
+      for (const { phase, query } of phases) {
+        const session = await fixtureSession(page);
+        await openGlobe(page, `backend=${backend}&session=${session}&imagery=world&lon=10&lat=30&${query}`);
+        await waitForStreaming(page);
+        expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.phase)).toBe(phase);
+        // Placement: the grid lines, the source's ground control marks, within half a pixel.
+        const errors = await gridErrors(page, 'mercator');
+        console.log(
+          `[phases] ${backend} ${phase}: ${errors.length} probes, worst ${Math.max(...errors).toFixed(3)} px`,
+        );
+        expect(errors.length).toBeGreaterThan(50);
+        expect(Math.max(...errors)).toBeLessThanOrEqual(MAX_ERROR_PX);
+        // Colors: away from the grid lines, each sampled pixel shows the fixture's color at its position.
+        const image = await canvasImage(page);
+        const samples = await page.evaluate(
+          ({ width, height }) => {
+            const points = [];
+            for (let y = 8; y < height; y += 16)
+              for (let x = 8; x < width; x += 16)
+                points.push({ x, y, geo: window.vibeglobePlayground?.globe.screenToGeo({ xPx: x, yPx: y }) });
+            return points;
+          },
+          { width: image.width, height: image.height },
+        );
+        const differences: number[] = [];
+        for (const { x, y, geo } of samples) {
+          const i = (Math.floor(y) * image.width + Math.floor(x)) * 4;
+          const shown = [image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0];
+          if (!geo || Math.max(...shown) < 60) continue;
+          const expected = worldColor((geo.longitudeDeg * Math.PI) / 180, (geo.latitudeDeg * Math.PI) / 180);
+          differences.push(Math.max(...shown.map((value, c) => Math.abs(value - (expected[c] ?? 0)))));
+        }
+        differences.sort((a, b) => a - b);
+        const median = differences[Math.floor(differences.length / 2)] ?? 255;
+        console.log(`[phases] ${backend} ${phase}: color difference median ${median} over ${differences.length}`);
+        expect(differences.length).toBeGreaterThan(100);
+        expect(median).toBeLessThanOrEqual(6);
+        // Credits and requests: the same credit, and every tile from the same template, each drawn one requested.
+        expect(await page.evaluate(() => window.vibeglobePlayground?.globe.credits().map((c) => c.text))).toEqual([
+          'Fixture world',
+        ]);
+        const log = await requestLog(page, session);
+        const template = new RegExp(`^/fixture-tiles/${session}/world/mercator/\\d+/\\d+/\\d+\\.png$`);
+        expect(log.filter((request) => !template.test(request.path)).map((r) => r.path)).toEqual([]);
+        expect(log.filter((request) => request.status !== 200).length).toBe(0);
+      }
     });
   });
 }

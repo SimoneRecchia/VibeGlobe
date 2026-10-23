@@ -3341,7 +3341,7 @@
         "Assert markers align within half a pixel in every phase and mean colors differ by less than the visual-test tolerance",
         "Assert attribution and request patterns are the same in every phase"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F251",

@@ -16,12 +16,13 @@ import {
 /** Application feature ids. */
 export type FeatureId = string | number;
 
-const STRING_CHANNELS: readonly BatchStringChannel[] = ['text', 'icon'];
+const STRING_CHANNELS: readonly BatchStringChannel[] = ['text', 'icon', 'font'];
 const STRING_BIT: Readonly<Record<BatchStringChannel, number>> = {
   text: 1 << BATCH_ATTRIBUTES.length,
   icon: 1 << (BATCH_ATTRIBUTES.length + 1),
+  font: 1 << (BATCH_ATTRIBUTES.length + 2),
 };
-const GEOMETRY_BIT = 1 << (BATCH_ATTRIBUTES.length + 2);
+const GEOMETRY_BIT = 1 << (BATCH_ATTRIBUTES.length + 3);
 const ATTRIBUTE_BIT = Object.fromEntries(BATCH_ATTRIBUTES.map((name, i) => [name, 1 << i])) as Record<
   BatchAttribute,
   number
@@ -42,7 +43,7 @@ export class FeatureStore {
   readonly #index = new Map<FeatureId, number>();
   readonly #properties: Record<string, unknown>[] = [];
   readonly #geometry: (FeatureGeometry | undefined)[] = [];
-  readonly #strings: Record<BatchStringChannel, string[]> = { text: [], icon: [] };
+  readonly #strings: Record<BatchStringChannel, string[]> = { text: [], icon: [], font: [] };
   #arrays: Record<BatchAttribute, Float64Array | Float32Array | Uint32Array>;
   #dirty: Uint32Array;
   #dirtyMin = Infinity;

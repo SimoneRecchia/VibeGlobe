@@ -20,6 +20,17 @@ const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, 
 
 type Canvas2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
+/** How a label's text is drawn (F357): a CSS font-family list, fill and halo colors (CSS), halo width in CSS pixels. */
+export interface TextStyle {
+  readonly font: string;
+  readonly fill: string;
+  readonly halo: string;
+  readonly haloPx: number;
+}
+
+/** White text with a dark halo, tinted by the label's color (`text` without a style). */
+const DEFAULT_TEXT: TextStyle = { font: '', fill: '#ffffff', halo: 'rgba(0, 0, 0, 0.85)', haloPx: 2 };
+
 function createCanvas(): { canvas: OffscreenCanvas | HTMLCanvasElement; context: Canvas2D } {
   const canvas =
     typeof OffscreenCanvas === 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(SIZE, SIZE);
@@ -32,7 +43,7 @@ function createCanvas(): { canvas: OffscreenCanvas | HTMLCanvasElement; context:
 
 /**
  * The texture atlas of labels and marker images (ADR 0037): text rasterized with the browser's fonts at the screen's
- * pixel ratio, white with a dark halo so a shader tints it, and the images applications register, packed in rows.
+ * pixel ratio in its colors and halo, and the images applications register, packed in rows.
  * When full it starts over and the batches using it rebuild.
  */
 export class LayerAtlas {
@@ -74,27 +85,33 @@ export class LayerAtlas {
     this.reset();
   }
 
-  /** The entry of a text at a size (CSS pixels), drawn on first use. */
-  text(text: string, sizePx: number): AtlasEntry {
-    const key = `t:${String(sizePx)}:${text}`;
+  /**
+   * The entry of a text at a size (CSS pixels) in a style, drawn on first use: the style's fonts before the system's
+   * (which carry the scripts a font lacks: Greek, Cyrillic, CJK), its fill, and a halo of its color and width.
+   */
+  text(text: string, sizePx: number, style: TextStyle = DEFAULT_TEXT): AtlasEntry {
+    const key = `t:${String(sizePx)}:${style.font}:${style.fill}:${style.halo}:${String(style.haloPx)}:${text}`;
     const cached = this.entries.get(key);
     if (cached) return cached;
     const context = this.context;
     const scale = this.pixelRatio;
-    const font = `${String(sizePx * scale)}px ${FONT}`;
+    const font = `${String(sizePx * scale)}px ${style.font ? `${style.font}, ` : ''}${FONT}`;
     context.font = font;
-    const halo = Math.max(1, Math.round(sizePx * 0.12)) * scale;
-    const width = Math.ceil(context.measureText(text).width + 2 * halo);
-    const height = Math.ceil(sizePx * 1.3 * scale + 2 * halo);
+    const halo = Math.max(0, style.haloPx) * scale;
+    const pad = Math.ceil(halo) + scale;
+    const width = Math.ceil(context.measureText(text).width + 2 * pad);
+    const height = Math.ceil(sizePx * 1.3 * scale + 2 * pad);
     const at = this.allocate(width, height);
     context.font = font;
     context.textBaseline = 'middle';
     context.lineJoin = 'round';
-    context.lineWidth = 2 * halo;
-    context.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    context.fillStyle = '#ffffff';
-    context.strokeText(text, at.x + halo, at.y + height / 2);
-    context.fillText(text, at.x + halo, at.y + height / 2);
+    if (halo > 0) {
+      context.lineWidth = 2 * halo;
+      context.strokeStyle = style.halo;
+      context.strokeText(text, at.x + pad, at.y + height / 2);
+    }
+    context.fillStyle = style.fill;
+    context.fillText(text, at.x + pad, at.y + height / 2);
     return this.remember(key, at.x, at.y, width, height, scale);
   }
 

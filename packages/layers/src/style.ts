@@ -6,6 +6,7 @@
 import {
   Color,
   createPropertyExpression,
+  isExpression,
   latest,
   type StylePropertySpecification,
 } from '@maplibre/maplibre-gl-style-spec';
@@ -65,6 +66,7 @@ const KIND_PROPERTIES: Readonly<Record<BatchKind, { groups: readonly string[]; m
     groups: ['layout_symbol', 'paint_symbol'],
     map: {
       'text-field': 'text',
+      'text-font': 'font',
       'text-size': 'sizePx',
       'text-rotate': 'rotationDeg',
       'text-offset': 'offsetPx',
@@ -148,8 +150,8 @@ export function compileStyle(kind: BatchKind, style: LayerStyle = {}): CompiledS
     if (spec === undefined) throw new Error(`style specification has no ${name}`);
     const value = style[name] ?? (spec as { default?: unknown }).default;
     if (value === undefined) continue;
-    // A constant array (for example `[0, 1]` for an offset) is a literal, not an expression (MapLibre semantics).
-    const input = Array.isArray(value) && typeof value[0] !== 'string' ? ['literal', value] : value;
+    // A constant array (`[0, 1]` for an offset, a font stack) is a literal, not an expression (MapLibre semantics).
+    const input = Array.isArray(value) && !isExpression(value) ? ['literal', value] : value;
     const compiled = createPropertyExpression(input, name, spec);
     if (compiled.result === 'error') {
       for (const error of compiled.value) problems.push(`${name}${error.key}: ${error.message}`);
@@ -165,10 +167,15 @@ export function compileStyle(kind: BatchKind, style: LayerStyle = {}): CompiledS
   };
 }
 
+/** Whether a channel holds a string per feature (text, marker image name, font stack) rather than numbers. */
+export function isStringChannel(channel: string): channel is 'text' | 'icon' | 'font' {
+  return channel === 'text' || channel === 'icon' || channel === 'font';
+}
+
 /**
  * Evaluates one property and writes its numeric value into `out` at `offset` (colors as straight RGBA, offsets as two
  * numbers, everything else one number).
- * @returns the string value for the text and icon channels, otherwise undefined.
+ * @returns the string value for the text, icon and font channels, otherwise undefined.
  */
 export function evaluateProperty(
   property: CompiledProperty,
@@ -179,8 +186,14 @@ export function evaluateProperty(
   featureState?: Readonly<Record<string, unknown>>,
 ): string | undefined {
   const value = property.expression.evaluate({ zoom }, feature, featureState);
-  if (property.channel === 'text' || property.channel === 'icon') {
+  if (isStringChannel(property.channel)) {
     if (value === undefined || value === null) return '';
+    // A font stack (`text-font`) is a list of family names: a CSS font-family list.
+    // Names are quoted, except single-word ones such as the generic families (`serif`, `monospace`).
+    if (Array.isArray(value))
+      return value
+        .map((name) => (/^[a-z-]+$/i.test(String(name)) ? String(name) : JSON.stringify(String(name))))
+        .join(', ');
     const named = value as { name?: unknown };
     return typeof named.name === 'string' ? named.name : String(value);
   }

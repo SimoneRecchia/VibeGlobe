@@ -2,6 +2,7 @@ import type { DebugMeshData, DepthPath, TileMeshData } from '@vibeglobe/core';
 import { positionLocal, sin, vec3 } from 'three/tsl';
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial, type Scene } from 'three/webgpu';
 import { makeEyeRelative, placeEyeRelative } from './eye-relative.js';
+import { releaseMesh } from './release-mesh.js';
 
 /** A drawn debug quad. */
 export interface DebugEntry {
@@ -48,8 +49,7 @@ export function placeDebugEntries(entries: readonly DebugEntry[], eye: Float64Ar
 /** Removes debug meshes from the scene and releases their geometry and materials. */
 export function disposeDebugEntries(scene: Scene, entries: readonly DebugEntry[]): void {
   for (const entry of entries) {
-    scene.remove(entry.mesh);
-    entry.mesh.geometry.dispose();
+    releaseMesh(scene, entry.mesh);
     (entry.mesh.material as MeshBasicNodeMaterial).dispose();
   }
 }

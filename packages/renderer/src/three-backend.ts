@@ -32,6 +32,7 @@ import { placeTile } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
 import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
+import { releaseMesh } from './release-mesh.js';
 import {
   RecoveryLimiter,
   createFailureMessage,
@@ -285,8 +286,7 @@ export class ThreeBackend implements RendererBackend {
   removeMesh(key: number): void {
     const entry = this.tiles.get(key);
     if (!entry) return;
-    this.scene.remove(entry.mesh);
-    entry.mesh.geometry.dispose();
+    releaseMesh(this.scene, entry.mesh);
     this.tiles.delete(key);
     const shownIndex = this.shown.indexOf(entry.mesh);
     if (shownIndex !== -1 && shownIndex < this.shownCount) this.shown[shownIndex] = undefined;
@@ -380,7 +380,7 @@ export class ThreeBackend implements RendererBackend {
     return {
       meshes: this.tiles.size + this.debugEntries.length + this.layers.meshCount,
       textures: (this.imageryTexture ? 1 : 0) + this.tileTextures.size,
-      gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes,
+      gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes + this.layers.gpuBytes,
       vertexArrays: this.destroyed ? this.vertexArraysLeft : countVertexArrays(this.renderer.backend),
       contexts: this.lossWatch.held() ? 1 : 0,
     };

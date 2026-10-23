@@ -1,10 +1,12 @@
 import type { Globe } from '@vibeglobe/core';
 import { allAltitudeLayers, altitudeModels } from './layers-altitudes.js';
+import { BeaconLayer } from '@vibeglobe/custom-layer-example';
 import { fitLayers } from './layers-fit.js';
+import { antimeridianLayers } from './layers-world.js';
 import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { selectLayers, selectModels } from './layers-select.js';
 import type { ModelLayer } from '@vibeglobe/layers/models';
-import { styledLayers, zoomLayers } from './layers-styled.js';
+import { labelsLayer, styledLayers, zoomLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
   createGlobeLayers,
@@ -24,6 +26,8 @@ declare global {
       interaction?: InteractionController;
       /** The glTF models of `?scenario=data-select` (F381). */
       models?: ModelLayer;
+      /** The custom layer of `?scenario=data-custom` (F388). */
+      custom?: BeaconLayer;
     };
   }
 }
@@ -179,31 +183,7 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
       ],
       style: { 'fill-color': '#20c040', 'fill-opacity': 0.9 },
     }),
-  // Latin with accents, Greek, Cyrillic and CJK, at several sizes, colors and anchors (F357).
-  'data-labels': () =>
-    new DataLayer('label', {
-      id: 'labels',
-      data: [
-        feature(
-          'roma',
-          { type: 'Point', coordinates: [12.5, 41.9] },
-          { t: 'Roma – Città', s: 20, c: '#ffd000', a: 'center' },
-        ),
-        feature('athens', { type: 'Point', coordinates: [23.7, 38.0] }, { t: 'Αθήνα', s: 16, c: '#40e0ff', a: 'left' }),
-        feature(
-          'moscow',
-          { type: 'Point', coordinates: [37.6, 55.75] },
-          { t: 'Москва', s: 24, c: '#ff60ff', a: 'bottom' },
-        ),
-        feature('tokyo', { type: 'Point', coordinates: [139.7, 35.7] }, { t: '東京', s: 18, c: '#ffffff', a: 'top' }),
-      ],
-      style: {
-        'text-field': ['get', 't'],
-        'text-size': ['get', 's'],
-        'text-color': ['get', 'c'],
-        'text-anchor': ['get', 'a'],
-      },
-    }),
+  'data-labels': labelsLayer,
   // Circles and an ellipse at the equator, at 60° and near a pole, radii in meters (F356).
   'data-circles': () =>
     new DataLayer('circle', {
@@ -272,15 +252,41 @@ const DATA_SCENES: Record<string, () => DataLayer> = {
       data: [feature('summit', { type: 'Polygon', coordinates: [rectangle(6.7, 45.72, 7.0, 45.95)] })],
       style: { 'fill-color': '#20c040', 'fill-opacity': 0.9 },
     }),
-  // Images with several anchors, sizes and rotations (F352).
+  // Images with several anchors, sizes, rotations and offsets (F352).
   'data-markers': () =>
     new DataLayer('marker', {
       id: 'markers',
       data: [
-        feature('m1', { type: 'Point', coordinates: [12.5, 41.9] }, { i: 'pin', a: 'bottom', r: 0 }),
-        feature('m2', { type: 'Point', coordinates: [14.25, 40.85] }, { i: 'square', a: 'center', r: 45 }),
+        feature('m1', { type: 'Point', coordinates: [12.5, 41.9] }, { i: 'pin', a: 'bottom', r: 0, s: 32, o: [0, 0] }),
+        feature(
+          'm2',
+          { type: 'Point', coordinates: [14.25, 40.85] },
+          { i: 'square', a: 'center', r: 45, s: 32, o: [0, 0] },
+        ),
+        feature(
+          'm3',
+          { type: 'Point', coordinates: [13.0, 40.9] },
+          { i: 'square', a: 'center', r: 0, s: 24, o: [0, 0] },
+        ),
+        feature('m4', { type: 'Point', coordinates: [13.6, 41.8] }, { i: 'pin', a: 'bottom', r: 0, s: 16, o: [0, 0] }),
+        feature(
+          'm5',
+          { type: 'Point', coordinates: [12.9, 41.5] },
+          { i: 'square', a: 'top-left', r: 0, s: 48, o: [0, 0] },
+        ),
+        feature(
+          'm6',
+          { type: 'Point', coordinates: [14.0, 41.5] },
+          { i: 'pin', a: 'bottom', r: 0, s: 32, o: [0, -12] },
+        ),
       ],
-      style: { 'icon-image': ['get', 'i'], 'icon-anchor': ['get', 'a'], 'icon-rotate': ['get', 'r'], 'icon-size': 32 },
+      style: {
+        'icon-image': ['get', 'i'],
+        'icon-anchor': ['get', 'a'],
+        'icon-rotate': ['get', 'r'],
+        'icon-size': ['get', 's'],
+        'icon-offset': ['get', 'o'],
+      },
     }),
 };
 
@@ -362,6 +368,7 @@ export function showDataScenario(globe: Globe, name: string): void {
     'data-pick': pickLayers,
     'data-fit': () => fitLayers(globe),
     'data-zoom': zoomLayers,
+    'data-antimeridian': antimeridianLayers,
   };
   const single = DATA_SCENES[name];
   const added = single ? [single()] : (scenes[name]?.() ?? []);
@@ -376,6 +383,18 @@ export function showDataScenario(globe: Globe, name: string): void {
             scale: 60,
           });
     void models.then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
+    return;
+  }
+  if (name === 'data-custom') {
+    // A layer type from outside the engine (F388), north, south and east of Rome.
+    const custom = stack.add(
+      new BeaconLayer('beacons', [
+        { id: 'north', position: { longitudeDeg: 12.5, latitudeDeg: 42.2 } },
+        { id: 'south', position: { longitudeDeg: 12.3, latitudeDeg: 41.6 } },
+        { id: 'east', position: { longitudeDeg: 13.0, latitudeDeg: 41.9 } },
+      ]),
+    );
+    window.vibeglobeLayers = { stack, layers, interaction, custom };
     return;
   }
   if (name === 'data-select' || name === 'data-altitudes-all') {

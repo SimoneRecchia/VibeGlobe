@@ -27,4 +27,9 @@ test('documentation site serves the guides and the API reference of every packag
 
   await page.goto(`${DOCS_URL}/documents/Development.html`);
   await expect(page.getByRole('heading', { name: 'Development', level: 1 })).toBeVisible();
+
+  // The data layers guide (F386), its examples run by e2e/data-layers-guide.spec.ts.
+  await page.goto(`${DOCS_URL}/documents/Data_layers.html`);
+  await expect(page.getByRole('heading', { name: 'Data layers', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Picking, events and selection' })).toBeVisible();
 });

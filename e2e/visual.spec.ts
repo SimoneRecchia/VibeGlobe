@@ -17,6 +17,8 @@ const VIEWS: readonly {
   crossBackend?: false;
   /** Streams for longer than the default 60 s on the software GPU (docs/test-changes.md). */
   slow?: true;
+  /** Device pixel ratio of the capture (default 1). */
+  dpr?: number;
 }[] = [
   { name: 'orbit', query: 'lon=-30&lat=20&zoom=1.5' },
   { name: 'europe', query: 'lon=12&lat=45&zoom=4' },
@@ -76,6 +78,16 @@ const VIEWS: readonly {
     query: 'scenario=data-circles&viewMode=2d&lon=10&lat=60&zoom=5.2',
     crossBackend: false,
   },
+  // Marker images with anchors, sizes, rotations and offsets, crisp at device pixel ratios 1 and 2 (F352).
+  { name: 'data-markers', query: 'scenario=data-markers&viewMode=2d&lon=13.3&lat=41.3&zoom=7', crossBackend: false },
+  {
+    name: 'data-markers-dpr2',
+    query: 'scenario=data-markers&viewMode=2d&lon=13.3&lat=41.3&zoom=7',
+    crossBackend: false,
+    dpr: 2,
+  },
+  // Labels in several scripts, fonts, sizes, colors, halos, anchors and offsets (F357).
+  { name: 'data-labels', query: 'scenario=data-labels&viewMode=2d&lon=18.5&lat=43.8&zoom=5', crossBackend: false },
   {
     name: 'data-circles-tilted',
     query: 'scenario=data-circles&viewMode=3d&lon=10&lat=60&zoom=5.2&tilt=40',
@@ -97,6 +109,15 @@ for (const backend of BACKENDS) {
       // Tiled imagery streams about 120 tiles before the capture, beyond 30 s on CI's software WebGPU.
       if (view.imagery) test.setTimeout(view.slow ? 180_000 : 90_000);
       const stages = stageLog(`${backend} ${view.name}`);
+      if (view.dpr !== undefined)
+        await (
+          await page.context().newCDPSession(page)
+        ).send('Emulation.setDeviceMetricsOverride', {
+          width: 960,
+          height: 540,
+          deviceScaleFactor: view.dpr,
+          mobile: false,
+        });
       await openGlobe(page, `backend=${backend}&${view.query}`);
       stages('opened');
       if (view.drawCalls !== undefined) {

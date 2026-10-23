@@ -13,6 +13,7 @@
   "dependencies": {
     "@vibeglobe/controls": "*",
     "@vibeglobe/core": "*",
+    "@vibeglobe/custom-layer-example": "*",
     "@vibeglobe/gis": "*",
     "@vibeglobe/layers": "*",
     "@vibeglobe/renderer": "*",

@@ -4,6 +4,7 @@ import {
   writeLayerVertex,
   type BatchAttribute,
   type BatchKind,
+  type BatchStringChannel,
   type FeatureGeometry,
   type LayerGround,
   type LayerOrigin,
@@ -20,6 +21,8 @@ import {
   vertexOf,
   type Triangle,
 } from './layer-subdivision.js';
+import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
+import type { TextStyle } from './layer-atlas.js';
 
 /** What a batch holds on the CPU: per-feature attributes, uniform overrides, strings and geometry (ADR 0037). */
 export interface BatchContents {
@@ -27,7 +30,7 @@ export interface BatchContents {
   count: number;
   readonly attributes: Map<BatchAttribute, Float64Array>;
   readonly uniforms: Map<BatchAttribute, Float64Array>;
-  readonly strings: Map<'text' | 'icon', string[]>;
+  readonly strings: Map<BatchStringChannel, string[]>;
   readonly geometry: Map<number, FeatureGeometry>;
 }
 
@@ -93,11 +96,33 @@ class Builder {
   other = { positions: [] as number[], normals: [] as number[], planes: [] as number[], heights: [] as number[] };
   private readonly one = { positions: new Float32Array(3), normals: new Float32Array(3), planes: new Float32Array(4) };
 
+  /** Longitudes on the flat map (F368): nearest the origin (quads), the previous one (lines), or as given (rings). */
+  private mode: 'origin' | 'chain' | 'raw' = 'origin';
+  private previousLon = Number.NaN;
+  readonly originLon: number;
+
   constructor(
     readonly origin: LayerOrigin,
     /** With a ground, heights are above the terrain under each vertex (clamped and draped features). */
     private readonly ground?: LayerGround,
-  ) {}
+  ) {
+    this.originLon = originLonDeg(origin);
+  }
+
+  /** Starts a feature whose longitudes are placed as `mode` says. */
+  startFeature(mode: 'origin' | 'chain' | 'raw'): void {
+    this.mode = mode;
+    this.previousLon = Number.NaN;
+  }
+
+  /** A longitude placed on the flat map's branch for the current feature. */
+  private place(lonDeg: number): number {
+    if (this.mode === 'raw') return lonDeg;
+    const reference = this.mode === 'chain' && !Number.isNaN(this.previousLon) ? this.previousLon : this.originLon;
+    const placed = nearestLon(lonDeg, reference);
+    this.previousLon = placed;
+    return placed;
+  }
 
   /** The longest straight piece of a line or polygon edge, degrees: finer on the terrain, so drapes follow it. */
   stepDeg(extentDeg: number): number {
@@ -118,14 +143,17 @@ class Builder {
     to?: number[],
     uv: number[] = [-1, -1],
   ): void {
-    this.attributesOf(lonDeg, latDeg, this);
-    this.heights.push(heightMeters + (this.ground?.heightAt(lonDeg, latDeg) ?? 0));
+    const lon = this.place(lonDeg);
+    this.attributesOf(lon, latDeg, this);
+    this.heights.push(heightMeters + (this.ground?.heightAt(wrappedLon(lon), latDeg) ?? 0));
     this.colors.push(...color);
     this.corners.push(...corner);
     this.uvs.push(...uv);
     if (to) {
-      this.attributesOf(to[0] ?? 0, to[1] ?? 0, this.other);
-      this.other.heights.push((to[2] ?? 0) + (this.ground?.heightAt(to[0] ?? 0, to[1] ?? 0) ?? 0));
+      // A segment's other end: on the branch next to this one.
+      const toLon = nearestLon(to[0] ?? 0, lon);
+      this.attributesOf(toLon, to[1] ?? 0, this.other);
+      this.other.heights.push((to[2] ?? 0) + (this.ground?.heightAt(wrappedLon(toLon), to[1] ?? 0) ?? 0));
     }
   }
 
@@ -174,7 +202,7 @@ function quadIndices(builder: Builder): void {
 
 /** Where labels and marker images come from (`LayerAtlas`). */
 export interface QuadImages {
-  text(text: string, sizePx: number): AtlasRect;
+  text(text: string, sizePx: number, style: TextStyle): AtlasRect;
   image(name: string): AtlasRect | undefined;
 }
 
@@ -195,6 +223,22 @@ function anchorShift(anchor: number, w: number, h: number): [number, number] {
   return [x, y];
 }
 
+/** A style color (sRGB, 0–1) as CSS, opaque unless `withAlpha`. */
+function cssOf(batch: BatchContents, attribute: BatchAttribute, feature: number, withAlpha: boolean): string {
+  const [r = 0, g = 0, b = 0, a = 1] = [0, 1, 2, 3].map((c) => valueOf(batch, attribute, feature, c));
+  return `rgba(${[r, g, b].map((v) => String(Math.round(v * 255))).join(', ')}, ${String(withAlpha ? a : 1)})`;
+}
+
+/** How a label's text is drawn (F357): `text-font`, `text-color`, `text-halo-color` and `text-halo-width`. */
+function textStyleOf(batch: BatchContents, feature: number): TextStyle {
+  return {
+    font: batch.strings.get('font')?.[feature] ?? '',
+    fill: cssOf(batch, 'color', feature, false),
+    halo: cssOf(batch, 'outlineColor', feature, true),
+    haloPx: valueOf(batch, 'widthPx', feature),
+  };
+}
+
 /** The box of a quad feature: half-sizes and its atlas region (none: a solid shape). */
 function boxOf(
   batch: BatchContents,
@@ -205,7 +249,7 @@ function boxOf(
   // Points: `sizePx` is the radius (MapLibre `circle-radius`).
   if (batch.kind === 'point') return { w: size, h: size, rect: undefined };
   if (batch.kind === 'label') {
-    const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size);
+    const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size, textStyleOf(batch, feature));
     return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: size / 2, h: size / 2, rect };
   }
   // Markers: the image at `sizePx` tall (its natural height when unset), or a solid square without one.
@@ -249,14 +293,18 @@ function quadVertices(batch: BatchContents, feature: number, images: QuadImages 
   }
   const { w, h, rect } = boxOf(batch, feature, images);
   const [ax, ay] = anchorShift(valueOf(batch, 'anchor', feature), w, h);
-  const dx = valueOf(batch, 'offsetPx', feature, 0) + ax;
-  const dy = -valueOf(batch, 'offsetPx', feature, 1) + ay;
+  // A label's offset is in ems of its text size (MapLibre's `text-offset`); a marker's in pixels.
+  const unit = batch.kind === 'label' ? valueOf(batch, 'sizePx', feature) : 1;
+  const dx = valueOf(batch, 'offsetPx', feature, 0) * unit + ax;
+  const dy = -valueOf(batch, 'offsetPx', feature, 1) * unit + ay;
   const angle = (-valueOf(batch, 'rotationDeg', feature) * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const round = batch.kind === 'point';
-  // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha.
-  const color = batch.kind === 'marker' && rect ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
+  // Marker images keep their own colors (MapLibre tints only SDF icons), and labels are drawn in theirs (F357): white,
+  // with the feature's alpha.
+  const own = (batch.kind === 'marker' || batch.kind === 'label') && rect;
+  const color = own ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
   const corners: number[][] = [];
   const uvs: number[][] = [];
   for (const [sx, sy] of QUAD_CORNERS) {
@@ -282,6 +330,7 @@ const QUAD_CORNERS = [
  * order (hidden ones collapsed), so a change to one feature rewrites only its vertices ({@link rewriteQuads}).
  */
 function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages | undefined): void {
+  builder.startFeature('origin');
   for (let feature = 0; feature < batch.count; feature++) {
     const q = quadVertices(batch, feature, images);
     for (let c = 0; c < 4; c++) builder.add(q.lon, q.lat, q.height, q.color, q.corners[c] ?? [], undefined, q.uvs[c]);
@@ -305,9 +354,10 @@ export function rewriteQuads(
   for (let feature = first; feature < end; feature++) {
     const q = quadVertices(batch, feature, images);
     const height = q.height + (ground?.heightAt(q.lon, q.lat) ?? 0);
+    const lon = nearestLon(q.lon, originLonDeg(arrays.origin));
     for (let c = 0; c < 4; c++) {
       const v = feature * 4 + c;
-      writeLayerVertex(arrays, v, q.lon, q.lat, arrays.origin);
+      writeLayerVertex(arrays, v, lon, q.lat, arrays.origin);
       arrays.heights[v] = height;
       arrays.colors.set(q.color, v * 4);
       arrays.corners.set(q.corners[c] ?? [], v * 4);
@@ -325,6 +375,7 @@ function buildLines(batch: BatchContents, builder: Builder): void {
     const step = builder.stepDeg(extentOf(geometry));
     const color = colorOf(batch, feature);
     const half = valueOf(batch, 'widthPx', feature) / 2;
+    builder.startFeature('chain');
     forEachPart(geometry, (start, end) => {
       for (let i = start; i + 1 < end; i++) {
         // Long segments follow the surface: pieces of at most MAX_STEP_DEG along the great circle.
@@ -357,22 +408,22 @@ function buildPolygons(batch: BatchContents, builder: Builder): void {
     for (let p = 0; p < starts.length; p++) {
       const firstPart = starts[p] ?? 0;
       const lastPart = starts[p + 1] ?? geometry.partStarts.length;
-      const first = geometry.partStarts[firstPart] ?? 0;
-      const end = geometry.partStarts[lastPart] ?? geometry.positions.length / 3;
-      const flat: number[] = [];
-      for (let i = first; i < end; i++) flat.push(geometry.positions[i * 3] ?? 0, geometry.positions[i * 3 + 1] ?? 0);
-      const holes: number[] = [];
-      for (let part = firstPart + 1; part < lastPart; part++) holes.push((geometry.partStarts[part] ?? 0) - first);
+      const { vertices, holes } = unwrappedPolygon(geometry, firstPart, lastPart, builder.originLon);
+      const flat = vertices.flatMap((v) => [v[0], v[1]]);
       const triangles = earcut(flat, holes);
-      for (let t = 0; t + 2 < triangles.length; t += 3) {
-        const corners = [0, 1, 2].map((c) => vertexOf(geometry, first + (triangles[t + c] ?? 0)));
-        // Large triangles follow the surface: split until every edge is at most MAX_STEP_DEG.
-        for (const triangle of subdivide(corners as Triangle, step)) {
-          for (const v of triangle) builder.add(v[0], v[1], top > 0 ? top : v[2], color, [0, 0, 0, 0]);
-          const at = builder.count - 3;
-          builder.indices.push(at, at + 1, at + 2);
+      builder.startFeature('raw');
+      // A ring around a pole repeats on the flat map's neighboring world copies (corner.w = 1, hidden near the globe).
+      for (const shift of worldCopies(vertices))
+        for (let t = 0; t + 2 < triangles.length; t += 3) {
+          const corners = [0, 1, 2].map((c) => vertices[triangles[t + c] ?? 0] ?? [0, 0, 0]);
+          // Large triangles follow the surface: split until every edge is at most MAX_STEP_DEG.
+          for (const triangle of subdivide(corners as Triangle, step)) {
+            for (const v of triangle)
+              builder.add(v[0] + shift, v[1], top > 0 ? top : v[2], color, [0, 0, 0, shift ? 1 : 0]);
+            const at = builder.count - 3;
+            builder.indices.push(at, at + 1, at + 2);
+          }
         }
-      }
       if (top > 0) buildWalls(geometry, builder, firstPart, lastPart, base, top, color);
     }
   }

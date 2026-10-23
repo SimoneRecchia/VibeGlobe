@@ -113,6 +113,8 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atl
   material.transparent = shape !== 'solid';
   material.depthWrite = shape === 'solid';
   material.side = DoubleSide;
+  // Flat layers have no back faces to order: one pass, so a batch is one draw call (F352's budget), not two.
+  material.forceSinglePass = true;
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;
   material.userData['viewport'] = viewport;
@@ -132,7 +134,12 @@ function layerColor(
   morphParams: Node<'vec4'>,
   atlas: Texture | undefined,
 ): { rgb: Node<'vec3'>; alpha: Node<'float'> } {
-  if (shape !== 'quad') return { rgb: color.xyz, alpha: color.w };
+  // A world copy of a ring around a pole (corner.w = 1) shows only on the flat map's half of the morph (F368).
+  if (shape !== 'quad')
+    return {
+      rgb: color.xyz,
+      alpha: color.w.mul(corner.w.greaterThan(0.5).and(morphParams.x.lessThan(0.5)).select(0, 1)),
+    };
   let rgb: Node<'vec3'> = color.xyz;
   let alpha: Node<'float'> = color.w;
   if (atlas) {

@@ -112,7 +112,7 @@ export class ModelLayer extends LayerEmitter implements Layer {
     ).then(() => undefined);
   }
 
-  /** Removes the models and frees the pick slot. */
+  /** Removes the models, frees the pick slot and drops the event handlers, as data layers do (KB-115). */
   detach(): void {
     const context = this.#context;
     this.#context = undefined;
@@ -122,6 +122,7 @@ export class ModelLayer extends LayerEmitter implements Layer {
     }
     if (context && this.#slot !== 0) context.releasePickSlot(this.#slot);
     this.#slot = 0;
+    this.clear();
   }
 
   /** Models are depth-tested volumes: they keep no draw order among the layers. */

@@ -3,6 +3,13 @@
 import { expect, test } from '@playwright/test';
 import { openGlobe, waitForIdle } from './support/globe.ts';
 
+declare global {
+  interface Window {
+    /** `?scenario=data-fit` (`apps/playground/src/layers-fit.ts`). */
+    vibeglobeFit?: { objects: { geometry: unknown }[]; fit(paddingPx: number): Promise<string> };
+  }
+}
+
 test.use({ viewport: { width: 480, height: 360 } });
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;

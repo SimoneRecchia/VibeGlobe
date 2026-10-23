@@ -1,0 +1,19 @@
+{
+  "name": "@vibeglobe/custom-layer-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A layer type written outside the engine against the public layer plug-in interface only (F388).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "source": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@vibeglobe/core": "*",
+    "@vibeglobe/layers": "*"
+  }
+}

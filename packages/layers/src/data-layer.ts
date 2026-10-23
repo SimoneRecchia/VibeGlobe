@@ -30,7 +30,14 @@ import {
   type BatchKind,
   type Placement,
 } from './render-target.js';
-import { compileStyle, evaluateProperty, type CompiledProperty, type CompiledStyle, type LayerStyle } from './style.js';
+import {
+  compileStyle,
+  evaluateProperty,
+  isStringChannel,
+  type CompiledProperty,
+  type CompiledStyle,
+  type LayerStyle,
+} from './style.js';
 
 /** Data a layer starts with: a collection, an array of features, or a stream of feature chunks. */
 export type LayerData = FeatureCollection | readonly Feature[] | AsyncIterable<readonly Feature[]>;
@@ -306,9 +313,10 @@ export class DataLayer implements Layer {
       this.context.target.setOrder(this.handle, order * ORDER_STRIDE + this.#orderOffset);
   }
 
-  /** Shows or hides the layer. */
+  /** Shows or hides the layer, from the next frame, which it asks for (KB-113). */
   setVisible(visible: boolean): void {
     this.#visible = visible;
+    this.context?.requestFrame();
   }
 
   /** Whether the layer is shown (independent of its zoom range). */
@@ -384,7 +392,7 @@ export class DataLayer implements Layer {
 
   #splitStyle(): void {
     const perFeature = (p: CompiledProperty): boolean =>
-      p.channel === 'text' || p.channel === 'icon' || p.kind === 'source' || p.kind === 'composite';
+      isStringChannel(p.channel) || p.kind === 'source' || p.kind === 'composite';
     this.#perFeature = this.#style.properties.filter((p) => p.channel !== 'sortKey' && perFeature(p));
     this.#uniforms = this.#style.properties.filter((p) => p.channel !== 'sortKey' && !perFeature(p));
     this.#uniformValues.clear();
@@ -400,14 +408,14 @@ export class DataLayer implements Layer {
     const { context, handle } = this;
     if (context === undefined || handle === undefined) return;
     for (const property of this.#uniforms) {
-      if (property.channel === 'text' || property.channel === 'icon' || property.channel === 'sortKey') continue;
+      if (isStringChannel(property.channel) || property.channel === 'sortKey') continue;
       const value = new Float64Array(ATTRIBUTE_COMPONENTS[property.channel]);
       evaluateProperty(property, zoom, undefined, value, 0);
       this.#uniformValues.set(property.channel, value);
       context.target.setUniform(handle, property.channel, value);
     }
     for (const property of this.#perFeature) {
-      if (property.channel !== 'text' && property.channel !== 'icon' && property.channel !== 'sortKey') {
+      if (!isStringChannel(property.channel) && property.channel !== 'sortKey') {
         context.target.setUniform(handle, property.channel, undefined);
       }
     }
@@ -449,8 +457,7 @@ export class DataLayer implements Layer {
     const state = id === undefined ? undefined : this.#states.get(id);
     for (const property of this.#perFeature) {
       const text = evaluateProperty(property, zoom, feature, scratch, 0, state);
-      if (property.channel === 'text' || property.channel === 'icon')
-        this.store.setString(property.channel, index, text ?? '');
+      if (isStringChannel(property.channel)) this.store.setString(property.channel, index, text ?? '');
       else this.store.set(property.channel as BatchAttribute, index, scratch);
     }
     if (this.#sortKey !== undefined && id !== undefined) {

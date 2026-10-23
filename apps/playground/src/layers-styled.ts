@@ -107,3 +107,35 @@ export function zoomLayers(): DataLayer[] {
     }),
   ];
 }
+
+/**
+ * `?scenario=data-labels` (F357): Latin with accents, Greek, Cyrillic and CJK at several sizes, colors and anchors;
+ * the same narrow text in a monospace and the default font; a magenta halo; an offset of two ems upward.
+ */
+export function labelsLayer(): DataLayer {
+  const label = (id: string, lon: number, lat: number, properties: Record<string, unknown>) =>
+    feature(id, point(lon, lat), properties);
+  return new DataLayer('label', {
+    id: 'labels',
+    data: [
+      label('roma', 12.5, 41.9, { t: 'Roma – Città', s: 20, c: '#ffd000', a: 'center' }),
+      label('athens', 23.7, 38.0, { t: 'Αθήνα', s: 16, c: '#40e0ff', a: 'left' }),
+      label('moscow', 37.6, 55.75, { t: 'Москва', s: 24, c: '#ff60ff', a: 'bottom' }),
+      label('tokyo', 139.7, 35.7, { t: '東京', s: 18, c: '#ffffff', a: 'top' }),
+      label('mono', 16.0, 45.5, { t: 'iiiiiiii', s: 18, c: '#ffffff', a: 'left', f: ['monospace'] }),
+      label('sans', 16.0, 44.0, { t: 'iiiiiiii', s: 18, c: '#ffffff', a: 'left' }),
+      label('halo', 19.0, 44.5, { t: 'HALO', s: 22, c: '#ffffff', a: 'center', hc: '#ff00ff', hw: 3 }),
+      label('offset', 21.0, 41.5, { t: 'Up', s: 20, c: '#40ff40', a: 'center', o: [0, -2] }),
+    ],
+    style: {
+      'text-field': ['get', 't'],
+      'text-size': ['get', 's'],
+      'text-color': ['get', 'c'],
+      'text-anchor': ['get', 'a'],
+      'text-font': ['coalesce', ['get', 'f'], ['literal', ['sans-serif']]],
+      'text-halo-color': ['coalesce', ['get', 'hc'], 'rgba(0, 0, 0, 0.85)'],
+      'text-halo-width': ['coalesce', ['get', 'hw'], 1.5],
+      'text-offset': ['coalesce', ['get', 'o'], ['literal', [0, 0]]],
+    },
+  });
+}

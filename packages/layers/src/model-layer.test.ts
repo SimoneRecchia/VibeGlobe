@@ -69,4 +69,18 @@ describe('model layer (F379, F381)', () => {
     expect(models.removed).toEqual([1, 2]);
     expect(stack.resolvePick(models.pickIds.get(1) ?? 0)).toBeUndefined();
   });
+
+  it('drops its event handlers when removed from the stack, as data layers do (KB-115, F385)', async () => {
+    const models = fakeModels();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    const layer = new ModelLayer({
+      id: 'models',
+      models: [{ id: 'a', url: 'a.gltf', position: { longitudeDeg: 12, latitudeDeg: 41 } }],
+    });
+    layer.on('click', () => undefined);
+    stack.add(layer);
+    await layer.ready;
+    stack.remove(layer);
+    expect(layer.listenerCount).toBe(0);
+  });
 });

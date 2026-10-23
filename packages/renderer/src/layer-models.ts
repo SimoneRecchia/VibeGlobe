@@ -9,6 +9,7 @@ import {
 import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
 import {
   Box3,
+  type BufferGeometry,
   Euler,
   Matrix4,
   MeshBasicNodeMaterial,
@@ -206,6 +207,19 @@ export class LayerModels implements ModelRenderer {
     }
   }
 
+  /** Meshes and geometry bytes held by the models, for the resource counters (F385). */
+  held(): { meshes: number; bytes: number } {
+    const held = { meshes: 0, bytes: 0 };
+    for (const model of this.modelList)
+      model.root.traverse((object) => {
+        const geometry = (object as Partial<Mesh>).geometry;
+        if (!geometry) return;
+        held.meshes += 1;
+        held.bytes += geometryBytes(geometry);
+      });
+    return held;
+  }
+
   /** Removes every model. */
   dispose(): void {
     for (const id of [...this.models.keys()]) this.remove(id);
@@ -233,6 +247,17 @@ function unlit(material: Material, highlight: { value: Vector4 }): MeshBasicNode
   unlitMaterial.side = material.side;
   material.dispose();
   return unlitMaterial;
+}
+
+/** The bytes of a geometry's vertex and index arrays, each shared buffer counted once. */
+export function geometryBytes(geometry: BufferGeometry): number {
+  const arrays = new Set<ArrayBufferView>();
+  for (const attribute of Object.values(geometry.attributes))
+    arrays.add('data' in attribute && attribute.data ? attribute.data.array : attribute.array);
+  if (geometry.index) arrays.add(geometry.index.array);
+  let bytes = 0;
+  for (const array of arrays) bytes += array.byteLength;
+  return bytes;
 }
 
 /** Frees the geometry, materials and textures of a model's scene graph. */

@@ -62,7 +62,7 @@ export const ANCHORS = [
 export const BATCH_ATTRIBUTES = Object.keys(ATTRIBUTE_COMPONENTS) as readonly BatchAttribute[];
 
 /** Per-feature text channels: a label's text and a marker's icon name (the renderer lays out glyphs and atlases icons). */
-export type BatchStringChannel = 'text' | 'icon';
+export type BatchStringChannel = 'text' | 'icon' | 'font';
 
 /** Line and polygon geometry of one feature: flat `[lon, lat, height, ...]` vertices and the start of each part. */
 export interface FeatureGeometry {

@@ -20,8 +20,9 @@ import {
   type Scene,
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
+import { releaseMesh } from './release-mesh.js';
 import { pickAt } from './layer-picking.js';
-import { LayerModels } from './layer-models.js';
+import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
@@ -245,11 +246,18 @@ export class LayerBatches implements LayerRenderTarget {
     return Promise.resolve(id !== 0 ? id : this.models.pickAt(view, point.xPx, point.yPx));
   }
 
-  /** Meshes held, for the resource counters. */
+  /** Meshes held (batches and models), for the resource counters. */
   get meshCount(): number {
-    let count = 0;
+    let count = this.models.held().meshes;
     for (const batch of this.batches.values()) if (batch.mesh) count++;
     return count;
+  }
+
+  /** Geometry bytes held by the batches and models, for the resource counters (F385: they return after a removal). */
+  get gpuBytes(): number {
+    let bytes = this.models.held().bytes;
+    for (const batch of this.batches.values()) if (batch.mesh) bytes += geometryBytes(batch.mesh.geometry);
+    return bytes;
   }
 
   /** Brings every batch up to date and places it for this frame (call before drawing the scene). */
@@ -382,8 +390,7 @@ export class LayerBatches implements LayerRenderTarget {
 
   private disposeMesh(batch: Batch): void {
     if (!batch.mesh) return;
-    this.scene.remove(batch.mesh);
-    batch.mesh.geometry.dispose();
+    releaseMesh(this.scene, batch.mesh);
     batch.mesh = undefined;
   }
 }

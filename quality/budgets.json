@@ -121,8 +121,9 @@
     }
   },
   "dataLayers": {
-    "_comment": "Per-feature updates of a 100,000-point layer (F376, F377): the CPU time of one update call, and the vertices uploaded per changed point (one quad).",
+    "_comment": "Per-feature updates of a 100,000-point layer (F376, F377): the CPU time of one update call, and the vertices uploaded per changed point (one quad). A marker layer's images share one atlas, so the layer is one draw call (F352).",
     "featureUpdateP95Ms": 1,
-    "uploadedVerticesPerFeature": 4
+    "uploadedVerticesPerFeature": 4,
+    "markerDrawCallsPerLayer": 1
   }
 }

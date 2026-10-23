@@ -4904,7 +4904,7 @@
         "Capture screenshots in the globe, 2D and tilted 3D phases on WebGPU and forced WebGL2",
         "Verify no feature wraps the wrong way around the world, shows a gap at ±180° or degenerates near a pole"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F369",
@@ -5114,7 +5114,7 @@
         "Verify GPU and RAM memory return to their baseline within tolerance after each cycle",
         "Verify no listeners, workers or timers remain from removed layers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F386",
@@ -5126,7 +5126,7 @@
         "Verify every topic listed is covered with a runnable example",
         "Run every example from the guide and verify it works as described"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F387",
@@ -5151,7 +5151,7 @@
         "Add it in the playground and capture screenshots on WebGPU and forced WebGL2, asserting it renders at its expected coordinates",
         "Assert it receives frame and camera events and that picking returns its features"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F389",

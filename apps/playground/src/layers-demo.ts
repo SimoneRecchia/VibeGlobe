@@ -1,5 +1,5 @@
 import type { Globe } from '@vibeglobe/core';
-import { manyPointsLayer } from './layers-many.js';
+import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { selectLayers } from './layers-select.js';
 import { styledLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
@@ -354,7 +354,9 @@ export function showDataScenario(globe: Globe, name: string): void {
           ? styledLayers()
           : name === 'data-select'
             ? selectLayers()
-            : [];
+            : name === 'data-pick'
+              ? pickLayers()
+              : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
   if (name === 'data-models' || name === 'data-sync') {
     const models =

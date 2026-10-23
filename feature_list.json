@@ -5102,7 +5102,7 @@
         "Verify every pick returns the expected feature, including small features at street level",
         "Repeat during a running flight and verify picks match what is displayed in that frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F385",

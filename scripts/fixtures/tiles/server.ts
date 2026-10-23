@@ -109,7 +109,8 @@ const PATTERNS: readonly string[] = [
   'blue',
   'shade',
 ];
-const SCHEMES: readonly string[] = ['mercator', 'geographic'];
+// `mercator-tms`: the Web Mercator tiles with TMS rows, counted from the south (F229).
+const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms'];
 const TILE_PATH =
   /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
@@ -281,10 +282,10 @@ export class FixtureServer {
     const entry = this.session(id);
     const tile: FixtureTile = {
       pattern: source as FixturePattern,
-      scheme: scheme as FixtureScheme,
+      scheme: (scheme === 'mercator-tms' ? 'mercator' : scheme) as FixtureScheme,
       level: Number(z),
       x: Number(x),
-      y: Number(y),
+      y: scheme === 'mercator-tms' ? 2 ** Number(z) - 1 - Number(y) : Number(y),
       // `{y}@2x.png`: the same tile at 512 pixels, a high-DPI variant or a 512-pixel pyramid (F240, F241).
       ...(path.includes('@2x.') ? { sizePx: 512 } : {}),
     };

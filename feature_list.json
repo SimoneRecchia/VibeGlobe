@@ -3070,7 +3070,7 @@
         "Show both fixtures in the playground and assert tiles land at the correct positions within half a pixel on both backends",
         "Fuzz URL templates and assert invalid templates are rejected with a descriptive error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F230",

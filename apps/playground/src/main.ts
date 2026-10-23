@@ -168,8 +168,8 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const extension = ['etc1s', 'uastc'].includes(params.get('ktx2') ?? '') ? `${params.get('ktx2')}.ktx2` : 'png';
   // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
   const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
-  const { tileSizePx, variant } = tileVariant(params);
-  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}${variant}.${extension}`;
+  const { tileSizePx, variant, rows } = tileVariant(params);
+  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}${rows}${variant}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);

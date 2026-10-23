@@ -128,10 +128,12 @@ export function chainSources(
 
 /**
  * The fixture imagery's tile size and URL suffix: `?imageryTileSize=512` serves the same tiles at 512 pixels (F240),
- * `?imageryHiDpi=1` adds `@2x` variants through the `{r}` template field (F241).
+ * `?imageryHiDpi=1` adds `@2x` variants through the `{r}` template field (F241); `rows` addresses the tiles.
  */
-export function tileVariant(params: URLSearchParams): { tileSizePx: number; variant: string } {
+export function tileVariant(params: URLSearchParams): { tileSizePx: number; variant: string; rows: string } {
   const tileSizePx = params.get('imageryTileSize') === '512' ? 512 : 256;
   const variant = tileSizePx === 512 ? '@2x' : params.get('imageryHiDpi') === '1' ? '{r}' : '';
-  return { tileSizePx, variant };
+  // `?imageryAddressing=tms` requests Web Mercator tiles with TMS rows from the fixture's `mercator-tms` (F229).
+  const rows = params.get('imageryAddressing') === 'tms' ? '-tms/{z}/{x}/{-y}' : '/{z}/{x}/{y}';
+  return { tileSizePx, variant, rows };
 }

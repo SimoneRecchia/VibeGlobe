@@ -28,6 +28,9 @@ const VIEWS: Record<Scheme, readonly { name: string; query: string }[]> = {
     { name: '2d', query: 'viewMode=2d&lon=10&lat=50&zoom=5&imageryMax=5' },
     { name: '3d', query: 'viewMode=3d&lon=10&lat=45&zoom=6&tilt=40&imageryMax=5' },
     { name: '2d-85', query: 'viewMode=2d&lon=-60&lat=83.5&zoom=5&imageryMax=5' },
+    // TMS rows counted from the south (F229).
+    { name: 'globe-tms', query: 'lon=10&lat=30&zoom=2&imageryMax=2&level=4&imageryAddressing=tms' },
+    { name: '2d-tms', query: 'viewMode=2d&lon=10&lat=50&zoom=5&imageryMax=5&imageryAddressing=tms' },
   ],
   geographic: [
     { name: 'globe-antimeridian', query: 'lon=180&lat=10&zoom=2.3&imageryMax=1&level=4' },
@@ -219,8 +222,8 @@ function blackPixels(image: PNG): number {
 for (const backend of BACKENDS) {
   test.describe(backend, () => {
     for (const scheme of ['mercator', 'geographic'] as const) {
-      const feature = scheme === 'mercator' ? 'F224' : 'F225';
       for (const view of VIEWS[scheme]) {
+        const feature = view.name.endsWith('tms') ? 'F229' : scheme === 'mercator' ? 'F224' : 'F225';
         test(`${scheme} tiles' grid lines land within half a pixel of their projected positions, ${view.name}, on ${backend} (${feature})`, async ({
           page,
         }) => {

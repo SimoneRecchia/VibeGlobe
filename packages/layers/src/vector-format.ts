@@ -12,6 +12,7 @@ import {
   type Geometry as SourceGeometry,
   type VectorFeature,
 } from '@vibeglobe/sources/vector';
+import type { WorkerPool } from '@vibeglobe/core';
 import type { Feature, Geometry } from './geojson.js';
 
 /** Raw input of an adapter: the bytes of a file or response, text, or (GeoJSON only) an already parsed object. */
@@ -27,6 +28,8 @@ export interface ParsedVectorData {
 export interface VectorFormatAdapter {
   /** Format name, for errors ('geojson', 'kml', 'gpx'). */
   readonly format: string;
+  /** The worker task that parses this format (`parse-geojson`, …), when the worker program has one. */
+  readonly task?: string;
   /** Parses untrusted input; never rejects for malformed data, which comes back as issues. */
   parse(input: VectorInput): Promise<ParsedVectorData>;
 }
@@ -64,6 +67,7 @@ type Parser = (input: string | Uint8Array | ArrayBuffer) => {
 function adapter(format: string, parser: Parser, acceptsObjects: boolean): VectorFormatAdapter {
   return {
     format,
+    task: `parse-${format}`,
     parse(input) {
       let source: string | Uint8Array | ArrayBuffer;
       if (typeof input === 'string' || input instanceof ArrayBuffer || input instanceof Uint8Array) source = input;
@@ -83,18 +87,37 @@ export const kmlFormat: VectorFormatAdapter = adapter('kml', parseKml, false);
 /** GPX waypoints, routes and tracks. */
 export const gpxFormat: VectorFormatAdapter = adapter('gpx', parseGpx, false);
 
+/** Parses in the worker pool (F371): the input goes over as text or transferred bytes, the features come back. */
+function parseInWorker(adapter: VectorFormatAdapter, task: string, input: VectorInput, pool: WorkerPool) {
+  let message: { text?: string; bytes?: ArrayBuffer };
+  if (typeof input === 'string') message = { text: input };
+  else if (input instanceof ArrayBuffer) message = { bytes: input };
+  else if (input instanceof Uint8Array) message = { bytes: input.slice().buffer };
+  else if (adapter.format === 'geojson') message = { text: JSON.stringify(input) };
+  else return adapter.parse(input);
+  return new Promise<ParsedVectorData>((resolve, reject) => {
+    pool.run({ task, input: message, transfer: message.bytes ? [message.bytes] : [] }, (outcome) => {
+      if (!outcome.ok) return reject(new Error(`${adapter.format}: ${outcome.error.message}`));
+      const parsed = outcome.output as { features: readonly VectorFeature[]; issues: readonly FeatureIssue[] };
+      resolve({ features: toFeatures(parsed.features), issues: parsed.issues });
+    });
+  });
+}
+
 /** Where vector data comes from: a URL, a File or Blob, or an in-memory object or text. */
 export type VectorSource = URL | { readonly url: string } | Blob | VectorInput;
 
 /**
  * Reads vector data from a URL, a File or Blob, or memory, and parses it with an adapter.
  * @param fetchFn the fetch implementation (the engine's transport rules apply to URLs).
+ * @param pool the worker pool that parses, off the main thread (F371); without it parsing runs here.
  * @throws Error (a rejected promise) when a URL answers with an error status.
  */
 export async function loadVectorData(
   source: VectorSource,
   adapter: VectorFormatAdapter,
   fetchFn: (url: string) => Promise<Response> = (url) => fetch(url),
+  pool?: WorkerPool,
 ): Promise<ParsedVectorData> {
   let input: VectorInput;
   if (
@@ -110,5 +133,5 @@ export async function loadVectorData(
   } else {
     input = source as VectorInput;
   }
-  return adapter.parse(input);
+  return pool && adapter.task ? parseInWorker(adapter, adapter.task, input, pool) : adapter.parse(input);
 }

@@ -216,4 +216,23 @@ describe('touch gestures (ADR 0009 §4)', () => {
     // 1 px/ms for τ = 200 ms: about 200 px more.
     expect(released - h.camera.centerX).toBeGreaterThan(150);
   });
+
+  it('coasts when moves and the release arrive 100 ms apart on a slow device, but not after holding still (KB-121)', () => {
+    const coast = (releaseAfterMs: number) => {
+      const h = controlsHarness();
+      touch(h, 'pointerdown', 1, 100, 300, 0);
+      h.frame(100);
+      for (let i = 1; i <= 8; i++) {
+        touch(h, 'pointermove', 1, 100 + 10 * i, 300, i * 100);
+        h.frame(100);
+      }
+      const released = h.camera.centerX;
+      touch(h, 'pointerup', 1, 180, 300, 800 + releaseAfterMs);
+      h.run(h.globe.timeMs + 3000);
+      return released - h.camera.centerX;
+    };
+    // 0.1 px/ms: about 30 px more at τ = 300 ms.
+    expect(coast(100)).toBeGreaterThan(5);
+    expect(coast(400)).toBeCloseTo(0, 9);
+  });
 });

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { frameAt } from './__fixtures__/test-support.js';
 import type { FeatureCollection } from './geojson.js';
 import { GeoJsonLayer } from './geojson-layer.js';
-import { gpxFormat, kmlFormat } from './vector-format.js';
+import type { WorkerPool } from '@vibeglobe/core';
+import { VECTOR_TASKS } from '@vibeglobe/sources/vector';
+import { geojsonFormat, gpxFormat, kmlFormat, loadVectorData } from './vector-format.js';
 import { LayerStack } from './layer-stack.js';
 import { RecordingRenderTarget } from './testing.js';
 
@@ -189,5 +191,26 @@ describe('vector data layer with multi-points', () => {
       ],
     });
     expect(layer.featureCounts.point).toBe(4);
+  });
+
+  it('parses in the worker pool when given one, transferring the bytes (F371)', async () => {
+    const tasks: string[] = [];
+    const transferred: object[] = [];
+    const pool = {
+      run(request, done) {
+        tasks.push(request.task);
+        transferred.push(...(request.transfer ?? []));
+        void Promise.resolve(VECTOR_TASKS[request.task]?.(request.input, {} as never)).then((result) =>
+          done({ ok: true, output: result?.output }),
+        );
+        return 1;
+      },
+    } as Pick<WorkerPool, 'run'> as WorkerPool;
+    const bytes = new TextEncoder().encode(JSON.stringify(collection)).buffer;
+    const parsed = await loadVectorData(bytes, geojsonFormat, undefined, pool);
+    expect(tasks).toEqual(['parse-geojson']);
+    expect(parsed.features.map((feature) => feature.id)).toEqual(collection.features.map((feature) => feature.id));
+    // The bytes go to the worker without a copy.
+    expect(transferred).toEqual([bytes]);
   });
 });

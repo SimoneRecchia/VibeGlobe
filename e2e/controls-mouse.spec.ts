@@ -57,6 +57,10 @@ for (const backend of BACKENDS) {
     expect(Math.abs((await camera(page)).headingDeg - before.headingDeg)).toBeLessThan(90);
     await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=8&tilt=40&heading=30`);
     await dragKeepsAnchor(page, { xPx: 400, yPx: 400 }, { xPx: 300, yPx: 330 });
+    // The flat map (M5): the same drag in the 2D view.
+    await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=5&viewMode=2d`);
+    expect((await camera(page)).viewMode).toBe('2d');
+    await dragKeepsAnchor(page, { xPx: 400, yPx: 300 }, { xPx: 520, yPx: 240 });
   });
 }
 
@@ -207,6 +211,8 @@ async function rotateDrag(page: Page, button: 'right' | 'left', ctrl: boolean, d
   await page.mouse.move(400, 300);
   await page.mouse.down({ button });
   await page.mouse.move(400 + dx, 300 + dy, { steps: 10 });
+  // Held still before the release, so neither drag coasts: inertia depends on event timing, the mapping does not.
+  await page.waitForTimeout(400);
   await page.mouse.up({ button });
   if (ctrl) await page.keyboard.up('Control');
   await settle(page);
@@ -236,6 +242,10 @@ for (const backend of BACKENDS) {
     const vertical = await rotateDrag(page, 'right', false, 0, -150);
     expect(vertical.tilt).toBeGreaterThan(15);
     expect(vertical.centerMoved).toBeLessThan(1e-9);
+    // The new tilt and heading are the chosen ones (M5): the engine keeps them.
+    const state = await camera(page);
+    expect(state.chosenTiltDeg).toBeCloseTo(state.tiltDeg, 6);
+    expect(state.chosenHeadingDeg).toBeCloseTo(state.headingDeg, 6);
     expect(await page.evaluate(() => (window as { menus?: number }).menus ?? 0)).toBe(0);
   });
 }
@@ -316,6 +326,37 @@ for (const backend of BACKENDS) {
       const zooms = recorded.map((frame) => groundZoom(frame.camera));
       expect(new Set(zooms).size).toBeGreaterThan(4);
       expect(groundZoom(await camera(page)) - zoom).toBeCloseTo(-(deltaY * (deltaMode === 1 ? 16 : 1)) / 300, 6);
+    }
+  });
+}
+
+for (const backend of BACKENDS) {
+  test(`wheel notches stay anchored at the cursor in the 2D view and in the tilted view over terrain on ${backend} (F168)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    for (const query of [
+      `backend=${backend}&lon=10&lat=45&zoom=5&viewMode=2d&size=320x240`,
+      `backend=${backend}&lon=6.86&lat=45.7&zoom=11&tilt=55&terrain=terrarium&size=320x240`,
+    ]) {
+      await openControls(page, query);
+      await settle(page);
+      for (const [x, y, deltaMode, deltaY] of [
+        [120, 150, 0, -100],
+        [200, 110, 1, 3],
+      ] as const) {
+        const under = await positionAt(page, { xPx: x, yPx: y });
+        expect(under, `${query}: a position under ${x}, ${y}`).not.toBeNull();
+        await record(page, [under as GeoPosition]);
+        await wheel(page, [{ x, y, deltaY, deltaMode }]);
+        await settle(page);
+        const recorded = await frames(page);
+        expect(
+          maxDrift(recorded, () => ({ xPx: x, yPx: y })),
+          query,
+        ).toBeLessThan(1);
+        expect(new Set(recorded.map((frame) => groundZoom(frame.camera))).size).toBeGreaterThan(4);
+      }
     }
   });
 }

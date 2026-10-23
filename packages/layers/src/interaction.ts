@@ -5,6 +5,7 @@
  * feature states (`['feature-state', 'hover']`, `['feature-state', 'selected']`).
  */
 import type { GeoPosition, ScreenPoint } from '@vibeglobe/core';
+import type { Project } from './anchors.js';
 import type { FeatureId } from './feature-store.js';
 import type { FeatureEvent, Layer, LayerEvents, PickedFeature } from './layer.js';
 import type { LayerStack } from './layer-stack.js';
@@ -23,6 +24,12 @@ interface InteractiveLayer extends Layer {
   setFeatureState?(id: FeatureId, state: Readonly<Record<string, unknown>> | undefined): boolean;
   setFeaturePosition?(id: FeatureId, longitudeDeg: number, latitudeDeg: number, heightMeters?: number): boolean;
   readonly draggable?: boolean;
+  /** How the layer places its features: on the ground (a height above the terrain) or at absolute altitudes. */
+  readonly placement?: unknown;
+  /** A feature's position, to keep its height above the ground while it is dragged (KB-129). */
+  getPosition?(id: FeatureId): GeoPosition | undefined;
+  /** Whether a feature anchor shows within `radiusPx` of `point`: the synchronous check before a drag (F382). */
+  anchorNear?(point: ScreenPoint, radiusPx: number, project: Project): boolean;
 }
 
 interface Hit {
@@ -63,6 +70,19 @@ export class InteractionController {
   /** Selected features. */
   get selection(): readonly PickedFeature[] {
     return [...this.#selected.values()].map((hit) => hit.feature);
+  }
+
+  /**
+   * True when a press at `point` lands near the anchor of a feature in a draggable layer (within `radiusPx`): the map's
+   * own gestures must not start, since the asynchronous pick confirms the feature only frames later (F382).
+   */
+  pressesDraggable(point: ScreenPoint, radiusPx: number, project: Project): boolean {
+    for (const id of this.#stack.order) {
+      const layer = this.#stack.get(id);
+      if (layer === undefined || !isInteractive(layer) || layer.draggable !== true) continue;
+      if (this.#stack.isVisible(id) && layer.anchorNear?.(point, radiusPx, project) === true) return true;
+    }
+    return false;
   }
 
   /** Handles a pointer move: drags the pressed feature, or updates the hover. */
@@ -179,12 +199,12 @@ export class InteractionController {
       pressed.layer.emit('drag-start', this.#event(pressed, point));
     }
     if (position === undefined) return;
-    pressed.layer.setFeaturePosition?.(
-      pressed.feature.id,
-      position.longitudeDeg,
-      position.latitudeDeg,
-      position.heightMeters ?? 0,
-    );
+    // On the ground a feature keeps its height above the terrain; at absolute altitudes it takes the picked one.
+    const onGround = typeof pressed.layer.placement === 'string';
+    const height = onGround
+      ? (pressed.layer.getPosition?.(pressed.feature.id)?.heightMeters ?? 0)
+      : (position.heightMeters ?? 0);
+    pressed.layer.setFeaturePosition?.(pressed.feature.id, position.longitudeDeg, position.latitudeDeg, height);
     pressed.layer.emit('drag', { feature: pressed.feature, position, screenPoint: point });
   }
 

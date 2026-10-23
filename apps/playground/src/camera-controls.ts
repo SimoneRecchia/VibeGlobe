@@ -1,3 +1,4 @@
+import type { NavigationControls } from '@vibeglobe/controls';
 import type { Globe } from '@vibeglobe/core';
 
 /** The orientation commands (F191): the heading each button turns to. */
@@ -18,14 +19,18 @@ function button(label: string, name: string, onClick: () => void): HTMLButtonEle
 }
 
 /**
- * The playground's camera commands (M6): a tilt slider (F188), north, east, south and west (F191), reset to the globe
+ * The playground's camera commands (M6): zoom in and out by one level about the center (F174), a tilt slider (F188), north, east, south and west (F191), reset to the globe
  * (F193) and home (F194). Each calls the public movement API; the slider follows the applied tilt.
  */
-export function showCameraControls(globe: Globe, app: HTMLElement): void {
+export function showCameraControls(globe: Globe, app: HTMLElement, navigation: NavigationControls): void {
   const group = document.createElement('div');
   group.id = 'camera-controls';
   group.setAttribute('role', 'group');
   group.setAttribute('aria-label', 'Camera');
+  group.append(
+    button('+', 'zoom-in', () => navigation.zoomIn()),
+    button('−', 'zoom-out', () => navigation.zoomOut()),
+  );
   const tilt = document.createElement('input');
   tilt.type = 'range';
   tilt.min = '0';

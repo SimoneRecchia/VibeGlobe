@@ -15,6 +15,7 @@ export interface ViewWiring {
   readonly surface: {
     readonly view: ViewState;
     preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
+    cameraJumped(): void;
   };
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
@@ -54,6 +55,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
     constrainEnd: (end) => globe.constraints.clampEnd(end),
     preloadView: (end, flight) => globe.surface.preloadView(end, globe.cam, flight),
+    cameraJumped: () => globe.surface.cameraJumped(),
   });
   return { viewControl, movements };
 }

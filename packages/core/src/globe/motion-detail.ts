@@ -28,6 +28,11 @@ export class MotionDetail {
   /** The largest texel at rest, render-target pixels in CSS pixels (1.5 over the pixel ratio, F109). */
   baseTexelErrorPx = 1.5;
 
+  /** The camera jumped (`jumpTo`): not motion the eye follows, so the next frame measures no speed from it (F085). */
+  jumped(): void {
+    this.lastMs = Number.NaN;
+  }
+
   /**
    * Measures the camera's speed at the clock time `clock[0]` and returns the texel error multiplier for this frame;
    * `link` is the page's measured link. Numbers come in arrays and objects: doubles passed as arguments would allocate

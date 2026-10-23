@@ -286,6 +286,11 @@ export class SurfaceFrame {
     else this.imagery.preload.clear();
   }
 
+  /** The camera jumped: no motion for motion-aware detail (F085). */
+  cameraJumped(): void {
+    motionOf(this).jumped();
+  }
+
   /** The layers' tile sizes and levels changed (a layer was added or removed): the selection reads them again. */
   imageryChanged(): void {
     if (!this.imagery) return;

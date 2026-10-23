@@ -47,6 +47,17 @@ describe('bandwidth estimate (F300, F303)', () => {
     expect(Math.abs(estimator.bitsPerSecond / 50e6 - 1)).toBeLessThan(0.2);
   });
 
+  it('counts only network-timed responses once it has three, not main-thread-timed ones from other hosts', () => {
+    const estimator = new BandwidthEstimator();
+    for (let i = 0; i < 10; i++) {
+      const startMs = 100 * i;
+      // 50 Mbps measured by the network; a cross-origin host without timings looks 100 times slower.
+      estimator.ended(startMs + 18, startMs, { ...response(6250, 2), transferMs: 1, endAgoMs: 15 });
+      estimator.ended(startMs + 50, startMs, response(6250, 0));
+    }
+    expect(Math.abs(estimator.bitsPerSecond / 50e6 - 1)).toBeLessThan(0.2);
+  });
+
   it('knows nothing before a few downloads, and does not count idle time', () => {
     const estimator = new BandwidthEstimator();
     expect(estimator.bitsPerSecond).toBeNaN();

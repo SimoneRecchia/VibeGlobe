@@ -35,6 +35,20 @@ describe('motion-aware detail (F288, F301)', () => {
     expect(run(motion, camera, clock, 31, 0)).toBe(1);
   });
 
+  it('takes a jump as no motion: full detail at once (F085)', () => {
+    const camera = new Camera();
+    camera.pose.rangeMeters = 50_000;
+    camera.update();
+    const motion = new MotionDetail();
+    const clock = new Float64Array(1);
+    run(motion, camera, clock, 5, 0);
+    // 20 view ranges east in one frame, announced as a jump.
+    motion.jumped();
+    expect(run(motion, camera, clock, 1, 20 / 0.016)).toBe(1);
+    // The same without the announcement is motion.
+    expect(run(motion, camera, clock, 1, 20 / 0.016)).toBe(4);
+  });
+
   it('holds the coarse detail while the camera slows and refines straight to full once still, never in steps (F090)', () => {
     const camera = new Camera();
     camera.pose.rangeMeters = 50_000;

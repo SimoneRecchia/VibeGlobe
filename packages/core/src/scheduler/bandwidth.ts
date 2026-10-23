@@ -20,6 +20,8 @@ export class BandwidthEstimator {
   private readonly to = new Float64Array(RECENT);
   private readonly sizes = new Float64Array(RECENT);
   private readonly waits = new Float64Array(RECENT).fill(Number.POSITIVE_INFINITY);
+  /** 1 for a response timed by the network (Resource Timing), 0 for one timed by the main thread. */
+  private readonly exact = new Uint8Array(RECENT);
   private count = 0;
   private next = 0;
   /** Measured throughput in bits per second; NaN until a few responses over enough transfer time. */
@@ -45,6 +47,7 @@ export class BandwidthEstimator {
     this.from[at] = result.transferMs === undefined ? startMs + waitMs : endMs - Math.max(0, result.transferMs);
     this.sizes[at] = result.bytes.byteLength;
     this.waits[at] = result.waitMs ?? nowMs - startMs;
+    this.exact[at] = result.transferMs === undefined ? 0 : 1;
     this.next = (at + 1) % RECENT;
     this.count = Math.min(RECENT, this.count + 1);
     this.bitsPerSecond = this.measure();
@@ -68,13 +71,20 @@ export class BandwidthEstimator {
     return bitsPerSecond < SLOW_LINK_BPS && !(this.latencyMs >= DISTANT_LINK_MS) ? 2 : Number.POSITIVE_INFINITY;
   }
 
-  /** The recent responses' bytes over the union of their transfer intervals. */
+  /**
+   * The recent responses' bytes over the union of their transfer intervals. Once three responses were timed by the
+   * network, only those count: the main thread notices a response's end late, more so on a busy page (F300).
+   */
   private measure(): number {
-    if (this.count < 3) return Number.NaN;
+    let timed = 0;
+    for (let i = 0; i < this.count; i++) timed += this.exact[i] ?? 0;
+    const exactOnly = timed >= 3;
+    if ((exactOnly ? timed : this.count) < 3) return Number.NaN;
     // Sort the transfers by start (insertion sort of indices; at most 32).
     const order = this.order;
     let n = 0;
     for (let i = 0; i < this.count; i++) {
+      if (exactOnly && this.exact[i] === 0) continue;
       let j = n++;
       while (j > 0 && (this.from[order[j - 1] ?? 0] ?? 0) > (this.from[i] ?? 0)) {
         order[j] = order[j - 1] ?? 0;

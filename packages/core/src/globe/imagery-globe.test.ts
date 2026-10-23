@@ -127,9 +127,10 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
         .sort()
         .join(' ');
     const still = tiles();
-    globe.jumpTo({ longitudeDeg: -74, latitudeDeg: 40.7, zoom: 6 });
+    // A fast pan east and back (jumps are no motion for motion-aware detail), then rest.
+    void globe.easeTo({ ...berlin, longitudeDeg: berlin.longitudeDeg + 1 }, { durationMs: 300 });
     await run();
-    globe.jumpTo(berlin);
+    void globe.easeTo(berlin, { durationMs: 300 });
     await run();
     expect(tiles()).toBe(still);
     globe.destroy();

@@ -64,6 +64,8 @@ export interface MovementHost {
    * more (undefined).
    */
   preloadView?(end: Float64Array | undefined, flight?: boolean): void;
+  /** The camera jumped (`jumpTo`): motion-aware detail does not count it as motion (F085). */
+  cameraJumped?(): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -380,6 +382,7 @@ export class Movements {
     }
     applyView(camera, view, keepRange);
     camera.update();
+    this.host.cameraJumped?.();
     this.jumped();
     this.host.requestRender();
     return undefined;

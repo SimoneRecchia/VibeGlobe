@@ -35,8 +35,10 @@ function withProvider(bytes: Buffer, path: string): Buffer {
   const level = Number(match[1]);
   const east = level > 0 && Number(match[2]) >= 2 ** level / 2;
   const provider = (east ? EAST_PROVIDER : WEST_PROVIDER).padEnd(ORIGINAL.length, ' ');
-  const at = bytes.indexOf(ORIGINAL);
-  if (at < 0) return bytes;
+  const key = '"copyright":"';
+  const found = bytes.indexOf(`${key}${ORIGINAL}`);
+  if (found < 0) return bytes;
+  const at = found + key.length;
   const out = Buffer.from(bytes);
   out.write(provider, at, 'latin1');
   return out;

@@ -83,7 +83,8 @@ const transient = (r: TransportResult): boolean =>
 class Tiles3DLoader implements Tiles3DExtension {
   readonly loaded: Promise<Tileset>;
   private root: Tileset | undefined;
-  private anchor: TilesetAnchor | undefined;
+  /** Each tile's placement anchor, its own center (undefined for a whole-Earth volume around the ECEF origin). */
+  private readonly anchors = new WeakMap<Tile3D, TilesetAnchor | undefined>();
   private readonly frameScratch: ViewFrame = createViewFrame();
   private readonly matrix = new Float64Array(16);
   private readonly fetcher: TileFetcher;
@@ -137,7 +138,6 @@ class Tiles3DLoader implements Tiles3DExtension {
     if (!tileset)
       throw new GlobeError('resource-failed', `3D Tiles '${this.name}': ${problems[0]?.message ?? 'invalid'}`);
     this.root = tileset;
-    this.anchor = new TilesetAnchor(tileset.root.volume.center);
     this.context.requestRender();
     return tileset;
   }
@@ -145,27 +145,45 @@ class Tiles3DLoader implements Tiles3DExtension {
   frame(view: FrameView): void {
     this.lastView = view;
     const root = this.root;
-    const anchor = this.anchor;
-    if (!root || !anchor || this.disposed) return;
-    const frame = viewFrame(view, anchor, this.frameScratch);
-    const result = selectTiles(root.root, traversalCamera(view, frame), {
+    if (!root || this.disposed) return;
+    const anchor = viewAnchor(view);
+    const result = selectTiles(root.root, traversalCamera(view, viewFrame(view, anchor, this.frameScratch)), {
       maximumScreenSpaceError: this.options.maximumScreenSpaceError ?? 16,
     });
     this.lastResult = result;
-    this.place(result, frame);
+    this.place(result, view, anchor);
     this.schedule(result);
     this.cache.touch(result.used);
     this.counters.evicted += this.cache.trim(result.used).length;
   }
 
-  private place(result: TraversalResult, frame: ViewFrame): void {
+  private anchorOf(tile: Tile3D): TilesetAnchor | undefined {
+    if (!this.anchors.has(tile)) {
+      const center = tile.volume.center;
+      // A volume around the ECEF origin (a whole-Earth root) has no meaningful local frame.
+      this.anchors.set(
+        tile,
+        Math.hypot(center[0] ?? 0, center[1] ?? 0, center[2] ?? 0) > 1e6 ? new TilesetAnchor(center) : undefined,
+      );
+    }
+    return this.anchors.get(tile);
+  }
+
+  /** The frame placing a tile's content: linear about its own anchor (else the view's), as the frame maps there. */
+  private tileFrame(tile: Tile3D, view: FrameView, fallback: TilesetAnchor, out: ViewFrame): ViewFrame {
+    return viewFrame(view, this.anchorOf(tile) ?? fallback, out, true);
+  }
+
+  private place(result: TraversalResult, view: FrameView, anchor: TilesetAnchor): void {
     const visible = new Set<number>();
-    for (const tile of result.render)
+    for (const tile of result.render) {
+      const frame = this.tileFrame(tile, view, anchor, this.frameScratch);
       for (const piece of this.data.get(tile)?.pieces ?? []) {
         this.meshes.setMatrix(piece.key, contentToWorld(frame, piece.matrix, this.matrix));
         if (!this.visible.has(piece.key)) this.meshes.setVisible(piece.key, true);
         visible.add(piece.key);
       }
+    }
     for (const key of this.visible) if (!visible.has(key)) this.meshes.setVisible(key, false);
     this.visible = visible;
   }
@@ -324,8 +342,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   pick = (xPx: number, yPx: number): Tiles3DPick | undefined => {
     this.refuseData('pick');
     const view = this.lastView;
-    const anchor = this.anchor;
-    if (!view || !anchor) return undefined;
+    if (!view) return undefined;
     const ray = screenRay(view, xPx, yPx);
     const hit = this.meshes.raycast(ray.origin, ray.direction);
     const tile = hit && this.keys.get(hit.key);
@@ -349,7 +366,7 @@ class Tiles3DLoader implements Tiles3DExtension {
       }
       featureId ??= hit.featureIds['_FEATURE_ID_0'];
     }
-    const ecef = worldToEcef(viewFrame(view, anchor, createViewFrame()), hit.point);
+    const ecef = worldToEcef(this.tileFrame(tile, view, viewAnchor(view), createViewFrame()), hit.point);
     const g: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
     ecefToGeodetic(ecef[0], ecef[1], ecef[2], g);
     return {
@@ -411,6 +428,11 @@ class Tiles3DLoader implements Tiles3DExtension {
     this.data.clear();
     this.keys.clear();
   }
+}
+
+/** The anchor of traversal: the point the view's morph is centered on. */
+function viewAnchor(view: FrameView): TilesetAnchor {
+  return TilesetAnchor.at(view.morph.anchor[0] ?? 0, view.morph.anchor[1] ?? 0, 0);
 }
 
 /** A request to try again later (a timeout, a network error, 429 or 5xx). */

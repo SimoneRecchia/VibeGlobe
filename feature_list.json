@@ -6169,7 +6169,7 @@
         "In CI, run the same flow against a mock Map Tiles server",
         "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F469",
@@ -6182,7 +6182,7 @@
         "Record frames across the renewal and assert no holes or blank frames",
         "Manually keep a real session open beyond three hours on the reference desktop and record the renewal in the test log"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F470",

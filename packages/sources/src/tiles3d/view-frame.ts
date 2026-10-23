@@ -1,12 +1,18 @@
 /**
- * Where a tileset is drawn in a frame (F464, F465; ADR 0141). The renderer's world space is relative to the eye
- * (ADR 0004) and, during the globe-to-flat morph, morphed (ADR 0008). A tileset is placed rigidly: its ECEF geometry is
- * carried by the rotation that turns the east, north and up axes of its anchor (the root's center) into the axes the
+ * Where 3D Tiles content is drawn in a frame (F464, F465; ADR 0141). The renderer's world space is relative to the
+ * eye (ADR 0004) and, during the globe-to-flat morph, morphed (ADR 0008). Content is placed rigidly about an anchor:
+ * its ECEF geometry is carried by the rotation that turns the anchor's east, north and up axes into the axes the
  * frame draws there, and translated to where the frame draws the anchor. On the globe this is exactly ECEF minus the
- * eye; on the flat map a city keeps its shape (its curvature is a few centimeters over a kilometer). The inverse gives
- * traversal its camera in the tileset's ECEF, so levels of detail follow the true distances in every phase.
+ * eye. The inverse gives traversal its camera in ECEF, so levels of detail follow the true distances in every phase.
  */
-import { ecefToGeodetic, enuFrame, morphPointInto, type FrameView, type GeodeticRad } from '@vibeglobe/core';
+import {
+  ecefToGeodetic,
+  enuFrame,
+  geodeticToEcef,
+  morphPointInto,
+  type FrameView,
+  type GeodeticRad,
+} from '@vibeglobe/core';
 import type { TraversalCamera } from './traversal.js';
 import type { Mat4, Plane } from './volumes.js';
 
@@ -19,7 +25,11 @@ export interface ViewFrame {
   readonly offset: Float64Array;
 }
 
-/** The anchor of a tileset, fixed once: its geodetic position and its local east, north and up axes in ECEF. */
+/**
+ * An anchor of placement: a point and its local east, north and up axes in ECEF. Each tile is placed rigidly about its
+ * own center (exact on the globe; on the flat map a tile keeps its shape, its curvature a few millimeters over 100 m);
+ * traversal uses the view's morph anchor.
+ */
 export class TilesetAnchor {
   readonly ecef: Float64Array;
   readonly geodetic = new Float64Array(3);
@@ -34,25 +44,68 @@ export class TilesetAnchor {
     this.geodetic.set([g.longitudeRad, g.latitudeRad, g.heightMeters]);
     enuFrame(g.longitudeRad, g.latitudeRad, this.enu);
   }
+
+  /** The anchor at a geodetic position (radians, meters). */
+  static at(longitudeRad: number, latitudeRad: number, heightMeters: number): TilesetAnchor {
+    const ecef = new Float64Array(3);
+    geodeticToEcef(longitudeRad, latitudeRad, heightMeters, ecef);
+    return new TilesetAnchor([...ecef]);
+  }
 }
 
 const morphed = new Float64Array(3);
+const stepped = new Float64Array(3);
+const stepGeodetic = new Float64Array(3);
+const scratchGeodetic: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+/** The step of the finite differences of {@link viewFrame}'s linear placement, meters. */
+const STEP_M = 1;
 
-/** Writes the frame's ECEF-to-world transform for a tileset anchored at `anchor`. */
-export function viewFrame(view: FrameView, anchor: TilesetAnchor, out: ViewFrame): ViewFrame {
+/**
+ * Writes the frame's ECEF-to-world transform about `anchor`. Rigid by default (traversal's camera). `linear` places
+ * content by the derivative of the frame's own mapping at the anchor instead (finite differences of
+ * `morphPointInto` along the anchor's east, north and up): exactly the rigid placement on the globe, and on the flat
+ * map it follows the map's local scale, which differs from true meters (north–south by 0.4% at Rome), so content stays
+ * within millimeters of where the engine draws each WGS84 point across a tile.
+ */
+export function viewFrame(view: FrameView, anchor: TilesetAnchor, out: ViewFrame, linear = false): ViewFrame {
   const morph = view.morph;
-  const flat = (morph.factors[0] ?? 0) >= 0.5;
-  const axes = flat ? morph.axes : anchor.enu;
+  const factor = morph.factors[0] ?? 0;
+  const flat = factor >= 0.5;
   const enu = anchor.enu;
-  // rotation = axes · enuᵀ: the anchor's local axes onto the drawn ones (identity on the globe).
-  for (let r = 0; r < 3; r++)
-    for (let c = 0; c < 3; c++) {
-      let sum = 0;
-      for (let k = 0; k < 3; k++) sum += (axes[k * 3 + r] ?? 0) * (enu[k * 3 + c] ?? 0);
-      out.rotation[r * 3 + c] = flat ? sum : r === c ? 1 : 0;
-    }
-  if ((morph.factors[0] ?? 0) === 0) morphed.set(anchor.ecef);
+  if (factor === 0) morphed.set(anchor.ecef);
   else morphPointInto(morph, anchor.geodetic, morphed);
+  if (linear && factor > 0) {
+    // rotation = J · enuᵀ, J's columns the drawn offsets of 1 m east, north and up of the anchor.
+    const J = new Float64Array(9);
+    for (let k = 0; k < 3; k++) {
+      ecefToGeodetic(
+        (anchor.ecef[0] ?? 0) + (enu[k * 3] ?? 0) * STEP_M,
+        (anchor.ecef[1] ?? 0) + (enu[k * 3 + 1] ?? 0) * STEP_M,
+        (anchor.ecef[2] ?? 0) + (enu[k * 3 + 2] ?? 0) * STEP_M,
+        scratchGeodetic,
+      );
+      stepGeodetic[0] = scratchGeodetic.longitudeRad;
+      stepGeodetic[1] = scratchGeodetic.latitudeRad;
+      stepGeodetic[2] = scratchGeodetic.heightMeters;
+      morphPointInto(morph, stepGeodetic, stepped);
+      for (let r = 0; r < 3; r++) J[r * 3 + k] = ((stepped[r] ?? 0) - (morphed[r] ?? 0)) / STEP_M;
+    }
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 3; c++) {
+        let sum = 0;
+        for (let k = 0; k < 3; k++) sum += (J[r * 3 + k] ?? 0) * (enu[k * 3 + c] ?? 0);
+        out.rotation[r * 3 + c] = sum;
+      }
+  } else {
+    const axes = flat ? morph.axes : enu;
+    // rotation = axes · enuᵀ: the anchor's local axes onto the drawn ones (identity on the globe).
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 3; c++) {
+        let sum = 0;
+        for (let k = 0; k < 3; k++) sum += (axes[k * 3 + r] ?? 0) * (enu[k * 3 + c] ?? 0);
+        out.rotation[r * 3 + c] = flat ? sum : r === c ? 1 : 0;
+      }
+  }
   for (let i = 0; i < 3; i++) out.offset[i] = (morphed[i] ?? 0) - (view.eyeEcef[i] ?? 0);
   out.anchorEcef.set(anchor.ecef);
   return out;
@@ -86,16 +139,28 @@ export function contentToWorld(frame: ViewFrame, tileMatrix: Mat4, out: Float64A
   return out;
 }
 
+/** The inverse of a row-major 3×3 matrix. */
+function inverse3(m: Float64Array): number[] {
+  const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0, g = 0, h = 0, i = 0] = m;
+  const A = e * i - f * h;
+  const B = f * g - d * i;
+  const C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  return [A, c * h - b * i, b * f - c * e, B, a * i - c * g, c * d - a * f, C, b * g - a * h, a * e - b * d].map(
+    (v) => v / det,
+  );
+}
+
 /** A world point (relative to the eye) back in ECEF. */
 export function worldToEcef(frame: ViewFrame, world: readonly number[]): [number, number, number] {
   const d = [0, 1, 2].map((i) => (world[i] ?? 0) - (frame.offset[i] ?? 0));
-  const R = frame.rotation;
+  const inv = inverse3(frame.rotation);
   return [0, 1, 2].map(
-    (c) =>
-      (frame.anchorEcef[c] ?? 0) +
-      (R[c] ?? 0) * (d[0] ?? 0) +
-      (R[3 + c] ?? 0) * (d[1] ?? 0) +
-      (R[6 + c] ?? 0) * (d[2] ?? 0),
+    (r) =>
+      (frame.anchorEcef[r] ?? 0) +
+      (inv[r * 3] ?? 0) * (d[0] ?? 0) +
+      (inv[r * 3 + 1] ?? 0) * (d[1] ?? 0) +
+      (inv[r * 3 + 2] ?? 0) * (d[2] ?? 0),
   ) as [number, number, number];
 }
 

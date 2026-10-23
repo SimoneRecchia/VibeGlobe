@@ -269,11 +269,13 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
 }
 
 /** Creates one engine instance in a container with its own canvas. */
+/** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
 function startGlobe(
   container: HTMLElement,
   target: HTMLCanvasElement,
   view: ViewInit,
   choice: BackendChoice = backend,
+  controls = createControls(),
 ): Globe {
   return createGlobe({
     container,
@@ -290,7 +292,7 @@ function startGlobe(
         ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }
         : {}),
     }),
-    controls: createControls(),
+    controls,
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
     ...fixtureLayers(),
@@ -460,7 +462,8 @@ if (params.get('experiment') === 'gpu-probes') {
   });
 } else if (app && canvas) {
   const scenario = params.get('scenario');
-  const globe = startGlobe(app, canvas, viewFromUrl());
+  const navigation = createControls();
+  const globe = startGlobe(app, canvas, viewFromUrl(), backend, navigation);
   // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
   // A failed start records no time (the error reaches the status line and the error event, not a rejection here).
   const firstFrame = globe.ready.then(
@@ -470,7 +473,7 @@ if (params.get('experiment') === 'gpu-probes') {
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
   showViewModeControls(globe, app, params.get('viewMode'));
-  showCameraControls(globe, app);
+  showCameraControls(globe, app, navigation);
   runScenario(globe, scenario);
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
   if (params.get('layers') === 'demo')

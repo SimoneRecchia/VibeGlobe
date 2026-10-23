@@ -357,6 +357,8 @@ describe('camera constraints (F209–F211)', () => {
       maxTiltDeg: 30,
       bounds: { westDeg: 170, southDeg: -50, eastDeg: -170, northDeg: 50 },
     });
+    // Readable back, for controls that disable their buttons at the limits (track A hook request 3).
+    expect(globe.constraints).toMatchObject({ minZoom: 5, maxZoom: 12, maxTiltDeg: 30 });
     ticks(2);
     // The center moves into the bounds across the antimeridian, to the nearer edge.
     expect(Math.abs(globe.camera.longitudeDeg)).toBeGreaterThanOrEqual(170 - 1e-9);
@@ -379,6 +381,52 @@ describe('camera constraints (F209–F211)', () => {
     expect(() => globe.setConstraints({ minZoom: 9, maxZoom: 3 })).toThrow(
       expect.objectContaining({ code: 'invalid-option' }),
     );
+    globe.destroy();
+  });
+
+  it('does not pan when zooming at an off-center point beyond the zoom limits (KB-126)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 12 });
+    globe.setConstraints({ minZoom: 5, maxZoom: 12 });
+    ticks(1);
+    const { longitudeDeg, latitudeDeg } = globe.camera;
+    for (const delta of [0.3, -0, 0.3]) {
+      globe.navigation.zoomAt({ xPx: 700, yPx: 100 }, delta);
+      ticks(1);
+    }
+    expect(globe.camera.zoom).toBeCloseTo(12, 3);
+    expect(globe.camera.longitudeDeg).toBeCloseTo(longitudeDeg, 9);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(latitudeDeg, 9);
+    // Up to the limit, the cursor point stays put; the zoom then stops there.
+    globe.jumpTo({ zoom: 11.9 });
+    ticks(1);
+    const under = globe.screenToGeo({ xPx: 700, yPx: 100 });
+    globe.navigation.zoomAt({ xPx: 700, yPx: 100 }, 0.5);
+    ticks(1);
+    expect(globe.camera.zoom).toBeCloseTo(12, 3);
+    const after = globe.screenToGeo({ xPx: 700, yPx: 100 });
+    expect(after?.longitudeDeg).toBeCloseTo(under?.longitudeDeg ?? 0, 5);
+    expect(after?.latitudeDeg).toBeCloseTo(under?.latitudeDeg ?? 0, 5);
+    globe.destroy();
+  });
+
+  it('keeps the default tilt of 3D mode under the maximum tilt, and flies to a target outside the bounds without a jump (KB-123)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 10, latitudeDeg: 45, zoom: 14 });
+    globe.setConstraints({ maxTiltDeg: 30, bounds: { westDeg: 5, southDeg: 40, eastDeg: 15, northDeg: 50 } });
+    globe.setViewMode('3d');
+    ticks(1);
+    expect(globe.camera.chosenTiltDeg).toBeLessThanOrEqual(30 + 1e-9);
+    const flight = globe.flyTo({ longitudeDeg: 40, latitudeDeg: -60, zoom: 6 }, { durationMs: 800 });
+    let last = globe.camera;
+    for (let i = 0; i < 80; i++) {
+      ticks(1);
+      const now = globe.camera;
+      expect(Math.hypot(now.longitudeDeg - last.longitudeDeg, now.latitudeDeg - last.latitudeDeg)).toBeLessThan(1);
+      last = now;
+    }
+    expect(await flight).toBe('completed');
+    // At the nearest corner of the bounds.
+    expect(globe.camera.longitudeDeg).toBeCloseTo(15, 6);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(40, 6);
     globe.destroy();
   });
 

@@ -73,6 +73,9 @@ test('Shift+arrows rotate and tilt smoothly while held (F187)', async ({ page })
   const state = await camera(page);
   expect(state.headingDeg).toBeGreaterThan(10);
   expect(state.tiltDeg).toBeGreaterThan(10);
+  // The resulting tilt and heading are the chosen ones (M5).
+  expect(state.chosenTiltDeg).toBeCloseTo(state.tiltDeg, 6);
+  expect(state.chosenHeadingDeg).toBeCloseTo(state.headingDeg, 6);
   expect(state.longitudeDeg).toBeCloseTo(10, 6);
   for (const [recorded, field] of [
     [right, 'headingDeg'],
@@ -120,6 +123,8 @@ test('+/- keys and the zoom commands zoom one level per press about the center, 
 });
 
 test('every navigation action works from the keyboard alone, with a visible focus ring (F213)', async ({ page }) => {
+  // Every action is driven and settled in turn: about 60 s on a software GPU.
+  test.setTimeout(120_000);
   await openControls(page, 'lon=10&lat=45&zoom=6');
   await page.focus('#text');
   await page.keyboard.type('+-nN');
@@ -149,4 +154,19 @@ test('every navigation action works from the keyboard alone, with a visible focu
   const north = (await camera(page)).headingDeg;
   expect(Math.min(north, 360 - north)).toBeLessThan(0.02);
   expect((await camera(page)).tiltDeg).toBeCloseTo(turned.tiltDeg, 6);
+  // View modes (F163) and home (F194) from the keyboard; '3d' chooses the default tilt, reported as 'manual'.
+  for (const [key, mode] of [
+    ['2', '2d'],
+    ['3', 'manual'],
+    ['a', 'auto'],
+  ] as const) {
+    await page.keyboard.press(key);
+    await settle(page);
+    expect((await camera(page)).viewMode, key).toBe(mode);
+  }
+  await page.keyboard.press('Home');
+  await settle(page);
+  const home = await camera(page);
+  expect(home.longitudeDeg).toBeCloseTo(start.longitudeDeg, 3);
+  expect(home.latitudeDeg).toBeCloseTo(start.latitudeDeg, 3);
 });

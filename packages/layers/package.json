@@ -25,6 +25,11 @@
       "types": "./dist/vector-tiles/index.d.ts",
       "source": "./src/vector-tiles/index.ts",
       "default": "./dist/vector-tiles/index.js"
+    },
+    "./cluster-worker": {
+      "types": "./dist/cluster-worker.d.ts",
+      "source": "./src/cluster-worker.ts",
+      "default": "./dist/cluster-worker.js"
     }
   },
   "files": [

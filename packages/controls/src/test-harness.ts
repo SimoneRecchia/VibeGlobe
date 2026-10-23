@@ -41,6 +41,13 @@ export class FlatCamera {
   zooms = 0;
   jumps = 0;
   requests = 0;
+  /** The engine clock, milliseconds (advanced by the harness's frames). */
+  timeMs = 0;
+  /** Camera changes made while coasting, and whether the controls are coasting now. */
+  coastingChanges = 0;
+  coasting = false;
+  /** API movements stopped by a press. */
+  movementInterruptions = 0;
 
   constructor(
     readonly widthPx: number,
@@ -65,27 +72,55 @@ export class FlatCamera {
     };
   }
 
-  readonly navigation: NavigationApi = {
-    grab: (point) => {
-      const world = this.worldAt(point);
-      return { longitudeDeg: world.x, latitudeDeg: world.y };
-    },
-    dragTo: (anchor: GeoPosition, point) => {
-      this.drags++;
-      const scale = 2 ** this.zoom;
-      this.centerX = anchor.longitudeDeg - (point.xPx - this.widthPx / 2) / scale;
-      this.centerY = anchor.latitudeDeg - (point.yPx - this.heightPx / 2) / scale;
-    },
-    zoomAt: (point, deltaZoom) => {
-      this.zooms++;
-      const world = this.worldAt(point);
-      this.zoom += deltaZoom;
-      const scale = 2 ** this.zoom;
-      this.centerX = world.x - (point.xPx - this.widthPx / 2) / scale;
-      this.centerY = world.y - (point.yPx - this.heightPx / 2) / scale;
-    },
-    requestUpdate: () => void this.requests++,
-  };
+  readonly navigation: NavigationApi = this.createNavigation();
+
+  private createNavigation(): NavigationApi {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the getters below read this camera
+    const camera = this;
+    return {
+      grab: (point) => {
+        const world = this.worldAt(point);
+        return { longitudeDeg: world.x, latitudeDeg: world.y };
+      },
+      dragTo: (anchor: GeoPosition, point) => {
+        this.drags++;
+        if (this.coasting) this.coastingChanges++;
+        const scale = 2 ** this.zoom;
+        this.centerX = anchor.longitudeDeg - (point.xPx - this.widthPx / 2) / scale;
+        this.centerY = anchor.latitudeDeg - (point.yPx - this.heightPx / 2) / scale;
+      },
+      zoomAt: (point, deltaZoom) => {
+        this.zooms++;
+        const world = this.worldAt(point);
+        this.zoom += deltaZoom;
+        const scale = 2 ** this.zoom;
+        this.centerX = world.x - (point.xPx - this.widthPx / 2) / scale;
+        this.centerY = world.y - (point.yPx - this.heightPx / 2) / scale;
+      },
+      requestUpdate: () => void this.requests++,
+      interruptMovement: () => void this.movementInterruptions++,
+      orbit: (deltaHeadingDeg, deltaTiltDeg) => {
+        this.jumps++;
+        this.headingDeg = (((this.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;
+        this.tiltDeg = Math.min(90, Math.max(0, this.tiltDeg + deltaTiltDeg));
+      },
+      get timeMs() {
+        return camera.timeMs;
+      },
+      get coasting() {
+        return camera.coasting;
+      },
+      set coasting(value: boolean) {
+        camera.coasting = value;
+      },
+      get headingDeg() {
+        return camera.headingDeg;
+      },
+      get tiltDeg() {
+        return camera.tiltDeg;
+      },
+    };
+  }
 }
 
 /** A fake document: overlays the zoom box appends land in `overlays`. */
@@ -146,7 +181,12 @@ export interface PointerInit {
 /** The parts of a globe the controls read once connected, on a {@link FlatCamera}. */
 function fakeGlobe(camera: FlatCamera) {
   return {
-    timeMs: 0,
+    get timeMs(): number {
+      return camera.timeMs;
+    },
+    set timeMs(value: number) {
+      camera.timeMs = value;
+    },
     get camera(): CameraState {
       return { headingDeg: camera.headingDeg, tiltDeg: camera.tiltDeg } as CameraState;
     },

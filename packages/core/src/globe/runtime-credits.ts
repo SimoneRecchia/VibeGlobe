@@ -14,6 +14,8 @@ import type { GlobeError } from './errors.js';
 export class RuntimeCredits {
   readonly visible: VisibleSources;
   private readonly warned = new Set<string>();
+  /** The last list reported, as text: a refresh reports only a change. */
+  private reported = '[]';
 
   /**
    * `sources` are the imagery sources then the terrain source, if any; `changed` receives the new list; `warn` logs
@@ -40,7 +42,18 @@ export class RuntimeCredits {
         }
       }
     }
-    if (this.visible.settle()) this.changed(this.list());
+    if (this.visible.settle()) this.report(this.list());
+  }
+
+  /** Reads the visible sources' `attribution` again and reports a change (`Globe.refreshCredits`, F258). */
+  refresh(): void {
+    const credits = this.list();
+    if (JSON.stringify(credits) !== this.reported) this.report(credits);
+  }
+
+  private report(credits: Credit[]): void {
+    this.reported = JSON.stringify(credits);
+    this.changed(credits);
   }
 
   /** The credits of the sources the last frame showed (allocates; called on a change and by `Globe.credits()`). */
@@ -66,6 +79,8 @@ export interface ImageryCallbacks {
   sourceError?(error: GlobeError): void;
   /** Sources whose credits the application hides (`GlobeOptions.hiddenCredits`); required credits stay (F255). */
   readonly hiddenCredits?: readonly string[];
+  /** False when the application shows the credits itself (`GlobeOptions.creditsElement`). */
+  readonly creditsElement?: boolean;
 }
 
 /** The credits of an engine's sources, shown in the renderer's attribution element and reported to the globe. */
@@ -80,7 +95,7 @@ export function runtimeCredits(
     terrain ? [...sources, terrain] : sources,
     new Set(callbacks.hiddenCredits ?? []),
     (credits) => {
-      renderer.host.showCredits?.(credits);
+      if (callbacks.creditsElement !== false) renderer.host.showCredits?.(credits);
       callbacks.creditsChange?.(credits);
     },
     (message) => observability?.logger.log('warn', message),

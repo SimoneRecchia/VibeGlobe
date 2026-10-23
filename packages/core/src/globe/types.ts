@@ -244,8 +244,28 @@ export interface NavigationApi {
   dragTo(anchor: GeoPosition, point: ScreenPoint): void;
   /** Zooms by `deltaZoom` levels keeping the position under `point` fixed. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void;
-  /** Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4). */
+  /**
+   * Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4); a request
+   * made inside `update` asks for the next frame.
+   */
   requestUpdate(): void;
+  /**
+   * Turns the camera about the screen-center target by `deltaHeadingDeg` and tilts it by `deltaTiltDeg` (the new values
+   * become the chosen ones, the tilt within 0–90° and the constraints); allocation-free (F182–F185).
+   */
+  orbit(deltaHeadingDeg: number, deltaTiltDeg: number): void;
+  /** Stops a running API movement where it is, settled as interrupted: a press on the map, before any drag (F202). */
+  interruptMovement(): void;
+  /**
+   * True while the controls apply their release inertia: the camera changes made meanwhile are announced with the
+   * cause 'inertia' instead of 'user' (F200). The controls set it around their inertia step.
+   */
+  coasting: boolean;
+  /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
+  readonly timeMs: number;
+  /** The applied heading and tilt, degrees. */
+  readonly headingDeg: number;
+  readonly tiltDeg: number;
 }
 
 /** An input plug-in instance. */
@@ -256,11 +276,18 @@ export interface Controls {
    * allocate when nothing is pending.
    */
   update?(): void;
+  /** Optional: an API movement (`flyTo`, `easeTo`, …) starts: inertia, smoothed zooms and held keys stop (F202). */
+  interrupt?(): void;
   destroy(): void;
 }
 
-/** Creates input handling on the renderer's input element. */
-export type ControlsFactory = (element: unknown, navigation: NavigationApi) => Controls;
+/**
+ * Creates input handling on the renderer's input element. A factory with `connect` is given the globe once it is
+ * attached (the home and view-mode keys use it).
+ */
+export type ControlsFactory = ((element: unknown, navigation: NavigationApi) => Controls) & {
+  connect?(globe: Globe): void;
+};
 
 /** The camera as the public API reports it: applied values, WGS84 degrees and meters. */
 export interface CameraState {
@@ -363,6 +390,12 @@ export interface GlobeOptions {
    * source's provider requires stays, and a warning names the source.
    */
   readonly hiddenCredits?: readonly string[];
+  /**
+   * `false` leaves the credits to the application's own attribution control (a UI package's), which must then show
+   * every credit `Globe.credits()` and `credits-change` report, required ones included: the engine draws no credits
+   * element (F255). Default true.
+   */
+  readonly creditsElement?: boolean;
   /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
@@ -705,6 +738,8 @@ export interface Globe {
     readonly degreesPerSecond?: number;
     readonly signal?: AbortSignalLike;
   }): CameraMovement;
+  /** The camera constraints in force (F209–F211), as last set; `{}` without any. */
+  readonly constraints: CameraConstraints;
   /** The current view mode (F161–F163). */
   readonly viewMode: ViewMode;
   /**
@@ -774,6 +809,11 @@ export interface Globe {
   layerTarget(): LayerRenderTarget | undefined;
   /** The credits of the imagery and terrain sources the last frame showed, deduplicated, required ones first (F254). */
   credits(): readonly Credit[];
+  /**
+   * Reads the visible sources' `attribution` again, for a source whose credits change at runtime (a provider's
+   * copyrights of the settled view, F258), and emits `credits-change` when the list changed.
+   */
+  refreshCredits(): void;
   /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
   readonly imageryLayers: ImageryLayers;
   /**

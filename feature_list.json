@@ -2725,7 +2725,7 @@
         "Record the camera per frame and assert no frame-to-frame change above the jump threshold at the takeover",
         "Assert the interrupted movement's promise settles as interrupted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F203",

@@ -1,10 +1,12 @@
 import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
+import type { CameraState } from '@vibeglobe/core';
 import {
   viewStateFromFragment,
   viewStateFromJson,
   viewStateFromUrl,
   viewStateToJson,
+  viewStateOf,
   viewStateToUrl,
   type ViewState,
 } from './view-state.js';
@@ -27,8 +29,9 @@ describe('view-state serialization', () => {
       zoom: fc.double({ min: -2, max: 28, noNaN: true }),
       headingDeg: fc.double({ min: 0, max: 360, maxExcluded: true, noNaN: true }),
       tiltDeg: fc.double({ min: 0, max: 89, noNaN: true }),
-      viewMode: fc.constantFrom('auto' as const, '2d' as const, '3d' as const),
+      viewMode: fc.constantFrom('auto' as const, '2d' as const, 'manual' as const),
       chosenTiltDeg: fc.double({ min: 0, max: 89, noNaN: true }),
+      chosenHeadingDeg: fc.double({ min: 0, max: 360, maxExcluded: true, noNaN: true }),
     },
     { requiredKeys: ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg', 'viewMode'] },
   );
@@ -56,7 +59,7 @@ describe('view-state serialization', () => {
       longitudeDeg: -170,
       headingDeg: 330,
       tiltDeg: 89,
-      viewMode: '3d',
+      viewMode: 'manual',
     });
   });
 
@@ -65,7 +68,7 @@ describe('view-state serialization', () => {
     '1/2/3/4/5',
     '1/2/3/4/5/flat',
     '1/2/3/4/x/auto',
-    '1/2/3/4/5/auto/7/8',
+    '1/2/3/4/5/auto/7/8/9',
     '1/2/Infinity/4/5/auto',
     '1/2/3/4/5/auto/NaN',
     '0x10/2/3/4/5/auto',
@@ -77,11 +80,31 @@ describe('view-state serialization', () => {
     'not json',
     'null',
     '[]',
-    '{"version":2,"longitudeDeg":0,"latitudeDeg":0,"zoom":1,"headingDeg":0,"tiltDeg":0,"viewMode":"auto"}',
+    '{"version":3,"longitudeDeg":0,"latitudeDeg":0,"zoom":1,"headingDeg":0,"tiltDeg":0,"viewMode":"auto"}',
     '{"version":1,"longitudeDeg":"0","latitudeDeg":0,"zoom":1,"headingDeg":0,"tiltDeg":0,"viewMode":"auto"}',
     '{"version":1,"latitudeDeg":0,"zoom":1,"headingDeg":0,"tiltDeg":0,"viewMode":"auto"}',
   ])('rejects the malformed JSON %j', (json) => {
     expect(viewStateFromJson(json)).toBeUndefined();
+  });
+
+  it('reads views written with version 1, whose manual mode was "3d"', () => {
+    const json = '{"version":1,"longitudeDeg":1,"latitudeDeg":2,"zoom":3,"headingDeg":4,"tiltDeg":5,"viewMode":"3d"}';
+    expect(viewStateFromJson(json)?.viewMode).toBe('manual');
+  });
+
+  it('reads a globe camera, or nothing while it waits for a viewport', () => {
+    const camera = {
+      longitudeDeg: 7,
+      latitudeDeg: 45,
+      zoom: 11,
+      headingDeg: 20,
+      tiltDeg: 30,
+      viewMode: 'manual',
+      chosenTiltDeg: 50,
+      chosenHeadingDeg: 20,
+    } as CameraState;
+    expect(viewStateOf(camera)).toEqual({ ...camera });
+    expect(viewStateOf({ ...camera, zoom: NaN })).toBeUndefined();
   });
 
   it('rejects URLs without a view', () => {

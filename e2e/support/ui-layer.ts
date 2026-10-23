@@ -4,6 +4,7 @@
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type * as GisModule from '@vibeglobe/gis';
+import type * as LayersModule from '@vibeglobe/layers';
 import type * as UiModule from '@vibeglobe/ui';
 import { openGlobe } from './globe.ts';
 
@@ -12,6 +13,8 @@ interface UiTestHandle {
   readonly ui: typeof UiModule;
   readonly gis: typeof GisModule;
   readonly layer: UiModule.Ui;
+  /** `@vibeglobe/layers`, loaded on demand by {@link loadLayers}. */
+  layers?: typeof LayersModule;
 }
 
 declare global {
@@ -22,6 +25,16 @@ declare global {
 
 const UI_ENTRY = `/@fs${resolve('packages/ui/src/index.ts')}`;
 const GIS_ENTRY = `/@fs${resolve('packages/gis/src/index.ts')}`;
+const LAYERS_ENTRY = `/@fs${resolve('packages/layers/src/index.ts')}`;
+
+/** Loads `@vibeglobe/layers` into the page as `window.vibeglobeUi.layers`. */
+export async function loadLayers(page: Page): Promise<void> {
+  await page.evaluate(async (entry) => {
+    const handle = window.vibeglobeUi;
+    if (handle === undefined) throw new Error('no ui');
+    handle.layers = (await import(/* @vite-ignore */ entry)) as typeof LayersModule;
+  }, LAYERS_ENTRY);
+}
 
 /** Options of {@link openUi}. */
 export interface OpenUiOptions {
@@ -30,8 +43,8 @@ export interface OpenUiOptions {
   readonly debug?: boolean;
   readonly theme?: 'light' | 'dark';
   readonly language?: string;
-  /** Adds the default controls (default true). */
-  readonly defaults?: boolean;
+  /** Adds the default controls (default true); 'all' adds every navigation control (`addAllControls`). */
+  readonly defaults?: boolean | 'all';
 }
 
 /** Opens the playground, waits for its first frame and adds a UI layer with the default controls. */
@@ -45,7 +58,8 @@ export async function openUi(page: Page, options: OpenUiOptions = {}): Promise<v
       const container = document.getElementById('app');
       if (globe === undefined || container === null) throw new Error('no playground globe');
       const layer = ui.createUi(globe, container, { theme, ...(language === undefined ? {} : { language }) });
-      if (defaults) ui.addDefaultControls(layer, { debug });
+      if (defaults === 'all') ui.addAllControls(layer, { debug });
+      else if (defaults) ui.addDefaultControls(layer, { debug });
       window.vibeglobeUi = { ui, gis, layer };
     },
     {

@@ -53,6 +53,7 @@
     "@types/pngjs": "6.0.5",
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/eslint-plugin": "1.6.27",
+    "accessibility-checker-engine": "4.0.34",
     "eslint": "10.13.0",
     "eslint-plugin-jsdoc": "63.3.3",
     "eslint-plugin-playwright": "2.12.1",

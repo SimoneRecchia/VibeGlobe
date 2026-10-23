@@ -3147,7 +3147,7 @@
         "Assert metadata, tile addressing, coverage, zoom range, error handling, cancellation and attribution checks pass for each",
         "Assert heights decoded at test coordinates match the fixture reference values within the encoding's precision"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F236",

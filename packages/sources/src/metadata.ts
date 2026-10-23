@@ -38,6 +38,12 @@ export interface ProviderProfile {
   readonly termsAdr?: string;
 }
 
+/** The metadata of this package's adapters, on any tiled source (imagery or terrain). */
+export interface DescribedSource {
+  readonly attribution: readonly Attribution[];
+  readonly profile: ProviderProfile;
+}
+
 /** An imagery source with the metadata of this package's adapters. */
 export interface DescribedImagerySource extends ImagerySource {
   readonly attribution: readonly Attribution[];
@@ -60,4 +66,50 @@ export class SourceConfigError extends Error {
     this.name = 'SourceConfigError';
     this.code = code;
   }
+}
+
+/**
+ * A profile that applies every rule of both (F325, F326): the union of what they forbid, the lower concurrency and
+ * renewal limits, cache headers respected when either asks. `outer`'s required credit leads; the adapter keeps the
+ * inner one among its credits, so neither is lost.
+ */
+export function combineProfiles(inner: ProviderProfile, outer: ProviderProfile): ProviderProfile {
+  const lower = (a: number | undefined, b: number | undefined): number | undefined =>
+    a === undefined ? b : b === undefined ? a : Math.min(a, b);
+  const maxConcurrentRequests = lower(inner.maxConcurrentRequests, outer.maxConcurrentRequests);
+  const sessionRenewalSeconds = lower(inner.sessionRenewalSeconds, outer.sessionRenewalSeconds);
+  const requiredAttribution = outer.requiredAttribution ?? inner.requiredAttribution;
+  const termsAdr = outer.termsAdr ?? inner.termsAdr;
+  return Object.freeze({
+    id: `${outer.id}+${inner.id}`,
+    forbids: new Set([...inner.forbids, ...outer.forbids]),
+    respectCacheHeaders: inner.respectCacheHeaders || outer.respectCacheHeaders,
+    ...(maxConcurrentRequests === undefined ? {} : { maxConcurrentRequests }),
+    ...(sessionRenewalSeconds === undefined ? {} : { sessionRenewalSeconds }),
+    ...(requiredAttribution ? { requiredAttribution } : {}),
+    ...(termsAdr === undefined ? {} : { termsAdr }),
+  });
+}
+
+/**
+ * Applies a source's profile where the engine reads it (F326): the per-host concurrency is capped by the profile's
+ * limit, and the required credit is added to the attribution when missing. Adapters call it once when they are created;
+ * a consumer's own adapter calls it the same way.
+ */
+export function withProfile<S extends ImagerySource>(
+  source: S,
+  profile: ProviderProfile,
+  attribution: readonly Attribution[] = [],
+): S & DescribedImagerySource {
+  const credits = [...attribution];
+  const required = profile.requiredAttribution;
+  if (required && !credits.some((a) => a.text === required.text)) credits.unshift(required);
+  const limit = profile.maxConcurrentRequests;
+  const perHost = limit === undefined ? source.maxRequestsPerHost : Math.min(limit, source.maxRequestsPerHost ?? limit);
+  return {
+    ...source,
+    ...(perHost === undefined ? {} : { maxRequestsPerHost: perHost }),
+    attribution: credits,
+    profile,
+  };
 }

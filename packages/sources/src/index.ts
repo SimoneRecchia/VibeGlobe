@@ -11,8 +11,14 @@ export { heightmapTerrain } from './heightmap-terrain.js';
 export type { HeightmapTerrainOptions } from './heightmap-terrain.js';
 export { quantizedMeshTerrain } from './quantized-mesh-terrain.js';
 export type { QuantizedMeshTerrainOptions } from './quantized-mesh-terrain.js';
-export { CUSTOM_PROFILE, SourceConfigError } from './metadata.js';
-export type { Attribution, DescribedImagerySource, LoadingSwitches, ProviderProfile } from './metadata.js';
+export { combineProfiles, CUSTOM_PROFILE, SourceConfigError, withProfile } from './metadata.js';
+export type {
+  Attribution,
+  DescribedImagerySource,
+  DescribedSource,
+  LoadingSwitches,
+  ProviderProfile,
+} from './metadata.js';
 export { pmtilesImagery } from './pmtiles-imagery.js';
 export type { PmtilesImageryOptions } from './pmtiles-imagery.js';
 export { wmtsImagery } from './ogc/wmts-imagery.js';
@@ -42,11 +48,14 @@ export type {
 export { googleStreetView } from './providers/google-street-view-provider.js';
 export type { GoogleStreetView, StreetViewMetadata, StreetViewQuery } from './providers/google-street-view-provider.js';
 export {
+  OSM_ODBL_ATTRIBUTION,
   OSM_PUBLIC_MAX_CONCURRENT,
   OSM_PUBLIC_PROFILE,
+  OSM_SELF_HOSTED_PROFILE,
+  openStreetMapHostedImagery,
   openStreetMapImagery,
 } from './providers/openstreetmap-provider.js';
-export type { OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';
+export type { OpenStreetMapHostedOptions, OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';
 export { composeInBrowser, reprojectedImagery, warpInBrowser } from './reproject/reprojected-imagery.js';
 export type {
   ComposeImage,

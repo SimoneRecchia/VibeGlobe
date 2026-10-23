@@ -477,3 +477,47 @@ unit-tested here; its remaining steps need what the last column names.
 | F462 | Priorities (screen center first), cancellation of requests no longer needed, `TileContentCache` LRU within the budget with overflow only for tiles in view, evicted tiles reload | The engine scheduler and memory budgets driving them (hook 5); the 10-minute browser run (`docs/hardening-backlog.md`) |
 The other M13 entries (F440, F441, F444, F445, F452, F457–F459, F463–F472) are the main track's: they are about
 drawing, the phases, terrain, picking and the Google tileset, and use this track's modules.
+
+## Track B, source adapters and offline: status
+
+Branch `claude/laughing-tesla-a6tkm3` (2026-10-23), owner-merged pull requests into `main`. Owns `packages/sources`
+(except `xyz-imagery.ts` and `fetchTransport`) and `packages/offline`, the offline and sources harness pages and specs
+(`e2e/support/offline*`, `e2e/support/sources.ts`, `e2e/offline-*.spec.ts`, `e2e/sources-*.spec.ts`) and the guides
+`docs/guides/sources.md` and `docs/guides/offline.md`. ADR numbers 0111–0119. Layer composition, reprojection internals,
+memory reuse, prefetch, flight preloading and anything in `core` stay with the main session (hook requests above, rows
+dated 2026-10-23 and marked "Track B").
+
+Entries this track takes (the main session keeps the other M7 and M8 entries: F219, F220, F224, F225, F229, F240–F242,
+F249, F250, F269, F285–F288, F300–F303, F329):
+
+| Entry | Milestone | Topic                                               | Status  | Blocker or remaining step |
+| ----- | --------- | --------------------------------------------------- | ------- | ------------------------- |
+| F228  | M7        | Custom WMTS tile matrix sets through reprojection   | failing | in progress               |
+| F234  | M7        | Single georeferenced image adapter                  | failing | in progress               |
+| F235  | M7        | Terrain adapters pass the shared conformance suite  | passing | —                         |
+| F258  | M7        | Google viewport attributions                        | failing | in progress               |
+| F259  | M7        | Google logo and attributions never covered          | failing | in progress               |
+| F260  | M7        | Google tiles reused only while cache headers allow  | failing | in progress               |
+| F264  | M7        | OpenStreetMap public servers with attribution       | failing | in progress               |
+| F268  | M7        | Sources and custom adapters guide                   | failing | in progress               |
+| F271  | M8        | Defaults: hybrid and every loading feature on       | failing | in progress               |
+| F272  | M8        | Cache tiers in order, filled on the way back        | failing | in progress               |
+| F290  | M8        | Switches global, per layer, at runtime              | failing | in progress               |
+| F292  | M8        | Offline-only mode never touches the network         | failing | in progress               |
+| F293  | M8        | Hybrid mode                                         | failing | in progress               |
+| F294  | M8        | Mixed mode: low-detail package plus online detail   | failing | in progress               |
+| F295  | M8        | Offline mode 1: LAN server                          | failing | in progress               |
+| F296  | M8        | Offline mode 2: browser storage only                | failing | in progress               |
+| F298  | M8        | Connectivity drops seamlessly                       | failing | in progress               |
+| F306  | M8        | Package license and attribution shown               | failing | in progress               |
+| F314  | M8        | Matrix of network modes and switches                | failing | in progress               |
+| F315  | M8        | Network simulation suite                            | failing | in progress               |
+| F316  | M8        | No telemetry                                        | failing | in progress               |
+| F320  | M8        | Provider profile rule                               | failing | in progress               |
+| F321  | M8        | Google: no persistent cache or packaging            | failing | in progress               |
+| F322  | M8        | Google: limited prefetch and preloading             | failing | in progress               |
+| F323  | M8        | Google: display only                                | failing | in progress               |
+| F324  | M8        | OpenStreetMap public: no packaging or bulk prefetch | failing | in progress               |
+| F325  | M8        | OpenStreetMap self-hosted or provider profile       | failing | in progress               |
+| F326  | M8        | Any provider's own profile enforced                 | failing | in progress               |
+| F328  | M8        | Terrain and MVT in PMTiles and MBTiles packages     | failing | in progress               |

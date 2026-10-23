@@ -144,6 +144,14 @@ export class VectorTileLoader {
     this.evict();
   }
 
+  /** Tiles requested or being laid out, not ready yet (tests wait for 0). */
+  get loading(): number {
+    let n = 0;
+    for (const entry of this.entries.values())
+      if (entry.state === 'queued' || entry.state === 'fetching' || entry.state === 'layout') n++;
+    return n;
+  }
+
   /** Frees everything; nothing is called back afterwards. */
   dispose(): void {
     this.disposed = true;

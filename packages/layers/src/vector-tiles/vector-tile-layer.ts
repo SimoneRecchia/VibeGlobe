@@ -15,6 +15,7 @@ import { TileGrounds } from './drape.js';
 import { GlyphSource } from './glyph-source.js';
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
+import { localizedTextField } from './osm.js';
 import { tileOrigin } from './globe-vertices.js';
 import { VectorTileLoader } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
@@ -144,12 +145,26 @@ class Runtime implements VectorTileLayer {
     );
   }
 
+  setLanguage(language: string): void {
+    for (const layer of this.style.layers) {
+      if (layer.type !== 'symbol' || !JSON.stringify(layer.json.layout?.['text-field'] ?? '').includes('name'))
+        continue;
+      this.style.setLayoutProperty(layer.id, 'text-field', localizedTextField(language));
+    }
+  }
+
   on(listener: (event: VectorFeatureEvent) => void): () => void {
     return this.interaction.on(listener);
   }
 
   placedLabels(): readonly PlacedLabel[] {
     return this.placer?.placed() ?? [];
+  }
+
+  loadingTiles(): number {
+    let n = 0;
+    for (const source of this.sources.values()) n += source.loader.loading;
+    return n;
   }
 
   requestLog(source?: string): readonly string[] {
@@ -317,7 +332,7 @@ class Runtime implements VectorTileLayer {
       opacity: opacity * extrusionOpacity,
       zoomT: t,
       ...(Array.isArray(dash) ? { dash: dash as number[] } : {}),
-      ...(layer.type === 'fill-extrusion' ? { solid: extrusionOpacity >= 1 } : {}),
+      ...(layer.type === 'fill-extrusion' ? { solid: extrusionOpacity >= 1, heightScale: opacity } : {}),
       draws: list,
     };
   }

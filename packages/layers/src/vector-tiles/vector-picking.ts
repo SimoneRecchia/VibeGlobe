@@ -5,6 +5,7 @@
  * layers from the top down.
  */
 import type { GeoPosition, ScreenPoint } from '@vibeglobe/core';
+import { buildingHeight, type BuildingHeight } from './buildings.js';
 import { tileToLonLat } from './globe-vertices.js';
 import { BUCKET_EXTENT, type Bucket } from './layout-tile.js';
 import type { PlacedLabel } from './label-placer.js';
@@ -20,6 +21,8 @@ export interface PickedVectorFeature {
   readonly properties: Readonly<Record<string, unknown>>;
   /** Where the feature was picked: the label's anchor, or the ground under the pointer. */
   readonly position: GeoPosition;
+  /** Buildings: their top and base heights in meters as extruded, and where the height came from (F455, F458). */
+  readonly building?: BuildingHeight;
 }
 
 /** A tile the frame drew for a source, with the square it covers. */
@@ -142,7 +145,6 @@ function hitExtrusion(ctx: PickContext, d: DrawnTile, bucket: Bucket, point: Scr
     const f = g.featureIndex[v] ?? 0;
     const x = g.positions[v * 3] ?? 0;
     const y = g.positions[v * 3 + 1] ?? 0;
-    if (x < d.clip[0] || y < d.clip[1] || x > d.clip[2] || y > d.clip[3]) continue;
     const [lon, lat] = tileToLonLat(d.tile, BUCKET_EXTENT, x, y);
     const screen = ctx.geoToScreen({
       longitudeDeg: lon ?? 0,
@@ -209,6 +211,7 @@ export function pickVectorFeatures(ctx: PickContext, point: ScreenPoint): Picked
         id: feature.id,
         properties: feature.properties,
         position: ground,
+        ...(layer.type === 'fill-extrusion' ? { building: buildingHeight(feature.properties) } : {}),
       });
       break;
     }

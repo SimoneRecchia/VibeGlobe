@@ -65,6 +65,8 @@ export interface VectorLayerDraws {
   readonly zoomT: number;
   readonly dash?: readonly number[];
   readonly solid?: boolean;
+  /** Extrusions: the share of their height drawn (they grow as their layer fades in, F457). */
+  readonly heightScale?: number;
   readonly draws: readonly VectorDraw[];
 }
 

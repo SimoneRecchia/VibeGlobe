@@ -33,12 +33,19 @@ export interface VectorTileLayer {
   ): void;
   /** The labels the last frame placed, with their screen boxes (F449). */
   placedLabels(): readonly PlacedLabel[];
+  /** Tiles requested or being laid out and not ready yet, over every source (tests wait for 0). */
+  loadingTiles(): number;
   /** Every tile URL requested so far, per source (tests: F442, F450). */
   requestLog(source?: string): readonly string[];
   /** Diagnostics: the drawn tiles of the last frame, as `z/x/y` of the drawn tile → target. */
   drawnTiles(): readonly { readonly tile: string; readonly target: string; readonly standIn: boolean }[];
   /** Every feature drawn under a screen point, topmost first (labels, then layers from the top down; F459). */
   queryRenderedFeatures(point: ScreenPoint): PickedVectorFeature[];
+  /**
+   * Shows names in a language (F454): every symbol layer whose `text-field` reads a name uses `name:<language>`, then
+   * `name_<language>`, then `name`. The tiles are laid out again from their kept bytes, not downloaded.
+   */
+  setLanguage(language: string): void;
   /** Subscribes to hover and click events of features (with `element` given); returns the unsubscribe function. */
   on(listener: (event: VectorFeatureEvent) => void): () => void;
   /** Removes the layer and frees its resources. */

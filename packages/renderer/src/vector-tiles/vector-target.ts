@@ -81,6 +81,8 @@ export interface VectorLayerDraws {
   readonly dash?: readonly number[];
   /** Extrusions drawn opaque, writing depth. */
   readonly solid?: boolean;
+  /** Extrusions: the share of their height drawn (they grow as their layer fades in, F457). */
+  readonly heightScale?: number;
   readonly draws: readonly VectorDraw[];
 }
 
@@ -164,7 +166,7 @@ export class ThreeVectorTarget {
     for (const layer of layers) {
       const material = this.material(layer);
       setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
-      setVectorLayer(material, layer.opacity, layer.zoomT, layer.dash);
+      setVectorLayer(material, layer.opacity, layer.zoomT, layer.dash, layer.heightScale);
       for (const draw of layer.draws) {
         const mesh = draw.mesh as ThreeVectorMesh;
         if (mesh.disposed) continue;

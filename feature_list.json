@@ -6055,7 +6055,7 @@
         "Assert the selection highlight appears on the picked feature in a screenshot",
         "Repeat on both backends and with touch emulation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F460",

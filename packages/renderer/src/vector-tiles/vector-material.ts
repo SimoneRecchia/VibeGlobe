@@ -66,7 +66,7 @@ interface Uniforms {
   readonly morphParams: Node<'vec4'>;
   readonly morphAxes: Node<'mat3'>;
   readonly viewport: Node<'vec2'>;
-  /** Layer opacity times its fade, the zoom factor between A and B, then 0, 0. */
+  /** Layer opacity times its fade, the zoom factor between A and B, the height scale of extrusions, then 0. */
   readonly layer: Node<'vec4'>;
   /** Dash and gap lengths in line widths (up to two pairs); `dashInfo`: pattern length, 1 when dashed. */
   readonly dash: Node<'vec4'>;
@@ -221,7 +221,8 @@ function dashMask(u: Uniforms, distanceUnits: Node<'float'>, halfWidth: Node<'fl
 }
 
 function extrusionMaterial(u: Uniforms, depthPath: DepthPath, solid: boolean): MeshBasicNodeMaterial {
-  const above = attribute('vtHeight', 'float');
+  // Buildings grow from the ground as their layer fades in (F457): the layer's height scale.
+  const above = attribute('vtHeight', 'float').mul(u.layer.z);
   const here = placed(
     positionGeometry,
     attribute('tileNormal', 'vec3'),
@@ -240,10 +241,11 @@ function extrusionMaterial(u: Uniforms, depthPath: DepthPath, solid: boolean): M
   const light = normalize(vec3(-0.25, 0.433, 0.866));
   const lambert = max(n.dot(light), 0);
   const shade = float(0.5).add(lambert.mul(0.5));
-  // Vertical gradient: walls darken toward their base (`fill-extrusion-vertical-gradient`).
+  // Vertical gradient: walls darken toward their base (`fill-extrusion-vertical-gradient`); roofs, at the top, get 1.
+  // (A `select` on a boolean inside this varying made roofs vanish on WebGL2, so none is used.)
   const gradient = min(float(1), float(0.7).add(above.div(max(attribute('vtTop', 'float'), 1)).mul(0.3)));
   const color = varying(mixAB('vtColor', u));
-  const lit = color.xyz.mul(varying(shade.mul(n.z.greaterThan(0.5).select(float(1), gradient))));
+  const lit = color.xyz.mul(varying(shade.mul(gradient)));
   const alpha = color.w.mul(u.layer.x).mul(insideClip(u));
   // Solid extrusions blend nothing: their alpha only carries the clip, which the alpha test discards.
   material.colorNode = vec4(lit, solid ? insideClip(u) : alpha);
@@ -329,10 +331,11 @@ export function setVectorLayer(
   opacity: number,
   zoomT: number,
   dashWidths?: readonly number[],
+  heightScale = 1,
 ): void {
   const u = uniformsOf(material);
   if (u === undefined) return;
-  (u.layer as unknown as Valued<Vector4>).value.set(opacity, zoomT, 0, 0);
+  (u.layer as unknown as Valued<Vector4>).value.set(opacity, zoomT, heightScale, 0);
   const dash = (u.dash as unknown as Valued<Vector4>).value;
   const info = (u.dashInfo as unknown as Valued<Vector4>).value;
   if (dashWidths === undefined || dashWidths.length < 2) {

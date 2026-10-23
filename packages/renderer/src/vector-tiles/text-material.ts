@@ -9,7 +9,7 @@
  * 1 for an icon).
  */
 import { attribute, float, max, smoothstep, texture, uniform, varying, vec2, vec4 } from 'three/tsl';
-import { MeshBasicNodeMaterial, Vector2, type Node, type Texture } from 'three/webgpu';
+import { DoubleSide, MeshBasicNodeMaterial, Vector2, type Node, type Texture } from 'three/webgpu';
 
 /** The SDF value at a glyph's outline (glyph PBF format). */
 const OUTLINE = 0.75;
@@ -26,7 +26,8 @@ export function createTextMaterial(atlas: Texture, atlasSize: number): MeshBasic
   const params = attribute('labelParams', 'vec4');
   const ndc = vec2(screen.x.div(viewport.x).mul(2).sub(1), float(1).sub(screen.y.div(viewport.y).mul(2)));
   const material = new MeshBasicNodeMaterial();
-  material.vertexNode = vec4(ndc, 0, 1);
+  // Nearer than any scene depth on both depth paths, in case a backend keeps the depth test.
+  material.vertexNode = vec4(ndc, 0.5, 1);
   const uv = varying(attribute('labelUv', 'vec2').div(atlasSize));
   const sample = texture(atlas, uv);
   const p = varying(params);
@@ -49,6 +50,8 @@ export function createTextMaterial(atlas: Texture, atlasSize: number): MeshBasic
   material.transparent = true;
   material.depthTest = false;
   material.depthWrite = false;
+  // Corners run clockwise on screen: both faces are drawn.
+  material.side = DoubleSide;
   material.forceSinglePass = true;
   material.userData['viewport'] = viewport;
   return material;

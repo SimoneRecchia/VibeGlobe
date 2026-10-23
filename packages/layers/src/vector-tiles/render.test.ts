@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { encodeMvt } from '../__fixtures__/mvt-writer.js';
 import { fillArea, tessellateFill, tileClipRect } from './fill-tessellate.js';
 import { globeVertices, maxEdgeUnits, subdividedFill, tileOrigin, tileToLonLat } from './globe-vertices.js';
-import { BUCKET_EXTENT, layoutVectorTile } from './layout-tile.js';
+import { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile } from './layout-tile.js';
 import { StyleLayer } from './style-layer.js';
 import { VectorTileLoader } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
@@ -166,8 +166,9 @@ describe('paint and meshes (F440, F450)', () => {
     const bucket = backgroundBucket({ z: 0, x: 0, y: 0 }, 'bg');
     const mesh = meshGeometry('fill', bucket, tileOrigin({ z: 0, x: 0, y: 0 }));
     expect(mesh?.data.indices.length).toBeGreaterThan(1000);
-    expect(mesh?.data.tile[0]).toBe(0);
-    expect(mesh?.data.tile.at(-1)).toBe(BUCKET_EXTENT);
+    // Past the square by the buffer: the draw's clip decides.
+    expect(mesh?.data.tile[0]).toBe(-BUCKET_BUFFER);
+    expect(mesh?.data.tile.at(-1)).toBe(BUCKET_EXTENT + BUCKET_BUFFER);
   });
 });
 

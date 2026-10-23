@@ -5,7 +5,7 @@
  * `@vibeglobe/layers/vector-tiles`, which decides what to draw; it decides nothing itself.
  */
 import type { FrameView } from '@vibeglobe/core';
-import { BufferAttribute, BufferGeometry, Mesh, Vector4, type MeshBasicNodeMaterial } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, Group, Mesh, Vector4, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { placeTile } from '../eye-relative.js';
 import type { ThreeExtensionContext } from '../extensions.js';
 import { rasterizeSdfGlyphs } from './local-glyphs.js';
@@ -19,11 +19,6 @@ import {
   type VectorDrawUniforms,
   type VectorMeshKind,
 } from './vector-material.js';
-
-/** Render order of the vector tile layers: over the surface, under data layers (1000 and up, ADR 0037). */
-const VECTOR_RENDER_ORDER = 500;
-/** Render order of vector tile labels: over every vector layer, under data layers. */
-const LABEL_RENDER_ORDER = 950;
 
 /** One tile's mesh of one style layer. Attribute arrays have the lengths given in the names' comments. */
 export interface VectorMeshData {
@@ -136,8 +131,15 @@ export class ThreeVectorTarget {
   private labelMesh: Mesh | undefined;
   private pendingLabels: LabelQuads | undefined;
 
+  /** Every vector object, in drawing order: the layer groups, then the labels. */
+  private readonly root = new Group();
+  private readonly groups = new Map<string, Group>();
+
   constructor(private readonly context: ThreeExtensionContext) {
     this.textMaterial = createTextMaterial(this.atlas.texture, this.atlas.size);
+    this.root.matrixAutoUpdate = false;
+    this.root.matrixWorldAutoUpdate = false;
+    context.scene.add(this.root);
   }
 
   /** Uploads one tile's mesh of one style layer; it is drawn when a frame's draws list it. */
@@ -150,21 +152,29 @@ export class ThreeVectorTarget {
   /** Draws the frame: every layer's draws in order (meshes not drawn are hidden), then the labels. */
   draw(layers: readonly VectorLayerDraws[], view: FrameView): void {
     for (const mesh of this.meshes) mesh.used = 0;
-    layers.forEach((layer, order) => {
+    // The engine renders without sorting (scene order): one group per style layer, in style order, labels last.
+    for (const group of this.groups.values()) group.visible = false;
+    this.root.children.length = 0;
+    for (const layer of layers) {
+      const group = this.group(layer.layerId);
+      group.visible = true;
+      this.root.children.push(group);
+    }
+    if (this.labelMesh !== undefined) this.root.children.push(this.labelMesh);
+    for (const layer of layers) {
       const material = this.material(layer);
       setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
       setVectorLayer(material, layer.opacity, layer.zoomT, layer.dash);
       for (const draw of layer.draws) {
         const mesh = draw.mesh as ThreeVectorMesh;
         if (mesh.disposed) continue;
-        const object = this.object(mesh, material);
-        object.renderOrder = VECTOR_RENDER_ORDER + order / Math.max(1, layers.length);
+        const object = this.object(mesh, material, this.group(layer.layerId));
         const uniforms = object.userData['vectorDraw'] as VectorDrawUniforms;
         uniforms.clip.set(draw.clip[0], draw.clip[1], draw.clip[2], draw.clip[3]);
         uniforms.tile.set(draw.pxPerUnit, 0, 0, 0);
         placeTile(object, mesh.data, view);
       }
-    });
+    }
     for (const mesh of this.meshes) {
       for (let i = 0; i < mesh.objects.length; i++) {
         const object = mesh.objects[i];
@@ -181,6 +191,8 @@ export class ThreeVectorTarget {
 
   /** Frees a layer's materials (the layer was removed from the style). */
   removeLayer(layerId: string): void {
+    this.groups.get(layerId)?.removeFromParent();
+    this.groups.delete(layerId);
     for (const [key, material] of this.materials) {
       if (!key.startsWith(`${layerId}\u0000`)) continue;
       material.dispose();
@@ -194,6 +206,7 @@ export class ThreeVectorTarget {
     for (const material of this.materials.values()) material.dispose();
     this.materials.clear();
     this.disposeLabels();
+    this.root.removeFromParent();
     this.textMaterial.dispose();
     this.atlas.dispose();
   }
@@ -201,7 +214,7 @@ export class ThreeVectorTarget {
   /** Called by a mesh's `dispose`. */
   release(mesh: ThreeVectorMesh): void {
     this.meshes.delete(mesh);
-    for (const object of mesh.objects) this.context.scene.remove(object);
+    for (const object of mesh.objects) object.removeFromParent();
     mesh.objects.length = 0;
     mesh.geometry.dispose();
   }
@@ -216,7 +229,19 @@ export class ThreeVectorTarget {
     return material;
   }
 
-  private object(mesh: ThreeVectorMesh, material: MeshBasicNodeMaterial): Mesh {
+  private group(layerId: string): Group {
+    let group = this.groups.get(layerId);
+    if (group === undefined) {
+      group = new Group();
+      group.matrixAutoUpdate = false;
+      group.matrixWorldAutoUpdate = false;
+      group.parent = this.root;
+      this.groups.set(layerId, group);
+    }
+    return group;
+  }
+
+  private object(mesh: ThreeVectorMesh, material: MeshBasicNodeMaterial, group: Group): Mesh {
     let object = mesh.objects[mesh.used];
     if (object === undefined) {
       object = new Mesh(mesh.geometry, material);
@@ -226,7 +251,7 @@ export class ThreeVectorTarget {
       const uniforms: VectorDrawUniforms = { clip: new Vector4(), tile: new Vector4() };
       object.userData['vectorDraw'] = uniforms;
       mesh.objects.push(object);
-      this.context.scene.add(object);
+      group.add(object);
     } else if (object.material !== material) {
       object.material = material;
     }
@@ -279,15 +304,15 @@ export class ThreeVectorTarget {
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
     mesh.frustumCulled = false;
-    mesh.renderOrder = LABEL_RENDER_ORDER;
     this.labelMesh = mesh;
-    this.context.scene.add(mesh);
+    mesh.parent = this.root;
+    this.root.children.push(mesh);
     return g;
   }
 
   private disposeLabels(): void {
     if (this.labelMesh === undefined) return;
-    this.context.scene.remove(this.labelMesh);
+    this.labelMesh.removeFromParent();
     this.labelMesh.geometry.dispose();
     this.labelMesh = undefined;
   }

@@ -8,20 +8,16 @@
  */
 import type { FrameView, Globe, RenderExtensionContext, TileTransport } from '@vibeglobe/core';
 import { fetchTransport } from '@vibeglobe/sources';
+import { GlyphSource } from './glyph-source.js';
+import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
 import { tileOrigin } from './globe-vertices.js';
 import { VectorTileLoader } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
-import {
-  retainedTiles,
-  tileKey,
-  tilesToDraw,
-  tilesToRequest,
-  type SourceCoverage,
-  type TileId,
-} from './tile-pyramid.js';
+import { retainedTiles, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
 import { meshKindOf, meshPaint, zoomBracket, type MeshPaint } from './vector-paint.js';
-import { VectorStyle, changeNeedsRelayout, type StyleChange, type StyleSourceJson } from './vector-style.js';
+import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
+import { json, resolveSource, tileUrl, type SourceInfo } from './style-sources.js';
 import type { StyleLayer } from './style-layer.js';
 import type { VectorLayerDraws, VectorMesh, VectorTileTarget } from './vector-target.js';
 import { sampledTiles, viewTargets } from './view-tiles.js';
@@ -35,16 +31,15 @@ export interface VectorTilesOptions {
   readonly target: (renderer: unknown) => VectorTileTarget;
   /** The transport of tile, TileJSON, glyph and sprite requests; `fetchTransport()` by default. */
   readonly transport?: TileTransport;
-  /** `fetch` for the style and TileJSON documents; the global one by default. */
+  /** `fetch` for the style, TileJSON, glyph and sprite documents; the global one by default. */
   readonly fetch?: typeof fetch;
+  /** A CSS font family drawn locally for characters the style's glyphs lack (CJK, F448). */
+  readonly localFontFamily?: string;
 }
 
 /** A source of the style, resolved (TileJSON read). */
-interface ResolvedSource {
+interface ResolvedSource extends SourceInfo {
   readonly id: string;
-  readonly templates: readonly string[];
-  readonly scheme: 'xyz' | 'tms';
-  readonly coverage: SourceCoverage;
   readonly loader: VectorTileLoader;
 }
 
@@ -70,49 +65,14 @@ export interface VectorTileLayer {
     feature: { readonly source: string; readonly id: number | string },
     state: Record<string, unknown>,
   ): void;
+  /** The labels the last frame placed, with their screen boxes (F449). */
+  placedLabels(): readonly PlacedLabel[];
   /** Every tile URL requested so far, per source (tests: F442, F450). */
   requestLog(source?: string): readonly string[];
   /** Diagnostics: the drawn tiles of the last frame, as `z/x/y` of the drawn tile → target. */
   drawnTiles(): readonly { readonly tile: string; readonly target: string; readonly standIn: boolean }[];
   /** Removes the layer and frees its resources. */
   remove(): void;
-}
-
-async function json(url: string, fetchImpl: typeof fetch): Promise<unknown> {
-  const response = await fetchImpl(url);
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return response.json();
-}
-
-async function resolveSource(
-  id: string,
-  source: StyleSourceJson,
-  base: string | undefined,
-  fetchImpl: typeof fetch,
-): Promise<{ templates: string[]; coverage: SourceCoverage; scheme: 'xyz' | 'tms' } | undefined> {
-  let doc: StyleSourceJson = source;
-  if (source.tiles === undefined && typeof source.url === 'string') {
-    const url = new URL(source.url, base).href;
-    doc = { ...((await json(url, fetchImpl)) as StyleSourceJson), ...source };
-    doc = { ...doc, tiles: (doc.tiles ?? []).map((t) => new URL(t, url).href) };
-  }
-  if (source.type !== 'vector' || doc.tiles === undefined || doc.tiles.length === 0) return undefined;
-  const bounds =
-    Array.isArray(doc.bounds) && doc.bounds.length === 4 ? (doc.bounds as [number, number, number, number]) : undefined;
-  return {
-    templates: doc.tiles.map((t) =>
-      (base === undefined ? t : new URL(t, base).href).replace(/%7B/g, '{').replace(/%7D/g, '}'),
-    ),
-    coverage: { minzoom: doc.minzoom ?? 0, maxzoom: doc.maxzoom ?? 22, ...(bounds ? { bounds } : {}) },
-    scheme: doc.scheme ?? 'xyz',
-  };
-  void id;
-}
-
-function tileUrl(source: ResolvedSource, tile: TileId): string {
-  const template = source.templates[(tile.x + tile.y) % source.templates.length] ?? '';
-  const y = source.scheme === 'tms' ? 2 ** tile.z - 1 - tile.y : tile.y;
-  return template.replace('{z}', String(tile.z)).replace('{x}', String(tile.x)).replace('{y}', String(y));
 }
 
 /** Logs a problem the way the engine's log does (until extensions can use it: hook request D (1)). */
@@ -130,10 +90,10 @@ export async function addVectorTiles(globe: Globe, options: VectorTilesOptions):
   const styleJson = typeof options.style === 'string' ? await json(base ?? options.style, fetchImpl) : options.style;
   const style = VectorStyle.load(styleJson);
   for (const problem of style.problems) warn(`style ${problem.path}: ${problem.message}`);
-  const resolved = new Map<string, Awaited<ReturnType<typeof resolveSource>>>();
+  const resolved = new Map<string, SourceInfo | undefined>();
   for (const [id, source] of Object.entries(style.sources)) {
     try {
-      resolved.set(id, await resolveSource(id, source, base, fetchImpl));
+      resolved.set(id, await resolveSource(source, base, fetchImpl));
     } catch (error) {
       style.problems.push({ path: `sources.${id}`, message: String(error) });
       warn(`style source ${id}: ${String(error)}`);
@@ -155,12 +115,13 @@ class Runtime implements VectorTileLayer {
   private targets: TileId[] = [];
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
+  private placer: LabelPlacer | undefined;
 
   constructor(
     private readonly globe: Globe,
     private readonly options: VectorTilesOptions,
     readonly style: VectorStyle,
-    private readonly resolved: ReadonlyMap<string, Awaited<ReturnType<typeof resolveSource>>>,
+    private readonly resolved: ReadonlyMap<string, SourceInfo | undefined>,
   ) {}
 
   start(): this {
@@ -177,6 +138,10 @@ class Runtime implements VectorTileLayer {
     this.featureStates.set(key, { ...this.featureStates.get(key), ...state });
     this.paintVersion++;
     this.globe.requestRender();
+  }
+
+  placedLabels(): readonly PlacedLabel[] {
+    return this.placer?.placed() ?? [];
   }
 
   requestLog(source?: string): readonly string[] {
@@ -198,6 +163,16 @@ class Runtime implements VectorTileLayer {
     const target = this.options.target(context.renderer);
     this.target = target;
     const transport = this.options.transport ?? fetchTransport();
+    const fetchImpl = this.options.fetch ?? ((input, init) => fetch(input, init));
+    const glyphs = new GlyphSource(
+      this.style.glyphs,
+      fetchImpl,
+      () => context.requestRender(),
+      target,
+      this.options.localFontFamily,
+    );
+    void glyphs.loadSprite(this.style.sprite, globalThis.devicePixelRatio ?? 1);
+    this.placer = new LabelPlacer(this.globe, glyphs, target.atlas);
     for (const [id, source] of this.resolved) {
       if (source === undefined) continue;
       const loader = new VectorTileLoader({
@@ -243,8 +218,30 @@ class Runtime implements VectorTileLayer {
       if (drawn !== undefined) layerDraws.push(drawn);
     }
     this.evictMeshes();
+    const labels = this.placer?.frame(this.labelSources(fades, draws), view, zoom, this.globe.timeMs);
+    target.setLabels(labels?.quads);
     target.draw(layerDraws, view);
-    if (animating) context.requestRender();
+    if (animating || labels?.animating === true) context.requestRender();
+  }
+
+  /** The symbol buckets of the drawn tiles, with their layer's fade. */
+  private labelSources(
+    fades: ReadonlyMap<string, number>,
+    draws: ReadonlyMap<string, readonly SourceDraw[]>,
+  ): LabelSource[] {
+    const out: LabelSource[] = [];
+    this.style.layers.forEach((layer, layerIndex) => {
+      const opacity = fades.get(layer.id) ?? 0;
+      const source = layer.source === undefined ? undefined : this.sources.get(layer.source);
+      if (layer.type !== 'symbol' || opacity <= 0 || source === undefined) return;
+      for (const d of draws.get(source.id) ?? []) {
+        const loaded = source.loader.get(d.tile);
+        const bucket = loaded?.buckets.find((b) => b.layerId === layer.id);
+        if (loaded === undefined || bucket === undefined) continue;
+        out.push({ layer, layerIndex, opacity, tile: d.tile, clip: d.clip, bucket, version: loaded.version });
+      }
+    });
+    return out;
   }
 
   /** Per source: the tiles to draw for the view's targets (requesting what is missing), each with its clip. */

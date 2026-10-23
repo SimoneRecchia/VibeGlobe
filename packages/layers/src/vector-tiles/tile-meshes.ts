@@ -5,7 +5,7 @@
  */
 import type { LayerOrigin } from '@vibeglobe/core';
 import { globeVertices, maxEdgeUnits } from './globe-vertices.js';
-import { BUCKET_EXTENT, type Bucket } from './layout-tile.js';
+import { BUCKET_BUFFER, BUCKET_EXTENT, type Bucket } from './layout-tile.js';
 import type { TileId } from './tile-pyramid.js';
 import type { MeshPaint } from './vector-paint.js';
 import type { VectorMeshData, VectorMeshKind } from './vector-target.js';
@@ -133,11 +133,13 @@ export function backgroundBucket(tile: TileId, layerId: string): Bucket {
   const cells = Number.isFinite(maxEdgeUnits(tile.z, BUCKET_EXTENT))
     ? Math.ceil(BUCKET_EXTENT / maxEdgeUnits(tile.z, BUCKET_EXTENT))
     : 1;
+  // The grid reaches past the square by a buffer, as laid-out fills do, so the draw's clip alone decides each pixel.
+  const from = -BUCKET_BUFFER;
+  const step = (BUCKET_EXTENT + 2 * BUCKET_BUFFER) / cells;
   const side = cells + 1;
   const positions = new Float32Array(side * side * 2);
   for (let j = 0; j < side; j++)
-    for (let i = 0; i < side; i++)
-      positions.set([(i / cells) * BUCKET_EXTENT, (j / cells) * BUCKET_EXTENT], (j * side + i) * 2);
+    for (let i = 0; i < side; i++) positions.set([from + i * step, from + j * step], (j * side + i) * 2);
   const indices = new Uint32Array(cells * cells * 6);
   for (let j = 0; j < cells; j++) {
     for (let i = 0; i < cells; i++) {

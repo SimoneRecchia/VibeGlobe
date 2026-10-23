@@ -1,7 +1,15 @@
 // Data layers drawn by the renderer (M10, ADR 0037): points, lines and polygons in the globe, 2D and tilted phases.
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
+import type { DataLayer, InteractionController, LayerStack } from '@vibeglobe/layers';
 import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
+
+declare global {
+  interface Window {
+    /** The playground's data scenario (`apps/playground/src/layers-demo.ts`). */
+    vibeglobeLayers?: { stack: LayerStack; layers: Record<string, DataLayer>; interaction?: InteractionController };
+  }
+}
 
 test.use({ viewport: { width: 480, height: 360 } });
 
@@ -22,7 +30,14 @@ async function openScenario(page: Page, backend: string, scenario: string): Prom
   await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
 }
 
-async function showPhase(page: Page, phase: (typeof PHASES)[number]): Promise<PNG> {
+/** A view in one phase, with the view mode to set first. */
+interface PhaseView {
+  readonly name: string;
+  readonly view: { longitudeDeg: number; latitudeDeg: number; zoom: number; tiltDeg?: number };
+  readonly mode: 'auto' | '2d' | 'manual';
+}
+
+async function showPhase(page: Page, phase: PhaseView): Promise<PNG> {
   await page.evaluate(({ view, mode }) => {
     const globe = window.vibeglobePlayground?.globe;
     if (!globe) throw new Error('no globe');

@@ -4,7 +4,7 @@ import { fitLayers } from './layers-fit.js';
 import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { selectLayers, selectModels } from './layers-select.js';
 import type { ModelLayer } from '@vibeglobe/layers/models';
-import { styledLayers } from './layers-styled.js';
+import { styledLayers, zoomLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
   createGlobeLayers,
@@ -352,24 +352,19 @@ export function showDataScenario(globe: Globe, name: string): void {
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (['data-markers', 'data-styled', 'data-select', 'data-altitudes-all'].includes(name))
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
-  const scene = name === 'data-points-100k' ? manyPointsLayer : DATA_SCENES[name];
-  const added = scene
-    ? [scene()]
-    : name === 'data-altitudes'
-      ? altitudeLayers()
-      : name === 'data-altitudes-all'
-        ? allAltitudeLayers()
-        : name === 'data-sync'
-          ? syncLayers()
-          : name === 'data-styled'
-            ? styledLayers()
-            : name === 'data-select'
-              ? selectLayers()
-              : name === 'data-pick'
-                ? pickLayers()
-                : name === 'data-fit'
-                  ? fitLayers(globe)
-                  : [];
+  const scenes: Record<string, () => DataLayer[]> = {
+    'data-points-100k': () => [manyPointsLayer()],
+    'data-altitudes': altitudeLayers,
+    'data-altitudes-all': allAltitudeLayers,
+    'data-sync': syncLayers,
+    'data-styled': styledLayers,
+    'data-select': selectLayers,
+    'data-pick': pickLayers,
+    'data-fit': () => fitLayers(globe),
+    'data-zoom': zoomLayers,
+  };
+  const single = DATA_SCENES[name];
+  const added = single ? [single()] : (scenes[name]?.() ?? []);
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
   if (name === 'data-models' || name === 'data-sync') {
     const models =

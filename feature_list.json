@@ -4929,7 +4929,7 @@
         "Zoom continuously while recording frames",
         "Verify interpolated properties change smoothly by frame differencing and the stepped property switches exactly at its stop"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F371",

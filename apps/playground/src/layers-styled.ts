@@ -65,3 +65,45 @@ export function styledLayers(): DataLayer[] {
     }),
   ];
 }
+
+/**
+ * `?scenario=data-zoom` (F370): a point whose radius, a point whose opacity and a line whose width interpolate with
+ * zoom (zoom 6 to 10), and a point shown only from zoom 8 (a step), around (12.5°, 41.9°).
+ */
+export function zoomLayers(): DataLayer[] {
+  const zoomed = (low: number, high: number) => ['interpolate', ['linear'], ['zoom'], 6, low, 10, high];
+  return [
+    new DataLayer('polyline', {
+      id: 'zoom-line',
+      data: [
+        feature(
+          'line',
+          {
+            type: 'LineString',
+            coordinates: [
+              [12.3, 41.88],
+              [12.7, 41.88],
+            ],
+          },
+          {},
+        ),
+      ],
+      style: { 'line-color': '#20c040', 'line-width': zoomed(2, 12) },
+    }),
+    new DataLayer('point', {
+      id: 'zoom-point',
+      data: [feature('dot', point(12.5, 41.9), {})],
+      style: { 'circle-color': '#ff2020', 'circle-radius': zoomed(3, 15) },
+    }),
+    new DataLayer('point', {
+      id: 'zoom-fade',
+      data: [feature('fade', point(12.56, 41.9), {})],
+      style: { 'circle-color': '#ff2020', 'circle-radius': 6, 'circle-opacity': zoomed(0.4, 1) },
+    }),
+    new DataLayer('point', {
+      id: 'zoom-step',
+      data: [feature('step', point(12.5, 41.92), {})],
+      style: { 'circle-color': '#2040ff', 'circle-radius': 4, 'circle-opacity': ['step', ['zoom'], 0, 8, 1] },
+    }),
+  ];
+}

@@ -1,10 +1,19 @@
-import { enuFrame, morphPointInto, type FrameView, type ModelPose, type ModelRenderer } from '@vibeglobe/core';
-import { max, normalView, texture, uv, vec3, vec4 } from 'three/tsl';
 import {
+  enuFrame,
+  morphPointInto,
+  projectLayerPoint,
+  type FrameView,
+  type ModelPose,
+  type ModelRenderer,
+} from '@vibeglobe/core';
+import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
+import {
+  Box3,
   Euler,
   Matrix4,
   MeshBasicNodeMaterial,
   Vector3,
+  Vector4,
   type Material,
   type Mesh,
   type Node,
@@ -27,6 +36,13 @@ export type GltfLoaderFactory = () => Promise<GltfLoader>;
 interface Model {
   readonly root: Object3D;
   pose: ModelPose | undefined;
+  /** Blend toward a color (rgb, amount), shared by the model's materials. */
+  readonly highlight: { value: Vector4 };
+  pickId: number;
+  visible: boolean;
+  /** Bounding sphere in model units: the center's height above the anchor, and the radius. */
+  readonly centerUp: number;
+  readonly radius: number;
 }
 
 const geodetic = new Float64Array(3);
@@ -36,6 +52,8 @@ const axesToModel = new Matrix4();
 const attitude = new Matrix4();
 const euler = new Euler(0, 0, 0, 'YXZ');
 const scaled = new Vector3();
+const center = new Float64Array(2);
+const edge = new Float64Array(2);
 
 /**
  * Writes a model's transform for a frame: its anchor where the frame draws that position (ADR 0008: the morph, with the
@@ -94,12 +112,23 @@ export class LayerModels implements ModelRenderer {
     root.traverse((object) => (object.frustumCulled = false));
     root.visible = false;
     const id = this.nextId++;
-    const model: Model = { root, pose: undefined };
+    const bounds = new Box3().setFromObject(root);
+    const center = bounds.getCenter(new Vector3());
+    const highlight = uniform(new Vector4(0, 0, 0, 0));
+    const model: Model = {
+      root,
+      pose: undefined,
+      highlight,
+      pickId: 0,
+      visible: true,
+      centerUp: center.y,
+      radius: bounds.getSize(new Vector3()).length() / 2,
+    };
     this.models.set(id, model);
     this.modelList.push(model);
     root.traverse((object) => {
       const mesh = object as Partial<Mesh>;
-      if (mesh.isMesh && mesh.material) mesh.material = unlit(mesh.material as Material);
+      if (mesh.isMesh && mesh.material) mesh.material = unlit(mesh.material as Material, highlight);
     });
     this.scene.add(root);
     return id;
@@ -109,6 +138,52 @@ export class LayerModels implements ModelRenderer {
   setPose(id: number, pose: ModelPose): void {
     const model = this.models.get(id);
     if (model) model.pose = pose;
+  }
+
+  /** See {@link ModelRenderer}. */
+  setPickId(id: number, pickId: number): void {
+    const model = this.models.get(id);
+    if (model) model.pickId = pickId;
+  }
+
+  /** See {@link ModelRenderer}. */
+  setHighlight(id: number, rgba: readonly [number, number, number, number] | undefined): void {
+    this.models.get(id)?.highlight.value.set(rgba?.[0] ?? 0, rgba?.[1] ?? 0, rgba?.[2] ?? 0, rgba?.[3] ?? 0);
+  }
+
+  /** See {@link ModelRenderer}. */
+  setVisible(id: number, visible: boolean): void {
+    const model = this.models.get(id);
+    if (model) model.visible = visible;
+  }
+
+  /**
+   * The pick id of the model drawn at a screen point, 0 for none: among those whose bounding sphere, projected where
+   * the frame draws it, covers the point, the one whose center is nearest relative to its size.
+   */
+  pickAt(view: FrameView, xPx: number, yPx: number): number {
+    let best = 0;
+    let bestRatio = Infinity;
+    for (const model of this.modelList) {
+      const pose = model.pose;
+      if (!pose || !model.visible || model.pickId === 0) continue;
+      const scale = pose.scale ?? 1;
+      const { longitudeDeg, latitudeDeg } = pose.position;
+      const height = (pose.position.heightMeters ?? 0) + model.centerUp * scale;
+      if (!projectLayerPoint(view, longitudeDeg, latitudeDeg, height, center)) continue;
+      // The radius on screen: the center to a point one radius east of it.
+      const radiusMeters = model.radius * scale;
+      const east = (radiusMeters / (111_320 * Math.max(Math.cos(latitudeDeg * RAD), 1e-6))) % 360;
+      if (!projectLayerPoint(view, longitudeDeg + east, latitudeDeg, height, edge)) continue;
+      const radiusPx = Math.hypot((edge[0] ?? 0) - (center[0] ?? 0), (edge[1] ?? 0) - (center[1] ?? 0));
+      const distance = Math.hypot(xPx - (center[0] ?? 0), yPx - (center[1] ?? 0));
+      const ratio = distance / radiusPx;
+      if (ratio <= 1 && ratio < bestRatio) {
+        best = model.pickId;
+        bestRatio = ratio;
+      }
+    }
+    return best;
   }
 
   /** See {@link ModelRenderer}. */
@@ -126,7 +201,7 @@ export class LayerModels implements ModelRenderer {
     for (let i = 0; i < this.modelList.length; i++) {
       const model = this.modelList[i];
       if (!model) continue;
-      model.root.visible = model.pose !== undefined;
+      model.root.visible = model.visible && model.pose !== undefined;
       if (model.pose) place(model, model.pose, view);
     }
   }
@@ -142,16 +217,18 @@ const LIGHT = vec3(0.3, 0.8, 0.5).normalize();
 
 /**
  * An unlit copy of a glTF material (the renderer draws without three.js's lighting, F064): its base color, texture and
- * opacity, shaded by a fixed light from above the eye so volumes read (ADR 0037). Lit, image-based PBR is M11's.
+ * opacity, shaded by a fixed light from above the eye so volumes read (ADR 0037), and blended toward the model's
+ * highlight color (selection, F381). Lit, image-based PBR is M11's.
  */
-function unlit(material: Material): MeshBasicNodeMaterial {
+function unlit(material: Material, highlight: { value: Vector4 }): MeshBasicNodeMaterial {
   const standard = material as Partial<MeshStandardMaterial>;
   const unlitMaterial = new MeshBasicNodeMaterial();
   const tint = standard.color ?? { r: 1, g: 1, b: 1 };
   const factor = vec4(tint.r, tint.g, tint.b, standard.opacity ?? 1);
   const base: Node<'vec4'> = standard.map ? factor.mul(texture(standard.map, uv())) : factor;
   const shade = max(normalView.dot(LIGHT), 0).mul(0.6).add(0.4);
-  unlitMaterial.colorNode = vec4(base.xyz.mul(shade), base.w);
+  const blend = highlight as unknown as Node<'vec4'>;
+  unlitMaterial.colorNode = vec4(mix(base.xyz.mul(shade), blend.xyz, blend.w), base.w);
   unlitMaterial.transparent = material.transparent;
   unlitMaterial.side = material.side;
   material.dispose();

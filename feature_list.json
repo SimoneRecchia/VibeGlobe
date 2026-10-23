@@ -5065,7 +5065,7 @@
         "Verify the highlight appears in the next frame and is removed on deselection",
         "Move the camera and live-update the selected feature and verify the highlight follows it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F382",

@@ -35,6 +35,12 @@ export interface ModelRenderer {
   load(source: { readonly url?: string; readonly data?: ArrayBuffer }): Promise<number>;
   setPose(id: number, pose: ModelPose): void;
   remove(id: number): void;
+  /** The pick id a pick at the model returns (data layers' model features, F379); 0 for none. */
+  setPickId?(id: number, pickId: number): void;
+  /** Blends the model toward a color, `[r, g, b, amount]` from 0 to 1 (selection and hover styles, F381); `undefined` clears it. */
+  setHighlight?(id: number, rgba: readonly [number, number, number, number] | undefined): void;
+  /** Shows or hides a model. */
+  setVisible?(id: number, visible: boolean): void;
 }
 
 /** Throws a GlobeError unless the pose is valid. */

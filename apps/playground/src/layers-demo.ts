@@ -1,6 +1,7 @@
 import type { Globe } from '@vibeglobe/core';
 import { manyPointsLayer, pickLayers } from './layers-many.js';
-import { selectLayers } from './layers-select.js';
+import { selectLayers, selectModels } from './layers-select.js';
+import type { ModelLayer } from '@vibeglobe/layers/models';
 import { styledLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
@@ -15,7 +16,13 @@ import {
 declare global {
   interface Window {
     /** The `?layers=demo` stack and its layers, for the end-to-end tests of M10. */
-    vibeglobeLayers?: { stack: LayerStack; layers: Record<string, DataLayer>; interaction?: InteractionController };
+    vibeglobeLayers?: {
+      stack: LayerStack;
+      layers: Record<string, DataLayer>;
+      interaction?: InteractionController;
+      /** The glTF models of `?scenario=data-select` (F381). */
+      models?: ModelLayer;
+    };
   }
 }
 
@@ -368,6 +375,11 @@ export function showDataScenario(globe: Globe, name: string): void {
             scale: 60,
           });
     void models.then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
+    return;
+  }
+  if (name === 'data-select') {
+    const models = stack.add(selectModels(import.meta.env.BASE_URL));
+    void models.ready.then(() => (window.vibeglobeLayers = { stack, layers, interaction, models }));
     return;
   }
   window.vibeglobeLayers = { stack, layers, interaction };

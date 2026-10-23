@@ -11,6 +11,8 @@ const BACKENDS = ['webgpu', 'webgl2'] as const;
 type Rgb = [number, number, number];
 const isYellow = ([r, g, b]: Rgb): boolean => r > 200 && g > 200 && b < 90;
 const isBlue = ([r, g, b]: Rgb): boolean => b > 180 && r < 90 && g < 120;
+/** The red pyramid blended toward yellow. */
+const isAmber = ([r, g, b]: Rgb): boolean => r > 150 && g > 90 && b < 70;
 
 /** Pixels passing `test` in a square of half-size `half` around a point. */
 function count(image: PNG, at: { xPx: number; yPx: number }, half: number, test: (rgb: Rgb) => boolean): number {
@@ -33,6 +35,7 @@ const TARGETS = [
   { layer: 'sel-marker', id: 'mk', at: [12.5, 41.85] },
   { layer: 'sel-label', id: 'lb', at: [12.65, 41.85] },
   { layer: 'sel-extrusion', id: 'ex', at: [12.5, 41.74] },
+  { layer: 'sel-model', id: 'md', at: [12.35, 41.75] },
 ] as const;
 
 async function screen(page: Page, [lon, lat]: readonly [number, number]): Promise<{ xPx: number; yPx: number }> {
@@ -48,6 +51,7 @@ async function screen(page: Page, [lon, lat]: readonly [number, number]): Promis
 /** Whether a target shows its highlight: yellow, or for the marker its larger size (blue pixels). */
 function highlighted(image: PNG, target: (typeof TARGETS)[number], at: { xPx: number; yPx: number }): boolean {
   if (target.layer === 'sel-marker') return count(image, at, 20, isBlue) > 900;
+  if (target.layer === 'sel-model') return count(image, at, 6, isAmber) > 20;
   return count(image, at, 6, isYellow) > 4;
 }
 
@@ -61,15 +65,16 @@ for (const backend of BACKENDS) {
   test(`features of every data-layer primitive selected by click or API are highlighted in the next frame, follow camera moves and updates, and clear on deselection on ${backend} (F381)`, async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     await openGlobe(page, `backend=${backend}&scenario=data-select`);
     await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
     await page.evaluate(() => {
       const globe = window.vibeglobePlayground?.globe;
       const layers = window.vibeglobeLayers;
       if (!globe || !layers?.interaction) throw new Error('no layers');
-      // The application's click handler selects the clicked feature.
-      for (const layer of Object.values(layers.layers))
+      // The application's click handler selects the clicked feature, glTF models included.
+      const models = (layers as { models?: (typeof layers.layers)[string] }).models;
+      for (const layer of [...Object.values(layers.layers), ...(models ? [models] : [])])
         layer.on('click', ({ feature }) => layers.interaction?.select(feature.layerId, feature.id));
       // The playground's camera buttons sit over the top of the canvas, where the first row of features is.
       document.querySelector<HTMLElement>('#camera-controls')?.style.setProperty('display', 'none');
@@ -83,22 +88,23 @@ for (const backend of BACKENDS) {
     let image = await canvasImage(page);
     const positions = await Promise.all(TARGETS.map((t) => screen(page, t.at)));
     TARGETS.forEach((t, i) => expect(highlighted(image, t, positions[i] ?? { xPx: 0, yPx: 0 }), t.layer).toBe(false));
-    // The first three by click, the others through the API; each shows in the next frame.
+    // Every primitive by click, then again through the API after clearing; each shows in the next frame.
+    const selected = () =>
+      page.evaluate(() => window.vibeglobeLayers?.interaction?.selection.map((f) => `${f.layerId}/${String(f.id)}`));
     for (const [i, target] of TARGETS.entries()) {
       const at = positions[i] ?? { xPx: 0, yPx: 0 };
-      if (i < 3) {
-        await page.mouse.click(box.x + at.xPx, box.y + at.yPx);
-        await expect
-          .poll(() =>
-            page.evaluate(
-              ({ layer, id }) => window.vibeglobeLayers?.layers[layer]?.getFeatureState(id)?.['selected'],
-              target,
-            ),
-          )
-          .toBe(true);
-      } else await page.evaluate(({ layer, id }) => window.vibeglobeLayers?.interaction?.select(layer, id), target);
+      await page.mouse.click(box.x + at.xPx, box.y + at.yPx);
+      await expect.poll(selected, `${target.layer} clicked`).toContain(`${target.layer}/${target.id}`);
       image = await frame(page);
-      expect(highlighted(image, target, at), `${target.layer} selected`).toBe(true);
+      expect(highlighted(image, target, at), `${target.layer} selected by click`).toBe(true);
+    }
+    await page.evaluate(() => window.vibeglobeLayers?.interaction?.clearSelection());
+    image = await frame(page);
+    TARGETS.forEach((t, i) => expect(highlighted(image, t, positions[i] ?? { xPx: 0, yPx: 0 }), t.layer).toBe(false));
+    for (const [i, target] of TARGETS.entries()) {
+      await page.evaluate(({ layer, id }) => window.vibeglobeLayers?.interaction?.select(layer, id), target);
+      image = await frame(page);
+      expect(highlighted(image, target, positions[i] ?? { xPx: 0, yPx: 0 }), `${target.layer} selected`).toBe(true);
     }
     // The camera pans: every highlight is at its feature's new screen position.
     await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 12.55, latitudeDeg: 41.9 }));

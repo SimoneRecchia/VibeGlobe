@@ -2,6 +2,8 @@
  * The draw interface of data layers (ADR 0029, ADR 0037): types and constants only. `@vibeglobe/layers` decides what
  * changed and writes it here; the renderer owns the GPU buffers and draws them.
  */
+import type { ModelRenderer } from './models.js';
+
 /** Primitive families a batch can hold. */
 export type BatchKind = 'point' | 'marker' | 'label' | 'polyline' | 'polygon' | 'circle';
 
@@ -134,6 +136,8 @@ export interface LayerRenderTarget {
    * when none is (the layers package's `PickProvider`, F379–F384).
    */
   pick?(point: { readonly xPx: number; readonly yPx: number }): Promise<number>;
+  /** The renderer's glTF models, for layers whose features are models (F379, F381). */
+  readonly models?: ModelRenderer;
   /**
    * Optional: registers or replaces a marker image by name, which the `icon` channel names (F352): an image, bitmap or
    * canvas the renderer can draw.

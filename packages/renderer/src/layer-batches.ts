@@ -236,10 +236,13 @@ export class LayerBatches implements LayerRenderTarget {
     for (const batch of this.batches.values()) if (batch.kind === 'marker') batch.dirty = true;
   }
 
-  /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame. */
+  /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame, features before models. */
   pick(point: { readonly xPx: number; readonly yPx: number }): Promise<number> {
     const view = this.lastView;
-    return Promise.resolve(view ? pickAt(this.batches.values(), view, point.xPx, point.yPx) : 0);
+    if (!view) return Promise.resolve(0);
+    // Features draw over models: a model is picked only where no feature is.
+    const id = pickAt(this.batches.values(), view, point.xPx, point.yPx);
+    return Promise.resolve(id !== 0 ? id : this.models.pickAt(view, point.xPx, point.yPx));
   }
 
   /** Meshes held, for the resource counters. */

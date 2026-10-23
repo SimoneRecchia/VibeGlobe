@@ -1,4 +1,5 @@
 import { DataLayer, type Feature, type Geometry } from '@vibeglobe/layers';
+import { ModelLayer } from '@vibeglobe/layers/models';
 
 function feature(id: string, geometry: Geometry, properties: Record<string, unknown> = {}): Feature {
   return { type: 'Feature', id, properties, geometry };
@@ -71,4 +72,19 @@ export function selectLayers(): DataLayer[] {
       style: { 'fill-color': selectable('#c0a080'), 'fill-extrusion-height': 500 },
     }),
   ];
+}
+
+/** The glTF model of `?scenario=data-select`: the fixture pyramid (2 by 4 units) 5 km across, south-west of the other features. */
+export function selectModels(baseUrl: string): ModelLayer {
+  return new ModelLayer({
+    id: 'sel-model',
+    models: [
+      {
+        id: 'md',
+        url: `${baseUrl}models/pyramid.gltf`,
+        position: { longitudeDeg: 12.35, latitudeDeg: 41.74 },
+        scale: 2500,
+      },
+    ],
+  });
 }

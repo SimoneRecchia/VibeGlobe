@@ -1,6 +1,7 @@
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { planeCenterOf, writeNormal, writePlane } from '../surface/surface-mesh.js';
 import type { LayerRenderTarget } from './layer-target.js';
+import type { ModelRenderer } from './models.js';
 import type { FrameView } from '../globe/types.js';
 import { morphPointInto } from '../view/morph.js';
 
@@ -80,6 +81,22 @@ export function requestingTarget(
     ...(target.pick ? { pick: target.pick.bind(target) } : {}),
     ...(target.stats ? { stats: target.stats.bind(target) } : {}),
     ...(target.addImage ? { addImage: after(target.addImage.bind(target)) } : {}),
+    ...(target.models ? { models: requestingModels(target.models, after) } : {}),
+  };
+}
+
+/** A model renderer whose changes each ask for a frame. */
+function requestingModels(
+  models: ModelRenderer,
+  after: <A extends unknown[], R>(call: (...args: A) => R) => (...args: A) => R,
+): ModelRenderer {
+  return {
+    load: after((source) => models.load(source)),
+    setPose: after((id, pose) => models.setPose(id, pose)),
+    remove: after((id) => models.remove(id)),
+    ...(models.setPickId ? { setPickId: models.setPickId.bind(models) } : {}),
+    ...(models.setHighlight ? { setHighlight: after(models.setHighlight.bind(models)) } : {}),
+    ...(models.setVisible ? { setVisible: after(models.setVisible.bind(models)) } : {}),
   };
 }
 

@@ -5821,7 +5821,7 @@
         "Assert by frame differencing that vector features do not jump or slide during the morph",
         "Capture the same area in the globe, 2D and 3D phases and assert colors, line widths and feature presence match within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F442",

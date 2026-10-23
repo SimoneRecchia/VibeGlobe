@@ -178,7 +178,7 @@ function profileOf(s: HarnessSource): ProviderProfile | undefined {
 }
 
 /** The adapter of a harness source, before the offline engine wraps it. */
-async function adapterOf(s: HarnessSource): Promise<ImagerySource & { readonly profile?: ProviderProfile }> {
+async function adapterOf(s: HarnessSource): Promise<ImagerySource> {
   const levels = { minLevel: s.minLevel ?? 0, maxLevel: s.maxLevel ?? 18 };
   const profile = profileOf(s);
   if (s.provider === 'google')
@@ -200,7 +200,17 @@ async function adapterOf(s: HarnessSource): Promise<ImagerySource & { readonly p
       ...(s.attribution ? { attribution: s.attribution } : {}),
     });
   const source = xyzImagery({ id: s.id, url: urlOf(s), ...levels });
-  return withProfile(source, profile ?? CUSTOM, s.attribution ?? []);
+  // A plain fixture source stays as it is unless the test declares a profile or credits (the offline track's specs
+  // rely on its default cache behavior).
+  return profile || s.attribution ? withProfile(source, profile ?? CUSTOM, s.attribution ?? []) : source;
+}
+
+/** The provider rules a source's own profile declares, if any. */
+function rulesOf(source: ImagerySource): ProviderRules | undefined {
+  const profile = (source as { profile?: unknown }).profile;
+  return typeof profile === 'object' && profile !== null && 'forbids' in profile
+    ? (profile as ProviderRules)
+    : undefined;
 }
 
 const CUSTOM: ProviderProfile = { id: 'custom', forbids: new Set(), respectCacheHeaders: true };
@@ -337,8 +347,7 @@ const harness: OfflineHarness = {
         sources: await Promise.all(
           request.sources.map(async (s) => {
             const source = await adapterOf(s);
-            const profile = source.profile;
-            const rules = s.rules ? { ...s.rules, forbids: new Set(s.rules.forbids) } : profile;
+            const rules = s.rules ? { ...s.rules, forbids: new Set(s.rules.forbids) } : rulesOf(source);
             return {
               source,
               ...(rules ? { rules } : {}),

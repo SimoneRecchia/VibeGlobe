@@ -175,6 +175,25 @@ export class CameraAnimator {
     const b = this.b;
     let wa = 1 - f;
     let wb = f;
+    if (angle > Math.PI - 1e-9) {
+      // Antipodal ends: every great circle joins them; take the one through the north of the start (KB-128).
+      const ax = a[0] ?? 0;
+      const ay = a[1] ?? 0;
+      const az = a[2] ?? 0;
+      const horizontal = Math.sqrt(ax * ax + ay * ay);
+      // The northward tangent at the start; at a pole, the direction of longitude 0.
+      const px = horizontal > 1e-12 ? (-az * ax) / horizontal : 1;
+      const py = horizontal > 1e-12 ? (-az * ay) / horizontal : 0;
+      const pz = horizontal > 1e-12 ? horizontal : 0;
+      const cos = Math.cos(f * angle);
+      const sin = Math.sin(f * angle);
+      const x = cos * ax + sin * px;
+      const y = cos * ay + sin * py;
+      const z = cos * az + sin * pz;
+      pose.targetLongitudeRad = Math.atan2(y, x);
+      pose.targetLatitudeRad = Math.atan2(z, Math.sqrt(x * x + y * y));
+      return;
+    }
     if (angle > 1e-12) {
       const sin = Math.sin(angle);
       wa = Math.sin((1 - f) * angle) / sin;

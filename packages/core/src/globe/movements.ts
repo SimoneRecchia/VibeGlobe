@@ -1,4 +1,3 @@
-import type { Constraints } from './constraints.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js';
 import { FadeJump } from '../camera/fade-jump.js';
@@ -30,9 +29,7 @@ import { validateBounds, viewForBounds } from './fit-bounds.js';
 import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
-import type { EngineClock } from './engine-clock.js';
 import type { ViewState } from '../view/view-state.js';
-import { ViewControl } from './view-control.js';
 
 const RAD = Math.PI / 180;
 /** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
@@ -385,6 +382,8 @@ export class Movements {
   /** A jump: the three events in one go (F197). */
   private jumped(): void {
     this.interrupt();
+    // The controls' inertia and smoothed zooms stop too, or their next step would undo the jump (KB-125).
+    this.host.interruptInput();
     this.host.emitter.emit('movestart', { cause: 'api' });
     this.moveEvent.cause = 'api';
     this.host.emitter.emit('move', this.moveEvent);
@@ -444,49 +443,6 @@ function validDuration(value: unknown): number | undefined {
       `A movement's durationMs must be a finite number of 0 or more, got ${String(value)}`,
     );
   return value;
-}
-
-/** What {@link wireView} needs from its globe. */
-export interface ViewWiring {
-  readonly cam: Camera;
-  readonly view: ViewState;
-  readonly emitter: Emitter<GlobeEvents>;
-  readonly clock: EngineClock;
-  readonly constraints: Constraints;
-  setOpacity(opacity: number): void;
-  waiting(): boolean;
-  assertAlive(): void;
-  requestRender(): void;
-}
-
-/** The view API and the camera movements of a globe, wired to each other: input intents interrupt movements. */
-export function wireView(globe: ViewWiring): { viewControl: ViewControl; movements: Movements } {
-  const viewControl: ViewControl = new ViewControl({
-    cam: globe.cam,
-    view: globe.view,
-    emitter: globe.emitter,
-    waiting: () => globe.waiting(),
-    assertAlive: () => globe.assertAlive(),
-    requestRender: () => globe.requestRender(),
-    userInput: (cause) => movements.userInput(cause),
-    timeMs: () => globe.clock.timeMs,
-  });
-  const movements: Movements = new Movements({
-    cam: globe.cam,
-    view: globe.view,
-    assertAlive: () => globe.assertAlive(),
-    emitter: globe.emitter,
-    timeMs: () => globe.clock.timeMs,
-    currentView: () => currentView(globe.cam),
-    chooseTilt: (tiltDeg) => viewControl.chooseTilt(tiltDeg),
-    setMode: (mode) => viewControl.setMode(mode),
-    animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
-    setOpacity: (opacity) => globe.setOpacity(opacity),
-    requestRender: () => globe.requestRender(),
-    interruptInput: () => viewControl.slot.controls?.interrupt?.(),
-    constrainEnd: (end) => globe.constraints.clampEnd(end),
-  });
-  return { viewControl, movements };
 }
 
 /** A movement that has already settled as 'completed': what a jump returns (F197, F200). */

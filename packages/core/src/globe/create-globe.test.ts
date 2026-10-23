@@ -483,6 +483,13 @@ describe('createGlobe', () => {
     expect(renderer.flush()).toBe(0);
     void globe.flyTo({ longitudeDeg: 20, latitudeDeg: 10, zoom: 3 });
     expect(interrupted).toBe(1);
+    // A jump stops them too, so their inertia does not undo it (KB-125).
+    void globe.jumpTo({ longitudeDeg: 139.69, latitudeDeg: 35.68 });
+    expect(interrupted).toBe(2);
+    // A press on the map stops a running movement before any drag (KB-127).
+    const flight = globe.flyTo({ longitudeDeg: 20, latitudeDeg: 10, zoom: 3 });
+    navigation.interruptMovement();
+    expect(await flight).toBe('interrupted');
   });
 
   it('announces inertia from the controls with the cause inertia, after the drag that started it (F200)', async () => {

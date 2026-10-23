@@ -59,6 +59,23 @@ describe('camera animations (F195, F198, F203)', () => {
     expect(poseAt2s(2000)).toEqual(poseAt2s(1000 / 30));
   });
 
+  it('flies between antipodal points along a great circle, without a jump at mid-path (KB-128)', () => {
+    const camera = cameraAt(0, 0, 2000);
+    const animator = new CameraAnimator('fly', camera, target(180, 0, 2000, 0), 0, 4000);
+    let last = { lon: 0, lat: 0 };
+    for (let ms = 5; ms <= 4000; ms += 5) {
+      at(animator, camera, ms);
+      const now = { lon: camera.pose.targetLongitudeRad / DEG, lat: camera.pose.targetLatitudeRad / DEG };
+      // The great-circle angle between consecutive targets: the fast middle of a flight moves far, a jump 180°.
+      const cosAngle =
+        Math.sin(now.lat * DEG) * Math.sin(last.lat * DEG) +
+        Math.cos(now.lat * DEG) * Math.cos(last.lat * DEG) * Math.cos((now.lon - last.lon) * DEG);
+      expect(Math.acos(Math.min(1, cosAngle)) / DEG).toBeLessThan(20);
+      last = now;
+    }
+    expect(Math.abs(camera.pose.targetLongitudeRad / DEG)).toBeCloseTo(180, 9);
+  });
+
   it('flies high between distant places and lands at street scale (F195, F196)', () => {
     const camera = cameraAt(9.19, 45.46, 2000);
     const animator = new CameraAnimator('fly', camera, target(139.69, 35.68, 2000, 0), 0, undefined);

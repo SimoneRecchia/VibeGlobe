@@ -23,6 +23,10 @@ export interface ViewHost {
   userInput(cause: 'user' | 'inertia'): void;
   /** The engine clock's time, milliseconds. */
   timeMs(): number;
+  /** The part of a zoom step the zoom limits allow (KB-126). */
+  limitZoom(deltaZoom: number): number;
+  /** Stops a running API movement (KB-127). */
+  interruptMovement(): void;
 }
 
 /**
@@ -54,13 +58,19 @@ export class ViewControl {
         host.assertAlive();
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
-        if (zoomCamera(host.cam, host.view, point, deltaZoom)) host.requestRender();
+        const allowed =
+          typeof deltaZoom === 'number' && Number.isFinite(deltaZoom) ? host.limitZoom(deltaZoom) : deltaZoom;
+        if (zoomCamera(host.cam, host.view, point, allowed)) host.requestRender();
       },
       requestUpdate: () => {
         this.updateRequested = true;
         host.requestRender();
       },
       orbit: (deltaHeadingDeg, deltaTiltDeg) => this.orbit(deltaHeadingDeg, deltaTiltDeg),
+      interruptMovement: () => {
+        host.assertAlive();
+        host.interruptMovement();
+      },
       get coasting() {
         return control.coasting;
       },

@@ -93,6 +93,26 @@ export class Constraints {
     end[1] = Math.min(Math.max(end[1] ?? 0, south), v[NORTH] ?? 0);
   }
 
+  /**
+   * The part of a zoom step by `deltaZoom` levels that stays within the zoom limits, so a zoom anchored at a point
+   * stops at the limit instead of panning the view toward the point (KB-126). Never moves further out of range.
+   */
+  limitZoomDelta(camera: Camera, deltaZoom: number): number {
+    const v = this.values;
+    const minZoom = v[MIN_ZOOM] ?? Number.NaN;
+    const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
+    if (minZoom !== minZoom && maxZoom !== maxZoom) return deltaZoom;
+    const pose = camera.pose;
+    const toRange =
+      ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(pose.targetLatitudeRad)) /
+      Math.tan(camera.fovYRad / 2);
+    const zoom = Math.log2(toRange / pose.rangeMeters);
+    let target = zoom + deltaZoom;
+    if (maxZoom === maxZoom && target > maxZoom) target = Math.max(maxZoom, Math.min(zoom, target));
+    if (minZoom === minZoom && target < minZoom) target = Math.min(minZoom, Math.max(zoom, target));
+    return target - zoom;
+  }
+
   /** Clamps the camera's range to the zoom limits and its target into the bounds. Does not update the camera. */
   apply(camera: Camera): void {
     const v = this.values;

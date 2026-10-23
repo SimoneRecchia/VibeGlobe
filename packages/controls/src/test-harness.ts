@@ -46,6 +46,8 @@ export class FlatCamera {
   /** Camera changes made while coasting, and whether the controls are coasting now. */
   coastingChanges = 0;
   coasting = false;
+  /** API movements stopped by a press. */
+  movementInterruptions = 0;
 
   constructor(
     readonly widthPx: number,
@@ -96,6 +98,7 @@ export class FlatCamera {
         this.centerY = world.y - (point.yPx - this.heightPx / 2) / scale;
       },
       requestUpdate: () => void this.requests++,
+      interruptMovement: () => void this.movementInterruptions++,
       orbit: (deltaHeadingDeg, deltaTiltDeg) => {
         this.jumps++;
         this.headingDeg = (((this.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;

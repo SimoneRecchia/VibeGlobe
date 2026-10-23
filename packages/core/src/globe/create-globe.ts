@@ -17,7 +17,8 @@ import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
-import { completedMovement, wireView, type Movements } from './movements.js';
+import { completedMovement, type Movements } from './movements.js';
+import { wireView } from './view-wiring.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {

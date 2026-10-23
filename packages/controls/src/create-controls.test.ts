@@ -62,6 +62,14 @@ describe('inertia (F179, ADR 0009 §6)', () => {
     expect(h.camera.coasting).toBe(false);
   });
 
+  it('stops a running API movement on a press, before any drag (KB-127)', () => {
+    const h = controlsHarness();
+    h.pointer('pointerdown', { x: 100, y: 100, t: 0 });
+    h.pointer('pointerup', { x: 100, y: 100, t: 50 });
+    h.pointer('pointerdown', { x: 100, y: 100, t: 400, id: 2, pointerType: 'touch' });
+    expect(h.camera.movementInterruptions).toBe(2);
+  });
+
   it('does not coast after the pointer held still before the release', () => {
     const { h, released } = fling(120);
     h.run(2000);

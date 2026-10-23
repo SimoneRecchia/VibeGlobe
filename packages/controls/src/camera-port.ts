@@ -110,6 +110,11 @@ export class CameraPort {
     this.navigation.dragTo(anchor, point);
   }
 
+  /** Stops a running API movement: a press on the map (`NavigationApi.interruptMovement`, F202). */
+  interruptMovement(): void {
+    this.navigation.interruptMovement();
+  }
+
   /** Marks the camera changes that follow as the release inertia's (`NavigationApi.coasting`, F200). */
   setCoasting(coasting: boolean): void {
     this.navigation.coasting = coasting;

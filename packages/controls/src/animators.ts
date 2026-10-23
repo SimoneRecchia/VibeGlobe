@@ -267,6 +267,8 @@ export class KeyMotion {
       this.moved.yPx = this.center.yPx - dy;
       if (anchor) port.dragTo(anchor, this.moved);
     }
+    // At rest the next press starts a new timeline: the update skips this step while nothing moves (KB-124).
+    if (!this.moving) this.running = false;
     return this.moving;
   }
 }

@@ -382,6 +382,31 @@ describe('camera constraints (F209–F211)', () => {
     globe.destroy();
   });
 
+  it('does not pan when zooming at an off-center point beyond the zoom limits (KB-126)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 12 });
+    globe.setConstraints({ minZoom: 5, maxZoom: 12 });
+    ticks(1);
+    const { longitudeDeg, latitudeDeg } = globe.camera;
+    for (const delta of [0.3, -0, 0.3]) {
+      globe.navigation.zoomAt({ xPx: 700, yPx: 100 }, delta);
+      ticks(1);
+    }
+    expect(globe.camera.zoom).toBeCloseTo(12, 3);
+    expect(globe.camera.longitudeDeg).toBeCloseTo(longitudeDeg, 9);
+    expect(globe.camera.latitudeDeg).toBeCloseTo(latitudeDeg, 9);
+    // Up to the limit, the cursor point stays put; the zoom then stops there.
+    globe.jumpTo({ zoom: 11.9 });
+    ticks(1);
+    const under = globe.screenToGeo({ xPx: 700, yPx: 100 });
+    globe.navigation.zoomAt({ xPx: 700, yPx: 100 }, 0.5);
+    ticks(1);
+    expect(globe.camera.zoom).toBeCloseTo(12, 3);
+    const after = globe.screenToGeo({ xPx: 700, yPx: 100 });
+    expect(after?.longitudeDeg).toBeCloseTo(under?.longitudeDeg ?? 0, 5);
+    expect(after?.latitudeDeg).toBeCloseTo(under?.latitudeDeg ?? 0, 5);
+    globe.destroy();
+  });
+
   it('keeps the default tilt of 3D mode under the maximum tilt, and flies to a target outside the bounds without a jump (KB-123)', async () => {
     const { globe, ticks } = await started({ longitudeDeg: 10, latitudeDeg: 45, zoom: 14 });
     globe.setConstraints({ maxTiltDeg: 30, bounds: { westDeg: 5, southDeg: 40, eastDeg: 15, northDeg: 50 } });

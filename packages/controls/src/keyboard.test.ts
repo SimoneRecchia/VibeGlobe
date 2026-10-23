@@ -46,6 +46,21 @@ describe('keyboard (F181, F187, F174, F213)', () => {
     expect(stalled.camera.centerY).toBeCloseTo(distance(60), 6);
   });
 
+  it('starts from rest on a second press after a long idle time, without a jump (KB-124)', () => {
+    const h = controlsHarness();
+    h.key('keydown', 'ArrowRight');
+    h.run(500);
+    h.key('keyup', 'ArrowRight');
+    // To rest: the engine then draws no frames until the next press.
+    h.run(h.globe.timeMs + 10_000);
+    h.globe.timeMs += 10_000;
+    const before = h.camera.centerX;
+    h.key('keydown', 'ArrowRight');
+    h.frame();
+    // An eased start: less than one frame at full speed (0.8 viewport heights per second, 8 px), not the idle time's.
+    expect(Math.abs(h.camera.centerX - before)).toBeLessThan(4);
+  });
+
   it('rotates with Shift+Left/Right and tilts with Shift+Up/Down', () => {
     const h = controlsHarness();
     h.key('keydown', 'Shift');

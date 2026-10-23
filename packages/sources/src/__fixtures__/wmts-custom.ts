@@ -11,7 +11,7 @@ export interface CustomMatrix {
 }
 
 /** The set's origin (easting, northing), meters. */
-export const ORIGIN: readonly [number, number] = [200_000, 5_300_000];
+const ORIGIN: readonly [number, number] = [200_000, 5_300_000];
 /** The tile size, pixels. */
 export const TILE_PX = 512;
 /** The size of a pixel at scale 1:1 (OGC's standardized rendering pixel), meters. */
@@ -27,7 +27,7 @@ export const MATRICES: readonly CustomMatrix[] = [
 ];
 
 /** The span of one tile of a matrix, meters. */
-export function tileSpanM(matrix: CustomMatrix): number {
+function tileSpanM(matrix: CustomMatrix): number {
   return matrix.scaleDenominator * PIXEL_M * TILE_PX;
 }
 

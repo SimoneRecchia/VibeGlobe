@@ -83,18 +83,6 @@ function markerCentroid(image: PNG, near: { xPx: number; yPx: number }, radiusPx
   return total < 3 ? undefined : { xPx: sx / total, yPx: sy / total };
 }
 
-/**
- * Imports the GeoTIFF entry once and waits: on its first import the dev server optimizes the `geotiff` dependency and
- * reloads the page, which must not happen in the middle of the test.
- */
-async function warmGeotiff(page: Page): Promise<void> {
-  await openSources(page, 'lon=9&lat=45&zoom=3');
-  await page
-    .evaluate((url) => import(/* @vite-ignore */ url).then(() => undefined), fsUrl('packages/sources/src/geotiff.ts'))
-    .catch(() => undefined);
-  await page.waitForTimeout(3000);
-}
-
 const SOURCE_BODY = `async (s, v) => {
   const gis = await import(v.gis);
   const transforms = (crs) => crs === 'EPSG:32632' ? {
@@ -120,7 +108,6 @@ for (const backend of ['webgpu', 'webgl2'] as const)
       files.set(`${spec.crs}.tif`, geoImageTiff(spec));
     }
     await serveImages(page, files);
-    await warmGeotiff(page);
     await openSources(page, `backend=${backend}&lon=9&lat=45&zoom=7`);
     const offsets: string[] = [];
     for (const spec of SPECS)

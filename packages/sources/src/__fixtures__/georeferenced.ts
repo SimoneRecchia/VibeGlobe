@@ -2,7 +2,6 @@
 // magenta ground control markers on every multiple of 3° of longitude and latitude, rendered in EPSG:4326,
 // EPSG:3857 or EPSG:32632 over a box, as PNG (with a world file) or as a GeoTIFF with its own tags.
 import { transformCoordinates } from '@vibeglobe/gis';
-import { writeArrayBuffer } from 'geotiff';
 import { PNG } from 'pngjs';
 
 const DEG = Math.PI / 180;
@@ -17,7 +16,7 @@ function worldColor(lonRad: number, latRad: number): [number, number, number] {
 }
 
 /** The marker spacing, degrees, and size, pixels; its centroid is within half a pixel of the crossing. */
-export const MARKER_STEP_DEG = 3;
+const MARKER_STEP_DEG = 3;
 const MARKER_PX = 9;
 
 /** A fixture image: its system, box (minx, miny, maxx, maxy) and size. */
@@ -42,7 +41,7 @@ const fromLonLat = (crs: string, lon: number, lat: number): [number, number] => 
 };
 
 /** The image's RGBA pixels, rows from the north. */
-export function renderGeoImage(spec: GeoImageSpec): Uint8Array {
+function renderGeoImage(spec: GeoImageSpec): Uint8Array {
   const { crs, widthPx: w, heightPx: h } = spec;
   const [minX, minY, maxX, maxY] = spec.box;
   const rgba = new Uint8Array(w * h * 4);
@@ -88,6 +87,48 @@ export function worldFileOf(spec: GeoImageSpec): string {
   return [a, 0, 0, e, minX + a / 2, maxY + e / 2].map(String).join('\n') + '\n';
 }
 
+/** One IFD entry: tag, type (3 SHORT, 4 LONG, 12 DOUBLE) and values. */
+type Entry = readonly [tag: number, type: 3 | 4 | 12, values: readonly number[]];
+
+/** A little-endian, uncompressed, single-strip classic TIFF with the given entries and pixel data. */
+function writeTiff(entries: readonly Entry[], pixels: Uint8Array): ArrayBuffer {
+  const size = (type: number): number => (type === 3 ? 2 : type === 4 ? 4 : 8);
+  const sorted = [...entries].sort((a, b) => a[0] - b[0]);
+  const ifdBytes = 2 + sorted.length * 12 + 4;
+  let extra = 8 + ifdBytes;
+  const placed = sorted.map(([tag, type, values]) => {
+    const bytes = size(type) * values.length;
+    const at = bytes > 4 ? extra : -1;
+    if (bytes > 4) extra += bytes + (bytes % 2);
+    return { tag, type, values, at };
+  });
+  const dataAt = extra;
+  const buffer = new ArrayBuffer(dataAt + pixels.length);
+  const view = new DataView(buffer);
+  view.setUint16(0, 0x4949, false);
+  view.setUint16(2, 42, true);
+  view.setUint32(4, 8, true);
+  view.setUint16(8, placed.length, true);
+  const write = (type: number, at: number, value: number): void => {
+    if (type === 3) view.setUint16(at, value, true);
+    else if (type === 4) view.setUint32(at, value, true);
+    else view.setFloat64(at, value, true);
+  };
+  placed.forEach(({ tag, type, values, at }, k) => {
+    const entry = 10 + k * 12;
+    view.setUint16(entry, tag, true);
+    view.setUint16(entry + 2, type, true);
+    view.setUint32(entry + 4, values.length, true);
+    // The strip's offset is known only now: tag 273 points at the pixel data.
+    const resolved = tag === 273 ? [dataAt] : values;
+    const base = at < 0 ? entry + 8 : at;
+    if (at >= 0) view.setUint32(entry + 8, at, true);
+    resolved.forEach((value, n) => write(type, base + n * size(type), value));
+  });
+  new Uint8Array(buffer, dataAt).set(pixels);
+  return buffer;
+}
+
 /** The image as an RGB GeoTIFF placed by ModelTiepoint and ModelPixelScale, its EPSG code in its GeoKeys. */
 export function geoImageTiff(spec: GeoImageSpec): ArrayBuffer {
   const rgba = renderGeoImage(spec);
@@ -96,16 +137,23 @@ export function geoImageTiff(spec: GeoImageSpec): ArrayBuffer {
   const [minX, minY, maxX, maxY] = spec.box;
   const code = Number(spec.crs.slice(5));
   const geographic = spec.crs === 'EPSG:4326';
-  return writeArrayBuffer(rgb, {
-    width: spec.widthPx,
-    height: spec.heightPx,
-    BitsPerSample: [8, 8, 8],
-    PhotometricInterpretation: 2,
-    SamplesPerPixel: 3,
-    ModelPixelScale: [(maxX - minX) / spec.widthPx, (maxY - minY) / spec.heightPx, 0],
-    ModelTiepoint: [0, 0, 0, minX, maxY, 0],
-    GTModelTypeGeoKey: geographic ? 2 : 1,
-    GTRasterTypeGeoKey: 1,
-    ...(geographic ? { GeographicTypeGeoKey: code } : { ProjectedCSTypeGeoKey: code }),
-  });
+  return writeTiff(
+    [
+      [256, 4, [spec.widthPx]],
+      [257, 4, [spec.heightPx]],
+      [258, 3, [8, 8, 8]],
+      [259, 3, [1]],
+      [262, 3, [2]],
+      [273, 4, [0]],
+      [277, 3, [3]],
+      [278, 4, [spec.heightPx]],
+      [279, 4, [rgb.length]],
+      [284, 3, [1]],
+      [33550, 12, [(maxX - minX) / spec.widthPx, (maxY - minY) / spec.heightPx, 0]],
+      [33922, 12, [0, 0, 0, minX, maxY, 0]],
+      // GeoKeyDirectory: version 1.1.0, three keys: model type, raster type (pixel is area), the EPSG code.
+      [34735, 3, [1, 1, 0, 3, 1024, 0, 1, geographic ? 2 : 1, 1025, 0, 1, 1, geographic ? 2048 : 3072, 0, 1, code]],
+    ],
+    rgb,
+  );
 }

@@ -2,7 +2,7 @@
 // example runs: in Node, with the hosts it names answered by the adapters' recorded fixtures and `createGlobe`
 // standing in for a globe (the engine itself is tested in the browser).
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import * as core from '@vibeglobe/core';
 import * as gis from '@vibeglobe/gis';
 import * as sources from '@vibeglobe/sources';
@@ -22,7 +22,8 @@ import { terrainTile } from '../fixtures/tiles/terrain.ts';
 const GUIDE = readFileSync('docs/guides/sources.md', 'utf8');
 const EXAMPLES = [...GUIDE.matchAll(/```ts\n([\s\S]*?)```/g)].map((match) => match[1] ?? '');
 const CAPABILITIES = new URL('../../packages/sources/src/__fixtures__/capabilities/', import.meta.url);
-const SQL_WASM = fileURLToPath(new URL('../../node_modules/sql.js/dist/sql-wasm.wasm', import.meta.url));
+// sql.js's WebAssembly file, where npm installs it (the guide's examples name the URL an application hosts it at).
+const SQL_WASM = resolve('node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
 
 /** A 2 × 2 PNG, the answer of every imagery tile URL. */
 const PNG_TILE = new Uint8Array(PNG.sync.write(Object.assign(new PNG({ width: 2, height: 2 }), {})));

@@ -365,13 +365,21 @@ function syncLayers(): DataLayer[] {
   ];
 }
 
+/** Scenarios in modules of their own, loaded on demand. */
+const LAZY_SCENES: Record<string, (globe: Globe) => Promise<void>> = {
+  'data-formats': async (globe) => (await import('./layers-formats.js')).showFormats(globe),
+  'data-stream': async (globe) => (await import('./layers-stream.js')).showStream(globe),
+  'data-street': async (globe) => (await import('./layers-street.js')).showStreet(globe),
+  'data-cluster': async (globe) =>
+    (await import('./layers-cluster.js')).showCluster(
+      globe,
+      Number(new URLSearchParams(location.search).get('points') ?? 100_000),
+    ),
+};
+
 export function showDataScenario(globe: Globe, name: string): void {
-  if (name === 'data-formats') return void import('./layers-formats.js').then((module) => module.showFormats(globe));
-  if (name === 'data-stream') return void import('./layers-stream.js').then((module) => module.showStream(globe));
-  if (name === 'data-cluster') {
-    const count = Number(new URLSearchParams(location.search).get('points') ?? 100_000);
-    return void import('./layers-cluster.js').then((module) => module.showCluster(globe, count));
-  }
+  const lazy = LAZY_SCENES[name];
+  if (lazy) return void lazy(globe);
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (['data-markers', 'data-styled', 'data-select', 'data-altitudes-all', 'data-drag'].includes(name))

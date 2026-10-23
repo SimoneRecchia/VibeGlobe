@@ -4892,7 +4892,7 @@
         "Zoom to about 1 m above the ground and record frames while making sub-meter camera moves",
         "Verify by frame analysis that no primitive vertex moves relative to the ground by more than 1 pixel beyond camera motion on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F368",

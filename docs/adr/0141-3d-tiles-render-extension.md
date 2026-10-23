@@ -61,5 +61,9 @@ gives (`modelTasks`) on the main thread. KTX2 textures transcode with the worker
   `@vibeglobe/sources/tiles3d`. The renderer now depends on `@vibeglobe/models` (types only at run time).
 - Render extensions need a globe with tiled imagery to receive `network` and `workers`; without them the loader
   falls back to six requests at once and the fallback task table.
+- The fallback task table brings meshoptimizer's decoder, whose Blob-worker code built bundles refuse (F100): the
+  playground loads it only on its development server, so its production build decodes 3D Tiles content once the
+  worker program registers `parse-model` (hook request E (1)); applications that pass `modelTasks` meet the same
+  check in their own bundles.
 - Credits of render extensions cannot reach the engine's attribution yet (hook request E (2)); the playground's
   Google scenario shows the logo and copyrights in its own pinned element meanwhile.

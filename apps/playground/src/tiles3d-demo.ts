@@ -10,7 +10,6 @@
  * `googleSessionMs=` (session lifetime). Clicks pick features. `window.vibeglobeTiles3d` exposes the extension.
  */
 import { ecefToGeodetic, type GeodeticRad, type Globe } from '@vibeglobe/core';
-import { createModelTasks, loadDraco3d } from '@vibeglobe/models';
 import { threeTileMeshes } from '@vibeglobe/renderer/tiles3d';
 import {
   tiles3d,
@@ -79,16 +78,21 @@ export function tilesetOptions(params: URLSearchParams, base: string): Tiles3DOp
     url: params.get('tileset') ?? new URL(`${base}tiles3d/city-${variant}/tileset.json`, location.href).href,
     id: 'fixture-city',
     meshes: threeTileMeshes,
-    modelTasks: modelTasks(params),
     ...(sse > 0 ? { maximumScreenSpaceError: sse } : {}),
     ...(budgetMb > 0 ? { memoryBudgetBytes: budgetMb * 1024 * 1024 } : {}),
   };
 }
 
-/** The model task table of the scenarios, its Draco decoder from `decoders=` (F463) or the bundled file. */
-export function modelTasks(params: URLSearchParams): NonNullable<Tiles3DOptions['modelTasks']> {
-  // Until the worker program registers parse-model (hook request E (1)), models decode with this table.
-  return createModelTasks({ draco: loadDraco3d(params.get('decoders') ?? dracoWasmUrl) });
+/**
+ * The model task table the loader falls back to while the worker program lacks `parse-model` (hook request E (1)),
+ * its Draco decoder from `decoders=` (F463) or the bundled file. Development builds only: `@vibeglobe/models` brings
+ * meshoptimizer's decoder, whose Blob-worker code production bundles refuse (F100), so a production playground decodes
+ * 3D Tiles content once the worker program registers the task.
+ */
+async function fallbackModelTasks(params: URLSearchParams): Promise<Pick<Tiles3DOptions, 'modelTasks'>> {
+  if (!import.meta.env.DEV) return {};
+  const { createModelTasks, loadDraco3d } = await import('@vibeglobe/models');
+  return { modelTasks: createModelTasks({ draco: loadDraco3d(params.get('decoders') ?? dracoWasmUrl) }) };
 }
 
 /**
@@ -108,8 +112,9 @@ export async function showTiles3DScenario(
     params.get('scenario') === '3dtiles-google'
       ? (await import('./tiles3d-google-provider.js')).googleScenario(params, app)
       : undefined;
-  const options = google ? google.options : tilesetOptions(params, import.meta.env.BASE_URL);
-  if (!options) return undefined;
+  const chosen = google ? google.options : tilesetOptions(params, import.meta.env.BASE_URL);
+  if (!chosen) return undefined;
+  const options = { ...chosen, ...(await fallbackModelTasks(params)) };
   globe.addRenderExtension(
     tiles3d(
       {

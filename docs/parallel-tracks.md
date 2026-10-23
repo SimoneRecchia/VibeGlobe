@@ -652,5 +652,8 @@ meshopt, KTX2 and on terrain). Hook requests E (1)–(5) above.
 | F470  | failing | `e2e/tiles3d-google.spec.ts`: copyrights by area, uncovered logo, display only, nothing stored   | Hook E (2): extension credits in the engine's attribution (the scenario shows them meanwhile) |
 | F471  | failing | `e2e/tiles3d-performance.spec.ts`: no hole, no black pixel; frame time gated on real GPUs only   | Reference desktop and tablet (question 2); hook E (5): the benchmark scenario and history     |
 
+Until hook E (1) lands, the playground decodes 3D Tiles content only on its development server (the fallback task
+table brings meshoptimizer's Blob-worker code, which production bundles refuse, F100).
+
 F323: the 3D Tiles part is done (picking and `tileset()` of a display-only source throw `GlobeError` 'display-only'
 naming the profile; `tiles3d.test.ts`, `e2e/tiles3d-google.spec.ts`).

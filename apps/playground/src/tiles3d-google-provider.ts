@@ -6,7 +6,6 @@
 import type { Globe } from '@vibeglobe/core';
 import { threeTileMeshes } from '@vibeglobe/renderer/tiles3d';
 import { google3dTiles, type Tiles3DExtension, type Tiles3DOptions } from '@vibeglobe/sources/tiles3d';
-import { modelTasks } from './tiles3d-demo.js';
 
 /**
  * The Google logo and the copyrights of the drawn tiles (F470), updated every frame, its visibility pinned. Until
@@ -70,7 +69,6 @@ export function googleScenario(
       transport: google.transport,
       profile: google.profile,
       meshes: threeTileMeshes,
-      modelTasks: modelTasks(params),
     },
     showCredits: credits,
   };

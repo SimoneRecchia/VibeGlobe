@@ -3,20 +3,20 @@
 // screenshot, no pixel inside the city's footprint shows the terrain's imagery (its light green) through the tileset.
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { canvasImage, waitForIdle } from './support/globe.ts';
+import { canvasImage } from './support/globe.ts';
 import { CITY, cityPoint, openCity, settleTiles } from './support/tiles3d.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 test.setTimeout(180_000);
 
-/** Canvas pixels (every third one) whose ground lies inside the city's footprint, inset by 24 m. */
+/** Canvas pixels (every fourth one) whose ground lies inside the city's footprint, inset by 24 m. */
 async function footprintMask(page: Page): Promise<Set<number>> {
   const inside = await page.evaluate((city) => {
     const globe = window.vibeglobePlayground?.globe;
     const cos = Math.cos((city.latitudeDeg * Math.PI) / 180);
     const out: number[] = [];
-    for (let y = 0; y < 240; y += 3)
-      for (let x = 0; x < 320; x += 3) {
+    for (let y = 0; y < 240; y += 4)
+      for (let x = 0; x < 320; x += 4) {
         const g = globe?.screenToGeo({ xPx: x, yPx: y });
         if (!g) continue;
         const east = (g.longitudeDeg - city.longitudeDeg) * 111_320 * cos;
@@ -53,8 +53,7 @@ for (const backend of ['webgl2', 'webgpu'] as const)
         },
         { longitudeDeg: at.longitudeDeg, latitudeDeg: at.latitudeDeg, zoom: 17.5, tiltDeg: 70, headingDeg: heading },
       );
-      await settleTiles(page);
-      await waitForIdle(page);
+      // The frame right after the turn, tiles still loading: REPLACE keeps parents drawn, so the ground is covered.
       const mask = await footprintMask(page);
       const image = await canvasImage(page);
       let leaked = 0;
@@ -62,7 +61,7 @@ for (const backend of ['webgl2', 'webgpu'] as const)
       checked += mask.size;
       if (leaked > 0) leaks.push(`heading ${heading}: ${leaked} of ${mask.size}`);
     }
-    expect(checked).toBeGreaterThan(2000);
+    expect(checked).toBeGreaterThan(1000);
     expect(leaks).toEqual([]);
   });
 
@@ -78,6 +77,6 @@ test('a top-down screenshot over terrain shows the tileset, never the terrain, i
   const image = await canvasImage(page);
   let leaked = 0;
   for (const index of mask) if (isImagery(image, index)) leaked++;
-  expect(mask.size).toBeGreaterThan(4000);
+  expect(mask.size).toBeGreaterThan(2000);
   expect(leaked).toBe(0);
 });

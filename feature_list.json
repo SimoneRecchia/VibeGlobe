@@ -2576,7 +2576,7 @@
         "Drag around the compass and assert the heading follows the drag angle",
         "Repeat the click and drag under touch emulation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F191",

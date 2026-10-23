@@ -602,4 +602,16 @@ describe('ImageryLoader', () => {
     expect(runFrame([[5, 0, 0]])).toEqual([-1]);
     expect(transport.started).toEqual([url(5, 0, 0), url(5, 0, 0)]);
   });
+
+  it('cancels the prefetch requests of a view the camera left (F284)', () => {
+    const { transport, timers, runFrame } = setUp(32, { prefetchRing: true, source: { maxRequestsPerHost: 16 } });
+    runFrame([[5, 10, 10]]);
+    const ring = transport.started.slice(1);
+    expect(ring).toHaveLength(8);
+    for (let i = 0; i < 3; i++) {
+      runFrame([[5, 30, 30]]);
+      timers.advance(100);
+    }
+    expect(transport.aborted).toEqual(expect.arrayContaining(ring));
+  });
 });

@@ -3742,7 +3742,7 @@
         "Assert returning tiles are drawn from memory on the first frame with no request and no black pixels",
         "Assert GPU and RAM use stay within the configured budgets with least-recently-used eviction"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F282",
@@ -3754,7 +3754,7 @@
         "Assert GPU and RAM tile memory track the current working set and drop after tiles leave the screen",
         "Pan back and assert tiles come from persistent storage, packages or network, with parent fallback and zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F283",
@@ -3766,7 +3766,7 @@
         "Record every frame and assert no visible tile is evicted and re-requested while on screen",
         "Assert zero black pixels and no flicker (frame-difference analysis)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F284",
@@ -3778,7 +3778,7 @@
         "Assert tiles entering the view were already loaded and are drawn at full detail on the first frame they appear",
         "Assert prefetch requests are issued only after all visible tiles are requested and are cancelled when the view moves away"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F285",

@@ -1,7 +1,5 @@
 {
-  "bundleExternal": [
-    "three"
-  ],
+  "bundleExternal": ["three"],
   "initialJs": {
     "threeGzipKB": 236,
     "totalGzipKB": 351

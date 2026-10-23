@@ -3,9 +3,12 @@ import {
   ClampToEdgeWrapping,
   CompressedTexture,
   DataTexture,
+  FloatType,
   LinearFilter,
   LinearMipmapLinearFilter,
   LinearSRGBColorSpace,
+  NearestFilter,
+  RedFormat,
   RepeatWrapping,
   RGB_ETC2_Format,
   RGB_S3TC_DXT1_Format,
@@ -50,6 +53,33 @@ function compressedTexture(image: CompressedTileImage): Texture {
   const texture = new CompressedTexture(mipmaps, base.width, base.height, COMPRESSED_FORMATS[image.target]);
   texture.colorSpace = image.srgb ? SRGBColorSpace : LinearSRGBColorSpace;
   texture.generateMipmaps = false;
+  return texture;
+}
+
+/** A terrain height grid (`HeightGrid` of `@vibeglobe/core`): (cells + 1)² float32 heights, rows from the north. */
+interface HeightImage {
+  readonly cells: number;
+  readonly heightsMeters: Float32Array;
+}
+
+function isHeights(image: unknown): image is HeightImage {
+  return (
+    typeof image === 'object' && image !== null && (image as Partial<HeightImage>).heightsMeters instanceof Float32Array
+  );
+}
+
+/**
+ * A height grid as an R32F texture of its vertices, read with `textureLoad` by the surface material (ADR 0006 §5):
+ * no filtering, no mipmaps, no color space.
+ */
+function heightTexture(image: HeightImage): Texture {
+  const side = image.cells + 1;
+  const texture = new DataTexture(image.heightsMeters, side, side, RedFormat, FloatType);
+  texture.flipY = false;
+  texture.minFilter = NearestFilter;
+  texture.magFilter = NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
   return texture;
 }
 
@@ -135,6 +165,7 @@ export class TileTextures {
 
   private create(tile: DecodedTile): Texture {
     const image = tile.image;
+    if (isHeights(image)) return heightTexture(image);
     const compressed = isCompressed(image);
     let texture: Texture;
     if (compressed) texture = compressedTexture(image);

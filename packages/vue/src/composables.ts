@@ -52,6 +52,15 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     tiltDeg: 0,
     rollDeg: 0,
     rangeMeters: 0,
+    eyeLongitudeDeg: 0,
+    eyeLatitudeDeg: 0,
+    groundHeightMeters: 0,
+    viewMode: 'auto' as CameraState['viewMode'],
+    chosenTiltDeg: 0,
+    chosenHeadingDeg: 0,
+    morphFactor: 0,
+    reliefFactor: 0,
+    phase: 'globe' as CameraState['phase'],
   });
   const copy = (from: CameraState): void => {
     camera.longitudeDeg = from.longitudeDeg;
@@ -62,6 +71,15 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     camera.tiltDeg = from.tiltDeg;
     camera.rollDeg = from.rollDeg;
     camera.rangeMeters = from.rangeMeters;
+    camera.eyeLongitudeDeg = from.eyeLongitudeDeg;
+    camera.eyeLatitudeDeg = from.eyeLatitudeDeg;
+    camera.groundHeightMeters = from.groundHeightMeters;
+    camera.viewMode = from.viewMode;
+    camera.chosenTiltDeg = from.chosenTiltDeg;
+    camera.chosenHeadingDeg = from.chosenHeadingDeg;
+    camera.morphFactor = from.morphFactor;
+    camera.reliefFactor = from.reliefFactor;
+    camera.phase = from.phase;
   };
   onEachGlobe(globe, (engine) => {
     copy(engine.camera);

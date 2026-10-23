@@ -4,7 +4,7 @@ import type { FeatureCollection } from './geojson.js';
 import { GeoJsonLayer } from './geojson-layer.js';
 import { gpxFormat, kmlFormat } from './vector-format.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 const collection: FeatureCollection = {
   type: 'FeatureCollection',

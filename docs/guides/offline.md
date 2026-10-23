@@ -172,8 +172,28 @@ The build stops before any download when a provider forbids packaging; sources w
 are left out and named in the build report.
 
 A new version replaces the old one: `packages.update(id)` installs the newest version from the package's manifest URL
-and deletes the old version's tiles. Recreate the globe (or reload the page) afterwards so tiles already in memory are
-read again.
+and deletes the old version's tiles. A running globe drops the tiles it still holds in memory when the manager tells
+it which sources changed:
+
+```ts
+import { createOffline, createPackageManager } from '@vibeglobe/offline';
+import { pmtilesImagery } from '@vibeglobe/sources';
+import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+
+// `globe` is the running globe; a stand-in here records what the manager tells it.
+const reloaded = [];
+const globe = { reloadSource: (id) => reloaded.push(id) > 0 };
+const offline = createOffline();
+const packages = createPackageManager(offline, {
+  adapters: { pmtiles: (o) => pmtilesImagery(o), mbtiles: (o) => mbtilesImagery({ ...o, wasmUrl: '/sql-wasm.wasm' }) },
+  onChange: ({ sourceIds }) => sourceIds.forEach((id) => globe.reloadSource(id)),
+});
+await packages.install('https://lan.example/packages/rome/manifest.json');
+await packages.remove('rome');
+if (reloaded.join() !== 'osm,osm') throw new Error('the globe was not told which source changed');
+packages.destroy();
+offline.destroy();
+```
 
 ## Storage quotas and persistence
 

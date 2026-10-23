@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import type { DebugShape } from '@vibeglobe/core';
 import {
+  GLOBE_GEOMETRY,
   canvasImage,
   expectCompleteGlobe,
   geoToScreen,
@@ -201,7 +202,12 @@ test('no known bug is open at the end of milestone 2 (F078)', () => {
     .split('\n')
     .filter((line) => /^\| KB-\d+/.test(line));
   expect(rows.length).toBeGreaterThan(0);
-  const open = rows.filter((row) => !/^\s*Fixed\b/.test(row.split('|')[4] ?? ''));
+  // A bug found in a later milestone stays open until that milestone ends: its status names it, "Open (M5)".
+  const open = rows.filter((row) => {
+    const status = row.split('|')[4] ?? '';
+    const later = /^\s*Open \(M(\d+)\)/.exec(status);
+    return !/^\s*Fixed\b/.test(status) && !(later && Number(later[1]) > 2);
+  });
   expect(open).toEqual([]);
 });
 
@@ -214,7 +220,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     // The checkered street-level quad is placed under the initial target, where the zoom ends.
     await openGlobe(
       page,
-      `backend=${backend}&scenario=street-level-jitter&lon=${MILAN.longitudeDeg}&lat=${MILAN.latitudeDeg}&zoom=2`,
+      // M2's globe geometry: the debug quads are placed on the unmorphed ellipsoid, which M5's curves flatten here.
+      `backend=${backend}&scenario=street-level-jitter&lon=${MILAN.longitudeDeg}&lat=${MILAN.latitudeDeg}&zoom=2&${GLOBE_GEOMETRY}`,
     );
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');

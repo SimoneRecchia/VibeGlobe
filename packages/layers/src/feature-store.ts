@@ -16,12 +16,13 @@ import {
 /** Application feature ids. */
 export type FeatureId = string | number;
 
-const STRING_CHANNELS: readonly BatchStringChannel[] = ['text', 'icon'];
+const STRING_CHANNELS: readonly BatchStringChannel[] = ['text', 'icon', 'font'];
 const STRING_BIT: Readonly<Record<BatchStringChannel, number>> = {
   text: 1 << BATCH_ATTRIBUTES.length,
   icon: 1 << (BATCH_ATTRIBUTES.length + 1),
+  font: 1 << (BATCH_ATTRIBUTES.length + 2),
 };
-const GEOMETRY_BIT = 1 << (BATCH_ATTRIBUTES.length + 2);
+const GEOMETRY_BIT = 1 << (BATCH_ATTRIBUTES.length + 3);
 const ATTRIBUTE_BIT = Object.fromEntries(BATCH_ATTRIBUTES.map((name, i) => [name, 1 << i])) as Record<
   BatchAttribute,
   number
@@ -42,11 +43,13 @@ export class FeatureStore {
   readonly #index = new Map<FeatureId, number>();
   readonly #properties: Record<string, unknown>[] = [];
   readonly #geometry: (FeatureGeometry | undefined)[] = [];
-  readonly #strings: Record<BatchStringChannel, string[]> = { text: [], icon: [] };
+  readonly #strings: Record<BatchStringChannel, string[]> = { text: [], icon: [], font: [] };
   #arrays: Record<BatchAttribute, Float64Array | Float32Array | Uint32Array>;
   #dirty: Uint32Array;
   #dirtyMin = Infinity;
   #dirtyMax = -1;
+  /** Called when the store goes from clean to dirty: the host draws a frame, which flushes it. */
+  onDirty: (() => void) | undefined;
   /** Count the renderer last received. */
   #flushedCount = 0;
   /** Capacity the renderer last received. */
@@ -250,6 +253,7 @@ export class FeatureStore {
   }
 
   #mark(index: number, bits: number): void {
+    if (this.#dirtyMax < 0) this.onDirty?.();
     this.#dirty[index] = ((this.#dirty[index] ?? 0) | bits) >>> 0;
     if (index < this.#dirtyMin) this.#dirtyMin = index;
     if (index > this.#dirtyMax) this.#dirtyMax = index;

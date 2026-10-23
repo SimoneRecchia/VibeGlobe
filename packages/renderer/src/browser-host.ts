@@ -1,8 +1,10 @@
+import { CreditsElement } from './credits-element.js';
 import type { RenderHost } from '@vibeglobe/core';
 
 /** Browser services for the engine: frames, size and pixel-ratio changes, page visibility (architecture §2). */
 export function createBrowserHost(container: HTMLElement): RenderHost {
   const view = container.ownerDocument.defaultView ?? window;
+  const credits = new CreditsElement(container);
   /** Matches while the pixel ratio is the one the canvas was last sized for. */
   let ratioQuery: MediaQueryList | undefined;
   let onRatioChange: (() => void) | undefined;
@@ -55,6 +57,9 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     checkSize() {
       if (ratioQuery && !ratioQuery.matches) onRatioChange?.();
     },
+    observeReducedMotion: (callback) => observeReducedMotion(view, callback),
+    setOpacity: (opacity) => setCanvasOpacity(container, opacity),
+    showCredits: (list) => credits.show(list),
     observeVisibility(callback) {
       const document = container.ownerDocument;
       const onChange = (): void => callback(document.visibilityState === 'visible');
@@ -62,4 +67,19 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
       return () => document.removeEventListener('visibilitychange', onChange);
     },
   };
+}
+
+/** Calls `callback` now and on every change with the system's reduced-motion setting (F214); returns an unsubscribe. */
+function observeReducedMotion(view: Window, callback: (reduce: boolean) => void): () => void {
+  const query = view.matchMedia('(prefers-reduced-motion: reduce)');
+  const onChange = (): void => callback(query.matches);
+  query.addEventListener('change', onChange);
+  onChange();
+  return () => query.removeEventListener('change', onChange);
+}
+
+/** Shows the canvases the backend draws into, the container's own (ADR 0011), at `opacity` (F214). */
+function setCanvasOpacity(container: HTMLElement, opacity: number): void {
+  for (const canvas of container.querySelectorAll<HTMLCanvasElement>(':scope > canvas'))
+    canvas.style.opacity = opacity >= 1 ? '' : String(opacity);
 }

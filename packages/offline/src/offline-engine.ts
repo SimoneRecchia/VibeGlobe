@@ -201,7 +201,7 @@ class OfflineEngine implements Offline {
   }
 
   source<S extends ImagerySource>(source: S, options: TieredSourceOptions = {}): S {
-    const rules = options.rules ?? (source as { profile?: ProviderRules }).profile;
+    const rules = options.rules ?? (source as unknown as { profile?: ProviderRules }).profile;
     if (rules) this.rules.set(source.id, rules);
     this.registerEndpoint(source);
     const wrapped = tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) });
@@ -277,6 +277,7 @@ class OfflineEngine implements Offline {
   private context(): Parameters<typeof tieredSource>[1] {
     return {
       decide: (sourceId, layerId) => this.policy.resolve({ sourceId, layerId, purpose: 'visible' }),
+      prefetch: (sourceId, layerId) => this.effectiveSwitches(sourceId, layerId).prefetch,
       store: {
         get: (key) => this.store.get(key),
         put: (key, tile) => void this.put(key, tile),

@@ -3,7 +3,7 @@
  * {@link LabelPlacer} with fades. Glyph rendering (SDF atlases) is the renderer's; this layer decides what shows.
  */
 import { DataLayer, type DataLayerOptions } from './data-layer.js';
-import type { FrameContext } from './layer.js';
+import type { FrameContext, LayerContext } from './layer.js';
 import { LabelPlacer, type CollisionBox, type PlacementInput, type PlacementOptions } from './label-placement.js';
 import { estimatedTextMeasurer, type TextMeasurer } from './render-target.js';
 import type { FeatureId } from './feature-store.js';
@@ -19,10 +19,22 @@ export interface LabelLayerOptions extends DataLayerOptions {
 /** Labels with collision and priorities. */
 export class LabelLayer extends DataLayer {
   readonly placer: LabelPlacer;
+  readonly #ownMeasurer: boolean;
 
   constructor(options: LabelLayerOptions = {}) {
     super('label', options);
+    this.#ownMeasurer = options.measurer !== undefined;
     this.placer = new LabelPlacer(options.measurer ?? estimatedTextMeasurer, options.collision);
+  }
+
+  /** Attaches, measuring collision boxes with the renderer's glyph metrics unless a measurer was given (F359). */
+  override attach(context: LayerContext): void {
+    const target = context.target;
+    if (!this.#ownMeasurer && target.measureText)
+      this.placer.setMeasurer({
+        measure: (text, sizePx) => target.measureText?.(text, sizePx) ?? estimatedTextMeasurer.measure(text, sizePx),
+      });
+    super.attach(context);
   }
 
   /** Boxes of the last placement pass (debug collision overlay, F359). */
@@ -48,6 +60,8 @@ export class LabelLayer extends DataLayer {
       this.#placedCount = this.store.count;
     }
     this.placer.update(frame.nowMs, frame.projector, () => this.#inputs());
+    // A sliced pass, or a view that changed since the last one, needs more frames: the globe draws only when asked.
+    if (this.placer.pending) this.context?.requestFrame();
     for (let i = 0; i < this.store.count; i++) {
       const id = this.store.idAt(i);
       if (id !== undefined) this.writeVisibility(i, this.placer.opacity(id));

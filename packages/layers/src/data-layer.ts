@@ -2,8 +2,9 @@
  * The built-in data layer: one batch of points, markers, labels, lines, polygons or circles, styled by MapLibre
  * expressions and updated feature by feature (F369, F370, F372, F376, F377).
  */
-import type { GeoPosition } from '@vibeglobe/core';
+import type { FeatureGeometry, GeoPosition } from '@vibeglobe/core';
 import { FeatureStore, type FeatureId } from './feature-store.js';
+import { ellipseGeometry } from './circle.js';
 import {
   anchorOf,
   toFeatureGeometry,
@@ -29,7 +30,14 @@ import {
   type BatchKind,
   type Placement,
 } from './render-target.js';
-import { compileStyle, evaluateProperty, type CompiledProperty, type CompiledStyle, type LayerStyle } from './style.js';
+import {
+  compileStyle,
+  evaluateProperty,
+  isStringChannel,
+  type CompiledProperty,
+  type CompiledStyle,
+  type LayerStyle,
+} from './style.js';
 
 /** Data a layer starts with: a collection, an array of features, or a stream of feature chunks. */
 export type LayerData = FeatureCollection | readonly Feature[] | AsyncIterable<readonly Feature[]>;
@@ -161,7 +169,11 @@ export class DataLayer implements Layer {
     for (const feature of features) {
       if (feature.geometry === null) throw new TypeError('feature without geometry');
       const id = feature.id ?? `${this.id}:${this.store.count}:${++generatedIds}`;
-      const index = this.store.add(id, { ...feature.properties }, toFeatureGeometry(feature.geometry));
+      const index = this.store.add(
+        id,
+        { ...feature.properties },
+        this.#geometryOf(feature.geometry, feature.properties),
+      );
       this.#writeAnchor(index, anchorOf(feature.geometry));
       this.#writeIdentity(index);
       this.#evaluate(index, zoom, feature.geometry.type);
@@ -181,7 +193,7 @@ export class DataLayer implements Layer {
       this.#writeAnchor(index, 'longitudeDeg' in p ? [p.longitudeDeg, p.latitudeDeg, p.heightMeters ?? 0] : p);
     }
     if (update.geometry !== undefined) {
-      const geometry = toFeatureGeometry(update.geometry);
+      const geometry = this.#geometryOf(update.geometry, this.store.propertiesAt(index));
       if (geometry !== undefined) this.store.setGeometry(index, geometry);
       if (update.position === undefined) this.#writeAnchor(index, anchorOf(update.geometry));
     }
@@ -265,6 +277,7 @@ export class DataLayer implements Layer {
   attach(context: LayerContext): void {
     if (this.context !== undefined) throw new Error(`layer ${this.id} is already in a stack`);
     this.context = context;
+    this.store.onDirty = () => context.requestFrame();
     this.handle = context.target.createBatch({
       kind: this.kind,
       layerId: this.id,
@@ -283,6 +296,7 @@ export class DataLayer implements Layer {
   detach(): void {
     const context = this.context;
     if (context === undefined) return;
+    this.store.onDirty = undefined;
     this.#streaming = false;
     if (this.handle !== undefined) context.target.release(this.handle);
     if (this.#slot !== 0) context.releasePickSlot(this.#slot);
@@ -299,9 +313,10 @@ export class DataLayer implements Layer {
       this.context.target.setOrder(this.handle, order * ORDER_STRIDE + this.#orderOffset);
   }
 
-  /** Shows or hides the layer. */
+  /** Shows or hides the layer, from the next frame, which it asks for (KB-113). */
   setVisible(visible: boolean): void {
     this.#visible = visible;
+    this.context?.requestFrame();
   }
 
   /** Whether the layer is shown (independent of its zoom range). */
@@ -377,7 +392,7 @@ export class DataLayer implements Layer {
 
   #splitStyle(): void {
     const perFeature = (p: CompiledProperty): boolean =>
-      p.channel === 'text' || p.channel === 'icon' || p.kind === 'source' || p.kind === 'composite';
+      isStringChannel(p.channel) || p.kind === 'source' || p.kind === 'composite';
     this.#perFeature = this.#style.properties.filter((p) => p.channel !== 'sortKey' && perFeature(p));
     this.#uniforms = this.#style.properties.filter((p) => p.channel !== 'sortKey' && !perFeature(p));
     this.#uniformValues.clear();
@@ -393,14 +408,14 @@ export class DataLayer implements Layer {
     const { context, handle } = this;
     if (context === undefined || handle === undefined) return;
     for (const property of this.#uniforms) {
-      if (property.channel === 'text' || property.channel === 'icon' || property.channel === 'sortKey') continue;
+      if (isStringChannel(property.channel) || property.channel === 'sortKey') continue;
       const value = new Float64Array(ATTRIBUTE_COMPONENTS[property.channel]);
       evaluateProperty(property, zoom, undefined, value, 0);
       this.#uniformValues.set(property.channel, value);
       context.target.setUniform(handle, property.channel, value);
     }
     for (const property of this.#perFeature) {
-      if (property.channel !== 'text' && property.channel !== 'icon' && property.channel !== 'sortKey') {
+      if (!isStringChannel(property.channel) && property.channel !== 'sortKey') {
         context.target.setUniform(handle, property.channel, undefined);
       }
     }
@@ -417,6 +432,18 @@ export class DataLayer implements Layer {
     };
   }
 
+  /** A feature's geometry for the renderer: circles from a center and their radii (F356), others as given. */
+  #geometryOf(
+    geometry: Geometry,
+    properties: Readonly<Record<string, unknown>> | null | undefined,
+  ): FeatureGeometry | undefined {
+    if (this.kind === 'circle' && geometry.type === 'Point')
+      return ellipseGeometry(geometry.coordinates, properties ?? {});
+    // Vertices without their own height take the layer's absolute altitude (F362), as anchors do.
+    const altitude = typeof this.placement === 'object' ? this.placement.absoluteAltitudeMeters : undefined;
+    return toFeatureGeometry(altitude === undefined ? geometry : (atAltitude(geometry, altitude) as Geometry));
+  }
+
   #geometryType(index: number): string {
     const geometry = this.store.geometryAt(index);
     if (geometry === undefined) return 'Point';
@@ -430,8 +457,7 @@ export class DataLayer implements Layer {
     const state = id === undefined ? undefined : this.#states.get(id);
     for (const property of this.#perFeature) {
       const text = evaluateProperty(property, zoom, feature, scratch, 0, state);
-      if (property.channel === 'text' || property.channel === 'icon')
-        this.store.setString(property.channel, index, text ?? '');
+      if (isStringChannel(property.channel)) this.store.setString(property.channel, index, text ?? '');
       else this.store.set(property.channel as BatchAttribute, index, scratch);
     }
     if (this.#sortKey !== undefined && id !== undefined) {
@@ -456,4 +482,14 @@ export class DataLayer implements Layer {
     this.store.setScalar('pickId', index, this.#slot === 0 ? 0 : packPickId(this.#slot, index));
     this.writeVisibility(index, this.featureVisibility(index));
   }
+}
+
+/** Coordinates with `heightMeters` added where a position has none. */
+function atAltitude(value: unknown, heightMeters: number): unknown {
+  if (!Array.isArray(value)) {
+    const geometry = value as { coordinates?: unknown };
+    return { ...geometry, coordinates: atAltitude(geometry.coordinates, heightMeters) };
+  }
+  if (typeof value[0] === 'number') return value.length >= 3 ? value : [value[0], value[1], heightMeters];
+  return value.map((item: unknown) => atAltitude(item, heightMeters));
 }

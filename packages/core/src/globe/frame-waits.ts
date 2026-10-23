@@ -1,6 +1,6 @@
 import type { Emitter } from './emitter.js';
-import type { GlobeError } from './errors.js';
-import type { GlobeEvents } from './types.js';
+import { GlobeError as GlobeErrorClass, type GlobeError } from './errors.js';
+import type { FrameCapture, GlobeEvents, RendererBackend } from './types.js';
 
 /** Callers waiting for the next drawn frame, such as a capture while nothing can be drawn (KB-051). */
 export class FrameWaits {
@@ -26,5 +26,32 @@ export class FrameWaits {
   /** Rejects every wait: no frame will come. */
   end(error: GlobeError): void {
     for (const settle of [...this.waits]) settle(error);
+  }
+}
+
+/** What {@link captureWhenDrawn} needs from its globe. */
+export interface CaptureSource {
+  readonly ready: Promise<void>;
+  readonly waits: FrameWaits;
+  /** The renderer (undefined once destroyed), the failure that stopped the globe if any, and the frames drawn. */
+  state(): { renderer: RendererBackend | undefined; failure: GlobeError | undefined; frames: number };
+  /** Draws a frame now, in this task. */
+  draw(renderer: RendererBackend): void;
+}
+
+/**
+ * Captures the next drawn frame (ADR 0012, Capture): drawn and read in one task, since the canvas keeps the frame
+ * only until the browser presents it; when nothing could be drawn (a recovery, a container without a size), waits for
+ * a drawn frame and tries again (KB-051).
+ */
+export async function captureWhenDrawn(source: CaptureSource): Promise<FrameCapture> {
+  await source.ready;
+  for (;;) {
+    const { renderer, failure, frames } = source.state();
+    if (!renderer) throw new GlobeErrorClass('destroyed', 'The globe was destroyed');
+    if (failure) throw failure;
+    source.draw(renderer);
+    if (source.state().frames > frames) return renderer.capture();
+    await source.waits.next();
   }
 }

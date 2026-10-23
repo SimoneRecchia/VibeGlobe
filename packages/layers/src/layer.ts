@@ -24,6 +24,8 @@ export interface LayerContext {
   acquirePickSlot(resolve: (featureIndex: number) => PickedFeature | undefined): number;
   /** Frees a slot acquired by this layer. */
   releasePickSlot(slot: number): void;
+  /** Asks the host for a frame, in which the layer writes its changes (a globe draws only when asked). */
+  requestFrame(): void;
 }
 
 /** Per-frame input of a layer. */

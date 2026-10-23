@@ -3,9 +3,14 @@
  * Source adapters for imagery, terrain, vector and 3D data, with provider profiles.
  * @module @vibeglobe/sources
  */
-export { fetchTransport, retryAfterMs } from './fetch-transport.js';
+export { fetchTransport, redactUrl, retryAfterMs } from './fetch-transport.js';
+export type { FetchTransportExtras, SourceAuth } from './fetch-transport.js';
 export { xyzImagery } from './xyz-imagery.js';
 export type { XyzImageryOptions } from './xyz-imagery.js';
+export { heightmapTerrain } from './heightmap-terrain.js';
+export type { HeightmapTerrainOptions } from './heightmap-terrain.js';
+export { quantizedMeshTerrain } from './quantized-mesh-terrain.js';
+export type { QuantizedMeshTerrainOptions } from './quantized-mesh-terrain.js';
 export { CUSTOM_PROFILE, SourceConfigError } from './metadata.js';
 export type { Attribution, DescribedImagerySource, LoadingSwitches, ProviderProfile } from './metadata.js';
 export { pmtilesImagery } from './pmtiles-imagery.js';
@@ -42,3 +47,23 @@ export {
   openStreetMapImagery,
 } from './providers/openstreetmap-provider.js';
 export type { OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';
+export { composeInBrowser, reprojectedImagery, warpInBrowser } from './reproject/reprojected-imagery.js';
+export type {
+  ComposeImage,
+  FetchedPart,
+  ImagePart,
+  ReprojectedImageryOptions,
+  WarpImage,
+} from './reproject/reprojected-imagery.js';
+export { wmsGetMapUrl } from './reproject/wms-get-map.js';
+export type { WmsGetMapParameters } from './reproject/wms-get-map.js';
+export { lonLatBoundsOf, planWarp, solveAffine } from './reproject/warp-math.js';
+export type {
+  Affine,
+  FromSource,
+  SourceBbox,
+  ToSource,
+  Triangle,
+  WarpPlan,
+  WarpTriangle,
+} from './reproject/warp-math.js';

@@ -24,7 +24,9 @@ export interface TimeoutsMs {
 export type TransportResult =
   | { readonly kind: 'ok'; readonly bytes: ArrayBuffer; readonly contentType: string }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
-  | { readonly kind: 'network-error' | 'timeout' | 'aborted' };
+  | { readonly kind: 'timeout' | 'aborted' }
+  /** `cause` 'cors': the server answers but sends no CORS headers, so the browser withholds the bytes (F251). */
+  | { readonly kind: 'network-error'; readonly cause?: 'cors' };
 
 /** Cancels a request in flight (F090). Calling it after the request ended does nothing. */
 export type AbortHandle = () => void;

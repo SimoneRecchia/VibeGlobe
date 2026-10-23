@@ -1,11 +1,25 @@
 import { createControls } from '@vibeglobe/controls';
-import { createGlobe, WGS84, type Globe, type GlobeOptions, type LogEntry, type ViewInit } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import {
+  createGlobe,
+  readGeoidFile,
+  WGS84,
+  type Globe,
+  type GlobeOptions,
+  type LogEntry,
+  type ViewCurvesInit,
+  type ViewInit,
+  type WorkerEndpointFactory,
+} from '@vibeglobe/core';
+import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
+import { chainSources, credits, overlayLayers } from './fixture-layers.js';
+import { showCameraControls } from './camera-controls.js';
+import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
+import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
@@ -13,6 +27,100 @@ const OVERLAY_REFRESH_MS = 250;
 const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
+// `?utm=` layers need the gis package and proj4: loaded only then, so the engine alone loads neither (F418).
+const reprojected = params.has('utm') ? await import('./reprojected-layers.js') : undefined;
+
+/**
+ * Terrain scenarios (M4): URL parameters each one sets unless the URL gives them, over the fixture server's analytic
+ * terrain (a 4,000 m peak at 6.86° E, 45.83° N and a sharp 1,500 m ridge along 46.5° N from 7° to 10° E).
+ */
+const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  // The peak and its valleys, tilted (F126, F134, F138, F146).
+  'terrain-alps': { terrain: 'terrarium', imagery: 'world', lon: '6.86', lat: '45.7', zoom: '11', tilt: '60' },
+  // One view per encoding (F127, F129, F130).
+  'terrain-terrarium': {
+    terrain: 'terrarium',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '9.5',
+    tilt: '45',
+    heading: '30',
+  },
+  'terrain-rgb': {
+    terrain: 'terrain-rgb',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '9.5',
+    tilt: '45',
+    heading: '30',
+  },
+  // Farther out: quantized-mesh's level-zero error (65 samples per tile) refines about two levels deeper than 256 px
+  // heightmaps, so the same view would stream about 230 tiles.
+  'terrain-quantized-mesh': {
+    terrain: 'quantized-mesh',
+    imagery: 'world',
+    lon: '6.7',
+    lat: '45.6',
+    zoom: '7.5',
+    tilt: '30',
+    heading: '30',
+  },
+  // Steep relief across tiles of different levels: the ridge seen along its length (F137).
+  'terrain-crack-sweep': { terrain: 'terrain-rgb', imagery: 'world', lon: '8.5', lat: '46.42', zoom: '13', tilt: '70' },
+  // The eye 2 m above the peak's steep flank (F136).
+  'terrain-street-level': {
+    terrain: 'terrarium',
+    imagery: 'stripes',
+    lon: '6.9',
+    lat: '45.84',
+    zoom: '22',
+    tilt: '55',
+    terrainClearance: '2',
+  },
+  // The peak 200 km away, from about 400 m up: its base lies behind the ellipsoid's horizon (about 70 km away), its
+  // top about 8 px above it on a 480 × 360 canvas (F142).
+  'terrain-horizon-peaks': {
+    terrain: 'terrarium',
+    imagery: 'world',
+    lon: '6.86',
+    lat: '44.03',
+    zoom: '12',
+    tilt: '87',
+  },
+  // Terrain to level 10, imagery to level 18 (F140).
+  'independent-levels': {
+    terrain: 'terrarium',
+    terrainMax: '10',
+    imagery: 'world',
+    imageryMax: '18',
+    // Over the fixture's ±300 m hills, below the eye: the view's distances match the imagery-only reference's.
+    lon: '11',
+    lat: '44.5',
+    zoom: '17',
+    tilt: '45',
+  },
+  // M5 phases: the whole globe (F151), a city on the flat 2D map (F153) and a city in Auto mode to zoom into (F154).
+  'globe-world': { imagery: 'world', lon: '10', lat: '20', zoom: '1' },
+  'map-2d-city': { imagery: 'world', lon: '12.5', lat: '41.9', zoom: '11' },
+  'zoom-city-to-street': { imagery: 'world', lon: '12.5', lat: '41.9', zoom: '12' },
+  // M5: the fixture cones at 100° E seen from the south, tilted, at ground zoom 14.2 (F157); the URL sets the latitude.
+  'terrain-cones': { terrain: 'terrarium', imagery: 'smooth', lon: '100', lat: '0', zoom: '14.2', tilt: '83' },
+  // The flat map in 2D just west of the antimeridian, for drags across it (F159).
+  'map-2d-antimeridian': { imagery: 'smooth', lon: '179.2', lat: '20', zoom: '6.6', viewMode: '2d' },
+  // A chosen 70° tilt looking north 4.5 km south of the fixture ridge (F165).
+  'tilt-clamp-terrain': {
+    terrain: 'terrarium',
+    imagery: 'smooth',
+    lon: '8.5',
+    lat: '46.4595',
+    zoom: '12.5',
+    tilt: '70',
+  },
+};
+for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
+  if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
 const status = document.querySelector<HTMLParagraphElement>('#status');
@@ -42,6 +150,8 @@ const depth: DepthChoice = params.get('depth') === 'fragment' ? 'fragment' : 'au
 const DEG = Math.PI / 180;
 /** A box around Italy, radians: the coverage of `?coverage=italy`. */
 const ITALY = { westRad: 6 * DEG, southRad: 36 * DEG, eastRad: 19 * DEG, northRad: 47.5 * DEG };
+/** The coverage of `?terrainCoverage=alps`: east of 6.5° E, so its west edge crosses the peak's valleys (F139). */
+const ALPS = { westRad: 6.5 * DEG, southRad: 43 * DEG, eastRad: 12 * DEG, northRad: 48 * DEG };
 
 /**
  * `?imagery=<pattern>` streams Web Mercator tiles of a fixture pattern (world, levels, border) from the playground's
@@ -57,7 +167,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
   const ktx2 = params.get('ktx2');
   const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
-  const url = `${base}fixture-tiles/${session}/${pattern}/mercator/{z}/{x}/{y}.${extension}`;
+  // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
+  const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
+  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -65,15 +177,19 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   const source = xyzImagery({
     id: `fixture-${pattern}`,
     url,
+    tiling: imageryTiling,
     minLevel: number('imageryMin') ?? 0,
     maxLevel: number('imageryMax') ?? 18,
     ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),
     ...(params.has('perHost') ? { maxRequestsPerHost: Number(params.get('perHost')) } : {}),
     ...(params.has('multiplexed') ? { multiplexed: true } : {}),
+    // `?rateLimit=` declares the source's requests per second (F222).
+    ...(params.has('rateLimit') ? { maxRequestsPerSecond: Number(params.get('rateLimit')) } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
     ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
+    ...credits(params, `fixture-${pattern}`, pattern),
   });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
@@ -84,7 +200,72 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [source], workers, memory };
+  const chain = chainSources(params, base, session, imageryTiling, ITALY);
+  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
+  // `?utm=32632,32633` adds fixture rasters served in those UTM zones, reprojected on the client (F226).
+  const utm = reprojected?.utmLayers(params, base, session) ?? [];
+  return { imagery: [layer, ...utm, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
+}
+
+/**
+ * `?terrain=terrarium|terrain-rgb` displaces the surface with the fixture server's analytic terrain (M4 plan §2) in
+ * that encoding; `&terrainTiling=geographic` serves it in the geographic scheme, `&terrainMax=` limits its levels.
+ */
+function fixtureTerrain(): Pick<GlobeOptions, 'terrain' | 'workers'> {
+  const encoding = params.get('terrain');
+  const workers = (): WorkerEndpointFactory =>
+    assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
+  if (quantizedMesh) return { terrain: quantizedMesh, workers: workers() };
+  // `?terrain=rgb24|float32`: the fixture terrain in two encodings the engine does not know, decoded by the test
+  // adapters of `terrain-adapters.ts` (F132).
+  if (encoding === 'rgb24' || encoding === 'float32') {
+    const url = `${import.meta.env.BASE_URL}fixture-tiles/${params.get('session') ?? 'playground'}/terrain/mercator/{z}/{x}/{y}.${encoding === 'rgb24' ? 'rgb24' : 'f32'}`;
+    const adapter = encoding === 'rgb24' ? rgb24Terrain : float32Terrain;
+    return { terrain: adapter(`fixture-terrain-${encoding}`, url), workers: workers() };
+  }
+  if (encoding !== 'terrarium' && encoding !== 'terrain-rgb') return {};
+  const session = params.get('session') ?? 'playground';
+  const scheme = params.get('terrainTiling') === 'geographic' ? 'geographic' : 'mercator';
+  // `&terrainDatum=geoid`: the same terrain served above the fixture geoid, with the geoid's grid file (F133).
+  const path = geoid ? 'terrain-geoid' : 'terrain';
+  const terrain = heightmapTerrain({
+    id: `fixture-terrain-${encoding}`,
+    url: `${import.meta.env.BASE_URL}fixture-tiles/${session}/${path}/${scheme}/{z}/{x}/{y}.${encoding}.png`,
+    encoding,
+    tiling: scheme,
+    maxLevel: params.has('terrainMax') ? Number(params.get('terrainMax')) : 14,
+    // `&terrainCoverage=alps` limits the terrain to a box whose west edge crosses the Alps views (F139).
+    ...(params.get('terrainCoverage') === 'alps' ? { coverage: [ALPS] } : {}),
+    ...(geoid ? { datum: { kind: 'geoid' as const, model: geoid } } : {}),
+  });
+  return { terrain, workers: workers() };
+}
+
+/** The fixture geoid for `?terrainDatum=geoid`, read before the globe starts. */
+const geoid =
+  params.get('terrainDatum') === 'geoid'
+    ? readGeoidFile(await (await fetch(`${import.meta.env.BASE_URL}fixture-geoid.bin`)).arrayBuffer())
+    : undefined;
+
+/**
+ * `?terrain=quantized-mesh` reads the fixture server's `layer.json` for the session (geographic by default,
+ * `&terrainTiling=mercator`) before the globe starts (F127, F128).
+ */
+const quantizedMesh =
+  params.get('terrain') === 'quantized-mesh'
+    ? await quantizedMeshTerrain({
+        id: 'fixture-terrain-quantized-mesh',
+        url: `${import.meta.env.BASE_URL}fixture-tiles/${params.get('session') ?? 'playground'}/terrain/${
+          params.get('terrainTiling') === 'mercator' ? 'mercator' : 'geographic'
+        }/layer.json`,
+      })
+    : undefined;
+
+/** The fixture imagery and terrain of the URL, sharing one worker pool. */
+function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
+  const imagery = fixtureImagery();
+  const terrain = fixtureTerrain();
+  return { ...terrain, ...imagery };
 }
 
 /** Creates one engine instance in a container with its own canvas. */
@@ -102,6 +283,8 @@ function startGlobe(
       depth,
       canvas: target,
       gpuTiming: params.has('gpuTiming'),
+      // Models (F361) load the glTF loader on the first model only.
+      gltf: async () => (await import('@vibeglobe/renderer/gltf')).gltfLoader(),
       // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
       ...(params.has('compressed')
         ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }
@@ -110,13 +293,19 @@ function startGlobe(
     controls: createControls(),
     baseImageryUrl: `${assets ?? `${import.meta.env.BASE_URL}imagery/`}natural-earth-4096.jpg`,
     view,
-    ...fixtureImagery(),
+    ...fixtureLayers(),
     // `?clockStepMs=` steps engine time by a fixed amount per drawn frame and `?fadeMs=` sets the imagery cross-fade
     // (scenario tests, F105; `fadeMs=0` is their injected pop).
     ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?hiddenCredits=<source id>,…` leaves those sources' optional credits out (F255).
+    ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
+    // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
+    ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
+    // `?curves=` sets the Auto mode's zoom curves as JSON (F150).
+    ...(params.has('curves') ? { viewCurves: JSON.parse(params.get('curves') ?? '{}') as ViewCurvesInit } : {}),
     // `?level=` sets the coarsest surface level, which sets how many tiles a view draws (benchmark scenarios `drag-*`).
     ...(params.has('level') ? { minSurfaceLevel: Number(params.get('level')) } : {}),
   });
@@ -176,6 +365,19 @@ function startSecondGlobe(host: HTMLElement): Globe {
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
 }
 
+/** The debug overlay's lines of each imagery source's declared metadata (F220). */
+function sourceLines(globe: Globe): [string, string][] {
+  return globe.imageryLayers
+    .list()
+    .flatMap((layer) =>
+      layer.sources.map((source): [string, string] => [
+        `source-${source.id}`,
+        `source ${source.id} ${source.crs} z${source.minLevel}–${source.maxLevel} ${source.tileSizePx}px` +
+          (source.maxRequestsPerSecond ? ` ${source.maxRequestsPerSecond}/s` : ''),
+      ]),
+    );
+}
+
 async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
   // Loaded on demand so the overlay code is not part of the default page.
   const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
@@ -200,6 +402,7 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
       ['device-memory', `memory ${caps.deviceMemoryGiB === undefined ? 'unknown' : `${caps.deviceMemoryGiB} GiB`}`],
       ['adapter', `adapter ${caps.adapter}`],
       ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
+      ...sourceLines(globe),
     ];
   };
   void globe.ready.then(readInfo);
@@ -266,7 +469,14 @@ if (params.get('experiment') === 'gpu-probes') {
   );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
+  showViewModeControls(globe, app, params.get('viewMode'));
+  showCameraControls(globe, app);
   runScenario(globe, scenario);
+  // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
+  if (params.get('layers') === 'demo')
+    void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
+  if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
+    void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;

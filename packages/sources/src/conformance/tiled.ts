@@ -43,7 +43,7 @@ async function fetchTile(
   abortAfterMs?: number,
 ): Promise<{ result: TransportResult | 'noData'; calls: number; threw: boolean }> {
   const request = source.request(coord, { url: '', hostIndex: 0 });
-  if (request === 'noData') return { result: 'noData', calls: 0, threw: false };
+  if (request === 'noData' || request === 'unknown') return { result: 'noData', calls: 0, threw: false };
   return new Promise((resolve) => {
     let calls = 0;
     let first: TransportResult | undefined;

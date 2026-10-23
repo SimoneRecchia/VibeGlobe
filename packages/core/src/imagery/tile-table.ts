@@ -1,6 +1,6 @@
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import { NO_SLOT } from '../scheduler/network-pool.js';
-import { packTileKey, type TileCoord } from '../tiling/tile-key.js';
+import { MAX_TILE_LEVEL, packTileKey, type TileCoord } from '../tiling/tile-key.js';
 
 /** Not wanted, or wanted and not yet queued (M3 plan §3's tile states). */
 export const UNLOADED = 0;
@@ -35,6 +35,8 @@ export interface TileRecord {
   task: number;
   /** The tile belongs to the pinned base: loaded first, never evicted (ADR 0007, F084). */
   readonly pinned: boolean;
+  /** The source last answered that it cannot tell yet whether the tile exists (F128). */
+  availabilityUnknown: boolean;
 }
 
 /**
@@ -49,6 +51,8 @@ export class TileTable {
   eligibleAt = new Float64Array(1024);
   private readonly records = new IntegerKeyMap<TileRecord>(1024);
   private readonly coord: TileCoord = { root: 0, level: 0, x: 0, y: 0 };
+  /** {@link TileTable.findInside}'s key, in an array so passing it boxes nothing (ADR 0018). */
+  private readonly key = new Float64Array(1);
 
   /** `rootTilesX` of the source's tiling scheme; tiles at or above `pinnedLevel` are pinned. */
   constructor(
@@ -63,6 +67,17 @@ export class TileTable {
     coord.x = x;
     coord.y = y;
     return this.records.get(packTileKey(coord, this.rootTilesX, 1));
+  }
+
+  /**
+   * {@link TileTable.find} for a tile known to lie in the pyramid (callers clamp its column and row): the key is
+   * computed without packTileKey's checks, for per-query code (F144).
+   */
+  findInside(level: number, x: number, y: number): TileRecord | undefined {
+    const columns = this.rootTilesX * (POWERS_OF_TWO[level] ?? 0);
+    const above = (this.rootTilesX * ((POWERS_OF_FOUR[level] ?? 1) - 1)) / 3;
+    this.key[0] = (above + y * columns + x) * 3;
+    return this.records.getAt(this.key, 0);
   }
 
   /** The record of a tile, created on first use. */
@@ -81,6 +96,7 @@ export class TileTable {
       consumer: NO_SLOT,
       task: -1,
       pinned: level <= this.pinnedLevel,
+      availabilityUnknown: false,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);
@@ -91,6 +107,10 @@ export class TileTable {
     return record;
   }
 }
+
+/** 2^level and 4^level by level, for {@link TileTable.findInside}. */
+const POWERS_OF_TWO = Float64Array.from({ length: MAX_TILE_LEVEL + 1 }, (_, level) => 2 ** level);
+const POWERS_OF_FOUR = Float64Array.from({ length: MAX_TILE_LEVEL + 1 }, (_, level) => 4 ** level);
 
 function grown(array: Float64Array<ArrayBuffer>): Float64Array<ArrayBuffer> {
   const next = new Float64Array(array.length * 2);

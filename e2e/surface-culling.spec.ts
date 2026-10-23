@@ -81,7 +81,9 @@ for (const backend of BACKENDS) {
   test(`horizon culling skips tiles behind the curve of the Earth and never a visible one on ${backend} (F087)`, async ({
     page,
   }) => {
-    await openGlobe(page, `backend=${backend}&lon=9.19&lat=45.46&zoom=14&tilt=80`);
+    // The globe phase (ADR 0008: the flat map has no horizon), close enough that the globe fills the small viewport.
+    await page.setViewportSize({ width: 400, height: 400 });
+    await openGlobe(page, `backend=${backend}&lon=9.19&lat=45.46&zoom=3.4`);
     await waitForIdle(page);
     const result = await page.evaluate(() => {
       const globe = window.vibeglobePlayground?.globe;

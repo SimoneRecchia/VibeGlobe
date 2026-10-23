@@ -8,6 +8,8 @@ import {
   type TileRequest,
   type TileTransport,
   type TimeoutsMs,
+  type Attribution,
+  type CreditProfile,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
 
@@ -25,6 +27,8 @@ export interface XyzImageryOptions {
   minLevel?: number;
   maxLevel?: number;
   tileSizePx?: number;
+  /** The tiles have transparent areas, where the layers below show (F242). */
+  transparent?: boolean;
   /** 2 for high-DPI (`@2x`) tiles. */
   pixelRatio?: number;
   /** Values for `{s}`, spread over tiles so several hosts share the load (F089). */
@@ -38,8 +42,14 @@ export interface XyzImageryOptions {
   maxRequestsPerHost?: number;
   /** The hosts speak HTTP/2 or HTTP/3, so more requests share one connection (F096). */
   multiplexed?: boolean;
+  /** Requests per second the hosts accept; the engine never starts more in any second (F222). */
+  maxRequestsPerSecond?: number;
   /** Time limits of each request (default 10 s to the headers, 30 s in all; F092). */
   timeoutsMs?: TimeoutsMs;
+  /** Credits shown while the source's tiles are in view (F254). */
+  attribution?: readonly Attribution[];
+  /** The provider's credit rules: a required credit is always shown (F255). */
+  profile?: CreditProfile;
 }
 
 /** A tiled imagery source from an XYZ or TMS URL template. */
@@ -61,7 +71,11 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     decoder: options.decoder ?? 'image',
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
+    ...(options.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: options.maxRequestsPerSecond }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
+    ...(options.attribution ? { attribution: options.attribution } : {}),
+    ...(options.transparent ? { transparent: true } : {}),
+    ...(options.profile ? { profile: options.profile } : {}),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';

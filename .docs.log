@@ -1,0 +1,6 @@
+
+> vibeglobe@0.0.0 docs:serve
+> vite preview --outDir docs-site --port 5174 --strictPort
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose

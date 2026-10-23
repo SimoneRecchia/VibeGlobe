@@ -7,6 +7,7 @@ import {
 } from '../camera/zoom.js';
 import type { CameraState } from './types.js';
 import type { ValidView } from './validation.js';
+import type { ViewState } from '../view/view-state.js';
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -21,8 +22,8 @@ export function wrapDegrees(angleDeg: number): number {
 }
 
 /** Reads the public camera state from the camera (applied values, degrees, Mercator zoom). */
-export function readCameraState(camera: Camera): CameraState {
-  return writeCameraState(camera, newCameraState());
+export function readCameraState(camera: Camera, view?: ViewState): CameraState {
+  return writeCameraState(camera, newCameraState(), view);
 }
 
 /** A camera state whose fields can be overwritten, for a payload reused every frame. */
@@ -39,11 +40,20 @@ export function newCameraState(): MutableCameraState {
     tiltDeg: 0.5,
     rollDeg: 0.5,
     rangeMeters: 0.5,
+    eyeLongitudeDeg: 0.5,
+    eyeLatitudeDeg: 0.5,
+    groundHeightMeters: 0.5,
+    viewMode: 'auto',
+    chosenTiltDeg: 0.5,
+    chosenHeadingDeg: 0.5,
+    morphFactor: 0.5,
+    reliefFactor: 0.5,
+    phase: 'globe',
   };
 }
 
 /** Writes the camera's public state into `out` and returns it; allocates nothing, so the frame loop can use it. */
-export function writeCameraState(camera: Camera, out: MutableCameraState): MutableCameraState {
+export function writeCameraState(camera: Camera, out: MutableCameraState, view?: ViewState): MutableCameraState {
   const { pose } = camera;
   const groundZoom = groundZoomForRange(pose.rangeMeters, camera.heightPx, camera.fovYRad);
   out.longitudeDeg = wrapDegrees(pose.targetLongitudeRad * DEG);
@@ -54,6 +64,16 @@ export function writeCameraState(camera: Camera, out: MutableCameraState): Mutab
   out.tiltDeg = pose.tiltRad * DEG;
   out.rollDeg = pose.rollRad * DEG;
   out.rangeMeters = pose.rangeMeters;
+  out.eyeLongitudeDeg = wrapDegrees(camera.eyeGeodetic.longitudeRad * DEG);
+  out.eyeLatitudeDeg = camera.eyeGeodetic.latitudeRad * DEG;
+  out.groundHeightMeters = camera.groundHeightMeters;
+  // The heading has no clamp: the applied heading is the chosen one (F164).
+  out.viewMode = view ? view.mode : 'manual';
+  out.chosenTiltDeg = view && view.mode === 'manual' ? view.chosenTiltRad * DEG : out.tiltDeg;
+  out.chosenHeadingDeg = out.headingDeg;
+  out.morphFactor = view ? (view.morph.factors[0] ?? 0) : 0;
+  out.reliefFactor = view ? (view.morph.factors[1] ?? 1) : 1;
+  out.phase = view ? view.phase : 'globe';
   return out;
 }
 
@@ -113,7 +133,7 @@ export function currentView(camera: Camera): ValidView {
 }
 
 /** The camera state of a view requested before the viewport has a size: range and altitude are not known yet. */
-export function requestedCameraState(view: ValidView): CameraState {
+export function requestedCameraState(view: ValidView, state?: ViewState): CameraState {
   return {
     longitudeDeg: wrapDegrees(view.longitudeDeg),
     latitudeDeg: view.latitudeDeg,
@@ -123,5 +143,15 @@ export function requestedCameraState(view: ValidView): CameraState {
     tiltDeg: view.tiltDeg,
     rollDeg: 0,
     rangeMeters: Number.NaN,
+    eyeLongitudeDeg: Number.NaN,
+    eyeLatitudeDeg: Number.NaN,
+    groundHeightMeters: 0,
+    viewMode: state ? state.mode : 'manual',
+    chosenTiltDeg: view.tiltDeg,
+    chosenHeadingDeg: wrapDegrees(view.headingDeg),
+    // Nothing is drawn yet: the factors and phase are those of the start state.
+    morphFactor: state ? (state.morph.factors[0] ?? 0) : 0,
+    reliefFactor: state ? (state.morph.factors[1] ?? 1) : 1,
+    phase: state ? state.phase : 'globe',
   };
 }

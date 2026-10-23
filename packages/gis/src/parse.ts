@@ -101,8 +101,49 @@ function degreesOf(angle: Angle): number | undefined {
   return negative || southOrWest ? -magnitude : magnitude;
 }
 
+/** Why a text is not a coordinate (F207). */
+export type CoordinateParseErrorCode =
+  | 'unrecognized'
+  | 'latitude-out-of-range'
+  | 'longitude-out-of-range'
+  | 'invalid-utm-zone'
+  | 'invalid-minutes-or-seconds';
+
+/** A typed parse error: its code and an English sentence for logs (the ui translates the code). */
+export interface CoordinateParseError {
+  readonly code: CoordinateParseErrorCode;
+  readonly message: string;
+}
+
+/** The outcome of {@link parseCoordinateResult}: a position, or the reason there is none. */
+export type CoordinateParseResult =
+  | { readonly position: LonLat; readonly error?: undefined }
+  | { readonly position?: undefined; readonly error: CoordinateParseError };
+
+const MESSAGES: Readonly<Record<CoordinateParseErrorCode, string>> = {
+  unrecognized: 'The text is not a coordinate in decimal degrees, degrees-minutes-seconds or UTM.',
+  'latitude-out-of-range': 'The latitude must lie between -90 and 90 degrees.',
+  'longitude-out-of-range': 'The longitude must lie between -180 and 180 degrees.',
+  'invalid-utm-zone': 'The UTM zone must be 1 to 60 with a band letter C to X (no I or O; not 32X, 34X or 36X).',
+  'invalid-minutes-or-seconds': 'Minutes and seconds must be unsigned and below 60, after whole degrees and minutes.',
+};
+
+const failed = (code: CoordinateParseErrorCode): CoordinateParseResult => ({
+  error: { code, message: MESSAGES[code] },
+});
+
 /**
- * Reads a WGS84 position from text, or returns undefined when the text is not a coordinate. Accepted forms:
+ * Reads a WGS84 position from text, or returns undefined when the text is not a coordinate; see
+ * {@link parseCoordinateResult} for the accepted forms and the reasons a text is refused.
+ *
+ * @param text - What the user typed.
+ */
+export function parseCoordinate(text: string): LonLat | undefined {
+  return parseCoordinateResult(text).position;
+}
+
+/**
+ * Reads a WGS84 position from text, or says why it cannot (F207). Accepted forms:
  * decimal degrees (`45.4643, 9.19`, `45.4643°N 9.19°E`, `-33.9 18.4`), degrees-minutes-seconds (`45°27′51.6″N
  * 9°11′24″E`, `45 27 51.6 N 9 11 24 E`, `N 45° 27.86' E 9° 11.4'`) and UTM (`32T 514880 5034425`, the band letter giving
  * the hemisphere). Without hemisphere letters the latitude comes first; with them, the letters decide. A comma between
@@ -110,7 +151,7 @@ function degreesOf(angle: Angle): number | undefined {
  *
  * @param text - What the user typed.
  */
-export function parseCoordinate(text: string): LonLat | undefined {
+export function parseCoordinateResult(text: string): CoordinateParseResult {
   const normalized = normalize(text);
   const utm = UTM.exec(normalized);
   if (utm !== null) {
@@ -121,23 +162,38 @@ export function parseCoordinate(text: string): LonLat | undefined {
         eastingMeters: Number(utm[3]),
         northingMeters: Number(utm[4]),
       });
-      return Math.abs(position.latitudeDeg) <= 90 ? position : undefined;
+      return Math.abs(position.latitudeDeg) <= 90 && Number.isFinite(position.longitudeDeg)
+        ? { position }
+        : failed('latitude-out-of-range');
     } catch {
-      return undefined;
+      return failed('invalid-utm-zone');
     }
   }
+  if (/^\d{1,2}\s*[A-Z]\s+\d/i.test(normalized)) return failed('invalid-utm-zone');
   const tokens = normalized.match(TOKEN);
-  if (tokens === null || tokens.join('') !== normalized) return undefined;
+  if (tokens === null || tokens.join('') !== normalized) return failed('unrecognized');
   const angles = groupAngles(tokens);
-  if (angles?.length !== 2) return undefined;
+  if (angles?.length !== 2) return failed('unrecognized');
   const [first, second] = angles as [Angle, Angle];
   const isLongitude = (angle: Angle): boolean => angle.hemisphere === 'E' || angle.hemisphere === 'W';
   const isLatitude = (angle: Angle): boolean => angle.hemisphere === 'N' || angle.hemisphere === 'S';
-  if ((isLatitude(first) && isLatitude(second)) || (isLongitude(first) && isLongitude(second))) return undefined;
+  if ((isLatitude(first) && isLatitude(second)) || (isLongitude(first) && isLongitude(second)))
+    return failed('unrecognized');
   const swap = isLongitude(first) || isLatitude(second);
   const latitudeDeg = degreesOf(swap ? second : first);
   const longitudeDeg = degreesOf(swap ? first : second);
-  if (latitudeDeg === undefined || longitudeDeg === undefined) return undefined;
-  if (Math.abs(latitudeDeg) > 90 || Math.abs(longitudeDeg) > 180) return undefined;
-  return { longitudeDeg, latitudeDeg };
+  if (latitudeDeg === undefined || longitudeDeg === undefined)
+    return failed(
+      hasBadMinutes(swap ? second : first) || hasBadMinutes(swap ? first : second)
+        ? 'invalid-minutes-or-seconds'
+        : 'unrecognized',
+    );
+  if (Math.abs(latitudeDeg) > 90) return failed('latitude-out-of-range');
+  if (Math.abs(longitudeDeg) > 180) return failed('longitude-out-of-range');
+  return { position: { longitudeDeg, latitudeDeg } };
+}
+
+/** True when an angle's minutes or seconds are signed or 60 or more. */
+function hasBadMinutes(angle: Angle): boolean {
+  return angle.values.some((raw, i) => i > 0 && (/^[+-]/.test(raw) || Math.abs(Number(raw)) >= 60));
 }

@@ -5,9 +5,17 @@ const port = Number(process.env['PLAYGROUND_PORT'] ?? 5173);
 const docsPort = Number(process.env['DOCS_PORT'] ?? 5174);
 // Cloud containers ship a preinstalled Chromium; init.sh points VIBEGLOBE_CHROMIUM_PATH at it.
 const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
+/**
+ * Elsewhere (CI's container), the full Chromium in its headless mode rather than Playwright's default headless shell:
+ * the shell has no display pacing, so it queues frames faster than SwiftShader draws them and a capture waits behind
+ * the queue for minutes (KB-102).
+ */
+const CHROMIUM = { ...devices['Desktop Chrome'], ...(chromiumPath ? {} : { channel: 'chromium' }) };
 /** Tests whose results depend on having the machine to themselves. */
 const MEASURES_THE_MACHINE =
-  /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts/;
+  /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts|hud-overhead\.spec\.ts/;
+/** Without Docker (CI's container shards), the LAN host test runs elsewhere (CI's lan job). */
+const NEEDS_DOCKER = process.env['VIBEGLOBE_NO_DOCKER'] === '1' ? [/offline-lan\.spec\.ts/] : [];
 /**
  * With VIBEGLOBE_CROSS_BROWSER=1 (CI's nightly cross-browser job), the globe suites also run in Firefox and WebKit on
  * WebGL2; tests of WebGPU itself stay Chromium-only, and so do the visual baselines (recorded in CI's Chromium).
@@ -42,6 +50,8 @@ const crossBrowserProjects =
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.spec.ts',
+  // Shards split by test, not by file, so a long spec does not hold one shard far past the others (ADR 0035).
+  fullyParallel: true,
   // Visual baselines (ADR 0012): one per view and backend, recorded only in the pinned CI environment.
   snapshotPathTemplate: '{testDir}/__baselines__/{arg}{ext}',
   forbidOnly: Boolean(process.env['CI']),
@@ -54,11 +64,11 @@ export default defineConfig({
     launchOptions: { args: gpuArgs(), ...(chromiumPath ? { executablePath: chromiumPath } : {}) },
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: MEASURES_THE_MACHINE },
+    { name: 'chromium', use: CHROMIUM, testIgnore: [MEASURES_THE_MACHINE, ...NEEDS_DOCKER] },
     // Measurements of the whole machine (heap sampling, GC traces) run after every other test, alone (F064).
     {
       name: 'measurements',
-      use: { ...devices['Desktop Chrome'] },
+      use: CHROMIUM,
       testMatch: MEASURES_THE_MACHINE,
       dependencies: ['chromium'],
     },

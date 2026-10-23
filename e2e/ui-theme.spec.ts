@@ -282,6 +282,8 @@ test.describe('keyboard', () => {
   });
 
   test('operates the search box with arrows, Enter and Escape (F433)', async ({ page }) => {
+    // Choosing a place flies there (F208); reduced motion makes it a short fade (F214), so the check follows arrival.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await openUi(page, {
       // A geocoder with two results, so the arrow keys have something to move through.
       defaults: false,

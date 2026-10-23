@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { chooseKtx2Target, readKtx2, type CompressedTileImage, type Ktx2Target } from '@vibeglobe/core';
+import type { CompressedTileImage, Ktx2Target } from '@vibeglobe/core';
+import { chooseKtx2Target, readKtx2 } from '@vibeglobe/core/decoders';
 import { describe, expect, it } from 'vitest';
 import { createTranscodeKtx2 } from '@vibeglobe/worker';
 import { renderTile } from './generate.ts';

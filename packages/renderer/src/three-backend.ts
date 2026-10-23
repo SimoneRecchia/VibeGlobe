@@ -18,18 +18,21 @@ import {
 import { Mesh, Scene, Texture, WebGPURenderer, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { readCapabilities } from './capabilities.js';
 import { CanvasSlot, captureCanvas } from './canvas-slot.js';
-import { createDebugEntry, type DebugEntry } from './debug-meshes.js';
+import { createDebugEntry, disposeDebugEntries, placeDebugEntries, type DebugEntry } from './debug-meshes.js';
+import { meshBytes } from './debug-meshes.js';
+import { LayerBatches } from './layer-batches.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
 import { chooseWebGPU, decodeBitmap } from './environment.js';
-import { applyDraw, attachSurfaceDraw, createSurfaceMaterial, type SurfaceDraw } from './surface-material.js';
+import * as surface from './surface-material.js';
 import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
-import { placeEyeRelative } from './eye-relative.js';
+import { placeTile } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
 import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
+import { releaseMesh } from './release-mesh.js';
 import {
   RecoveryLimiter,
   createFailureMessage,
@@ -43,7 +46,7 @@ import {
 interface TileEntry {
   readonly data: TileMeshData;
   readonly mesh: Mesh;
-  readonly draw: SurfaceDraw;
+  readonly draw: surface.SurfaceDraw;
 }
 
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
@@ -91,7 +94,10 @@ export class ThreeBackend implements RendererBackend {
   /** Surface tiles by key (no Map: it boxes keys beyond 31 bits on every per-frame lookup, ADR 0018). */
   private readonly tiles = new IntegerKeyMap<TileEntry>(1024);
   private debugEntries: DebugEntry[] = [];
+  readonly layers = new LayerBatches(this.scene, 'reversed-z'); // Data layers (ADR 0037).
+  readonly models = this.layers.models;
   private textureUploads = 0;
+  private meshUploads = 0;
   private matrixUpdates = 0;
   private pipelineCompiles = 0;
   private pipelineSwitches: PipelineSwitches | undefined;
@@ -131,9 +137,7 @@ export class ThreeBackend implements RendererBackend {
     private readonly settings: BackendSettings,
   ) {
     this.canvases = new CanvasSlot(surface);
-    this.camera.matrixAutoUpdate = false;
-    this.camera.matrixWorldAutoUpdate = false;
-    this.scene.matrixWorldAutoUpdate = false;
+    this.camera.matrixAutoUpdate = this.camera.matrixWorldAutoUpdate = this.scene.matrixWorldAutoUpdate = false;
   }
 
   /** Creates and initializes a backend; rejects with GlobeError 'unsupported-device' when nothing can render. */
@@ -169,9 +173,8 @@ export class ThreeBackend implements RendererBackend {
     // A recovery may find WebGPU gone (blocked after a GPU-process crash): WebGL2 takes over, reported (KB-049),
     // unless a self-test failure reports it (KB-052).
     const previous = (this.capabilities as RendererCapabilities | undefined)?.backend;
-    if (forceWebGL && previous === 'webgpu' && this.webgpuFailure === undefined) {
+    if (forceWebGL && previous === 'webgpu' && this.webgpuFailure === undefined)
       this.events.backendFallback('WebGPU is no longer available after a device loss; using WebGL2');
-    }
     if (webgpu) patchIdentitySwizzle(scope);
     const canvas = this.canvases.next(webgpu);
     const renderer = new WebGPURenderer({
@@ -184,6 +187,7 @@ export class ThreeBackend implements RendererBackend {
     });
     await renderer.init();
     this.depthPath = depthPathOf(renderer);
+    this.layers.restore(this.depthPath);
     // Every path stores near / d, cleared to 0, nearest kept by greater-equal (ADR 0005 §1). With reversed depth three.js
     // inverts the clear value and the compare itself.
     if (this.depthPath === 'fragment') renderer.setClearDepth(0);
@@ -252,16 +256,13 @@ export class ThreeBackend implements RendererBackend {
     const mesh = createTileMesh(data, this.material);
     countMatrixUpdates(mesh, () => this.matrixUpdates++);
     this.scene.add(mesh);
-    return { data, mesh, draw: attachSurfaceDraw(mesh) };
+    this.meshUploads++;
+    return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
-    for (const entry of this.debugEntries) {
-      this.scene.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      (entry.mesh.material as MeshBasicNodeMaterial).dispose();
-    }
+    disposeDebugEntries(this.scene, this.debugEntries);
     this.debugEntries = meshes.map((data) => createDebugEntry(data, this.depthPath));
     for (const entry of this.debugEntries) this.scene.add(entry.mesh);
   }
@@ -272,6 +273,7 @@ export class ThreeBackend implements RendererBackend {
       drawCalls: this.lastDrawCalls,
       triangles: this.lastTriangles,
       textureUploads: this.textureUploads,
+      meshUploads: this.meshUploads,
       matrixUpdates: this.matrixUpdates,
       pipelineCompiles: this.pipelineCompiles,
       pipelineSwitches: this.pipelineSwitches?.count ?? 0,
@@ -284,8 +286,7 @@ export class ThreeBackend implements RendererBackend {
   removeMesh(key: number): void {
     const entry = this.tiles.get(key);
     if (!entry) return;
-    this.scene.remove(entry.mesh);
-    entry.mesh.geometry.dispose();
+    releaseMesh(this.scene, entry.mesh);
     this.tiles.delete(key);
     const shownIndex = this.shown.indexOf(entry.mesh);
     if (shownIndex !== -1 && shownIndex < this.shownCount) this.shown[shownIndex] = undefined;
@@ -327,7 +328,7 @@ export class ThreeBackend implements RendererBackend {
     this.imageryTexture?.dispose();
     this.imageryTexture = texture;
     this.material?.dispose();
-    this.material = createSurfaceMaterial(texture, this.depthPath);
+    this.material = surface.createSurfaceMaterial(texture, this.depthPath);
     const material = this.material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
@@ -345,15 +346,14 @@ export class ThreeBackend implements RendererBackend {
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
-      applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
+      surface.applyDraw(entry.draw, draws, i, this.tileTextures, this.imageryTexture);
       entry.mesh.visible = true;
       this.shown[this.shownCount++] = entry.mesh;
-      placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
+      placeTile(entry.mesh, entry.data, view);
     }
-    for (let i = 0; i < this.debugEntries.length; i++) {
-      const entry = this.debugEntries[i];
-      if (entry) placeEyeRelative(entry.mesh, entry.data.originEcef, view.eyeEcef);
-    }
+    surface.setSurfaceMorph(this.material, view.morph);
+    placeDebugEntries(this.debugEntries, view.eyeEcef);
+    this.layers.place(view);
     this.camera.apply(view, this.depthPath);
     this.beginFrame();
     this.pipelineSwitches?.begin();
@@ -374,15 +374,13 @@ export class ThreeBackend implements RendererBackend {
 
   /** GPU resource counters, counted from what is actually held (after destroy too, so a leak shows). */
   resourceCounts(): ResourceCounts {
-    let gpuBytes = 0;
-    this.tiles.forEach((entry) => (gpuBytes += entry.data.byteLength + entry.data.indices.byteLength));
-    for (const entry of this.debugEntries) gpuBytes += entry.data.positions.byteLength;
-    const image = this.imagery;
-    const textureBytes = image && this.imageryTexture ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
+    const gpuBytes = meshBytes(this.tiles, this.debugEntries);
+    const image = this.imageryTexture ? this.imagery : undefined;
+    const textureBytes = image ? Math.round((image.width * image.height * 4 * 4) / 3) : 0;
     return {
-      meshes: this.tiles.size + this.debugEntries.length,
+      meshes: this.tiles.size + this.debugEntries.length + this.layers.meshCount,
       textures: (this.imageryTexture ? 1 : 0) + this.tileTextures.size,
-      gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes,
+      gpuBytes: gpuBytes + textureBytes + this.tileTextures.gpuBytes + this.layers.gpuBytes,
       vertexArrays: this.destroyed ? this.vertexArraysLeft : countVertexArrays(this.renderer.backend),
       contexts: this.lossWatch.held() ? 1 : 0,
     };
@@ -490,6 +488,7 @@ export class ThreeBackend implements RendererBackend {
     this.tiles.forEach((_, key) => keys.push(key));
     for (const key of keys) this.removeMesh(key);
     this.setDebugMeshes([]);
+    this.layers.dispose();
     this.material?.dispose();
     this.material = undefined;
     this.imageryTexture?.dispose();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { geodeticToEcef } from '../geodesy/ecef.js';
 import { buildQuadtreeTileMesh, buildTileMesh, tileIndices, TILE_SEGMENTS, type TileMeshData } from './surface-mesh.js';
 import {
   MERCATOR_ROOT,
@@ -19,6 +20,37 @@ describe('buildTileMesh', () => {
     expect(mesh.indices).toBe(tileIndices());
     expect(Math.max(...mesh.indices)).toBe(vertices - 1);
     expect(mesh.uvs.every((v) => v >= 0 && v <= 1)).toBe(true);
+  });
+});
+
+describe('terrain attributes (M4)', () => {
+  it('gives every vertex its ellipsoid normal, along which the renderer displaces heights: unit, doubled on skirts', () => {
+    const tile = quadtreeTileBounds(MERCATOR_ROOT, 6, 33, 22, 1, {
+      key: 0,
+      root: 0,
+      level: 0,
+      x: 0,
+      y: 0,
+      span: 1,
+      westRad: 0,
+      southRad: 0,
+      eastRad: 0,
+      northRad: 0,
+    });
+    const mesh = buildQuadtreeTileMesh(tile, 50);
+    const vertices = mesh.positions.length / 3;
+    expect(mesh.normals.length).toBe(vertices * 3);
+    // The skirt vertices follow the (segments + 1)² surface vertices; their doubled normal marks them (M4 review).
+    const side = Math.round(Math.sqrt(4 + vertices) - 2);
+    expect(side * side + 4 * side).toBe(vertices);
+    for (let i = 0; i < vertices; i++) {
+      const [x = 0, y = 0, z = 0] = mesh.normals.subarray(i * 3, i * 3 + 3);
+      expect(Math.hypot(x, y, z)).toBeCloseTo(i < side * side ? 1 : 2, 6);
+    }
+    // The north-west corner's normal points at its latitude and longitude.
+    const [x = 0, y = 0, z = 0] = mesh.normals.subarray(0, 3);
+    expect(Math.asin(z)).toBeCloseTo(tile.northRad, 6);
+    expect(Math.atan2(y, x)).toBeCloseTo(tile.westRad, 6);
   });
 });
 
@@ -62,6 +94,44 @@ describe('tile-local texture coordinates (M3 plan §2.4)', () => {
       // The first skirt runs along the north edge.
       expect(uvw(mesh, GRID * GRID)[1]).toBe(0);
       expect(uvw(mesh, GRID * GRID + 4 * GRID - 1)).toEqual(uvw(mesh, 0));
+    }
+  });
+});
+
+describe('displaced vertices (F135)', () => {
+  it('places every vertex, displaced along its normal by a height, at the geodetic-to-ECEF position of that height', () => {
+    const tile = quadtreeTileBounds(MERCATOR_ROOT, 12, 2133, 1458, 1, {
+      key: 0,
+      root: 0,
+      level: 0,
+      x: 0,
+      y: 0,
+      span: 1,
+      westRad: 0,
+      southRad: 0,
+      eastRad: 0,
+      northRad: 0,
+    });
+    const mesh = buildQuadtreeTileMesh(tile, 50);
+    const surface = (TILE_SEGMENTS + 1) ** 2;
+    const expected = new Float64Array(3);
+    for (const heightMeters of [-400, 0, 1234.5, 4810]) {
+      for (let i = 0; i < surface; i++) {
+        // The vertex's longitude and latitude from its texture coordinates (geographic v is linear in latitude).
+        const lonRad = tile.westRad + (mesh.uvs[i * 3] ?? 0) * (tile.eastRad - tile.westRad);
+        const latRad = tile.northRad - (mesh.uvs[i * 3 + 2] ?? 0) * (tile.northRad - tile.southRad);
+        geodeticToEcef(lonRad, latRad, heightMeters, expected);
+        // What the vertex shader computes, in float64: origin + position + normal × height.
+        let error = 0;
+        for (let c = 0; c < 3; c++) {
+          const displaced =
+            (mesh.originEcef[c] ?? 0) +
+            (mesh.positions[i * 3 + c] ?? 0) +
+            (mesh.normals[i * 3 + c] ?? 0) * heightMeters;
+          error = Math.max(error, Math.abs(displaced - (expected[c] ?? 0)));
+        }
+        expect(error).toBeLessThan(0.001);
+      }
     }
   });
 });

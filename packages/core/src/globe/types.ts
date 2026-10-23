@@ -1,9 +1,21 @@
-import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
+import type { LayerRenderTarget } from '../layers/layer-target.js';
+import type { ImageryLayerInput, ImageryLayers } from '../imagery/imagery-stack.js';
+import type { Credit } from '../imagery/credits.js';
+import type { TerrainSource } from '../terrain/terrain-source.js';
+import type { ElevationSample } from '../terrain/terrain-heights.js';
+import type { AbortSignalLike } from './imagery-runtime.js';
 import type { GlobeDiagnostics, LogLevel, LogSink } from '../diagnostics/observability.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
+import type { MorphFrame } from '../view/morph.js';
+import type { ViewCurvesInit } from '../view/curves.js';
+import type { ViewMode, ViewPhase } from '../view/view-state.js';
+import type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
+
+export type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
 
 /** A WGS84 geodetic position: degrees and meters above the ellipsoid, whatever the display projection. */
 export interface GeoPosition {
@@ -51,59 +63,14 @@ export interface RendererCapabilities {
 
 /** The view the renderer draws, in eye-relative ECEF (ADR 0004): float64, rounded to float32 at upload. */
 export interface FrameView {
+  /** The frame's globe-to-flat morph (ADR 0008): the renderer forms both endpoints of every vertex and mixes them. */
+  readonly morph: MorphFrame;
   readonly view: Float64Array;
   readonly projection: Float64Array;
   readonly eyeEcef: Float64Array;
   readonly widthPx: number;
   readonly heightPx: number;
   readonly pixelRatio: number;
-}
-
-/** A drawn frame's pixels (test hook). */
-export interface FrameCapture {
-  /** Drawing-buffer size in device pixels. */
-  readonly widthPx: number;
-  readonly heightPx: number;
-  /** RGBA, 8 bits per channel, not premultiplied, top row first; transparent where nothing was drawn. */
-  readonly rgba: Uint8ClampedArray;
-}
-
-/** GPU resource counters, all zero after destroy (F068). */
-export interface ResourceCounts {
-  /** Surface and debug meshes held on the GPU. */
-  readonly meshes: number;
-  readonly textures: number;
-  readonly gpuBytes: number;
-  /** WebGL2 vertex array objects held (0 on WebGPU), which must follow the meshes (KB-021). */
-  readonly vertexArrays: number;
-  /** GPU devices or contexts held: 1 while the globe runs, 0 once released. */
-  readonly contexts: number;
-}
-
-/** Cumulative renderer counters for diagnostics and tests (F052). */
-export interface RendererStats {
-  /** Draw calls in the last frame. */
-  readonly drawCalls: number;
-  /** Triangles in the last frame. */
-  readonly triangles: number;
-  /** Texture uploads since the renderer started. */
-  readonly textureUploads: number;
-  /** Automatic object matrix updates since the renderer started (tiles must cause none). */
-  readonly matrixUpdates: number;
-  /**
-   * Render pipelines compiled since the warm-up before the first frame (ADR 0010 §4): 0 while only the warmed-up
-   * material variants draw. Debug shapes have their own materials and count.
-   */
-  readonly pipelineCompiles: number;
-  /** Times the render pipeline changed between draws in the last frame, the output pass included (F103). */
-  readonly pipelineSwitches: number;
-  /** Imagery tile textures held in a block-compressed format (KTX2 sources, ADR 0020). */
-  readonly compressedTextures: number;
-  /**
-   * GPU time of the last frame measured, in milliseconds: null unless the renderer was asked to measure it and the
-   * device offers timestamp queries (benchmarks).
-   */
-  readonly gpuFrameMs: number | null;
 }
 
 /** A flat test quad drawn with the surface's precision path, for scenario tests of jitter and depth (F057, F058). */
@@ -147,6 +114,18 @@ export interface RenderHost {
   containerSize(): { widthPx: number; heightPx: number };
   /** Device pixel ratio. */
   pixelRatio(): number;
+  /**
+   * Optional: calls `callback` now and on every change with whether the system asks for reduced motion (F214); returns
+   * an unsubscribe. Without it the engine assumes full motion.
+   */
+  observeReducedMotion?(callback: (reduce: boolean) => void): () => void;
+  /** Optional: shows the drawn view at `opacity` (0 to 1), for a reduced-motion flight's fade (F214). */
+  setOpacity?(opacity: number): void;
+  /**
+   * Optional: shows the credits of the sources in view in a minimal attribution element of the container, required
+   * ones always visible (F255); an empty list hides it.
+   */
+  showCredits?(credits: readonly Credit[]): void;
 }
 
 /** Callbacks a renderer uses to report device events to the engine. */
@@ -164,19 +143,57 @@ export interface RendererEvents {
  * own coordinates into the texture's. `geographic[i]` is 1 when the texture's rows are linear in latitude (the tile's
  * geographic v), 0 when they are in the tile's own scheme.
  */
-export interface TileDrawList {
-  readonly count: number;
-  readonly meshKeys: Float64Array;
+/**
+ * One layer's choice for every draw of a frame (ADR 0006 §4): the texture each draw shows, with its UV transform and
+ * choice of v, and the one it fades from.
+ */
+export interface TileDrawLayer {
   readonly textures: Int32Array;
+  /** Scale u, scale v, offset u, offset v from tile coordinates into the texture's, four per draw. */
   readonly uvTransforms: Float32Array;
+  /** 1 where the texture's rows are linear in latitude, 0 where they follow the tile's own rows. */
   readonly geographic: Uint8Array;
-  /** The imagery each draw cross-fades from (F105): like `textures`, `uvTransforms` and `geographic`. */
+  /** What each draw cross-fades from (F105, F138): like `textures`, `uvTransforms` and `geographic`. */
   readonly fromTextures: Int32Array;
   readonly fromUvTransforms: Float32Array;
   readonly fromGeographic: Uint8Array;
-  /** Each draw's fade progress: 0 shows only the `from` imagery, 1 only its own. */
+  /** Each draw's fade progress: 0 shows only the `from` data, 1 only its own. */
   readonly fades: Float32Array;
+  /**
+   * Meters to lower each draw's skirts by beyond its mesh's own depth (terrain only, 0 otherwise): a tile showing
+   * terrain coarser than its level's may differ from its neighbors by that terrain's error.
+   */
+  readonly skirtMeters: Float32Array;
 }
+
+/**
+ * An overlay slot of every draw (F244, F246): imagery above the draw's own, shown with an opacity and a blend mode.
+ * `opacities[i]` 0 means draw `i` shows nothing in this slot.
+ */
+export interface TileDrawOverlay {
+  readonly textures: Int32Array;
+  readonly uvTransforms: Float32Array;
+  readonly geographic: Uint8Array;
+  readonly opacities: Float32Array;
+  /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
+  readonly blends: Uint8Array;
+}
+
+/** The surface tiles a frame draws, with their imagery (the list's own layer) and their terrain heights. */
+export interface TileDrawList extends TileDrawLayer {
+  readonly count: number;
+  readonly meshKeys: Float64Array;
+  /**
+   * Terrain heights (M4, ADR 0006 §5): height-grid textures by handle, {@link NO_TERRAIN} where a draw shows the
+   * ellipsoid (no terrain source, or none resident yet).
+   */
+  readonly terrain: TileDrawLayer;
+  /** Imagery shown above the draw's own, bottom first, in at most two slots (ADR 0038). */
+  readonly overlays: readonly TileDrawOverlay[];
+}
+
+/** The terrain handle of a draw without terrain: heights are 0 on the ellipsoid. */
+export const NO_TERRAIN = -1;
 
 /** The engine's renderer interface; three.js stays behind it (ADR 0010). */
 export interface RendererBackend {
@@ -184,6 +201,10 @@ export interface RendererBackend {
   readonly host: RenderHost;
   /** The element that receives input (the canvas). */
   readonly inputElement: unknown;
+  /** Draws data layers (ADR 0037); absent in renderers that draw none. */
+  readonly layers?: LayerRenderTarget;
+  /** Optional: glTF models (F361, ADR 0037). */
+  readonly models?: ModelRenderer;
   /** Uploads a surface tile mesh; returns false while the renderer cannot accept it. */
   addMesh(mesh: TileMeshData): void;
   removeMesh(key: number): void;
@@ -255,9 +276,31 @@ export interface CameraState {
   readonly rollDeg: number;
   /** Distance from the eye to the target. */
   readonly rangeMeters: number;
+  /** The eye's own position (the fields above place the target it looks at). */
+  readonly eyeLongitudeDeg: number;
+  readonly eyeLatitudeDeg: number;
+  /**
+   * Height above the ellipsoid of the surface the last frame showed under the eye: the terrain as drawn, its morph
+   * included (F146, F147); 0 without terrain. `altitudeMeters` minus this is the eye's height above the ground.
+   */
+  readonly groundHeightMeters: number;
+  /** The view mode: the zoom curves drive the tilt ('auto'), it stays 0° ('2d'), or the user chose it ('manual'). */
+  readonly viewMode: ViewMode;
+  /**
+   * The tilt and heading the user chose (F164). `tiltDeg` and `headingDeg` are the applied values: a temporary clamp
+   * (terrain, empty sky; F165, F166) or the Auto curve may lower the tilt, never the choice.
+   */
+  readonly chosenTiltDeg: number;
+  readonly chosenHeadingDeg: number;
+  /** The globe-to-flat morph factor the last frame drew: 0 the globe, 1 the flat map (ADR 0008). */
+  readonly morphFactor: number;
+  /** The share of terrain relief the last frame drew: 0 flat, 1 full height. */
+  readonly reliefFactor: number;
+  /** The phase of the last frame (`PLAN.md`, Map experience). */
+  readonly phase: ViewPhase;
 }
 
-/** Initial camera. */
+/** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0034). */
 export interface ViewInit {
   readonly longitudeDeg?: number;
   readonly latitudeDeg?: number;
@@ -275,6 +318,15 @@ export interface GlobeOptions {
   /** URL of the pinned base imagery: an equirectangular image of the whole world. */
   readonly baseImageryUrl: string;
   readonly view?: ViewInit;
+  /** Camera constraints held for every input and movement (F209–F211); see {@link Globe.setConstraints}. */
+  readonly constraints?: CameraConstraints;
+  /** The project's home view (F194), which {@link Globe.goHome} flies to; by default the start view. */
+  readonly home?: HomeView;
+  /**
+   * The zoom curves of the Auto view mode (F150): the globe-to-flat morph, the relief and the automatic tilt, each over
+   * a band of ground zoom; fields not given keep `DEFAULT_VIEW_CURVES`. Invalid curves throw 'invalid-option'.
+   */
+  readonly viewCurves?: ViewCurvesInit;
   /** Multiplies the device pixel ratio (default 1). */
   readonly resolutionScale?: number;
   /** Largest projected geometric error, in CSS pixels (default 1). */
@@ -300,11 +352,29 @@ export interface GlobeOptions {
   /** Receives the engine's log messages instead of the console (F120). */
   readonly logSink?: LogSink;
   /**
-   * Tiled imagery layers, bottom first (M3): each surface tile shows the topmost layer that has a tile for it, else the
-   * world base image. Tiles are fetched, decoded in workers and uploaded as the view needs them.
+   * Tiled imagery layers, bottom first (M3, ADR 0038): each surface tile shows the topmost opaque layer that has a tile
+   * for it (else the world base image), with up to two translucent or blended layers above it. A layer is a source, or
+   * a chain of sources with an opacity, a visibility and a blend mode (`ImageryLayerOptions`). Tiles are fetched,
+   * decoded in workers and uploaded as the view needs them.
    */
-  readonly imagery?: readonly ImagerySource[];
-  /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required when `imagery` is set. */
+  readonly imagery?: readonly ImageryLayerInput[];
+  /**
+   * Ids of sources whose credits the attribution element and `Globe.credits()` leave out (F255). A credit the
+   * source's provider requires stays, and a warning names the source.
+   */
+  readonly hiddenCredits?: readonly string[];
+  /**
+   * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
+   * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
+   */
+  readonly terrain?: TerrainSource;
+  /**
+   * How far above the displayed terrain the eye always stays, meters (F146; default 10): zooming, panning, tilting or
+   * finer terrain arriving never takes the camera into the surface. Finer terrain lifts it as the surface morphs
+   * (F147).
+   */
+  readonly terrainClearanceMeters?: number;
+  /** The worker pool's endpoints, `createWorkers()` from `@vibeglobe/worker`; required with `imagery` or `terrain`. */
   readonly workers?: WorkerEndpointFactory;
   /** Memory budgets of the imagery caches (ADR 0007). */
   readonly memory?: MemoryOptions;
@@ -316,6 +386,28 @@ export interface MemoryOptions {
   readonly gpuBudgetBytes?: number;
   /** RAM for encoded tile bytes, reused without a new request (default 256 MiB, F097). */
   readonly ramBudgetBytes?: number;
+}
+
+/** Counters of the terrain streaming of one engine instance (`Globe.terrainStats()`, F134). */
+export interface TerrainStats {
+  /** Tiles waiting for a request slot, in flight, being decoded, on the GPU, failed, without data. */
+  readonly queued: number;
+  readonly loading: number;
+  readonly decoding: number;
+  readonly ready: number;
+  readonly failed: number;
+  readonly noData: number;
+  /** Requests started so far. */
+  readonly requested: number;
+  /** Height uploads so far, the time and bytes the last frame spent uploading, and the decoded tiles still waiting. */
+  readonly uploads: number;
+  readonly uploadMsLastFrame: number;
+  readonly uploadBytesLastFrame: number;
+  readonly uploadsPending: number;
+  /** The bytes terrain may upload in one frame (ADR 0007's upload budget). */
+  readonly uploadBudgetBytes: number;
+  /** Main-thread time the last frame spent on terrain: tiles wanted, morphs, elevation queries, requests, uploads. */
+  readonly msLastFrame: number;
 }
 
 /** Counters of the imagery streaming of one engine instance (`Globe.imageryStats()`). */
@@ -371,14 +463,119 @@ export interface GlobeEvents {
   'backend-fallback': { readonly reason: string };
   /** An imagery tile failed for good; its area keeps showing an ancestor (F112). */
   'tile-error': TileErrorEvent;
+  /** The credits of the sources in view changed (F254): the new list, as {@link Globe.credits} returns it. */
+  'credits-change': { readonly credits: readonly Credit[] };
+  /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
+  'view-mode-change': { readonly mode: ViewMode };
+  /** A camera movement began (F200, ADR 0036). */
+  movestart: MoveEvent;
+  /** The camera moved in a movement, at most once per drawn frame. The payload object is reused. */
+  move: MoveEvent;
+  /** A camera movement ended, with how. */
+  moveend: MoveEndEvent;
+  /** A tour reached a waypoint (F199): its index in the tour. */
+  'tour-waypoint': { readonly index: number };
   error: GlobeError;
+}
+
+/** What moved the camera (F200): a movement call, the user's input through the controls, or the controls' inertia. */
+export type MoveCause = 'api' | 'user' | 'inertia';
+
+/** How a movement ended (ADR 0036): it reached its target, a newer movement or user input took over, or it was cancelled. */
+export type MoveOutcome = 'completed' | 'interrupted' | 'cancelled';
+
+/** The payload of `movestart` and `move`. */
+export interface MoveEvent {
+  readonly cause: MoveCause;
+}
+
+/** The payload of `moveend`. */
+export interface MoveEndEvent extends MoveEvent {
+  readonly outcome: MoveOutcome;
+}
+
+/**
+ * A running camera movement (ADR 0036): a promise of its outcome, which never rejects once the movement started, and
+ * a way to stop it where it is.
+ */
+export interface CameraMovement extends Promise<MoveOutcome> {
+  /** Stops the movement where the last frame left it; the promise settles as 'cancelled'. */
+  cancel(): void;
+}
+
+/** Limits on the camera (F209–F211): zoom range, maximum tilt, and bounds for the view's center. */
+export interface CameraConstraints {
+  readonly minZoom?: number;
+  readonly maxZoom?: number;
+  readonly maxTiltDeg?: number;
+  readonly bounds?: GeoBounds;
+}
+
+/** A home view (F194): a view, and optionally the view mode to set on the way. */
+export interface HomeView extends ViewInit {
+  readonly viewMode?: '2d' | '3d' | 'auto';
+}
+
+/** A place an application's geocoder found (F208). */
+export interface GeocoderResult {
+  /** What a result list shows. */
+  readonly label: string;
+  readonly longitudeDeg: number;
+  readonly latitudeDeg: number;
+  /** The zoom to show it at; a search box picks one when omitted and no bounds are given. */
+  readonly zoom?: number;
+  /** The area of the place: a search box then fits it to the view. */
+  readonly bounds?: GeoBounds;
+}
+
+/**
+ * A search provider the application supplies (F208): the engine and its packages bundle none and make no geocoding
+ * request without one. `search` resolves the places matching `query`, empty when none; `signal` aborts a query the
+ * user typed past.
+ */
+export interface Geocoder {
+  search(
+    query: string,
+    options: { readonly signal: AbortSignalLike; readonly language: string },
+  ): Promise<readonly GeocoderResult[]>;
+}
+
+/** A geographic rectangle in degrees; `eastDeg` below `westDeg` crosses the antimeridian. */
+export interface GeoBounds {
+  readonly westDeg: number;
+  readonly southDeg: number;
+  readonly eastDeg: number;
+  readonly northDeg: number;
+}
+
+/** One stop of a tour (F199): where to go, how (a flight by default), how long the leg takes and how long to stay. */
+export interface TourWaypoint {
+  readonly target: ViewInit;
+  readonly movement?: 'fly' | 'ease' | 'jump';
+  readonly durationMs?: number;
+  readonly dwellMs?: number;
+}
+
+/** Options of {@link Globe.easeTo} and {@link Globe.flyTo}. */
+export interface MovementOptions {
+  /** The movement's duration, milliseconds (0 or more); by default 1 s for an ease and, for a flight, the path's length. */
+  readonly durationMs?: number;
+  /** Cancels the movement when aborted, as {@link CameraMovement.cancel} does. */
+  readonly signal?: AbortSignalLike;
+  /** Flights without a duration: path units per second (default 1.2, more than 0; F195). */
+  readonly speed?: number;
+  /** Flights: van Wijk and Nuij's ρ, how high the flight rises (default 1.42, more than 0; F195). */
+  readonly curve?: number;
+  /** The timing curve: 'ease-in-out' (default), 'linear', or a function on [0, 1] with f(0) = 0 and f(1) = 1. */
+  readonly easing?: 'ease-in-out' | 'linear' | ((t: number) => number);
 }
 
 /**
  * Why a tile failed for good: `corrupt` bytes that do not decode, `failed` after its retries ran out, or
  * `unsupported` data the engine or device cannot use (for example KTX2 without a usable transcoder, ADR 0020).
  */
-export type TileErrorReason = 'corrupt' | 'failed' | 'unsupported';
+/** Why a tile failed for good: 'cors' when its server sends no CORS headers (F251). */
+export type TileErrorReason = 'corrupt' | 'failed' | 'unsupported' | 'cors';
 
 /** A tile that failed for good. */
 export interface TileErrorEvent {
@@ -405,6 +602,10 @@ export interface SurfaceTileInfo {
   readonly texelErrorPx: number;
   /** The imagery level the tile shows, an ancestor's while its own is not loaded (F083); null for the base image. */
   readonly imageryLevel: number | null;
+  /** The terrain level the tile shows, an ancestor's while its own loads (F126, F139); null without terrain. */
+  readonly terrainLevel: number | null;
+  /** The projected error of the terrain the tile's level shows, in CSS pixels, as the selection measures it (F126). */
+  readonly terrainErrorPx: number;
 }
 
 /** Counters of a frame's surface selection. */
@@ -447,13 +648,85 @@ export interface Globe {
   /** Input intents, used by the controls plug-in and available to applications. */
   readonly navigation: NavigationApi;
   /**
-   * Moves the camera in one frame (before `ready`, the start view becomes this one). Invalid input throws a GlobeError
-   * and leaves the camera unchanged.
+   * Moves the camera in one frame (before `ready`, the start view becomes this one), with `movestart`, `move` and
+   * `moveend` (F197); the returned movement has already settled as 'completed', like the other movements' (F200).
+   * Invalid input throws a GlobeError and leaves the camera unchanged.
    */
-  jumpTo(target: ViewInit): void;
+  jumpTo(target: ViewInit): CameraMovement;
   /**
-   * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. A point
-   * without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').
+   * Moves the camera to `target` with eased interpolation of center, zoom, heading and tilt, the shorter way round
+   * (F198). Fields not given keep their values: the chosen tilt, heading and view mode stay unless given (F201).
+   * Invalid input rejects with a GlobeError and moves nothing.
+   */
+  easeTo(target: ViewInit, options?: MovementOptions): CameraMovement;
+  /**
+   * Flies the camera to `target` along van Wijk and Nuij's zoom-out and zoom-in path (F195, F196), ending exactly
+   * there. Fields not given keep their values, as for {@link easeTo}.
+   */
+  flyTo(target: ViewInit, options?: MovementOptions): CameraMovement;
+  /**
+   * Flies (or eases, with `movement: 'ease'`) to the view that shows `bounds` inside the viewport minus `paddingPx`
+   * (default 0) on every side, keeping the heading and the view mode's tilt (F176). Positions in `include`, heights
+   * included, must show inside it too (objects above the ground, F387).
+   */
+  fitBounds(
+    bounds: GeoBounds,
+    options?: MovementOptions & {
+      readonly paddingPx?: number;
+      readonly movement?: 'fly' | 'ease';
+      readonly include?: readonly GeoPosition[];
+    },
+  ): CameraMovement;
+  /**
+   * Plays the waypoints in order, each with its movement, duration and dwell time, announcing each with a
+   * `tour-waypoint` event (F199). It settles as completed at the end, interrupted when user input or another movement
+   * takes over, and cancelled through cancel() or the signal.
+   */
+  tour(waypoints: readonly TourWaypoint[], options?: { readonly signal?: AbortSignalLike }): CameraMovement;
+  /** Turns the view to `headingDeg` along the shorter arc, keeping center and tilt (F191: 0 north, 90 east…). */
+  rotateTo(headingDeg: number, options?: MovementOptions): CameraMovement;
+  /**
+   * The tilt control (F188): eases the view to `tiltDeg`, keeping center, zoom and heading. The tilt becomes the chosen
+   * one (manual mode, also from 2D or Auto, as tilting by hand does: ADR 0034) and never exceeds the maximum tilt.
+   */
+  tiltTo(tiltDeg: number, options?: MovementOptions): CameraMovement;
+  /** Replaces the camera constraints (F209–F211); invalid ones throw a GlobeError and change nothing. */
+  setConstraints(constraints: CameraConstraints): void;
+  /** Flies out to the whole globe centered on the current location (F193). */
+  resetToGlobe(options?: MovementOptions): CameraMovement;
+  /** Flies to the home view (F194), setting its view mode first when it has one. */
+  goHome(options?: MovementOptions): CameraMovement;
+  /**
+   * Orbits the camera about `center` (by default the target) at `degreesPerSecond` (default 10), keeping the center
+   * fixed on screen, until cancelled, interrupted by input or replaced by another movement (F192).
+   */
+  orbit(options?: {
+    readonly center?: GeoPosition;
+    readonly degreesPerSecond?: number;
+    readonly signal?: AbortSignalLike;
+  }): CameraMovement;
+  /** The current view mode (F161–F163). */
+  readonly viewMode: ViewMode;
+  /**
+   * Whether the system asks for reduced motion (F214), followed at runtime: flights then fade to their target in
+   * 300 ms instead of traversing the path, and input should keep inertia and other large animations to a minimum.
+   */
+  readonly reducedMotion: boolean;
+  /**
+   * The 2D / 3D / Auto toggle (F163): '2d' keeps the tilt at 0° at every zoom while the globe still flattens, '3d'
+   * chooses the default tilt (manual mode), 'auto' restores the zoom-driven curves. Anything else throws a GlobeError
+   * ('invalid-option').
+   */
+  setViewMode(mode: '2d' | '3d' | 'auto'): void;
+  /**
+   * Replaces the zoom curves (F150): fields not given keep their defaults; the view eases to the new curves without a
+   * jump. Invalid curves throw a GlobeError ('invalid-option') and change nothing.
+   */
+  setViewCurves(curves: ViewCurvesInit): void;
+  /**
+   * The WGS84 position shown at a screen point, or undefined off the globe or before the viewport has a size. Over
+   * terrain it is the point of the terrain drawn there, with its height from the terrain in memory (F383); without
+   * terrain, the ellipsoid's, height 0. A point without finite `xPx` and `yPx` throws a GlobeError ('invalid-coordinate').
    */
   screenToGeo(point: ScreenPoint): GeoPosition | undefined;
   /**
@@ -477,8 +750,43 @@ export interface Globe {
   surfaceStats(): SurfaceStats;
   /** Counters of the imagery streaming; undefined without imagery layers or before the renderer starts. */
   imageryStats(): ImageryStats | undefined;
+  /** Counters of the terrain streaming; undefined without terrain or before the renderer starts (F134). */
+  terrainStats(): TerrainStats | undefined;
+  /**
+   * The terrain height at a position from the terrain already in memory, with the level it came from (F144): the
+   * deepest resident tile, interpolated as the surface shows it. Where no terrain is resident or covers the position,
+   * the ellipsoid's height 0 with `noData` set. Writes into `out` when given, so a caller can query without
+   * allocating. Throws a GlobeError ('invalid-coordinate') for an invalid position.
+   */
+  elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample;
+  /**
+   * The terrain height at a position from the finest terrain the source delivers there, loading it first (F145).
+   * Rejects with a GlobeError: 'resource-failed' when that tile fails for good, 'aborted' when `signal` aborts,
+   * 'destroyed' when the globe is destroyed first. Without terrain it resolves with the ellipsoid's height 0, `noData`.
+   */
+  elevationAtAsync(position: GeoPosition, options?: { signal?: AbortSignalLike }): Promise<ElevationSample>;
   /** Draws test quads (scenario tests of jitter and depth); an empty list removes them. */
   setDebugShapes(shapes: readonly DebugShape[]): void;
+  /**
+   * Where data layers draw (ADR 0037): the renderer's batches, each change shown on the next frame. Undefined until the
+   * renderer has started (after `ready`) or when it draws no layers.
+   */
+  layerTarget(): LayerRenderTarget | undefined;
+  /** The credits of the imagery and terrain sources the last frame showed, deduplicated, required ones first (F254). */
+  credits(): readonly Credit[];
+  /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
+  readonly imageryLayers: ImageryLayers;
+  /**
+   * Drops every tile of the imagery or terrain source with this id from GPU and RAM memory, with its no-data and
+   * failure marks, so the view loads it again (a new offline package version, F279). False when no source has the id.
+   */
+  reloadSource(sourceId: string): boolean;
+  /**
+   * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
+   * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the
+   * loader cannot read. Call after `ready`.
+   */
+  addModel(options: ModelOptions): Promise<ModelHandle>;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */
   simulateDeviceLoss(): void;
   /**

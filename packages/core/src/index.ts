@@ -31,12 +31,14 @@ export type {
   ControlsFactory,
   FrameCapture,
   FrameView,
+  TileDrawLayer,
   TileDrawList,
   GeoPosition,
   Globe,
   GlobeEvents,
   GlobeOptions,
   ImageryStats,
+  TerrainStats,
   MemoryOptions,
   NavigationApi,
   RendererBackend,
@@ -52,8 +54,25 @@ export type {
   TileErrorEvent,
   TileErrorReason,
   ViewInit,
+  CameraMovement,
+  MoveCause,
+  MoveEndEvent,
+  MoveEvent,
+  MoveOutcome,
+  MovementOptions,
+  GeoBounds,
+  Geocoder,
+  GeocoderResult,
+  TourWaypoint,
+  HomeView,
+  CameraConstraints,
 } from './globe/types.js';
+export { NO_TERRAIN } from './globe/types.js';
 export { buildTileMesh } from './surface/surface-mesh.js';
+export { MorphFrame, morphPointInto } from './view/morph.js';
+export { AUTO_TILT_RANGE_DEG, DEFAULT_VIEW_CURVES, validateViewCurves } from './view/curves.js';
+export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.js';
+export type { ViewMode, ViewPhase } from './view/view-state.js';
 export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
 export {
@@ -101,8 +120,32 @@ export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } fr
 export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
-export { inCoverage } from './imagery/imagery-source.js';
-export type { ImagerySource } from './imagery/imagery-source.js';
+export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
+export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
+export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
+export type {
+  ImageryBlend,
+  ImageryLayerChanges,
+  ImageryLayerInput,
+  ImageryLayerOptions,
+  ImageryLayers,
+  ImageryLayerState,
+  ImagerySourceInfo,
+} from './imagery/imagery-stack.js';
+export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
+export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
+export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
+export type { MeasuredGrid } from './terrain/grid-size.js';
+export { readLayerJson, readRanges, TerrainAvailability } from './terrain/layer-json.js';
+export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
+export { sampleHeight } from './terrain/sample-height.js';
+export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';
+export type { TerrainDecoder, TerrainSource } from './terrain/terrain-source.js';
+export type { ElevationSample } from './terrain/terrain-heights.js';
+export type { AbortSignalLike } from './globe/imagery-runtime.js';
+export { geoidModel, toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
+export type { GeoidModel, VerticalDatum } from './terrain/vertical-datum.js';
+export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
 export { FRAME_PHASES } from './diagnostics/observability.js';
 export type {
   FramePhase,
@@ -113,17 +156,6 @@ export type {
   PhaseTimesMs,
   TraceEvent,
 } from './diagnostics/observability.js';
-export {
-  chooseKtx2Target,
-  isKtx2,
-  Ktx2Error,
-  KTX2_TARGET_CODES,
-  ktx2GpuBytes,
-  ktx2LevelBytes,
-  ktx2LevelRange,
-  ktx2LevelSize,
-  readKtx2,
-} from './imagery/ktx2.js';
 export type {
   CompressedLevel,
   CompressedTileImage,
@@ -156,3 +188,25 @@ export type {
   WorkerRequest,
   WorkerRunMessage,
 } from './scheduler/worker-protocol.js';
+export {
+  ANCHORS,
+  ATTRIBUTE_COMPONENTS,
+  BATCH_ATTRIBUTES,
+  type BatchAttribute,
+  type BatchDescriptor,
+  type BatchHandle,
+  type BatchKind,
+  type BatchStringChannel,
+  type FeatureGeometry,
+  type LayerGround,
+  type LayerRenderTarget,
+  type Placement,
+} from './layers/layer-target.js';
+export {
+  layerOrigin,
+  projectLayerPoint,
+  writeLayerVertex,
+  type LayerOrigin,
+  type LayerVertices,
+} from './layers/layer-geometry.js';
+export type { ModelHandle, ModelOptions, ModelPose, ModelRenderer } from './layers/models.js';

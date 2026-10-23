@@ -6,7 +6,7 @@ Framework-agnostic heart of the engine: math, WGS84 geodesy, projections and mor
 
 - No runtime dependencies and no DOM: `tsconfig.json` has no DOM lib, so `window`, `document` and GPU APIs do not type-check here. Browser APIs arrive through plug-ins at runtime.
 - Angles are radians internally and degrees in the public API; distances are meters. Put the unit in the name when it could be ambiguous.
-- Per-frame code allocates nothing: reuse preallocated `Float64Array`s and pooled objects. Hot-path modules are `*.hot.ts` with a `@hotpath` / `@benchmark` header (`npm run check`).
+- Per-frame code allocates nothing: reuse preallocated `Float64Array`s and pooled objects. A new field on a class the frame loop writes (`GlobeEngine`, `SurfaceFrame`, `DrawList`) can change its V8 layout so that its per-frame writes allocate: keep new state elsewhere (a module-level `WeakMap`, a prototype getter) and run `frame-allocation.test.ts` a few times. Hot-path modules are `*.hot.ts` with a `@hotpath` / `@benchmark` header (`npm run check`).
 - Coverage of this package is enforced at 90% lines (`npm run coverage`).
 
 ## Commands

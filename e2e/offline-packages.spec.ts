@@ -164,9 +164,13 @@ test('a new version replaces the old one everywhere; removing a package frees it
   expect(new Set(await servedPackages(page))).toEqual(new Set(['rome@1']));
 
   await publishFixture(page, server, { ...ROME, version: '2', pattern: 'levels', session: 'pkg-rome-2' });
+  // The running globe shows the new version at once: the update drops the old version's tiles from its GPU and RAM
+  // tiers (`Globe.reloadSource`, KB-PT-19), without a restart.
+  await page.evaluate(() => {
+    if (window.offlineHarness) window.offlineHarness.served.length = 0;
+  });
   await page.evaluate(() => window.offlineHarness?.manager?.update('rome'));
   expect((await page.evaluate(() => window.offlineHarness?.manager?.list()))?.map((p) => p.version)).toEqual(['2']);
-  await page.evaluate(() => window.offlineHarness?.restartGlobe());
   expect(await emptyPixels(page)).toBe(0);
   const served = await servedPackages(page);
   expect(served.length).toBeGreaterThan(5);

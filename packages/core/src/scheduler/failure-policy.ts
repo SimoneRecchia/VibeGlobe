@@ -75,6 +75,8 @@ export function classifyTransportResult(result: TransportResult): FailureClass {
     case 'status':
       return classifyStatus(result.status);
     case 'network-error':
+      // Without CORS headers the browser never hands over the bytes: retrying cannot help (F251).
+      return result.cause === 'cors' ? FAILURE_PERMANENT : FAILURE_TRANSIENT;
     case 'timeout':
       return FAILURE_TRANSIENT;
     case 'aborted':

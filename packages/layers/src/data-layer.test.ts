@@ -3,7 +3,7 @@ import { frameAt, point, randomPoints } from './__fixtures__/test-support.js';
 import { DataLayer } from './data-layer.js';
 import type { Feature } from './geojson.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 function setup(layer: DataLayer): { target: RecordingRenderTarget; stack: LayerStack; handle: { id: number } } {
   const target = new RecordingRenderTarget();
@@ -100,6 +100,21 @@ describe('data layer', () => {
       target.clearWrites();
     }
     expect(layer.stats.fullEvaluations).toBe(0);
+  });
+
+  it('asks for a frame when shown or hidden, so the change shows without other activity (KB-113)', () => {
+    let frames = 0;
+    const target = new RecordingRenderTarget();
+    const stack = new LayerStack(target, () => frames++);
+    const layer = stack.add(new DataLayer('point', { data: [point('a', 9, 45)] }));
+    stack.frame(frameAt(0, 5));
+    const before = frames;
+    layer.setVisible(false);
+    expect(frames).toBeGreaterThan(before);
+    stack.frame(frameAt(16, 5));
+    const asked = frames;
+    stack.setVisible(layer.id, true);
+    expect(frames).toBeGreaterThan(asked);
   });
 
   it('places features at an absolute altitude and rejects invalid coordinates', () => {

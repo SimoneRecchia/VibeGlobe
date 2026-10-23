@@ -4,7 +4,7 @@ import { DataLayer } from './data-layer.js';
 import { LayerStack } from './layer-stack.js';
 import { ORDER_STRIDE } from './layer.js';
 import { packPickId } from './picking.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 const layer = (id: string): DataLayer =>
   new DataLayer('point', { id, data: [point(`${id}-a`, 1, 2), point(`${id}-b`, 3, 4)] });

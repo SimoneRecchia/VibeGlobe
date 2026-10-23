@@ -40,7 +40,7 @@ function staticTiles(root: string): { z: number; x: number; y: number; bytes: Ui
 
 function read(source: ImagerySource, z: number, x: number, y: number): Promise<Uint8Array | string> {
   const request = source.request({ root: 0, level: z, x, y }, { url: '', hostIndex: 0 });
-  if (request === 'noData') return Promise.resolve('noData');
+  if (request === 'noData' || request === 'unknown') return Promise.resolve('noData');
   return new Promise((resolve) =>
     source.transport.start(request, { firstByteMs: 5000, totalMs: 10_000 }, (result) =>
       resolve(result.kind === 'ok' ? new Uint8Array(result.bytes) : JSON.stringify(result)),

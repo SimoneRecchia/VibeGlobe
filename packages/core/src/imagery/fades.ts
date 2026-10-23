@@ -1,5 +1,5 @@
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
-import type { DrawList } from './draw-list.js';
+import type { DrawLayer } from './draw-list.js';
 
 /** Default duration of an imagery cross-fade (M3 plan §4.2: the popping detector assumes 250 ms). */
 export const DEFAULT_FADE_MS = 250;
@@ -12,6 +12,8 @@ export const DEFAULT_FADE_MS = 250;
 export class ImageryFades {
   /** True when the last frame drew a fade in progress: the engine draws the next frame and is not idle. */
   fading = false;
+  /** Set for a frame that shows a change at once (the imagery stack's, F243): it starts no fade. */
+  snapNext = false;
   private readonly slots = new IntegerKeyMap<number>(1024);
   private capacity = 0;
   private used = 0;
@@ -32,69 +34,101 @@ export class ImageryFades {
   /**
    * Writes each draw's fade at engine time `now[0]` into `list`: the texture it fades from and how far it is (`fades`,
    * 1 when done). A draw whose imagery changes during a fade keeps the fade's imagery until it ends. `keep` is called
-   * with every texture a fade still needs, so the memory budget keeps it resident.
+   * with every texture a fade still needs, so the memory budget keeps it resident. A change across more than
+   * `maxLevelGap` levels switches at once: terrain morphs between levels that far apart would open cracks wider than
+   * any skirt against neighbors already showing the finer level (KB-079).
    */
-  apply(list: DrawList, now: Float64Array, durationMs: number, keep: (handle: number) => void): void {
+  apply(
+    list: { readonly count: number; readonly meshKeys: Float64Array },
+    layer: DrawLayer,
+    now: Float64Array,
+    durationMs: number,
+    keep: (handle: number) => void,
+    maxLevelGap = Infinity,
+  ): void {
     const nowMs = now[0] ?? 0;
+    const fadeMs = this.snapNext ? 0 : durationMs;
+    this.snapNext = false;
     this.frame++;
     this.fading = false;
     for (let i = 0; i < list.count; i++) {
       const key = list.meshKeys[i] ?? 0;
       let slot = this.slots.get(key);
-      const texture = list.textures[i] ?? 0;
-      const level = list.imageryLevels[i] ?? -1;
+      const texture = layer.textures[i] ?? 0;
+      const level = layer.levels[i] ?? -1;
       if (slot === undefined) {
-        slot = this.allocate(key);
-        this.store(slot, list, i);
-        this.startMs[slot] = -Infinity;
+        slot = this.begin(key, layer, i, nowMs);
       } else if (this.toTexture[slot] !== texture || this.toLevel[slot] !== level) {
-        if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
+        const gap = (this.toLevel[slot] ?? -1) - level;
+        if (gap > maxLevelGap || -gap > maxLevelGap) {
+          // Too far apart to morph: the draw shows its new data at once.
+          this.store(slot, layer, i);
+          this.startMs[slot] = -Infinity;
+        } else if (nowMs - (this.startMs[slot] ?? 0) < fadeMs) {
           // A fade is under way: it finishes first, so what the tile shows never jumps; the new imagery fades in next.
           keep(texture);
           keep(this.toTexture[slot] ?? 0);
-          this.restore(slot, list, i);
+          this.restore(slot, layer, i);
         } else {
           // Fade from what the tile showed to its new imagery.
           this.fromTexture[slot] = this.toTexture[slot] ?? 0;
           this.fromGeographic[slot] = this.toGeographic[slot] ?? 1;
           for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = this.toTransform[slot * 4 + c] ?? 0;
-          this.store(slot, list, i);
-          this.startMs[slot] = nowMs;
+          this.store(slot, layer, i);
+          // Without a duration (a frame that shows a change at once, F243) no fade starts.
+          this.startMs[slot] = fadeMs > 0 ? nowMs : -Infinity;
         }
       }
       this.stamps[slot] = this.frame;
       const elapsed = nowMs - (this.startMs[slot] ?? 0);
-      const t = durationMs > 0 && elapsed < durationMs ? Math.max(0, elapsed / durationMs) : 1;
-      list.fades[i] = t;
+      const t = fadeMs > 0 && elapsed < fadeMs ? Math.max(0, elapsed / fadeMs) : 1;
+      layer.fades[i] = t;
       if (t < 1) {
         this.fading = true;
         const from = this.fromTexture[slot] ?? 0;
         keep(from);
-        list.fromTextures[i] = from;
-        list.fromGeographic[i] = this.fromGeographic[slot] ?? 1;
-        for (let c = 0; c < 4; c++) list.fromUvTransforms[i * 4 + c] = this.fromTransform[slot * 4 + c] ?? 0;
+        layer.fromTextures[i] = from;
+        layer.fromGeographic[i] = this.fromGeographic[slot] ?? 1;
+        for (let c = 0; c < 4; c++) layer.fromUvTransforms[i * 4 + c] = this.fromTransform[slot * 4 + c] ?? 0;
       } else {
-        list.fromTextures[i] = list.textures[i] ?? 0;
-        list.fromGeographic[i] = list.geographic[i] ?? 1;
-        for (let c = 0; c < 4; c++) list.fromUvTransforms[i * 4 + c] = list.uvTransforms[i * 4 + c] ?? 0;
+        layer.fromTextures[i] = layer.textures[i] ?? 0;
+        layer.fromGeographic[i] = layer.geographic[i] ?? 1;
+        for (let c = 0; c < 4; c++) layer.fromUvTransforms[i * 4 + c] = layer.uvTransforms[i * 4 + c] ?? 0;
       }
     }
     this.dropUndrawn();
   }
 
-  private store(slot: number, list: DrawList, i: number): void {
-    this.toTexture[slot] = list.textures[i] ?? 0;
-    this.toLevel[slot] = list.imageryLevels[i] ?? -1;
-    this.toGeographic[slot] = list.geographic[i] ?? 1;
-    for (let c = 0; c < 4; c++) this.toTransform[slot * 4 + c] = list.uvTransforms[i * 4 + c] ?? 0;
+  /**
+   * A slot for a tile drawn for the first time: it starts without a fade, or, when its draw names what was shown there
+   * before (`seeded`, terrain, F138), fading from that.
+   */
+  private begin(key: number, layer: DrawLayer, i: number, nowMs: number): number {
+    const slot = this.allocate(key);
+    this.store(slot, layer, i);
+    this.startMs[slot] = -Infinity;
+    if (layer.seeded[i] === 1) {
+      this.fromTexture[slot] = layer.fromTextures[i] ?? 0;
+      this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
+      for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
+      this.startMs[slot] = nowMs;
+    }
+    return slot;
+  }
+
+  private store(slot: number, layer: DrawLayer, i: number): void {
+    this.toTexture[slot] = layer.textures[i] ?? 0;
+    this.toLevel[slot] = layer.levels[i] ?? -1;
+    this.toGeographic[slot] = layer.geographic[i] ?? 1;
+    for (let c = 0; c < 4; c++) this.toTransform[slot * 4 + c] = layer.uvTransforms[i * 4 + c] ?? 0;
   }
 
   /** Draws the imagery a fade under way goes to, in place of the draw's newer imagery, keeping it resident. */
-  private restore(slot: number, list: DrawList, i: number): void {
-    list.textures[i] = this.toTexture[slot] ?? 0;
-    list.imageryLevels[i] = this.toLevel[slot] ?? -1;
-    list.geographic[i] = this.toGeographic[slot] ?? 1;
-    for (let c = 0; c < 4; c++) list.uvTransforms[i * 4 + c] = this.toTransform[slot * 4 + c] ?? 0;
+  private restore(slot: number, layer: DrawLayer, i: number): void {
+    layer.textures[i] = this.toTexture[slot] ?? 0;
+    layer.levels[i] = this.toLevel[slot] ?? -1;
+    layer.geographic[i] = this.toGeographic[slot] ?? 1;
+    for (let c = 0; c < 4; c++) layer.uvTransforms[i * 4 + c] = this.toTransform[slot * 4 + c] ?? 0;
   }
 
   private allocate(key: number): number {

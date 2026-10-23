@@ -1,4 +1,6 @@
+import { stackEntries, type ImageryLayerInput } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
+import { validateConstraints } from './constraints.hot.js';
 import type { GeoPosition, GlobeEvents, GlobeOptions, ScreenPoint, ViewInit } from './types.js';
 
 // Beyond any view the camera can reach: the 0.5 m minimum eye height (camera-state.ts) is about zoom 27 at the equator.
@@ -51,6 +53,7 @@ const NUMBER_OPTIONS = [
   ['maxScreenErrorPx', 0.1, 64],
   ['manualClockStepMs', 0.001, 1000],
   ['imageryFadeMs', 0, 5000],
+  ['terrainClearanceMeters', 0, 10_000],
 ] as const;
 
 /** Validates the logging options (F120). */
@@ -62,6 +65,15 @@ function validateLogging(level: unknown, sink: unknown): void {
     );
   if (sink !== undefined && typeof sink !== 'function')
     throw new GlobeError('invalid-option', 'logSink must be a function');
+}
+
+/** Throws a GlobeError unless the home view (F194) is undefined or a valid view with an optional view mode. */
+function validateHome(home: unknown): void {
+  if (home === undefined) return;
+  validateView(home, DEFAULT_VIEW);
+  const mode = (home as { viewMode?: unknown }).viewMode;
+  if (mode !== undefined && mode !== '2d' && mode !== '3d' && mode !== 'auto')
+    throw new GlobeError('invalid-option', `home.viewMode must be '2d', '3d' or 'auto', got ${describeInput(mode)}`);
 }
 
 /** Validates the options of createGlobe at the API boundary. Throws a typed GlobeError naming the bad option. */
@@ -105,7 +117,10 @@ export function validateOptions(options: unknown): GlobeOptions {
     );
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
+  validateHome(input.home);
+  if (input.constraints !== undefined) validateConstraints(input.constraints);
   validateImagery(input.imagery, input.workers);
+  validateTerrain(input.terrain, input.workers);
   const memory = input.memory as Partial<Record<string, unknown>> | undefined;
   if (memory !== undefined) {
     if (memory === null || typeof memory !== 'object')
@@ -126,23 +141,23 @@ export function validateOptions(options: unknown): GlobeOptions {
 /** Imagery sources need the worker pool that decodes their tiles: a missing one is an error, never a silent fallback. */
 function validateImagery(imagery: unknown, workers: unknown): void {
   if (imagery === undefined) return;
-  if (!Array.isArray(imagery)) throw new GlobeError('invalid-option', 'imagery must be an array of imagery sources');
+  if (!Array.isArray(imagery)) throw new GlobeError('invalid-option', 'imagery must be an array of imagery layers');
   const ids = new Set<string>();
-  for (const source of imagery as unknown[]) {
-    const candidate = source as Partial<Record<string, unknown>> | null;
-    if (
-      candidate === null ||
-      typeof candidate !== 'object' ||
-      typeof candidate['id'] !== 'string' ||
-      typeof candidate['request'] !== 'function' ||
-      typeof candidate['transport'] !== 'object' ||
-      typeof candidate['tiling'] !== 'object'
-    ) {
-      throw new GlobeError('invalid-option', `imagery entries must be imagery sources, got ${describeInput(source)}`);
+  for (const input of imagery as unknown[]) {
+    const layer = input as Partial<Record<string, unknown>> | null;
+    const chain =
+      layer !== null && typeof layer === 'object' && Array.isArray(layer['sources']) ? layer['sources'] : [input];
+    for (const source of chain as unknown[]) {
+      if (!isImagerySource(source))
+        throw new GlobeError('invalid-option', `imagery entries must be imagery sources, got ${describeInput(source)}`);
+      if (ids.has(source.id)) throw new GlobeError('invalid-option', `imagery ids must be unique: ${source.id}`);
+      ids.add(source.id);
     }
-    if (ids.has(candidate['id']))
-      throw new GlobeError('invalid-option', `imagery ids must be unique: ${candidate['id']}`);
-    ids.add(candidate['id']);
+  }
+  try {
+    stackEntries(imagery as ImageryLayerInput[]);
+  } catch (error) {
+    throw new GlobeError('invalid-option', error instanceof Error ? error.message : String(error));
   }
   const factory = workers as Partial<Record<string, unknown>> | null | undefined;
   if (
@@ -152,6 +167,45 @@ function validateImagery(imagery: unknown, workers: unknown): void {
     throw new GlobeError(
       'invalid-option',
       'workers is required when imagery is set: pass createWorkers() from @vibeglobe/worker',
+    );
+  }
+}
+
+const TERRAIN_DECODERS: readonly string[] = ['terrarium', 'terrain-rgb', 'quantized-mesh', 'custom'];
+
+/**
+ * A terrain source: a tile source with a known decoder, a declared vertical datum (F133) and a geometric error per
+ * level; like imagery, it needs the worker pool.
+ */
+function validateTerrain(terrain: unknown, workers: unknown): void {
+  if (terrain === undefined) return;
+  const source = terrain as Partial<Record<string, unknown>> | null;
+  if (
+    source === null ||
+    typeof source !== 'object' ||
+    typeof source['id'] !== 'string' ||
+    typeof source['request'] !== 'function' ||
+    typeof source['transport'] !== 'object' ||
+    typeof source['tiling'] !== 'object' ||
+    typeof source['geometricErrorMeters'] !== 'function'
+  ) {
+    throw new GlobeError('invalid-option', `terrain must be a terrain source, got ${describeInput(terrain)}`);
+  }
+  const id = source['id'];
+  const decoder = source['decoder'] as Partial<Record<string, unknown>> | null | undefined;
+  if (typeof decoder !== 'object' || decoder === null || !TERRAIN_DECODERS.includes(decoder['kind'] as string))
+    throw new GlobeError('invalid-option', `terrain source ${id}: unknown decoder ${describeInput(decoder)}`);
+  if (decoder['kind'] === 'custom' && typeof decoder['decode'] !== 'function')
+    throw new GlobeError('invalid-option', `terrain source ${id}: a custom decoder needs a decode function`);
+  const datum = source['datum'] as Partial<Record<string, unknown>> | null | undefined;
+  const geoid = datum?.['kind'] === 'geoid' && typeof datum['model'] === 'object' && datum['model'] !== null;
+  if (typeof datum !== 'object' || datum === null || !(datum['kind'] === 'ellipsoid' || geoid))
+    throw new GlobeError('invalid-option', `terrain source ${id}: unknown vertical datum ${describeInput(datum)}`);
+  const factory = workers as Partial<Record<string, unknown>> | null | undefined;
+  if (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function') {
+    throw new GlobeError(
+      'invalid-option',
+      'workers is required when terrain is set: pass createWorkers() from @vibeglobe/worker',
     );
   }
 }
@@ -169,7 +223,13 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'device-restored',
   'backend-fallback',
   'tile-error',
+  'credits-change',
   'error',
+  'view-mode-change',
+  'movestart',
+  'move',
+  'moveend',
+  'tour-waypoint',
 ]);
 
 /** Throws a typed error unless `event` is a globe event and `handler` a function (KB-038). */
@@ -186,21 +246,23 @@ export function validateHandler(event: unknown, handler: unknown): void {
   }
 }
 
+/** Throws a typed GlobeError naming `name` unless `value` is a finite number. */
+function requireFinite(name: string, value: unknown): void {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
+  }
+}
+
 /** Validates a WGS84 position given to a query; throws a typed GlobeError. */
 export function validatePosition(position: unknown): void {
   if (position === null || typeof position !== 'object') {
     throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describeInput(position)}`);
   }
+  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144).
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  for (const [name, value] of [
-    ['longitudeDeg', longitudeDeg],
-    ['latitudeDeg', latitudeDeg],
-    ['heightMeters', heightMeters ?? 0],
-  ] as const) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
-    }
-  }
+  requireFinite('longitudeDeg', longitudeDeg);
+  requireFinite('latitudeDeg', latitudeDeg);
+  requireFinite('heightMeters', heightMeters ?? 0);
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',
@@ -243,4 +305,17 @@ export function describeInput(value: unknown): string {
   } catch {
     return Object.prototype.toString.call(value);
   }
+}
+
+/** True for an object shaped like an imagery source. */
+function isImagerySource(source: unknown): source is { id: string } {
+  const candidate = source as Partial<Record<string, unknown>> | null;
+  return (
+    candidate !== null &&
+    typeof candidate === 'object' &&
+    typeof candidate['id'] === 'string' &&
+    typeof candidate['request'] === 'function' &&
+    typeof candidate['transport'] === 'object' &&
+    typeof candidate['tiling'] === 'object'
+  );
 }

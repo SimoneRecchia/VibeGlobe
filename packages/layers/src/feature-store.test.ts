@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FeatureStore } from './feature-store.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 function filled(count: number): { store: FeatureStore; target: RecordingRenderTarget; handle: { id: number } } {
   const store = new FeatureStore(16);

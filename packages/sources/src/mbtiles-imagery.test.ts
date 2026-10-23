@@ -42,7 +42,7 @@ function fetchVia(
   c: TileCoord,
 ): Promise<TransportResult | 'noData'> {
   const request = source.request(c, { url: '', hostIndex: 0 });
-  if (request === 'noData') return Promise.resolve('noData');
+  if (request === 'noData' || request === 'unknown') return Promise.resolve('noData');
   return new Promise((resolve) => source.transport.start(request, { firstByteMs: 1000, totalMs: 2000 }, resolve));
 }
 

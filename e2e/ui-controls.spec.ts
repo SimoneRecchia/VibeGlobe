@@ -1,6 +1,6 @@
 // The ui package's controls on a live globe (M12, F405, F418–F420, F427, F428): mouse, touch and keyboard.
 import { expect, test, type Page } from '@playwright/test';
-import { nextFrame } from './support/globe.ts';
+import { nextFrame, waitForIdle } from './support/globe.ts';
 import { cameraOf, openUi, recordCamera, touch, type Sample } from './support/ui-layer.ts';
 
 const control = (page: Page, name: string): ReturnType<Page['locator']> => page.locator(`.vg-ui__button--${name}`);
@@ -138,11 +138,20 @@ test.describe('compass control (F420)', () => {
     }
   });
 
-  test('a click resets north with an animation; a mouse drag rotates the map', async ({ page }) => {
+  test('a click resets north with an animation, keeping center and tilt; a mouse drag rotates the map (F190)', async ({
+    page,
+  }) => {
     await openUi(page);
-    await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: 90 }));
+    await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: 90, tiltDeg: 30 }));
+    // After the frames that apply the view's own tilt limits, so that only the compass changes the camera.
+    await waitForIdle(page);
+    const before = await cameraOf(page);
     const reset = await recordCamera(page, 'headingDeg', () => control(page, 'compass').click());
     expectAnimated(reset, 90, 0);
+    const after = await cameraOf(page);
+    expect(after.lon).toBeCloseTo(before.lon, 9);
+    expect(after.lat).toBeCloseTo(before.lat, 9);
+    expect(after.tiltDeg).toBeCloseTo(before.tiltDeg, 9);
     const { x, y } = await center(page, 'compass');
     await page.mouse.move(x, y);
     await page.mouse.down();
@@ -268,6 +277,9 @@ test.describe('the readout and the search box use the gis coordinate functions (
   });
 
   test('typed decimal, DMS and UTM coordinates in the search box go to that place', async ({ page }) => {
+    // The search box flies there (F204); with reduced motion the flight is a short fade (F214), so each check starts
+    // after arrival rather than after a flight of many seconds on the software GPU.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await openUi(page);
     const input = page.locator('.vg-ui__search-input');
     for (const [text, lon, lat] of [

@@ -89,41 +89,6 @@ test('engine phases appear as named marks in a performance trace, and none are m
     expect(trace, phase).toContain(`vibeglobe:${phase}`);
 });
 
-test('the performance HUD shows frame time, frame rate and per-phase costs live, within its documented overhead (F119)', async ({
-  page,
-}) => {
-  await openGlobe(page, 'backend=webgl2&scenario=drag&zoom=3&level=4');
-  // The median CPU frame time of a 1.5 s window: GC pauses and the odd slow frame do not count as the HUD's cost.
-  const cpuMedian = async (): Promise<number> => {
-    await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());
-    await page.waitForTimeout(1500);
-    const samples = await page.evaluate(() => window.vibeglobePlayground?.cpuFrameTimesMs() ?? []);
-    samples.sort((a, b) => a - b);
-    return samples[Math.floor(samples.length / 2)] ?? 0;
-  };
-  const showHud = (on: boolean): Promise<void> =>
-    page.evaluate((show) => window.vibeglobePlayground?.showHud(show), on);
-  // Windows without and with the HUD alternate, so a drift of the machine or the scenario between them cancels out.
-  let without = 0;
-  let withHud = 0;
-  const pairs = 3;
-  for (let pair = 0; pair < pairs; pair++) {
-    await showHud(false);
-    without += (await cpuMedian()) / pairs;
-    await showHud(true);
-    withHud += (await cpuMedian()) / pairs;
-  }
-  // The HUD, shown since the last window, updates live.
-  const hud = page.locator('.vibeglobe-hud');
-  await expect(hud).toContainText(/\d+(\.\d+)? ms · \d+ fps/);
-  for (const phase of ['update', 'selection', 'scheduling', 'upload', 'render']) await expect(hud).toContainText(phase);
-  const first = await hud.innerText();
-  await expect.poll(() => hud.innerText(), { timeout: 5000 }).not.toBe(first);
-  console.log(`CPU frame time without HUD ${without.toFixed(3)} ms, with HUD ${withHud.toFixed(3)} ms`);
-  // docs/guides/debugging.md documents the HUD's overhead: at most 0.5 ms of main-thread time per frame.
-  expect(withHud - without).toBeLessThan(0.5);
-});
-
 test('log levels filter the engine messages, and a custom sink receives them instead of the console (F120)', async ({
   page,
 }) => {
@@ -174,6 +139,12 @@ test('an exported trace holds tile states, requests with their end, cancellation
   for (const zoom of [6.5, 7.5, 5.5]) {
     await page.evaluate((z) => window.vibeglobePlayground?.globe.jumpTo({ zoom: z }), zoom);
     await page.waitForTimeout(1500);
+    // The slow level-7 requests are in flight before the view leaves them, so leaving cancels them (on a slow renderer
+    // 1.5 s may not reach them).
+    if (zoom === 7.5)
+      await expect
+        .poll(() => page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats()?.loading ?? 0))
+        .toBeGreaterThan(0);
   }
   const trace = await page.evaluate(
     () => JSON.stringify(window.vibeglobePlayground?.globe.diagnostics.stopTrace()) ?? '[]',

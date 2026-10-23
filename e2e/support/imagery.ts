@@ -23,6 +23,18 @@ export interface LoggedRequest {
   status?: number;
   host?: string;
   connection?: number;
+  /** The fixture source of the path (`terrain`, `world`, …). */
+  source?: string;
+  /** The request's Accept header (F128). */
+  accept?: string;
+  /** The query string, `?` included (F253). */
+  query?: string;
+  /** The request's Authorization header (F252). */
+  authorization?: string;
+  /** Whether the request carried cookies (F251). */
+  cookie?: boolean;
+  /** The request's Sec-Fetch-Mode (F251). */
+  fetchMode?: string;
 }
 
 /** The fixture server's log of a session's requests. */
@@ -34,7 +46,7 @@ export async function requestLog(page: Page, session: string, server = ''): Prom
  * Waits until every Mercator tile of the view shows imagery of its own level (the polar caps keep the base image),
  * then for the engine to go idle.
  */
-export async function waitForImagery(page: Page): Promise<void> {
+export async function waitForImagery(page: Page, timeoutMs = 60_000): Promise<void> {
   await expect
     .poll(
       () =>
@@ -43,7 +55,7 @@ export async function waitForImagery(page: Page): Promise<void> {
           const tiles = globe?.surfaceTiles() ?? [];
           return tiles.length > 0 && tiles.every((t) => t.root !== 'mercator' || t.imageryLevel === t.level);
         }),
-      { timeout: 60_000 },
+      { timeout: timeoutMs },
     )
     .toBe(true);
   await waitForIdle(page);

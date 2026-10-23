@@ -194,6 +194,9 @@ const harness: OfflineHarness = {
     const manager = createPackageManager(offline, {
       adapters,
       onIntegrityError: (event) => harness.integrityErrors.push(`${event.packageId}: ${event.message}`),
+      onChange: ({ sourceIds }) => {
+        for (const id of sourceIds) harness.globe?.reloadSource(id);
+      },
     });
     await manager.ready;
     for (const url of next.served ?? []) await manager.addServedPackage(url);

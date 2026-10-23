@@ -95,7 +95,7 @@ export class PackageTileReader implements PackageReader {
     const source = await this.open(pkg, file);
     if (!source) return undefined;
     const request = source.request(coord, { url: '', hostIndex: 0 });
-    if (request === 'noData') return undefined;
+    if (request === 'noData' || request === 'unknown') return undefined;
     const result = await new Promise<TransportResult>((resolve) => {
       const abort = source.transport.start(request, READ_TIMEOUTS, resolve);
       signal.addEventListener('abort', abort, { once: true });

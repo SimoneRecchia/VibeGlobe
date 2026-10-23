@@ -1,9 +1,10 @@
 name: CI
 
 # Saves minutes (ADR 0015): every push and every pull request run one job with every fast check (pull requests
-# run only the unit tests their changes reach; builds and browsers are cached); pushes to main, the nightly schedule
-# and manual runs add the browser jobs: the end-to-end suite in eight shards, the isolated
-# measurements, the cross-browser run and the recorded benchmarks, each on its own runner (ADR 0022).
+# run only the unit tests their changes reach; builds are cached). Pushes to main, the nightly schedule and manual
+# runs add the end-to-end suite in sixteen shards and (nightly and manual) the isolated measurements; the recorded
+# benchmarks run nightly and Firefox and WebKit weekly. Each browser job runs alone on its runner (ADR 0022), inside
+# Playwright's image, on one build made once per run (ADR 0035).
 on:
   push:
   pull_request:
@@ -83,19 +84,11 @@ jobs:
       - name: Tree shaking
         run: npm run treeshake
 
-  e2e:
-    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/8)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+  build:
+    # ADR 0035: one build per run, handed to every browser job as an artifact instead of a build in each.
+    name: Build for the browser jobs
+    if: github.event.schedule == '23 2 * * *' || github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    # ADR 0022: the functional suite is split across eight runners by test file, one test at a time on each: two tests
-    # rendering at once on the software GPU slowed each other's frames past their time limits. The machine-wide
-    # measurements run in their own job below, so no shard waits for them and none of them shares a machine with a test.
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    env:
-      CI: true
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -111,17 +104,49 @@ jobs:
             node_modules/.cache
           key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - uses: actions/cache@v4
-        id: browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: browsers-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
       - run: npm run build
-      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/8 --workers=1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-output
+          path: |
+            packages/*/dist
+            apps/*/dist
+            apps/nuxt-example/.output
+          # The lazy host's .vite manifest and Nuxt's .output are hidden paths, left out by default.
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  e2e:
+    name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/16)
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: build
+    runs-on: ubuntu-latest
+    # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    # ADR 0022, ADR 0035: the functional suite is split across sixteen runners by test file, one test at a time on each: two tests
+    # rendering at once on the software GPU slowed each other's frames past their time limits. The machine-wide
+    # measurements run in their own job below, so no shard waits for them and none of them shares a machine with a test.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    env:
+      CI: true
+      # The image's user is root; Firefox and the npm cache want a home of their own.
+      HOME: /root
+      # The container has no Docker: the LAN test runs in the lan job below, on the runner itself.
+      VIBEGLOBE_NO_DOCKER: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
+      - run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/16 --workers=1
       - name: Geodesics against Karney's GeodTest data set (downloaded; F076)
         if: matrix.shard == 1
         run: npm run geodtest
@@ -133,13 +158,12 @@ jobs:
             playwright-report/
             test-results/
 
-  measurements:
-    name: Isolated measurements (allocation, rendering probes)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch'
+  lan:
+    name: Offline package over a LAN host (Docker, F284)
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: build
     runs-on: ubuntu-latest
-    # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
-    # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
-    # a bug that must be fixed before the milestone closes.
+    # ADR 0035: the one test that starts Docker containers runs on the runner, where Docker is, not in the image.
     env:
       CI: true
     steps:
@@ -147,26 +171,41 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/offline-lan.spec.ts --project=chromium --workers=1
+      - if: failure()
+        uses: actions/upload-artifact@v7
         with:
+          name: lan-report
           path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - uses: actions/cache@v4
-        id: browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: browsers-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-      - run: npm run build
+            playwright-report/
+            test-results/
+
+  measurements:
+    name: Isolated measurements (allocation, rendering probes)
+    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    # ADR 0022: tests that measure the whole machine (heap sampling, GC traces: F064) and ADR 0012's probes run alone
+    # on their own runner, never next to another test, and never hold up the functional suite. A red result is still
+    # a bug that must be fixed before the milestone closes.
+    env:
+      CI: true
+      # The image's user is root; Firefox and the npm cache want a home of their own.
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
       # One test at a time: they measure the whole machine (playwright.config.ts).
       - run: npx playwright test --project=measurements --no-deps --workers=1
       # ADR 0012's probes on the pinned Chromium (ADR 0013 #6): determinism, backend consistency, capture cost, pacing.
@@ -175,7 +214,10 @@ jobs:
         timeout-minutes: 15
         env:
           VIBEGLOBE_DEVICE: ci-swiftshader
-        run: npm run bench:probes
+        # The probes record the commit; in the container the checkout belongs to another user (git's safe.directory).
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          npm run bench:probes
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -191,13 +233,21 @@ jobs:
 
   cross-browser:
     name: Firefox and WebKit (WebGL2, informational until F504)
-    if: github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch'
+    # Weekly only (simplification item 11, ADR 0035).
+    if: github.event.schedule == '41 3 * * 1'
+    needs: build
     runs-on: ubuntu-latest
     # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
     # suites; both are inputs to F504 (M15), which makes this job binding (ADR 0012, update 2026-10-21).
     continue-on-error: true
+    # ADR 0035: Playwright's own image for this Playwright version brings Firefox, WebKit and their system libraries;
+    # installing them on the runner took up to 47 minutes of apt.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     env:
       CI: true
+      # Firefox refuses a home directory owned by another user when it runs as root in the container.
+      HOME: /root
       VIBEGLOBE_CROSS_BROWSER: '1'
       VIBEGLOBE_DEVICE: ci-software
     steps:
@@ -205,28 +255,13 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - uses: actions/cache@v4
-        id: browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: browsers-firefox-webkit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps firefox webkit
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps firefox webkit
-      # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner.
-      - run: sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2
-      - run: npm run build
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
+      # Firefox needs Mesa's EGL and software rasterizer for WebGL on a GPU-less runner (installed only if missing).
+      - run: |
+          dpkg -s libegl1 libgl1-mesa-dri libgles2 >/dev/null 2>&1 ||
+            (apt-get update && apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri libgles2)
       # The globe suites on WebGL2 in Firefox (no EXT_clip_control: the fragment depth path) and WebKit.
       - run: npx playwright test --project=firefox --project=webkit
       # ADR 0019's OffscreenCanvas measurement in both engines (software rendering; recorded, not gated, F065).
@@ -247,35 +282,24 @@ jobs:
 
   benchmarks:
     name: Benchmarks (recorded, not gated)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Recorded, not gated, on SwiftShader: nightly only (ADR 0035).
+    if: github.event.schedule == '23 2 * * *'
+    needs: build
     runs-on: ubuntu-latest
+    # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     env:
+      HOME: /root
       VIBEGLOBE_DEVICE: ci-swiftshader
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      # Incremental builds: tsc -b reuses the outputs and build info of the last run on this branch or main.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            apps/*/dist
-            **/*.tsbuildinfo
-            node_modules/.cache
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - uses: actions/cache@v4
-        id: browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: browsers-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-      - run: npm run build
+      # The run's one build (ADR 0035), from the build job.
+      - uses: actions/download-artifact@v7
+        with: { name: build-output }
       # Timings on SwiftShader are not meaningful (ADR 0012): record them as a trend, gate only deterministic counters.
       - run: npm run bench -- --report-only
       - run: npm run bench:micro -- --report-only

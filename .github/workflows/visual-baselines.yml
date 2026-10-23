@@ -1,7 +1,7 @@
 name: Visual baselines
 
-# Records the visual-test baselines in the pinned environment (ADR 0012): Playwright's own Chromium on a GitHub-hosted
-# runner, the same setup as the CI end-to-end job. Run it manually on a branch after an intended visual change; it
+# Records the visual-test baselines in the pinned environment (ADR 0012): Playwright's own Chromium in Playwright's image
+# on a GitHub-hosted runner, the same setup as the CI end-to-end jobs (ADR 0035). Run it manually on a branch after an intended visual change; it
 # commits the new baselines to that branch. A push that changes e2e/__baselines__/request.md (the reason for new
 # baselines) also starts it, so it works on branches before the workflow reaches the default branch. Procedure:
 # docs/guides/visual-tests.md.
@@ -17,22 +17,42 @@ jobs:
   baselines:
     name: Record visual baselines
     runs-on: ubuntu-latest
+    # The environment of the end-to-end jobs (ADR 0035): Playwright's image for the pinned Playwright version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     env:
       CI: true
+      HOME: /root
     steps:
+      # The baseline commit needs git, which the image may lack.
+      - run: command -v git || (apt-get update && apt-get install -y --no-install-recommends git)
       - uses: actions/checkout@v7
         # Full history, so the baseline commit can be rebased onto commits pushed while the job ran.
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npx playwright test e2e/visual.spec.ts --update-snapshots=all
+      # One test at a time, as in the CI shards: two views rendering at once on the software GPU slowed each capture
+      # from under a second to 20-30 s, past the views' time limits.
+      - run: npx playwright test e2e/visual.spec.ts --project=chromium --workers=1 --update-snapshots=all
+        # The views that were captured are committed even when another view fails (KB-102); the run stays red.
+        continue-on-error: true
+        id: views
       # The ui package's controls in the light and dark themes (F430).
-      - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --update-snapshots=all
+      - run: npx playwright test e2e/ui-theme.spec.ts --project=chromium --grep F430 --workers=1 --update-snapshots=all
+      # Traces of failed views (recorded on the retry, ADR 0012), to investigate a capture that never completes.
+      - name: Upload the failed views' traces
+        if: steps.views.outcome == 'failure' || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines-test-results
+          path: test-results/
+          retention-days: 7
       - name: Commit the baselines
+        if: always()
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add e2e/__baselines__
@@ -47,3 +67,6 @@ jobs:
             done
             exit 1
           fi
+      - name: Fail when a view could not be recorded
+        if: steps.views.outcome == 'failure'
+        run: exit 1

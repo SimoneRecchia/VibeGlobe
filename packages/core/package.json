@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./decoders": {
+      "types": "./dist/decoders.d.ts",
+      "source": "./src/decoders.ts",
+      "default": "./dist/decoders.js"
     }
   },
   "files": [

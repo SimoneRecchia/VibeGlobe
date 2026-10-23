@@ -86,7 +86,7 @@ afterEach(() => {
 
 function load(source: ReturnType<typeof setup>['source'], coord: TileCoord): Promise<string> {
   const request = source.request(coord, { url: '', hostIndex: 0 });
-  if (request === 'noData') return Promise.resolve('noData');
+  if (request === 'noData' || request === 'unknown') return Promise.resolve('noData');
   return new Promise<TransportResult>((resolve) =>
     source.transport.start(request, { firstByteMs: 1000, totalMs: 1000 }, resolve),
   ).then((r) =>

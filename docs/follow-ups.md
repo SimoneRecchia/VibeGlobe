@@ -19,6 +19,7 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Tile record recycling (M3 review, finding 6).** Imagery tile records and their key-map entries are never freed, and `dropUnwanted` walks every record each frame; CPU per frame and memory outside the budgets grow with very long sessions (handles also collide past 2^22 records per layer). Recycle records of unloaded tiles that no frame wants, keeping their RAM-tier entries keyed consistently.
 - **Memory-pressure response (ADR 0007, M3 plan §3).** The error multiplier that rises ×1.05 per frame while admissions are refused, the `memory-pressure` event and the reservation of predicted bytes at dispatch are not built; no feature entry requires them. Refused tiles now wait 1 s and come back from RAM (KB-073).
 - **A drag step at the globe's edge on an 800 × 600 page (M3 CI, unconfirmed).** On CI's software WebGPU, F060's second drag, started at 95 % of the globe's radius on an 800 × 600 page, left the grabbed point exactly one step (25.25 px) away and never caught up, on two attempts; the same test passes locally at that size and on CI at the default page size, so F060 keeps its default size. To investigate: run F060 at 800 × 600 on CI with the camera logged per step, and check whether `dragCamera` rejects a cursor point that grazes the limb.
+- **Zero allocation in the frame loop with tiled imagery and terrain (M4, measured).** F064 covers the base globe; with terrain and tiled imagery in steady state (everything loaded, a small drag in a circle, the fake renderer) the frame loop allocates about 256 bytes per frame: doubles boxed across calls V8 does not inline (ADR 0018), in `screenDistance` (returned to `drawImagery` and `drawTerrain`), the `priority` argument of `ImageryLoader.want`, the selection's per-tile relief range, and `displayedHeightMeters` / `layerHeight` in terrain collision. Passing these through `Float64Array`s, as the elevation queries now do (KB-076), would bring it to zero; a test like `frame-allocation.test.ts` over `terrain-globe.test.ts`'s fixture terrain, warmed up until every tile has loaded, measures it.
 
 ## Data pipeline track (`packages/tools`)
 
@@ -40,3 +41,15 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Composite style expressions on the GPU:** zoom-and-feature expressions are re-evaluated per feature on every zoom change; MapLibre evaluates both bracketing stops and interpolates in the shader. Worth it if F370's frame times show the cost on large layers.
 - **Incremental cluster updates for live feeds:** supercluster cannot update in place; a clustered live layer rebuilds its index (throttled) through `setData`.
 - **Cluster bounds across the antimeridian:** `boundsOf` returns west–east in degrees without wrapping, so a cluster straddling ±180° reports bounds spanning the world.
+
+## Atmosphere track (`packages/renderer/src/atmosphere/`)
+
+- Hillaire-style transmittance and sky-view LUTs behind the same `Atmosphere` interface, if the per-pixel march misses the tablet budget (ADR 0040).
+- A sun disk and halo in the sky when sun lighting is on (Filament's analytic disk); stars on the night side.
+- Multiple scattering and ozone absorption for brighter, bluer twilight (single scattering only today).
+- Night lights texture on the dark side, faded with altitude (OpenGlobus).
+
+## Vector tiles and 3D Tiles track (M13 computational parts)
+
+- **Right-to-left and complex scripts in labels:** the shaper lays glyphs out left to right from their advances (ADR 0041). Arabic, Hebrew and Indic scripts need bidi reordering and contextual shaping (MapLibre loads an RTL plugin for this; HarfBuzz in WebAssembly is the complete option).
+- **Balanced line breaking:** labels break greedily at `text-max-width`; MapLibre balances line lengths, which looks better for two-line place names.

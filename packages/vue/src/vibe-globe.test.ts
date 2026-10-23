@@ -24,6 +24,15 @@ vi.mock('@vibeglobe/core', async (original) => ({
         tiltDeg: 0,
         rollDeg: 0,
         rangeMeters: 0,
+        eyeLongitudeDeg: 0,
+        eyeLatitudeDeg: 0,
+        groundHeightMeters: 0,
+        viewMode: 'auto',
+        chosenTiltDeg: 0,
+        chosenHeadingDeg: 0,
+        morphFactor: 0,
+        reliefFactor: 0,
+        phase: 'globe',
       },
       on: ((event: string, handler: (payload: unknown) => void) => {
         handlers.set(event, handler);

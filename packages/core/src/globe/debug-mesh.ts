@@ -7,7 +7,7 @@ const RAD = Math.PI / 180;
 const corner = new Float64Array(3);
 
 /** Throws a typed error unless `shapes` is a list of debug quads (F050, KB-038); corners are checked when built. */
-export function validateDebugShapes(shapes: unknown): asserts shapes is readonly DebugShape[] {
+function validateDebugShapes(shapes: unknown): asserts shapes is readonly DebugShape[] {
   if (!Array.isArray(shapes)) throw new GlobeError('invalid-option', 'setDebugShapes needs an array of shapes');
   for (const shape of shapes as unknown[]) {
     const { corners, colorRgb, checkerMeters } = (shape ?? {}) as Partial<Record<keyof DebugShape, unknown>>;
@@ -34,7 +34,7 @@ export function validateDebugShapes(shapes: unknown): asserts shapes is readonly
 }
 
 /** Converts a debug quad to renderer data: corners as float32 offsets from their float64 centroid (ADR 0004). */
-export function buildDebugMesh(shape: DebugShape): DebugMeshData {
+function buildDebugMesh(shape: DebugShape): DebugMeshData {
   const ecef: number[] = [];
   for (const position of shape.corners) {
     const values = [position.longitudeDeg, position.latitudeDeg, position.heightMeters ?? 0];
@@ -50,4 +50,10 @@ export function buildDebugMesh(shape: DebugShape): DebugMeshData {
   const positions = new Float32Array(12);
   for (let i = 0; i < 12; i++) positions[i] = (ecef[i] ?? 0) - (originEcef[i % 3] ?? 0);
   return { originEcef, positions, colorRgb: shape.colorRgb, checkerMeters: shape.checkerMeters ?? 0 };
+}
+
+/** Validated shapes as meshes; before the renderer exists they are kept and handed over when it starts (KB-042). */
+export function debugMeshesOf(shapes: readonly DebugShape[]): DebugMeshData[] {
+  validateDebugShapes(shapes);
+  return shapes.map((shape) => buildDebugMesh(shape));
 }

@@ -1,7 +1,7 @@
 import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import { Camera } from '../camera/camera.js';
-import { ecefToGeodetic } from '../geodesy/ecef.js';
+import { ecefToGeodetic, geodeticToEcef } from '../geodesy/ecef.js';
 import { buildQuadtreeTileMesh, tileIndices } from './surface-mesh.js';
 import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import { packTileKey } from '../tiling/tile-key.js';
@@ -15,6 +15,7 @@ import {
   quadtreeTileKey,
   selectQuadtreeTiles,
   SOUTH_CAP,
+  type QuadtreeSelectionOptions,
   type QuadtreeTile,
 } from './surface-quadtree.hot.js';
 
@@ -159,6 +160,22 @@ describe('selectQuadtreeTiles', () => {
     expect(count).toBeLessThan(3000);
   });
 
+  it('keeps tiles whose relief can rise above the horizon, and refines while the terrain error shows (F142, F126)', () => {
+    // From 1 km, tilted toward the horizon: tiles wholly behind the ellipsoid's horizon (about 113 km away) are culled,
+    // but a 4,000 m peak stays visible to about 340 km, so with the terrain's heights more tiles stay drawn.
+    const c = camera(9.19, 45.46, 1000, 85, 0);
+    const flat = { maxScreenErrorPx: 1, maxLevel: 25 };
+    const flatCount = selectQuadtreeTiles(c, flat, out);
+    const relief: QuadtreeSelectionOptions = { ...flat, terrainMaxMeters: 4000, terrainMinMeters: -100 };
+    expect(selectQuadtreeTiles(c, relief, out)).toBeGreaterThan(flatCount);
+    // Terrain whose error is large next to the ellipsoid's chord sag refines the view further.
+    const nadir = camera(7, 46, 50_000);
+    const deepest = (options: QuadtreeSelectionOptions): number =>
+      Math.max(...out.slice(0, selectQuadtreeTiles(nadir, options, out)).map((t) => t.level));
+    const errors = new Float64Array(26).map((_, level) => 4e6 / 2 ** level);
+    expect(deepest({ ...flat, terrainErrorMeters: errors, terrainMaxLevel: 25 })).toBeGreaterThan(deepest(flat));
+  });
+
   it('refines to tiles small enough for float32 offsets at 1 m altitude (ADR 0004)', () => {
     const count = selectQuadtreeTiles(camera(9.19, 45.46, 1), { maxScreenErrorPx: 1, maxLevel: 25 }, out);
     const under = out.slice(0, count).find((t) => contains(t, 9.19 * DEG, 45.46 * DEG));
@@ -278,5 +295,81 @@ describe('buildQuadtreeTileMesh', () => {
     const point = new Float64Array(3);
     for (let i = 0; i < 3; i++) point[i] = (mesh.positions[i] ?? 0) + (mesh.originEcef[i] ?? 0);
     expect(Math.hypot(point[0] ?? 0, point[1] ?? 0)).toBeLessThan(1e-6 * 6378137);
+  });
+});
+
+describe('bounding volumes with relief (F142)', () => {
+  const A = 6378137;
+  const B = 6356752.314245179;
+  const MIN_METERS = -100;
+  const MAX_METERS = 4000;
+  const point = new Float64Array(3);
+  const out: QuadtreeTile[] = [];
+
+  /** True when the eye sees `p`: inside the frustum, and the ellipsoid lowered to the lowest terrain is not between. */
+  function visible(c: Camera, p: Float64Array): boolean {
+    const rel = [
+      (p[0] ?? 0) - (c.eyeEcef[0] ?? 0),
+      (p[1] ?? 0) - (c.eyeEcef[1] ?? 0),
+      (p[2] ?? 0) - (c.eyeEcef[2] ?? 0),
+    ];
+    for (let plane = 0; plane < 5; plane++) {
+      const f = c.frustumPlanes;
+      const at = plane * 4;
+      if (
+        (f[at] ?? 0) * (rel[0] ?? 0) +
+          (f[at + 1] ?? 0) * (rel[1] ?? 0) +
+          (f[at + 2] ?? 0) * (rel[2] ?? 0) +
+          (f[at + 3] ?? 0) <
+        0
+      )
+        return false;
+    }
+    // In coordinates where the lowered ellipsoid is the unit sphere: does the segment come within 1 of the center?
+    const scale = [A + MIN_METERS, A + MIN_METERS, B + MIN_METERS];
+    const e = [0, 1, 2].map((i) => (c.eyeEcef[i] ?? 0) / (scale[i] ?? 1));
+    const d = [0, 1, 2].map((i) => (rel[i] ?? 0) / (scale[i] ?? 1));
+    const dd = (d[0] ?? 0) ** 2 + (d[1] ?? 0) ** 2 + (d[2] ?? 0) ** 2;
+    const t = Math.min(
+      1,
+      Math.max(0, -((e[0] ?? 0) * (d[0] ?? 0) + (e[1] ?? 0) * (d[1] ?? 0) + (e[2] ?? 0) * (d[2] ?? 0)) / dd),
+    );
+    const closest = Math.hypot(...[0, 1, 2].map((i) => (e[i] ?? 0) + t * (d[i] ?? 0)));
+    return closest >= 1;
+  }
+
+  test.prop(
+    [
+      fc.double({ min: 5, max: 10, noNaN: true }),
+      fc.double({ min: 44, max: 47, noNaN: true }),
+      fc.double({ min: 300, max: 60_000, noNaN: true }),
+      fc.double({ min: 0, max: 88, noNaN: true }),
+      fc.double({ min: 0, max: 360, noNaN: true }),
+      fc.array(
+        fc.tuple(
+          fc.double({ min: -1, max: 1, noNaN: true }),
+          fc.double({ min: -1, max: 1, noNaN: true }),
+          fc.double({ min: MIN_METERS, max: MAX_METERS, noNaN: true }),
+        ),
+        { minLength: 20, maxLength: 20 },
+      ),
+    ],
+    { numRuns: 60 },
+  )('every point of the relief the eye sees lies in a selected tile', (lon, lat, range, tilt, heading, points) => {
+    const c = camera(lon, lat, range, tilt, heading);
+    const options: QuadtreeSelectionOptions = {
+      maxScreenErrorPx: 1,
+      maxLevel: 25,
+      terrainMinMeters: MIN_METERS,
+      terrainMaxMeters: MAX_METERS,
+    };
+    const selected = out.slice(0, selectQuadtreeTiles(c, options, out));
+    for (const [du, dv, height] of points) {
+      const lonRad = (lon + du * 0.5) * DEG;
+      const latRad = (lat + dv * 0.5) * DEG;
+      geodeticToEcef(lonRad, latRad, height, point);
+      if (!visible(c, point)) continue;
+      expect(selected.some((t) => contains(t, lonRad, latRad))).toBe(true);
+    }
   });
 });

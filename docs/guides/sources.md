@@ -106,6 +106,28 @@ Apple's map data may only be used through Apple's own MapKit, so VibeGlobe offer
 
 Send credentials in headers where the provider supports it (`headers` on the PMTiles and MBTiles adapters). Where a provider requires a key in the URL, as Google's Map Tiles API does, the adapter adds the key and the session inside its own transport: the URLs the engine sees, coalesces, logs and shows in the debug overlay carry neither.
 
+Any tiled adapter that takes a `transport` gets the same protection from `fetchTransport`'s third argument:
+
+```ts
+import { fetchTransport, xyzImagery } from '@vibeglobe/sources';
+
+const transport = fetchTransport(undefined, undefined, {
+  // Headers sent only to these origins; renewed once when the server answers 401 or 403.
+  auth: {
+    origins: ['https://tiles.example.com'],
+    headers: () => ({ Authorization: `Bearer ${session.token}` }),
+    refresh: () => session.renew(),
+  },
+  // A key the provider insists on in the URL: appended only when the request is made.
+  secretQuery: () => ({ key: myRestrictedKey }),
+  // The fetch credentials mode (cookies) for this source; 'omit' by default.
+  credentials: 'omit',
+});
+const imagery = xyzImagery({ id: 'tiles', url: 'https://tiles.example.com/{z}/{x}/{y}.png', transport });
+```
+
+The engine never sees the `secretQuery` values or the headers, so its logs, traces, errors and debug overlay cannot show them. When your own code logs URLs, pass them through `redactUrl`, which masks the values of query parameters named like keys, tokens and signatures. Tiles from another origin need CORS headers (`Access-Control-Allow-Origin`) on the tile server; without them the engine logs one error naming the source and the cause, and treats its tiles as unavailable instead of retrying them.
+
 ## Writing and testing a custom adapter
 
 An adapter is any object that implements `ImagerySource`; add `attribution` and `profile` (`DescribedImagerySource`) so the engine can credit it and enforce its terms. Run the shared conformance suite, which needs no test framework, from your own tests:

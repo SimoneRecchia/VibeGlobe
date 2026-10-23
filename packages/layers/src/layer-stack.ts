@@ -24,11 +24,14 @@ export type LayerPosition = { readonly index: number } | { readonly above: strin
 /** The ordered set of layers of one globe. */
 export class LayerStack {
   readonly #target: LayerRenderTarget;
+  readonly #requestFrame: () => void;
   readonly #entries: Entry[] = [];
   readonly #slots = new PickSlotTable<SlotOwner>();
 
-  constructor(target: LayerRenderTarget) {
+  /** @param requestFrame - asks the host for a frame when a layer changed (a globe draws only when asked). */
+  constructor(target: LayerRenderTarget, requestFrame: () => void = () => undefined) {
     this.#target = target;
+    this.#requestFrame = requestFrame;
   }
 
   /** Layer ids from bottom to top. */
@@ -59,6 +62,7 @@ export class LayerStack {
       releasePickSlot: (slot) => {
         if (entry.slots.delete(slot)) this.#slots.release(slot);
       },
+      requestFrame: () => this.#requestFrame(),
     };
     this.#entries.splice(position === undefined ? this.#entries.length : this.#resolve(position), 0, entry);
     try {

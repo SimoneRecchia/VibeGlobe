@@ -11,9 +11,19 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * `levels` the same tinted per level, so refinement is visible; `border` alternating colors per tile parity with a
  * 1 px edge stripe; `smooth` the color field alone, continuous across every tile edge (seam checks, F110, F111);
  * `tiles` alternating colors per tile parity, contrasting at every tile edge (F106); `stripes` one-texel dark and
- * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108).
+ * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
+ * `red`, `green`, `blue` and `shade` one color everywhere ({@link SOLID_COLORS}).
  */
-export type FixturePattern = 'world' | 'levels' | 'border' | 'smooth' | 'tiles' | 'stripes' | 'patches';
+export type FixturePattern =
+  'world' | 'levels' | 'border' | 'smooth' | 'tiles' | 'stripes' | 'patches' | 'red' | 'green' | 'blue' | 'shade';
+
+/** The single colors of the `red`, `green`, `blue` and `shade` (a flat hillshade) patterns: layer stacking (F243–F246). */
+export const SOLID_COLORS: Readonly<Record<string, readonly [number, number, number]>> = {
+  red: [220, 60, 60],
+  green: [60, 200, 60],
+  blue: [60, 60, 220],
+  shade: [128, 128, 128],
+};
 
 /** A tile request. */
 export interface FixtureTile {
@@ -83,7 +93,10 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       const u = (i + 0.5) / size;
       const v = (j + 0.5) / size;
       let color: [number, number, number];
-      if (tile.pattern === 'border' || tile.pattern === 'tiles') {
+      const solid = SOLID_COLORS[tile.pattern];
+      if (solid) {
+        color = [...solid];
+      } else if (tile.pattern === 'border' || tile.pattern === 'tiles') {
         const edge = tile.pattern === 'border' && (i === 0 || j === 0 || i === size - 1 || j === size - 1);
         const odd = (tile.x + tile.y) % 2 === 1;
         color = edge ? [240, 240, 40] : odd ? [60, 60, 200] : [200, 60, 60];

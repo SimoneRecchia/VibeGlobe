@@ -10,6 +10,8 @@ export function createTileMesh(data: TileMeshData, material: Material | undefine
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
   geometry.setAttribute('tileUv', new BufferAttribute(data.uvs, 3));
+  geometry.setAttribute('tileNormal', new BufferAttribute(data.normals, 3));
+  geometry.setAttribute('tilePlane', new BufferAttribute(data.planes, 4));
   geometry.setIndex(new BufferAttribute(data.indices, 1));
   const mesh = new Mesh(geometry, material);
   mesh.matrixAutoUpdate = false;

@@ -19,6 +19,13 @@ export interface ScenarioReport {
   firstHole?: { xPx: number; yPx: number; latitudeDeg: number; longitudeDeg: number };
   pops: number;
   firstPopFrame: number;
+  terrainDrops: number;
+  firstTerrainDropFrame: number;
+  minReliefAboveHorizonPx: number;
+  maxChangedShare: number;
+  maxChangedFrame: number;
+  /** Per frame: zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase, heading (degrees). */
+  samples: [number, number, number, number, string, string, number][];
 }
 
 declare global {
@@ -40,6 +47,10 @@ declare global {
       showHud(on: boolean): void;
       loggedLevels(): string[];
       clearLog(): void;
+      geodesicDistanceMeters(
+        from: { longitudeDeg: number; latitudeDeg: number },
+        to: { longitudeDeg: number; latitudeDeg: number },
+      ): number;
     };
     /** The GPU probes' result on `?experiment=gpu-probes` (apps/playground/src/gpu-probes.ts). */
     vibeglobeGpuProbes?: GpuProbeResult | { readonly error: string };
@@ -106,7 +117,23 @@ export async function waitForIdle(page: Page): Promise<number> {
  */
 export async function canvasImage(page: Page, index = 0): Promise<PNG> {
   const frame = await page.evaluate(async (i) => {
-    const capture = await window.vibeglobePlayground?.globes[i]?.captureFrame();
+    const globe = window.vibeglobePlayground?.globes[i];
+    // A capture that never completes (no frame could be drawn) fails with the engine's state, to investigate in CI.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const state = globe && {
+          frames: globe.frameNumber,
+          renderer: globe.rendererStats(),
+          resources: globe.resourceCounts(),
+          terrain: globe.terrainStats(),
+          imagery: globe.imageryStats(),
+          size: [globe.camera.zoom, document.querySelector('canvas')?.width, document.querySelector('canvas')?.height],
+        };
+        reject(new Error(`captureFrame did not complete in 60 s: ${JSON.stringify(state)}`));
+      }, 60_000);
+    });
+    const capture = await Promise.race([globe?.captureFrame(), stalled]).finally(() => clearTimeout(timer));
     if (!capture) throw new Error(`no globe ${i}`);
     const bytes = new Uint8Array(capture.rgba.buffer, capture.rgba.byteOffset, capture.rgba.byteLength);
     let binary = '';
@@ -205,3 +232,16 @@ export async function screenToGeo(
 ): Promise<{ longitudeDeg: number; latitudeDeg: number } | undefined> {
   return page.evaluate((p) => window.vibeglobePlayground?.globe.screenToGeo(p), point);
 }
+
+/**
+ * A playground query that keeps M3 and M4's view geometry (`?curves=`): the globe never flattens and relief is full at
+ * every zoom. For tests of imagery and terrain rendering whose views M5's Auto curves would otherwise turn into the flat
+ * map or flat terrain (ADR 0034).
+ */
+export const GLOBE_GEOMETRY = `curves=${encodeURIComponent(
+  JSON.stringify({
+    morph: { startGroundZoom: 40, endGroundZoom: 41 },
+    relief: { startGroundZoom: -2, endGroundZoom: -1 },
+    tilt: { startGroundZoom: 41, endGroundZoom: 42 },
+  }),
+)}`;

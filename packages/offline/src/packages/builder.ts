@@ -119,7 +119,7 @@ async function fetchTileInto(
 ): Promise<number> {
   const prefix = versionKey(request);
   const tileRequest = job.source.request(job.coord, { url: '', hostIndex: 0 });
-  if (tileRequest === 'noData') return 0;
+  if (tileRequest === 'noData' || tileRequest === 'unknown') return 0;
   const response = await download(context.fetch, tileRequest.url, signal).catch((error: unknown) => {
     if (signal?.aborted) throw error;
     throw new PackageError(

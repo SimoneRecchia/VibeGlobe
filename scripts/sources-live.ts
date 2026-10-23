@@ -49,7 +49,7 @@ function guardedFetch(base: typeof fetch, report: LiveReport): typeof fetch {
 async function tiles(source: DescribedImagerySource, coords: readonly [number, number, number][]): Promise<void> {
   for (const [level, x, y] of coords) {
     const request = source.request({ root: 0, level, x, y }, { url: '', hostIndex: 0 });
-    if (request === 'noData') throw new Error(`${level}/${x}/${y} reported as no data`);
+    if (request === 'noData' || request === 'unknown') throw new Error(`${level}/${x}/${y} reported as no data`);
     const result = await new Promise<{ kind: string }>((done) =>
       source.transport.start(request, { firstByteMs: 10_000, totalMs: 30_000 }, done),
     );

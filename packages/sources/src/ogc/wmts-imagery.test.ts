@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { TileCoord } from '@vibeglobe/core';
+import { WEB_MERCATOR_TILING, type TileCoord, type TransportResult } from '@vibeglobe/core';
+import { transformCoordinates } from '@vibeglobe/gis';
 import { failures, runParserConformance, runTiledConformance } from '../conformance/index.js';
 import { fetchTransport } from '../fetch-transport.js';
 import { SourceConfigError } from '../metadata.js';
 import { parseWmtsCapabilities } from './wmts-capabilities.js';
 import { wmtsImagery } from './wmts-imagery.js';
+import { wmtsParts } from './wmts-reprojected.js';
 
 const fixture = (name: string): string =>
   readFileSync(new URL(`../__fixtures__/capabilities/${name}`, import.meta.url), 'utf8');
@@ -109,7 +111,7 @@ describe('wmtsImagery (F230, F227)', () => {
       transport: never,
     });
     const request = source.request(coord(3, 4, 2), blank());
-    expect(request !== 'noData' && request.url).toBe(
+    expect(typeof request === 'object' && request.url).toBe(
       'https://wmts.test/service?token=abc&SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ortho&STYLE=natural' +
         '&FORMAT=image%2Fjpeg&TILEMATRIXSET=WebMercator512&Time=2023&TILEMATRIX=m3&TILEROW=2&TILECOL=4',
     );
@@ -125,7 +127,7 @@ describe('wmtsImagery (F230, F227)', () => {
     });
     expect([geographic.tiling.crs, geographic.minLevel, geographic.maxLevel]).toEqual(['EPSG:4326', 0, 2]);
     const request = geographic.request(coord(2, 4, 1), blank());
-    expect(request !== 'noData' && request.url).toContain('/EPSG%3A4326/EPSG%3A4326%3A2/1/4.png');
+    expect(typeof request === 'object' && request.url).toContain('/EPSG%3A4326/EPSG%3A4326%3A2/1/4.png');
     const recorded = await wmtsImagery({
       id: 'a',
       capabilities: ARCGIS,
@@ -133,10 +135,91 @@ describe('wmtsImagery (F230, F227)', () => {
       transport: never,
     });
     const tile = recorded.request(coord(3, 2, 3), blank());
-    expect(tile !== 'noData' && tile.url).toContain('/default/GoogleMapsCompatible/3/3/2.png');
+    expect(typeof tile === 'object' && tile.url).toContain('/default/GoogleMapsCompatible/3/3/2.png');
     await expect(wmtsImagery({ id: 'u', capabilities: SYNTHETIC, layer: 'utm-only' })).rejects.toThrow(/reprojection/);
     const inspire = await wmtsImagery({ id: 'i', capabilities: WGS84, layer: 'baselayer', transport: never });
     expect(inspire.tiling.crs).toBe('EPSG:4326');
+  });
+
+  it('reprojects a UTM-only layer on the client, composing its tiles in place, but not a layer with a matching set (F227)', async () => {
+    const transforms = (crs: string) =>
+      crs === 'EPSG:32632'
+        ? {
+            toSource: (lon: number, lat: number): [number, number] => {
+              const p = transformCoordinates({ x: lon, y: lat }, 'EPSG:4326', crs);
+              return [p.x, p.y];
+            },
+            fromSource: (x: number, y: number): [number, number] => {
+              const p = transformCoordinates({ x, y }, crs, 'EPSG:4326');
+              return [p.x, p.y];
+            },
+          }
+        : undefined;
+    const direct = await wmtsImagery({
+      id: 'd',
+      capabilities: SYNTHETIC,
+      layer: 'ortho',
+      transforms,
+      transport: never,
+    });
+    const tile = direct.request(coord(2, 2, 1), blank());
+    expect(typeof tile === 'object' && tile.url).toContain('WebMercator512');
+    const urls: string[] = [];
+    const source = await wmtsImagery({
+      id: 'u',
+      capabilities: SYNTHETIC,
+      layer: 'utm-only',
+      transforms,
+      transport: fetchTransport((input) => {
+        urls.push(String(input));
+        return Promise.resolve(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }));
+      }),
+    });
+    expect([source.tiling.crs, source.transparent]).toEqual(['EPSG:3857', true]);
+    const c = WEB_MERCATOR_TILING.tileAt((9.19 * Math.PI) / 180, (45.46 * Math.PI) / 180, 6, coord(0, 0, 0));
+    const request = source.request(c, blank());
+    if (typeof request !== 'object') throw new Error('no request');
+    // The composition and warp need a browser (e2e reprojection.spec.ts, F226); here they settle as no data.
+    const result = await new Promise<TransportResult>((resolve) =>
+      source.transport.start({ url: request.url, hostIndex: 0 }, { firstByteMs: 1000, totalMs: 1000 }, resolve),
+    );
+    expect(result.kind).toBe('ok');
+    // The u0 matrix: 256 km tiles from (200 km E, 5300 km N); Milan (514.9 km E, 5034.5 km N) is in row 1, column 1.
+    const tiles = urls.map((u) => {
+      const q = new URL(u).searchParams;
+      return [q.get('TILEMATRIXSET'), q.get('TILEMATRIX'), Number(q.get('TILEROW')), Number(q.get('TILECOL'))];
+    });
+    expect(tiles).toContainEqual(['utm32', 'u0', 1, 1]);
+    for (const [, , row, col] of tiles) {
+      expect(row).toBeLessThan(4);
+      expect(col).toBeLessThan(3);
+    }
+  });
+
+  it('places each composed tile at its source position in the image (F227)', () => {
+    const set = parseWmtsCapabilities(SYNTHETIC).tileMatrixSets.find((s) => s.identifier === 'utm32');
+    if (!set) throw new Error('no set');
+    const bbox = [400_000, 4_900_000, 600_000, 5_100_000] as const;
+    const parts = wmtsParts(set.matrices, new Map(), (m, r, c) => `${m}/${r}/${c}`, bbox, 400, 400);
+    // 200 km at 500 m per pixel; u0's 256 km tiles from (200 km, 5300 km): columns 0–1, rows 0–1.
+    expect(parts.map((p) => p.url)).toEqual(['u0/0/0', 'u0/0/1', 'u0/1/0', 'u0/1/1']);
+    for (const p of parts) {
+      const [, row, col] = p.url.split('/').map(Number);
+      // Pixel → source: the part's left and top edges are its tile's, at 500 m per pixel (tiles of 3571428.57 × 0.28 mm × 256 ≈ 256 km).
+      expect(bbox[0] + p.xPx * 500).toBeCloseTo(200_000 + (col ?? NaN) * 256_000, 3);
+      expect(bbox[3] - p.yPx * 500).toBeCloseTo(5_300_000 - (row ?? NaN) * 256_000, 3);
+      expect(p.widthPx).toBeCloseTo(512, 3);
+      expect(p.heightPx).toBeCloseTo(512, 3);
+    }
+    const limited = wmtsParts(
+      set.matrices,
+      new Map([['u0', { minRow: 1, maxRow: 1, minCol: 0, maxCol: 2 }]]),
+      (m, r, c) => `${m}/${r}/${c}`,
+      bbox,
+      400,
+      400,
+    );
+    expect(limited.map((p) => p.url)).toEqual(['u0/1/0', 'u0/1/1']);
   });
 
   it('passes the tiled conformance suite', async () => {

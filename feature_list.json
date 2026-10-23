@@ -600,7 +600,20 @@
         "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
         "Confirm the latest run on main and the latest nightly run contain the fast, end-to-end and benchmark jobs and are green"
       ],
-      "status": "failing"
+      "status": "superseded"
+    },
+    {
+      "id": "F565",
+      "milestone": 1,
+      "section": "Testing and verification",
+      "description": "CI saves minutes on GitHub-hosted runners without a GPU: every push and every pull request from a fork runs one fast job with the type check, lint, format check, repository checks and guards, unit tests with coverage, license audit, API documentation build and bundle-size checks, while pushes to main, a nightly schedule and manual runs add the end-to-end tests and the recorded benchmarks.",
+      "steps": [
+        "Open the CI workflow and confirm its triggers and the conditions of each job match the description",
+        "Push a branch and confirm its run contains only the fast job, every listed check runs, and a newer push cancels the older run",
+        "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
+        "Confirm the latest run on main is green, and that a run of the full workflow, scheduled (nightly) or started by hand (workflow_dispatch), contains the fast, end-to-end and benchmark jobs and is green"
+      ],
+      "status": "passing"
     },
     {
       "id": "F041",
@@ -1736,7 +1749,7 @@
         "Open `http://localhost:5173/?scenario=terrain-alps&debug=1` and drive a zoom from 50 km to 500 m altitude with Playwright",
         "Assert from the debug overlay data that terrain levels increase toward the camera and that no tile is refined beyond the source's maximum level"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F127",
@@ -1749,7 +1762,7 @@
         "Serve the fixtures from the local fixture tile server and open `?scenario=terrain-quantized-mesh` on `?backend=webgpu` and `?backend=webgl2`",
         "Capture screenshots and assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F128",
@@ -1762,7 +1775,7 @@
         "Assert zero requests for tiles outside the declared availability and that those areas render with the best available ancestor terrain",
         "Assert extensions are requested (Accept header) only when layer.json declares them"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F129",
@@ -1775,7 +1788,7 @@
         "Open `?scenario=terrain-terrarium` with the fixtures on both backends and capture screenshots",
         "Assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F130",
@@ -1788,7 +1801,7 @@
         "Open `?scenario=terrain-rgb` with the fixtures on both backends and capture screenshots",
         "Assert the pixel diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F131",
@@ -1801,7 +1814,7 @@
         "Serve corrupted terrain tiles in the playground and record frames with a sentinel clear color on both backends",
         "Assert zero sentinel pixels and that the corrupted tiles are covered by their best available ancestor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F132",
@@ -1814,7 +1827,7 @@
         "Assert the rendered relief and elevation queries match the fixture heights within the encodings' precision",
         "Assert the test adapters import nothing beyond the published package entry points"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F133",
@@ -1827,7 +1840,7 @@
         "Assert elevation queries and rendered vertex positions agree between the two within tolerance",
         "Assert the source metadata exposes the declared datum and an unknown datum value is rejected with a validation error naming the source"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F134",
@@ -1840,7 +1853,7 @@
         "Assert decoding and mesh generation run only on worker threads and the main-thread time attributable to terrain per frame stays within the terrain CPU budget in docs/plan",
         "Assert per-frame GPU upload bytes for terrain never exceed the upload budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F135",
@@ -1852,7 +1865,7 @@
         "Render a fixture containing an analytic synthetic mountain on both backends and compare screenshots against analytically generated baselines",
         "Read back depth at selected pixels and assert reconstructed positions match the analytic surface within the depth-precision tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F136",
@@ -1864,7 +1877,7 @@
         "Record every frame during a slow scripted orbit and during a static hold",
         "Assert by frame differencing that terrain features move only by the expected camera motion and the static hold shows zero vertex oscillation above the jitter threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F137",
@@ -1890,7 +1903,7 @@
         "Assert no frame-to-frame change at a refinement or coarsening event exceeds the popping threshold",
         "Unit test the morph: at the end of each transition the geometry equals the target level's mesh exactly"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F139",
@@ -1904,7 +1917,7 @@
         "Assert from the tile-state trace that no parent terrain tile is released before all of its replacing children are ready and that 404 tiles are not retried",
         "Assert no step or wall is visible where covered terrain meets uncovered areas, including coastlines at the edge of coverage (seam detector)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F140",
@@ -1917,7 +1930,7 @@
         "Assert imagery levels exceed terrain levels and the on-screen imagery texel density matches the imagery-only reference within tolerance",
         "Capture screenshots on both backends and assert no seams where imagery tile edges cross terrain tiles (edge-detection check along tile borders)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F141",
@@ -1929,7 +1942,7 @@
         "Assert the grid lines rendered over the terrain land at their expected screen positions within 1 pixel at latitudes 0°, 45° and 75° on both backends",
         "Repeat with Web Mercator heightmap terrain and geographic imagery"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F142",
@@ -1941,7 +1954,7 @@
         "Open `?scenario=terrain-horizon-peaks` with a tall peak just behind the ellipsoid horizon and another at the frustum edge",
         "Record frames while panning on both backends and assert by frame differencing that the peaks never disappear or flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F143",
@@ -1953,7 +1966,7 @@
         "Record frames during a scripted orbit on both backends with a sentinel clear color",
         "Assert zero sentinel pixels and no seam lines (edge-detection along the 180° meridian and the polar cap boundary)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F144",
@@ -1965,7 +1978,7 @@
         "In the playground, run 10,000 queries per frame at random coordinates and assert the total time stays within its CPU budget with zero heap allocations per query",
         "Assert a query outside terrain coverage returns the height of the no-data surface chosen in the terrain ADR (the ellipsoid or geoid sea level) with a no-data flag"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F145",
@@ -1978,7 +1991,7 @@
         "Issue 1,000 queries over the same area and assert each tile is requested at most once",
         "Assert the promise settles with a typed error (never hangs) when the source fails, times out or the query is cancelled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F146",
@@ -1991,7 +2004,7 @@
         "In every frame assert the camera height above the terrain at the camera position (finest loaded level) is at least the configured clearance",
         "Assert no frame shows the inside of the terrain (sentinel and back-face checks)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F147",
@@ -2004,7 +2017,7 @@
         "Assert the camera stays above the displayed surface in every frame",
         "Assert the lift spans multiple frames with per-frame displacement below the jump threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F148",
@@ -2045,7 +2058,7 @@
         "Assert the default phase ranges match the numeric zoom or altitude ranges set in docs/plan for globe (world, continents), flattening (country), 2D map (region, city) and 3D view (neighborhood, street)",
         "Open `?scenario=zoom-globe-to-street` and assert the morph factor, tilt and relief reported per frame follow the curves"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F150",
@@ -2057,7 +2070,7 @@
         "Configure custom curves in the playground and assert the reported morph, tilt and relief follow them",
         "Change the curves at runtime and assert the view adapts without a jump (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F151",
@@ -2070,7 +2083,7 @@
         "Capture screenshots and assert the diff against the globe baseline is within the visual tolerance",
         "Assert the rendered limb matches the projected WGS84 ellipsoid silhouette within 1 px"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F152",
@@ -2083,7 +2096,7 @@
         "Assert renderer upload counters show no tile geometry re-upload caused by the sweep",
         "Assert frame differencing shows no frame-to-frame jump above the threshold"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F153",
@@ -2095,7 +2108,7 @@
         "Assert through the public camera state: phase 2D map, morph factor 1, applied tilt 0°, relief factor within the configured 2D range",
         "Capture screenshots and assert they match a reference mosaic of the same Web Mercator tiles within the visual tolerance (parallels and meridians straight and perpendicular)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F154",
@@ -2120,7 +2133,7 @@
         "Zoom with Playwright wheel events through the whole flattening range with the cursor at the center, the corners and near the limb, and with non-zero heading",
         "In every frame pick the geographic coordinate under the cursor and assert it stays within 1 px of the cursor"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F156",
@@ -2132,7 +2145,7 @@
         "In every frame project the start center coordinate to the screen",
         "Assert it stays within 1 px of the screen center"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F157",
@@ -2157,7 +2170,7 @@
         "Compute the geodesic distance between two picked points with the core geodesic API in each phase and assert identical results",
         "Assert no public measurement or picking API accepts or returns projected plane coordinates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F159",
@@ -2170,7 +2183,7 @@
         "Assert zero sentinel pixels and no seam (edge detection along the wrap line)",
         "Assert the reported center longitude wraps into [−180°, 180°) while the camera motion stays continuous"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F160",
@@ -2182,7 +2195,7 @@
         "Sweep the morph and the tilt while recording every frame with a sentinel clear color",
         "Assert zero sentinel pixels inside the map area and no seam at the cap boundary"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F161",
@@ -2194,7 +2207,7 @@
         "Zoom through every phase and assert the applied tilt equals the curve value in every frame",
         "After a manual tilt, select Auto and assert the tilt returns to the curve value without a jump and follows the curves again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F162",
@@ -2207,7 +2220,7 @@
         "Assert the applied tilt is 0° in every frame and the morph factor follows the zoom curve",
         "Assert rotation still works and the heading persists"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F163",
@@ -2220,7 +2233,7 @@
         "Assert the Auto control is visible next to the 2D/3D toggle and reflects the active mode",
         "Repeat through the public API and assert identical results and mode-change events"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F164",
@@ -2232,7 +2245,7 @@
         "Property test: for random sequences of zoom, pan and constraint changes, the chosen values change only on explicit user or API tilt and heading input",
         "Assert the public camera state exposes chosen and applied tilt and heading and the view mode"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F165",
@@ -2245,7 +2258,7 @@
         "Assert the camera never enters the terrain, the applied tilt is reduced only while required and returns to 70° once clear",
         "Assert the chosen tilt stays 70° throughout and every transition is free of jumps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F166",
@@ -2258,7 +2271,7 @@
         "Zoom back in and assert the applied tilt returns to 60° without a jump",
         "Assert the chosen tilt remains 60° throughout"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F167",
@@ -2299,7 +2312,7 @@
         "Assert the zoom changes in proportion to the deltas with no stepping (no frame-to-frame jump above threshold) and stays anchored within 1 px",
         "Manually check on a macOS trackpad and a Windows precision touchpad and record the result"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F170",
@@ -2311,7 +2324,7 @@
         "Assert the zoom increases by exactly one level at the end of the animation and the clicked coordinate stays within 1 px of the pointer",
         "Assert a single click does not zoom"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F171",
@@ -2324,7 +2337,7 @@
         "Assert a single tap and a tap followed by a drag do not trigger it",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F172",
@@ -2337,7 +2350,7 @@
         "Assert two-finger touches that move beyond the tap tolerance or last beyond the tap duration do not trigger it",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F173",
@@ -2376,7 +2389,7 @@
         "On release assert the box's geographic corners are inside the viewport and the view fills the box's larger dimension within tolerance",
         "Press Escape during a box drag and assert nothing moves"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F176",
@@ -2388,7 +2401,7 @@
         "After the animation, project the bounds' corners and edge samples to the screen",
         "Assert all are inside the padded viewport and at least one edge touches the padding within 2 px"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F177",
@@ -2427,7 +2440,7 @@
         "Assert inertia on the globe continues along the drag's great-circle direction",
         "Repeat with a one-finger touch drag and release and assert the same inertia behavior"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F180",
@@ -2440,7 +2453,7 @@
         "Assert release with velocity produces the same inertia as a mouse drag",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F181",
@@ -2452,7 +2465,7 @@
         "Assert the view pans in the matching screen direction with eased acceleration and deceleration and no stutter",
         "Assert the keys do nothing when focus is outside the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F182",
@@ -2476,7 +2489,7 @@
         "Assert the heading and tilt change exactly as for an equivalent right-drag",
         "Assert releasing Ctrl mid-drag ends the rotation without a jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F184",
@@ -2489,7 +2502,7 @@
         "Assert small unintended twists during a pinch below the rotation threshold do not rotate",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F185",
@@ -2514,7 +2527,7 @@
         "Record the camera per frame and assert no frame-to-frame change above the jump threshold at each finger change",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F187",
@@ -2538,7 +2551,7 @@
         "Assert the tilt animates to the value, becomes the chosen tilt and never exceeds the maximum tilt",
         "Assert using it in 2D locked or Auto mode follows the documented view-mode rules"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F189",
@@ -2550,7 +2563,7 @@
         "Wheel, pinch and touch-drag over the map and assert the window scroll position and visual viewport scale do not change",
         "Wheel outside the map and assert the page scrolls normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F190",
@@ -2563,7 +2576,7 @@
         "Drag around the compass and assert the heading follows the drag angle",
         "Repeat the click and drag under touch emulation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F191",
@@ -2575,7 +2588,7 @@
         "Assert the heading animates to 0°, 90°, 180° and 270° respectively along the shortest arc",
         "Assert the center and tilt are kept and the new heading becomes the chosen heading"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F192",
@@ -2587,7 +2600,7 @@
         "In every frame assert the orbit point stays within 1 px of its screen position and the camera distance to it is constant",
         "Assert user input or a cancel call stops the orbit without a jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F193",
@@ -2599,7 +2612,7 @@
         "Assert the animation ends with the whole globe visible and centered on the previous center longitude and latitude",
         "Assert the movement events and promise report completion"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F194",
@@ -2611,7 +2624,7 @@
         "Assert the camera arrives exactly at the home view",
         "Assert an invalid home view is rejected by configuration validation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F195",
@@ -2624,7 +2637,7 @@
         "Assert the final camera state equals the target within floating-point tolerance",
         "Assert duration, speed, curve and easing options are honored and invalid values are rejected"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F196",
@@ -2637,7 +2650,7 @@
         "Assert continuity of morph factor, tilt and relief in every frame (no jump)",
         "Record frames and assert zero black or empty pixels after the base has loaded"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F197",
@@ -2649,7 +2662,7 @@
         "Assert the next rendered frame shows the target camera state exactly",
         "Assert movestart, move and moveend fire once each and the promise or return value reports completion"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F198",
@@ -2661,7 +2674,7 @@
         "Assert the eased interpolation per frame and the exact final state",
         "Assert heading 350° → 10° passes through 0° and a move from 179°E to 179°W crosses the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F199",
@@ -2673,7 +2686,7 @@
         "Assert the camera reaches each waypoint in order and emits a waypoint event for each",
         "Assert the tour promise settles as completed at the end, and as interrupted when cancelled or when the user takes over mid-tour"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F200",
@@ -2700,7 +2713,7 @@
         "Call each movement API with an explicit tilt and heading and assert they are applied",
         "Assert the view mode is unchanged by every movement call"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F202",
@@ -2736,7 +2749,7 @@
         "Assert hemisphere letters decide the axes when present and the documented latitude, longitude order applies otherwise",
         "Type a coordinate into the playground go-to input with Playwright and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F205",
@@ -2748,7 +2761,7 @@
         "Assert parsed values equal the expected decimal degrees within 1e-9°",
         "Type a DMS coordinate into the playground go-to input and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F206",
@@ -2760,7 +2773,7 @@
         "Assert the Norway and Svalbard zone exceptions and band letters are validated",
         "Type a UTM coordinate into the playground go-to input and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F207",
@@ -2772,7 +2785,7 @@
         "Run the coordinate-string fuzzer for its iteration budget and assert no exception escapes and no input hangs",
         "Assert invalid inputs (latitude above 90°, zone 61, mixed garbage) return typed errors and the go-to input shows the error without moving the camera"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F208",
@@ -2785,7 +2798,7 @@
         "Assert that without a registered geocoder no network request is made and the search reports that no provider is configured",
         "Assert no geocoding provider is a dependency of any package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F209",
@@ -2833,7 +2846,7 @@
         "In every frame assert the camera clearance above the terrain is at least the configured minimum",
         "Assert the path adjustment is continuous (no jump) and the arrival state equals the target"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F213",
@@ -2911,7 +2924,7 @@
         "Confirm it lists how those projects test their adapters (fixtures, live endpoints, conformance suites)",
         "Confirm it states the chosen approach and why, links the ADRs that record the decisions, and states that no code was copied and only open-source projects were studied"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F219",
@@ -2952,7 +2965,7 @@
         "Assert that above zoom 12 the view shows upsampled level-12 imagery, that below zoom 3 the base layer shows through, and that every frame has zero black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F222",
@@ -2965,7 +2978,7 @@
         "Assert no one-second window exceeds 10 requests to the limited source while the other source is not slowed down",
         "Assert the view keeps showing parent-tile fallback with zero black pixels while requests are throttled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F223",
@@ -3018,7 +3031,7 @@
         "Record frames while panning across the 12°E boundary and assert no gap, seam or overlap appears between the two zones",
         "Unit-test the reprojection against a projection library reference with property-based round trips"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F227",
@@ -3031,7 +3044,7 @@
         "Point them at fixture services that offer only EPSG:32632 and assert the adapter reprojects on the client with correct alignment",
         "Set a preferred reference system in the source configuration and assert it is honored"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F228",
@@ -3237,7 +3250,7 @@
         "Assert the top layer's color is visible in the overlap after each change and no frame shows a missing layer or black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F244",
@@ -3250,7 +3263,7 @@
         "Animate opacity over 1 s while recording frames and assert the change is monotonic with no flicker",
         "Assert a layer at opacity 0 issues no new tile requests"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F245",
@@ -3263,7 +3276,7 @@
         "Assert showing it again draws its cached tiles on the next frame and no frame shows black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F246",
@@ -3275,7 +3288,7 @@
         "Capture screenshots and compare with reference images computed from the blend formulas within tolerance",
         "Assert WebGPU and forced WebGL2 results match within the visual-test tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F247",
@@ -3288,7 +3301,7 @@
         "Assert tiles inside Italy above zoom 8 come from the online source, tiles outside its coverage are never requested from it, and the package supplies everything else",
         "Record frames and assert zero black pixels and no visible seam at the coverage boundary"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F248",
@@ -3301,7 +3314,7 @@
         "Assert tiles come from the second source while the first is failing and return to the first after recovery",
         "Record frames and assert zero black pixels and no popping during each switch"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F249",
@@ -3341,7 +3354,7 @@
         "Assert a source without CORS logs one descriptive error naming the source, its tiles are treated as unavailable, and the rest of the view keeps rendering with zero black pixels",
         "Set the credentials mode per source and assert requests are sent with the configured mode"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F252",
@@ -3354,7 +3367,7 @@
         "Make the fixture server reject an expired token and assert the callback is called, the request is retried with the new token, and no black pixels appear",
         "Assert tokens never appear in logs, traces, the debug overlay or error messages"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F253",
@@ -3367,7 +3380,7 @@
         "Trigger logging, tracing, the debug overlay (?debug=1) and a failing request, and assert the key appears in none of their outputs",
         "Assert the sources guide explains how to keep secrets out of URLs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F254",
@@ -3380,7 +3393,7 @@
         "Assert the credits list contains exactly the sources with visible tiles at each moment and the event fires on each change",
         "Assert a source used by two layers is credited once"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F255",
@@ -3393,7 +3406,7 @@
         "Try to hide the attribution element through configuration and CSS and assert required credits stay visible and a warning names the requiring source",
         "Assert sources that do not require attribution can be hidden from the element"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F256",
@@ -3729,7 +3742,7 @@
         "Assert returning tiles are drawn from memory on the first frame with no request and no black pixels",
         "Assert GPU and RAM use stay within the configured budgets with least-recently-used eviction"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F282",
@@ -3741,7 +3754,7 @@
         "Assert GPU and RAM tile memory track the current working set and drop after tiles leave the screen",
         "Pan back and assert tiles come from persistent storage, packages or network, with parent fallback and zero black pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F283",
@@ -3753,7 +3766,7 @@
         "Record every frame and assert no visible tile is evicted and re-requested while on screen",
         "Assert zero black pixels and no flicker (frame-difference analysis)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F284",
@@ -3765,7 +3778,7 @@
         "Assert tiles entering the view were already loaded and are drawn at full detail on the first frame they appear",
         "Assert prefetch requests are issued only after all visible tiles are requested and are cancelled when the view moves away"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F285",
@@ -4687,7 +4700,7 @@
         "Rotate and tilt the camera and verify billboards keep facing the screen and the anchor stays on the coordinate within 1 pixel",
         "Verify marker images share a texture atlas so draw calls stay within the documented budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F353",
@@ -4738,7 +4751,7 @@
         "Verify sampled outline points lie at the configured geodesic distance from the center within 0.1% using the geodesic utilities",
         "Capture screenshots in the globe, 2D and tilted 3D phases on WebGPU and forced WebGL2 and compare against baselines within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F357",
@@ -4751,7 +4764,7 @@
         "Verify text with accented Latin, Greek and Cyrillic characters renders with the correct glyphs, and CJK text renders through a fallback font",
         "Verify the label anchor stays on its coordinate within 1 pixel while panning and zooming"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F358",
@@ -4777,7 +4790,7 @@
         "Verify that whenever two labels collide, the one with higher priority is the one shown",
         "Zoom in and verify hidden labels appear as space frees up, with collision work staying within the per-frame budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F360",
@@ -4789,7 +4802,7 @@
         "Run temporal glitch detection and verify no label toggles visibility more than once within the fade window and none jumps more than 1 pixel between frames beyond camera motion",
         "Verify visibility changes are fades of the documented duration, not single-frame pops"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F361",
@@ -4816,7 +4829,7 @@
         "Verify their screen positions match the projection of their ellipsoidal coordinates within 1 pixel in the globe, 2D and tilted 3D phases",
         "Verify on the flat plane that altitude is scaled consistently with the terrain relief scaling, so objects stay at the same height relative to the terrain"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F363",
@@ -4891,7 +4904,7 @@
         "Capture screenshots in the globe, 2D and tilted 3D phases on WebGPU and forced WebGL2",
         "Verify no feature wraps the wrong way around the world, shows a gap at ±180° or degenerates near a pole"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F369",
@@ -4904,7 +4917,7 @@
         "Change a feature property through a live update and verify its style updates in the next frame without rebuilding the layer",
         "Feed malformed style expressions and verify they are rejected at the API boundary with a clear error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F370",
@@ -4916,7 +4929,7 @@
         "Zoom continuously while recording frames",
         "Verify interpolated properties change smoothly by frame differencing and the stepped property switches exactly at its stop"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F371",
@@ -4990,7 +5003,7 @@
         "Verify the feature appears at its new position in the next frame",
         "Verify through instrumentation that only the changed range is uploaded and the per-frame update cost stays within budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F377",
@@ -5002,7 +5015,7 @@
         "Verify each change is visible in the next frame",
         "Verify through instrumentation that only the changed ranges are uploaded"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F378",
@@ -5040,7 +5053,7 @@
         "Click overlapping features and verify the topmost one is reported",
         "Manually verify tapping on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F381",
@@ -5052,7 +5065,7 @@
         "Verify the highlight appears in the next frame and is removed on deselection",
         "Move the camera and live-update the selected feature and verify the highlight follows it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F382",
@@ -5077,7 +5090,7 @@
         "Verify coordinates match the expected location within the size of one screen pixel on the ground",
         "Verify the elevation matches the best available terrain height within the documented tolerance on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F384",
@@ -5089,7 +5102,7 @@
         "Verify every pick returns the expected feature, including small features at street level",
         "Repeat during a running flight and verify picks match what is displayed in that frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F385",
@@ -5101,7 +5114,7 @@
         "Verify GPU and RAM memory return to their baseline within tolerance after each cycle",
         "Verify no listeners, workers or timers remain from removed layers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F386",
@@ -5113,7 +5126,7 @@
         "Verify every topic listed is covered with a runnable example",
         "Run every example from the guide and verify it works as described"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F387",
@@ -5125,7 +5138,7 @@
         "Project every object's extent (including height) to the screen after the animation",
         "Assert all are inside the padded viewport and the view is not wider than needed (one edge within 2 px of the padding)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F388",
@@ -5138,7 +5151,7 @@
         "Add it in the playground and capture screenshots on WebGPU and forced WebGL2, asserting it renders at its expected coordinates",
         "Assert it receives frame and camera events and that picking returns its features"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F389",
@@ -5165,7 +5178,7 @@
         "Verify it lists known failure modes with issue references (for example banding, precision artifacts near the horizon, discontinuities at altitude changes, cost on tablets)",
         "Verify it states the chosen approach, why, and how it will be tested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F391",
@@ -5782,7 +5795,7 @@
         "Check it records the approaches found, their trade-offs and failure modes, the chosen approach and why, with a linked ADR",
         "Confirm no restrictively licensed source-available project (for example Mapbox GL JS v2+) was studied and no code was copied"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F440",
@@ -6055,7 +6068,7 @@
         "Fuzz tileset JSON and binary tile content and assert no crash, the tile is marked failed and its parent stays visible",
         "Run the suite against public sample tilesets where their terms allow it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F461",

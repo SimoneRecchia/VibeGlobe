@@ -1,0 +1,51 @@
+{
+  "source": "scripts/fixtures/tiles/terrain.ts terrainTile(geographic 8/266/62, quantized-mesh, 16 cells, metadata)",
+  "minHeightMeters": -122.51982879638672,
+  "maxHeightMeters": 3168.719970703125,
+  "vertexCount": 289,
+  "triangleCount": 512,
+  "edgeVertices": 17,
+  "quantizationMeters": 0.10044373300880495,
+  "metadataAvailable": [
+    [
+      {
+        "startX": 532,
+        "startY": 386,
+        "endX": 533,
+        "endY": 387
+      }
+    ]
+  ],
+  "samples": [
+    {
+      "u": 0,
+      "v": 1,
+      "heightMeters": -81.69180524396111
+    },
+    {
+      "u": 0.5,
+      "v": 0.5,
+      "heightMeters": 206.63686335880746
+    },
+    {
+      "u": 1,
+      "v": 0,
+      "heightMeters": -109.03226684616345
+    },
+    {
+      "u": 0.1875,
+      "v": 0.3125,
+      "heightMeters": 1810.251104958639
+    },
+    {
+      "u": 1,
+      "v": 1,
+      "heightMeters": -122.43165932522778
+    },
+    {
+      "u": 0,
+      "v": 0,
+      "heightMeters": 2514.513302225708
+    }
+  ]
+}

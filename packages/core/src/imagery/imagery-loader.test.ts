@@ -7,7 +7,7 @@ import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
-import type { ImagerySource } from './imagery-source.js';
+import { imageryDecodeTask, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
 class ManualTransport implements TileTransport {
@@ -100,6 +100,7 @@ function setUp(
     decoder?: 'image' | 'ktx2';
     workers?: WorkerPool;
     source?: Partial<ImagerySource>;
+    prefetchRing?: boolean;
   } = {},
 ) {
   const tasks: { task: string; input: unknown }[] = [];
@@ -148,7 +149,8 @@ function setUp(
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
-    compressedFormats: ['bc'],
+    ...(memory.prefetchRing === undefined ? {} : { prefetchRing: memory.prefetchRing }),
+    decodeTask: imageryDecodeTask(source, ['bc']),
     uploadTexture: (handle) => uploaded.push(handle),
     releaseTexture: (handle) => released.push(handle),
     tileError: (_source, level, x, y, reason) => errors.push(`${reason} ${level}/${x}/${y}`),
@@ -269,6 +271,26 @@ describe('ImageryLoader', () => {
     loader.endFrame();
     timers.advance(10);
     expect(transport.started).toEqual([url(4, 0, 0), url(7, 9, 9)]);
+  });
+
+  it('asks for the frames that cancel a request no longer wanted, even when nothing else draws (KB-105)', () => {
+    const { timers, transport, loader, frames } = setUp();
+    loader.beginFrame();
+    loader.want(4, 0, 0, 1);
+    loader.endFrame();
+    // The view left the tile and the engine would go idle: the loader keeps asking for frames until it cancels it.
+    let drawn = 0;
+    while (transport.aborted.length === 0 && drawn < 5) {
+      const before = frames();
+      loader.beginFrame();
+      loader.endFrame();
+      timers.advance(20);
+      drawn++;
+      if (frames() === before) break;
+    }
+    // The network pool aborts a released request after its grace period.
+    timers.advance(1000);
+    expect(transport.aborted).toEqual([url(4, 0, 0)]);
   });
 
   it('keeps GPU use within its budget, evicting the least recently used tile but never one drawn (F098, F102)', () => {
@@ -418,10 +440,7 @@ describe('ImageryLoader', () => {
           tiling: WEB_MERCATOR_TILING,
           minLevel: 0,
           maxLevel: 10,
-          tileSizePx: 256,
-          pixelRatio: 1,
           transport,
-          decoder: 'image',
           request: (coord, out) => {
             out.url = url(coord.level, coord.x, coord.y);
             return out;
@@ -432,7 +451,7 @@ describe('ImageryLoader', () => {
         memory: { residency, ram: new RamTier({ budgetBytes: 1e9 }), frame: () => 1 },
         handleBase,
         pinnedLevel: -1,
-        compressedFormats: [],
+        decodeTask: (bytes, contentType) => ({ task: 'decode-image', input: { bytes, contentType } }),
         uploadTexture: (handle) => uploaded.push(handle),
         releaseTexture: () => undefined,
         requestFrame: () => undefined,
@@ -537,5 +556,62 @@ describe('ImageryLoader', () => {
     expect(errors).toEqual(['failed 4/1/1']);
     // From the RAM copy: the tile was downloaded once.
     expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+  });
+
+  it('prefetches the ring around the visible tiles after them, and nothing beyond the view without prefetch (F284, F285)', () => {
+    for (const flags of [LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH, LOAD_KEEP_IN_MEMORY]) {
+      const { transport, runFrame } = setUp(32, {
+        prefetchRing: true,
+        source: { loadingFlags: () => flags, maxRequestsPerHost: 16 },
+      });
+      runFrame([[5, 10, 10]]);
+      if (flags & LOAD_PREFETCH) {
+        expect(transport.started[0]).toBe(url(5, 10, 10));
+        expect(new Set(transport.started.slice(1))).toEqual(
+          new Set(
+            [-1, 0, 1].flatMap((dy) => [-1, 0, 1].filter((dx) => dx || dy).map((dx) => url(5, 10 + dx, 10 + dy))),
+          ),
+        );
+      } else expect(transport.started).toEqual([url(5, 10, 10)]);
+    }
+  });
+
+  it('keeps tiles that left the view in memory with memory reuse, and releases them at once without it (F281, F282)', () => {
+    for (const flags of [LOAD_KEEP_IN_MEMORY, 0]) {
+      const { transport, released, ram, ok, runFrame } = setUp(32, { source: { loadingFlags: () => flags } });
+      runFrame([[5, 0, 0]]);
+      transport.answer(url(5, 0, 0), ok);
+      runFrame([[5, 0, 0]]);
+      // The tile leaves the view: kept on the GPU and in RAM with reuse, released from both without it.
+      runFrame([[5, 3, 3]]);
+      expect(released, `flags ${flags}`).toEqual(flags ? [] : [100]);
+      expect(ram.has(100), `flags ${flags}`).toBe(flags !== 0);
+    }
+  });
+
+  it('forgets every tile on reload: textures and RAM copies released, and the tiles requested again (KB-PT-19, F279)', () => {
+    const { transport, loader, released, ram, ok, runFrame } = setUp(32);
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), ok);
+    runFrame([[5, 0, 0]]);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    loader.reload();
+    expect(released).toEqual([100]);
+    expect(ram.has(100)).toBe(false);
+    // The next frame wants it again: a new request, not the old texture or bytes.
+    expect(runFrame([[5, 0, 0]])).toEqual([-1]);
+    expect(transport.started).toEqual([url(5, 0, 0), url(5, 0, 0)]);
+  });
+
+  it('cancels the prefetch requests of a view the camera left (F284)', () => {
+    const { transport, timers, runFrame } = setUp(32, { prefetchRing: true, source: { maxRequestsPerHost: 16 } });
+    runFrame([[5, 10, 10]]);
+    const ring = transport.started.slice(1);
+    expect(ring).toHaveLength(8);
+    for (let i = 0; i < 3; i++) {
+      runFrame([[5, 30, 30]]);
+      timers.advance(100);
+    }
+    expect(transport.aborted).toEqual(expect.arrayContaining(ring));
   });
 });

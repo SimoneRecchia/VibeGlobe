@@ -11,11 +11,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vibeglobe/core": "*",
-    "@vibeglobe/ui": "*",
     "@vibeglobe/controls": "*",
+    "@vibeglobe/core": "*",
+    "@vibeglobe/custom-layer-example": "*",
+    "@vibeglobe/gis": "*",
+    "@vibeglobe/layers": "*",
     "@vibeglobe/renderer": "*",
     "@vibeglobe/sources": "*",
+    "@vibeglobe/ui": "*",
     "@vibeglobe/worker": "*"
   }
 }

@@ -36,6 +36,10 @@ export const EN = {
   'search.noResults': 'No results',
   'search.failed': 'Search is not available right now',
   'search.searching': 'Searching…',
+  'search.invalid.latitude-out-of-range': 'The latitude must lie between −90° and 90°',
+  'search.invalid.longitude-out-of-range': 'The longitude must lie between −180° and 180°',
+  'search.invalid.invalid-utm-zone': 'Unknown UTM zone or band letter',
+  'search.invalid.invalid-minutes-or-seconds': 'Minutes and seconds must be below 60',
 } as const;
 
 /** Keys of every translated UI string. */

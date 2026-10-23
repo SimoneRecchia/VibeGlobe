@@ -135,8 +135,12 @@ test('the built bundles contain no eval, no Function constructor and no blob-gen
     for (const file of readdirSync(directory, { recursive: true }).map(String)) {
       if (!file.endsWith('.js')) continue;
       const code = readFileSync(join(directory, file), 'utf8');
-      // Blob-generated code needs createObjectURL; the worker package only mentions blob: URLs to refuse them.
-      if (/\beval\s*\(|new\s+Function\s*\(|\bFunction\s*\(\s*['"`]|createObjectURL/.test(code))
+      // Blob-generated code needs createObjectURL and a worker or script to run it; the worker package only mentions
+      // blob: URLs to refuse them, and three.js's glTF loader makes blob: URLs of images only (ADR 0037).
+      const blobCode =
+        /createObjectURL/.test(code) &&
+        /new\s+(Shared)?Worker\s*\(|importScripts|createElement\(\s*['"`]script/.test(code);
+      if (/\beval\s*\(|new\s+Function\s*\(|\bFunction\s*\(\s*['"`]/.test(code) || blobCode)
         offenders.push(join(directory, file));
     }
   }

@@ -1,27 +1,29 @@
+import { requestingTarget } from '../layers/layer-geometry.js';
+import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import {
-  applyView,
-  currentView,
-  newCameraState,
-  readCameraState,
-  requestedCameraState,
-  writeCameraState,
-} from './camera-state.js';
+import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
-import { dragCamera, zoomCamera } from './navigation.hot.js';
-import { buildDebugMesh, validateDebugShapes } from './debug-mesh.js';
+import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
-import { FrameWaits } from './frame-waits.js';
-import { NO_RENDERER_STATS } from './diagnostics.js';
+import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
+import { ControlsSlot } from './controls-slot.js';
+import { imageryLayersOf } from './imagery-layers.js';
+import type { ImageryLayers } from '../imagery/imagery-stack.js';
+import type { Credit } from '../imagery/credits.js';
+import { Constraints, validateConstraints } from './constraints.hot.js';
+import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
-import { keepGroundScale, positionAt, screenOf } from './view-geometry.js';
+import type { ViewMode } from '../view/view-state.js';
+import type { ViewControl } from './view-control.js';
+import { completedMovement, wireView, type Movements } from './movements.js';
+import type { ElevationSample } from '../terrain/terrain-heights.js';
+import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
-  Controls,
   DebugMeshData,
   DebugShape,
   FrameCapture,
@@ -30,6 +32,7 @@ import type {
   GlobeEvents,
   GlobeOptions,
   ImageryStats,
+  TerrainStats,
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
@@ -39,11 +42,9 @@ import type {
   SurfaceTileInfo,
   ResourceCounts,
   ScreenPoint,
-  ViewInit,
 } from './types.js';
 import {
   DEFAULT_VIEW,
-  isScreenPoint,
   validateHandler,
   validateResolutionScale,
   validateScreenPoint,
@@ -64,12 +65,14 @@ export function createGlobe(options: GlobeOptions): Globe {
 class GlobeEngine implements Globe {
   readonly ready: Promise<void>;
   readonly navigation: NavigationApi;
+  private readonly viewControl: ViewControl;
+  private readonly movements: Movements;
+  private readonly constraints = new Constraints();
   private readonly emitter = new Emitter<GlobeEvents>();
   private readonly cam = new Camera();
   private renderer: RendererBackend | undefined;
   private surface: SurfaceCache | undefined;
-  private controls: Controls | undefined;
-  private controlsElement: unknown;
+  private readonly controlsSlot = new ControlsSlot();
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
   private frames = 0;
@@ -106,14 +109,7 @@ class GlobeEngine implements Globe {
   private resolutionScale: number;
   private readonly diag: ReturnType<typeof createObservability>;
   readonly diagnostics: GlobeDiagnostics;
-  private readonly frameView = {
-    view: this.cam.view,
-    projection: this.cam.projection,
-    eyeEcef: this.cam.eyeEcef,
-    widthPx: 1,
-    heightPx: 1,
-    pixelRatio: 1,
-  };
+  private readonly frameView: MutableFrameView;
 
   constructor(private readonly options: GlobeOptions) {
     this.resolutionScale = options.resolutionScale ?? 1;
@@ -121,14 +117,21 @@ class GlobeEngine implements Globe {
     this.diag = createObservability(options.logLevel ?? 'warn', options.logSink, () => this.renderer?.host.now() ?? 0);
     this.diagnostics = this.diag.api;
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
+    this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
-    this.navigation = {
-      // Input plug-ins call these every frame: invalid input is ignored, never thrown.
-      grab: (point) => (isScreenPoint(point) ? this.pick(point) : undefined),
-      dragTo: (anchor, point) => this.dragTo(anchor, point),
-      zoomAt: (point, deltaZoom) => this.zoomAt(point, deltaZoom),
-      requestUpdate: () => this.requestRender(),
-    };
+    ({ viewControl: this.viewControl, movements: this.movements } = wireView({
+      cam: this.cam,
+      view: this.surfaceFrame.view,
+      emitter: this.emitter,
+      clock: this.clock,
+      setOpacity: (opacity) => this.renderer?.host.setOpacity?.(opacity),
+      waiting: () => this.waiting,
+      assertAlive: () => this.assertAlive(),
+      requestRender: () => this.requestRender(),
+    }));
+    this.navigation = this.viewControl.navigation;
+    if (options.constraints) this.setConstraints(options.constraints);
+    if (options.view?.tiltDeg !== undefined) this.viewControl.chooseTilt(this.pendingView.tiltDeg);
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
@@ -153,9 +156,28 @@ class GlobeEngine implements Globe {
   }
 
   get camera(): CameraState {
-    const pending = this.pendingView;
     // Before the viewport has a size, range and altitude are unknown (types.ts, Globe.camera).
-    return pending ? requestedCameraState(pending) : readCameraState(this.cam);
+    const view = this.surfaceFrame.view;
+    return this.pendingView ? requestedCameraState(this.pendingView, view) : readCameraState(this.cam, view);
+  }
+
+  get reducedMotion(): boolean {
+    return this.movements.reducedMotion;
+  }
+
+  get viewMode(): ViewMode {
+    return this.surfaceFrame.view.mode;
+  }
+
+  readonly setViewMode: Globe['setViewMode'] = (mode) => this.assertAlive() ?? this.viewControl.setMode(mode);
+  readonly setViewCurves: Globe['setViewCurves'] = (curves) => this.assertAlive() ?? this.viewControl.setCurves(curves);
+
+  credits(): readonly Credit[] {
+    return this.surfaceFrame.imagery?.credits.list() ?? [];
+  }
+
+  get imageryLayers(): ImageryLayers {
+    return imageryLayersOf(this.surfaceFrame);
   }
 
   get frameNumber(): number {
@@ -195,12 +217,16 @@ class GlobeEngine implements Globe {
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) return renderer.destroy();
     this.renderer = renderer;
-    this.surface = new SurfaceCache(renderer);
     // Loads finishing after destroy ask for nothing.
     this.surfaceFrame.startImagery(this.options, renderer, {
       requestFrame: () => this.destroyed || this.requestRender(),
       tileError: (event) => this.emitter.emit('tile-error', event),
+      creditsChange: (credits) => this.emitter.emit('credits-change', { credits }),
+      sourceError: (error) => this.emitter.emit('error', error),
     });
+    // After the terrain starts: its errors set the skirt depths.
+    this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);
+    renderer.layers?.setGround?.(this.surfaceFrame.layerGround());
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(
@@ -214,6 +240,7 @@ class GlobeEngine implements Globe {
         this.visible = visible;
         if (visible) this.requestRender();
       }),
+      renderer.host.observeReducedMotion?.((reduce) => (this.movements.reducedMotion = reduce)) ?? (() => undefined),
     );
     this.attachControls();
     await renderer.setBaseImagery(this.options.baseImageryUrl);
@@ -224,12 +251,7 @@ class GlobeEngine implements Globe {
 
   /** Attaches the controls to the renderer's input element, again when a recovery replaced it (KB-020). */
   private attachControls(): void {
-    const factory = this.options.controls;
-    const element = this.renderer?.inputElement;
-    if (!factory || (this.controls && element === this.controlsElement)) return;
-    this.controls?.destroy();
-    this.controlsElement = element;
-    this.controls = factory(element, this.navigation);
+    this.controlsSlot.attach(this.options.controls, this.renderer?.inputElement, this.navigation);
   }
 
   private syncSize(): void {
@@ -293,13 +315,21 @@ class GlobeEngine implements Globe {
     this.inFrame = true;
     renderer.host.checkSize?.();
     // Until the requested view has a viewport there is no camera to draw or report (KB-040).
-    if (!this.waiting) this.controls?.update?.();
+    // A running movement steps to this frame's time first; input the controls apply then interrupts it (ADR 0036).
+    if (!this.waiting) {
+      this.movements.step();
+      this.controlsSlot.controls?.update?.();
+      this.movements.afterInput();
+      this.constraints.apply(this.cam);
+    }
     this.inFrame = false;
     this.dirty = false;
     // A frame not drawn takes no step of the manual clock (KB-058).
     if (this.waiting) return this.clock.skipped();
     this.cam.update();
     const draws = this.surfaceFrame.prepare(this.cam, surface);
+    // A lift moved the camera after the selection: the next frame draws the new pose, until the lift settles (F146).
+    if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.dirty = true;
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
     if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
@@ -312,7 +342,7 @@ class GlobeEngine implements Globe {
       this.emitter.emit('frame', this.framePayload);
     }
     if (this.emitter.has('camera-change'))
-      this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload));
+      this.emitter.emit('camera-change', writeCameraState(this.cam, this.cameraPayload, this.surfaceFrame.view));
     // With imagery, `ready` waits for the pinned base: from then on zooming out always shows a complete picture (F084).
     if (this.resolveReady && this.surfaceFrame.baseReady) {
       this.resolveReady();
@@ -320,7 +350,8 @@ class GlobeEngine implements Globe {
       this.emitter.emit('ready', { backend: renderer.capabilities.backend });
       this.diag.logger.log('info', `started on ${renderer.capabilities.backend}`);
     }
-    if (this.dirty || this.surfaceFrame.fading) this.requestRender();
+    if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing || this.movements.active)
+      this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
       this.idlePayload.frameNumber = this.frames;
       this.emitter.emit('idle', this.idlePayload);
@@ -334,59 +365,37 @@ class GlobeEngine implements Globe {
     this.requestRender();
   }
 
-  jumpTo(target: ViewInit): void {
+  readonly jumpTo: Globe['jumpTo'] = (target) => {
     this.assertAlive();
-    const keepRange = typeof target === 'object' && target !== null && target.zoom === undefined;
-    // While the container has no size a jump with a zoom is kept as a request, like before start (KB-046); one without
-    // keeps the camera's range, which needs no viewport (KB-056).
-    const pending = this.pendingView ?? (this.collapsed && !keepRange ? currentView(this.cam) : undefined);
-    let view;
-    try {
-      view = validateView(target, pending ?? currentView(this.cam));
-    } catch (error) {
-      // The view stays as it was; the error reaches both the caller and the error event.
-      if (error instanceof GlobeError) this.emitter.emit('error', error);
-      throw error;
-    }
-    if (pending) {
-      // Not started yet: keep the request. A position-only jump keeps the ground scale, as it does after start.
-      if (keepRange) keepGroundScale(pending, view);
-      this.pendingView = view;
-      return;
-    }
-    applyView(this.cam, view, keepRange);
-    this.cam.update();
+    this.pendingView = this.movements.jump(target, this.pendingView, this.collapsed) ?? this.pendingView;
+    return completedMovement();
+  };
+
+  readonly easeTo: Globe['easeTo'] = (target, options) => this.movements.start('ease', target, options);
+  readonly flyTo: Globe['flyTo'] = (target, options) => this.movements.start('fly', target, options);
+  readonly fitBounds: Globe['fitBounds'] = (bounds, options) => this.movements.fitBounds(bounds, options);
+  readonly tour: Globe['tour'] = (waypoints, options) => this.movements.tour(waypoints, options);
+  readonly orbit: Globe['orbit'] = (options) => this.movements.orbit(options);
+  readonly rotateTo: Globe['rotateTo'] = (heading, options) => this.movements.rotateTo(heading, options);
+  readonly tiltTo: Globe['tiltTo'] = (tilt, options) => this.movements.start('ease', { tiltDeg: tilt }, options);
+  readonly setConstraints: Globe['setConstraints'] = (constraints) => {
+    this.constraints.set(validateConstraints(constraints));
+    this.surfaceFrame.view.setMaxTilt(this.constraints.maxTiltRad);
     this.requestRender();
-  }
+  };
+  readonly resetToGlobe: Globe['resetToGlobe'] = (options) => this.movements.resetToGlobe(options);
+  readonly goHome: Globe['goHome'] = (options) =>
+    this.movements.goHome(this.options.home ?? this.options.view ?? DEFAULT_VIEW, options);
 
   screenToGeo(point: ScreenPoint): GeoPosition | undefined {
     this.assertAlive();
-    return this.pick(validateScreenPoint(point));
-  }
-
-  /** The position under a valid screen point; none before the viewport has a size. */
-  private pick(point: ScreenPoint): GeoPosition | undefined {
-    if (this.waiting) return undefined;
-    this.cam.update();
-    return positionAt(this.cam, point);
+    return this.viewControl.positionAt(validateScreenPoint(point), (λ, φ) => this.surfaceFrame.terrainHeightRad(λ, φ));
   }
 
   geoToScreen(position: GeoPosition): ScreenPoint | undefined {
     this.assertAlive();
     validatePosition(position);
-    if (this.waiting) return undefined;
-    this.cam.update();
-    return screenOf(this.cam, position);
-  }
-
-  private dragTo(anchor: GeoPosition, point: ScreenPoint): void {
-    this.assertAlive();
-    if (!this.waiting && dragCamera(this.cam, anchor, point)) this.requestRender();
-  }
-
-  private zoomAt(point: ScreenPoint, deltaZoom: number): void {
-    this.assertAlive();
-    if (!this.waiting && zoomCamera(this.cam, point, deltaZoom)) this.requestRender();
+    return this.waiting ? undefined : screenOf(this.cam, this.surfaceFrame.view, position);
   }
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {
@@ -395,60 +404,46 @@ class GlobeEngine implements Globe {
     return this.emitter.on(event, handler);
   }
 
-  resourceCounts(): ResourceCounts {
-    return this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 };
-  }
-
-  rendererStats(): RendererStats {
-    return this.renderer?.stats() ?? NO_RENDERER_STATS;
-  }
-
-  surfaceTiles(): SurfaceTileInfo[] {
-    return this.surfaceFrame.describe(this.cam);
-  }
-
-  surfaceStats(): SurfaceStats {
-    return this.surfaceFrame.stats();
-  }
-
-  imageryStats(): ImageryStats | undefined {
-    return this.surfaceFrame.imageryStats();
-  }
-
+  // Diagnostics delegate to the renderer and the surface frame.
+  readonly resourceCounts = (): ResourceCounts => this.renderer?.resourceCounts() ?? NO_RESOURCES;
+  readonly rendererStats = (): RendererStats => this.renderer?.stats() ?? NO_RENDERER_STATS;
+  readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
+  readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
+  readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
+  readonly reloadSource = (sourceId: string): boolean => this.surfaceFrame.reloadSource(sourceId);
+  readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
+  readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
+    this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
+  readonly elevationAtAsync: Globe['elevationAtAsync'] = (position, options = {}) =>
+    this.assertAlive() ?? this.surfaceFrame.queryElevation(position, options.signal);
+  readonly addModel: Globe['addModel'] = async (options) =>
+    this.assertAlive() ?? addModel(this.renderer, options, () => this.requestRender());
+  readonly layerTarget: Globe['layerTarget'] = () =>
+    this.assertAlive() ?? requestingTarget(this.renderer?.layers, () => this.requestRender());
   setDebugShapes(shapes: readonly DebugShape[]): void {
     this.assertAlive();
-    validateDebugShapes(shapes);
-    this.debugMeshes = shapes.map((shape) => buildDebugMesh(shape));
-    // Before the renderer exists they are kept and handed over when it starts (KB-042).
+    this.debugMeshes = debugMeshesOf(shapes);
     this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
   }
-
-  async captureFrame(): Promise<FrameCapture> {
+  captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
-    await this.ready;
-    for (;;) {
-      const renderer = this.renderer;
-      if (this.destroyed || !renderer) throw new GlobeError('destroyed', 'The globe was destroyed');
-      if (this.failure) throw this.failure;
-      const drawn = this.frames;
-      // Drawn and read in one task: the canvas keeps the frame only until the browser presents it.
-      this.drawNow(renderer);
-      if (this.frames > drawn) return renderer.capture();
-      // Nothing could be drawn (a recovery, a container without a size): wait for a drawn frame (KB-051).
-      await this.captureWaits.next();
-    }
+    return captureWhenDrawn({
+      ready: this.ready,
+      waits: this.captureWaits,
+      state: () => ({
+        renderer: this.destroyed ? undefined : this.renderer,
+        failure: this.failure,
+        frames: this.frames,
+      }),
+      draw: (renderer) => this.drawNow(renderer),
+    });
   }
-
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */
   private get waiting(): boolean {
     return this.pendingView !== undefined || this.collapsed;
   }
-
-  simulateDeviceLoss(): void {
-    this.assertAlive();
-    this.renderer?.simulateDeviceLoss();
-  }
+  readonly simulateDeviceLoss = (): void => (this.assertAlive(), this.renderer?.simulateDeviceLoss());
 
   destroy(): void {
     if (this.destroyed) return;
@@ -458,9 +453,7 @@ class GlobeEngine implements Globe {
       this.rejectReady?.(new GlobeError('destroyed', 'The globe was destroyed before its first frame'));
     }
     if (this.frameId !== undefined) this.renderer?.host.cancelFrame(this.frameId);
-    this.controls?.destroy();
-    // The canvas holds its GPU context, whose device holds the renderer (KB-053).
-    this.controlsElement = undefined;
+    this.controlsSlot.destroy();
     for (const cleanup of this.cleanups) cleanup();
     this.surfaceFrame.destroy();
     this.surface?.clear();

@@ -40,6 +40,8 @@ export class InteractionController {
   #sequence = 0;
   #hover: Hit | undefined;
   #pressed: Hit | undefined;
+  /** The pick of the latest press, which a release waits for (KB-111). */
+  #pressing: Promise<Hit | undefined> | undefined;
   #dragging = false;
   readonly #selected = new Map<string, Hit>();
 
@@ -79,8 +81,13 @@ export class InteractionController {
    * @returns true when the press landed on a draggable feature, so the map's own gestures must ignore it.
    */
   async pointerDown(point: ScreenPoint): Promise<boolean> {
-    const hit = await this.#pick(point);
-    if (hit === null) return false;
+    // A press supersedes pending hover picks but is never superseded itself: its release waits for it (KB-111).
+    this.#sequence++;
+    const pending = this.#resolve(point);
+    this.#pressing = pending;
+    const hit = await pending;
+    if (this.#pressing !== pending) return false;
+    this.#pressing = undefined;
     this.#pressed = hit;
     this.#dragging = false;
     return hit?.layer.draggable === true;
@@ -88,6 +95,7 @@ export class InteractionController {
 
   /** Handles a pointer release: ends a drag, or clicks the feature pressed and released on. */
   async pointerUp(point: ScreenPoint): Promise<void> {
+    if (this.#pressing !== undefined) await this.#pressing;
     const pressed = this.#pressed;
     this.#pressed = undefined;
     if (pressed === undefined) return;
@@ -96,8 +104,9 @@ export class InteractionController {
       pressed.layer.emit('drag-end', this.#event(pressed, point));
       return;
     }
-    const hit = await this.#pick(point);
-    if (hit === null || hit === undefined) return;
+    this.#sequence++;
+    const hit = await this.#resolve(point);
+    if (hit === undefined) return;
     if (hit.layer === pressed.layer && hit.feature.id === pressed.feature.id)
       hit.layer.emit('click', this.#event(hit, point));
   }
@@ -136,8 +145,13 @@ export class InteractionController {
   /** Resolves a pick; `null` when a newer pick superseded it. */
   async #pick(point: ScreenPoint): Promise<Hit | undefined | null> {
     const sequence = ++this.#sequence;
+    const hit = await this.#resolve(point);
+    return sequence === this.#sequence ? hit : null;
+  }
+
+  /** The interactive feature at a screen point. */
+  async #resolve(point: ScreenPoint): Promise<Hit | undefined> {
     const id = await this.#provider.pick(point);
-    if (sequence !== this.#sequence) return null;
     const resolved = this.#stack.resolvePick(id);
     if (resolved === undefined || !isInteractive(resolved.layer)) return undefined;
     return { layer: resolved.layer, feature: resolved.feature };

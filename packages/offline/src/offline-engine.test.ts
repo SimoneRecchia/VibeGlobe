@@ -45,7 +45,7 @@ afterEach(() => {
 
 function load(source: ImagerySource, coord: TileCoord): Promise<TransportResult> {
   const request = source.request(coord, { url: '', hostIndex: 0 });
-  if (request === 'noData') throw new Error('no data');
+  if (request === 'noData' || request === 'unknown') throw new Error('no data');
   return new Promise((resolve) => source.transport.start(request, TIMEOUTS, resolve));
 }
 
@@ -61,6 +61,19 @@ describe('the offline engine', () => {
       mode: 'hybrid',
       switches: { persistentCache: true, memoryReuse: true, prefetch: true, offlinePackaging: true },
     });
+  });
+
+  it('tells the engine at every frame whether to keep tiles in memory and prefetch, per source, at runtime (F281–F285, F290)', () => {
+    const offline = engine({});
+    const a = offline.source(fixture('a'));
+    const b = offline.source(fixture('b'));
+    expect([a.loadingFlags?.(), b.loadingFlags?.()]).toEqual([3, 3]);
+    offline.setSwitches({ memoryReuse: false });
+    expect([a.loadingFlags?.(), b.loadingFlags?.()]).toEqual([2, 2]);
+    offline.setSwitches({ prefetch: false }, { sourceId: 'b' });
+    expect([a.loadingFlags?.(), b.loadingFlags?.()]).toEqual([2, 0]);
+    offline.setSwitches({ memoryReuse: true, prefetch: true });
+    expect([a.loadingFlags?.(), b.loadingFlags?.()]).toEqual([3, 1]);
   });
 
   it('serves a fresh cached tile without a request and revalidates an expired one with its ETag (F277, F278)', async () => {

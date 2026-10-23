@@ -3,6 +3,10 @@ import { expect, test } from '@playwright/test';
 import { consoleProblems, expectRenderedGlobe, NUXT_URL } from './support/adapters.ts';
 import { trackGpuObjects } from './support/leaks.ts';
 
+// One shared setup (beforeAll) for the file's tests: they run in order on one worker, together in one shard
+// (playwright.config.ts runs everything else fully parallel, ADR 0035).
+test.describe.configure({ mode: 'default' });
+
 // The Nuxt example (apps/nuxt-example) as a consumer ships it: its production build (npm run build) served by its own
 // Nitro server, whose output these tests read.
 

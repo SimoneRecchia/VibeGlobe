@@ -133,3 +133,60 @@ test('the +/- buttons zoom one level per press about the center, rapid presses a
   await page.locator('[data-command="zoom-out"]').click();
   expect((await settled()) - start).toBeCloseTo(3, 6);
 });
+
+test('zoom is continuous and fractional: the API keeps 10.37, a trackpad pinch never snaps to integers, and the ground scale follows it (F177)', async ({
+  page,
+}) => {
+  await openGlobe(page, 'backend=webgl2&lon=10&lat=45&zoom=9.6');
+  await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 10.37 }));
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.zoom)).toBeCloseTo(10.37, 9);
+  await page.evaluate(() => {
+    const globe = window.vibeglobePlayground?.globe;
+    if (!globe) throw new Error('no globe');
+    const record = window as unknown as { scaleFrames: { zoom: number; metersPerPx: number }[] };
+    record.scaleFrames = [];
+    // Ground meters per pixel at the center, from the positions one pixel apart.
+    const metersPerPx = (): number => {
+      const a = globe.screenToGeo({ xPx: 160, yPx: 120 });
+      const b = globe.screenToGeo({ xPx: 161, yPx: 120 });
+      if (!a || !b) return Number.NaN;
+      const rad = Math.PI / 180;
+      const dLon = (b.longitudeDeg - a.longitudeDeg) * Math.cos(a.latitudeDeg * rad);
+      return Math.hypot(dLon, b.latitudeDeg - a.latitudeDeg) * rad * 6371008.8;
+    };
+    globe.on('frame', () => record.scaleFrames.push({ zoom: globe.camera.zoom, metersPerPx: metersPerPx() }));
+  });
+  // A trackpad pinch: small ctrlKey wheel deltas, one per display frame.
+  await page.evaluate(async () => {
+    const canvas = document.querySelector('#globe') as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    for (let i = 0; i < 40; i++) {
+      canvas.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -2,
+          ctrlKey: true,
+          clientX: rect.left + 160,
+          clientY: rect.top + 120,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  });
+  const frames = await page.evaluate(
+    () => (window as unknown as { scaleFrames: { zoom: number; metersPerPx: number }[] }).scaleFrames,
+  );
+  const zooms = frames.map((frame) => frame.zoom);
+  // It crosses zoom 11 in many small steps, none landing on an integer.
+  expect(Math.max(...zooms)).toBeGreaterThan(11);
+  expect(new Set(zooms).size).toBeGreaterThan(10);
+  expect(zooms.filter((zoom) => Math.abs(zoom - Math.round(zoom)) < 1e-6)).toEqual([]);
+  // The ground scale changes with the zoom in every frame, by 2^-Δzoom, also across the integer boundary.
+  for (let i = 1; i < frames.length; i++) {
+    const [before, after] = [frames[i - 1], frames[i]];
+    if (!before || !after || after.zoom === before.zoom) continue;
+    expect(after.metersPerPx / before.metersPerPx).toBeCloseTo(2 ** (before.zoom - after.zoom), 2);
+  }
+});

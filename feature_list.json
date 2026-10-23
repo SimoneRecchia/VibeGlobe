@@ -2413,7 +2413,7 @@
         "Zoom continuously with a trackpad sequence and assert the reported zoom changes without quantization",
         "Assert the ground distance per pixel at the center changes continuously across integer zoom boundaries"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F178",

@@ -65,11 +65,20 @@ export function toUtm(longitudeDeg: number, latitudeDeg: number): UtmCoordinate 
 
 /**
  * The WGS84 position of a UTM coordinate; the band letter selects the hemisphere. Throws a RangeError for a zone
- * outside 1–60 or an unknown band letter.
+ * outside 1–60, an unknown band letter, or zone 32, 34 or 36 in band X (Svalbard's exceptions).
  */
 export function fromUtm(utm: UtmCoordinate): { longitudeDeg: number; latitudeDeg: number } {
   const bandIndex = BANDS.indexOf(utm.band.toUpperCase());
-  if (!Number.isInteger(utm.zone) || utm.zone < 1 || utm.zone > 60 || bandIndex < 0 || utm.band.length !== 1)
+  // Zones 32, 34 and 36 do not exist in band X (Svalbard).
+  const svalbardGap = utm.band.toUpperCase() === 'X' && (utm.zone === 32 || utm.zone === 34 || utm.zone === 36);
+  if (
+    !Number.isInteger(utm.zone) ||
+    utm.zone < 1 ||
+    utm.zone > 60 ||
+    bandIndex < 0 ||
+    utm.band.length !== 1 ||
+    svalbardGap
+  )
     throw new RangeError(`Invalid UTM zone ${utm.zone}${utm.band}`);
   const north = bandIndex >= SOUTHERN_BANDS;
   const { x, y } = transformCoordinates(

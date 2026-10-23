@@ -61,6 +61,8 @@ export type {
   MoveOutcome,
   MovementOptions,
   GeoBounds,
+  Geocoder,
+  GeocoderResult,
   TourWaypoint,
   HomeView,
   CameraConstraints,

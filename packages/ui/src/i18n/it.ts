@@ -38,4 +38,8 @@ export const IT: Readonly<Record<TranslationKey, string>> = {
   'search.noResults': 'Nessun risultato',
   'search.failed': 'La ricerca non è disponibile al momento',
   'search.searching': 'Ricerca in corso…',
+  'search.invalid.latitude-out-of-range': 'La latitudine deve essere tra −90° e 90°',
+  'search.invalid.longitude-out-of-range': 'La longitudine deve essere tra −180° e 180°',
+  'search.invalid.invalid-utm-zone': 'Zona UTM o lettera di fascia sconosciuta',
+  'search.invalid.invalid-minutes-or-seconds': 'Minuti e secondi devono essere inferiori a 60',
 };

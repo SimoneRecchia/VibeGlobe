@@ -2,36 +2,20 @@
  * The search box (F426): typed coordinates in every format of `@vibeglobe/gis` (F405), and places from the
  * application's geocoder when one is configured; none is bundled and no request is made without one.
  */
-import { formatCoordinate, parseCoordinate } from '@vibeglobe/gis';
-import type { Globe } from '@vibeglobe/core';
+import { formatCoordinate, parseCoordinate, parseCoordinateResult } from '@vibeglobe/gis';
+import type { GeoBounds, Geocoder, GeocoderResult, Globe } from '@vibeglobe/core';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame } from './dom.js';
 import { decimalSeparator } from './locale.js';
 
-/** A place found by a geocoder. */
-export interface GeocoderResult {
-  /** What the list shows. */
-  readonly label: string;
-  readonly longitudeDeg: number;
-  readonly latitudeDeg: number;
-  /** The zoom to show it at; the search box picks one when omitted. */
-  readonly zoom?: number;
-}
+/** The engine's geocoder interface (F208), re-exported for the search box's users. */
+export type { Geocoder, GeocoderResult };
 
-/**
- * A search provider supplied by the application. A stub of the engine's pluggable geocoder interface until it exists
- * (F208; docs/parallel-tracks.md).
- */
-export interface Geocoder {
-  /** Places matching `query`; reject or resolve empty when none. The signal aborts queries the user typed past. */
-  search(
-    query: string,
-    options: { readonly signal: AbortSignal; readonly language: string },
-  ): Promise<readonly GeocoderResult[]>;
-}
-
-/** Moves the camera to a chosen place; a jump until the engine has flights (F195; docs/parallel-tracks.md). */
-export type GoTo = (globe: Globe, target: { longitudeDeg: number; latitudeDeg: number; zoom: number }) => void;
+/** Moves the camera to a chosen place; by default a flight (F195), or a fit of the place's bounds when it has some. */
+export type GoTo = (
+  globe: Globe,
+  target: { longitudeDeg: number; latitudeDeg: number; zoom: number; bounds?: GeoBounds },
+) => void;
 
 /** Options of {@link SearchControl}. */
 export interface SearchControlOptions {
@@ -46,9 +30,20 @@ export interface SearchControlOptions {
 }
 
 /** Messages under the search box. */
-type StatusKey = 'search.coordinatesOnly' | 'search.searching' | 'search.noResults' | 'search.failed';
+type StatusKey =
+  | 'search.coordinatesOnly'
+  | 'search.searching'
+  | 'search.noResults'
+  | 'search.failed'
+  | 'search.invalid.latitude-out-of-range'
+  | 'search.invalid.longitude-out-of-range'
+  | 'search.invalid.invalid-utm-zone'
+  | 'search.invalid.invalid-minutes-or-seconds';
 
-const jump: GoTo = (globe, target) => globe.jumpTo(target);
+const fly: GoTo = (globe, target) =>
+  void (target.bounds
+    ? globe.fitBounds(target.bounds, { paddingPx: 20 })
+    : globe.flyTo({ longitudeDeg: target.longitudeDeg, latitudeDeg: target.latitudeDeg, zoom: target.zoom }));
 let instances = 0;
 
 /** A combobox: type, move through the results with the arrow keys, choose with Enter, a click or a tap. */
@@ -77,7 +72,7 @@ export class SearchControl implements UiControl {
     this.#geocoder = options.geocoder;
     this.#debounceMs = options.debounceMs ?? 250;
     this.#zoom = options.zoom ?? 12;
-    this.#goTo = options.goTo ?? jump;
+    this.#goTo = options.goTo ?? fly;
   }
 
   /** Builds the control's element (UiControl). */
@@ -129,6 +124,7 @@ export class SearchControl implements UiControl {
       longitudeDeg: result.longitudeDeg,
       latitudeDeg: result.latitudeDeg,
       zoom: result.zoom ?? this.#zoom,
+      ...(result.bounds ? { bounds: result.bounds } : {}),
     });
     this.#results = [];
     this.#close();
@@ -157,8 +153,12 @@ export class SearchControl implements UiControl {
     this.#abort?.abort();
     this.#results = [];
     const query = this.#input?.value.trim() ?? '';
-    const isCoordinate = parseCoordinate(query) !== undefined;
-    if (query === '') this.#setStatus(undefined);
+    const parsed = parseCoordinateResult(query);
+    const isCoordinate = parsed.position !== undefined;
+    // A coordinate typed wrong (latitude 95, zone 61…) says why, and nothing moves (F207).
+    const code = parsed.error?.code;
+    if (query !== '' && code !== undefined && code !== 'unrecognized') this.#setStatus(`search.invalid.${code}`);
+    else if (query === '') this.#setStatus(undefined);
     else if (this.#geocoder === undefined || isCoordinate)
       this.#setStatus(isCoordinate ? undefined : 'search.coordinatesOnly');
     else {

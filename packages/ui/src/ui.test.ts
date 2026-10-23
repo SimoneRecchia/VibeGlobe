@@ -10,7 +10,7 @@ import { ZoomControl } from './controls/zoom.js';
 import { addDefaultControls } from './defaults.js';
 import { createUi, type ControlContext, type Ui, type UiControl } from './ui.js';
 
-/** A globe double with the public API the controls use: a camera that `jumpTo` changes, and its events. */
+/** A globe double with the public API the controls use: a camera that `jumpTo` and `flyTo` change, and its events. */
 function fakeGlobe(): Globe & { emit(): void } {
   let camera: CameraState = {
     longitudeDeg: 9.19,
@@ -40,6 +40,11 @@ function fakeGlobe(): Globe & { emit(): void } {
     jumpTo(target: Partial<CameraState>) {
       camera = { ...camera, ...target };
       globe.emit();
+    },
+    // Flights arrive at once in the double: the search box flies to a chosen place (F204, F208).
+    flyTo(target: Partial<CameraState>) {
+      globe.jumpTo(target);
+      return Promise.resolve('completed');
     },
     screenToGeo: ({ xPx, yPx }: { xPx: number; yPx: number }) =>
       xPx < 0 ? undefined : { longitudeDeg: xPx / 10, latitudeDeg: yPx / 10 },

@@ -245,8 +245,10 @@ export class ImageryLoader implements NetworkPoolClient {
       this.ring[at + 2] = y;
       this.ring[at + 3] = priority;
     }
-    const state = record.state;
     const handle = this.options.handleBase + record.slot;
+    // A tile whose cache headers ran out is requested again, even from the RAM tier (F260).
+    if (this.stale(record)) this.expire(record);
+    const state = record.state;
     if (state === READY) {
       this.options.memory.residency.touch(handle, this.options.memory.frame());
       return handle;
@@ -320,6 +322,7 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The texture handle of a tile on the GPU, or -1; does not want it, but keeps it resident this frame. */
   readyHandle(level: number, x: number, y: number): number {
     const record = this.table.find(level, x, y);
+    if (record?.state === READY && this.stale(record)) this.expire(record);
     if (record?.state !== READY) return -1;
     const handle = this.options.handleBase + record.slot;
     this.options.memory.residency.touch(handle, this.options.memory.frame());
@@ -414,6 +417,22 @@ export class ImageryLoader implements NetworkPoolClient {
     this.active.length = 0;
     this.pinnedSettled = 0;
     this.options.requestFrame();
+  }
+
+  /** True for a tile whose cache headers no longer allow reusing it (F260). */
+  private stale(record: TileRecord): boolean {
+    return record.freshUntilMs !== Infinity && this.options.now() >= record.freshUntilMs;
+  }
+
+  /** Drops a stale tile from the GPU and the RAM tier, so wanting it requests it again; its ancestors show meanwhile. */
+  private expire(record: TileRecord): void {
+    const handle = this.options.handleBase + record.slot;
+    if (record.state === READY) {
+      if (this.options.memory.residency.release(handle)) this.options.releaseTexture(handle);
+      record.state = UNLOADED;
+    }
+    this.options.memory.ram.delete(handle);
+    record.freshUntilMs = Infinity;
   }
 
   /** Cancels everything in flight; the textures are released by the renderer. */
@@ -582,6 +601,10 @@ export class ImageryLoader implements NetworkPoolClient {
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
+      record.freshUntilMs =
+        result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
+          ? this.options.now() + result.maxAgeMs
+          : Infinity;
       // The RAM tier keeps a copy: the bytes themselves move to the worker.
       this.options.memory.ram.put(this.options.handleBase + record.slot, {
         bytes: result.bytes.slice(0),

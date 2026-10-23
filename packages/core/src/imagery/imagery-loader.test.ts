@@ -334,6 +334,37 @@ describe('ImageryLoader', () => {
     expect(residency.usedBytes).toBeLessThanOrEqual(3 * 349_524);
   });
 
+  it('reuses a tile only while its cache headers allow it when the provider asks (F260)', () => {
+    const { transport, released, ok, runFrame, timers } = setUp(32, {
+      source: { profile: { respectCacheHeaders: true } },
+    });
+    const fresh: TransportResult = { ...ok, maxAgeMs: 1000 } as TransportResult;
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), fresh);
+    runFrame([[5, 0, 0]]);
+    const [handle] = runFrame([[5, 0, 0]]);
+    expect(handle).toBe(100);
+    // Within its lifetime: drawn without a new request.
+    timers.advance(900);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    expect(transport.started).toEqual([url(5, 0, 0)]);
+    // Expired: released, requested again; nothing is drawn from it meanwhile (its ancestors are).
+    timers.advance(200);
+    expect(runFrame([[5, 0, 0]])).toEqual([-1]);
+    expect(released).toContain(100);
+    expect(transport.started).toEqual([url(5, 0, 0), url(5, 0, 0)]);
+  });
+
+  it('ignores cache headers for sources whose provider does not ask (F260)', () => {
+    const { transport, ok, runFrame, timers } = setUp();
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), { ...ok, maxAgeMs: 0 } as TransportResult);
+    runFrame([[5, 0, 0]]);
+    timers.advance(10_000);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    expect(transport.started).toEqual([url(5, 0, 0)]);
+  });
+
   it('serves a tile evicted from the GPU from the RAM tier, with no new request (F097)', () => {
     const { transport, uploaded, ram, ok, runFrame } = setUp(32, { gpuBytes: 349_524 });
     runFrame([[5, 0, 0]]);

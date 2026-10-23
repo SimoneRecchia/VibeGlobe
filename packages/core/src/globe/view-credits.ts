@@ -20,7 +20,7 @@ interface SettledGlobe {
 const STEPS = 5;
 
 /** The visible area of a view (the ground under a 5 × 5 grid of screen points) and its zoom (F258). */
-export function creditViewport(globe: SettledGlobe, widthPx: number, heightPx: number): CreditViewport {
+function creditViewport(globe: SettledGlobe, widthPx: number, heightPx: number): CreditViewport {
   let west = Infinity;
   let south = Infinity;
   let east = -Infinity;

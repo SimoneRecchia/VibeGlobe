@@ -22,7 +22,17 @@ export interface TimeoutsMs {
 
 /** How a transport request ended. */
 export type TransportResult =
-  | { readonly kind: 'ok'; readonly bytes: ArrayBuffer; readonly contentType: string }
+  | {
+      readonly kind: 'ok';
+      readonly bytes: ArrayBuffer;
+      readonly contentType: string;
+      /**
+       * How long the response may be reused, from its `Cache-Control` (`max-age`, `no-store`, `no-cache`) or `Expires`
+       * header; absent without such headers. Sources whose provider profile respects cache headers reuse the tile
+       * only that long, in memory as on the GPU (F260).
+       */
+      readonly maxAgeMs?: number;
+    }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
   | { readonly kind: 'timeout' | 'aborted' }
   /** `cause` 'cors': the server answers but sends no CORS headers, so the browser withholds the bytes (F251). */

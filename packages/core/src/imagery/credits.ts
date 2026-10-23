@@ -8,6 +8,8 @@ export interface Attribution {
 /** What a source's provider profile asks of the credits: the credit that must always stay visible (F255). */
 export interface CreditProfile {
   readonly requiredAttribution?: Attribution;
+  /** Tiles are reused only while their responses' cache headers allow it (`TransportResult` `maxAgeMs`, F260). */
+  readonly respectCacheHeaders?: boolean;
 }
 
 /** A settled view for `TileSource.viewportCopyright`: the visible area in degrees and the Web Mercator zoom. */

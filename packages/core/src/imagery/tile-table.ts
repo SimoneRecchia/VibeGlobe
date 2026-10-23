@@ -37,6 +37,8 @@ export interface TileRecord {
   readonly pinned: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
+  /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
+  freshUntilMs: number;
 }
 
 /**
@@ -97,6 +99,7 @@ export class TileTable {
       task: -1,
       pinned: level <= this.pinnedLevel,
       availabilityUnknown: false,
+      freshUntilMs: Infinity,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);

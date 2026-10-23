@@ -128,7 +128,31 @@ async function resultOf(response: Response): Promise<TransportResult> {
       retryAfterMs: retryAfterMs(response.headers.get('Retry-After'), Date.now()),
     };
   const bytes = await response.arrayBuffer();
-  return { kind: 'ok', bytes, contentType: response.headers.get('Content-Type') ?? '' };
+  const maxAgeMs = maxAgeOf(response.headers, Date.now());
+  return {
+    kind: 'ok',
+    bytes,
+    contentType: response.headers.get('Content-Type') ?? '',
+    ...(maxAgeMs === undefined ? {} : { maxAgeMs }),
+  };
+}
+
+/**
+ * How long a response may be reused (F260): none with `no-store` or `no-cache`, `max-age`, else `Expires` less the
+ * response's `Date` (or now); undefined without cache headers.
+ */
+export function maxAgeOf(headers: Headers, nowMs: number): number | undefined {
+  const control = (headers.get('Cache-Control') ?? '').toLowerCase();
+  if (/(^|[,\s])(no-store|no-cache)($|[,\s=])/.test(control)) return 0;
+  const maxAge = /(^|[,\s])max-age\s*=\s*"?(\d+)/.exec(control)?.[2];
+  if (maxAge !== undefined) return Number(maxAge) * 1000;
+  const expires = headers.get('Expires');
+  if (expires === null) return undefined;
+  // An invalid date, such as the common `Expires: 0`, means already expired (RFC 9111 §5.3).
+  const expiresMs = /[a-z]/i.test(expires) ? Date.parse(expires) : NaN;
+  if (Number.isNaN(expiresMs)) return 0;
+  const dateMs = Date.parse(headers.get('Date') ?? '');
+  return Math.max(0, expiresMs - (Number.isNaN(dateMs) ? nowMs : dateMs));
 }
 
 /** A source's credentials and secret query parameters (F252, F253). */

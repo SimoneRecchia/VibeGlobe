@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TransportResult } from '@vibeglobe/core';
-import { fetchTransport, redactUrl } from './fetch-transport.js';
+import { fetchTransport, maxAgeOf, redactUrl } from './fetch-transport.js';
 
 const timeouts = { firstByteMs: 1000, totalMs: 2000 };
 
@@ -64,5 +64,29 @@ describe('fetch transport security (F251–F253)', () => {
     expect(redactUrl('https://a.example/t.png?api_key=abc&z=3&access_token=xyz')).toBe(
       'https://a.example/t.png?api_key=***&z=3&access_token=***',
     );
+  });
+});
+
+describe('cache lifetime of responses (F260)', () => {
+  const headers = (entries: Record<string, string>): Headers => new Headers(entries);
+
+  it('reads max-age, refuses reuse with no-store and no-cache, falls back to Expires, and knows nothing otherwise', () => {
+    expect(maxAgeOf(headers({ 'Cache-Control': 'public, max-age=60' }), 0)).toBe(60_000);
+    expect(maxAgeOf(headers({ 'Cache-Control': 'no-store' }), 0)).toBe(0);
+    expect(maxAgeOf(headers({ 'Cache-Control': 'private, no-cache' }), 0)).toBe(0);
+    const date = 'Fri, 23 Oct 2026 12:00:00 GMT';
+    expect(maxAgeOf(headers({ Date: date, Expires: 'Fri, 23 Oct 2026 12:00:30 GMT' }), 0)).toBe(30_000);
+    expect(maxAgeOf(headers({ Expires: '0' }), 0)).toBe(0);
+    expect(maxAgeOf(headers({}), 0)).toBeUndefined();
+  });
+
+  it('reports the lifetime with the bytes of an ok response', async () => {
+    const transport = fetchTransport(() =>
+      Promise.resolve(new Response('png', { headers: { 'Cache-Control': 'max-age=5' } })),
+    );
+    const result = await new Promise<TransportResult>((resolve) =>
+      transport.start({ url: 'https://t.test/1/0/0.png', hostIndex: 0 }, { firstByteMs: 1000, totalMs: 1000 }, resolve),
+    );
+    expect(result).toMatchObject({ kind: 'ok', maxAgeMs: 5000 });
   });
 });

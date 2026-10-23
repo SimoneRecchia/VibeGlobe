@@ -277,6 +277,9 @@ test.describe('the readout and the search box use the gis coordinate functions (
   });
 
   test('typed decimal, DMS and UTM coordinates in the search box go to that place', async ({ page }) => {
+    // The search box flies there (F204); with reduced motion the flight is a short fade (F214), so each check starts
+    // after arrival rather than after a flight of many seconds on the software GPU.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await openUi(page);
     const input = page.locator('.vg-ui__search-input');
     for (const [text, lon, lat] of [

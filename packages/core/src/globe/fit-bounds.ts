@@ -2,7 +2,7 @@ import { Camera } from '../camera/camera.js';
 import { groundZoomFromMercatorZoom, rangeForGroundZoom } from '../camera/zoom.js';
 import { ViewState } from '../view/view-state.js';
 import { GlobeError } from './errors.js';
-import type { GeoBounds } from './types.js';
+import type { GeoBounds, GeoPosition } from './types.js';
 import { screenOf } from './view-geometry.js';
 
 const RAD = Math.PI / 180;
@@ -68,20 +68,22 @@ function edgeSamples(bounds: GeoBounds, width: number): { longitudeDeg: number; 
  * The view that shows `bounds` inside the viewport minus `paddingPx` on every side, with the camera's heading and the
  * tilt the view mode applies there (F176): centered on the bounds' Web Mercator middle (across the antimeridian when
  * east < west), at the largest zoom where every corner and edge sample projects inside the padded viewport, using the
- * engine's own projection through the globe-to-flat morph. Works on copies: the camera and view state are untouched.
+ * engine's own projection through the globe-to-flat morph; `include` adds positions (with heights) that must fit too.
+ * Works on copies: the camera and view state are untouched.
  */
 export function viewForBounds(
   camera: Camera,
   view: ViewState,
   bounds: GeoBounds,
   paddingPx: number,
+  include: readonly GeoPosition[] = [],
 ): { longitudeDeg: number; latitudeDeg: number; zoom: number } {
   const width =
     bounds.eastDeg >= bounds.westDeg ? bounds.eastDeg - bounds.westDeg : bounds.eastDeg + 360 - bounds.westDeg;
   let longitudeDeg = bounds.westDeg + width / 2;
   if (longitudeDeg >= 180) longitudeDeg -= 360;
   const latitudeDeg = latitudeOfY((mercatorY(bounds.southDeg) + mercatorY(bounds.northDeg)) / 2);
-  const samples = edgeSamples(bounds, width);
+  const samples: GeoPosition[] = [...edgeSamples(bounds, width), ...include];
   const probe = new Camera();
   probe.widthPx = camera.widthPx;
   probe.heightPx = camera.heightPx;

@@ -5138,7 +5138,7 @@
         "Project every object's extent (including height) to the screen after the animation",
         "Assert all are inside the padded viewport and the view is not wider than needed (one edge within 2 px of the padding)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F388",

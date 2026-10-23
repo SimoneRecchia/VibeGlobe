@@ -15,6 +15,7 @@ import type {
   CameraMovement,
   GeoBounds,
   GeoPosition,
+  Globe,
   HomeView,
   GlobeEvents,
   MoveCause,
@@ -211,10 +212,7 @@ export class Movements {
   }
 
   /** Flies or eases to the view that shows `bounds` inside the padded viewport (F176). */
-  fitBounds(
-    bounds: GeoBounds,
-    options: (MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' }) | undefined,
-  ): CameraMovement {
+  fitBounds(bounds: GeoBounds, options: Parameters<Globe['fitBounds']>[1]): CameraMovement {
     this.host.assertAlive();
     const camera = this.host.cam;
     let target;
@@ -225,7 +223,10 @@ export class Movements {
         throw new GlobeError('invalid-option', `paddingPx must leave part of the viewport, got ${String(padding)}`);
       if (options?.movement !== undefined && options.movement !== 'fly' && options.movement !== 'ease')
         throw new GlobeError('invalid-option', `movement must be 'fly' or 'ease', got ${String(options.movement)}`);
-      target = viewForBounds(camera, this.host.view, valid, padding);
+      const include = options?.include ?? [];
+      if (!Array.isArray(include)) throw new GlobeError('invalid-option', 'include must be an array of positions');
+      for (const position of include) validatePosition(position);
+      target = viewForBounds(camera, this.host.view, valid, padding, include);
     } catch (error) {
       return rejected(error);
     }

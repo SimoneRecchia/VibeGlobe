@@ -712,11 +712,16 @@ export interface Globe {
   flyTo(target: ViewInit, options?: MovementOptions): CameraMovement;
   /**
    * Flies (or eases, with `movement: 'ease'`) to the view that shows `bounds` inside the viewport minus `paddingPx`
-   * (default 0) on every side, keeping the heading and the view mode's tilt (F176).
+   * (default 0) on every side, keeping the heading and the view mode's tilt (F176). Positions in `include`, heights
+   * included, must show inside it too (objects above the ground, F387).
    */
   fitBounds(
     bounds: GeoBounds,
-    options?: MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' },
+    options?: MovementOptions & {
+      readonly paddingPx?: number;
+      readonly movement?: 'fly' | 'ease';
+      readonly include?: readonly GeoPosition[];
+    },
   ): CameraMovement;
   /**
    * Plays the waypoints in order, each with its movement, duration and dwell time, announcing each with a

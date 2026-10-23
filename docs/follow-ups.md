@@ -48,3 +48,8 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - A sun disk and halo in the sky when sun lighting is on (Filament's analytic disk); stars on the night side.
 - Multiple scattering and ozone absorption for brighter, bluer twilight (single scattering only today).
 - Night lights texture on the dark side, faded with altitude (OpenGlobus).
+
+## Vector tiles and 3D Tiles track (M13 computational parts)
+
+- **Right-to-left and complex scripts in labels:** the shaper lays glyphs out left to right from their advances (ADR 0041). Arabic, Hebrew and Indic scripts need bidi reordering and contextual shaping (MapLibre loads an RTL plugin for this; HarfBuzz in WebAssembly is the complete option).
+- **Balanced line breaking:** labels break greedily at `text-max-width`; MapLibre balances line lengths, which looks better for two-line place names.

@@ -1,4 +1,4 @@
-import type { CameraState, GeoPosition, NavigationApi, ScreenPoint, ViewInit } from '@vibeglobe/core';
+import type { CameraMovement, CameraState, GeoPosition, NavigationApi, ScreenPoint, ViewInit } from '@vibeglobe/core';
 import { createControls, type NavigationControls } from './create-controls.js';
 import type { ControlsOptions } from './options.js';
 
@@ -150,10 +150,12 @@ function fakeGlobe(camera: FlatCamera) {
     get camera(): CameraState {
       return { headingDeg: camera.headingDeg, tiltDeg: camera.tiltDeg } as CameraState;
     },
-    jumpTo(view: ViewInit) {
+    jumpTo(view: ViewInit): CameraMovement {
       camera.jumps++;
       if (view.headingDeg !== undefined) camera.headingDeg = view.headingDeg;
       if (view.tiltDeg !== undefined) camera.tiltDeg = view.tiltDeg;
+      // A jump completes at once (ADR 0036).
+      return Object.assign(Promise.resolve('completed' as const), { cancel: () => undefined });
     },
   };
 }

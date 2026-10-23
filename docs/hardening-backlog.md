@@ -30,3 +30,10 @@ perfection in edge cases.
 | F391, F393 | Firefox and Safari                 | The harness checks in the cross-browser job once the engine draws the atmosphere (the container has Chromium only)                       |
 | F392       | Banding on large real displays     | The dithering checked by eye on an 8-bit desktop monitor at 4K; the automated measure runs at 480 × 320 on SwiftShader                   |
 | F394       | Edge cases                         | Haze over high mountains seen from below their summits (ground below the eye's horizon), polar views                                     |
+
+## Vector tiles and 3D Tiles track (M13)
+
+| Entry | Step                                                                            | Built and tested meanwhile                                                                                                  |
+| ----- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| F462  | 10 minutes of randomized navigation in a browser within the GPU and RAM budgets | `tiles3d.test.ts`: 600 frames of random cameras keep `TileContentCache` within its budget (overflow only for tiles in view) |
+| F451  | Style fuzzing with the view never blank (rendered frames)                       | `vector-style.test.ts`: randomly mutated styles load without an exception and keep evaluable layers                         |

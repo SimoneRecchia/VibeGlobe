@@ -20,6 +20,11 @@
       "types": "./dist/model-layer.d.ts",
       "source": "./src/model-layer.ts",
       "default": "./dist/model-layer.js"
+    },
+    "./vector-tiles": {
+      "types": "./dist/vector-tiles/index.d.ts",
+      "source": "./src/vector-tiles/index.ts",
+      "default": "./dist/vector-tiles/index.js"
     }
   },
   "files": [
@@ -30,6 +35,8 @@
     "@maplibre/maplibre-gl-style-spec": "26.4.4",
     "@vibeglobe/core": "0.0.0",
     "@vibeglobe/sources": "0.0.0",
+    "earcut": "3.2.4",
+    "pbf": "5.1.2",
     "rbush": "4.0.1",
     "supercluster": "9.1.0"
   },

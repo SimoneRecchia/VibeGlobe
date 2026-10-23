@@ -4,7 +4,7 @@
 // (docs/parallel-tracks.md, "Atmosphere hook"), it draws the WGS84 ellipsoid with the playground's base imagery the way
 // the engine does (eye-relative vertices, reversed-Z, the engine's camera) and the atmosphere exactly as the hook
 // describes: the sky mesh in the scene, the surface color wrapped, `update` before each render.
-import { Camera, geodeticToEcef, type CameraPose, type FrameView } from '@vibeglobe/core';
+import { Camera, geodeticToEcef, MorphFrame, type CameraPose, type FrameView } from '@vibeglobe/core';
 import { eyeRelativePosition, makeEyeRelative, placeEyeRelative } from '../eye-relative.js';
 import { depthPathOf } from '../depth.js';
 import { captureCanvas } from '../canvas-slot.js';
@@ -32,6 +32,9 @@ import {
 } from 'three/webgpu';
 import { EngineCamera } from '../engine-camera.js';
 import { patchIdentitySwizzle } from '../webgpu-compat.js';
+
+/** The globe's morph frame (factor 0): the harness draws the globe, never the flat map. */
+const GLOBE = new MorphFrame();
 
 /** What a test starts. */
 interface AtmosphereHarnessConfig {
@@ -271,6 +274,7 @@ class HarnessPage implements AtmosphereHarness {
     const renderer = this.renderer;
     if (!renderer || !this.globe) throw new Error('not started');
     const view: FrameView = {
+      morph: GLOBE,
       view: this.camera.view,
       projection: this.camera.projection,
       eyeEcef: this.camera.eyeEcef,

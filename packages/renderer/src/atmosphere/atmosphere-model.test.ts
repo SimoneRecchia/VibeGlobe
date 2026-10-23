@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { geodeticToEcef, type FrameView } from '@vibeglobe/core';
+import { geodeticToEcef, MorphFrame, type FrameView } from '@vibeglobe/core';
 import {
   Atmosphere,
   createAtmosphereFrame,
@@ -146,6 +146,7 @@ describe('atmosphere frame', () => {
 
 describe('Atmosphere', () => {
   const view: FrameView = {
+    morph: new MorphFrame(),
     // Looking down the −z axis of the world with x to the right: the identity rotation.
     view: new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
     projection: new Float64Array([2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0]),

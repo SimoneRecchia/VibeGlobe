@@ -1,0 +1,318 @@
+/**
+ * Lays out one vector tile for the style layers that read its source (F443): decodes the MVT, filters features,
+ * clips and tessellates fills, lines and extrusions, and prepares labels (text, glyph ranges, anchors). It runs as a
+ * worker-pool task (`VECTOR_TILE_TASKS`), so the main thread only uploads the result. Buckets keep one
+ * `featureIndex` per vertex and the kept features, so data-driven paint is re-evaluated at runtime without
+ * tessellating again (F450).
+ */
+import type { TaskOutput, TaskTable } from '@vibeglobe/core';
+import { decodeMvt, type MvtFeature, type MvtLayer } from '@vibeglobe/sources/vector';
+import { buildingHeight, extrudeBuilding, resolveBuildingParts, type BuildingFeature } from './buildings.js';
+import { tessellateFill, tileClipRect, type ClipRect, type TilePoint } from './fill-tessellate.js';
+import { glyphRanges } from './glyphs.js';
+import { clipLine, tessellateLine, type LineCap, type LineJoin } from './line-tessellate.js';
+import { StyleLayer, type StyleLayerJson } from './style-layer.js';
+import { toTargetTile, type OverzoomTransform } from './tile-pyramid.js';
+
+/** Extent every bucket is expressed in, whatever the source layer's extent. */
+export const BUCKET_EXTENT = 4096;
+/** Clip buffer around the tile, in bucket units (MapLibre's default buffer is 128 of 4096 too). */
+export const BUCKET_BUFFER = 128;
+
+/** A feature kept by a bucket. */
+export interface BucketFeature {
+  readonly id: number | undefined;
+  readonly type: MvtFeature['type'];
+  readonly properties: MvtFeature['properties'];
+}
+
+/** Geometry with per-vertex feature indices. */
+export interface BucketGeometry {
+  /** Fill: x, y. Line: x, y. Extrusion: x, y, z (meters). Circle and symbol anchors: x, y. */
+  readonly positions: Float32Array;
+  readonly indices: Uint32Array;
+  readonly featureIndex: Uint32Array;
+  /** Line extrusion vectors (ex, ey) and distances; extrusion normals (nx, ny, nz). */
+  readonly extrusions?: Float32Array;
+  readonly distances?: Float32Array;
+  readonly normals?: Float32Array;
+}
+
+/** A label to place, before shaping (glyphs arrive separately). */
+export interface BucketLabel {
+  readonly feature: number;
+  readonly text: string;
+  /** Point anchor, or the line the label follows (`symbol-placement: line`), in bucket units. */
+  readonly anchor?: TilePoint;
+  readonly line?: readonly TilePoint[];
+}
+
+/** The laid-out content of one style layer in one tile. */
+export interface Bucket {
+  readonly layerId: string;
+  readonly type: string;
+  readonly features: readonly BucketFeature[];
+  readonly geometry?: BucketGeometry;
+  readonly labels?: readonly BucketLabel[];
+  /** Glyph range starts the labels need, per font stack. */
+  readonly glyphRanges?: Readonly<Record<string, readonly number[]>>;
+}
+
+/** The input of `layout-vector-tile`. */
+export interface LayoutInput {
+  readonly bytes: ArrayBuffer;
+  /** The style layers of this tile's source (`StyleLayer.json`). */
+  readonly layers: readonly StyleLayerJson[];
+  /** The zoom the tile is laid out for (the target tile's zoom when overzoomed). */
+  readonly zoom: number;
+  /** Present when the tile is read from a lower-zoom source tile. */
+  readonly overzoom?: OverzoomTransform;
+}
+
+type Geometry = readonly (readonly TilePoint[])[];
+
+function scaled(feature: MvtFeature, extent: number, transform: OverzoomTransform | undefined): Geometry {
+  const k = BUCKET_EXTENT / extent;
+  return feature.geometry.map((part) =>
+    part.map(([x, y]): TilePoint => {
+      const p: TilePoint = [x * k, y * k];
+      return transform === undefined ? p : toTargetTile(transform, BUCKET_EXTENT, p[0], p[1]);
+    }),
+  );
+}
+
+class GeometryWriter {
+  readonly positions: number[] = [];
+  readonly indices: number[] = [];
+  readonly featureIndex: number[] = [];
+  readonly extrusions: number[] = [];
+  readonly distances: number[] = [];
+  readonly normals: number[] = [];
+
+  append(
+    feature: number,
+    stride: number,
+    g: {
+      positions: Float32Array;
+      indices: Uint32Array;
+      extrusions?: Float32Array;
+      distances?: Float32Array;
+      normals?: Float32Array;
+    },
+  ): void {
+    const base = this.featureIndex.length;
+    const count = g.positions.length / stride;
+    this.positions.push(...g.positions);
+    for (let i = 0; i < count; i++) this.featureIndex.push(feature);
+    for (const index of g.indices) this.indices.push(base + index);
+    if (g.extrusions !== undefined) this.extrusions.push(...g.extrusions);
+    if (g.distances !== undefined) this.distances.push(...g.distances);
+    if (g.normals !== undefined) this.normals.push(...g.normals);
+  }
+
+  build(): BucketGeometry {
+    const optional = (values: number[]) => (values.length > 0 ? new Float32Array(values) : undefined);
+    const extrusions = optional(this.extrusions);
+    const distances = optional(this.distances);
+    const normals = optional(this.normals);
+    return {
+      positions: new Float32Array(this.positions),
+      indices: new Uint32Array(this.indices),
+      featureIndex: new Uint32Array(this.featureIndex),
+      ...(extrusions === undefined ? {} : { extrusions }),
+      ...(distances === undefined ? {} : { distances }),
+      ...(normals === undefined ? {} : { normals }),
+    };
+  }
+}
+
+function sortKeyName(type: string): string | undefined {
+  return { fill: 'fill-sort-key', line: 'line-sort-key', circle: 'circle-sort-key', symbol: 'symbol-sort-key' }[type];
+}
+
+function selectFeatures(layer: StyleLayer, source: MvtLayer, zoom: number): MvtFeature[] {
+  const kept = source.features.filter((f) => f.type !== 'Unknown' && layer.filter(zoom, f));
+  const key = sortKeyName(layer.type);
+  if (key === undefined || layer.json.layout?.[key] === undefined) return kept;
+  const value = (f: MvtFeature) => Number(layer.layout(key, zoom, f)) || 0;
+  return kept
+    .map((f) => [value(f), f] as const)
+    .sort((a, b) => a[0] - b[0])
+    .map(([, f]) => f);
+}
+
+function layoutFill(
+  features: readonly MvtFeature[],
+  geometry: (f: MvtFeature) => Geometry,
+  clip: ClipRect,
+): BucketGeometry {
+  const writer = new GeometryWriter();
+  features.forEach((feature, index) => {
+    if (feature.type === 'Polygon') writer.append(index, 2, tessellateFill(geometry(feature), clip));
+  });
+  return writer.build();
+}
+
+function layoutLine(
+  layer: StyleLayer,
+  zoom: number,
+  features: readonly MvtFeature[],
+  geometry: (f: MvtFeature) => Geometry,
+  clip: ClipRect,
+): BucketGeometry {
+  const writer = new GeometryWriter();
+  features.forEach((feature, index) => {
+    if (feature.type === 'Point') return;
+    const options = {
+      join: layer.layout('line-join', zoom, feature) as LineJoin,
+      cap: layer.layout('line-cap', zoom, feature) as LineCap,
+      miterLimit: Number(layer.layout('line-miter-limit', zoom, feature)),
+    };
+    for (const part of geometry(feature)) {
+      for (const clipped of clipLine(part, clip)) writer.append(index, 2, tessellateLine(clipped, options, clip));
+    }
+  });
+  return writer.build();
+}
+
+function layoutExtrusion(
+  features: readonly MvtFeature[],
+  geometry: (f: MvtFeature) => Geometry,
+  clip: ClipRect,
+): BucketGeometry {
+  const writer = new GeometryWriter();
+  const buildings: (BuildingFeature & { index: number })[] = features
+    .map((f, index) => ({ id: f.id, rings: geometry(f), properties: f.properties, index }))
+    .filter((_, i) => features[i]?.type === 'Polygon');
+  for (const building of resolveBuildingParts(buildings) as (BuildingFeature & { index: number })[]) {
+    writer.append(building.index, 3, extrudeBuilding(building.rings, buildingHeight(building.properties), clip));
+  }
+  return writer.build();
+}
+
+function layoutPoints(
+  features: readonly MvtFeature[],
+  geometry: (f: MvtFeature) => Geometry,
+  clip: ClipRect,
+): BucketGeometry {
+  const writer = new GeometryWriter();
+  features.forEach((feature, index) => {
+    if (feature.type !== 'Point') return;
+    for (const [p] of geometry(feature)) {
+      if (
+        p !== undefined &&
+        p[0] >= 0 &&
+        p[1] >= 0 &&
+        p[0] < clip.maxX - BUCKET_BUFFER &&
+        p[1] < clip.maxY - BUCKET_BUFFER
+      ) {
+        writer.append(index, 2, { positions: new Float32Array(p), indices: new Uint32Array(0) });
+      }
+    }
+  });
+  return writer.build();
+}
+
+function layoutSymbols(
+  layer: StyleLayer,
+  zoom: number,
+  features: readonly MvtFeature[],
+  geometry: (f: MvtFeature) => Geometry,
+  clip: ClipRect,
+): Pick<Bucket, 'labels' | 'glyphRanges'> {
+  const labels: BucketLabel[] = [];
+  const ranges: Record<string, Set<number>> = {};
+  const alongLines = layer.layout('symbol-placement', zoom) !== 'point';
+  features.forEach((feature, index) => {
+    const text = String(layer.layout('text-field', zoom, feature) ?? '');
+    if (text === '') return;
+    const font = (layer.layout('text-font', zoom, feature) as string[] | undefined)?.join(',') ?? '';
+    const set = (ranges[font] ??= new Set());
+    for (const start of glyphRanges(text)) set.add(start);
+    for (const part of geometry(feature)) {
+      if (alongLines && feature.type !== 'Point') {
+        for (const line of clipLine(part, clip)) labels.push({ feature: index, text, line });
+      } else if (part[0] !== undefined) {
+        const [x, y] = part[0];
+        if (x >= 0 && y >= 0 && x < BUCKET_EXTENT && y < BUCKET_EXTENT)
+          labels.push({ feature: index, text, anchor: part[0] });
+      }
+    }
+  });
+  const glyphRangesOut = Object.fromEntries(Object.entries(ranges).map(([k, v]) => [k, [...v].sort((a, b) => a - b)]));
+  return { labels, glyphRanges: glyphRangesOut };
+}
+
+function layoutLayer(layer: StyleLayer, source: MvtLayer, input: LayoutInput, clip: ClipRect): Bucket {
+  const features = selectFeatures(layer, source, input.zoom);
+  const geometry = (f: MvtFeature) => scaled(f, source.extent, input.overzoom);
+  const kept = features.map((f) => ({ id: f.id, type: f.type, properties: f.properties }));
+  const base = { layerId: layer.id, type: layer.type, features: kept };
+  switch (layer.type) {
+    case 'fill':
+      return { ...base, geometry: layoutFill(features, geometry, clip) };
+    case 'line':
+      return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip) };
+    case 'fill-extrusion':
+      return { ...base, geometry: layoutExtrusion(features, geometry, clip) };
+    case 'circle':
+    case 'heatmap':
+      return { ...base, geometry: layoutPoints(features, geometry, clip) };
+    case 'symbol':
+      return { ...base, ...layoutSymbols(layer, input.zoom, features, geometry, clip) };
+    default:
+      return base;
+  }
+}
+
+/** Lays out a tile; a tile that does not decode yields no buckets. Problems in a layer's style skip that layer. */
+export function layoutVectorTile(input: LayoutInput): Bucket[] {
+  const tile = decodeMvt(input.bytes);
+  if (tile === undefined) return [];
+  const clip = tileClipRect(BUCKET_EXTENT, BUCKET_BUFFER);
+  const buckets: Bucket[] = [];
+  for (const json of input.layers) {
+    const layer = new StyleLayer(json);
+    // Hidden layers are laid out too, so showing them again needs no new layout (F447, F450).
+    const source = tile.layers.find((l) => l.name === layer.sourceLayer);
+    if (source === undefined) continue;
+    buckets.push(layoutLayer(layer, source, input, clip));
+  }
+  return buckets;
+}
+
+function transfers(buckets: readonly Bucket[]): ArrayBuffer[] {
+  const out: ArrayBuffer[] = [];
+  for (const { geometry } of buckets) {
+    if (geometry === undefined) continue;
+    for (const array of [
+      geometry.positions,
+      geometry.indices,
+      geometry.featureIndex,
+      geometry.extrusions,
+      geometry.distances,
+      geometry.normals,
+    ]) {
+      if (array !== undefined) out.push(array.buffer as ArrayBuffer);
+    }
+  }
+  return out;
+}
+
+/**
+ * The worker task of vector tiles (ADR 0011): `layout-vector-tile` (`LayoutInput` → `Bucket[]`, typed arrays
+ * transferred). It marks `vibeglobe:layout-vector-tile` in the worker's performance timeline (F443). The engine's
+ * worker program registers this table (hook request in `docs/parallel-tracks.md`).
+ */
+export const VECTOR_TILE_TASKS: TaskTable = Object.freeze({
+  'layout-vector-tile': (input: unknown): TaskOutput => {
+    const value = input as Partial<LayoutInput> | null;
+    if (!(value?.bytes instanceof ArrayBuffer) || !Array.isArray(value.layers) || typeof value.zoom !== 'number') {
+      throw Object.assign(new Error('layout-vector-tile needs bytes, layers and zoom'), { code: 'invalid-input' });
+    }
+    const start = performance.now();
+    const buckets = layoutVectorTile(value as LayoutInput);
+    performance.measure('vibeglobe:layout-vector-tile', { start, end: performance.now() });
+    return { output: buckets, transfer: transfers(buckets) };
+  },
+});

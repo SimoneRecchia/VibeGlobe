@@ -139,6 +139,8 @@ export interface LayerRenderTarget {
    * canvas the renderer can draw.
    */
   addImage?(name: string, image: unknown): void;
+  /** Optional, set by the engine: where clamped and draped features take their heights from (ADR 0037). */
+  setGround?(ground: LayerGround): void;
 }
 
 /**

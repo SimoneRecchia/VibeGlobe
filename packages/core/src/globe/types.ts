@@ -1,4 +1,5 @@
-import type { LayerGround, LayerRenderTarget } from '../layers/layer-target.js';
+import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
+import type { LayerRenderTarget } from '../layers/layer-target.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -227,8 +228,8 @@ export interface RendererBackend {
   readonly inputElement: unknown;
   /** Draws data layers (ADR 0037); absent in renderers that draw none. */
   readonly layers?: LayerRenderTarget;
-  /** Optional: where clamped and draped layer features take their heights from (ADR 0037). */
-  setLayerGround?(ground: LayerGround): void;
+  /** Optional: glTF models (F361, ADR 0037). */
+  readonly models?: ModelRenderer;
   /** Uploads a surface tile mesh; returns false while the renderer cannot accept it. */
   addMesh(mesh: TileMeshData): void;
   removeMesh(key: number): void;
@@ -749,6 +750,12 @@ export interface Globe {
    * renderer has started (after `ready`) or when it draws no layers.
    */
   layerTarget(): LayerRenderTarget | undefined;
+  /**
+   * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
+   * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the
+   * loader cannot read. Call after `ready`.
+   */
+  addModel(options: ModelOptions): Promise<ModelHandle>;
   /** Test hook: forces a GPU device or context loss, which the engine must recover from (F066, F067). */
   simulateDeviceLoss(): void;
   /**

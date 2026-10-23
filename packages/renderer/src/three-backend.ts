@@ -4,7 +4,6 @@ import {
   type DebugMeshData,
   type DepthPath,
   type FrameView,
-  type LayerGround,
   type RendererBackend,
   type FrameCapture,
   type RendererCapabilities,
@@ -95,6 +94,7 @@ export class ThreeBackend implements RendererBackend {
   private readonly tiles = new IntegerKeyMap<TileEntry>(1024);
   private debugEntries: DebugEntry[] = [];
   readonly layers = new LayerBatches(this.scene, 'reversed-z'); // Data layers (ADR 0037).
+  readonly models = this.layers.models;
   private textureUploads = 0;
   private meshUploads = 0;
   private matrixUpdates = 0;
@@ -259,7 +259,6 @@ export class ThreeBackend implements RendererBackend {
     return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
-  readonly setLayerGround = (ground: LayerGround): void => this.layers.setGround(ground);
   /** Replaces the debug quads drawn with the surface's precision path. */
   setDebugMeshes(meshes: readonly DebugMeshData[]): void {
     disposeDebugEntries(this.scene, this.debugEntries);

@@ -1,4 +1,5 @@
 import { requestingTarget } from '../layers/layer-geometry.js';
+import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
 import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
@@ -12,7 +13,6 @@ import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
-import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewControl } from './view-control.js';
 import { wireView, type Movements } from './movements.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -168,15 +168,8 @@ class GlobeEngine implements Globe {
     return this.surfaceFrame.view.mode;
   }
 
-  setViewMode(mode: '2d' | '3d' | 'auto'): void {
-    this.assertAlive();
-    this.viewControl.setMode(mode);
-  }
-
-  setViewCurves(curves: ViewCurvesInit): void {
-    this.assertAlive();
-    this.viewControl.setCurves(curves);
-  }
+  readonly setViewMode: Globe['setViewMode'] = (mode) => this.assertAlive() ?? this.viewControl.setMode(mode);
+  readonly setViewCurves: Globe['setViewCurves'] = (curves) => this.assertAlive() ?? this.viewControl.setCurves(curves);
 
   get frameNumber(): number {
     return this.frames;
@@ -222,7 +215,7 @@ class GlobeEngine implements Globe {
     });
     // After the terrain starts: its errors set the skirt depths.
     this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);
-    renderer.setLayerGround?.(this.surfaceFrame.layerGround());
+    renderer.layers?.setGround?.(this.surfaceFrame.layerGround());
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(
@@ -416,6 +409,8 @@ class GlobeEngine implements Globe {
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
   readonly elevationAtAsync: Globe['elevationAtAsync'] = (position, options = {}) =>
     this.assertAlive() ?? this.surfaceFrame.queryElevation(position, options.signal);
+  readonly addModel: Globe['addModel'] = async (options) =>
+    this.assertAlive() ?? addModel(this.renderer, options, () => this.requestRender());
   readonly layerTarget: Globe['layerTarget'] = () =>
     this.assertAlive() ?? requestingTarget(this.renderer?.layers, () => this.requestRender());
   setDebugShapes(shapes: readonly DebugShape[]): void {

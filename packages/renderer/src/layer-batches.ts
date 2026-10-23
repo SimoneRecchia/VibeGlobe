@@ -21,6 +21,7 @@ import {
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
 import { pickAt } from './layer-picking.js';
+import { LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { buildLayerArrays, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
@@ -59,6 +60,8 @@ function shapeOf(batch: BatchContents): LayerShape {
 export class LayerBatches implements LayerRenderTarget {
   private readonly batches = new Map<number, Batch>();
   private readonly materials = new Map<LayerShape, MeshBasicNodeMaterial>();
+  /** glTF models (F361), placed with the batches. */
+  readonly models: LayerModels;
   private nextId = 1;
   /** Labels and marker images (ADR 0037). */
   private readonly atlas = new LayerAtlas();
@@ -72,7 +75,9 @@ export class LayerBatches implements LayerRenderTarget {
   constructor(
     private readonly scene: Scene,
     private depthPath: DepthPath,
-  ) {}
+  ) {
+    this.models = new LayerModels(scene);
+  }
 
   /** See {@link LayerRenderTarget}. */
   createBatch(descriptor: BatchDescriptor): BatchHandle {
@@ -208,6 +213,7 @@ export class LayerBatches implements LayerRenderTarget {
   /** Brings every batch up to date and places it for this frame (call before drawing the scene). */
   place(view: FrameView): void {
     this.lastView = view;
+    this.models.place(view);
     this.atlas.setPixelRatio(view.pixelRatio);
     const version = this.ground?.version() ?? 0;
     if (version !== this.groundVersion) {
@@ -249,6 +255,7 @@ export class LayerBatches implements LayerRenderTarget {
 
   /** Releases every batch and material. */
   dispose(): void {
+    this.models.dispose();
     this.atlas.dispose();
     for (const batch of this.batches.values()) this.disposeMesh(batch);
     this.batches.clear();

@@ -316,6 +316,18 @@ function altitudeLayers(): DataLayer[] {
   );
 }
 
+/** `?scenario=data-models`: the fixture pyramid, 1 km across, at two coordinates and headings (F361). */
+async function showModels(globe: Globe): Promise<void> {
+  const url = `${import.meta.env.BASE_URL}models/pyramid.gltf`;
+  await globe.addModel({ url, position: { longitudeDeg: 12.45, latitudeDeg: 41.9, heightMeters: 0 }, scale: 500 });
+  await globe.addModel({
+    url,
+    position: { longitudeDeg: 12.55, latitudeDeg: 41.9, heightMeters: 0 },
+    headingDeg: 90,
+    scale: 500,
+  });
+}
+
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
@@ -324,5 +336,9 @@ export function showDataScenario(globe: Globe, name: string): void {
   const scene = DATA_SCENES[name];
   const added = scene ? [scene()] : name === 'data-altitudes' ? altitudeLayers() : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
+  if (name === 'data-models') {
+    void showModels(globe).then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
+    return;
+  }
   window.vibeglobeLayers = { stack, layers, interaction };
 }

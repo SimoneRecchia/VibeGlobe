@@ -515,3 +515,56 @@ for (const backend of BACKENDS) {
     for (const point of fillScreen) expect(near(fill, point.xPx, point.yPx, 1, isGreen)).toBe(true);
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`glTF models stand at their coordinates, turned by their heading on the local axes, and a corrupt file is rejected on ${backend} (F361)`, async ({
+    page,
+  }) => {
+    await openGlobe(page, `backend=${backend}&scenario=data-models&lon=12.5&lat=41.88&zoom=11.5&tilt=40`);
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await page.waitForTimeout(300);
+    await waitForIdle(page);
+    const image = await canvasImage(page);
+    const red = ([r, g, b]: Rgb): boolean => r > 90 && r > 2.5 * g && r > 2.5 * b;
+    // The fixture pyramid, scaled 500: its apex 500 m up, its nose 1,500 m ahead (−Z) and 100 m up.
+    const metersNorth = 1500 / 111_320;
+    const metersEast = 1500 / (111_320 * Math.cos(41.9 * DEG));
+    const points = await page.evaluate(
+      ([north, east]) => {
+        const globe = window.vibeglobePlayground?.globe;
+        if (!globe) throw new Error('no globe');
+        const at = (lon: number, lat: number, h: number) =>
+          globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: lat, heightMeters: h });
+        return {
+          apex: at(12.45, 41.9, 500),
+          noseNorth: at(12.45, 41.9 + (north ?? 0) * 0.7, 100),
+          turnedNoseEast: at(12.55 + (east ?? 0) * 0.7, 41.9, 100),
+          turnedNotNorth: at(12.55, 41.9 + (north ?? 0) * 0.7, 100),
+        };
+      },
+      [metersNorth, metersEast] as const,
+    );
+    for (const name of ['apex', 'noseNorth', 'turnedNoseEast'] as const) {
+      const point = points[name];
+      expect(point, name).toBeDefined();
+      if (point) expect(near(image, point.xPx, point.yPx, 2, red), name).toBe(true);
+    }
+    const notNorth = points.turnedNotNorth;
+    if (notNorth) expect(near(image, notNorth.xPx, notNorth.yPx, 2, red)).toBe(false);
+    // A truncated file: the promise rejects with a typed error, and the view keeps drawing.
+    const error = await page.evaluate(async () => {
+      const globe = window.vibeglobePlayground?.globe;
+      try {
+        await globe?.addModel({
+          data: new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0]).buffer,
+          position: { longitudeDeg: 0, latitudeDeg: 0 },
+        });
+        return 'resolved';
+      } catch (caught) {
+        return (caught as { code?: string }).code ?? 'untyped';
+      }
+    });
+    expect(error).toBe('invalid-option');
+    await waitForIdle(page);
+  });
+}

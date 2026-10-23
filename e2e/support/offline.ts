@@ -54,7 +54,9 @@ export async function tileHeaders(
         headers: (custom.headers as Record<string, string>) ?? {},
         body: '',
       });
-    const response = await route.fetch();
+    // The dev server sometimes resets a connection under load (ECONNRESET): one more try, then a failed tile.
+    const response = await route.fetch().catch(() => route.fetch().catch(() => undefined));
+    if (response === undefined) return route.abort('failed');
     const headers = { ...response.headers() };
     delete headers['cache-control'];
     return route.fulfill({ response, headers: { ...headers, ...(custom as Record<string, string>) } });

@@ -125,6 +125,32 @@ describe('wheel and trackpad zoom (F168, F169)', () => {
     expect(h.prevented()).toBe(4);
   });
 
+  it('applies a notch in one step once two animation frames in a row came three time constants late (slow displays)', async () => {
+    let host = 0;
+    const h = controlsHarness({}, { hostNow: () => host });
+    const flush = () => new Promise<void>((done) => queueMicrotask(done));
+    /** One notch, its animation's frames 400 ms of host time apart; returns the frames it took. */
+    const notch = async (): Promise<number> => {
+      h.fire('wheel', { clientX: 210, clientY: 170, deltaY: -100, deltaMode: 0 });
+      let frames = 0;
+      do {
+        h.frame();
+        frames++;
+        await flush();
+        host += 400;
+      } while (frames < 50 && Math.abs(h.camera.zoom * 3 - Math.round(h.camera.zoom * 3)) > 1e-9);
+      return frames;
+    };
+    // The first notch animates and measures two slow frames; the next ones apply at once.
+    expect(await notch()).toBeGreaterThan(2);
+    expect(await notch()).toBe(1);
+    expect(await notch()).toBe(1);
+    expect(h.camera.zoom).toBeCloseTo(1, 12);
+    // After 5 s without a measurement, animations are tried again.
+    host += 6000;
+    expect(await notch()).toBeGreaterThan(1);
+  });
+
   it('converts line deltas to pixels and caps the lead at two levels', () => {
     const h = controlsHarness();
     for (let i = 0; i < 20; i++) h.fire('wheel', { clientX: 410, clientY: 320, deltaY: -10, deltaMode: 1 });

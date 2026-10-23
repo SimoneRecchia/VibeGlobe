@@ -93,9 +93,9 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
     heightPx: () => element.clientHeight,
     // The media query is read at each release, so a change of the system setting applies without a reload (F214).
     inertiaTaus: () => (options.reducedMotion === 'reduce' || query?.matches === true ? quarter : full),
+    // A smoothed wheel zoom is part of the wheel's own response: it completes while other input goes on.
     interrupt() {
       context.inertia.stop();
-      context.zoom.stop();
       context.heading.stop();
     },
   };
@@ -132,23 +132,23 @@ function attach(
     port,
     keyboard,
     update() {
-      const now = port.beginFrame();
+      const { zoom, inertia, heading, keys } = context;
+      // The wheel's zoom goes first, so a drag started during it keeps its grabbed point under the pointer.
+      wheel.apply();
+      const zooming = zoom.pending !== 0;
+      // Unconnected and at rest, the frame reads no clock (the host clock would allocate, ADR 0018).
+      let now = zooming || port.globe ? port.beginFrame() : NaN;
+      let moving = zooming && zoom.step(now, port);
       mouse.apply();
       touch.apply();
-      wheel.apply();
-      let moving = context.zoom.step(now, port);
-      moving = context.inertia.step(now, port) || moving;
-      moving = context.heading.step(now, port, options.maxTiltDeg) || moving;
-      moving =
-        context.keys.step(
-          now,
-          port,
-          options.keyboard.smoothingMs,
-          context.widthPx(),
-          context.heightPx(),
-          options.maxTiltDeg,
-        ) || moving;
-      moving = box.step(now, port) || moving;
+      if (inertia.active || heading.active || keys.moving || box.fitting) {
+        if (Number.isNaN(now)) now = port.beginFrame();
+        moving = inertia.step(now, port) || moving;
+        moving = heading.step(now, port, options.maxTiltDeg) || moving;
+        const { smoothingMs } = options.keyboard;
+        moving = keys.step(now, port, smoothingMs, context.widthPx(), context.heightPx(), options.maxTiltDeg) || moving;
+        moving = box.step(now, port) || moving;
+      }
       if (moving) port.requestNextFrame();
     },
     destroy() {

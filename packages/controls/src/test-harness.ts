@@ -89,11 +89,11 @@ export class FlatCamera {
 }
 
 /** A fake document: overlays the zoom box appends land in `overlays`. */
-function fakeDocument(overlays: FakeOverlay[], reducedMotion: boolean) {
+function fakeDocument(overlays: FakeOverlay[], reducedMotion: boolean, hostNow: () => number) {
   return {
     ...fakeTarget(),
     defaultView: {
-      performance: { now: () => 0 },
+      performance: { now: hostNow },
       matchMedia: () => ({ matches: reducedMotion }),
     },
     createElement: (): FakeOverlay => {
@@ -161,12 +161,15 @@ function fakeGlobe(camera: FlatCamera) {
 const NO_MODIFIERS = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, repeat: false };
 
 /** Controls attached to a fake 800 × 600 canvas at (10, 20), a {@link FlatCamera} and an engine clock. */
-export function controlsHarness(options?: ControlsOptions, { connect = true, reducedMotion = false } = {}) {
+export function controlsHarness(
+  options?: ControlsOptions,
+  { connect = true, reducedMotion = false, hostNow = (): number => 0 } = {},
+) {
   const width = 800;
   const height = 600;
   const camera = new FlatCamera(width, height);
   const overlays: FakeOverlay[] = [];
-  const doc = fakeDocument(overlays, reducedMotion);
+  const doc = fakeDocument(overlays, reducedMotion, hostNow);
   const element = fakeElement(doc, width, height);
   const globe = fakeGlobe(camera);
   const controls: NavigationControls = createControls(options);

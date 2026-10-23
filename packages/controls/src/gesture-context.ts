@@ -15,7 +15,7 @@ export interface GestureContext {
   heightPx(): number;
   /** Inertia time constants, quartered under reduced motion (ADR 0009 §7). */
   inertiaTaus(): InertiaTaus;
-  /** New input takes over: running inertia and animations stop where they are (F202). */
+  /** New input takes over: running inertia and the north turn stop where they are (F202); a wheel zoom completes. */
   interrupt(): void;
 }
 

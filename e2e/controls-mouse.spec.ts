@@ -65,26 +65,48 @@ test('a released drag coasts with time-based inertia, and a release after holdin
 }) => {
   // A small canvas: software GPUs draw it fast enough for mouse events to arrive at a mouse's pace.
   await openControls(page, 'lon=10&lat=20&zoom=4&size=320x240');
+  // Warm-up: the first drag frames after start-up are slow, which would bunch the fling's events together.
+  await page.mouse.move(160, 120);
+  await page.mouse.down();
+  await page.mouse.move(170, 125, { steps: 5 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await settle(page);
+  await record(page, []);
   await page.mouse.move(100, 120);
   await page.mouse.down();
-  // Moves 16 ms apart, as a mouse reports them.
+  // Moves 16 ms apart, as a mouse reports them, and the release right after the last.
   for (let i = 1; i <= 12; i++) {
     await page.mouse.move(100 + 8 * i, 120);
     await page.waitForTimeout(16);
   }
-  await record(page, []);
   await page.mouse.up();
   await settle(page);
-  const recorded = await frames(page);
-  const lon = recorded.map((frame) => frame.camera.longitudeDeg);
+  const all = await frames(page);
+  const releasedAt = all.findIndex((frame) => frame.pointer === null);
+  const lon = all.map((frame) => frame.camera.longitudeDeg);
   const rate = (i: number): number =>
-    ((lon[i] ?? 0) - (lon[i - 1] ?? 0)) / ((recorded[i]?.timeMs ?? 0) - (recorded[i - 1]?.timeMs ?? 1));
-  // The motion continues westward (the content moves east) and slows monotonically to rest within the time constant.
-  expect(recorded.length).toBeGreaterThan(3);
-  expect(rate(1)).toBeLessThan(0);
-  for (let i = 2; i < lon.length; i++) expect(Math.abs(rate(i))).toBeLessThanOrEqual(Math.abs(rate(i - 1)) + 1e-9);
-  expect((recorded.at(-1)?.timeMs ?? 0) - (recorded[0]?.timeMs ?? 0)).toBeLessThan(2500);
-  expect(Math.abs((recorded.at(-1)?.camera.latitudeDeg ?? 0) - (recorded[0]?.camera.latitudeDeg ?? 0))).toBeLessThan(
+    ((lon[i] ?? 0) - (lon[i - 1] ?? 0)) / ((all[i]?.timeMs ?? 0) - (all[i - 1]?.timeMs ?? 1));
+  const trace = JSON.stringify(
+    all.map((f) => [f.timeMs.toFixed(1), f.camera.longitudeDeg.toFixed(5), f.pointer ? 1 : 0]),
+  );
+  expect(releasedAt, trace).toBeGreaterThan(3);
+  expect(all.length - releasedAt, trace).toBeGreaterThan(3);
+  // The release frame starts inertia part-way through its step; from the next frame on, inertia runs at the drag's
+  // speed (the content moves east, the center west) and slows monotonically to rest within the time constant.
+  const dragRate = (rate(releasedAt - 1) + rate(releasedAt - 2)) / 2;
+  const first = releasedAt + 1;
+  expect(rate(first), trace).toBeLessThan(0);
+  // A sanity bound: that frame averages a stretch already decaying, over uneven engine steps on a software GPU; the
+  // exact release velocity is the unit tests' (create-controls.test.ts, inertia).
+  expect(rate(first) / dragRate, trace).toBeGreaterThan(0.4);
+  expect(rate(first) / dragRate, trace).toBeLessThan(1.6);
+  for (let i = first + 1; i < lon.length; i++) {
+    expect(Math.abs(rate(i)), trace).toBeLessThanOrEqual(Math.abs(rate(i - 1)) + 1e-9);
+  }
+  expect((all.at(-1)?.timeMs ?? 0) - (all[releasedAt]?.timeMs ?? 0)).toBeLessThan(2500);
+  // Along the drag's direction: an east-west drag on the equator keeps the latitude.
+  expect(Math.abs((all.at(-1)?.camera.latitudeDeg ?? 0) - (all[releasedAt]?.camera.latitudeDeg ?? 0))).toBeLessThan(
     0.5,
   );
 
@@ -104,15 +126,16 @@ for (const backend of BACKENDS) {
   test(`a double click zooms in exactly one level at the clicked point, and a single click does not zoom, on ${backend} (F170)`, async ({
     page,
   }) => {
-    await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=4`);
+    // A small canvas: frames fast enough to show the animation on a software GPU.
+    await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=4&size=320x240`);
     const zoom0 = groundZoom(await camera(page));
-    await page.mouse.click(250, 250);
+    await page.mouse.click(100, 100);
     await settle(page);
     expect(groundZoom(await camera(page))).toBe(zoom0);
     for (const [x, y] of [
-      [250, 250],
-      [520, 380],
-      [400, 300],
+      [100, 100],
+      [208, 152],
+      [160, 120],
     ] as const) {
       const clicked = await positionAt(page, { xPx: x, yPx: y });
       const zoom = groundZoom(await camera(page));
@@ -276,11 +299,11 @@ for (const backend of BACKENDS) {
   test(`wheel notches zoom smoothly anchored at the cursor in pixel and line modes on ${backend} (F168)`, async ({
     page,
   }) => {
-    await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=4`);
+    await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=4&size=320x240`);
     for (const [x, y, deltaMode, deltaY] of [
-      [250, 250, 0, -100],
-      [560, 380, 1, -3],
-      [400, 300, 0, 100],
+      [100, 100, 0, -100],
+      [224, 152, 1, -3],
+      [160, 120, 0, 100],
     ] as const) {
       const under = await positionAt(page, { xPx: x, yPx: y });
       const zoom = groundZoom(await camera(page));

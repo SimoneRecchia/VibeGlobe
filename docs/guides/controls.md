@@ -37,6 +37,8 @@ Without `connect`, pan and zoom work and the rotate and tilt gestures are off.
 | Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                            |
 | Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                        |
 
+A new press, touch or key stops inertia and running turns where they are; a wheel zoom still in progress completes, about the point it started at.
+
 Input over the map never scrolls or zooms the page: the map takes wheel events and sets `touch-action: none` while the controls are attached. Outside the map the page scrolls as usual.
 
 ## Key map
@@ -74,5 +76,7 @@ createControls({
 ```
 
 Gesture switches: `dragPan`, `wheelZoom`, `doubleClickZoom`, `boxZoom`, `dragRotate`, `touchZoom`, `touchRotate`, `touchTilt`, `keyboard`, `inertia`.
+
+On a display too slow to show an animation (frames of an animation more than three of its time constants apart, as on software GPUs), wheel notches and the zoom commands apply in one step instead of costing frames.
 
 With reduced motion (the system's `prefers-reduced-motion: reduce`, followed at runtime, or `reducedMotion: 'reduce'`) inertia lasts a quarter as long.

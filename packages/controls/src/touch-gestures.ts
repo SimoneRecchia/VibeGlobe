@@ -6,6 +6,8 @@ import { SampleRing } from './samples.js';
 const DEG = 180 / Math.PI;
 /** A last finger lifted within this time of the one before it ends a two-finger gesture (its velocity carries on). */
 const LIFT_TOGETHER_MS = 50;
+/** How long a frame waits for the other finger's report of the same touch event. */
+const PARTNER_WAIT_MS = 40;
 
 /** Wraps an angle difference into (−π, π]. */
 function wrapRad(a: number): number {
@@ -29,7 +31,6 @@ export class TouchGestures {
   /** Each finger's last and previous move times, to see a touch event whose fingers are half reported. */
   private readonly moveMs = new Float64Array(2);
   private readonly previousMoveMs = new Float64Array(2);
-  private waited = false;
   private latestMs = 0;
   private dirty = false;
   private rebaseline = false;
@@ -222,8 +223,9 @@ export class TouchGestures {
   }
 
   /**
-   * True, at most one frame in a row, when the fingers moved in step so far and only one has reported the latest touch
-   * event: the browser dispatches each finger's move separately, and a frame between them would show half the motion.
+   * True while the fingers moved in step so far, only one has reported the latest touch event, and that report is less
+   * than 40 ms old: the browser dispatches each finger's move separately, and a frame between them would show half the
+   * motion. A finger that really stopped is applied once its partner's report is older.
    */
   private halfReported(): boolean {
     const a0 = this.moveMs[0] ?? 0;
@@ -231,13 +233,11 @@ export class TouchGestures {
     const p0 = this.previousMoveMs[0] ?? 0;
     const p1 = this.previousMoveMs[1] ?? 0;
     const half = (a0 > a1 && p0 === a1) || (a1 > a0 && p1 === a0);
-    if (half && !this.waited) {
-      this.waited = true;
-      this.context.port.requestNextFrame();
-      return true;
-    }
-    this.waited = false;
-    return false;
+    const ageMs = half ? this.context.port.hostMs() - Math.max(a0, a1) : 0;
+    // A negative age means clocks that do not compare: never wait then.
+    if (!half || ageMs < 0 || ageMs >= PARTNER_WAIT_MS) return false;
+    this.context.port.requestNextFrame();
+    return true;
   }
 
   private applyPan(): void {
@@ -314,7 +314,7 @@ export class TouchGestures {
 
   /** Measures a two-finger gesture's velocity as one of its fingers lifts. */
   private carryVelocity(timeMs: number): void {
-    this.measureRelease(this.carried);
+    this.measureRelease(this.carried, timeMs);
     this.carriedMs = timeMs;
     // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
     this.carriedAnchor = this.anchor;
@@ -322,9 +322,9 @@ export class TouchGestures {
     this.carriedPixel.yPx = this.applied.yPx;
   }
 
-  private measureRelease(out: ReleaseVelocity): void {
+  private measureRelease(out: ReleaseVelocity, releaseMs: number): void {
     const { options } = this.context;
-    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity);
+    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity, releaseMs);
     const vx = this.velocity[0] ?? 0;
     const vy = this.velocity[1] ?? 0;
     out.panXPx = out.panYPx = out.headingDeg = out.tiltDeg = out.zoomLevels = 0;
@@ -365,7 +365,7 @@ export class TouchGestures {
     this.taps.reset();
     if (!options.gestures.inertia) return false;
     if (carried) Object.assign(this.release, this.carried);
-    else this.measureRelease(this.release);
+    else this.measureRelease(this.release, timeMs);
     inertia.start(this.release, this.context.inertiaTaus(), anchor, pixel, options.maxTiltDeg);
     if (inertia.active) port.requestNextFrame();
     return inertia.active;

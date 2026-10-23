@@ -35,6 +35,7 @@ export class MouseGestures {
   private movePending = false;
   private releasePending = false;
   private downMs = 0;
+  private upMs = 0;
   private moved = false;
   private readonly down: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly pointer: MutablePoint = { xPx: 0, yPx: 0 };
@@ -62,6 +63,7 @@ export class MouseGestures {
     else if (press.button === 0 && !press.ctrlKey && (gestures.dragPan || gestures.doubleClickZoom)) mode = 'pan';
     if (mode === 'none') return false;
     this.context.interrupt();
+    this.box.stop();
     this.pointerId = id;
     this.mode = mode;
     this.ctrlRotate = rotate && press.button === 0;
@@ -102,7 +104,7 @@ export class MouseGestures {
   up(xPx: number, yPx: number, timeMs: number): boolean {
     const mode = this.mode;
     this.pointerId = undefined;
-    this.samples.add(timeMs, xPx, yPx);
+    this.upMs = timeMs;
     if (mode === 'box') {
       this.mode = 'none';
       const { context } = this;
@@ -184,7 +186,7 @@ export class MouseGestures {
     const anchor = this.anchor;
     this.end();
     if (!options.gestures.inertia || (mode === 'pan' && !anchor) || mode === 'none') return;
-    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity);
+    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity, this.upMs);
     const release = this.release;
     release.panXPx = release.panYPx = release.headingDeg = release.tiltDeg = release.zoomLevels = 0;
     const vx = this.velocity[0] ?? 0;

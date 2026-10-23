@@ -167,7 +167,7 @@ export class ZoomTarget {
     if (this.pending === 0) return false;
     const dt = this.timeline.step(nowMs, port.previousFrameMs);
     let levels = this.pending * approachShare(this.tauMs, dt);
-    if (Math.abs(this.pending - levels) < ZOOM_REST_LEVELS) levels = this.pending;
+    if (Math.abs(this.pending - levels) < ZOOM_REST_LEVELS || port.tooSlowFor(this.tauMs)) levels = this.pending;
     this.pending -= levels;
     port.zoomAt(this.at, levels);
     return this.pending !== 0;

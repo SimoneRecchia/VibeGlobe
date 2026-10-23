@@ -36,14 +36,17 @@ export class SampleRing {
   }
 
   /**
-   * Velocity per millisecond of each channel over the samples within `windowMs` of the latest one, written to `out`.
-   * Fewer than two samples in the window, as after holding still, give zero: a release after a pause does not coast.
+   * Velocity per millisecond of each channel over the samples within `windowMs` of the latest one, written to `out`,
+   * for a release at `releaseMs`. A release more than `windowMs` after the latest sample, or fewer than two samples in the
+   * window, give zero: a release after holding still does not coast. The window ends at the latest motion, not at the
+   * release, so slow event delivery (a busy main thread) still measures the drag.
    */
-  velocity(windowMs: number, out: Float64Array): void {
+  velocity(windowMs: number, out: Float64Array, releaseMs: number): void {
     out.fill(0);
     if (this.count < 2) return;
     const last = (this.head - 1 + CAPACITY) % CAPACITY;
     const lastTime = this.times[last] ?? 0;
+    if (releaseMs - lastTime > windowMs) return;
     let first = last;
     for (let n = 1; n < this.count; n++) {
       const i = (last - n + CAPACITY) % CAPACITY;

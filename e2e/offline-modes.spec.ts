@@ -6,9 +6,12 @@ import { nextFrame } from './support/globe.ts';
 import {
   connectivity,
   emptyPixels,
+  emptyPixelsMoving,
   emptyPixelsNow,
   openHarness,
+  publishFixture,
   recordTileRequests,
+  servePackages,
   startHarness,
   storedTileKeys,
   tileHeaders,
@@ -33,10 +36,15 @@ const WORLD_BASE = {
   minLevel: 0,
   maxLevel: 3,
 };
-const PACKAGES = [
-  { id: 'rome', sourceId: 'world', pattern: 'world', bounds: ROME_BOUNDS, minLevel: 4, maxLevel: 10 },
-  WORLD_BASE,
-];
+const ROME_PACKAGE = {
+  id: 'rome',
+  sourceId: 'world',
+  pattern: 'world',
+  bounds: ROME_BOUNDS,
+  minLevel: 4,
+  maxLevel: 10,
+};
+const PACKAGES = [ROME_PACKAGE, WORLD_BASE];
 
 const jump = (page: Page, view: Record<string, number>) =>
   page.evaluate((v) => window.offlineHarness?.globe?.jumpTo(v), view);
@@ -64,7 +72,7 @@ async function fly(page: Page, to: Record<string, number>, durationMs = 2500): P
   for (let sample = 0; sample < 12; sample++) {
     if (await page.evaluate(() => (window as unknown as { flightDone: boolean }).flightDone)) break;
     await nextFrame(page);
-    worst = Math.max(worst, await emptyPixelsNow(page));
+    worst = Math.max(worst, await emptyPixelsMoving(page));
   }
   await page.evaluate(() => (window as unknown as { flight?: Promise<unknown> }).flight);
   return Math.max(worst, await emptyPixels(page));
@@ -306,7 +314,7 @@ test('each tile comes from the highest tier holding it, GPU, RAM, persistent, pa
   expect(await emptyPixels(page)).toBe(0);
   const away = await page.evaluate(() => window.offlineHarness?.globe?.imageryStats());
   expect(away?.evicted).toBeGreaterThan(0);
-  let served = await page.evaluate(() => window.offlineHarness?.served.length ?? 0);
+  const served = await page.evaluate(() => window.offlineHarness?.served.length ?? 0);
   let sent = requests.length;
   await jump(page, INSIDE_ROME);
   expect(await emptyPixels(page)).toBe(0);
@@ -431,4 +439,100 @@ test('every switch, set globally or for one layer, takes effect at runtime durin
     window.offlineHarness?.offline?.effectiveSwitches('roads', 'roads-layer'),
   );
   expect(effective).toEqual({ persistentCache: false, memoryReuse: true, prefetch: false, offlinePackaging: true });
+});
+
+test('mixed mode: an instant start and flights from a low-detail package, detail from a slow network after the camera settles (F294)', async ({
+  page,
+}) => {
+  await openHarness(page);
+  await startHarness(page, { sources: [{ id: 'world', pattern: 'world', session: 'f294' }], view: ROME });
+  await page.evaluate((s) => window.offlineHarness?.installFixture(s), {
+    ...WORLD_BASE,
+    session: 'f294',
+    version: '1',
+  });
+  // The online source: 400 kbps and 300 ms of latency.
+  await page.route('**/fixture-tiles/f294/**', async (route) => {
+    const response = await route.fetch();
+    const body = await response.body();
+    await new Promise((resolve) => setTimeout(resolve, 300 + (body.length * 8) / 400));
+    return route.fulfill({ response, body });
+  });
+  const startedMs = Date.now();
+  await startHarness(page, {
+    sources: [{ id: 'world', pattern: 'world', session: 'f294' }],
+    view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 2 },
+    switches: { persistentCache: false },
+  });
+  const readyMs = Date.now();
+  console.log(`F294 first complete frame: ${String(readyMs - startedMs)} ms`);
+  // The first complete frame needed no network tile: every tile it drew shows a level the package holds.
+  const firstFrame = await page.evaluate(() =>
+    (window.offlineHarness?.globe?.surfaceTiles() ?? []).map((t) => t.imageryLevel ?? -1),
+  );
+  expect(firstFrame.length).toBeGreaterThan(0);
+  expect(firstFrame.every((level) => level >= 0 && level <= WORLD_BASE.maxLevel)).toBe(true);
+  expect(await emptyPixelsNow(page)).toBe(0);
+  // A long flight: every intermediate view drawn from the package with no black pixel.
+  const served = await page.evaluate(() => window.offlineHarness?.served.length ?? 0);
+  expect(await fly(page, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 3 }, 4000)).toBe(0);
+  const duringFlight = await tiersSince(page, served);
+  // The package serves every level it holds; only finer levels near the flight's ends go to the slow network.
+  // (The whole low-detail world is resident from the start, so the flight itself may need no new package tile.)
+  const session = await tiersSince(page, 0);
+  expect(session.some((t) => t.tier === 'package')).toBe(true);
+  expect(session.filter((t) => t.level <= WORLD_BASE.maxLevel).every((t) => t.tier === 'package')).toBe(true);
+  expect(duringFlight.filter((t) => t.level <= WORLD_BASE.maxLevel).every((t) => t.tier === 'package')).toBe(true);
+  // Settled at street level, the detail beyond the package arrives from the network.
+  const settledFrom = await page.evaluate(() => window.offlineHarness?.served.length ?? 0);
+  await jump(page, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 7 });
+  await expect
+    .poll(async () => (await tiersSince(page, settledFrom)).some((t) => t.tier === 'network' && t.level > 3), {
+      timeout: 60_000,
+    })
+    .toBe(true);
+  expect(await emptyPixels(page)).toBe(0);
+});
+
+test('offline mode 1: PMTiles and MBTiles packages and a static tile folder on a LAN server, no other host (F295)', async ({
+  page,
+}) => {
+  await openHarness(page);
+  const lan = await servePackages(page);
+  await startHarness(page, { sources: [{ id: 'world', pattern: 'world', session: 'f295' }], view: ROME });
+  // The packages on the LAN server: Rome's detail as PMTiles, the world's base as MBTiles.
+  const rome = await publishFixture(page, lan, { ...ROME_PACKAGE, session: 'f295', version: '1' });
+  const base = await publishFixture(page, lan, {
+    ...WORLD_BASE,
+    session: 'f295',
+    version: '1',
+    format: 'mbtiles' as const,
+  });
+  // No internet: only the LAN server (the dev server's origin) answers; every other host is unreachable.
+  const elsewhere: string[] = [];
+  await page.route(
+    (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
+    (route) => {
+      elsewhere.push(route.request().url());
+      return route.abort('internetdisconnected');
+    },
+  );
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(new URL(request.url()).host));
+  const startedMs = Date.now();
+  await startHarness(page, {
+    // The static tile folder on the same LAN server is the network tier of hybrid mode.
+    sources: [{ id: 'world', pattern: 'world', session: 'f295' }],
+    served: [rome.manifestUrl, base.manifestUrl],
+    view: { ...ROME, zoom: 8 },
+    healthChecks: HEALTH,
+  });
+  const firstFrameMs = Date.now() - startedMs;
+  expect(await navigateRome(page)).toBe(0);
+  const tiers = new Set((await tiersSince(page, 0)).map((t) => t.tier));
+  expect(tiers.has('package')).toBe(true);
+  expect(elsewhere).toEqual([]);
+  expect(new Set(requests)).toEqual(new Set([new URL(page.url()).host]));
+  // Logged for the hardening run on the LAN reference setup (the 1 s target is measured on real hardware).
+  console.log(`F295 first complete frame: ${String(firstFrameMs)} ms`);
 });

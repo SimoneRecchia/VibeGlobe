@@ -215,3 +215,21 @@ export async function emptyPixelsNow(page: Page): Promise<number> {
 export async function connectivity(page: Page): Promise<string | undefined> {
   return page.evaluate(() => window.offlineHarness?.offline?.connectivity);
 }
+
+/**
+ * The pixels without imagery inside the globe in a frame drawn while the camera moves (a flight): the camera range is
+ * read just before and just after the capture, and only the disk of the smaller silhouette counts, so a capture taken
+ * between two camera states never counts the background around a globe that was still growing or shrinking.
+ */
+export async function emptyPixelsMoving(page: Page): Promise<number> {
+  const before = await page.evaluate(() => window.offlineHarness?.globe?.camera.rangeMeters ?? NaN);
+  const image = await canvasImage(page);
+  const after = await page.evaluate(() => window.offlineHarness?.globe?.camera.rangeMeters ?? NaN);
+  const heightPx = await page.evaluate(() => document.querySelector('#globe')?.clientHeight ?? NaN);
+  const radius = (rangeMeters: number): number => {
+    const b = 6356752.314245179;
+    const angular = Math.asin(b / (rangeMeters + b));
+    return (Math.tan(angular) / Math.tan(0.6435011087932844 / 2)) * (heightPx / 2) - 1.5;
+  };
+  return emptyPixelsInside(image, Math.min(radius(before), radius(after)));
+}

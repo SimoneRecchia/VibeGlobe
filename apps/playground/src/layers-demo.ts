@@ -1,4 +1,5 @@
 import type { Globe } from '@vibeglobe/core';
+import { manyPointsLayer } from './layers-many.js';
 import {
   createGlobeLayers,
   DataLayer,
@@ -367,7 +368,7 @@ export function showDataScenario(globe: Globe, name: string): void {
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (name === 'data-markers')
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
-  const scene = DATA_SCENES[name];
+  const scene = name === 'data-points-100k' ? manyPointsLayer : DATA_SCENES[name];
   const added = scene
     ? [scene()]
     : name === 'data-altitudes'

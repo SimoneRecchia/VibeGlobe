@@ -5003,7 +5003,7 @@
         "Verify the feature appears at its new position in the next frame",
         "Verify through instrumentation that only the changed range is uploaded and the per-frame update cost stays within budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F377",
@@ -5015,7 +5015,7 @@
         "Verify each change is visible in the next frame",
         "Verify through instrumentation that only the changed ranges are uploaded"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F378",

@@ -1,5 +1,7 @@
 {
-  "bundleExternal": ["three"],
+  "bundleExternal": [
+    "three"
+  ],
   "initialJs": {
     "threeGzipKB": 236,
     "totalGzipKB": 351
@@ -119,5 +121,10 @@
       "file": "packages/worker/wasm/vibeglobe-basis.wasm",
       "gzipKB": 210
     }
+  },
+  "dataLayers": {
+    "_comment": "Per-feature updates of a 100,000-point layer (F376, F377): the CPU time of one update call, and the vertices uploaded per changed point (one quad).",
+    "featureUpdateP95Ms": 1,
+    "uploadedVerticesPerFeature": 4
   }
 }

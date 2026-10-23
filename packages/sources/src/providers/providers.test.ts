@@ -4,7 +4,7 @@ import { failures, runTiledConformance } from '../conformance/index.js';
 import { fixtureCopyright, GOOGLE_FIXTURE_KEY, googleFixture } from '../__fixtures__/google-server.js';
 import type { DescribedImagerySource } from '../metadata.js';
 import { SourceConfigError } from '../metadata.js';
-import { googleImagery, googleProfile } from './google-provider.js';
+import { followGoogleCopyrights, googleImagery, googleProfile } from './google-provider.js';
 import { googleStreetView } from './google-street-view-provider.js';
 import { OSM_PUBLIC_PROFILE, openStreetMapImagery } from './openstreetmap-provider.js';
 
@@ -101,6 +101,34 @@ describe('googleImagery (F257, F258)', () => {
     const viewport = server.requests.filter((r) => r.url.includes('/tile/v1/viewport'));
     expect(viewport).toHaveLength(2);
     expect(viewport[0]?.url).toContain('zoom=5&north=45.000000&south=40.000000&east=-2.000000&west=-10.000000');
+  });
+
+  it('follows the settled view: one viewport request per settled view, its copyright after the logo (F258)', async () => {
+    const server = googleFixture(tileBytes);
+    const source = await googleImagery({ ...base, id: 'g', mapType: 'roadmap', fetch: server.fetch });
+    let idle: (() => void) | undefined;
+    let tiles = [{ westDeg: -10, southDeg: 40, eastDeg: -2, northDeg: 45 }];
+    const refreshes: string[][] = [];
+    const globe = {
+      camera: { zoom: 6 },
+      on: (_event: 'idle', handler: () => void) => ((idle = handler), () => (idle = undefined)),
+      surfaceTiles: () => tiles,
+      refreshCredits: () => refreshes.push(source.attribution.map((a) => a.text)),
+    };
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+    const stop = followGoogleCopyrights(globe, source);
+    await settle();
+    idle?.();
+    idle?.();
+    await settle();
+    tiles = [{ westDeg: 8, southDeg: 40, eastDeg: 16, northDeg: 45 }];
+    idle?.();
+    await settle();
+    expect(server.requests.filter((r) => r.url.includes('/tile/v1/viewport'))).toHaveLength(2);
+    expect(source.attribution.map((a) => a.text)).toEqual(['Google', fixtureCopyright(8)]);
+    expect(refreshes.at(0)).toEqual(['Google', fixtureCopyright(-10)]);
+    stop();
+    expect(idle).toBeUndefined();
   });
 
   it('passes the tiled conformance suite, with every request carrying the session token', async () => {

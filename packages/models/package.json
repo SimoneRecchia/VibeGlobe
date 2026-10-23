@@ -1,0 +1,25 @@
+{
+  "name": "@vibeglobe/models",
+  "version": "0.0.0",
+  "description": "VibeGlobe models: glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding in workers, node transforms and a renderer-neutral model description.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo",
+    "!dist/__fixtures__"
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0",
+    "draco3d": "1.5.9",
+    "meshoptimizer": "1.3.0"
+  }
+}

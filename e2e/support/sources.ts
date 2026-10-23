@@ -16,7 +16,7 @@ interface SourcesTestHandle {
   /** The main entry and the MBTiles entry of `@vibeglobe/sources`. */
   readonly sources: typeof SourcesModule & typeof MbtilesModule;
   /** Replaces the mounted globe with one showing `source` over the base image. */
-  mount(source: CoreModule.ImagerySource): Promise<void>;
+  mount(source: CoreModule.ImagerySource, options?: { readonly hiddenCredits?: readonly string[] }): Promise<void>;
   globe?: CoreModule.Globe;
   /** URL of sql.js's WebAssembly file, served by the dev server. */
   readonly sqlWasmUrl: string;
@@ -61,7 +61,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
       const handle: SourcesTestHandle = {
         sources,
         sqlWasmUrl,
-        async mount(source) {
+        async mount(source, options = {}) {
           handle.globe?.destroy();
           host.querySelectorAll('.vg-source-test').forEach((node) => node.remove());
           const container = document.createElement('div');
@@ -84,6 +84,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
             },
             imagery: [source],
             workers,
+            ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
           });
           handle.globe = globe;
           await globe.ready;
@@ -228,17 +229,22 @@ async function waitForSourceIdle(page: Page): Promise<void> {
  * Builds a source in the page with `body`, a function `(sources, value, sqlWasmUrl) => source | Promise<source>`
  * written as text (it runs in the page), and mounts it.
  */
-export async function mountSource(page: Page, body: string, value: unknown = null): Promise<void> {
+export async function mountSource(
+  page: Page,
+  body: string,
+  value: unknown = null,
+  options: { readonly hiddenCredits?: readonly string[] } = {},
+): Promise<void> {
   await page.evaluate(
-    async ({ code, arg }) => {
+    async ({ code, arg, mountOptions }) => {
       const handle = window.vibeglobeSources;
       if (!handle) throw new Error('no source handle');
       const build = new Function('sources', 'value', 'wasm', `return (${code})(sources, value, wasm);`) as (
         ...args: unknown[]
       ) => Promise<CoreModule.ImagerySource>;
-      await handle.mount(await build(handle.sources, arg, handle.sqlWasmUrl));
+      await handle.mount(await build(handle.sources, arg, handle.sqlWasmUrl), mountOptions);
     },
-    { code: body, arg: value },
+    { code: body, arg: value, mountOptions: options },
   );
 }
 

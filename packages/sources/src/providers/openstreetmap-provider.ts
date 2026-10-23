@@ -1,6 +1,14 @@
 import type { TileTransport } from '@vibeglobe/core';
 import { fetchTransport } from '../fetch-transport.js';
-import { type DescribedImagerySource, type ProviderProfile, SourceConfigError } from '../metadata.js';
+import {
+  type Attribution,
+  combineProfiles,
+  type DescribedImagerySource,
+  type ProviderProfile,
+  SourceConfigError,
+  withProfile,
+} from '../metadata.js';
+import type { XyzImageryOptions } from '../xyz-imagery.js';
 import { xyzImagery } from '../xyz-imagery.js';
 
 /** At most this many requests in flight to the public servers (ADR 0032). */
@@ -84,5 +92,45 @@ export function openStreetMapImagery(options: OpenStreetMapImageryOptions): Desc
     ...source,
     attribution: [OSM_PUBLIC_PROFILE.requiredAttribution ?? { text: '' }],
     profile: OSM_PUBLIC_PROFILE,
+    transportRequired: true,
   };
+}
+
+/** The credit OpenStreetMap data needs wherever it is served from (ODbL, ADR 0032). */
+export const OSM_ODBL_ATTRIBUTION: Attribution = Object.freeze({
+  text: '© OpenStreetMap contributors, ODbL',
+  url: 'https://www.openstreetmap.org/copyright',
+});
+
+/** OpenStreetMap data from one's own servers or the data pipeline's tiles: everything enabled, the ODbL credit required. */
+export const OSM_SELF_HOSTED_PROFILE: ProviderProfile = Object.freeze({
+  id: 'osm-self-hosted',
+  forbids: new Set<never>(),
+  respectCacheHeaders: true,
+  requiredAttribution: OSM_ODBL_ATTRIBUTION,
+  termsAdr: 'docs/adr/0032-openstreetmap-tile-usage-policy.md',
+});
+
+/** Options of {@link openStreetMapHostedImagery}: an XYZ source, and the commercial provider's profile if any. */
+export interface OpenStreetMapHostedOptions extends XyzImageryOptions {
+  /**
+   * The profile of a commercial provider serving the tiles: its rules apply on top of the self-hosted profile, and its
+   * required credit is shown next to the ODbL one (F325).
+   */
+  readonly provider?: ProviderProfile;
+  /** Credits of the provider besides its required one. */
+  readonly attribution?: readonly Attribution[];
+}
+
+/**
+ * OpenStreetMap tiles that are not the OSMF's public servers (F325): self-hosted tiles enable every loading feature and
+ * show the ODbL credit; tiles of a commercial provider add that provider's own profile on top.
+ */
+export function openStreetMapHostedImagery(options: OpenStreetMapHostedOptions): DescribedImagerySource {
+  const { provider, attribution = [], ...xyz } = options;
+  const profile = provider ? combineProfiles(OSM_SELF_HOSTED_PROFILE, provider) : OSM_SELF_HOSTED_PROFILE;
+  const credits = [OSM_ODBL_ATTRIBUTION, ...attribution];
+  if (provider?.requiredAttribution && !credits.some((a) => a.text === provider.requiredAttribution?.text))
+    credits.push(provider.requiredAttribution);
+  return withProfile(xyzImagery(xyz), profile, credits);
 }

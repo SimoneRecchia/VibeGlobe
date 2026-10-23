@@ -373,3 +373,18 @@ describe('served offline packages and integrity', () => {
     await expect(lan.manager.addServedPackage('https://lan.test/lan/rome.json')).rejects.toThrow(/chunk/);
   });
 });
+
+describe('package credits (F306)', () => {
+  it("adds the package's recorded attribution to its source's credits once its tiles are read", async () => {
+    const data = archive('1');
+    const { manager, source } = setup();
+    await manager.install({
+      manifest: new Blob([JSON.stringify(await manifestOf('1', data))]),
+      files: { 'rome.pmtiles': new Blob([data as Uint8Array<ArrayBuffer>]) },
+    });
+    expect(source.attribution ?? []).toEqual([]);
+    expect(await load(source, tile(1, 1, 0))).toBe('1:1/1/0');
+    expect(source.attribution).toEqual([{ text: '© OpenStreetMap contributors' }]);
+    (await manager.list()).forEach((p) => expect(p.licenses).toEqual(['ODbL-1.0']));
+  });
+});

@@ -1,9 +1,11 @@
+import { createControls } from '@vibeglobe/controls';
 import {
   createGlobe,
   type CameraState,
   type Globe,
   type GlobeError,
   type GlobeEvents,
+  type ImageryLayerChanges,
   type ImagerySource,
   type ViewInit,
   type WorkerEndpointFactory,
@@ -22,7 +24,8 @@ import {
   type ShallowRef,
   type VNode,
 } from 'vue';
-import { GLOBE_KEY } from './context.js';
+import { EXTRAS_KEY, GLOBE_KEY } from './context.js';
+import { globeExtras } from './extras.js';
 import {
   changedView,
   globeOptions,
@@ -33,6 +36,35 @@ import {
 } from './globe-config.js';
 
 const FILL = 'position:absolute;inset:0';
+
+/** The look of one imagery layer, by id, as the `layers` prop takes it; the array's order is the layers' order. */
+export interface LayerLook extends ImageryLayerChanges {
+  readonly id: string;
+}
+
+/** The network modes of `@vibeglobe/offline` (F271). */
+export type NetworkMode = 'online' | 'offline' | 'hybrid';
+
+/** The part of an offline engine (`createOffline()` of `@vibeglobe/offline`) the `networkMode` prop drives. */
+export interface NetworkModeTarget {
+  readonly mode: NetworkMode;
+  setMode(mode: NetworkMode): void;
+}
+
+/** Applies layer looks and order to the engine's imagery layers; unknown ids are skipped. */
+function applyLayers(engine: Globe, looks: readonly LayerLook[] | undefined): void {
+  if (looks === undefined) return;
+  const known = new Set(engine.imageryLayers.list().map((layer) => layer.id));
+  const present = looks.filter((look) => known.has(look.id));
+  for (const [index, { id, ...changes }] of present.entries()) {
+    engine.imageryLayers.set(id, changes);
+    const now = engine.imageryLayers.list().findIndex((layer) => layer.id === id);
+    if (now !== index) engine.imageryLayers.move(id, index);
+  }
+}
+
+/** The choices of the 2D / 3D / Auto toggle, as `Globe.setViewMode` takes them. */
+export type ToggleMode = Parameters<Globe['setViewMode']>[0];
 
 /** The component's events, as `emit` takes them. */
 interface GlobeEmit {
@@ -51,9 +83,27 @@ function startGlobe(
   ready: ShallowRef<boolean>,
   emit: GlobeEmit,
   view: () => ViewInit,
+  viewMode: () => ToggleMode | undefined,
+  live: {
+    layers: () => readonly LayerLook[] | undefined;
+    network: () => readonly [NetworkModeTarget | undefined, NetworkMode | undefined];
+  },
 ): (() => void)[] {
-  const engine = createGlobe(globeOptions(element, config));
+  const controls = config.controls ? createControls() : undefined;
+  const engine = createGlobe(globeOptions(element, config, controls));
+  // Rotation, tilt and the engine clock of the controls need the globe (the M6 input track's hook 5).
+  controls?.connect(engine);
   globe.value = engine;
+  const applyMode = (mode: ToggleMode | undefined): void => {
+    if (mode && engine.viewMode !== (mode === '3d' ? 'manual' : mode)) engine.setViewMode(mode);
+  };
+  applyMode(viewMode());
+  // The engine lists its imagery layers once its renderer has started.
+  void engine.ready.then(() => applyLayers(engine, live.layers())).catch(() => undefined);
+  const applyNetwork = ([offline, mode]: readonly [NetworkModeTarget | undefined, NetworkMode | undefined]): void => {
+    if (offline && mode && offline.mode !== mode) offline.setMode(mode);
+  };
+  applyNetwork(live.network());
   let loaded = false;
   // A failed start is reported through the `error` event; the promise must not reject unhandled.
   engine.ready.catch(() => undefined);
@@ -70,6 +120,9 @@ function startGlobe(
     engine.on('camera-change', (camera) => emit('camera-change', camera)),
     engine.on('error', (error) => emit('error', error)),
     watchClicks(element, engine, (click) => emit('globe-click', click)),
+    watch(viewMode, applyMode),
+    watch(live.layers, (looks) => applyLayers(engine, looks), { deep: true }),
+    watch(live.network, applyNetwork),
     watch(view, (next) => {
       const changed = changedView(engine.camera, next);
       if (changed) engine.jumpTo(changed);
@@ -80,7 +133,7 @@ function startGlobe(
 /**
  * The globe component. On the server and before mount it renders only its `placeholder` slot; the engine starts in
  * `onMounted`, so importing and server-rendering it never touches the browser or the GPU. Camera props update the
- * running engine in place (`jumpTo`); the other props configure the engine when it starts. The default slot renders
+ * running engine in place (`jumpTo`), and so does `viewMode` (`setViewMode`); the other props configure the engine when it starts. The default slot renders
  * once the engine exists, with the engine available to its components through {@link useGlobe}.
  *
  * Events: `ready` (the engine drew its first frame, with the backend), `load` (the first view finished loading),
@@ -106,6 +159,17 @@ export const VibeGlobe = defineComponent({
     zoom: { type: Number, default: undefined },
     headingDeg: { type: Number, default: undefined },
     tiltDeg: { type: Number, default: undefined },
+    /** The 2D / 3D / Auto toggle (F163): changes the running engine's view mode in place; unset keeps the engine's. */
+    viewMode: { type: String as PropType<ToggleMode>, default: undefined },
+    /**
+     * Opacity, visibility, blend mode and order of the imagery layers, by id (F243–F245): changes apply to the running
+     * engine in place, keeping every tile already loaded.
+     */
+    layers: { type: Array as PropType<readonly LayerLook[]>, default: undefined },
+    /** The offline engine whose sources the `imagery` prop uses (`createOffline().source(…)`), for `networkMode`. */
+    offline: { type: Object as PropType<NetworkModeTarget>, default: undefined },
+    /** The network mode of `offline` (F271), changed at runtime with no reload of the engine. */
+    networkMode: { type: String as PropType<NetworkMode>, default: undefined },
   },
   emits: {
     ready: (payload: GlobeEvents['ready']) => typeof payload === 'object',
@@ -120,7 +184,12 @@ export const VibeGlobe = defineComponent({
     const globe = shallowRef<Globe>();
     const ready = shallowRef(false);
     provide(GLOBE_KEY, globe);
-    expose({ globe });
+    const extras = globeExtras(
+      () => globe.value,
+      () => container.value,
+    );
+    provide(EXTRAS_KEY, extras);
+    expose({ globe, extras });
     const view = (): ViewInit => {
       const fields: Record<string, number> = {};
       for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
@@ -134,12 +203,16 @@ export const VibeGlobe = defineComponent({
     onMounted(() => {
       const element = container.value;
       if (!element) return;
-      stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view);
+      stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view, () => props.viewMode, {
+        layers: () => props.layers,
+        network: () => [props.offline, props.networkMode] as const,
+      });
     });
 
     onBeforeUnmount(() => {
       for (const stop of stops) stop();
       stops = [];
+      extras.release();
       globe.value?.destroy();
       globe.value = undefined;
     });

@@ -12,6 +12,7 @@ import {
   type VerticalDatum,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
+import { type Attribution, CUSTOM_PROFILE, type DescribedSource, type ProviderProfile } from './metadata.js';
 
 /** Options of {@link quantizedMeshTerrain}. */
 export interface QuantizedMeshTerrainOptions {
@@ -26,6 +27,10 @@ export interface QuantizedMeshTerrainOptions {
   maxRequestsPerHost?: number;
   multiplexed?: boolean;
   timeoutsMs?: TimeoutsMs;
+  /** Credits shown while the terrain is in view (F254); none by default. */
+  attribution?: readonly Attribution[];
+  /** The provider's rules; everything enabled by default. */
+  profile?: ProviderProfile;
 }
 
 /** The extensions the engine decodes, by their `layer.json` and `Accept` names. */
@@ -49,7 +54,9 @@ function acceptHeader(declared: readonly string[]): string {
  * the metadata extension of loaded tiles, and asks for the declared extensions only. Rejects when `layer.json` cannot
  * be loaded or read.
  */
-export async function quantizedMeshTerrain(options: QuantizedMeshTerrainOptions): Promise<TerrainSource> {
+export async function quantizedMeshTerrain(
+  options: QuantizedMeshTerrainOptions,
+): Promise<TerrainSource & DescribedSource> {
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   const response = await fetchImpl(options.url, { mode: 'cors', credentials: 'omit' });
   if (!response.ok) throw new Error(`${options.id}: layer.json answered ${response.status}`);
@@ -69,6 +76,8 @@ export async function quantizedMeshTerrain(options: QuantizedMeshTerrainOptions)
     maxLevel: layer.maxZoom,
     transport: fetchTransport(fetchImpl, { Accept: acceptHeader(layer.extensions) }),
     decoder: { kind: 'quantized-mesh' },
+    attribution: options.attribution ?? [],
+    profile: options.profile ?? CUSTOM_PROFILE,
     datum: options.datum ?? { kind: 'ellipsoid' },
     geometricErrorMeters: (level) => levelZeroErrorMeters / 2 ** level,
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),

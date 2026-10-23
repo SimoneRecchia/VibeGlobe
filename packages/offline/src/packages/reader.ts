@@ -1,19 +1,20 @@
-import type { ImagerySource, TileCoord, TransportResult } from '@vibeglobe/core';
+import type { TileSource, TileCoord, TransportResult } from '@vibeglobe/core';
 import type { PackageReader } from '../offline-engine.js';
 import type { PackageTile } from '../tiered-source.js';
 import { tileKey } from '../tiered-source.js';
 import { sha256Hex } from './integrity.js';
-import type { PackageFileEntry, PackageManifest } from './manifest.js';
+import type { PackageAttribution, PackageFileEntry, PackageManifest } from './manifest.js';
 import { httpChunkLoader, IntegrityError, verifyingFetch, type ChunkLoader } from './package-fetch.js';
 import { type PackageStorage, versionKey } from './package-storage.js';
 
 /**
  * The PMTiles and MBTiles adapters of `@vibeglobe/sources` (F232, F233), passed in by the application: their
- * signatures, reduced to what packages use (`pmtilesImagery`, and `mbtilesImagery` of `@vibeglobe/sources/mbtiles`).
+ * signatures, reduced to what packages use. `pmtilesImagery` and `mbtilesImagery` read raster packages; packages of
+ * terrain or vector tiles need the adapters that accept any content (`(o) => pmtilesArchive(o, 'any')`, F328).
  */
 export interface ArchiveAdapters {
-  pmtiles(options: { id: string; archive: string; fetch: typeof fetch }): Promise<ImagerySource>;
-  mbtiles(options: { id: string; package: string; fetch: typeof fetch }): Promise<ImagerySource>;
+  pmtiles(options: { id: string; archive: string; fetch: typeof fetch }): Promise<TileSource>;
+  mbtiles(options: { id: string; package: string; fetch: typeof fetch }): Promise<TileSource>;
 }
 
 /** A package the reader serves tiles from: installed in browser storage, or on a LAN server (offline mode 1). */
@@ -29,7 +30,7 @@ const READ_TIMEOUTS = { firstByteMs: 30_000, totalMs: 30_000 };
 /** Reads tiles from active packages, newest first; corrupted or unreadable data reads as missing (F309, F310). */
 export class PackageTileReader implements PackageReader {
   private packages: readonly ActivePackage[] = [];
-  private readonly opened = new Map<string, Promise<ImagerySource | undefined>>();
+  private readonly opened = new Map<string, Promise<TileSource | undefined>>();
 
   constructor(
     private readonly storage: PackageStorage,
@@ -43,6 +44,12 @@ export class PackageTileReader implements PackageReader {
     this.packages = packages;
     const live = new Set(packages.flatMap((p) => p.manifest.files.map((f) => this.fileKey(p, f))));
     for (const key of this.opened.keys()) if (!live.has(key)) this.opened.delete(key);
+  }
+
+  /** The credit a package records for one of its sources (F306). */
+  attribution(packageId: string, sourceId: string): PackageAttribution | undefined {
+    const pkg = this.packages.find((p) => `${p.manifest.id}@${p.manifest.version}` === packageId);
+    return pkg?.manifest.sources.find((s) => s.sourceId === sourceId)?.attribution;
   }
 
   /** The active packages. */
@@ -113,7 +120,7 @@ export class PackageTileReader implements PackageReader {
     return `${where}|${versionKey(pkg.manifest)}${file.path}`;
   }
 
-  private open(pkg: ActivePackage, file: PackageFileEntry): Promise<ImagerySource | undefined> {
+  private open(pkg: ActivePackage, file: PackageFileEntry): Promise<TileSource | undefined> {
     const key = this.fileKey(pkg, file);
     let opened = this.opened.get(key);
     if (!opened) {
@@ -140,7 +147,7 @@ export class PackageTileReader implements PackageReader {
     pkg: ActivePackage,
     file: PackageFileEntry,
     reads: { failed: boolean },
-  ): Promise<ImagerySource> {
+  ): Promise<TileSource> {
     if (!this.adapters) throw new Error('no PMTiles or MBTiles adapter was given to the package manager');
     const prefix = versionKey(pkg.manifest);
     const loader: ChunkLoader =

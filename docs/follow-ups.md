@@ -57,3 +57,10 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 ## Sources (M7)
 
 - **Crop rectangle in the imagery decode task:** WMS adapters request a gutter around each tile and crop it in their transport by re-encoding the image (F231 works this way). An optional crop rectangle in the decoder description would crop in the worker's decode instead and save the re-encode (track B hook request, 2026-10-22).
+
+## A. UI, GIS and framework adapters track
+
+- **Minimap footprint near the horizon:** when any edge of the main view shows sky, the minimap outlines the whole visible cap (the horizon circle). A tilted view up to the horizon could instead combine the ground part of its edges with the horizon arc.
+- **One attribution list:** until the engine can leave its attribution to an application control (track A hook request 1), the UI's `AttributionControl` repeats the engine's element; once it lands, the control should become the only list.
+- **UI bundle budget:** `@vibeglobe/ui` is at 24.4 of its 25 KB gzip budget; further controls could move to entry points of their own (`@vibeglobe/ui/draw`, `@vibeglobe/ui/tools`) so applications load only what they add.
+- **Drawing on touch screens:** vertex handles are hit within 12 CSS pixels; the reference tablet (owner question 2) may call for a larger touch radius and for a long-press to delete a vertex.

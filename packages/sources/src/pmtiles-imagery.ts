@@ -1,14 +1,27 @@
-import { WEB_MERCATOR_TILING, type TileCoord, type TileRectangleRad, type TileRequest } from '@vibeglobe/core';
+import {
+  type TerrainSource,
+  WEB_MERCATOR_TILING,
+  type TileCoord,
+  type TileRectangleRad,
+  type TileRequest,
+} from '@vibeglobe/core';
 import { PMTiles, TileType, type Header, type RangeResponse, type Source } from 'pmtiles';
 import { archiveTransport, fetchRange, HttpStatusError, NetworkError, tileOfUrl } from './archive-transport.js';
 import {
   type Attribution,
   CUSTOM_PROFILE,
   type DescribedImagerySource,
+  type DescribedSource,
   type ProviderProfile,
   SourceConfigError,
 } from './metadata.js';
 import { coverageOf, inLevelsAndCoverage } from './tiling.js';
+import {
+  type ArchiveTerrainOptions,
+  terrainFromArchive,
+  vectorFromArchive,
+  type VectorTileSource,
+} from './archive-sources.js';
 
 /** Options of {@link pmtilesImagery}. */
 export interface PmtilesImageryOptions {
@@ -29,6 +42,7 @@ export interface PmtilesImageryOptions {
 }
 
 const CONTENT_TYPES: Partial<Record<TileType, string>> = {
+  [TileType.Mvt]: 'application/vnd.mapbox-vector-tile',
   [TileType.Png]: 'image/png',
   [TileType.Jpeg]: 'image/jpeg',
   [TileType.Webp]: 'image/webp',
@@ -67,8 +81,13 @@ function recordedAttribution(metadata: unknown): Attribution[] {
   return text.length === 0 ? [] : [link === undefined ? { text } : { text, url: link }];
 }
 
-/** Reads the header, checking that the archive is a raster PMTiles v3 archive. */
-async function openHeader(archive: PMTiles, id: string): Promise<Header> {
+/** What an archive may hold: raster images for imagery, anything for terrain and vector tiles (F328). */
+export type ArchiveContent = 'raster' | 'any';
+
+const RASTER = new Set([TileType.Png, TileType.Jpeg, TileType.Webp, TileType.Avif]);
+
+/** Reads the header, checking that the archive is a PMTiles v3 archive of the expected content. */
+async function openHeader(archive: PMTiles, id: string, content: ArchiveContent): Promise<Header> {
   let header: Header;
   try {
     header = await archive.getHeader();
@@ -78,7 +97,7 @@ async function openHeader(archive: PMTiles, id: string): Promise<Header> {
       `PMTiles source '${id}': cannot read the archive (${String(error)})`,
     );
   }
-  if (CONTENT_TYPES[header.tileType] === undefined)
+  if (content === 'raster' && !RASTER.has(header.tileType))
     throw new SourceConfigError(
       'not-raster',
       `PMTiles source '${id}': the archive holds tile type ${header.tileType}, not raster images`,
@@ -93,7 +112,15 @@ async function openHeader(archive: PMTiles, id: string): Promise<Header> {
  * header, the root and the leaf directories are fetched once per archive and cached; tiles the archive lacks are no
  * data. Resolves once the header is read, so levels, coverage and attribution come from the archive itself.
  */
-export async function pmtilesImagery(options: PmtilesImageryOptions): Promise<DescribedImagerySource> {
+export function pmtilesImagery(options: PmtilesImageryOptions): Promise<DescribedImagerySource> {
+  return pmtilesArchive(options, 'raster');
+}
+
+/** {@link pmtilesImagery} for any content; terrain and vector archives reuse its addressing and transport (F328). */
+export async function pmtilesArchive(
+  options: PmtilesImageryOptions,
+  content: ArchiveContent,
+): Promise<DescribedImagerySource> {
   const init: RequestInit = {
     ...(options.headers ? { headers: options.headers } : {}),
     credentials: options.credentials ?? 'omit',
@@ -101,14 +128,14 @@ export async function pmtilesImagery(options: PmtilesImageryOptions): Promise<De
   };
   const bytes = byteSource(options, init);
   let archive = new PMTiles(bytes);
-  const header = await openHeader(archive, options.id);
+  const header = await openHeader(archive, options.id, content);
   let metadata: unknown;
   try {
     metadata = await archive.getMetadata();
   } catch {
     metadata = undefined;
   }
-  const contentType = CONTENT_TYPES[header.tileType] ?? '';
+  const contentType = CONTENT_TYPES[header.tileType] ?? 'application/octet-stream';
   const coverage = coverageOf(header.minLon, header.minLat, header.maxLon, header.maxLat);
   const base = typeof options.archive === 'string' ? options.archive : `blob-archive://${options.id}`;
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
@@ -124,6 +151,7 @@ export async function pmtilesImagery(options: PmtilesImageryOptions): Promise<De
     maxRequestsPerHost: options.maxRequestsPerHost ?? 6,
     attribution: options.attribution ?? recordedAttribution(metadata),
     profile: options.profile ?? CUSTOM_PROFILE,
+    transportRequired: true,
     transport: archiveTransport(async (url, signal) => {
       const tile = tileOfUrl(url);
       if (!tile) return undefined;
@@ -144,4 +172,16 @@ export async function pmtilesImagery(options: PmtilesImageryOptions): Promise<De
     },
   };
   return source;
+}
+
+/** Terrain tiles (Terrarium, Terrain-RGB or quantized-mesh) from a PMTiles archive (F328). */
+export async function pmtilesTerrain(
+  options: PmtilesImageryOptions & ArchiveTerrainOptions,
+): Promise<TerrainSource & DescribedSource> {
+  return terrainFromArchive(await pmtilesArchive(options, 'any'), options);
+}
+
+/** Mapbox Vector Tiles from a PMTiles archive (F328). */
+export async function pmtilesVector(options: PmtilesImageryOptions): Promise<VectorTileSource> {
+  return vectorFromArchive(await pmtilesArchive(options, 'any'));
 }

@@ -2,15 +2,16 @@
  * The coordinates readout (F406): the position and elevation under the pointer, or at the view center while the map
  * is navigated with the keyboard, in the chosen format. Formatting comes from `@vibeglobe/gis` (F405).
  */
-import type { GeoPosition } from '@vibeglobe/core';
+import type { ElevationSample, GeoPosition } from '@vibeglobe/core';
 import { formatCoordinate, type CoordinateFormat } from '@vibeglobe/gis';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame, icon, iconButton, ICONS, label } from './dom.js';
 import { decimalSeparator } from './locale.js';
 
 /**
- * Terrain elevation at a position, in meters, or undefined where unknown. A stub until the engine exposes terrain
- * heights (F383; docs/parallel-tracks.md): without it the readout shows the elevation as unknown.
+ * Terrain elevation at a position, in meters, or undefined where unknown. By default the readout uses the engine's:
+ * the height of the terrain drawn under the pointer (`Globe.screenToGeo`, F383) and, at the view center, the terrain in
+ * memory (`Globe.elevationAt`, F144); unknown where no terrain is loaded.
  */
 export type ElevationProvider = (position: GeoPosition) => number | undefined;
 
@@ -47,6 +48,7 @@ export class CoordinateReadoutControl implements UiControl {
   #source: 'pointer' | 'center' = 'center';
   #pointer: { xPx: number; yPx: number } | undefined;
   #scheduled = 0;
+  readonly #sample: ElevationSample = { heightMeters: 0, level: 0, noData: true };
   #cleanup: (() => void)[] = [];
 
   /** @param options - Placement and behavior; every field is optional. */
@@ -170,11 +172,20 @@ export class CoordinateReadoutControl implements UiControl {
       formatCoordinate(position, this.#format, precision === undefined ? options : { ...options, precision }) ??
       formatCoordinate(position, 'decimal', options) ??
       '';
-    const elevation = this.#elevationAt?.(position);
+    const elevation = this.#elevationAt ? this.#elevationAt(position) : this.#engineElevation(position);
     const height =
       elevation === undefined
         ? i18n.t('readout.noElevation')
         : i18n.t('readout.elevation', { elevation: `${i18n.formatNumber(Math.round(elevation))} m` });
     this.#detail.textContent = `${where} · ${height}`;
+  }
+
+  /** The engine's terrain height at `position`: the picked height under the pointer, else the resident terrain. */
+  #engineElevation(position: GeoPosition): number | undefined {
+    const globe = this.#context?.globe;
+    if (globe === undefined || globe.terrainStats() === undefined) return undefined;
+    if (this.#source === 'pointer' && position.heightMeters !== undefined) return position.heightMeters;
+    const sample = globe.elevationAt(position, this.#sample);
+    return sample.noData ? undefined : sample.heightMeters;
   }
 }

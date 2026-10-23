@@ -1,4 +1,4 @@
-import type { ImagerySource, TileCoord } from '@vibeglobe/core';
+import type { Attribution, TileCoord, TileSource } from '@vibeglobe/core';
 import { ConnectivityMonitor, endpointOf, type HealthCheckTiming } from './connectivity.js';
 import { DEFAULT_CACHE_BYTES, indexedDbStore } from './idb-store.js';
 import { workerStore } from './worker-store.js';
@@ -6,10 +6,12 @@ import { memoryStore } from './memory-store.js';
 import { requestPersistence, type PersistenceResult } from './persistence.js';
 import { defaultNetworkPolicy } from './policy.js';
 import { SwitchBoard } from './switches.js';
+import type { PackageAttribution } from './packages/manifest.js';
 import { tieredSource, type PackageTile, type TieredSourceOptions } from './tiered-source.js';
 import type {
   CacheStore,
   Connectivity,
+  LoadingSwitch,
   LoadingSwitches,
   NetworkMode,
   NetworkPolicy,
@@ -27,12 +29,14 @@ export interface OfflineEvents {
   /** The network mode changed. */
   'mode-change': { mode: NetworkMode };
   /** A problem the engine worked around (a full store, missing storage); reported once per kind. */
-  warning: { code: 'quota' | 'storage-unavailable'; message: string };
+  warning: { code: 'quota' | 'storage-unavailable' | 'profile-rule'; message: string };
 }
 
 /** Reads tiles of installed or LAN-served packages; supplied by the package manager. */
 export interface PackageReader {
   read(sourceId: string, coord: TileCoord, signal: AbortSignal): Promise<PackageTile | undefined>;
+  /** The credit a package records for one of its sources (F306). */
+  attribution?(packageId: string, sourceId: string): PackageAttribution | undefined;
 }
 
 /** Options of {@link createOffline}. */
@@ -85,8 +89,11 @@ export interface Offline {
   /** The switches in effect for a source (in a layer), with its provider's rules applied. */
   effectiveSwitches(sourceId: string, layerId?: string): LoadingSwitches;
   readonly connectivity: Connectivity;
-  /** Wraps a source so its tiles go through the persistent cache, packages and network tiers (F272). */
-  source<S extends ImagerySource>(source: S, options?: TieredSourceOptions): S;
+  /**
+   * Wraps a source (imagery, terrain or vector tiles, F328) so its tiles go through the persistent cache, packages and
+   * network tiers (F272).
+   */
+  source<S extends TileSource>(source: S, options?: TieredSourceOptions): S;
   /** Where tiles came from, per source and in total. */
   stats(sourceId?: string): TierCounters;
   /** The persistent cache's use and limit. */
@@ -143,10 +150,14 @@ class OfflineEngine implements Offline {
   private readonly fetchImpl: typeof fetch;
   private readonly onServe: OfflineOptions['onServe'];
   private cacheMarked = false;
+  /** Switches the application set on globally: a source registered later whose profile forbids one is warned about. */
+  private readonly enabledGlobally = new Set<LoadingSwitch>();
+  /** The packages each source's tiles were read from: their credits join the source's (F306). */
+  private readonly servedPackages = new Map<string, Set<string>>();
 
   constructor(options: OfflineOptions) {
     this.currentMode = options.mode ?? 'hybrid';
-    if (options.switches) this.switches.set(options.switches);
+    if (options.switches) this.setSwitches(options.switches);
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
     this.onServe = options.onServe;
     this.policy =
@@ -189,6 +200,12 @@ class OfflineEngine implements Offline {
 
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void {
     this.switches.set(switches, scope);
+    const enabled = (Object.keys(switches) as LoadingSwitch[]).filter((name) => switches[name] === true);
+    for (const name of enabled) {
+      if (scope?.sourceId === undefined && scope?.layerId === undefined) this.enabledGlobally.add(name);
+      for (const [sourceId, rules] of this.rules)
+        if (scope?.sourceId === undefined || scope.sourceId === sourceId) this.refuseForbidden(sourceId, rules, name);
+    }
     this.wake();
   }
 
@@ -200,12 +217,33 @@ class OfflineEngine implements Offline {
     return this.switches.effective(sourceId, layerId, this.rules.get(sourceId));
   }
 
-  source<S extends ImagerySource>(source: S, options: TieredSourceOptions = {}): S {
+  source<S extends TileSource>(source: S, options: TieredSourceOptions = {}): S {
     const rules = options.rules ?? (source as unknown as { profile?: ProviderRules }).profile;
-    if (rules) this.rules.set(source.id, rules);
+    if (rules) {
+      this.rules.set(source.id, rules);
+      for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);
+    }
     this.registerEndpoint(source);
-    const wrapped = tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) });
-    return { ...source, ...wrapped } as S;
+    const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
+    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
+    // package its tiles came from (F306).
+    Object.defineProperty(wrapped, 'attribution', {
+      enumerable: true,
+      get: () => this.creditsOf(source.id, (source as { attribution?: readonly Attribution[] }).attribution ?? []),
+    });
+    return wrapped as S;
+  }
+
+  /** A source's credits followed by those of the packages that served its tiles, each text once. */
+  private creditsOf(sourceId: string, own: readonly Attribution[]): readonly Attribution[] {
+    const packages = this.servedPackages.get(sourceId);
+    if (!packages || !this.packageReader?.attribution) return own;
+    const credits = [...own];
+    for (const packageId of packages) {
+      const credit = this.packageReader.attribution(packageId, sourceId);
+      if (credit && !credits.some((c) => c.text === credit.text)) credits.push(credit);
+    }
+    return credits;
   }
 
   stats(sourceId?: string): TierCounters {
@@ -267,7 +305,7 @@ class OfflineEngine implements Offline {
       : indexedDbStore(settings);
   }
 
-  private registerEndpoint(source: ImagerySource): void {
+  private registerEndpoint(source: TileSource): void {
     const probe = { url: '', hostIndex: 0 };
     const root = { root: 0 as const, level: source.minLevel, x: 0, y: 0 };
     if (source.request(root, probe) === 'noData' || !/^https?:/.test(probe.url)) return;
@@ -308,6 +346,11 @@ class OfflineEngine implements Offline {
         let counters = this.counters.get(sourceId);
         if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
         counters[tier]++;
+        if (packageId !== undefined) {
+          let packages = this.servedPackages.get(sourceId);
+          if (!packages) this.servedPackages.set(sourceId, (packages = new Set()));
+          packages.add(packageId);
+        }
         if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
       },
       fetch: this.fetchImpl,
@@ -346,9 +389,19 @@ class OfflineEngine implements Offline {
     writeFlag(filled ? '1' : '0');
   }
 
-  private warn(code: OfflineEvents['warning']['code'], message: string): void {
-    if (this.warned.has(code)) return;
-    this.warned.add(code);
+  /** An application asked for a feature the source's provider forbids: it stays off, with one warning (F320). */
+  private refuseForbidden(sourceId: string, rules: ProviderRules, name: LoadingSwitch): void {
+    if (!rules.forbids.has(name)) return;
+    this.warn(
+      'profile-rule',
+      `${name} stays off for source '${sourceId}': its provider profile '${rules.id}' forbids it`,
+      `${sourceId}/${name}`,
+    );
+  }
+
+  private warn(code: OfflineEvents['warning']['code'], message: string, key: string = code): void {
+    if (this.warned.has(key)) return;
+    this.warned.add(key);
     console.warn(`[vibeglobe/offline] ${message}`);
     this.emit('warning', { code, message });
   }

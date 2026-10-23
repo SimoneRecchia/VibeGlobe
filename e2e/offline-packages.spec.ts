@@ -352,3 +352,93 @@ test('in-browser builds honour the packaging switch per source and globally, and
   });
   expect(refused?.error).toContain('offline packaging is switched off globally');
 });
+
+test('a package records the license and credit of each source, and its credits show while its tiles are in view (F306)', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await openHarness(page);
+  // A base under every view, and roads drawn from level 5: two sources with different licenses and credits.
+  const base = { id: 'base', pattern: 'world', session: 'f306-base' };
+  const roads = { id: 'roads', pattern: 'levels', session: 'f306-roads', minLevel: 5 };
+  const sources = [base, roads];
+  await startHarness(page, { ...OFFLINE, network: 'hybrid', sources });
+  const built = await page.evaluate((r) => window.offlineHarness?.buildArea(r), {
+    id: 'rome-credits',
+    version: '1',
+    area: { westDeg: 12.3, southDeg: 41.8, eastDeg: 12.7, northDeg: 42 },
+    minLevel: 0,
+    maxLevel: 7,
+    sources: [
+      {
+        ...base,
+        license: 'CC-BY-4.0',
+        attribution: [{ text: '© Base imagery fixture', url: 'https://base.test/' }],
+      },
+      { ...roads, license: 'ODbL-1.0', attribution: [{ text: '© Roads fixture contributors' }] },
+    ],
+  });
+  expect(built?.error).toBeUndefined();
+  const listed = await page.evaluate(async () => (await window.offlineHarness?.manager?.list()) ?? []);
+  expect(listed[0]?.sources.map((s) => [s.sourceId, s.license, s.attribution])).toEqual([
+    ['base', 'CC-BY-4.0', { text: '© Base imagery fixture', url: 'https://base.test/' }],
+    ['roads', 'ODbL-1.0', { text: '© Roads fixture contributors' }],
+  ]);
+  expect(listed[0]?.licenses).toEqual(['CC-BY-4.0', 'ODbL-1.0']);
+
+  // Offline, over the package: the credits of the sources whose package tiles are drawn.
+  await startHarness(page, { ...OFFLINE, sources, view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 2 } });
+  const credits = () => page.evaluate(() => (window.offlineHarness?.globe?.credits() ?? []).map((c) => c.text).sort());
+  const shown = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.vg-credits .vg-credit')].map((e) => e.textContent?.trim()).sort(),
+    );
+  expect(await emptyPixels(page)).toBe(0);
+  expect(await credits()).toEqual(['© Base imagery fixture']);
+  expect(await shown()).toEqual(['© Base imagery fixture']);
+  expect(await viewAt(page, 12.5, 41.9, 7)).toBe(0);
+  await expect.poll(credits).toContain('© Roads fixture contributors');
+  await expect.poll(shown).toContain('© Roads fixture contributors');
+  expect(await servedPackages(page)).toContain('rome-credits@1');
+});
+
+test('a terrain package works offline: relief from the package, no black pixel, no request (F328)', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await openHarness(page);
+  const alps = { westDeg: 6.4, southDeg: 45.5, eastDeg: 7.3, northDeg: 46.1 };
+  const sources = [{ id: 'world', pattern: 'world', session: 'f328-world' }];
+  const terrain = { id: 'dem', session: 'f328-dem', maxLevel: 10 };
+  await startHarness(page, { ...OFFLINE, network: 'hybrid', sources, terrain });
+  for (const spec of [
+    { id: 'alps-imagery', sourceId: 'world', pattern: 'world', session: 'f328-world' },
+    { id: 'alps-dem', sourceId: 'dem', pattern: 'terrain', session: 'f328-dem', extension: 'terrarium.png' },
+  ])
+    await page.evaluate((s) => window.offlineHarness?.installFixture(s), {
+      ...spec,
+      version: '1',
+      bounds: alps,
+      minLevel: 0,
+      maxLevel: 10,
+    });
+  const requests = recordTileRequests(page);
+  const peak = { longitudeDeg: 6.86, latitudeDeg: 45.83 };
+  await startHarness(page, {
+    network: 'offline',
+    sources,
+    terrain,
+    view: { ...peak, zoom: 10, tiltDeg: 60 },
+  });
+  expect(await emptyPixels(page)).toBe(0);
+  const height = await page.evaluate((p) => window.offlineHarness?.globe?.elevationAt(p).heightMeters, peak);
+  // The fixture peak is 4,000 m above rolling hills of ±300 m.
+  expect(height).toBeGreaterThan(3500);
+  expect(await viewAt(page, 6.95, 45.9, 9)).toBe(0);
+  expect(requests).toEqual([]);
+  const tiers = await page.evaluate(() =>
+    (window.offlineHarness?.served ?? []).filter((e) => e.sourceId === 'dem').map((e) => e.tier),
+  );
+  expect(tiers.length).toBeGreaterThan(0);
+  expect(new Set(tiers)).toEqual(new Set(['package']));
+});

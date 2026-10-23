@@ -191,6 +191,11 @@ export interface GoogleImagerySource extends DescribedImagerySource {
   viewportCopyright(view: GoogleViewport): Promise<string>;
   /** Sessions created so far (diagnostics and tests). */
   readonly sessionsCreated: () => number;
+  /**
+   * Shows `copyright` after Google's logo in the source's credits (`followGoogleCopyrights` sets it for each settled
+   * view); the engine reads it on its next credits refresh.
+   */
+  setCopyright(copyright: string): void;
 }
 
 /** Reads one tile through the session, renewing the session once when Google refuses it (401 or 403). */
@@ -208,6 +213,28 @@ function tileReader(session: GoogleSession): Parameters<typeof archiveTransport>
       }
       throw new HttpStatusError(response.status, retryAfterMs(response.headers.get('Retry-After'), Date.now()));
     }
+  };
+}
+
+/** The copyright of a viewport from the Map Tiles API, asked once per distinct view (the last one is kept). */
+function copyrightReader(session: GoogleSession): (view: GoogleViewport) => Promise<string> {
+  const copyrights = new Map<string, Promise<string>>();
+  return (view) => {
+    const z = Math.max(0, Math.round(view.zoom));
+    const key = `zoom=${z}&north=${view.northDeg.toFixed(6)}&south=${view.southDeg.toFixed(6)}&east=${view.eastDeg.toFixed(6)}&west=${view.westDeg.toFixed(6)}`;
+    let pending = copyrights.get(key);
+    if (!pending) {
+      pending = session
+        .signed(`${session.base}tile/v1/viewport?${key}`)
+        .then((url) => session.get(url))
+        .then(async (response) =>
+          response.ok ? String(((await response.json()) as { copyright?: unknown }).copyright ?? '') : '',
+        )
+        .catch(() => '');
+      copyrights.clear();
+      copyrights.set(key, pending);
+    }
+    return pending;
   };
 }
 
@@ -231,8 +258,8 @@ export async function googleImagery(options: GoogleImageryOptions): Promise<Goog
       `Google source '${options.id}': cannot create a session (${String(error)})`,
     );
   }
-  const copyrights = new Map<string, Promise<string>>();
-  const attribution: Attribution[] = [profile.requiredAttribution ?? { text: 'Google' }];
+  const logo: Attribution = profile.requiredAttribution ?? { text: 'Google' };
+  let attribution: readonly Attribution[] = [logo];
   return {
     id: options.id,
     tiling: WEB_MERCATOR_TILING,
@@ -241,8 +268,16 @@ export async function googleImagery(options: GoogleImageryOptions): Promise<Goog
     tileSizePx: 256,
     pixelRatio: options.pixelRatio ?? 1,
     decoder: 'image',
+    transportRequired: true,
     transport: archiveTransport(tileReader(session)),
-    attribution,
+    // Read live: the copyright of the settled view follows the logo (F258).
+    get attribution() {
+      return attribution;
+    },
+    setCopyright(copyright) {
+      const text = copyright.trim();
+      attribution = text.length === 0 ? [logo] : [logo, { text }];
+    },
     profile,
     sessionsCreated: () => session.created,
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
@@ -251,22 +286,47 @@ export async function googleImagery(options: GoogleImageryOptions): Promise<Goog
       out.hostIndex = 0;
       return out;
     },
-    viewportCopyright(view) {
-      const z = Math.max(0, Math.round(view.zoom));
-      const key = `zoom=${z}&north=${view.northDeg.toFixed(6)}&south=${view.southDeg.toFixed(6)}&east=${view.eastDeg.toFixed(6)}&west=${view.westDeg.toFixed(6)}`;
-      let pending = copyrights.get(key);
-      if (!pending) {
-        pending = session
-          .signed(`${session.base}tile/v1/viewport?${key}`)
-          .then((url) => session.get(url))
-          .then(async (response) =>
-            response.ok ? String(((await response.json()) as { copyright?: unknown }).copyright ?? '') : '',
-          )
-          .catch(() => '');
-        copyrights.clear();
-        copyrights.set(key, pending);
-      }
-      return pending;
-    },
+    viewportCopyright: copyrightReader(session),
   };
+}
+
+/** What {@link followGoogleCopyrights} needs of a globe (`Globe` of `@vibeglobe/core`). */
+export interface CopyrightGlobe {
+  on(event: 'idle', handler: () => void): () => void;
+  readonly camera: { readonly zoom: number };
+  surfaceTiles(): readonly { westDeg: number; southDeg: number; eastDeg: number; northDeg: number }[];
+  refreshCredits(): void;
+}
+
+/**
+ * Keeps a Google source's credits on the copyrights Google returns for the settled view (F258): on each `idle` the
+ * view's extent (the union of the drawn tiles) and zoom are sent to the Map Tiles API viewport endpoint, once per
+ * distinct view and never per frame, and the answer is shown after Google's logo. Returns a function that stops it.
+ */
+export function followGoogleCopyrights(globe: CopyrightGlobe, source: GoogleImagerySource): () => void {
+  let latest = 0;
+  const update = (): void => {
+    const tiles = globe.surfaceTiles();
+    if (tiles.length === 0) return;
+    let [west, south, east, north] = [180, 90, -180, -90];
+    for (const t of tiles)
+      [west, south, east, north] = [
+        Math.min(west, t.westDeg),
+        Math.min(south, t.southDeg),
+        Math.max(east, t.eastDeg),
+        Math.max(north, t.northDeg),
+      ];
+    const ask = ++latest;
+    void source
+      .viewportCopyright({ zoom: globe.camera.zoom, westDeg: west, southDeg: south, eastDeg: east, northDeg: north })
+      .then((copyright) => {
+        // An answer for a view the camera already left is dropped.
+        if (ask !== latest) return;
+        source.setCopyright(copyright);
+        globe.refreshCredits();
+      });
+  };
+  const stop = globe.on('idle', update);
+  update();
+  return stop;
 }

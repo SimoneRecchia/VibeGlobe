@@ -49,14 +49,18 @@ export function wmtsParts(
   const scaleX = widthPx / (e - w);
   const scaleY = heightPx / (n - s);
   const parts: ImagePart[] = [];
+  // Edges snapped to whole pixels, shared by neighbors: drawn at fractional positions, each part's antialiased edge
+  // would leave a half-transparent line between them (F228).
+  const xEdge = (c: number): number => Math.round((x0 + c * span - w) * scaleX);
+  const yEdge = (r: number): number => Math.round((n - (y0 - r * span)) * scaleY);
   for (let row = minRow; row <= maxRow; row++)
     for (let col = minCol; col <= maxCol; col++)
       parts.push({
         url: url(matrix.identifier, row, col),
-        xPx: (x0 + col * span - w) * scaleX,
-        yPx: (n - (y0 - row * span)) * scaleY,
-        widthPx: span * scaleX,
-        heightPx: span * scaleY,
+        xPx: xEdge(col),
+        yPx: yEdge(row),
+        widthPx: xEdge(col + 1) - xEdge(col),
+        heightPx: yEdge(row + 1) - yEdge(row),
       });
   return parts;
 }

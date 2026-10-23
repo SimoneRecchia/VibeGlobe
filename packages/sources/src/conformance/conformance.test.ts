@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TileCoord } from '@vibeglobe/core';
 import { fetchTransport } from '../fetch-transport.js';
-import { CUSTOM_PROFILE } from '../metadata.js';
+import { CUSTOM_PROFILE, withProfile } from '../metadata.js';
 import { xyzImagery } from '../xyz-imagery.js';
 import { failures, runTiledConformance } from './index.js';
 
@@ -58,5 +58,44 @@ describe('tiled conformance suite (F223)', () => {
     const failed = failures(results).join('\n');
     for (const area of ['attribution', 'zoom range', 'provider profile', 'addressing', 'error handling'])
       expect(failed).toContain(area);
+  });
+
+  it("enforces a provider adapter's own profile like the built-in ones (F326)", async () => {
+    const bytes = new TextEncoder().encode('png');
+    const acme = {
+      id: 'acme',
+      forbids: new Set(['persistentCache', 'offlinePackaging'] as const),
+      respectCacheHeaders: true,
+      maxConcurrentRequests: 2,
+      requiredAttribution: { text: 'Acme Maps', logo: { src: 'https://acme.test/logo.png', alt: 'Acme' } },
+    };
+    const subject = (declared: typeof acme | typeof CUSTOM_PROFILE) => ({
+      name: 'acme',
+      create: (fetchImpl: typeof fetch) =>
+        withProfile(
+          xyzImagery({ id: 'acme', url: 'https://acme.test/{z}/{x}/{y}.png', transport: fetchTransport(fetchImpl) }),
+          declared,
+        ),
+      fixture: () => Promise.resolve(new Response(bytes.slice())),
+      tiles: [{ coord: coord(3, 1, 2), bytes }],
+      profileChecks: [
+        (source: { profile: { forbids: ReadonlySet<string> } }) =>
+          source.profile.forbids.has('offlinePackaging') ? undefined : 'packaging is not forbidden',
+      ],
+    });
+    const results = await runTiledConformance(subject(acme));
+    expect(failures(results)).toEqual([]);
+    const names = results.filter((r) => r.area === 'provider profile').map((r) => r.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'keeps per-host concurrency within the profile limit',
+        'shows the attribution the profile requires',
+        'shows the logo the profile requires',
+      ]),
+    );
+    // The same adapter without its profile fails the adapter's own rule.
+    expect(failures(await runTiledConformance(subject(CUSTOM_PROFILE)))).toEqual([
+      'acme provider profile: packaging is not forbidden',
+    ]);
   });
 });

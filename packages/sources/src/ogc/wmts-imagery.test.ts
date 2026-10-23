@@ -242,3 +242,39 @@ describe('wmtsImagery (F230, F227)', () => {
     expect(failures(results)).toEqual([]);
   });
 });
+
+describe('custom tile matrix sets (F228)', () => {
+  it('chooses, for each image, the coarsest matrix at least as fine as its pixels, with non-power-of-two ratios', async () => {
+    const { customCapabilities, MATRICES, tileBox } = await import('../__fixtures__/wmts-custom.js');
+    const set = parseWmtsCapabilities(customCapabilities('https://wmts.test/')).tileMatrixSets[0];
+    if (!set) throw new Error('no matrix set');
+    expect(set.crs).toBe('EPSG:25832');
+    const matrixOf = (metersPerPx: number): string | undefined => {
+      // A 256-pixel image centred in the data at the given resolution.
+      const half = (256 * metersPerPx) / 2;
+      const parts = wmtsParts(
+        set.matrices,
+        new Map(),
+        (matrix, row, col) => `${matrix}/${String(row)}/${String(col)}`,
+        [550_000 - half, 4_800_000 - half, 550_000 + half, 4_800_000 + half],
+        256,
+        256,
+      );
+      return parts[0]?.url.split('/')[0];
+    };
+    // Pixel sizes of the matrices: 840, 336, 134.4, 44.8 and 17.92 m.
+    const pixelM = MATRICES.map((m) => m.scaleDenominator * 0.00028);
+    for (const [i, matrix] of MATRICES.entries()) {
+      // Just coarser than the matrix's pixels: the matrix itself is the coarsest fine enough.
+      expect(matrixOf((pixelM[i] ?? 0) * 1.01), `${matrix.id}`).toBe(matrix.id);
+    }
+    // Between two matrices the finer one is used, never a coarser one that would blur the view.
+    expect(matrixOf(200)).toBe('L2');
+    expect(matrixOf(50)).toBe('L3');
+    // Finer than the finest: the finest.
+    expect(matrixOf(5)).toBe('L4');
+    // Tiles outside a partial matrix are not requested.
+    expect(tileBox('L0', 3, 0)).toBeUndefined();
+    expect(tileBox('L4', 0, 76)).toBeDefined();
+  });
+});

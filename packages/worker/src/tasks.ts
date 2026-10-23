@@ -9,6 +9,7 @@ import { transcodeKtx2 } from './transcode-ktx2.js';
 
 let vectorTasks: Promise<TaskTable> | undefined;
 let clusterTasks: Promise<TaskTable> | undefined;
+const lazyTables = new Map<string, Promise<TaskTable>>();
 
 /**
  * A vector task of `@vibeglobe/sources/vector` (F371, M13): the parsers load on the first such task, in their own
@@ -33,6 +34,20 @@ function clusterTask(name: string): TaskFunction {
   };
 }
 
+/**
+ * A task of a table another package provides, imported on its first use in its own chunk: vector-tile layout of
+ * `@vibeglobe/layers/vector-tiles` and glTF parsing of `@vibeglobe/models` (M13, M10).
+ */
+function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): TaskFunction {
+  return async (input, context) => {
+    let tasks = lazyTables.get(table);
+    if (!tasks) lazyTables.set(table, (tasks = load()));
+    const task = (await tasks)[name];
+    if (!task) throw Object.assign(new Error(`no ${table} task ${name}`), { code: 'unknown-task' });
+    return task(input, context);
+  };
+}
+
 /** The built-in tasks. */
 export const TASKS: TaskTable = Object.freeze({
   'decode-image': decodeImage,
@@ -47,4 +62,14 @@ export const TASKS: TaskTable = Object.freeze({
   'cluster-expansion': clusterTask('cluster-expansion'),
   'cluster-leaves': clusterTask('cluster-leaves'),
   'cluster-destroy': clusterTask('cluster-destroy'),
+  'layout-vector-tile': lazyTask(
+    'vector-tile',
+    () => import('@vibeglobe/layers/vector-tiles').then((module) => module.VECTOR_TILE_TASKS),
+    'layout-vector-tile',
+  ),
+  'parse-model': lazyTask(
+    'model',
+    () => import('@vibeglobe/models').then((module) => module.createModelTasks()),
+    'parse-model',
+  ),
 });

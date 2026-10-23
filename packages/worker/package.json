@@ -26,6 +26,7 @@
   "dependencies": {
     "@vibeglobe/core": "0.0.0",
     "@vibeglobe/sources": "0.0.0",
-    "@vibeglobe/layers": "0.0.0"
+    "@vibeglobe/layers": "0.0.0",
+    "@vibeglobe/models": "0.0.0"
   }
 }

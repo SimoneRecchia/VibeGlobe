@@ -1,4 +1,5 @@
 import { requestingTarget } from '../layers/layer-geometry.js';
+import { addExtension } from './render-extensions.js';
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
@@ -74,7 +75,8 @@ class GlobeEngine implements Globe {
   private surface: SurfaceCache | undefined;
   private readonly cleanups: (() => void)[] = [];
   private frameId: number | undefined;
-  private frames = 0;
+  /** Frames drawn so far (`Globe.frameNumber`). */
+  frameNumber = 0;
   private readonly framePayload = { frameNumber: 0, tiles: 0 };
   private readonly idlePayload = { frameNumber: 0 };
   /** The debug quads, kept for a renderer that does not exist yet. */
@@ -181,10 +183,6 @@ class GlobeEngine implements Globe {
 
   get imageryLayers(): ImageryLayers {
     return imageryLayersOf(this.surfaceFrame);
-  }
-
-  get frameNumber(): number {
-    return this.frames;
   }
 
   get timeMs(): number {
@@ -339,10 +337,10 @@ class GlobeEngine implements Globe {
     if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
-    this.frames++;
+    this.frameNumber++;
     // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
-      this.framePayload.frameNumber = this.frames;
+      this.framePayload.frameNumber = this.frameNumber;
       this.framePayload.tiles = count;
       this.emitter.emit('frame', this.framePayload);
     }
@@ -358,7 +356,7 @@ class GlobeEngine implements Globe {
     if (this.dirty || this.surfaceFrame.fading || this.surfaceFrame.view.easing || this.movements.active)
       this.requestRender();
     else if (this.emitter.has('idle') && !this.surfaceFrame.loading) {
-      this.idlePayload.frameNumber = this.frames;
+      this.idlePayload.frameNumber = this.frameNumber;
       this.emitter.emit('idle', this.idlePayload);
     }
   }
@@ -422,12 +420,13 @@ class GlobeEngine implements Globe {
     this.assertAlive() ?? addModel(this.renderer, options, () => this.requestRender());
   readonly layerTarget: Globe['layerTarget'] = () =>
     this.assertAlive() ?? requestingTarget(this.renderer?.layers, () => this.requestRender());
-  setDebugShapes(shapes: readonly DebugShape[]): void {
-    this.assertAlive();
-    this.debugMeshes = debugMeshesOf(shapes);
+  readonly setDebugShapes = (shapes: readonly DebugShape[]): void => {
+    this.debugMeshes = this.assertAlive() ?? debugMeshesOf(shapes);
     this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
-  }
+  };
+  readonly addRenderExtension: Globe['addRenderExtension'] = (create) =>
+    this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
   captureFrame(): Promise<FrameCapture> {
     this.assertAlive();
     return captureWhenDrawn({
@@ -436,7 +435,7 @@ class GlobeEngine implements Globe {
       state: () => ({
         renderer: this.destroyed ? undefined : this.renderer,
         failure: this.failure,
-        frames: this.frames,
+        frames: this.frameNumber,
       }),
       draw: (renderer) => this.drawNow(renderer),
     });

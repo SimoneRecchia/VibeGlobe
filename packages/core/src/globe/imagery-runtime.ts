@@ -159,7 +159,8 @@ export class ImageryRuntime {
   maxLevel: number;
   /** The page's request pool, with the link it measures (F300). */
   readonly network: NetworkPool;
-  private readonly lease: WorkerPoolLease;
+  /** The engine's share of the page's worker pool (render extensions run their tasks on it too). */
+  readonly lease: WorkerPoolLease;
   private readonly residency: Residency;
   private readonly ram: RamTier;
   private frame = 0;

@@ -122,6 +122,7 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
+export type { RenderExtension, RenderExtensionContext } from './globe/render-extensions.js';
 export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
 export type {
   ImageryBlend,
@@ -174,6 +175,7 @@ export type {
 } from './scheduler/types.js';
 export { serializeTaskError, WORKER_PROTOCOL_VERSION } from './scheduler/worker-protocol.js';
 export { acquireWorkerPool } from './scheduler/worker-pool.js';
+export type { NetworkPool, RequestConsumer } from './scheduler/network-pool.js';
 export type {
   WorkerPool,
   WorkerPoolLease,

@@ -2401,7 +2401,7 @@
         "After the animation, project the bounds' corners and edge samples to the screen",
         "Assert all are inside the padded viewport and at least one edge touches the padding within 2 px"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F177",
@@ -2551,7 +2551,7 @@
         "Assert the tilt animates to the value, becomes the chosen tilt and never exceeds the maximum tilt",
         "Assert using it in 2D locked or Auto mode follows the documented view-mode rules"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F189",
@@ -2588,7 +2588,7 @@
         "Assert the heading animates to 0°, 90°, 180° and 270° respectively along the shortest arc",
         "Assert the center and tilt are kept and the new heading becomes the chosen heading"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F192",
@@ -2612,7 +2612,7 @@
         "Assert the animation ends with the whole globe visible and centered on the previous center longitude and latitude",
         "Assert the movement events and promise report completion"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F194",
@@ -2624,7 +2624,7 @@
         "Assert the camera arrives exactly at the home view",
         "Assert an invalid home view is rejected by configuration validation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F195",
@@ -2637,7 +2637,7 @@
         "Assert the final camera state equals the target within floating-point tolerance",
         "Assert duration, speed, curve and easing options are honored and invalid values are rejected"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F196",
@@ -2662,7 +2662,7 @@
         "Assert the next rendered frame shows the target camera state exactly",
         "Assert movestart, move and moveend fire once each and the promise or return value reports completion"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F198",
@@ -2674,7 +2674,7 @@
         "Assert the eased interpolation per frame and the exact final state",
         "Assert heading 350° → 10° passes through 0° and a move from 179°E to 179°W crosses the antimeridian"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F199",
@@ -2686,7 +2686,7 @@
         "Assert the camera reaches each waypoint in order and emits a waypoint event for each",
         "Assert the tour promise settles as completed at the end, and as interrupted when cancelled or when the user takes over mid-tour"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F200",
@@ -2713,7 +2713,7 @@
         "Call each movement API with an explicit tilt and heading and assert they are applied",
         "Assert the view mode is unchanged by every movement call"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F202",
@@ -2846,7 +2846,7 @@
         "In every frame assert the camera clearance above the terrain is at least the configured minimum",
         "Assert the path adjustment is continuous (no jump) and the arrival state equals the target"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F213",

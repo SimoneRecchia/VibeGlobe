@@ -260,7 +260,8 @@ for (const backend of BACKENDS) {
     test(`the 2D, 3D and Auto buttons and the API set the mode and tilt, animating, with mode events on ${backend} (F163)`, async ({
       page,
     }) => {
-      await openGlobe(page, `backend=${backend}&lon=12.5&lat=41.9&zoom=12`);
+      // The engine clock steps 1/60 s per frame: per-frame steps of the eased tilt are then those of a 60 Hz display.
+      await openGlobe(page, `${CLOCK}&backend=${backend}&lon=12.5&lat=41.9&zoom=12`);
       const buttons = page.locator('#view-modes button');
       await expect(buttons).toHaveText(['2D', '3D', 'Auto']);
       await expect(page.locator('#view-modes button[data-mode="auto"]')).toBeVisible();

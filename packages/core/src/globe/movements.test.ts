@@ -81,18 +81,42 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
   it('keeps the chosen tilt, heading and view mode unless the call gives them (F201)', async () => {
     const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 15, tiltDeg: 40, headingDeg: 70 });
     ticks(5);
-    const flight = globe.flyTo({ longitudeDeg: 139.69, latitudeDeg: 35.68 });
+    // Every movement call without tilt or heading, a flight through the globe phase first.
+    const calls = [
+      () => globe.flyTo({ longitudeDeg: 139.69, latitudeDeg: 35.68 }),
+      () => globe.easeTo({ longitudeDeg: 139.7, zoom: 15.5 }, { durationMs: 200 }),
+      () => globe.jumpTo({ latitudeDeg: 35.7, zoom: 15 }),
+      () => globe.tour([{ target: { longitudeDeg: 139.6 }, movement: 'ease', durationMs: 200 }]),
+    ];
+    for (const call of calls) {
+      const movement = call();
+      ticks(600);
+      expect(await movement).toBe('completed');
+      expect(globe.viewMode).toBe('manual');
+      expect(globe.camera.chosenTiltDeg).toBeCloseTo(40, 9);
+      expect(globe.camera.tiltDeg).toBeCloseTo(40, 6);
+      expect(globe.camera.headingDeg).toBeCloseTo(70, 9);
+    }
+    // With a tilt and heading, each call applies them, and the view mode stays.
+    let tilt = 10;
+    for (const call of [
+      () => globe.easeTo({ tiltDeg: tilt, headingDeg: tilt }, { durationMs: 200 }),
+      () => globe.flyTo({ longitudeDeg: 12.5, latitudeDeg: 41.9, tiltDeg: tilt, headingDeg: tilt }),
+      () => globe.jumpTo({ tiltDeg: tilt, headingDeg: tilt }),
+    ]) {
+      const movement = call();
+      ticks(600);
+      expect(await movement).toBe('completed');
+      expect(globe.camera.tiltDeg).toBeCloseTo(tilt, 6);
+      expect(globe.camera.headingDeg).toBeCloseTo(tilt, 9);
+      expect(globe.viewMode).toBe('manual');
+      tilt += 10;
+    }
+    globe.setViewMode('2d');
+    const flight = globe.flyTo({ longitudeDeg: 9, latitudeDeg: 45 });
     ticks(600);
     expect(await flight).toBe('completed');
-    expect(globe.viewMode).toBe('manual');
-    expect(globe.camera.chosenTiltDeg).toBeCloseTo(40, 9);
-    expect(globe.camera.tiltDeg).toBeCloseTo(40, 6);
-    expect(globe.camera.headingDeg).toBeCloseTo(70, 9);
-    const ease = globe.easeTo({ tiltDeg: 10, headingDeg: 0 }, { durationMs: 200 });
-    ticks(40);
-    expect(await ease).toBe('completed');
-    expect(globe.camera.tiltDeg).toBeCloseTo(10, 6);
-    expect(globe.camera.headingDeg).toBeCloseTo(0, 9);
+    expect(globe.viewMode).toBe('2d');
     globe.destroy();
   });
 

@@ -62,6 +62,7 @@ function fakeGlobe(): Globe & { emit(): void } {
     surfaceStats: () => ({ tiles: 3, maxLevel: 2 }),
     rendererStats: () => ({ drawCalls: 3, triangles: 99 }),
     imageryStats: () => undefined,
+    terrainStats: () => undefined,
   };
   return globe as unknown as Globe & { emit(): void };
 }

@@ -108,15 +108,18 @@ export function useLoading(globe: Readonly<Ref<Globe | undefined>> = useGlobe())
   return readonly(loading);
 }
 
-/** The view modes of PLAN.md: the automatic choice by zoom, the flat map and the globe. */
-export type ViewMode = 'auto' | '2d' | '3d';
+/** The engine's view modes: the zoom curves drive the tilt ('auto'), it stays 0° ('2d'), or the user chose it ('manual'). */
+export type ViewMode = CameraState['viewMode'];
 
 /**
- * The globe's view mode. Stub until the engine has view modes (F161, M5; docs/parallel-tracks.md): it is always
- * `'3d'`, the only mode the engine draws today.
+ * The globe's view mode, following `Globe.setViewMode`, the 3D choice and a tilt by hand (both report 'manual').
  * @param globe - the engine; by default that of the enclosing globe component ({@link useGlobe})
  */
 export function useViewMode(globe: Readonly<Ref<Globe | undefined>> = useGlobe()): Readonly<Ref<ViewMode>> {
-  void globe;
-  return readonly(shallowRef<ViewMode>('3d'));
+  const mode = shallowRef<ViewMode>('auto');
+  onEachGlobe(globe, (engine) => {
+    mode.value = engine.viewMode;
+    return engine.on('view-mode-change', ({ mode: next }) => (mode.value = next));
+  });
+  return readonly(mode);
 }

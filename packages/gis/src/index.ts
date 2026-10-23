@@ -15,6 +15,8 @@ export type { UtmCoordinate } from './utm.js';
 export { formatArea, formatLength, measureArea, measureDistance, measurePathLength } from './measure.js';
 export type { GeodesicMeasurement } from './measure.js';
 export {
+  applyViewState,
+  viewStateOf,
   VIEW_URL_PARAMETER,
   viewStateFromFragment,
   viewStateFromJson,

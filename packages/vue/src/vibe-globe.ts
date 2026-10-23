@@ -1,3 +1,4 @@
+import { createControls } from '@vibeglobe/controls';
 import {
   createGlobe,
   type CameraState,
@@ -34,6 +35,9 @@ import {
 
 const FILL = 'position:absolute;inset:0';
 
+/** The choices of the 2D / 3D / Auto toggle, as `Globe.setViewMode` takes them. */
+export type ToggleMode = Parameters<Globe['setViewMode']>[0];
+
 /** The component's events, as `emit` takes them. */
 interface GlobeEmit {
   (event: 'ready', payload: GlobeEvents['ready']): void;
@@ -51,9 +55,17 @@ function startGlobe(
   ready: ShallowRef<boolean>,
   emit: GlobeEmit,
   view: () => ViewInit,
+  viewMode: () => ToggleMode | undefined,
 ): (() => void)[] {
-  const engine = createGlobe(globeOptions(element, config));
+  const controls = config.controls ? createControls() : undefined;
+  const engine = createGlobe(globeOptions(element, config, controls));
+  // Rotation, tilt and the engine clock of the controls need the globe (the M6 input track's hook 5).
+  controls?.connect(engine);
   globe.value = engine;
+  const applyMode = (mode: ToggleMode | undefined): void => {
+    if (mode && engine.viewMode !== (mode === '3d' ? 'manual' : mode)) engine.setViewMode(mode);
+  };
+  applyMode(viewMode());
   let loaded = false;
   // A failed start is reported through the `error` event; the promise must not reject unhandled.
   engine.ready.catch(() => undefined);
@@ -70,6 +82,7 @@ function startGlobe(
     engine.on('camera-change', (camera) => emit('camera-change', camera)),
     engine.on('error', (error) => emit('error', error)),
     watchClicks(element, engine, (click) => emit('globe-click', click)),
+    watch(viewMode, applyMode),
     watch(view, (next) => {
       const changed = changedView(engine.camera, next);
       if (changed) engine.jumpTo(changed);
@@ -80,7 +93,7 @@ function startGlobe(
 /**
  * The globe component. On the server and before mount it renders only its `placeholder` slot; the engine starts in
  * `onMounted`, so importing and server-rendering it never touches the browser or the GPU. Camera props update the
- * running engine in place (`jumpTo`); the other props configure the engine when it starts. The default slot renders
+ * running engine in place (`jumpTo`), and so does `viewMode` (`setViewMode`); the other props configure the engine when it starts. The default slot renders
  * once the engine exists, with the engine available to its components through {@link useGlobe}.
  *
  * Events: `ready` (the engine drew its first frame, with the backend), `load` (the first view finished loading),
@@ -106,6 +119,8 @@ export const VibeGlobe = defineComponent({
     zoom: { type: Number, default: undefined },
     headingDeg: { type: Number, default: undefined },
     tiltDeg: { type: Number, default: undefined },
+    /** The 2D / 3D / Auto toggle (F163): changes the running engine's view mode in place; unset keeps the engine's. */
+    viewMode: { type: String as PropType<ToggleMode>, default: undefined },
   },
   emits: {
     ready: (payload: GlobeEvents['ready']) => typeof payload === 'object',
@@ -134,7 +149,7 @@ export const VibeGlobe = defineComponent({
     onMounted(() => {
       const element = container.value;
       if (!element) return;
-      stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view);
+      stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view, () => props.viewMode);
     });
 
     onBeforeUnmount(() => {

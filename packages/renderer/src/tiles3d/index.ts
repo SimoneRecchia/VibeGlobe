@@ -7,6 +7,6 @@
  * @module @vibeglobe/renderer/tiles3d
  */
 export { buildModelMeshes, decodeBrowserImage } from './model-meshes.js';
-export type { ImageDecoder, ModelMeshes, ModelMeshOptions } from './model-meshes.js';
+export type { ImageDecoder, ModelMeshes, ModelMeshOptions, RawImage } from './model-meshes.js';
 export { ThreeTileMeshes, threeTileMeshes } from './tile-meshes.js';
-export type { TileMeshHit } from './tile-meshes.js';
+export type { TileMeshContext, TileMeshHit } from './tile-meshes.js';

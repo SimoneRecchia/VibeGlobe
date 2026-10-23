@@ -6081,7 +6081,7 @@
         "Repeat with a slow network profile and assert still no holes",
         "Check the debug overlay shows each tile's level and screen-space error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F462",

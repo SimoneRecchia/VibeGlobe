@@ -19,7 +19,7 @@ import {
 } from '@vibeglobe/core';
 import { fetchTransport } from '../fetch-transport.js';
 import { TileContentCache } from './cache.js';
-import { batchProperties, parseTileContent, type BinaryTable, type ParsedContent } from './content.js';
+import { batchProperties, parseTileContent, type BinaryTable } from './content.js';
 import type {
   TileMeshes,
   Tiles3DDebugTile,
@@ -45,6 +45,7 @@ import {
   type ViewFrame,
 } from './view-frame.js';
 import { DecodeCancelled, ModelDecoder } from './model-decoder.js';
+import { gltfParts } from './content-parts.js';
 import { multiply, type Mat4 } from './volumes.js';
 
 /** A decoded glTF of a tile, as one mesh. */
@@ -67,36 +68,11 @@ interface Job {
   tasks: Set<number>;
 }
 
-/** glTF's +Y up to 3D Tiles' +Z up (specification 1.0 §glTF transforms). */
-const Y_UP_TO_Z_UP: Mat4 = [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1];
 const DEFAULT_BUDGET_BYTES = 256 * 1024 * 1024;
 const RETRY_AFTER_MS = 2000;
 
 /** Thrown by a cancelled job's awaits. */
 class Cancelled extends Error {}
-
-function translation(x: number, y: number, z: number): Mat4 {
-  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
-}
-
-/** The glTF parts of a parsed content with their content-to-tile matrices. */
-function gltfParts(content: ParsedContent): { glb: Uint8Array; local: Mat4; batch: Piece['batch'] }[] {
-  switch (content.type) {
-    case 'glb':
-      return [{ glb: content.glb, local: Y_UP_TO_Z_UP, batch: undefined }];
-    case 'b3dm': {
-      const rtc = content.featureTable.json['RTC_CENTER'];
-      const local = Array.isArray(rtc)
-        ? multiply(translation(Number(rtc[0]) || 0, Number(rtc[1]) || 0, Number(rtc[2]) || 0), Y_UP_TO_Z_UP)
-        : Y_UP_TO_Z_UP;
-      return [{ glb: content.glb, local, batch: { table: content.batchTable, length: content.batchLength } }];
-    }
-    case 'cmpt':
-      return content.tiles.flatMap(gltfParts);
-    default:
-      return [];
-  }
-}
 
 const transient = (r: TransportResult): boolean =>
   r.kind === 'timeout' ||
@@ -130,7 +106,7 @@ class Tiles3DLoader implements Tiles3DExtension {
     private readonly options: Tiles3DOptions,
     private readonly context: RenderExtensionContext,
   ) {
-    this.meshes = options.meshes(context.renderer);
+    this.meshes = options.meshes(context);
     this.workers = context.workers;
     this.decoder = new ModelDecoder(context.workers, options.modelTasks);
     this.fetcher = new TileFetcher(options.transport ?? fetchTransport(), context.network, options.onRequest);

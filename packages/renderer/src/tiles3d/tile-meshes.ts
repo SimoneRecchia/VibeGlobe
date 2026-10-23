@@ -1,7 +1,14 @@
 import type { ModelDescription } from '@vibeglobe/models';
 import { Raycaster, Vector3, type BufferGeometry, type Intersection, type Object3D } from 'three/webgpu';
 import type { ThreeExtensionContext } from '../extensions.js';
-import { buildModelMeshes, type ImageDecoder, type ModelMeshes } from './model-meshes.js';
+import {
+  buildModelMeshes,
+  decodeBrowserImage,
+  type ImageDecoder,
+  type ModelMeshes,
+  type RawImage,
+} from './model-meshes.js';
+import type { WorkerPool, WorkerTaskOutcome } from '@vibeglobe/core';
 
 /** A ray hit on 3D Tiles content. */
 export interface TileMeshHit {
@@ -117,7 +124,32 @@ function toHit(hit: Intersection): TileMeshHit {
   };
 }
 
-/** The `TileMeshes` of a three.js render extension context (`context.renderer` of `Globe.addRenderExtension`). */
-export function threeTileMeshes(renderer: unknown, decodeImage?: ImageDecoder): ThreeTileMeshes {
-  return new ThreeTileMeshes(renderer as ThreeExtensionContext, decodeImage);
+/** What {@link threeTileMeshes} reads of a render extension's context (`Globe.addRenderExtension`). */
+export interface TileMeshContext {
+  /** The three.js renderer's {@link ThreeExtensionContext}. */
+  readonly renderer: unknown;
+  /** The engine's worker pool: KTX2 textures are transcoded there (`transcode-ktx2`, ADR 0020). */
+  readonly workers?: WorkerPool;
+}
+
+/** Transcodes KTX2 images to RGBA8 with the worker program's `transcode-ktx2` task; other images in the browser. */
+function workerImageDecoder(workers: WorkerPool | undefined): ImageDecoder {
+  return async (image) => {
+    if (image.mimeType !== 'image/ktx2') return decodeBrowserImage(image);
+    if (!workers) return undefined;
+    const bytes = image.bytes.slice().buffer;
+    const outcome = await new Promise<WorkerTaskOutcome>((resolve) =>
+      workers.run({ task: 'transcode-ktx2', input: { bytes, formats: [] }, transfer: [bytes] }, resolve),
+    );
+    if (!outcome.ok) return undefined;
+    return (outcome.output as { image?: RawImage }).image;
+  };
+}
+
+/** The `TileMeshes` of a three.js render extension's context, for the tileset loader of `@vibeglobe/sources/tiles3d`. */
+export function threeTileMeshes(context: TileMeshContext, decodeImage?: ImageDecoder): ThreeTileMeshes {
+  return new ThreeTileMeshes(
+    context.renderer as ThreeExtensionContext,
+    decodeImage ?? workerImageDecoder(context.workers),
+  );
 }

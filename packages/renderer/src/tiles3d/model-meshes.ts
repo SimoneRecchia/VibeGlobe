@@ -5,6 +5,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   ClampToEdgeWrapping,
+  DataTexture,
   DoubleSide,
   FrontSide,
   GreaterEqualDepth,
@@ -18,6 +19,7 @@ import {
   MirroredRepeatWrapping,
   Points,
   RepeatWrapping,
+  RGBAFormat,
   SRGBColorSpace,
   Texture,
   type Node,
@@ -25,8 +27,15 @@ import {
   type Wrapping,
 } from 'three/webgpu';
 
+/** Decoded RGBA8 pixels, rows from the top (KTX2 transcoded in a worker). */
+export interface RawImage {
+  readonly data: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+}
+
 /** How {@link buildModelMeshes} turns encoded images into pixels; the browser's decoder by default. */
-export type ImageDecoder = (image: ModelImage) => Promise<ImageBitmap | undefined>;
+export type ImageDecoder = (image: ModelImage) => Promise<ImageBitmap | RawImage | undefined>;
 
 /** Options of {@link buildModelMeshes}. */
 export interface ModelMeshOptions {
@@ -114,8 +123,9 @@ function triangleIndices(primitive: ModelPrimitive): Uint16Array | Uint32Array |
   return out;
 }
 
-function textureOf(bitmap: ImageBitmap, material: ModelMaterial): Texture {
-  const tex = new Texture(bitmap);
+function textureOf(image: ImageBitmap | RawImage, material: ModelMaterial): Texture {
+  const tex = 'data' in image ? new DataTexture(image.data, image.width, image.height, RGBAFormat) : new Texture(image);
+  if ('data' in image) tex.generateMipmaps = true;
   const sampler = material.baseColorTexture?.sampler;
   tex.flipY = false;
   tex.colorSpace = SRGBColorSpace;
@@ -235,7 +245,7 @@ export async function buildModelMeshes(model: ModelDescription, options: ModelMe
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
       for (const tex of textures) tex?.dispose();
-      for (const bitmap of bitmaps) bitmap?.close();
+      for (const bitmap of bitmaps) if (bitmap && 'close' in bitmap) bitmap.close();
       root.clear();
     },
   };

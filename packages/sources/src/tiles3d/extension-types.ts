@@ -1,5 +1,5 @@
 /** Public types of the 3D Tiles render extension (ADR 0141). */
-import type { CreditProfile, RenderExtension, TaskTable, TileTransport } from '@vibeglobe/core';
+import type { CreditProfile, RenderExtension, RenderExtensionContext, TaskTable, TileTransport } from '@vibeglobe/core';
 import type { RequestEvent } from './fetcher.js';
 import type { Tileset } from './tileset.js';
 
@@ -30,8 +30,8 @@ export interface Tiles3DOptions {
   readonly url: string;
   /** A name for errors and credits. */
   readonly id?: string;
-  /** Creates the meshes from the renderer's extension context. */
-  readonly meshes: (renderer: unknown) => TileMeshes;
+  /** Creates the meshes from the extension's context (`threeTileMeshes` of `@vibeglobe/renderer/tiles3d`). */
+  readonly meshes: (context: RenderExtensionContext) => TileMeshes;
   /** Refine while a tile's screen-space error is above this many pixels; default 16. */
   readonly maximumScreenSpaceError?: number;
   /** Bytes of loaded content kept (GPU and RAM, F462); default 256 MiB. */

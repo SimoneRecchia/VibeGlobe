@@ -27,7 +27,7 @@ function fixtureTransport(delayMs = 0) {
     start(request, _timeouts, done) {
       let aborted = false;
       const send = (): void => {
-            if (aborted) return;
+        if (aborted) return;
         const path = request.url.replace('https://tiles.test/', '');
         const bytes = readFileSync(`${ROOT}${path}`);
         done({
@@ -90,7 +90,7 @@ function create(options: Partial<Tiles3DOptions> = {}, transport = fixtureTransp
   let renders = 0;
   const extension = tiles3d({
     url: `${BASE}tileset.json`,
-    meshes: (renderer) => threeTileMeshes(renderer),
+    meshes: threeTileMeshes,
     transport,
     modelTasks: createModelTasks(),
     ...options,

@@ -3,7 +3,7 @@
  * shortest round-trip form). Malformed input is rejected; out-of-range values are clamped or wrapped.
  */
 
-import type { CameraState, Globe, ViewMode } from '@vibeglobe/core';
+import type { CameraState, ViewMode } from '@vibeglobe/core';
 
 export type { ViewMode };
 
@@ -44,8 +44,8 @@ function wrap(value: number, min: number, period: number): number {
   return wrapped >= min + period ? min : wrapped;
 }
 
-/** Normalizes a view: longitude to [-180, 180), heading to [0, 360), the rest clamped to the engine's ranges. */
-function normalize(view: ViewState): ViewState {
+/** Normalizes a view (exported for restoring views): longitude to [-180, 180), heading to [0, 360), the rest clamped to the engine's ranges. */
+export function normalizeViewState(view: ViewState): ViewState {
   const normalized = {
     longitudeDeg: wrap(view.longitudeDeg, -180, 360),
     latitudeDeg: clamp(view.latitudeDeg, -90, 90),
@@ -85,7 +85,7 @@ function fromFields(fields: Readonly<Record<string, unknown>>): ViewState | unde
     tiltDeg: fields['tiltDeg'] as number,
     viewMode: mode as ViewMode,
   };
-  return normalize({
+  return normalizeViewState({
     ...view,
     ...(chosen === undefined ? {} : { chosenTiltDeg: chosen as number }),
     ...(chosenHeading === undefined ? {} : { chosenHeadingDeg: chosenHeading as number }),
@@ -94,7 +94,7 @@ function fromFields(fields: Readonly<Record<string, unknown>>): ViewState | unde
 
 /** The view as JSON text: `{"version":2,"longitudeDeg":…}`. */
 export function viewStateToJson(view: ViewState): string {
-  return JSON.stringify({ version: FORMAT_VERSION, ...normalize(view) });
+  return JSON.stringify({ version: FORMAT_VERSION, ...normalizeViewState(view) });
 }
 
 /**
@@ -123,7 +123,7 @@ export const VIEW_URL_PARAMETER = 'view';
  * their shortest round-trip form so the view restores exactly. Put it in a URL with {@link viewStateToUrl}.
  */
 export function viewStateToFragment(view: ViewState): string {
-  const v = normalize(view);
+  const v = normalizeViewState(view);
   const parts: (number | string)[] = [v.zoom, v.latitudeDeg, v.longitudeDeg, v.headingDeg, v.tiltDeg, v.viewMode];
   if (v.chosenTiltDeg !== undefined || v.chosenHeadingDeg !== undefined) parts.push(v.chosenTiltDeg ?? '');
   if (v.chosenHeadingDeg !== undefined) parts.push(v.chosenHeadingDeg);
@@ -181,7 +181,7 @@ export function viewStateFromUrl(url: string): ViewState | undefined {
 export function viewStateOf(camera: CameraState): ViewState | undefined {
   const fields = [camera.longitudeDeg, camera.latitudeDeg, camera.zoom, camera.headingDeg, camera.tiltDeg];
   if (!fields.every(Number.isFinite)) return undefined;
-  return normalize({
+  return normalizeViewState({
     longitudeDeg: camera.longitudeDeg,
     latitudeDeg: camera.latitudeDeg,
     zoom: camera.zoom,
@@ -191,29 +191,4 @@ export function viewStateOf(camera: CameraState): ViewState | undefined {
     chosenTiltDeg: camera.chosenTiltDeg,
     chosenHeadingDeg: camera.chosenHeadingDeg,
   });
-}
-
-/**
- * Restores a view on a globe through its public API: the view mode, then the position with the chosen tilt and
- * heading (a manual view chooses its tilt; Auto and 2D take theirs from the mode). `movement` 'jump' (default) moves in
- * one frame; 'fly' flies there (bookmarks, F415). Returns the movement.
- *
- * @param globe - The engine instance.
- * @param view - A view read by one of this module's functions or {@link viewStateOf}.
- */
-export function applyViewState(
-  globe: Globe,
-  view: ViewState,
-  options: { readonly movement?: 'jump' | 'fly' } = {},
-): ReturnType<Globe['jumpTo']> {
-  const v = normalize(view);
-  if (v.viewMode !== 'manual') globe.setViewMode(v.viewMode);
-  const target = {
-    longitudeDeg: v.longitudeDeg,
-    latitudeDeg: v.latitudeDeg,
-    zoom: v.zoom,
-    headingDeg: v.chosenHeadingDeg ?? v.headingDeg,
-    ...(v.viewMode === 'manual' ? { tiltDeg: v.chosenTiltDeg ?? v.tiltDeg } : {}),
-  };
-  return options.movement === 'fly' ? globe.flyTo(target) : globe.jumpTo(target);
 }

@@ -1,8 +1,7 @@
 import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
-import type { CameraState, Globe } from '@vibeglobe/core';
+import type { CameraState } from '@vibeglobe/core';
 import {
-  applyViewState,
   viewStateFromFragment,
   viewStateFromJson,
   viewStateFromUrl,
@@ -93,7 +92,7 @@ describe('view-state serialization', () => {
     expect(viewStateFromJson(json)?.viewMode).toBe('manual');
   });
 
-  it('reads a globe camera and restores each view mode through the public API', () => {
+  it('reads a globe camera, or nothing while it waits for a viewport', () => {
     const camera = {
       longitudeDeg: 7,
       latitudeDeg: 45,
@@ -104,22 +103,8 @@ describe('view-state serialization', () => {
       chosenTiltDeg: 50,
       chosenHeadingDeg: 20,
     } as CameraState;
-    const view = viewStateOf(camera);
-    expect(view).toEqual({ ...camera });
+    expect(viewStateOf(camera)).toEqual({ ...camera });
     expect(viewStateOf({ ...camera, zoom: NaN })).toBeUndefined();
-    const calls: unknown[] = [];
-    const globe = {
-      setViewMode: (mode: string) => calls.push(['mode', mode]),
-      jumpTo: (target: unknown) => calls.push(['jump', target]),
-      flyTo: (target: unknown) => calls.push(['fly', target]),
-    } as unknown as Globe;
-    applyViewState(globe, view as ViewState);
-    applyViewState(globe, { ...(view as ViewState), viewMode: 'auto' }, { movement: 'fly' });
-    expect(calls).toEqual([
-      ['jump', { longitudeDeg: 7, latitudeDeg: 45, zoom: 11, headingDeg: 20, tiltDeg: 50 }],
-      ['mode', 'auto'],
-      ['fly', { longitudeDeg: 7, latitudeDeg: 45, zoom: 11, headingDeg: 20 }],
-    ]);
   });
 
   it('rejects URLs without a view', () => {

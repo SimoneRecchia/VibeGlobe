@@ -41,6 +41,13 @@ const LIGHT = {
   '--vg-ui-disabled-opacity': '0.4',
   /** Duration of UI transitions; 0s when the system asks for reduced motion. */
   '--vg-ui-transition-duration': '150ms',
+  /**
+   * Height of the engine's own attribution element below the controls, set by the UI layer as it changes, so the
+   * bottom corners keep clear of it (F424, F437); not meant to be set by applications.
+   */
+  '--vg-ui-credits-height': '0px',
+  /** Height of the tilt slider's track. */
+  '--vg-ui-slider-length': '108px',
   /** The debug panel: light text on a translucent dark backing in both themes, readable over any imagery. */
   '--vg-ui-debug-color': '#ffffff',
   '--vg-ui-debug-background': 'rgba(0, 0, 0, 0.75)',
@@ -117,5 +124,31 @@ export const RULES_CSS = `
 .vg-ui__search-status:empty{display:none}
 .vibeglobe-debug-overlay{position:absolute;top:var(--vg-ui-spacing);left:var(--vg-ui-spacing);padding:calc(var(--vg-ui-spacing) / 2) var(--vg-ui-spacing);border-radius:var(--vg-ui-border-radius);font-family:var(--vg-ui-monospace-font-family);font-size:var(--vg-ui-debug-font-size);line-height:1.4;color:var(--vg-ui-debug-color);background:var(--vg-ui-debug-background);pointer-events:none;white-space:pre}
 .vg-ui__corner .vibeglobe-debug-overlay{position:static}
-@media (pointer: coarse){.vg-ui__button,.vg-ui__search-option,.vg-ui__search-input{min-width:var(--vg-ui-touch-size);min-height:var(--vg-ui-touch-size)}}
+.vg-ui__corner--bottom-left,.vg-ui__corner--bottom-right{padding-bottom:calc(var(--vg-ui-spacing) + var(--vg-ui-credits-height))}
+.vg-ui__segmented{display:flex;flex-direction:row}
+.vg-ui__view-mode{flex-direction:row;align-items:stretch}
+.vg-ui__button--text{width:auto;min-width:var(--vg-ui-button-size);padding:0 var(--vg-ui-spacing);font-weight:600}
+.vg-ui__segmented .vg-ui__button + .vg-ui__button,.vg-ui__view-mode > .vg-ui__button{border-top:0;border-left:var(--vg-ui-border-width) solid var(--vg-ui-border-color);border-radius:0}
+.vg-ui__button[aria-pressed="true"]{background:var(--vg-ui-color);color:var(--vg-ui-background)}
+.vg-ui__button[aria-pressed="true"]:hover:not(:disabled){background:var(--vg-ui-color)}
+.vg-ui__tilt-track{position:relative;width:var(--vg-ui-button-size);height:var(--vg-ui-slider-length);cursor:ns-resize;touch-action:none;border-radius:var(--vg-ui-border-radius)}
+.vg-ui__tilt-track::before{content:"";position:absolute;left:50%;top:var(--vg-ui-spacing);bottom:var(--vg-ui-spacing);border-left:calc(var(--vg-ui-border-width) * 2) solid var(--vg-ui-border-color)}
+.vg-ui__tilt-thumb{position:absolute;left:20%;width:60%;height:var(--vg-ui-spacing);border-radius:var(--vg-ui-border-radius);background:var(--vg-ui-color);bottom:calc((100% - var(--vg-ui-spacing)) * var(--vg-tilt-fraction))}
+.vg-ui__tilt-track[data-clamped="true"] .vg-ui__tilt-thumb{background:var(--vg-ui-accent-color)}
+.vg-ui__scale{padding:calc(var(--vg-ui-spacing) / 2) var(--vg-ui-spacing);align-items:flex-start;font-variant-numeric:tabular-nums}
+.vg-ui__scale-bar{height:var(--vg-ui-spacing);border:calc(var(--vg-ui-border-width) * 2) solid var(--vg-ui-color);border-top:0}
+.vg-ui__attribution{flex-direction:row;align-items:center;max-width:100%}
+.vg-ui__attribution-list{display:flex;flex-wrap:wrap;align-items:center;gap:var(--vg-ui-spacing);list-style:none;margin:0;padding:calc(var(--vg-ui-spacing) / 2) var(--vg-ui-spacing)}
+.vg-ui__attribution-list:empty{display:none}
+.vg-ui__attribution[data-expanded="false"] .vg-ui__credit:not(.vg-ui__credit--required){display:none}
+.vg-ui__credit{display:flex;align-items:center;gap:calc(var(--vg-ui-spacing) / 2)}
+.vg-ui__credit a{color:inherit}
+.vg-ui__credit-logo{height:var(--vg-ui-icon-size)}
+.vg-ui__panel{padding:var(--vg-ui-spacing);border-top:var(--vg-ui-border-width) solid var(--vg-ui-border-color);min-width:calc(var(--vg-ui-panel-width) / 2)}
+.vg-ui__layers-group{border:0;margin:0;padding:0}
+.vg-ui__layers-group legend{font-weight:600;padding:0}
+.vg-ui__layers-item{display:flex;align-items:center;gap:var(--vg-ui-spacing);min-height:var(--vg-ui-button-size);cursor:pointer}
+.vg-ui__status{padding:0 var(--vg-ui-spacing);color:var(--vg-ui-muted-color);max-width:var(--vg-ui-panel-width)}
+.vg-ui__status:empty{display:none}
+@media (pointer: coarse){.vg-ui__button,.vg-ui__search-option,.vg-ui__search-input,.vg-ui__tilt-track,.vg-ui__layers-item,.vg-ui__credit a,.vg-ui__scale{min-width:var(--vg-ui-touch-size);min-height:var(--vg-ui-touch-size)}.vg-ui__credit a{display:inline-flex;align-items:center}}
 `;

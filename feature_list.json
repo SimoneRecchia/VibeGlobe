@@ -5452,7 +5452,7 @@
         "Pan, zoom and tilt and verify the bar updates within one frame without flicker",
         "Verify the control is readable with the keyboard focus and by screen readers (accessible text with the current scale)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F413",
@@ -5465,7 +5465,7 @@
         "Move the emulated position and verify the marker follows",
         "Deny permission and verify a translated message appears and the engine keeps working"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F414",
@@ -5568,7 +5568,7 @@
         "Verify the control shows the current mode, including after a manual tilt",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F422",
@@ -5581,7 +5581,7 @@
         "Verify the control shows the applied tilt and indicates when it is temporarily clamped",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F423",
@@ -5594,7 +5594,7 @@
         "Verify any user input during the flight interrupts it smoothly",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F424",
@@ -5620,7 +5620,7 @@
         "Verify the list reflects layers added and removed through the API at runtime",
         "Manually verify on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F426",

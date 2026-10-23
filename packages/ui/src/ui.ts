@@ -3,6 +3,7 @@
  * application add, remove, replace and extend controls one by one (F418). The engine runs without any of it.
  */
 import type { Globe } from '@vibeglobe/core';
+import type { GlobeLayers } from '@vibeglobe/layers';
 import { Translator } from './i18n/translator.js';
 import { installStyles, uninstallStyles } from './theme/install.js';
 import type { ThemeName } from './theme/styles.js';
@@ -18,6 +19,12 @@ export interface ControlContext {
   readonly i18n: Translator;
   /** Whether the system currently asks for reduced motion. */
   reducedMotion(): boolean;
+  /**
+   * The data layers the controls draw with (geolocation, drawing and measurement): the application's, passed in
+   * {@link UiOptions.layers}, else one stack the UI creates on first use (`@vibeglobe/layers` is loaded only then).
+   * Resolves after `globe.ready`.
+   */
+  layers(): Promise<GlobeLayers>;
 }
 
 /**
@@ -43,6 +50,12 @@ export interface UiOptions {
   readonly theme?: ThemeName;
   /** Initial language (default 'en'). */
   readonly language?: string;
+  /**
+   * The application's data layers on this globe (`createGlobeLayers`), which the drawing, measurement and geolocation
+   * controls add their layers to; without it the UI creates its own on first use. One stack per globe keeps the
+   * picking ids apart.
+   */
+  readonly layers?: GlobeLayers;
 }
 
 /** A UI layer over one globe. */
@@ -88,6 +101,32 @@ function createLayer(container: HTMLElement): { element: HTMLElement; corners: M
   return { element, corners };
 }
 
+/**
+ * Keeps the bottom corners above the engine's own attribution element (`.vg-credits`, F255), which the engine pins to
+ * the container's bottom right: its height becomes `--vg-ui-credits-height` on the layer, so no control covers it.
+ */
+function keepClearOfCredits(container: HTMLElement, layer: HTMLElement): () => void {
+  let observed: Element | undefined;
+  const measure = (): void => {
+    const credits = container.querySelector(':scope > .vg-credits') ?? undefined;
+    if (credits !== observed) {
+      if (observed) resize.unobserve(observed);
+      if (credits) resize.observe(credits);
+      observed = credits;
+    }
+    const height = credits?.getBoundingClientRect().height ?? 0;
+    layer.style.setProperty('--vg-ui-credits-height', `${height}px`);
+  };
+  const resize = new ResizeObserver(measure);
+  const children = new MutationObserver(measure);
+  children.observe(container, { childList: true });
+  measure();
+  return () => {
+    resize.disconnect();
+    children.disconnect();
+  };
+}
+
 class UiLayer implements Ui {
   readonly element: HTMLElement;
   readonly i18n = new Translator();
@@ -95,15 +134,33 @@ class UiLayer implements Ui {
   readonly #context: ControlContext;
   readonly #mounted = new Map<string, { control: UiControl; element: HTMLElement }>();
   readonly #stopLanguage: () => void;
+  readonly #stopCredits: () => void;
   #theme: ThemeName = 'light';
   #destroyed = false;
 
-  constructor(globe: Globe, container: HTMLElement) {
+  #layers: Promise<GlobeLayers> | undefined;
+  #ownLayers: GlobeLayers | undefined;
+
+  constructor(globe: Globe, container: HTMLElement, layers: GlobeLayers | undefined) {
     installStyles();
     ({ element: this.element, corners: this.#corners } = createLayer(container));
     const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
-    this.#context = { globe, container, i18n: this.i18n, reducedMotion: () => motionQuery?.matches === true };
+    this.#layers = layers === undefined ? undefined : Promise.resolve(layers);
+    this.#context = {
+      globe,
+      container,
+      i18n: this.i18n,
+      reducedMotion: () => motionQuery?.matches === true,
+      layers: () =>
+        (this.#layers ??= globe.ready.then(async () => {
+          const { createGlobeLayers } = await import('@vibeglobe/layers');
+          if (this.#destroyed) throw new Error('The UI was destroyed');
+          this.#ownLayers = createGlobeLayers(globe, { element: container });
+          return this.#ownLayers;
+        })),
+    };
     this.#stopLanguage = this.i18n.onChange(() => this.localize());
+    this.#stopCredits = keepClearOfCredits(container, this.element);
   }
 
   get theme(): ThemeName {
@@ -165,8 +222,11 @@ class UiLayer implements Ui {
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#stopLanguage();
+    this.#stopCredits();
     for (const id of [...this.#mounted.keys()]) this.remove(id);
     this.element.remove();
+    this.#ownLayers?.detach();
+    this.#ownLayers?.stack.clear();
     uninstallStyles();
   }
 
@@ -192,7 +252,7 @@ class UiLayer implements Ui {
  * @param options - Initial theme and language.
  */
 export function createUi(globe: Globe, container: HTMLElement, options: UiOptions = {}): Ui {
-  const ui = new UiLayer(globe, container);
+  const ui = new UiLayer(globe, container, options.layers);
   ui.setTheme(options.theme ?? 'light');
   if (options.language !== undefined) ui.i18n.setLanguage(options.language);
   ui.localize();

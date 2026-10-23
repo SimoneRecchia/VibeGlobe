@@ -30,6 +30,11 @@
       "types": "./dist/tiles3d/index.d.ts",
       "source": "./src/tiles3d/index.ts",
       "default": "./dist/tiles3d/index.js"
+    },
+    "./geotiff": {
+      "types": "./dist/geotiff.d.ts",
+      "source": "./src/geotiff.ts",
+      "default": "./dist/geotiff.js"
     }
   },
   "files": [
@@ -39,6 +44,7 @@
   "dependencies": {
     "@vibeglobe/core": "0.0.0",
     "fflate": "0.8.3",
+    "geotiff": "3.0.5",
     "pbf": "5.1.2",
     "pmtiles": "4.5.0",
     "sql.js": "1.15.1",

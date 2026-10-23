@@ -370,3 +370,31 @@ describe('sources that need their own transport (TB-01)', () => {
     expect(network.requests).toEqual([]);
   });
 });
+
+describe('tier counters and aborted requests (TB-03)', () => {
+  it('does not count a tile the engine aborted before the persistent cache or a package delivered it', async () => {
+    const network = fakeNetwork(() => ({ body: 'net' }));
+    const served: string[] = [];
+    const offline = engine({ fetch: network.fetchImpl, onServe: (e) => served.push(e.tier) });
+    let release: (() => void) | undefined;
+    offline.setPackageReader({
+      read: () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ bytes: new TextEncoder().encode('pkg').buffer, contentType: 'image/png', packageId: 'p@1' });
+        }),
+    });
+    const source = offline.source(fixture('slow'));
+    const request = source.request(tile(2, 1, 1), { url: '', hostIndex: 0 });
+    if (request === 'noData' || request === 'unknown') throw new Error('no request');
+    const results: string[] = [];
+    const abort = source.transport.start(request, TIMEOUTS, (r) => results.push(r.kind));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    abort();
+    release?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(results).toEqual(['aborted']);
+    expect(served).toEqual([]);
+    expect(offline.stats('slow').package).toBe(0);
+  });
+});

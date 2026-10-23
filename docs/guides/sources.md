@@ -125,6 +125,31 @@ if (typeof request === 'object')
 
 The asynchronous factories read capabilities, archive headers or sessions before they return, and reject with a `SourceConfigError` (a stable `code` and a message naming the source) when the service cannot be used. Services that offer only other reference systems are reprojected on the client when you pass `transforms` (next section); without them they are refused with the code `needs-reprojection`.
 
+## Single georeferenced images
+
+```ts
+import { singleImage } from '@vibeglobe/sources';
+import { geotiffImage } from '@vibeglobe/sources/geotiff';
+
+// A PNG, JPEG or WebP placed by its bounds (west, south, east, north in the units of `crs`, degrees by default)…
+const flood = await singleImage({
+  id: 'flood-map',
+  image: 'https://images.example.com/flood.png',
+  bounds: [12.3, 41.7, 12.7, 42.0],
+  attribution: [{ text: '© Civil protection' }],
+});
+// …or by its world file, or a GeoTIFF by its own tags; other systems are reprojected through `transforms`.
+const scan = await singleImage({
+  id: 'scan',
+  image: 'https://images.example.com/scan.jpg',
+  crs: 'EPSG:3857',
+  worldFile: '10\n0\n0\n-10\n1380000.5\n5150000.5\n',
+});
+const survey = await geotiffImage({ id: 'survey', image: 'https://images.example.com/survey.tif' });
+```
+
+The image is downloaded and decoded once, and every engine tile draws its own piece, so an image larger than the GPU's texture limit shows completely. Rotated world files are refused with a `SourceConfigError`, as are images that cannot be read or placed.
+
 ## Reprojection
 
 The engine draws Web Mercator and geographic tile pyramids. A service in another reference system, such as Italian data in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) or a custom WMTS tile matrix set, is reprojected on the client ([ADR 0039](../adr/0039-reprojection-and-tone-harmonization.md)): each engine tile asks for the source image covering it (a WMS GetMap, or the WMTS tiles composed in place) and warps it piecewise-affinely.

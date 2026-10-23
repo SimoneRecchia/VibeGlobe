@@ -3057,7 +3057,7 @@
         "Assert ground control markers align within half a pixel and no seam appears between neighboring tiles or levels",
         "Unit-test that the level chosen for a view follows the screen-space-error rule with the custom resolutions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F229",
@@ -3135,7 +3135,7 @@
         "Load an image larger than the device's maximum texture size and assert it displays completely with no seams",
         "Fuzz the world-file and GeoTIFF parsers and assert malformed files never crash the engine"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F235",
@@ -4146,7 +4146,7 @@
         "Assert requests, storage reads and writes, memory residency and packaging behavior match the specification and the profile rules for every combination",
         "Assert zero black pixels after the base has loaded in every combination where the base is reachable"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F315",

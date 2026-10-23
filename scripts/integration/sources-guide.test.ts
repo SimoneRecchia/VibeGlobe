@@ -7,12 +7,14 @@ import * as core from '@vibeglobe/core';
 import * as gis from '@vibeglobe/gis';
 import * as sources from '@vibeglobe/sources';
 import * as conformance from '@vibeglobe/sources/conformance';
+import * as geotiff from '@vibeglobe/sources/geotiff';
 import * as mbtiles from '@vibeglobe/sources/mbtiles';
 import * as vector from '@vibeglobe/sources/vector';
 import { PNG } from 'pngjs';
 import ts from 'typescript';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { GOOGLE_FIXTURE_KEY, googleFixture } from '../../packages/sources/src/__fixtures__/google-server.ts';
+import { geoImageTiff } from '../../packages/sources/src/__fixtures__/georeferenced.ts';
 import { writeMbtiles } from '../../packages/sources/src/__fixtures__/mbtiles-writer.ts';
 import { writePmtiles } from '../../packages/sources/src/__fixtures__/pmtiles-writer.ts';
 import { terrainTile } from '../fixtures/tiles/terrain.ts';
@@ -36,6 +38,8 @@ const AT_120_M = (() => {
   for (let i = 0; i < png.data.length; i += 4) png.data.set([128, 120, 0, 255], i);
   return new Uint8Array(PNG.sync.write(png));
 })();
+/** A small GeoTIFF in EPSG:4326 over Rome. */
+const SURVEY = geoImageTiff({ crs: 'EPSG:4326', box: [12.3, 41.7, 12.7, 42.0], widthPx: 16, heightPx: 16 });
 const tile = (bytes: Uint8Array) => new Map([['3/4/2', bytes]]);
 
 /** Range answers from an archive's bytes. */
@@ -59,6 +63,7 @@ async function guideFetch(): Promise<typeof fetch> {
     if (url.startsWith('https://tile.googleapis.com/')) return google.fetch(input, init);
     const archive = archives[url];
     if (archive) return ranged(archive, init);
+    if (url === 'https://images.example.com/survey.tif') return new Response(SURVEY.slice(0));
     if (url === 'https://wmts.example.com/WMTSCapabilities.xml')
       return new Response(readFileSync(new URL('wmts-synthetic.xml', CAPABILITIES), 'utf8'));
     if (url.startsWith('https://wms.example.com/?SERVICE=WMS&REQUEST=GetCapabilities'))
@@ -122,6 +127,7 @@ function application(fetchImpl: typeof fetch) {
       '@vibeglobe/gis': gis,
       '@vibeglobe/sources': sources,
       '@vibeglobe/sources/conformance': conformance,
+      '@vibeglobe/sources/geotiff': geotiff,
       '@vibeglobe/sources/mbtiles': mbtiles,
       '@vibeglobe/sources/vector': vector,
     },
@@ -165,6 +171,7 @@ it(
       '## Imagery adapters',
       '## Terrain adapters',
       '## Vector tiles in packages',
+      '## Single georeferenced images',
       '## Reprojection',
       '## Layer composition and source chains',
       '## Vector formats',

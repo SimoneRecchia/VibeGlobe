@@ -68,6 +68,8 @@ const CHECK_WAIT_MS = 3000;
 
 const NO_HEADERS = { cacheControl: null, expires: null, date: null, etag: null, lastModified: null };
 
+const ABORTED: TransportResult = { kind: 'aborted' };
+
 const NOT_FOUND: TransportResult = { kind: 'status', status: 404, retryAfterMs: undefined };
 
 let wrapperCount = 0;
@@ -149,12 +151,15 @@ class TileLoader {
     const decision = this.context.decide(id, this.layerId);
     const key = tileKey(id, coord);
     const stored = decision.readPersistentCache ? await this.context.store.get(key).catch(() => undefined) : undefined;
+    // A request the engine aborted meanwhile delivers nothing, so no tier counts it (TB-03).
+    if (signal.aborted) return ABORTED;
     if (stored && this.fresh(stored)) {
       this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
     if (decision.readPackages) {
       const tile = await this.context.readPackage(id, coord, signal).catch(() => undefined);
+      if (signal.aborted) return ABORTED;
       if (tile) {
         this.context.count(id, 'package', coord, tile.packageId);
         return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType };
@@ -166,6 +171,7 @@ class TileLoader {
       const outcome = this.ownTransport(url)
         ? await this.viaTransport(url, timeouts, signal)
         : await fetchTile(this.context.fetch, url, timeouts, signal, this.conditional(url) ? stored : undefined);
+      if (signal.aborted) return ABORTED;
       const result = this.afterFetch(outcome, key, stored, decision, endpoint, coord);
       if (result !== FAILED_NETWORK && result !== FAILED_TIMEOUT) return result;
       // No usable answer: wait for the health check this triggered. An outage then never reaches the engine as a

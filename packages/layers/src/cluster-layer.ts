@@ -219,7 +219,10 @@ export class ClusterLayer extends DataLayer {
     void this.#loaded
       .then(() => this.#engine.items(zoom))
       .then((items) => {
-        if (generation === this.#generation && zoom === this.#requestedZoom) this.#pending = { zoom, items };
+        if (generation !== this.#generation || zoom !== this.#requestedZoom) return;
+        this.#pending = { zoom, items };
+        // They are applied in a frame: ask for one, as nothing else may (KB-130).
+        this.context?.requestFrame();
       })
       .catch((cause: unknown) => this.emit('error', { message: `clustering failed: ${String(cause)}`, cause }));
   }

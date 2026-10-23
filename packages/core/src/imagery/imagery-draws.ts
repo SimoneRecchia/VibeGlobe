@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { MAX_OVERLAYS, type DrawList } from './draw-list.js';
-import { ARRIVING, PREFETCH_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -274,4 +274,28 @@ export function screenDistance(tile: QuadtreeTile, camera: Camera): number {
   const dy = ((screen[1] ?? 0) - halfHeight) / halfHeight;
   const d = Math.sqrt((dx * dx + dy * dy) / 2);
   return d < 1 ? d : 1;
+}
+
+/**
+ * Wants, from every visible layer, the tiles of a flight's destination (F286): each surface tile's imagery at its own
+ * level from the first source of the chain that has it, at the preload class (after every visible tile, before
+ * prefetch). Sources whose loading flags forbid prefetch load nothing ahead. Allocates nothing.
+ */
+export function preloadImagery(stack: readonly StackLayer[], tiles: readonly QuadtreeTile[], count: number): void {
+  for (let index = 0; index < count; index++) {
+    const tile = tiles[index];
+    if (!tile) continue;
+    for (let s = 0; s < stack.length; s++) {
+      const layer = stack[s];
+      if (!layer || !layer.entry.visible || layer.entry.opacity <= 0) continue;
+      for (let k = 0; k < layer.chain.length; k++) {
+        const source = layer.chain[k];
+        if (!source || !hasTile(source, tile)) continue;
+        const level = mapping[MAPPING_LEVEL] ?? 0;
+        if (source.loader.preloading)
+          source.loader.want(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0, PRELOAD_CLASS + level);
+        break;
+      }
+    }
+  }
 }

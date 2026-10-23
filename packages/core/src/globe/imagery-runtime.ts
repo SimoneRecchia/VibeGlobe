@@ -1,11 +1,12 @@
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
+import { FlightPreload } from './flight-preload.js';
 import { applyPixelRatio } from './imagery-variants.js';
 import { loaderBase, type LoaderBase, type LoaderContext } from './loader-context.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
-import { drawImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
+import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
 import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
@@ -135,6 +136,8 @@ export class ImageryRuntime {
   readonly loaderContext: LoaderContext;
   readonly terrainIndex: number;
   nextIndex: number;
+  /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
+  readonly preload = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
   private readonly byIndex = new Map<number, ImageryLoader>();
@@ -154,7 +157,8 @@ export class ImageryRuntime {
   texelsPerTile: number;
   /** The finest surface level any layer serves. */
   maxLevel: number;
-  private readonly network: NetworkPool;
+  /** The page's request pool, with the link it measures (F300). */
+  readonly network: NetworkPool;
   private readonly lease: WorkerPoolLease;
   private readonly residency: Residency;
   private readonly ram: RamTier;
@@ -383,6 +387,7 @@ export class ImageryRuntime {
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
+    if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
     const terrain = this.terrain;
     const host = this.renderer.host;

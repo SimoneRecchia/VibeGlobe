@@ -1,4 +1,5 @@
 import type { LayerGround } from '../layers/layer-target.js';
+import { motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -144,7 +145,7 @@ export class SurfaceFrame {
       terrain,
     );
     this.imagery = imagery;
-    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / (this.selection.maxTexelErrorPx ?? MAX_TEXEL_ERROR_PX));
+    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / motionOf(this).baseTexelErrorPx);
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
@@ -236,6 +237,12 @@ export class SurfaceFrame {
     const imagery = this.imagery;
     const timed = imagery?.heights !== undefined;
     const selectionStart = timed ? imagery.now() : 0;
+    // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing.
+    const motion = motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    // Written only when it changes: a new double in the options' field would allocate every frame (F064).
+    const texelErrorPx = motionOf(this).baseTexelErrorPx * motion;
+    if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
+    if (imagery) for (const layer of imagery.layers) layer.loader.prefetchPaused = motion > 1;
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
     this.draws.reserve(count);
@@ -261,6 +268,13 @@ export class SurfaceFrame {
     this.observability.tracer.record('camera', 'move', subject);
   }
 
+  /** Loads a movement's destination tiles ahead while it runs (F286), or stops (undefined). */
+  preloadView(end: Float64Array | undefined, camera: Camera): void {
+    if (!this.imagery) return;
+    if (end) this.imagery.preload.select(camera, end, this.selection);
+    else this.imagery.preload.clear();
+  }
+
   /** The layers' tile sizes and levels changed (a layer was added or removed): the selection reads them again. */
   imageryChanged(): void {
     if (!this.imagery) return;
@@ -274,6 +288,7 @@ export class SurfaceFrame {
    */
   setPixelRatio(pixelRatio: number): void {
     this.selection.maxTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    motionOf(this).baseTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
     // High-DPI sources switch to their `@2x` tiles (F241).
     if (this.imagery) {
       this.imagery.setPixelRatio(pixelRatio);

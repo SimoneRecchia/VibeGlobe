@@ -39,6 +39,8 @@ import {
 export const VISIBLE_CLASS = 1024;
 /** Priority keys of prefetched tiles start here, after every visible tile (ADR 0007). */
 export const PREFETCH_CLASS = 4 * 1024;
+/** The class of a flight's destination tiles (F286): after every visible tile, before prefetch. */
+export const PRELOAD_CLASS = 2 * 1024;
 /** Visible tiles per frame whose neighbors are prefetched; more are rare and simply not ringed. */
 const RING_CAPACITY = 1024;
 
@@ -178,6 +180,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private destroyed = false;
   /** 2 while a high-DPI source's `@2x` tiles are wanted (F241). */
   pixelRatio = 1;
+  /** True while the camera moves fast: nothing beyond the view loads (F287, F288). */
+  prefetchPaused = false;
   /** Surface levels finer than the source's tiles: 1 for tiles of 512 texels, which serve the next level (F240). */
   levelShift = 0;
 
@@ -200,11 +204,18 @@ export class ImageryLoader implements NetworkPoolClient {
   }
 
   /**
-   * Whether the source prefetches now: its `loadingFlags` allow it (F284, F285) and the link is not slow, so prefetch
-   * never holds back visible tiles there (F302); tiles beyond the view load only then.
+   * Whether the source prefetches now: its `loadingFlags` allow it (F284, F285), the camera does not move fast (F287)
+   * and the link is not slow, so prefetch never holds back visible tiles there (F302); tiles beyond the view load only
+   * then.
    */
   get prefetching(): boolean {
-    return (this.flags & LOAD_PREFETCH) !== 0 && !(this.options.network.bandwidth.bitsPerSecond < SLOW_LINK_BPS);
+    if (this.prefetchPaused || (this.flags & LOAD_PREFETCH) === 0) return false;
+    return !(this.options.network.bandwidth.bitsPerSecond < SLOW_LINK_BPS);
+  }
+
+  /** Whether the source loads a flight's destination ahead: its `loadingFlags` allow prefetch (F285, F286). */
+  get preloading(): boolean {
+    return (this.flags & LOAD_PREFETCH) !== 0;
   }
 
   /** True once every pinned tile is on the GPU or known to have no data: refinement may begin (F084). */

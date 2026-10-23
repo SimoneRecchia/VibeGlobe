@@ -281,3 +281,51 @@ describe('imagery layers added and removed at runtime (track A hook 2)', () => {
     globe.destroy();
   });
 });
+
+describe('flight destination preloading (F286, F285)', () => {
+  async function flightRequests(loadingFlags?: number): Promise<{ urls: string[]; destination: string }> {
+    const urls: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const flyer: ImagerySource = {
+      ...source(urls),
+      ...(loadingFlags === undefined ? {} : { loadingFlags: () => loadingFlags }),
+    };
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [flyer],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 9 },
+    });
+    for (let frame = 0; frame < 30; frame++) {
+      await settle();
+      renderer.timers.advance(50);
+      renderer.flush();
+    }
+    urls.length = 0;
+    void globe.flyTo({ longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 9 }, { durationMs: 8000 });
+    // The first frames of the flight, still over Europe.
+    for (let frame = 0; frame < 3; frame++) {
+      await settle();
+      renderer.timers.advance(16);
+      renderer.flush();
+    }
+    globe.destroy();
+    // Tokyo's tile at level 9 or 10 (the destination's level).
+    const n = 2 ** 9;
+    const x = Math.floor(((139.7 + 180) / 360) * n);
+    return { urls, destination: `/tiles/9/${x}/` };
+  }
+
+  it('requests the destination tiles at their arrival level as soon as a flight starts', async () => {
+    const { urls } = await flightRequests();
+    const tokyo = urls.filter((url) => /\/tiles\/(9|10)\/(45[0-9]|9[01][0-9])\//.test(url));
+    expect(tokyo.length).toBeGreaterThan(0);
+  });
+
+  it('loads nothing ahead for a source whose loading flags forbid prefetch (F285)', async () => {
+    const { urls } = await flightRequests(1);
+    expect(urls.filter((url) => /\/tiles\/(9|10)\/(45[0-9]|9[01][0-9])\//.test(url))).toEqual([]);
+  });
+});

@@ -22,7 +22,8 @@ export class BandwidthEstimator {
   private readonly waits = new Float64Array(RECENT).fill(Number.POSITIVE_INFINITY);
   private count = 0;
   private next = 0;
-  private estimate = Number.NaN;
+  /** Measured throughput in bits per second; NaN until a few responses over enough transfer time. */
+  bitsPerSecond = Number.NaN;
   /** Scratch for the union of the transfers, sorted by start. */
   private readonly order = new Float64Array(2 * RECENT);
   /** Whether {@link requestsPerHost} limits hosts to what the link supports (F303). */
@@ -44,12 +45,7 @@ export class BandwidthEstimator {
     this.waits[at] = result.waitMs ?? nowMs - startMs;
     this.next = (at + 1) % RECENT;
     this.count = Math.min(RECENT, this.count + 1);
-    this.estimate = this.measure();
-  }
-
-  /** Measured throughput in bits per second; NaN until a few responses over enough transfer time. */
-  get bitsPerSecond(): number {
-    return this.estimate;
+    this.bitsPerSecond = this.measure();
   }
 
   /** The shortest recent wait for a response's headers, milliseconds; NaN before any response. */

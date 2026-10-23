@@ -120,7 +120,7 @@ class GlobeEngine implements Globe {
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     ({ viewControl: this.viewControl, movements: this.movements } = wireView({
       cam: this.cam,
-      view: this.surfaceFrame.view,
+      surface: this.surfaceFrame,
       emitter: this.emitter,
       clock: this.clock,
       constraints: this.limits,

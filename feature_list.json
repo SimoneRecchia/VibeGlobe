@@ -4171,7 +4171,7 @@
         "Assert every request targets a configured source, package or health-check endpoint, or a configured worker or asset URL",
         "Assert no request carries data about the user or the view beyond what a tile request needs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F317",

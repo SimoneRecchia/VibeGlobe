@@ -51,10 +51,11 @@ export interface VectorDrawUniforms {
 }
 
 /**
- * Share of its distance by which a draped vertex is pulled toward the eye (ADR 0037's method): 10 m at 10 km, so fills
- * stay in front of the surface along its tile edges and between terrain vertices (measured on the fixture terrain).
+ * Share of its distance by which a draped vertex is pulled toward the eye (ADR 0037's method): 30 m at 10 km. Less
+ * left seams where the surface's tile edges come nearer than the fills, at grazing views (0.2% was the least that
+ * closed them on the fixture views; 0.3% keeps a margin).
  */
-const DEPTH_PULL = 1e-3;
+const DEPTH_PULL = 3e-3;
 /** Pull of circles, which span pixels around their anchor where the curved surface may lie nearer. */
 const CIRCLE_DEPTH_PULL = 3e-3;
 

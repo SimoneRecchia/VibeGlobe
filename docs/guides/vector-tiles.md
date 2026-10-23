@@ -42,7 +42,7 @@ per-host limits, coalescing and cancellation), laid out in the engine's workers,
 - Line widths, dashes, circle radii and text sizes are in CSS pixels on the screen, in every phase and at every tilt;
   paint between two integer zooms is mixed continuously.
 - Fills and lines are draped on terrain: each vertex takes the height of the terrain in memory under it, again when
-  finer terrain arrives (within 4 ms of main-thread time per frame). Draped features are drawn 0.1 % of their distance
+  finer terrain arrives (within 4 ms of main-thread time per frame). Draped features are drawn 0.3 % of their distance
   nearer the eye than the ground, so they never fight its depth.
 - Buildings (`fill-extrusion`) take their heights from their tags (see [data layers](data-layers.md#buildings)),
   grow from the ground as their layer fades in, and on the flat map scale their height by the Mercator scale factor.

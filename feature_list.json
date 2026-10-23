@@ -3004,7 +3004,7 @@
         "Assert grid lines land within half a pixel of their projected positions",
         "Unit-test tile-to-bounds and bounds-to-tile conversions with property-based round trips"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F225",
@@ -3017,7 +3017,7 @@
         "Assert grid lines are within half a pixel of their expected positions and zero black pixels appear at the antimeridian and the poles",
         "Stack it above a Web Mercator layer and assert both align at test markers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F226",

@@ -1,5 +1,6 @@
 import type { Globe } from '@vibeglobe/core';
 import { manyPointsLayer } from './layers-many.js';
+import { selectLayers } from './layers-select.js';
 import { styledLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
@@ -340,7 +341,7 @@ function syncLayers(): DataLayer[] {
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
-  if (name === 'data-markers' || name === 'data-styled')
+  if (name === 'data-markers' || name === 'data-styled' || name === 'data-select')
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
   const scene = name === 'data-points-100k' ? manyPointsLayer : DATA_SCENES[name];
   const added = scene
@@ -351,7 +352,9 @@ export function showDataScenario(globe: Globe, name: string): void {
         ? syncLayers()
         : name === 'data-styled'
           ? styledLayers()
-          : [];
+          : name === 'data-select'
+            ? selectLayers()
+            : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
   if (name === 'data-models' || name === 'data-sync') {
     const models =

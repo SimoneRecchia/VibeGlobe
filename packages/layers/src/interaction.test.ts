@@ -66,6 +66,17 @@ describe('feature interaction', () => {
     expect(log).toEqual(['hover-enter:b:0.1']);
   });
 
+  it('clicks when the release comes before the press has picked, as in a quick tap (KB-111)', async () => {
+    const { stack, target, log } = setup();
+    // The press's pick answers after the release's.
+    const controller = new InteractionController(stack, provider(target, [0, 30, 0]));
+    const move = controller.pointerMove({ xPx: 1, yPx: 0 });
+    const down = controller.pointerDown({ xPx: 1, yPx: 0 });
+    const up = controller.pointerUp({ xPx: 1, yPx: 0 });
+    await Promise.all([move, down, up]);
+    expect(log.filter((e) => e.startsWith('click'))).toEqual(['click:b:0.1']);
+  });
+
   it('clicks with the feature, layer and position, and selects through feature state (F380, F381)', async () => {
     const { layer, stack, target, log } = setup();
     const controller = new InteractionController(stack, provider(target));

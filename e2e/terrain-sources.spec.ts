@@ -219,7 +219,18 @@ test.describe('vertical datums (F133)', () => {
     for (const datum of ['ellipsoid', 'geoid'] as const) {
       await openGlobe(page, `backend=webgl2&scenario=terrain-alps&terrainDatum=${datum}&session=datum`);
       await settle(page);
-      const samples = await elevations(page, points);
+      // The finest level at each point, loaded on demand: the resident levels can differ between the two runs.
+      const samples = await page.evaluate(
+        (positions) =>
+          Promise.all(
+            positions.map(([longitudeDeg, latitudeDeg]) => {
+              const globe = window.vibeglobePlayground?.globe;
+              if (!globe) throw new Error('no globe');
+              return globe.elevationAtAsync({ longitudeDeg, latitudeDeg });
+            }),
+          ),
+        points,
+      );
       runs.push({ heights: samples.map((s) => s.heightMeters), image: await canvasImage(page) });
     }
     const [ellipsoid, geoid] = runs;

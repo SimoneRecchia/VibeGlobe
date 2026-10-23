@@ -1,5 +1,5 @@
-// Google's viewport credits (F258): once per settled view, the engine asks the Map Tiles API fixture for the copyright
-// of the area shown and displays it with the Google credit, updated as the view moves to an area of other providers.
+// Google's logo and credits stay visible and uncovered (F259) with every UI control, at every viewport size, whatever
+// page CSS, scripts or covering elements try.
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { GOOGLE_FIXTURE_KEY, googleFixture } from '../packages/sources/src/__fixtures__/google-server.ts';
 import { mountSource, openSources, settledSourceFrame, tilePng } from './support/sources.ts';
@@ -22,45 +22,6 @@ async function fulfillFrom(route: Route, fixture: typeof fetch): Promise<void> {
     body: Buffer.from(await response.arrayBuffer()),
   });
 }
-
-/** The credits the mounted globe reports and the texts its attribution element shows. */
-async function shownCredits(page: Page): Promise<{ reported: string[]; element: string }> {
-  return page.evaluate(() => ({
-    reported: (window.vibeglobeSources?.globe?.credits() ?? []).map((credit) => credit.text),
-    element: document.querySelector('.vg-source-test .vg-credits')?.textContent ?? '',
-  }));
-}
-
-test('Google viewport credits are asked once per settled view and follow the view (F258)', async ({ page }) => {
-  test.setTimeout(180_000);
-  const server = googleFixture(tilePng);
-  await page.route('https://tile.googleapis.com/**', (route) => fulfillFrom(route, server.fetch));
-  await openSources(page, 'lon=12.5&lat=41.9&zoom=6.5');
-  await mountSource(
-    page,
-    `(s, key) => s.googleImagery({ id: 'google', apiKey: key, billingRegion: 'eea', mapType: 'roadmap' })`,
-    GOOGLE_FIXTURE_KEY,
-  );
-  await settledSourceFrame(page, 18);
-  const viewportRequests = (): number => server.requests.filter((r) => r.url.includes('/tile/v1/viewport')).length;
-  await expect.poll(async () => (await shownCredits(page)).reported).toContain('Map data ©2026 Eastern Provider');
-  expect((await shownCredits(page)).element).toContain('Map data ©2026 Eastern Provider');
-  expect(viewportRequests()).toBe(1);
-  // Frames of the same view ask nothing more.
-  await page.evaluate(() => window.vibeglobeSources?.globe?.requestRender());
-  await settledSourceFrame(page, 18);
-  expect(viewportRequests()).toBe(1);
-  // A view west of 0° shows the other provider.
-  await page.evaluate(() =>
-    window.vibeglobeSources?.globe?.jumpTo({ longitudeDeg: -74, latitudeDeg: 40.7, zoom: 6.5 }),
-  );
-  await settledSourceFrame(page, 18);
-  await expect.poll(async () => (await shownCredits(page)).element).toContain('Map data ©2026 Western Provider');
-  const { reported } = await shownCredits(page);
-  expect(reported).toContain('Map data ©2026 Western Provider');
-  expect(reported).not.toContain('Map data ©2026 Eastern Provider');
-  expect(viewportRequests()).toBe(2);
-});
 
 /** A stand-in logo image for the fixture: 60 × 18 px. */
 const LOGO =
@@ -130,9 +91,7 @@ for (const viewport of [
       ui.addDefaultControls(ui.createUi(globe, container), { debug: true });
     }, `/@fs${process.cwd()}/packages/ui/src/index.ts`);
     await settledSourceFrame(page, 18);
-    await expect
-      .poll(async () => (await creditVisibility(page)).map((c) => c.text))
-      .toContain('Map data ©2026 Eastern Provider');
+    await expect.poll(async () => (await creditVisibility(page)).map((c) => c.text)).toContain('Google');
     const check = async (): Promise<void> => {
       const credits = await creditVisibility(page);
       expect(credits.some((credit) => credit.logo)).toBe(true);

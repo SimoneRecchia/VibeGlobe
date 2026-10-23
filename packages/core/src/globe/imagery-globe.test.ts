@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { CreditViewport } from '../imagery/credits.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { TileRequest, TileTransport, TransportResult } from '../scheduler/types.js';
 import type { WorkerEndpointFactory, WorkerRequest } from '../scheduler/worker-protocol.js';
@@ -232,52 +231,6 @@ describe('tile sizes and high-DPI variants (F240, F241)', () => {
     await settledLevel(globe, renderer);
     expect(urls.length).toBeGreaterThan(0);
     expect(urls.some((url) => url.includes('@2x'))).toBe(false);
-    globe.destroy();
-  });
-});
-
-describe('credits of a settled view (F258)', () => {
-  it('asks a view-dependent source once per settled view and shows its answer with the source credits', async () => {
-    const views: CreditViewport[] = [];
-    const { renderer, factory } = fakeRenderer();
-    const viewSource: ImagerySource = {
-      ...source([]),
-      attribution: [{ text: 'Fixture' }],
-      viewportCopyright: (view) => {
-        views.push(view);
-        return Promise.resolve(view.westDeg < 0 ? 'Map data © West' : 'Map data © East');
-      },
-    };
-    const globe = createGlobe({
-      container: {},
-      renderer: factory,
-      baseImageryUrl: 'world.jpg',
-      imagery: [viewSource],
-      workers: instantWorkers(),
-      view: { longitudeDeg: 30, latitudeDeg: 40, zoom: 6 },
-    });
-    // Long frames, so cross-fades end and the camera comes to rest.
-    const run = async (frames: number): Promise<void> => {
-      for (let frame = 0; frame < frames; frame++) {
-        await settle();
-        renderer.timers.advance(50);
-        renderer.flush();
-      }
-    };
-    await run(60);
-    expect(views).toHaveLength(1);
-    expect(views[0]?.zoom).toBeCloseTo(6, 6);
-    expect(views[0]?.westDeg).toBeLessThan(30);
-    expect(views[0]?.eastDeg).toBeGreaterThan(30);
-    expect(globe.credits().map((credit) => credit.text)).toEqual(['Fixture', 'Map data © East']);
-    // More frames of the same view ask nothing more.
-    globe.requestRender();
-    await run(10);
-    expect(views).toHaveLength(1);
-    globe.jumpTo({ longitudeDeg: -60, latitudeDeg: 40, zoom: 6 });
-    await run(60);
-    expect(views).toHaveLength(2);
-    expect(globe.credits().map((credit) => credit.text)).toEqual(['Fixture', 'Map data © West']);
     globe.destroy();
   });
 });

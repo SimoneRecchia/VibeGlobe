@@ -3443,7 +3443,7 @@
         "Assert the viewport information request is made for each settled view and not on every frame",
         "Assert the displayed attribution always matches the copyrights returned for the current viewport"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F259",

@@ -12,21 +12,11 @@ export interface CreditProfile {
   readonly respectCacheHeaders?: boolean;
 }
 
-/** A settled view for `TileSource.viewportCopyright`: the visible area in degrees and the Web Mercator zoom. */
-export interface CreditViewport {
-  readonly zoom: number;
-  readonly westDeg: number;
-  readonly southDeg: number;
-  readonly eastDeg: number;
-  readonly northDeg: number;
-}
-
 /** The credit metadata a tiled source may carry (`DescribedImagerySource` in `@vibeglobe/sources`). */
 export interface CreditedSource {
   readonly id: string;
   readonly attribution?: readonly Attribution[];
   readonly profile?: CreditProfile;
-  viewportCopyright?(view: CreditViewport): Promise<string>;
 }
 
 /** A credit of the sources in view (F254): one per distinct text and link, with the sources that ask for it. */

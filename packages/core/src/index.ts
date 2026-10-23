@@ -122,7 +122,7 @@ export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.j
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
-export type { Attribution, Credit, CreditProfile, CreditViewport } from './imagery/credits.js';
+export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
 export type {
   ImageryBlend,
   ImageryLayerChanges,

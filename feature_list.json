@@ -5114,7 +5114,7 @@
         "Verify GPU and RAM memory return to their baseline within tolerance after each cycle",
         "Verify no listeners, workers or timers remain from removed layers"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F386",

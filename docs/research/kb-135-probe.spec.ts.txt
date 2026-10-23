@@ -1,0 +1,22 @@
+import { expect, test } from '@playwright/test';
+import { openGlobe } from './support/globe.ts';
+test('probe labels+model', async ({ page }) => {
+  test.setTimeout(45_000);
+  await openGlobe(page, `backend=webgl2&viewMode=2d&lon=12.2&lat=41.6&zoom=7`);
+  const ok = await page.evaluate(async () => {
+    const prefix = '/@id/@vibeglobe/';
+    const layers = (await import(/* @vite-ignore */ `${prefix}layers`)) as typeof import('@vibeglobe/layers');
+    const { ModelLayer } = (await import(/* @vite-ignore */ `${prefix}layers/models`)) as typeof import('@vibeglobe/layers/models');
+    const globe = window.vibeglobePlayground!.globe;
+    const { stack } = layers.createGlobeLayers(globe);
+    const point = (lon: number, lat: number) => ({ type: 'Point' as const, coordinates: [lon, lat] });
+    const data = Array.from({ length: 20 }, (_, i) => ({ type: 'Feature' as const, id: `p${i}`, properties: { name: `Label ${i}` }, geometry: point(11 + i * 0.1, 41 + i * 0.005) }));
+    stack.add(layers.labelLayer({ id: 'labels', data, style: { 'text-field': ['get', 'name'] } }));
+    const m = new ModelLayer({ id: 'models', models: [{ id: 'm', url: `${location.origin}/models/pyramid.gltf`, position: { longitudeDeg: 12.3, latitudeDeg: 41.7 }, scale: 2000 }] });
+    stack.add(m);
+    await m.ready;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(0))));
+    return true;
+  });
+  expect(ok).toBe(true);
+});

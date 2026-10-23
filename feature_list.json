@@ -2965,7 +2965,7 @@
         "Assert that above zoom 12 the view shows upsampled level-12 imagery, that below zoom 3 the base layer shows through, and that every frame has zero black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F222",
@@ -3250,7 +3250,7 @@
         "Assert the top layer's color is visible in the overlap after each change and no frame shows a missing layer or black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F244",
@@ -3263,7 +3263,7 @@
         "Animate opacity over 1 s while recording frames and assert the change is monotonic with no flicker",
         "Assert a layer at opacity 0 issues no new tile requests"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F245",
@@ -3276,7 +3276,7 @@
         "Assert showing it again draws its cached tiles on the next frame and no frame shows black pixels",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F246",
@@ -3288,7 +3288,7 @@
         "Capture screenshots and compare with reference images computed from the blend formulas within tolerance",
         "Assert WebGPU and forced WebGL2 results match within the visual-test tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F247",
@@ -3301,7 +3301,7 @@
         "Assert tiles inside Italy above zoom 8 come from the online source, tiles outside its coverage are never requested from it, and the package supplies everything else",
         "Record frames and assert zero black pixels and no visible seam at the coverage boundary"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F248",
@@ -3314,7 +3314,7 @@
         "Assert tiles come from the second source while the first is failing and return to the first after recovery",
         "Record frames and assert zero black pixels and no popping during each switch"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F249",
@@ -3393,7 +3393,7 @@
         "Assert the credits list contains exactly the sources with visible tiles at each moment and the event fires on each change",
         "Assert a source used by two layers is credited once"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F255",
@@ -3406,7 +3406,7 @@
         "Try to hide the attribution element through configuration and CSS and assert required credits stay visible and a warning names the requiring source",
         "Assert sources that do not require attribution can be hidden from the element"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F256",

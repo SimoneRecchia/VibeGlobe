@@ -1,3 +1,4 @@
+import { bleedTransparentEdges, encodeRgbaPng } from './edge-bleed.js';
 import {
   GEOGRAPHIC_TILING,
   WEB_MERCATOR_TILING,
@@ -64,8 +65,8 @@ export interface ReprojectedImageryOptions {
 
 /**
  * Warps in the browser: the source image is decoded by `createImageBitmap` and drawn once per triangle of the plan,
- * clipped to the triangle under the triangle's affine map, into an `OffscreenCanvas` encoded as PNG. Pixels the
- * source image does not cover stay transparent.
+ * clipped to the triangle under the triangle's affine map, into an `OffscreenCanvas`. Pixels the source image does
+ * not cover stay transparent, with their visible neighbors' color so that no dark edge shows (`bleedTransparentEdges`).
  */
 export const warpInBrowser: WarpImage = async (bytes, contentType, plan) => {
   const bitmap = await createImageBitmap(new Blob([bytes], { type: contentType }));
@@ -87,7 +88,9 @@ export const warpInBrowser: WarpImage = async (bytes, contentType, plan) => {
       context.drawImage(bitmap, 0, 0, plan.imageWidthPx, plan.imageHeightPx);
       context.restore();
     }
-    return await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer();
+    const pixels = context.getImageData(0, 0, plan.tileSizePx, plan.tileSizePx).data;
+    bleedTransparentEdges(pixels, plan.tileSizePx, plan.tileSizePx);
+    return await encodeRgbaPng(pixels, plan.tileSizePx, plan.tileSizePx);
   } finally {
     bitmap.close();
   }

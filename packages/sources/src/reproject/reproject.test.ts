@@ -2,6 +2,8 @@ import { fc, test } from '@fast-check/vitest';
 import { WEB_MERCATOR_TILING, type TileRequest, type TransportResult } from '@vibeglobe/core';
 import { transformCoordinates } from '@vibeglobe/gis';
 import { describe, expect, it } from 'vitest';
+import { PNG } from 'pngjs';
+import { bleedTransparentEdges, encodeRgbaPng } from './edge-bleed.js';
 import { reprojectedImagery, type WarpImage } from './reprojected-imagery.js';
 import { applyAffine, planWarp, solveAffine, tilePointLonLat, type SourceBbox, type Triangle } from './warp-math.js';
 import { wmsGetMapUrl } from './wms-get-map.js';
@@ -159,5 +161,20 @@ describe('wmsGetMapUrl', () => {
         bbox: [250000, 3980000, 770000, 5270000],
       }),
     ).toMatch(/^https:\/\/x\.test\/wms\?map=a&SERVICE=WMS.*&CRS=EPSG%3A32632&.*&BBOX=250000,3980000,770000,5270000$/);
+  });
+});
+
+describe('edges of warped tiles (F226)', () => {
+  it('gives transparent pixels next to visible ones their color, so filtering draws no dark edge, and keeps alpha', () => {
+    const rgba = new Uint8Array([200, 100, 50, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    bleedTransparentEdges(rgba, 4, 1, 2);
+    expect([...rgba]).toEqual([200, 100, 50, 255, 200, 100, 50, 0, 200, 100, 50, 0, 0, 0, 0, 0]);
+  });
+
+  it('encodes straight RGBA as PNG, color under zero alpha included', async () => {
+    const rgba = new Uint8Array([200, 100, 50, 255, 200, 100, 50, 0, 1, 2, 3, 128, 9, 8, 7, 0]);
+    const decoded = PNG.sync.read(Buffer.from(await encodeRgbaPng(rgba, 2, 2)));
+    expect([decoded.width, decoded.height]).toEqual([2, 2]);
+    expect([...decoded.data]).toEqual([...rgba]);
   });
 });

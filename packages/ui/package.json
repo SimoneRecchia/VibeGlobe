@@ -18,6 +18,7 @@
   ],
   "dependencies": {
     "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/gis": "0.0.0"
+    "@vibeglobe/gis": "0.0.0",
+    "@vibeglobe/layers": "0.0.0"
   }
 }

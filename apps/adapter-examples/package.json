@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@vibeglobe/core": "*",
+    "@vibeglobe/layers": "*",
+    "@vibeglobe/offline": "*",
     "@vibeglobe/sources": "*",
+    "@vibeglobe/ui": "*",
     "@vibeglobe/vue": "*",
     "@vibeglobe/web-component": "*",
     "react": "19.3.1",

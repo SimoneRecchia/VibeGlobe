@@ -80,7 +80,7 @@ export class SearchControl implements UiControl {
     this.#context = context;
     const frame = controlFrame('search');
     const input = document.createElement('input');
-    input.type = 'search';
+    input.type = 'text';
     input.className = 'vg-ui__search-input';
     input.autocomplete = 'off';
     input.spellcheck = false;

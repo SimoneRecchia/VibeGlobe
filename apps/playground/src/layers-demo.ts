@@ -357,6 +357,7 @@ function syncLayers(): DataLayer[] {
 
 export function showDataScenario(globe: Globe, name: string): void {
   if (name === 'data-formats') return void import('./layers-formats.js').then((module) => module.showFormats(globe));
+  if (name === 'data-stream') return void import('./layers-stream.js').then((module) => module.showStream(globe));
   if (name === 'data-cluster') {
     const count = Number(new URLSearchParams(location.search).get('points') ?? 100_000);
     return void import('./layers-cluster.js').then((module) => module.showCluster(globe, count));

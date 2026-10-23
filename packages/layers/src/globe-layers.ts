@@ -55,13 +55,36 @@ function routePointer(element: HTMLElement, interaction: InteractionController, 
 export function createGlobeLayers(globe: Globe, options: { readonly element?: HTMLElement } = {}): GlobeLayers {
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
-  const stack = new LayerStack(target, () => globe.requestRender());
+  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
+  let inFrame = false;
+  let detached = false;
+  let flushQueued = false;
+  // A change outside a frame (data streamed in, a style set) is written to the renderer before the next frame, so
+  // that frame shows it (F372); changes during a frame's step are drawn by the frame they ask for.
+  const flush = (): void => {
+    flushQueued = false;
+    if (detached || inFrame) return;
+    stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+  };
+  const stack = new LayerStack(target, () => {
+    if (!inFrame && !flushQueued) {
+      flushQueued = true;
+      queueMicrotask(flush);
+    }
+    globe.requestRender();
+  });
   const interaction = new InteractionController(stack, {
     pick: (point) => target.pick?.(point) ?? Promise.resolve(0),
     screenToGeo: (point) => globe.screenToGeo(point),
   });
-  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
-  const offFrame = globe.on('frame', () => stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector }));
+  const offFrame = globe.on('frame', () => {
+    inFrame = true;
+    try {
+      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+    } finally {
+      inFrame = false;
+    }
+  });
   const offPointer = options.element
     ? routePointer(options.element, interaction, (position, onGround) =>
         globe.geoToScreen(
@@ -73,6 +96,7 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
     stack,
     interaction,
     detach: () => {
+      detached = true;
       offFrame();
       offPointer();
     },

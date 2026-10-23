@@ -10,6 +10,8 @@ import {
 export interface BatchContents {
   readonly kind: BatchKind;
   count: number;
+  /** Features the layer reserved room for; quad batches allocate their vertices for all of them (F372). */
+  readonly capacity?: number;
   readonly attributes: Map<BatchAttribute, Float64Array>;
   readonly uniforms: Map<BatchAttribute, Float64Array>;
   readonly strings: Map<BatchStringChannel, string[]>;

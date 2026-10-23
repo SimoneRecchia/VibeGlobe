@@ -58,6 +58,8 @@ export interface DataLayerOptions {
   readonly pickable?: boolean;
   /** Whether features can be dragged with the pointer (default false, F382). */
   readonly draggable?: boolean;
+  /** Features to reserve room for, so features streamed in later are added without rebuilding the batch (F372). */
+  readonly capacity?: number;
   /** Added to the batch's draw order within the layer's band (0 to ORDER_STRIDE − 1; composite layers use it). */
   readonly orderOffset?: number;
 }
@@ -127,7 +129,7 @@ export class DataLayer implements Layer {
     this.#orderOffset = options.orderOffset ?? 0;
     this.#style = compileStyle(kind, options.style);
     this.#splitStyle();
-    this.store = new FeatureStore();
+    this.store = new FeatureStore(options.capacity);
     const data = options.data;
     if (data !== undefined && Symbol.asyncIterator in data) this.#stream = data;
     else if (data !== undefined) this.addFeatures('features' in data ? data.features : data);

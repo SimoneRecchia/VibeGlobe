@@ -11,7 +11,7 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { chainSources, credits, overlayLayers, tileVariant } from './fixture-layers.js';
+import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -164,8 +164,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `?tileBase=` serves the tiles from another fixture server (for example `http://{s}:5177/` with
   // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
   const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
-  // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
-  const extension = ['etc1s', 'uastc'].includes(params.get('ktx2') ?? '') ? `${params.get('ktx2')}.ktx2` : 'png';
+  const extension = imageExtension(params);
   // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
   const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
   const { tileSizePx, variant, rows } = tileVariant(params);
@@ -189,7 +188,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(timeoutMs === undefined ? {} : { timeoutsMs: { firstByteMs: timeoutMs, totalMs: timeoutMs } }),
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
-    ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
+    ...(extension.endsWith('ktx2') ? { decoder: 'ktx2' as const } : {}),
     ...credits(params, `fixture-${pattern}`, pattern),
   });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).

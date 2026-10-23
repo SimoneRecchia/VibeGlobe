@@ -11,6 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
+import { encodeTileImage, IMAGE_FORMATS, type ImageFormat } from './formats.ts';
 import { fixtureGeoidFile, terrainTile, type QuantizedMeshExtensions, type TerrainEncoding } from './terrain.ts';
 import {
   encodeTilePng,
@@ -104,6 +105,7 @@ const PATTERNS: readonly string[] = [
   'stripes',
   'patches',
   'checker',
+  'holes',
   'red',
   'green',
   'blue',
@@ -112,7 +114,7 @@ const PATTERNS: readonly string[] = [
 // `mercator-tms`: the Web Mercator tiles with TMS rows, counted from the south (F229).
 const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms'];
 const TILE_PATH =
-  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
+  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|jpg|webp|avif|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
 const WMS_UTM_PATH = /^\/fixture-tiles\/([\w-]+)\/wms-utm$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
@@ -126,6 +128,9 @@ const TERRAIN: Readonly<Record<string, TerrainEncoding>> = {
 };
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+  avif: 'image/avif',
   'terrarium.png': 'image/png',
   'terrain-rgb.png': 'image/png',
   terrain: 'application/vnd.quantized-mesh',
@@ -412,7 +417,9 @@ export class FixtureServer {
           ? terrainTile(tile, encoding, 256, 32, meshExtensions, tile.pattern === ('terrain-geoid' as FixturePattern))
           : extension === 'png'
             ? encodeTilePng(tile)
-            : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
+            : IMAGE_FORMATS.includes(extension)
+              ? await encodeTileImage(tile, extension as ImageFormat)
+              : await encodeKtx2(renderTile(tile), 256, 256, extension === 'uastc.ktx2' ? 'uastc' : 'etc1s');
       this.cache.set(key, body);
     }
     if (rule?.randomBytes !== undefined) {

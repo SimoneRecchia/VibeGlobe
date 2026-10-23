@@ -3237,7 +3237,7 @@
         "Assert transparent PNG and WebP areas show the layer below",
         "Force AVIF decoding to fail and assert those tiles fall back to the parent or the layer below with zero black pixels and a logged warning"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F243",

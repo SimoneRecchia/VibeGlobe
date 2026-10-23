@@ -1,6 +1,6 @@
 // Deterministic imagery tiles for tests (M3 plan §4.1): generated on request, no network, no downloaded data (ADR
-// 0015). Every channel stays at 40 or more and alpha at 255, so neither the black test nor the transparent-pixel
-// sentinel of the scenario detectors can match fixture imagery.
+// 0015). Every channel stays at 40 or more and alpha at 255 (except the `holes` pattern's transparent cells), so neither
+// the black test nor the transparent-pixel sentinel of the scenario detectors can match fixture imagery.
 import { PNG } from 'pngjs';
 
 /** The tiling schemes the fixture server cuts (EPSG:3857 XYZ and the two-root geographic pyramid). */
@@ -12,7 +12,7 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * 1 px edge stripe; `smooth` the color field alone, continuous across every tile edge (seam checks, F110, F111);
  * `tiles` alternating colors per tile parity, contrasting at every tile edge (F106); `stripes` one-texel dark and
  * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
- * `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
+ * `holes` the `world` colors with every other `checker` cell transparent (F242); `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
  * `red`, `green`, `blue` and `shade` one color everywhere ({@link SOLID_COLORS}).
  */
 export type FixturePattern =
@@ -24,6 +24,7 @@ export type FixturePattern =
   | 'stripes'
   | 'patches'
   | 'checker'
+  | 'holes'
   | 'red'
   | 'green'
   | 'blue'
@@ -50,6 +51,15 @@ export interface FixtureTile {
 const MAX_LAT = Math.atan(Math.sinh(Math.PI));
 /** Cells of the `checker` pattern across the Web Mercator world. */
 const CHECKER_CELLS = 4096;
+/** Cells of the `holes` pattern across the Web Mercator world: large enough to show at regional zooms. */
+const HOLE_CELLS = 256;
+
+/** Whether a position falls in an even cell of a checkerboard of `cells` × `cells` over the Web Mercator world. */
+function checkerCell(lonRad: number, latRad: number, cells: number): boolean {
+  const mx = (lonRad + Math.PI) / (2 * Math.PI);
+  const my = (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
+  return (Math.floor(mx * cells) + Math.floor(my * cells)) % 2 === 0;
+}
 const MIN_CHANNEL = 40;
 
 /** The longitude and latitude (radians) of a point of a tile, `u` and `v` from 0 to 1 across it (v from the north). */
@@ -107,6 +117,7 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       const u = (i + 0.5) / size;
       const v = (j + 0.5) / size;
       let color: [number, number, number];
+      let alpha = 255;
       const solid = SOLID_COLORS[tile.pattern];
       if (solid) {
         color = [...solid];
@@ -117,12 +128,13 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       } else if (tile.pattern === 'stripes') {
         const value = i % 2 === 0 ? 240 : MIN_CHANNEL;
         color = [value, value, value];
-      } else if (tile.pattern === 'checker') {
+      } else if (tile.pattern === 'checker' || tile.pattern === 'holes') {
         const { lonRad, latRad } = fixturePosition(tile, u, v);
-        const mx = (lonRad + Math.PI) / (2 * Math.PI);
-        const my = (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
-        const dark = (Math.floor(mx * CHECKER_CELLS) + Math.floor(my * CHECKER_CELLS)) % 2 === 0;
-        color = dark ? [60, 70, 90] : [230, 220, 200];
+        const dark = checkerCell(lonRad, latRad, tile.pattern === 'holes' ? HOLE_CELLS : CHECKER_CELLS);
+        if (tile.pattern === 'holes') {
+          color = worldColor(lonRad, latRad);
+          if (dark) alpha = 0;
+        } else color = dark ? [60, 70, 90] : [230, 220, 200];
       } else if (tile.pattern === 'patches') {
         color = [...(PATCH_COLORS[(tile.x + 3 * tile.y) % PATCH_COLORS.length] ?? [128, 128, 128])];
       } else if (tile.pattern === 'smooth') {
@@ -147,7 +159,7 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       rgba[k] = color[0];
       rgba[k + 1] = color[1];
       rgba[k + 2] = color[2];
-      rgba[k + 3] = 255;
+      rgba[k + 3] = alpha;
     }
   }
   return rgba;

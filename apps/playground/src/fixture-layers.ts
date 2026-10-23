@@ -54,7 +54,9 @@ export function overlayLayers(
     const host = hosts[index] || base;
     const source = xyzImagery({
       id: `overlay-${pattern}`,
-      url: `${host}fixture-tiles/${session}/${pattern}/${overlayTiling}/{z}/{x}/{y}.png`,
+      url: `${host}fixture-tiles/${session}/${pattern}/${overlayTiling}/{z}/{x}/{y}.${imageFormat(params, 'overlayFormat')}`,
+      // The `holes` pattern's transparent cells show the layers below (F242).
+      ...(pattern === 'holes' ? { transparent: true } : {}),
       ...overlayTransport(params, host, pattern),
       tiling: overlayTiling,
       minLevel: 0,
@@ -136,4 +138,16 @@ export function tileVariant(params: URLSearchParams): { tileSizePx: number; vari
   // `?imageryAddressing=tms` requests Web Mercator tiles with TMS rows from the fixture's `mercator-tms` (F229).
   const rows = params.get('imageryAddressing') === 'tms' ? '-tms/{z}/{x}/{-y}' : '/{z}/{x}/{y}';
   return { tileSizePx, variant, rows };
+}
+
+/** `?imageryFormat=jpg|webp|avif` (or `?overlayFormat=` for the overlays, under `name`) serves another format (F242). */
+function imageFormat(params: URLSearchParams, name = 'imageryFormat'): string {
+  const format = params.get(name);
+  return format === 'jpg' || format === 'webp' || format === 'avif' ? format : 'png';
+}
+
+/** The fixture imagery's file extension: `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain (F104). */
+export function imageExtension(params: URLSearchParams): string {
+  const ktx2 = params.get('ktx2');
+  return ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : imageFormat(params);
 }

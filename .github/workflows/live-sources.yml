@@ -1,0 +1,26 @@
+name: Live sources
+
+# The opt-in live run of the source adapters (F223, F264, F549): run by hand only, never on a schedule, so the
+# OpenStreetMap public servers see three tiles per run, as their usage policy allows (ADR 0032). Google runs only when
+# the GOOGLE_MAPS_API_KEY secret is set (ADR 0031); without it the run reports the Google checks as skipped.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live sources (opt-in)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      # The script imports the built packages.
+      - run: npx tsc -b
+      - run: npm run test:live-sources
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}

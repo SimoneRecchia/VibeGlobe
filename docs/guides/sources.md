@@ -382,5 +382,5 @@ const terrainResults = await runTerrainConformance({
   decodeImage: myPngDecoder, // RGBA of a heightmap tile; the browser decodes images in the engine
 });
 expect(failures(terrainResults)).toEqual([]);
-``` `runParserConformance` checks a parser against fixtures and fuzzes it. The opt-in live run (`npm run test:live-sources`) contacts only endpoints whose terms allow automated tests, Google only with `GOOGLE_MAPS_API_KEY` set, and stops at the first quota error.
+``` `runParserConformance` checks a parser against fixtures and fuzzes it. The opt-in live run (`npm run test:live-sources`, or the manual "Live sources" workflow in CI) contacts only endpoints whose terms allow automated tests, Google only with `GOOGLE_MAPS_API_KEY` set, and stops at the first quota error.
 ````

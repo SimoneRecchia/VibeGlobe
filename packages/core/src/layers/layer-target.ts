@@ -139,6 +139,11 @@ export interface LayerRenderTarget {
    * canvas the renderer can draw.
    */
   addImage?(name: string, image: unknown): void;
+  /**
+   * Optional instrumentation (F372, F376, F377): batches rebuilt whole, and feature ranges and vertices uploaded in
+   * place, since the target was created.
+   */
+  stats?(): { readonly rebuilds: number; readonly rangeUploads: number; readonly uploadedVertices: number };
   /** Optional, set by the engine: where clamped and draped features take their heights from (ADR 0037). */
   setGround?(ground: LayerGround): void;
 }

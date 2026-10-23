@@ -9,6 +9,17 @@ import {
   type LayerOrigin,
 } from '@vibeglobe/core';
 import earcut from 'earcut';
+import {
+  DRAPE_STEP_DEG,
+  extentOf,
+  forEachPart,
+  greatCirclePoints,
+  MAX_DRAPE_PIECES,
+  MAX_STEP_DEG,
+  subdivide,
+  vertexOf,
+  type Triangle,
+} from './layer-subdivision.js';
 
 /** What a batch holds on the CPU: per-feature attributes, uniform overrides, strings and geometry (ADR 0037). */
 export interface BatchContents {
@@ -205,40 +216,105 @@ function boxOf(
   return { w: (h * rect.widthPx) / rect.heightPx, h, rect };
 }
 
-/** Points, markers and labels: a screen-sized quad around each feature's position. */
+/** The four vertices of a quad feature: anchor, color, and per corner its pixel offset and atlas coordinates. */
+interface QuadVertices {
+  readonly lon: number;
+  readonly lat: number;
+  readonly height: number;
+  readonly color: number[];
+  readonly corners: number[][];
+  readonly uvs: number[][];
+}
+
+/** A quad feature's vertices; a hidden one collapses to its anchor, transparent, keeping its place in the buffers. */
+function quadVertices(batch: BatchContents, feature: number, images: QuadImages | undefined): QuadVertices {
+  const lon = valueOf(batch, 'position', feature, 0);
+  const lat = valueOf(batch, 'position', feature, 1);
+  const height = valueOf(batch, 'position', feature, 2);
+  if (valueOf(batch, 'visible', feature) <= 0) {
+    const none = [0, 0, 2, 2];
+    return {
+      lon,
+      lat,
+      height,
+      color: [0, 0, 0, 0],
+      corners: [none, none, none, none],
+      uvs: [
+        [-1, -1],
+        [-1, -1],
+        [-1, -1],
+        [-1, -1],
+      ],
+    };
+  }
+  const { w, h, rect } = boxOf(batch, feature, images);
+  const [ax, ay] = anchorShift(valueOf(batch, 'anchor', feature), w, h);
+  const dx = valueOf(batch, 'offsetPx', feature, 0) + ax;
+  const dy = -valueOf(batch, 'offsetPx', feature, 1) + ay;
+  const angle = (-valueOf(batch, 'rotationDeg', feature) * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const round = batch.kind === 'point';
+  // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha.
+  const color = batch.kind === 'marker' && rect ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
+  const corners: number[][] = [];
+  const uvs: number[][] = [];
+  for (const [sx, sy] of QUAD_CORNERS) {
+    const x = sx * w;
+    const y = sy * h;
+    // corner.zw: the unit square for round points, 2 for every other quad.
+    corners.push([dx + x * cos - y * sin, dy + x * sin + y * cos, round ? sx : 2, round ? sy : 2]);
+    // Atlas rows run downward: the quad's top (sy = 1) samples v0.
+    uvs.push(rect ? [sx < 0 ? rect.u0 : rect.u1, sy > 0 ? rect.v0 : rect.v1] : [-1, -1]);
+  }
+  return { lon, lat, height, color, corners, uvs };
+}
+
+const QUAD_CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;
+
+/**
+ * Points, markers and labels: a screen-sized quad around each feature's position, four vertices per feature in feature
+ * order (hidden ones collapsed), so a change to one feature rewrites only its vertices ({@link rewriteQuads}).
+ */
 function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages | undefined): void {
   for (let feature = 0; feature < batch.count; feature++) {
-    if (valueOf(batch, 'visible', feature) <= 0) continue;
-    const lon = valueOf(batch, 'position', feature, 0);
-    const lat = valueOf(batch, 'position', feature, 1);
-    const height = valueOf(batch, 'position', feature, 2);
-    const { w, h, rect } = boxOf(batch, feature, images);
-    const [ax, ay] = anchorShift(valueOf(batch, 'anchor', feature), w, h);
-    const dx = valueOf(batch, 'offsetPx', feature, 0) + ax;
-    const dy = -valueOf(batch, 'offsetPx', feature, 1) + ay;
-    const angle = (-valueOf(batch, 'rotationDeg', feature) * Math.PI) / 180;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const round = batch.kind === 'point';
-    // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha.
-    const color =
-      batch.kind === 'marker' && rect ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
-    for (const [sx, sy] of [
-      [-1, -1],
-      [1, -1],
-      [1, 1],
-      [-1, 1],
-    ] as const) {
-      const x = sx * w;
-      const y = sy * h;
-      // corner.zw: the unit square for round points, 2 for every other quad.
-      const corner = [dx + x * cos - y * sin, dy + x * sin + y * cos, round ? sx : 2, round ? sy : 2];
-      // Atlas rows run downward: the quad's top (sy = 1) samples v0.
-      const uv = rect ? [sx < 0 ? rect.u0 : rect.u1, sy > 0 ? rect.v0 : rect.v1] : [-1, -1];
-      builder.add(lon, lat, height, color, corner, undefined, uv);
-    }
+    const q = quadVertices(batch, feature, images);
+    for (let c = 0; c < 4; c++) builder.add(q.lon, q.lat, q.height, q.color, q.corners[c] ?? [], undefined, q.uvs[c]);
     quadIndices(builder);
   }
+}
+
+/**
+ * Rewrites the vertices of features [first, end) of a quad batch in place (F376, F377); returns false when its arrays do
+ * not hold them (the batch must be rebuilt).
+ */
+export function rewriteQuads(
+  batch: BatchContents,
+  arrays: LayerArrays,
+  first: number,
+  end: number,
+  images: QuadImages | undefined,
+  ground: LayerGround | undefined,
+): boolean {
+  if (end * 4 > arrays.vertices) return false;
+  for (let feature = first; feature < end; feature++) {
+    const q = quadVertices(batch, feature, images);
+    const height = q.height + (ground?.heightAt(q.lon, q.lat) ?? 0);
+    for (let c = 0; c < 4; c++) {
+      const v = feature * 4 + c;
+      writeLayerVertex(arrays, v, q.lon, q.lat, arrays.origin);
+      arrays.heights[v] = height;
+      arrays.colors.set(q.color, v * 4);
+      arrays.corners.set(q.corners[c] ?? [], v * 4);
+      arrays.uvs.set(q.uvs[c] ?? [-1, -1], v * 2);
+    }
+  }
+  return true;
 }
 
 /** Lines: a quad per segment, its vertices offset across the projected segment by half the width. */
@@ -326,87 +402,6 @@ function buildWalls(
       quadIndices(builder);
     }
   }
-}
-
-/** The longest edge, degrees, drawn as one straight piece: shorter ones stay within a few meters of the surface. */
-const MAX_STEP_DEG = 1;
-/** On the terrain: pieces of about a kilometer, at most this many across a feature. */
-const DRAPE_STEP_DEG = 0.01;
-const MAX_DRAPE_PIECES = 100;
-
-type Vertex = [number, number, number];
-type Triangle = [Vertex, Vertex, Vertex];
-
-/** Points from `a` to `b` (degrees, meters) along the great circle, at most {@link MAX_STEP_DEG} apart. */
-function greatCirclePoints(a: Vertex, b: Vertex, stepDeg: number): Vertex[] {
-  const steps = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) / stepDeg);
-  if (steps <= 1) return [a, b];
-  const rad = Math.PI / 180;
-  const unit = (v: Vertex): number[] => [
-    Math.cos(v[1] * rad) * Math.cos(v[0] * rad),
-    Math.cos(v[1] * rad) * Math.sin(v[0] * rad),
-    Math.sin(v[1] * rad),
-  ];
-  const p = unit(a);
-  const q = unit(b);
-  const angle = Math.acos(
-    Math.min(1, Math.max(-1, (p[0] ?? 0) * (q[0] ?? 0) + (p[1] ?? 0) * (q[1] ?? 0) + (p[2] ?? 0) * (q[2] ?? 0))),
-  );
-  const points: Vertex[] = [a];
-  for (let i = 1; i < steps; i++) {
-    const f = i / steps;
-    const wa = angle > 1e-12 ? Math.sin((1 - f) * angle) / Math.sin(angle) : 1 - f;
-    const wb = angle > 1e-12 ? Math.sin(f * angle) / Math.sin(angle) : f;
-    const x = wa * (p[0] ?? 0) + wb * (q[0] ?? 0);
-    const y = wa * (p[1] ?? 0) + wb * (q[1] ?? 0);
-    const z = wa * (p[2] ?? 0) + wb * (q[2] ?? 0);
-    points.push([Math.atan2(y, x) / rad, Math.atan2(z, Math.hypot(x, y)) / rad, a[2] + f * (b[2] - a[2])]);
-  }
-  points.push(b);
-  return points;
-}
-
-/** A triangle split in four at its edge midpoints (degrees) until no edge exceeds {@link MAX_STEP_DEG}. */
-function subdivide(triangle: Triangle, stepDeg: number): Triangle[] {
-  const [a, b, c] = triangle;
-  const span = (u: Vertex, v: Vertex): number => Math.max(Math.abs(u[0] - v[0]), Math.abs(u[1] - v[1]));
-  if (Math.max(span(a, b), span(b, c), span(c, a)) <= stepDeg) return [triangle];
-  const mid = (u: Vertex, v: Vertex): Vertex => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2, (u[2] + v[2]) / 2];
-  const ab = mid(a, b);
-  const bc = mid(b, c);
-  const ca = mid(c, a);
-  return [
-    ...subdivide([a, ab, ca], stepDeg),
-    ...subdivide([ab, b, bc], stepDeg),
-    ...subdivide([ca, bc, c], stepDeg),
-    ...subdivide([ab, bc, ca], stepDeg),
-  ];
-}
-
-/** The larger side of a feature's longitude and latitude bounding box, degrees. */
-function extentOf(geometry: FeatureGeometry): number {
-  let west = Infinity;
-  let east = -Infinity;
-  let south = Infinity;
-  let north = -Infinity;
-  for (let i = 0; i * 3 < geometry.positions.length; i++) {
-    const lon = geometry.positions[i * 3] ?? 0;
-    const lat = geometry.positions[i * 3 + 1] ?? 0;
-    west = Math.min(west, lon);
-    east = Math.max(east, lon);
-    south = Math.min(south, lat);
-    north = Math.max(north, lat);
-  }
-  return Math.max(east - west, north - south, 0);
-}
-
-function vertexOf(geometry: FeatureGeometry, i: number): [number, number, number] {
-  return [geometry.positions[i * 3] ?? 0, geometry.positions[i * 3 + 1] ?? 0, geometry.positions[i * 3 + 2] ?? 0];
-}
-
-function forEachPart(geometry: FeatureGeometry, visit: (start: number, end: number) => void): void {
-  for (let part = 0; part < geometry.partStarts.length; part++)
-    visit(geometry.partStarts[part] ?? 0, geometry.partStarts[part + 1] ?? geometry.positions.length / 3);
 }
 
 /** The first position a batch holds, its origin (ADR 0004), or undefined when it holds nothing to draw. */

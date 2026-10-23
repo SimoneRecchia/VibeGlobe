@@ -78,6 +78,7 @@ export function requestingTarget(
     setVisible: after((handle, visible) => target.setVisible(handle, visible)),
     release: after((handle) => target.release(handle)),
     ...(target.pick ? { pick: target.pick.bind(target) } : {}),
+    ...(target.stats ? { stats: target.stats.bind(target) } : {}),
     ...(target.addImage ? { addImage: after(target.addImage.bind(target)) } : {}),
   };
 }

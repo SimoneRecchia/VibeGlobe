@@ -23,7 +23,7 @@ import { placeTile } from './eye-relative.js';
 import { pickAt } from './layer-picking.js';
 import { LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
-import { buildLayerArrays, type BatchContents, type LayerArrays } from './layer-geometry.js';
+import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
 
@@ -32,6 +32,8 @@ const LAYER_RENDER_ORDER = 1000;
 
 interface Batch extends BatchContents {
   readonly descriptor: BatchDescriptor;
+  /** Feature ranges [first, end) changed since the last frame, rewritten in place when the layout allows. */
+  readonly ranges: [number, number][];
   capacity: number;
   order: number;
   visible: boolean;
@@ -44,6 +46,17 @@ interface Batch extends BatchContents {
 function onGround(batch: Batch): boolean {
   return typeof batch.descriptor.placement === 'string';
 }
+
+/** The vertex attributes of a quad batch and their components (`rebuild`). */
+const QUAD_ATTRIBUTES = [
+  ['position', 3],
+  ['tileNormal', 3],
+  ['tilePlane', 4],
+  ['layerHeight', 1],
+  ['layerColor', 4],
+  ['layerCorner', 4],
+  ['layerUv', 2],
+] as const;
 
 function shapeOf(batch: BatchContents): LayerShape {
   const kind = batch.kind;
@@ -63,6 +76,9 @@ export class LayerBatches implements LayerRenderTarget {
   /** glTF models (F361), placed with the batches. */
   readonly models: LayerModels;
   private nextId = 1;
+  private rebuilds = 0;
+  private rangeUploads = 0;
+  private uploadedVertices = 0;
   /** Labels and marker images (ADR 0037). */
   private readonly atlas = new LayerAtlas();
   private atlasGeneration = 0;
@@ -90,6 +106,7 @@ export class LayerBatches implements LayerRenderTarget {
       order: 0,
       visible: true,
       dirty: true,
+      ranges: [],
       attributes: new Map(),
       uniforms: new Map(),
       strings: new Map(),
@@ -125,7 +142,7 @@ export class LayerBatches implements LayerRenderTarget {
       batch.attributes.set(attribute, values);
     }
     for (let i = first * components; i < (first + count) * components; i++) values[i] = data[i] ?? 0;
-    batch.dirty = true;
+    this.changed(batch, first, first + count);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -140,7 +157,7 @@ export class LayerBatches implements LayerRenderTarget {
     const strings = batch.strings.get(channel) ?? [];
     for (let i = first; i < first + count; i++) strings[i] = values[i] ?? '';
     batch.strings.set(channel, strings);
-    batch.dirty = true;
+    this.changed(batch, first, first + count);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -161,8 +178,24 @@ export class LayerBatches implements LayerRenderTarget {
   /** See {@link LayerRenderTarget}. */
   setCount(handle: BatchHandle, count: number): void {
     const batch = this.get(handle);
+    if (count === batch.count) return;
     batch.count = count;
     batch.dirty = true;
+  }
+
+  /** See {@link LayerRenderTarget}. */
+  stats(): { rebuilds: number; rangeUploads: number; uploadedVertices: number } {
+    return { rebuilds: this.rebuilds, rangeUploads: this.rangeUploads, uploadedVertices: this.uploadedVertices };
+  }
+
+  /**
+   * Records a change to features [first, end): a quad batch whose buffers hold them rewrites only those (F376, F377);
+   * anything else is rebuilt on the next frame.
+   */
+  private changed(batch: Batch, first: number, end: number): void {
+    if (batch.dirty) return;
+    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.ranges.push([first, end]);
+    else batch.dirty = true;
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -230,6 +263,7 @@ export class LayerBatches implements LayerRenderTarget {
     }
     for (const batch of this.batches.values()) {
       if (batch.dirty) this.rebuild(batch);
+      else if (batch.ranges.length > 0) this.rewrite(batch);
       const mesh = batch.mesh;
       if (!mesh || !batch.arrays) continue;
       mesh.visible = batch.visible;
@@ -278,8 +312,29 @@ export class LayerBatches implements LayerRenderTarget {
     return material;
   }
 
+  /** Rewrites the changed feature ranges of a quad batch and uploads only those vertices (F376, F377). */
+  private rewrite(batch: Batch): void {
+    const { arrays, mesh } = batch;
+    for (const [first, end] of batch.ranges.splice(0)) {
+      const ground = onGround(batch) ? this.ground : undefined;
+      if (!arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.atlas, ground)) {
+        this.rebuild(batch);
+        return;
+      }
+      for (const [name, size] of QUAD_ATTRIBUTES) {
+        const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
+        attribute.addUpdateRange(first * 4 * size, (end - first) * 4 * size);
+        attribute.needsUpdate = true;
+      }
+      this.rangeUploads++;
+      this.uploadedVertices += (end - first) * 4;
+    }
+  }
+
   private rebuild(batch: Batch): void {
     batch.dirty = false;
+    batch.ranges.length = 0;
+    this.rebuilds++;
     this.disposeMesh(batch);
     const arrays = buildLayerArrays(batch, this.atlas, onGround(batch) ? this.ground : undefined);
     batch.arrays = arrays;

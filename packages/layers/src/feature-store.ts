@@ -47,6 +47,8 @@ export class FeatureStore {
   #dirty: Uint32Array;
   #dirtyMin = Infinity;
   #dirtyMax = -1;
+  /** Called when the store goes from clean to dirty: the host draws a frame, which flushes it. */
+  onDirty: (() => void) | undefined;
   /** Count the renderer last received. */
   #flushedCount = 0;
   /** Capacity the renderer last received. */
@@ -250,6 +252,7 @@ export class FeatureStore {
   }
 
   #mark(index: number, bits: number): void {
+    if (this.#dirtyMax < 0) this.onDirty?.();
     this.#dirty[index] = ((this.#dirty[index] ?? 0) | bits) >>> 0;
     if (index < this.#dirtyMin) this.#dirtyMin = index;
     if (index > this.#dirtyMax) this.#dirtyMax = index;

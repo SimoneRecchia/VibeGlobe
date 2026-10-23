@@ -270,6 +270,7 @@ export class DataLayer implements Layer {
   attach(context: LayerContext): void {
     if (this.context !== undefined) throw new Error(`layer ${this.id} is already in a stack`);
     this.context = context;
+    this.store.onDirty = () => context.requestFrame();
     this.handle = context.target.createBatch({
       kind: this.kind,
       layerId: this.id,
@@ -288,6 +289,7 @@ export class DataLayer implements Layer {
   detach(): void {
     const context = this.context;
     if (context === undefined) return;
+    this.store.onDirty = undefined;
     this.#streaming = false;
     if (this.handle !== undefined) context.target.release(this.handle);
     if (this.#slot !== 0) context.releasePickSlot(this.#slot);

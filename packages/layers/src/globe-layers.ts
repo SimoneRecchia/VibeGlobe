@@ -41,7 +41,7 @@ function routePointer(element: HTMLElement, interaction: InteractionController):
 export function createGlobeLayers(globe: Globe, options: { readonly element?: HTMLElement } = {}): GlobeLayers {
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
-  const stack = new LayerStack(target);
+  const stack = new LayerStack(target, () => globe.requestRender());
   const interaction = new InteractionController(stack, {
     pick: (point) => target.pick?.(point) ?? Promise.resolve(0),
     screenToGeo: (point) => globe.screenToGeo(point),

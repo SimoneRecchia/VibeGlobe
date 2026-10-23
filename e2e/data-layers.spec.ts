@@ -617,3 +617,50 @@ for (const backend of BACKENDS) {
     }
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`moving, hiding and restyling one feature uploads only its vertices and shows on the next frame on ${backend} (F376, F377)`, async ({
+    page,
+  }) => {
+    await openScenario(page, backend, 'data-points');
+    await showPhase(page, { name: '2D', view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 7 }, mode: '2d' });
+    const stats = () => page.evaluate(() => window.vibeglobePlayground?.globe.layerTarget()?.stats?.());
+    const before = await stats();
+    expect(before).toBeDefined();
+    // Grid point g44 at (12.2°, 41.6°) moves to (12.5°, 41.75°).
+    await page.evaluate(() => window.vibeglobeLayers?.layers['points']?.setFeaturePosition('g44', 12.5, 41.75));
+    await page.waitForTimeout(200);
+    await waitForIdle(page);
+    let image = await canvasImage(page);
+    const [moved, old] = await project(page, [
+      [12.5, 41.75],
+      [12.2, 41.6],
+    ]);
+    if (!moved || !old) throw new Error('out of view');
+    expect(near(image, moved.xPx, moved.yPx, 1, isRed)).toBe(true);
+    expect(near(image, old.xPx, old.yPx, 1, isRed)).toBe(false);
+    // Hidden, then larger: each change one feature's four vertices, no rebuild.
+    await page.evaluate(() => window.vibeglobeLayers?.layers['points']?.setFeatureVisible('g44', false));
+    await page.waitForTimeout(200);
+    await waitForIdle(page);
+    image = await canvasImage(page);
+    expect(near(image, moved.xPx, moved.yPx, 1, isRed)).toBe(false);
+    await page.evaluate(() => {
+      const layer = window.vibeglobeLayers?.layers['points'];
+      layer?.setFeatureVisible('g44', true);
+      layer?.updateFeature('g44', { properties: { r: 12 } });
+    });
+    await page.waitForTimeout(200);
+    await waitForIdle(page);
+    image = await canvasImage(page);
+    expect(near(image, moved.xPx + 9, moved.yPx, 1, isRed)).toBe(true);
+    const after = await stats();
+    expect(after?.rebuilds).toBe(before?.rebuilds);
+    expect((after?.rangeUploads ?? 0) - (before?.rangeUploads ?? 0)).toBeGreaterThanOrEqual(3);
+    // Only the changed feature's vertices: four per upload.
+    expect(
+      ((after?.uploadedVertices ?? 0) - (before?.uploadedVertices ?? 0)) /
+        ((after?.rangeUploads ?? 0) - (before?.rangeUploads ?? 0)),
+    ).toBe(4);
+  });
+}

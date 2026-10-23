@@ -2749,7 +2749,7 @@
         "Assert hemisphere letters decide the axes when present and the documented latitude, longitude order applies otherwise",
         "Type a coordinate into the playground go-to input with Playwright and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F205",
@@ -2761,7 +2761,7 @@
         "Assert parsed values equal the expected decimal degrees within 1e-9°",
         "Type a DMS coordinate into the playground go-to input and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F206",
@@ -2773,7 +2773,7 @@
         "Assert the Norway and Svalbard zone exceptions and band letters are validated",
         "Type a UTM coordinate into the playground go-to input and assert the camera flies to it"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F207",
@@ -2785,7 +2785,7 @@
         "Run the coordinate-string fuzzer for its iteration budget and assert no exception escapes and no input hangs",
         "Assert invalid inputs (latitude above 90°, zone 61, mixed garbage) return typed errors and the go-to input shows the error without moving the camera"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F208",
@@ -2798,7 +2798,7 @@
         "Assert that without a registered geocoder no network request is made and the search reports that no provider is configured",
         "Assert no geocoding provider is a dependency of any package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F209",

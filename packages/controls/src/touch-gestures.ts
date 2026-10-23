@@ -86,6 +86,7 @@ export class TouchGestures {
     this.y[slot] = this.downY[slot] = yPx;
     if (this.count === 0) {
       this.context.interrupt();
+      this.context.port.interruptMovement();
       this.sessionStartMs = timeMs;
       this.sessionFingers = 0;
       this.sessionMoved = false;

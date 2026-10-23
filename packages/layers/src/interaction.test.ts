@@ -104,7 +104,23 @@ describe('feature interaction', () => {
     await controller.pointerMove({ xPx: 50, yPx: 60 });
     await controller.pointerUp({ xPx: 50, yPx: 60 });
     expect(log).toEqual(['drag-start:a:3', 'drag:a:3', 'drag:a:5', 'drag-end:a:5']);
-    expect(layer.getPosition('a')).toEqual({ longitudeDeg: 5, latitudeDeg: 6, heightMeters: 12 });
+    // A ground-clamped point keeps its height above the ground: the terrain's height under the pointer is not added
+    // to it (KB-129).
+    expect(layer.getPosition('a')).toEqual({ longitudeDeg: 5, latitudeDeg: 6, heightMeters: 0 });
     expect(controller.dragging).toBe(false);
+  });
+
+  it('tells at once whether a press lands on a draggable feature, before the asynchronous pick (F382)', () => {
+    // Positions show at 100 px per degree.
+    const project = (p: GeoPosition): ScreenPoint => ({
+      xPx: p.longitudeDeg * 100,
+      yPx: p.latitudeDeg * 100,
+    });
+    for (const draggable of [true, false]) {
+      const { stack, target } = setup(draggable);
+      const controller = new InteractionController(stack, provider(target));
+      expect(controller.pressesDraggable({ xPx: 105, yPx: 95 }, 16, project)).toBe(draggable);
+      expect(controller.pressesDraggable({ xPx: 50, yPx: 50 }, 16, project)).toBe(false);
+    }
   });
 });

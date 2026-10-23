@@ -14,6 +14,19 @@ const PINNED = [
   ['pointer-events', 'auto'],
 ] as const;
 
+/** What page CSS cannot change on each credit and its logo either (TB-02, F259): only the element's own were pinned. */
+const PINNED_ITEM = [
+  ['visibility', 'visible'],
+  ['opacity', '1'],
+  ['transform', 'none'],
+  ['clip-path', 'none'],
+] as const;
+
+function pinItem(element: HTMLElement, display: string): void {
+  element.style.setProperty('display', display, 'important');
+  for (const [name, value] of PINNED_ITEM) element.style.setProperty(name, value, 'important');
+}
+
 /**
  * The engine's minimal attribution element (F255): the credits of the sources in view, with their links and logos,
  * at the bottom right of the container, above everything else in it. Its look is pinned with inline `!important`
@@ -88,12 +101,14 @@ function creditNode(document: Document, credit: Credit): HTMLElement {
   const item = document.createElement('span');
   item.className = credit.required ? 'vg-credit vg-credit-required' : 'vg-credit';
   item.dataset['sources'] = credit.sources.join(' ');
+  pinItem(item, 'inline');
   if (credit.logo) {
     const logo = document.createElement('img');
     logo.src = credit.logo.src;
     logo.alt = credit.logo.alt;
     logo.style.height = '14px';
     logo.style.verticalAlign = 'middle';
+    pinItem(logo, 'inline-block');
     item.append(logo);
   }
   const text = credit.url ? document.createElement('a') : document.createElement('span');

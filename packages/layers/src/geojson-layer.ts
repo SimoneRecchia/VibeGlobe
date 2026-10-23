@@ -2,6 +2,7 @@
  * A layer that loads vector data (GeoJSON now; KML, GPX and MVT through the M7 adapters) from a URL, a File or memory
  * and draws each geometry family with its own batch: polygons at the bottom, lines above, points on top (F371).
  */
+import { acquireWorkerPool, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { DataLayer } from './data-layer.js';
 import type { FeatureId } from './feature-store.js';
 import { geometryFamily, type Feature, type FeatureCollection, type GeometryFamily } from './geojson.js';
@@ -22,9 +23,19 @@ export interface GeoJsonLayerOptions {
   readonly placement?: Placement;
   /** The fetch used for URLs. */
   readonly fetch?: (url: string) => Promise<Response>;
+  /**
+   * The engine's worker program (`createWorkers()` of `@vibeglobe/worker`, as given to the globe): the data is parsed
+   * in its page-wide pool, off the main thread (F371). Without it parsing runs on the main thread.
+   */
+  readonly workers?: WorkerEndpointFactory;
 }
 
 let generated = 0;
+/** The pool's timers, from the page. */
+const TIMERS = {
+  set: (callback: () => void, delayMs: number): unknown => setTimeout(callback, delayMs),
+  clear: (handle: unknown): void => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
 const FAMILIES: readonly GeometryFamily[] = ['polygon', 'line', 'point'];
 
 /** Vector data drawn as points, lines and polygons. */
@@ -129,11 +140,14 @@ export class GeoJsonLayer implements Layer {
   async #load(generation: number): Promise<void> {
     const data = this.#options.data;
     try {
-      const format = this.#options.format ?? geojsonFormat;
-      const collection =
-        typeof data === 'object' && data !== null && (data as Partial<FeatureCollection>).type === 'FeatureCollection'
-          ? await geojsonFormat.parse(data)
-          : await loadVectorData(data, format, this.#options.fetch);
+      // An in-memory FeatureCollection is GeoJSON whatever the format option says.
+      const isCollection =
+        typeof data === 'object' && data !== null && (data as Partial<FeatureCollection>).type === 'FeatureCollection';
+      const format = isCollection ? geojsonFormat : (this.#options.format ?? geojsonFormat);
+      const lease = this.#options.workers && acquireWorkerPool(this.#options.workers, { timers: TIMERS });
+      const collection = await loadVectorData(data, format, this.#options.fetch, lease?.pool).finally(() =>
+        lease?.release(),
+      );
       if (!this.#attached || generation !== this.#generation) return;
       this.#added = true;
       for (const issue of collection.issues) {

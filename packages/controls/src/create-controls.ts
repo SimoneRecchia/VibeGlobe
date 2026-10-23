@@ -42,6 +42,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
     current = attached;
     return {
       update: attached.update,
+      interrupt: attached.interrupt,
       destroy() {
         attached.destroy();
         if (current === attached) current = undefined;
@@ -65,6 +66,8 @@ interface Attached {
   readonly port: CameraPort;
   readonly keyboard: KeyboardInput;
   update(): void;
+  /** An API movement starts (F202): inertia, smoothed zooms and held keys stop. */
+  interrupt(): void;
   destroy(): void;
 }
 
@@ -131,18 +134,23 @@ function attach(
   return {
     port,
     keyboard,
+    interrupt() {
+      context.interrupt();
+      context.zoom.stop();
+      context.keys.stop();
+      keyboard.releaseAll();
+    },
     update() {
       const { zoom, inertia, heading, keys } = context;
       // The wheel's zoom goes first, so a drag started during it keeps its grabbed point under the pointer.
       wheel.apply();
       const zooming = zoom.pending !== 0;
-      // Unconnected and at rest, the frame reads no clock (the host clock would allocate, ADR 0018).
-      let now = zooming || port.globe ? port.beginFrame() : NaN;
+      // Every frame reads the engine clock (`NavigationApi.timeMs`, no allocation), so animations start where it was.
+      const now = port.beginFrame();
       let moving = zooming && zoom.step(now, port);
       mouse.apply();
       touch.apply();
       if (inertia.active || heading.active || keys.moving || box.fitting) {
-        if (Number.isNaN(now)) now = port.beginFrame();
         moving = inertia.step(now, port) || moving;
         moving = heading.step(now, port, options.maxTiltDeg) || moving;
         const { smoothingMs } = options.keyboard;

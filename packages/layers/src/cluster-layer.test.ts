@@ -24,6 +24,22 @@ describe('clustered point layer', () => {
     }
   });
 
+  it('asks for a frame when clusters computed elsewhere arrive, so they show without other input (KB-130)', async () => {
+    const local = localClusterEngine();
+    // An engine whose answers arrive later, as a worker's do.
+    const engine = { ...local, items: async (zoom: number) => (await settle(), local.items(zoom)) };
+    const layer = new ClusterLayer({ data: randomPoints(1000), engine, cluster: { transitionMs: 0 } });
+    let frames = 0;
+    const stack = new LayerStack(new RecordingRenderTarget(), () => void frames++);
+    stack.add(layer);
+    await layer.loaded;
+    stack.frame(frameAt(0, 3));
+    const before = frames;
+    await settle();
+    await settle();
+    expect(frames).toBeGreaterThan(before);
+  });
+
   it('shows the clusters of the current integer zoom as layer features', async () => {
     const layer = new ClusterLayer({ data: randomPoints(10_000), cluster: { radiusPx: 60, transitionMs: 0 } });
     const target = new RecordingRenderTarget();

@@ -82,6 +82,19 @@ export class ModelLayer extends LayerEmitter implements Layer {
     return this.#ready;
   }
 
+  /** Whether a model's anchor shows within `radiusPx` of `point` (a press that starts a drag, F382). */
+  anchorNear(
+    point: { readonly xPx: number; readonly yPx: number },
+    radiusPx: number,
+    project: (position: GeoPosition, onGround: boolean) => { readonly xPx: number; readonly yPx: number } | undefined,
+  ): boolean {
+    for (const entry of this.#entries.values()) {
+      const shown = project(entry.pose.position, false);
+      if (shown && Math.hypot(shown.xPx - point.xPx, shown.yPx - point.yPx) <= radiusPx) return true;
+    }
+    return false;
+  }
+
   /** Loads the models into the target's model renderer. */
   attach(context: LayerContext): void {
     this.#context = context;
@@ -151,6 +164,11 @@ export class ModelLayer extends LayerEmitter implements Layer {
     this.#applyState(entry);
     this.#context?.requestFrame();
     return true;
+  }
+
+  /** A model's position. */
+  getPosition(id: FeatureId): GeoPosition | undefined {
+    return this.#entries.get(id)?.pose.position;
   }
 
   /** Moves a model (a drag, F382, or a live update). */

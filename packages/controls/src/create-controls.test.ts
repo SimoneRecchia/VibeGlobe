@@ -57,6 +57,17 @@ describe('inertia (F179, ADR 0009 §6)', () => {
     const steps = positions.map((p, i) => (i === 0 ? released : (positions[i - 1] ?? 0)) - p);
     for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeLessThanOrEqual((steps[i - 1] ?? 0) + 1e-9);
     expect(h.camera.centerY).toBe(0);
+    // Every inertia step is marked as coasting for the engine's move events (F200), and the mark is cleared after.
+    expect(h.camera.coastingChanges).toBeGreaterThan(10);
+    expect(h.camera.coasting).toBe(false);
+  });
+
+  it('stops a running API movement on a press, before any drag (KB-127)', () => {
+    const h = controlsHarness();
+    h.pointer('pointerdown', { x: 100, y: 100, t: 0 });
+    h.pointer('pointerup', { x: 100, y: 100, t: 50 });
+    h.pointer('pointerdown', { x: 100, y: 100, t: 400, id: 2, pointerType: 'touch' });
+    expect(h.camera.movementInterruptions).toBe(2);
   });
 
   it('does not coast after the pointer held still before the release', () => {
@@ -76,6 +87,17 @@ describe('inertia (F179, ADR 0009 §6)', () => {
     const reference = at(60);
     expect(reference).toBeCloseTo(-200 * (1 - Math.exp(-1.5)), 6);
     for (const hz of [30, 120, 144]) expect(at(hz)).toBeCloseTo(reference, 6);
+  });
+
+  it('continues from the time-correct position after a 250 ms stall, without overshoot (F203)', () => {
+    const { h, released, releasedMs } = fling(0);
+    h.run(releasedMs + 100);
+    h.frame(250);
+    // 350 ms after the release, as if no frame had stalled.
+    const offset = (ms: number) => -200 * (1 - Math.exp(-ms / 200));
+    expect(h.camera.centerX - released).toBeCloseTo(offset(h.globe.timeMs - releasedMs), 6);
+    h.run(h.globe.timeMs + 3000);
+    expect(h.camera.centerX - released).toBeGreaterThanOrEqual(-200 - 1e-6);
   });
 
   it('is quartered under reduced motion', () => {
@@ -206,14 +228,15 @@ describe('rotate and tilt drags (F182, F183)', () => {
     expect(h.camera.drags).toBe(0);
   });
 
-  it('suppresses the context menu, and leaves rotation off until a globe is connected', () => {
+  it('suppresses the context menu, and rotates through the navigation API without a connected globe', () => {
     const h = controlsHarness({}, { connect: false });
     h.fire('contextmenu', {});
     expect(h.prevented()).toBe(1);
     h.pointer('pointerdown', { x: 400, y: 300, t: 0, button: 2 });
     h.pointer('pointermove', { x: 500, y: 300, t: 100, button: 2 });
     h.frame();
-    expect(h.camera.headingDeg + h.camera.drags).toBe(0);
+    expect(h.camera.headingDeg).toBeGreaterThan(0);
+    expect(h.camera.drags).toBe(0);
   });
 });
 

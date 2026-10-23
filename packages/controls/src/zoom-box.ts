@@ -10,9 +10,17 @@ function ease(s: number): number {
   return s * s * (3 - 2 * s);
 }
 
+/** Longitude `lonDeg` unwrapped to within 180° of `nearDeg`. */
+function unwrap(lonDeg: number, nearDeg: number): number {
+  return nearDeg + ((((lonDeg - nearDeg + 180) % 360) + 360) % 360) - 180;
+}
+
 /**
  * The Shift+drag zoom box (F175): a dashed rectangle while dragging; on release the view eases so the box's center
- * comes to the screen center and the box fills the viewport in its limiting dimension. Escape cancels it.
+ * comes to the screen center and the box fills the viewport in its limiting dimension. Escape cancels it. With a
+ * connected globe the engine fits the box's geographic corners (`Globe.fitBounds`), so they stay inside the viewport
+ * when the projection changes on the way (the globe flattening into the map); otherwise the box zooms by its pixel
+ * ratio about its center.
  */
 export class ZoomBox {
   private overlay: HTMLElement | undefined;
@@ -83,6 +91,7 @@ export class ZoomBox {
     this.from.yPx = (this.start.yPx + this.end.yPx) / 2;
     this.anchor = port.grab(this.from);
     if (!this.anchor) return;
+    if (this.fitCorners(port, durationMs, this.anchor.longitudeDeg)) return;
     this.to.xPx = widthPx / 2;
     this.to.yPx = heightPx / 2;
     this.levels = Math.log2(Math.min(widthPx / boxWidth, heightPx / boxHeight));
@@ -90,6 +99,30 @@ export class ZoomBox {
     this.startMs = NaN;
     this.progress = 0;
     this.fitting = true;
+  }
+
+  /** Asks the connected engine to fit the box's geographic corners; false when it cannot (no globe, a corner off it). */
+  private fitCorners(port: CameraPort, durationMs: number, centerLonDeg: number): boolean {
+    const fitBounds = port.globe?.fitBounds;
+    if (!fitBounds) return false;
+    let west = Infinity;
+    let east = -Infinity;
+    let south = Infinity;
+    let north = -Infinity;
+    for (const xPx of [this.start.xPx, this.end.xPx]) {
+      for (const yPx of [this.start.yPx, this.end.yPx]) {
+        const corner = port.grab({ xPx, yPx });
+        if (!corner) return false;
+        const lon = unwrap(corner.longitudeDeg, centerLonDeg);
+        west = Math.min(west, lon);
+        east = Math.max(east, lon);
+        south = Math.min(south, corner.latitudeDeg);
+        north = Math.max(north, corner.latitudeDeg);
+      }
+    }
+    const bounds = { westDeg: unwrap(west, 0), eastDeg: unwrap(east, 0), southDeg: south, northDeg: north };
+    fitBounds.call(port.globe, bounds, { movement: 'ease', durationMs });
+    return true;
   }
 
   /** Stops the fit where it is. */

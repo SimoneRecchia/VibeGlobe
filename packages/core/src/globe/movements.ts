@@ -29,9 +29,7 @@ import { validateBounds, viewForBounds } from './fit-bounds.js';
 import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
-import type { EngineClock } from './engine-clock.js';
 import type { ViewState } from '../view/view-state.js';
-import { ViewControl } from './view-control.js';
 
 const RAD = Math.PI / 180;
 /** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
@@ -57,6 +55,10 @@ export interface MovementHost {
   /** Shows the view at this opacity (1 opaque): a reduced-motion flight's fade (F214). */
   setOpacity(opacity: number): void;
   requestRender(): void;
+  /** An API movement starts: the controls stop their own animations (F202). */
+  interruptInput(): void;
+  /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
+  constrainEnd(end: Float64Array): void;
 }
 
 /** A running animation: an ease or flight, or an orbit (F192). */
@@ -84,6 +86,8 @@ export class Movements {
   private readonly stepIo = new Float64Array(2);
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
+  /** What the running user movement is: input, or the controls' inertia after it (F200). */
+  private userCause: MoveCause = 'user';
   private userInputThisFrame = false;
   /**
    * The system's reduced-motion setting (F214), followed at runtime: flights then fade to their target instead of
@@ -95,7 +99,9 @@ export class Movements {
 
   /** True while a movement runs: the frame loop keeps drawing. */
   get active(): boolean {
-    return this.running !== undefined;
+    // With a moveend listener, a user movement keeps frames coming until one without input announces its end (F200);
+    // without one, frames stop with the input (F062).
+    return this.running !== undefined || (this.userMoving && this.host.emitter.has('moveend'));
   }
 
   /** Starts an ease or a flight; invalid input rejects with a GlobeError and moves nothing. */
@@ -124,6 +130,7 @@ export class Movements {
       view.headingDeg * RAD,
       target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
     );
+    this.host.constrainEnd(end);
     if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
     const animator =
       kind === 'fly' && this.reducedMotion
@@ -204,6 +211,7 @@ export class Movements {
     promise.cancel = () => this.finish(running, 'cancelled');
     this.running = running;
     this.moveEvent.cause = 'api';
+    this.host.interruptInput();
     this.host.emitter.emit('movestart', { cause: 'api' });
     if (signal?.aborted) this.finish(running, 'cancelled');
     else signal?.addEventListener('abort', onAbort);
@@ -291,13 +299,21 @@ export class Movements {
     if (this.running) this.finish(this.running, 'interrupted');
   }
 
-  /** Called by the navigation intents: user input takes over (F202) and is announced with the cause 'user'. */
-  userInput(): void {
+  /**
+   * Called by the navigation intents: user input takes over (F202) and is announced with its cause, 'user' or the
+   * controls' 'inertia'; a change of cause ends one movement and starts the next.
+   */
+  userInput(cause: 'user' | 'inertia' = 'user'): void {
     this.interrupt();
     this.userInputThisFrame = true;
+    if (this.userMoving && this.userCause !== cause) {
+      this.userMoving = false;
+      this.host.emitter.emit('moveend', { cause: this.userCause, outcome: 'completed' });
+    }
+    this.userCause = cause;
     if (!this.userMoving) {
       this.userMoving = true;
-      this.host.emitter.emit('movestart', { cause: 'user' });
+      this.host.emitter.emit('movestart', { cause });
     }
   }
 
@@ -323,11 +339,11 @@ export class Movements {
   /** Called after the controls ran in a frame: a user movement with no input this frame has ended. */
   afterInput(): void {
     if (this.userInputThisFrame) {
-      this.moveEvent.cause = 'user';
+      this.moveEvent.cause = this.userCause;
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
     } else if (this.userMoving) {
       this.userMoving = false;
-      this.host.emitter.emit('moveend', { cause: 'user', outcome: 'completed' });
+      this.host.emitter.emit('moveend', { cause: this.userCause, outcome: 'completed' });
     }
     this.userInputThisFrame = false;
   }
@@ -366,6 +382,8 @@ export class Movements {
   /** A jump: the three events in one go (F197). */
   private jumped(): void {
     this.interrupt();
+    // The controls' inertia and smoothed zooms stop too, or their next step would undo the jump (KB-125).
+    this.host.interruptInput();
     this.host.emitter.emit('movestart', { cause: 'api' });
     this.moveEvent.cause = 'api';
     this.host.emitter.emit('move', this.moveEvent);
@@ -425,45 +443,6 @@ function validDuration(value: unknown): number | undefined {
       `A movement's durationMs must be a finite number of 0 or more, got ${String(value)}`,
     );
   return value;
-}
-
-/** What {@link wireView} needs from its globe. */
-export interface ViewWiring {
-  readonly cam: Camera;
-  readonly view: ViewState;
-  readonly emitter: Emitter<GlobeEvents>;
-  readonly clock: EngineClock;
-  setOpacity(opacity: number): void;
-  waiting(): boolean;
-  assertAlive(): void;
-  requestRender(): void;
-}
-
-/** The view API and the camera movements of a globe, wired to each other: input intents interrupt movements. */
-export function wireView(globe: ViewWiring): { viewControl: ViewControl; movements: Movements } {
-  const viewControl: ViewControl = new ViewControl({
-    cam: globe.cam,
-    view: globe.view,
-    emitter: globe.emitter,
-    waiting: () => globe.waiting(),
-    assertAlive: () => globe.assertAlive(),
-    requestRender: () => globe.requestRender(),
-    userInput: () => movements.userInput(),
-  });
-  const movements: Movements = new Movements({
-    cam: globe.cam,
-    view: globe.view,
-    assertAlive: () => globe.assertAlive(),
-    emitter: globe.emitter,
-    timeMs: () => globe.clock.timeMs,
-    currentView: () => currentView(globe.cam),
-    chooseTilt: (tiltDeg) => viewControl.chooseTilt(tiltDeg),
-    setMode: (mode) => viewControl.setMode(mode),
-    animateTilt: (tiltRad) => globe.view.chooseTilt(tiltRad),
-    setOpacity: (opacity) => globe.setOpacity(opacity),
-    requestRender: () => globe.requestRender(),
-  });
-  return { viewControl, movements };
 }
 
 /** A movement that has already settled as 'completed': what a jump returns (F197, F200). */

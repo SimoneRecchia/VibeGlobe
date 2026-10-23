@@ -63,6 +63,7 @@ export class MouseGestures {
     else if (press.button === 0 && !press.ctrlKey && (gestures.dragPan || gestures.doubleClickZoom)) mode = 'pan';
     if (mode === 'none') return false;
     this.context.interrupt();
+    this.context.port.interruptMovement();
     this.box.stop();
     this.pointerId = id;
     this.mode = mode;

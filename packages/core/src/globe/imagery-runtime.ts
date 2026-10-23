@@ -6,6 +6,7 @@ import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
 import type { StackEntry } from '../imagery/imagery-stack.js';
+import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import {
@@ -37,7 +38,7 @@ import { FINEST_FAILED, TerrainHeights, type ElevationSample } from '../terrain/
 import { emptyLoaderStats, terrainStatsOf } from './diagnostics.js';
 import { GlobeError } from './errors.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
-import type { ImageryStats, MemoryOptions, RendererBackend, TerrainStats, TileErrorEvent } from './types.js';
+import type { ImageryStats, MemoryOptions, RendererBackend, TerrainStats } from './types.js';
 
 /** Texture handles of layer `i` start at `i × HANDLES_PER_LAYER`. */
 const HANDLES_PER_LAYER = 1 << 22;
@@ -122,12 +123,6 @@ function releaseNetworkPool(pool: NetworkPool): void {
 }
 
 /** What the runtime reports to its engine instance. */
-export interface ImageryCallbacks {
-  /** Something arrived that changes the picture or the queue. */
-  requestFrame(): void;
-  /** A tile failed for good; its ancestors stay drawn (F112). */
-  tileError(event: TileErrorEvent): void;
-}
 
 /**
  * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
@@ -197,6 +192,8 @@ export class ImageryRuntime {
   readonly layers: ImageryLayer[];
   /** The imagery stack, bottom first (ADR 0038): reordered in place by `Globe.imageryLayers.move`. */
   readonly stack: StackLayer[];
+  /** The credits of the sources in view (F254). */
+  readonly credits: RuntimeCredits;
   /** The terrain layer, when the engine has a terrain source (M4). */
   readonly terrain: TerrainLayer | undefined;
   /** The resident terrain grids, for elevation queries (F144, F145). */
@@ -272,9 +269,11 @@ export class ImageryRuntime {
         ...loaderOptions(source, index, pinned[index] ?? -1),
         decodeTask: imageryDecodeTask(source, renderer.capabilities.compressedTextureFormats),
       }),
+      index,
     }));
     this.stack = stackOf(entries, this.layers);
     this.heights = this.terrain && new TerrainHeights(this.terrain);
+    this.credits = runtimeCredits(sources, terrain, renderer, callbacks, observability);
     this.texelsPerTile = Math.max(0, ...sources.map((source) => source.tileSizePx));
     this.maxLevel = Math.max(0, ...sources.map((source) => source.maxLevel));
   }
@@ -412,9 +411,8 @@ export class ImageryRuntime {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
-    drawImagery(list, tiles, count, this.stack, camera);
-    this.fades.apply(list, list.imageryLayer, nowMs, this.snapFades ? 0 : fadeMs, this.keepTexture);
-    this.snapFades = false;
+    drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
+    this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
     const terrain = this.terrain;
     const host = this.renderer.host;
     let terrainStart = terrain ? host.now() : 0;
@@ -428,6 +426,7 @@ export class ImageryRuntime {
       this.terrainMs = host.now() - terrainStart + this.chargedMs;
       this.chargedMs = 0;
     }
+    this.credits.afterFrame(list, count);
     for (const layer of this.layers) layer.loader.scheduleRequests();
     terrainStart = terrain ? host.now() : 0;
     terrain?.loader.scheduleRequests();
@@ -448,8 +447,7 @@ export class ImageryRuntime {
   }
 
   /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
-  readonly stackChanged = (): void => ((this.snapFades = true), this.callbacks.requestFrame());
-  private snapFades = false;
+  readonly stackChanged = (): void => ((this.fades.snapNext = true), this.callbacks.requestFrame());
 
   /** The counters of `Globe.terrainStats()`; undefined without terrain. */
   terrainStats(): TerrainStats | undefined {
@@ -479,6 +477,7 @@ export class ImageryRuntime {
 
   /** Cancels every request and task and releases the worker pool share. */
   destroy(): void {
+    this.renderer.host.showCredits?.([]);
     for (const layer of this.layers) layer.loader.destroy();
     this.terrain?.loader.destroy();
     for (const query of this.elevationQueries.splice(0)) {

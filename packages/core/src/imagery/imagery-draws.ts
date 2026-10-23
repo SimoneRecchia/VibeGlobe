@@ -16,16 +16,18 @@ import {
   mapGeographic,
   mapMercator,
 } from './imagery-mapping.hot.js';
-import type { ImagerySource } from './imagery-source.js';
+import { inCoverage, type ImagerySource } from './imagery-source.js';
 import { BLEND_CODES, isOpaque, type StackEntry } from './imagery-stack.js';
+import type { VisibleSources } from './credits.js';
 
 /** Where `mapping` keeps the handle of the tile it maps to, after the mapping's own seven numbers. */
 const MAPPING_HANDLE = 7;
 
-/** A source of one engine instance: the source and the loader of its tiles. */
+/** A source of one engine instance: the source, the loader of its tiles and its index among the instance's sources. */
 export interface ImageryLayer {
   readonly source: ImagerySource;
   readonly loader: ImageryLoader;
+  readonly index: number;
 }
 
 /** A layer of the imagery stack (ADR 0038): its look and the loaded sources of its chain, in priority order. */
@@ -65,6 +67,7 @@ export function drawImagery(
   count: number,
   layers: readonly StackLayer[],
   camera: Camera,
+  visible?: VisibleSources,
 ): void {
   let center: QuadtreeTile | undefined;
   let centerDistance = Infinity;
@@ -89,6 +92,7 @@ export function drawImagery(
       const geographic = entry.chain[chosen]?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
       if (isOpaque(entry.entry)) {
         based = true;
+        visible?.mark(entry.chain[chosen]?.index ?? 0);
         list.textures[index] = handle;
         list.geographic[index] = geographic;
         list.imageryLevels[index] = mapping[MAPPING_LEVEL] ?? -1;
@@ -98,6 +102,7 @@ export function drawImagery(
         list.uvTransforms[at + 2] = mapping[MAPPING_OFFSET_U] ?? 0;
         list.uvTransforms[at + 3] = mapping[MAPPING_OFFSET_V] ?? 0;
       } else if (overlays < MAX_OVERLAYS) {
+        visible?.mark(entry.chain[chosen]?.index ?? 0);
         const at = overlays * 8;
         found[at] = handle;
         found[at + 1] = geographic;
@@ -176,6 +181,8 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
 
 /** Maps a tile into a source's tiles at the tile's level clamped to the source's (into `mapping`); false if it cannot. */
 function mapInto(source: ImagerySource, tile: QuadtreeTile): boolean {
+  // Outside its coverage a source has nothing, not even its coarse ancestors magnified: the layers below show (F094).
+  if (source.coverage && !inCoverage(source.coverage, tile)) return false;
   const level = tile.level < source.maxLevel ? tile.level : source.maxLevel;
   if (source.tiling.crs === 'EPSG:3857') return tile.root === MERCATOR_ROOT && mapMercator(tile, level, mapping, 0);
   return mapGeographic(tile, level, mapping, 0);

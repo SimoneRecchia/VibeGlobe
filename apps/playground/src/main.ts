@@ -5,14 +5,13 @@ import {
   WGS84,
   type Globe,
   type GlobeOptions,
-  type ImageryBlend,
-  type ImageryLayerOptions,
   type LogEntry,
   type ViewCurvesInit,
   type ViewInit,
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
+import { credits, overlayLayers } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -186,6 +185,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     // `?coverage=italy` limits the source to a box around Italy (F094).
     ...(params.get('coverage') === 'italy' ? { coverage: [ITALY] } : {}),
     ...(extension === 'png' ? {} : { decoder: 'ktx2' as const }),
+    ...credits(params, `fixture-${pattern}`, pattern),
   });
   // `?gpuBudgetMB=&ramBudgetMB=` set the cache budgets (F098).
   const megabytes = (name: string): number | undefined =>
@@ -196,27 +196,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(gpuBudgetBytes === undefined ? {} : { gpuBudgetBytes }),
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
-  return { imagery: [source, ...overlayLayers(base, session, imageryTiling)], workers, memory };
-}
-
-/**
- * `?overlays=<pattern>[:<opacity>[:<blend>]],…` adds fixture layers above `?imagery=`, bottom first, each with its
- * opacity and blend mode (F243–F246); their ids are `overlay-<pattern>`.
- */
-function overlayLayers(base: string, session: string, tiling: 'mercator' | 'geographic'): ImageryLayerOptions[] {
-  const spec = params.get('overlays');
-  if (!spec) return [];
-  return spec.split(',').map((item) => {
-    const [pattern = 'tiles', opacity = '1', blend = 'normal'] = item.split(':');
-    const source = xyzImagery({
-      id: `overlay-${pattern}`,
-      url: `${base}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
-      tiling,
-      minLevel: 0,
-      maxLevel: 18,
-    });
-    return { sources: [source], opacity: Number(opacity), blend: blend as ImageryBlend };
-  });
+  return { imagery: [source, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
 }
 
 /**
@@ -310,6 +290,8 @@ function startGlobe(
     // (scenario tests, F105; `fadeMs=0` is their injected pop).
     ...(params.has('clockStepMs') ? { manualClockStepMs: Number(params.get('clockStepMs')) } : {}),
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
+    // `?hiddenCredits=<source id>,…` leaves those sources' optional credits out (F255).
+    ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
     // `?terrainClearance=` sets how far above the terrain the eye stays (F146).

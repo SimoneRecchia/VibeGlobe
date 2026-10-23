@@ -17,7 +17,11 @@ const ALLOCATION_TESTS = [
   'packages/core/src/cache/cache-allocation.test.ts',
   'packages/renderer/src/eye-relative.test.ts',
 ];
-const coverageRun = process.argv.includes('--coverage');
+/**
+ * They also run only when named on the command line (`npm run coverage` names them, one file at a time): next to the
+ * other files they measured the load of the machine, not the engine (KB-106).
+ */
+const allocationRun = process.argv.some((arg) => ALLOCATION_TESTS.some((file) => arg.endsWith(file)));
 
 export default defineConfig({
   // Workspace packages resolve to their TypeScript sources, so tests need no prior build.
@@ -30,7 +34,7 @@ export default defineConfig({
         test: {
           name: 'packages',
           include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
-          exclude: coverageRun ? ALLOCATION_TESTS : [],
+          exclude: allocationRun ? [] : ALLOCATION_TESTS,
         },
       },
       { extends: true, test: { name: 'scripts', include: ['scripts/**/*.test.ts', 'benchmarks/**/*.test.ts'] } },

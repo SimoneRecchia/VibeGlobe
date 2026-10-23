@@ -15,7 +15,8 @@ import { validateViewCurves } from '../view/curves.js';
 import { ViewState } from '../view/view-state.js';
 import { mercatorScaleInto, type MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
-import { ImageryRuntime, type AbortSignalLike, type ImageryCallbacks } from './imagery-runtime.js';
+import { ImageryRuntime, type AbortSignalLike } from './imagery-runtime.js';
+import type { ImageryCallbacks } from './runtime-credits.js';
 import { stackEntries } from '../imagery/imagery-stack.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
@@ -114,6 +115,7 @@ export class SurfaceFrame {
       options.memory ?? {},
       renderer,
       {
+        ...callbacks,
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
           logger.log('warn', `${event.sourceId}: tile ${event.level}/${event.x}/${event.y} ${event.reason}`);

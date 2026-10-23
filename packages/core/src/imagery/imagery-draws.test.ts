@@ -42,7 +42,7 @@ function fakeLayer(
     markDrawn: () => undefined,
   } as unknown as ImageryLoader;
   const source = { tiling: WEB_MERCATOR_TILING, minLevel: 0, maxLevel } as ImagerySource;
-  return { layer: { source, loader }, wanted };
+  return { layer: { source, loader, index: 0 }, wanted };
 }
 
 /** A stack layer over a chain of fake sources, with a look. */
@@ -142,5 +142,17 @@ describe('drawImagery', () => {
     const outside = fakeLayer({}, [9]);
     const list = drawStack([stacked([fakeLayer({ 8: 40 }, [], 8).layer, outside.layer])], tile9);
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([40, 8]);
+  });
+
+  it('draws nothing of a source outside its coverage, not even a magnified ancestor (F094, F254)', () => {
+    const covered = fakeLayer({ 2: 50 });
+    const italy = { westRad: 0.11, southRad: 0.62, eastRad: 0.32, northRad: 0.83 };
+    const outside = tile(9, 258, 175); // around 1.4° E, 48.9° N
+    const list = drawStack(
+      [stacked([{ ...covered.layer, source: { ...covered.layer.source, coverage: [italy] } }])],
+      outside,
+    );
+    expect(list.textures[0]).toBe(-1);
+    expect(covered.wanted).toEqual([]);
   });
 });

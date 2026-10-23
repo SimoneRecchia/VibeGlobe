@@ -1,0 +1,86 @@
+import { NO_TERRAIN } from './types.js';
+import { creditsOf, VisibleSources, type Credit, type CreditedSource } from '../imagery/credits.js';
+import type { DrawList } from '../imagery/draw-list.js';
+import type { ImagerySource } from '../imagery/imagery-source.js';
+import type { Observability } from '../diagnostics/observability.js';
+import type { TerrainSource } from '../terrain/terrain-source.js';
+import type { RendererBackend, TileErrorEvent } from './types.js';
+
+/**
+ * The credits of one engine instance (F254, F255): which sources each frame shows, by index (imagery sources in the
+ * order of their loaders, then the terrain), and the list of their credits when that changes.
+ */
+export class RuntimeCredits {
+  readonly visible: VisibleSources;
+  private readonly warned = new Set<string>();
+
+  /**
+   * `sources` are the imagery sources then the terrain source, if any; `changed` receives the new list; `warn` logs
+   * once per source whose required credit the configuration tried to hide.
+   */
+  constructor(
+    private readonly sources: readonly CreditedSource[],
+    private readonly hidden: ReadonlySet<string>,
+    private readonly changed: (credits: readonly Credit[]) => void,
+    private readonly warn: (message: string) => void,
+    private readonly terrainIndex: number,
+  ) {
+    this.visible = new VisibleSources(sources.length);
+  }
+
+  /** Ends a frame of `count` draws: marks the terrain when a draw shows it, and reports a change of credits. */
+  afterFrame(list: DrawList, count: number): void {
+    if (this.terrainIndex >= 0) {
+      const textures = list.terrain.textures;
+      for (let i = 0; i < count; i++) {
+        if (textures[i] !== NO_TERRAIN) {
+          this.visible.mark(this.terrainIndex);
+          break;
+        }
+      }
+    }
+    if (this.visible.settle()) this.changed(this.list());
+  }
+
+  /** The credits of the sources the last frame showed (allocates; called on a change and by `Globe.credits()`). */
+  list(): Credit[] {
+    const shown = this.sources.filter((_, index) => this.visible.visible(index));
+    return creditsOf(shown, this.hidden, (sourceId) => {
+      if (this.warned.has(sourceId)) return;
+      this.warned.add(sourceId);
+      this.warn(`The credit of source "${sourceId}" is required by its provider and stays visible (F255)`);
+    });
+  }
+}
+
+/** What the imagery runtime reports to its globe. */
+export interface ImageryCallbacks {
+  /** Something arrived that changes the picture or the queue. */
+  requestFrame(): void;
+  /** A tile failed for good; its ancestors stay drawn (F112). */
+  tileError(event: TileErrorEvent): void;
+  /** The credits of the sources in view changed (F254). */
+  creditsChange?(credits: readonly Credit[]): void;
+  /** Sources whose credits the application hides (`GlobeOptions.hiddenCredits`); required credits stay (F255). */
+  readonly hiddenCredits?: readonly string[];
+}
+
+/** The credits of an engine's sources, shown in the renderer's attribution element and reported to the globe. */
+export function runtimeCredits(
+  sources: readonly ImagerySource[],
+  terrain: TerrainSource | undefined,
+  renderer: RendererBackend,
+  callbacks: ImageryCallbacks,
+  observability: Observability | undefined,
+): RuntimeCredits {
+  return new RuntimeCredits(
+    terrain ? [...sources, terrain] : sources,
+    new Set(callbacks.hiddenCredits ?? []),
+    (credits) => {
+      renderer.host.showCredits?.(credits);
+      callbacks.creditsChange?.(credits);
+    },
+    (message) => observability?.logger.log('warn', message),
+    terrain ? sources.length : -1,
+  );
+}

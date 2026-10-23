@@ -201,7 +201,7 @@ class OfflineEngine implements Offline {
   }
 
   source<S extends ImagerySource>(source: S, options: TieredSourceOptions = {}): S {
-    const rules = options.rules ?? (source as { profile?: ProviderRules }).profile;
+    const rules = options.rules ?? (source as unknown as { profile?: ProviderRules }).profile;
     if (rules) this.rules.set(source.id, rules);
     this.registerEndpoint(source);
     const wrapped = tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) });

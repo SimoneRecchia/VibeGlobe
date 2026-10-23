@@ -1,6 +1,7 @@
 import type { TileTransport, TileRequest, TimeoutsMs } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import type { TileRectangleRad, TilingScheme } from '../tiling/tiling-scheme.js';
+import type { Attribution, CreditProfile } from './credits.js';
 
 /**
  * What the tile loader needs of a tiled source, imagery or terrain: where its tiles come from and how they are cut.
@@ -29,6 +30,10 @@ export interface TileSource {
    * again when it wants the tile again.
    */
   request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown';
+  /** Credits shown while the source's tiles are in view (F254). */
+  readonly attribution?: readonly Attribution[];
+  /** The provider profile's credit rules: a required credit is always shown (F255). */
+  readonly profile?: CreditProfile;
 }
 
 /**

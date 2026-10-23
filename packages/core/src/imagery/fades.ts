@@ -12,6 +12,8 @@ export const DEFAULT_FADE_MS = 250;
 export class ImageryFades {
   /** True when the last frame drew a fade in progress: the engine draws the next frame and is not idle. */
   fading = false;
+  /** Set for a frame that shows a change at once (the imagery stack's, F243): it starts no fade. */
+  snapNext = false;
   private readonly slots = new IntegerKeyMap<number>(1024);
   private capacity = 0;
   private used = 0;
@@ -45,6 +47,8 @@ export class ImageryFades {
     maxLevelGap = Infinity,
   ): void {
     const nowMs = now[0] ?? 0;
+    const fadeMs = this.snapNext ? 0 : durationMs;
+    this.snapNext = false;
     this.frame++;
     this.fading = false;
     for (let i = 0; i < list.count; i++) {
@@ -60,7 +64,7 @@ export class ImageryFades {
           // Too far apart to morph: the draw shows its new data at once.
           this.store(slot, layer, i);
           this.startMs[slot] = -Infinity;
-        } else if (nowMs - (this.startMs[slot] ?? 0) < durationMs) {
+        } else if (nowMs - (this.startMs[slot] ?? 0) < fadeMs) {
           // A fade is under way: it finishes first, so what the tile shows never jumps; the new imagery fades in next.
           keep(texture);
           keep(this.toTexture[slot] ?? 0);
@@ -72,12 +76,12 @@ export class ImageryFades {
           for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = this.toTransform[slot * 4 + c] ?? 0;
           this.store(slot, layer, i);
           // Without a duration (a frame that shows a change at once, F243) no fade starts.
-          this.startMs[slot] = durationMs > 0 ? nowMs : -Infinity;
+          this.startMs[slot] = fadeMs > 0 ? nowMs : -Infinity;
         }
       }
       this.stamps[slot] = this.frame;
       const elapsed = nowMs - (this.startMs[slot] ?? 0);
-      const t = durationMs > 0 && elapsed < durationMs ? Math.max(0, elapsed / durationMs) : 1;
+      const t = fadeMs > 0 && elapsed < fadeMs ? Math.max(0, elapsed / fadeMs) : 1;
       layer.fades[i] = t;
       if (t < 1) {
         this.fading = true;

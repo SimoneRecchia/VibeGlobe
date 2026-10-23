@@ -1,8 +1,10 @@
+import { CreditsElement } from './credits-element.js';
 import type { RenderHost } from '@vibeglobe/core';
 
 /** Browser services for the engine: frames, size and pixel-ratio changes, page visibility (architecture §2). */
 export function createBrowserHost(container: HTMLElement): RenderHost {
   const view = container.ownerDocument.defaultView ?? window;
+  const credits = new CreditsElement(container);
   /** Matches while the pixel ratio is the one the canvas was last sized for. */
   let ratioQuery: MediaQueryList | undefined;
   let onRatioChange: (() => void) | undefined;
@@ -57,6 +59,7 @@ export function createBrowserHost(container: HTMLElement): RenderHost {
     },
     observeReducedMotion: (callback) => observeReducedMotion(view, callback),
     setOpacity: (opacity) => setCanvasOpacity(container, opacity),
+    showCredits: (list) => credits.show(list),
     observeVisibility(callback) {
       const document = container.ownerDocument;
       const onChange = (): void => callback(document.visibilityState === 'visible');

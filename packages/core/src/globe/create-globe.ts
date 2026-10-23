@@ -12,6 +12,7 @@ import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
 import { ControlsSlot } from './controls-slot.js';
 import { imageryLayersOf } from './imagery-layers.js';
 import type { ImageryLayers } from '../imagery/imagery-stack.js';
+import type { Credit } from '../imagery/credits.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
@@ -172,6 +173,10 @@ class GlobeEngine implements Globe {
   readonly setViewMode: Globe['setViewMode'] = (mode) => this.assertAlive() ?? this.viewControl.setMode(mode);
   readonly setViewCurves: Globe['setViewCurves'] = (curves) => this.assertAlive() ?? this.viewControl.setCurves(curves);
 
+  credits(): readonly Credit[] {
+    return this.surfaceFrame.imagery?.credits.list() ?? [];
+  }
+
   get imageryLayers(): ImageryLayers {
     return imageryLayersOf(this.surfaceFrame);
   }
@@ -217,6 +222,8 @@ class GlobeEngine implements Globe {
     this.surfaceFrame.startImagery(this.options, renderer, {
       requestFrame: () => this.destroyed || this.requestRender(),
       tileError: (event) => this.emitter.emit('tile-error', event),
+      creditsChange: (credits) => this.emitter.emit('credits-change', { credits }),
+      ...(this.options.hiddenCredits ? { hiddenCredits: this.options.hiddenCredits } : {}),
     });
     // After the terrain starts: its errors set the skirt depths.
     this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);

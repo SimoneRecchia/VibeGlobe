@@ -1,6 +1,7 @@
 import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
 import type { LayerRenderTarget } from '../layers/layer-target.js';
 import type { ImageryLayerInput, ImageryLayers } from '../imagery/imagery-stack.js';
+import type { Credit } from '../imagery/credits.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
@@ -166,6 +167,11 @@ export interface RenderHost {
   observeReducedMotion?(callback: (reduce: boolean) => void): () => void;
   /** Optional: shows the drawn view at `opacity` (0 to 1), for a reduced-motion flight's fade (F214). */
   setOpacity?(opacity: number): void;
+  /**
+   * Optional: shows the credits of the sources in view in a minimal attribution element of the container, required
+   * ones always visible (F255); an empty list hides it.
+   */
+  showCredits?(credits: readonly Credit[]): void;
 }
 
 /** Callbacks a renderer uses to report device events to the engine. */
@@ -399,6 +405,11 @@ export interface GlobeOptions {
    */
   readonly imagery?: readonly ImageryLayerInput[];
   /**
+   * Ids of sources whose credits the attribution element and `Globe.credits()` leave out (F255). A credit the
+   * source's provider requires stays, and a warning names the source.
+   */
+  readonly hiddenCredits?: readonly string[];
+  /**
    * A terrain source (M4): the surface is displaced to its heights, decoded in workers; without one the surface is
    * the WGS84 ellipsoid. Where the source has no data the surface stays on the ellipsoid (ADR 0027).
    */
@@ -498,6 +509,8 @@ export interface GlobeEvents {
   'backend-fallback': { readonly reason: string };
   /** An imagery tile failed for good; its area keeps showing an ancestor (F112). */
   'tile-error': TileErrorEvent;
+  /** The credits of the sources in view changed (F254): the new list, as {@link Globe.credits} returns it. */
+  'credits-change': { readonly credits: readonly Credit[] };
   /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
   'view-mode-change': { readonly mode: ViewMode };
   /** A camera movement began (F200, ADR 0036). */
@@ -767,6 +780,8 @@ export interface Globe {
    * renderer has started (after `ready`) or when it draws no layers.
    */
   layerTarget(): LayerRenderTarget | undefined;
+  /** The credits of the imagery and terrain sources the last frame showed, deduplicated, required ones first (F254). */
+  credits(): readonly Credit[];
   /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
   readonly imageryLayers: ImageryLayers;
   /**

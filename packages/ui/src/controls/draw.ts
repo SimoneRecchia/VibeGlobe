@@ -142,7 +142,10 @@ export class DrawControl implements UiControl {
   }
 
   async #attach(context: ControlContext): Promise<void> {
-    const [layers, module] = await Promise.all([context.layers(), import('@vibeglobe/layers')]);
+    const [layers, module] = await Promise.all([
+      context.layers(() => import('@vibeglobe/layers')),
+      import('@vibeglobe/layers'),
+    ]);
     if (this.#context === undefined || this.#cursor === undefined) return;
     this.tool.attach(new DrawLayers(layers, module, this.#prefix));
     this.#input = new DrawInput(context.globe, context.container, this.tool, this.#cursor, (p) => this.#announce(p));

@@ -53,3 +53,10 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 
 - **Right-to-left and complex scripts in labels:** the shaper lays glyphs out left to right from their advances (ADR 0041). Arabic, Hebrew and Indic scripts need bidi reordering and contextual shaping (MapLibre loads an RTL plugin for this; HarfBuzz in WebAssembly is the complete option).
 - **Balanced line breaking:** labels break greedily at `text-max-width`; MapLibre balances line lengths, which looks better for two-line place names.
+
+## A. UI, GIS and framework adapters track
+
+- **Minimap footprint near the horizon:** when any edge of the main view shows sky, the minimap outlines the whole visible cap (the horizon circle). A tilted view up to the horizon could instead combine the ground part of its edges with the horizon arc.
+- **One attribution list:** until the engine can leave its attribution to an application control (track A hook request 1), the UI's `AttributionControl` repeats the engine's element; once it lands, the control should become the only list.
+- **UI bundle budget:** `@vibeglobe/ui` is at 24.4 of its 25 KB gzip budget; further controls could move to entry points of their own (`@vibeglobe/ui/draw`, `@vibeglobe/ui/tools`) so applications load only what they add.
+- **Drawing on touch screens:** vertex handles are hit within 12 CSS pixels; the reference tablet (owner question 2) may call for a larger touch radius and for a long-press to delete a vertex.

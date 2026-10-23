@@ -4,6 +4,9 @@
  */
 import type { Globe } from '@vibeglobe/core';
 import type { GlobeLayers } from '@vibeglobe/layers';
+
+/** The `@vibeglobe/layers` module, as a dynamic import resolves it. */
+type LayersModule = typeof import('@vibeglobe/layers');
 import { Translator } from './i18n/translator.js';
 import { installStyles, styleRootOf, uninstallStyles } from './theme/install.js';
 import type { ThemeName } from './theme/styles.js';
@@ -22,9 +25,10 @@ export interface ControlContext {
   /**
    * The data layers the controls draw with (geolocation, drawing and measurement): the application's, passed in
    * {@link UiOptions.layers}, else one stack the UI creates on first use (`@vibeglobe/layers` is loaded only then).
-   * Resolves after `globe.ready`.
+   * Resolves after `globe.ready`. `load` imports `@vibeglobe/layers` (`() => import('@vibeglobe/layers')`): the
+   * control that draws loads the package, so a UI without such controls never bundles it.
    */
-  layers(): Promise<GlobeLayers>;
+  layers(load: () => Promise<LayersModule>): Promise<GlobeLayers>;
 }
 
 /**
@@ -151,9 +155,9 @@ class UiLayer implements Ui {
       container,
       i18n: this.i18n,
       reducedMotion: () => motionQuery?.matches === true,
-      layers: () =>
+      layers: (load) =>
         (this.#layers ??= globe.ready.then(async () => {
-          const { createGlobeLayers } = await import('@vibeglobe/layers');
+          const { createGlobeLayers } = await load();
           if (this.#destroyed) throw new Error('The UI was destroyed');
           this.#ownLayers = createGlobeLayers(globe, { element: container });
           return this.#ownLayers;

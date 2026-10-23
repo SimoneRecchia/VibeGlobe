@@ -6451,7 +6451,7 @@
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
         "Assert the guide never names Cube-specific code or configuration as a requirement"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F490",

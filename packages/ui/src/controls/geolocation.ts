@@ -141,7 +141,10 @@ export class GeolocationControl implements UiControl {
     if (this.#marker !== undefined) return this.#marker;
     const context = this.#context;
     if (context === undefined) return undefined;
-    const [layers, { circleLayer, pointLayer }] = await Promise.all([context.layers(), import('@vibeglobe/layers')]);
+    const [layers, { circleLayer, pointLayer }] = await Promise.all([
+      context.layers(() => import('@vibeglobe/layers')),
+      import('@vibeglobe/layers'),
+    ]);
     if (this.#marker !== undefined || !this.active) return this.#marker;
     const circle = layers.stack.add(
       circleLayer({
@@ -168,10 +171,12 @@ export class GeolocationControl implements UiControl {
     const marker = this.#marker;
     this.#marker = undefined;
     if (marker === undefined || this.#context === undefined) return;
-    void this.#context.layers().then((layers) => {
-      layers.stack.remove(marker.point);
-      layers.stack.remove(marker.circle);
-    });
+    void this.#context
+      .layers(() => import('@vibeglobe/layers'))
+      .then((layers) => {
+        layers.stack.remove(marker.point);
+        layers.stack.remove(marker.circle);
+      });
   }
 
   #setState(state: Status): void {

@@ -362,6 +362,38 @@ Passing: F473, F477–F484, F486, F487.
 | F555  | Network modes and offline packages (F271, F292, M8) and attribution (F254) for the guide's sections, and publishing to npm (owner question 17 in `docs/open-questions.md`) for "installation from the public npm registry". |
 | F490  | The entries above; M14's acceptance belongs to the main session.                                                                                                                                                            |
 
+## A. UI, GIS and framework adapters track: status
+
+Session of 2026-10-23 on branch `claude/confident-ride-i2h6il`, pull request SimoneRecchia/VibeGlobe#21 (not merged by
+the session). Owns `packages/ui`, `packages/gis`, `packages/vue`, `packages/web-component` and `apps/nuxt-example`
+(and, for their examples, `apps/adapter-examples`); decisions in ADR 0101.
+
+**Stubs replaced** (the tables of the UI and GIS utilities track and the framework adapters track above are history):
+the view state reads and restores the engine's `ViewMode` with the chosen and applied tilt and heading (`viewStateOf`
+in `@vibeglobe/gis`, `applyViewState` in `@vibeglobe/ui`; format version 2, version 1 still read); the readout's
+elevation comes from `Globe.screenToGeo` and `Globe.elevationAt`; the search box uses the engine's `Geocoder` and
+`flyTo` (already); `useViewMode()` follows `view-mode-change`; the Vue component and the element take a view mode and
+connect their navigation controls (the M6 input track's hook 5 for these two packages). The zoom control's limits stay
+learned from the engine until hook request 3 below lands.
+
+**Built:** controls for the 2D / 3D / Auto toggle, tilt, reset to globe and home, scale bar, attribution, layer
+switcher, geolocation, bookmarks, screenshot, minimap, drawing (points, lines, polygons, editing) and measurement;
+`addAllControls`; one shared data-layer stack per UI; the stylesheet in each document or shadow root; the Vue props
+`viewMode`, `layers`, `offline` and `networkMode`, the child components `VibeDataLayer`, `VibeMarker` and
+`VibeControl`; the element's `ui`, `theme` and `lang` attributes and its `ui` part; the Nuxt example's page per feature
+group with browser checks; the integration guide (`docs/guides/integration.md`).
+
+Passing: F407, F408, F409, F411, F412, F413, F414, F415, F417, F424, F426, F434, F436, F437, F475, F485. Pending (the
+reference tablet only, `docs/open-questions.md`): F406, F410, F421, F422, F423, F425; pending publishing to npm (owner
+question 17): F555, whose guide a fresh-context agent followed with packed packages.
+
+| Entry | Blocker                                                                                                                                                                                                                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F416  | Hook request 4 (a capture of the view at a chosen size, rendered off screen): 4096 × 4096 exports and exports on WebGPU without stutter; canvas-size and scaled exports with credits work                                                                                                       |
+| F474  | Quality presets (F399, M11) for the `qualityPreset` prop; camera, view mode, layers and network mode update the running engine in place (`e2e/vue-live.spec.ts`)                                                                                                                                |
+| F476  | Hook request 2 (imagery layers added and removed at runtime) for source components; data layer, marker and control components pass (`e2e/vue-live.spec.ts`)                                                                                                                                     |
+| F488  | Every feature group of PLAN.md must run in full on the client: the pages and their checks exist and pass for what the engine has (`e2e/nuxt-features.spec.ts`); the groups' missing engine features (quality presets F399, vector tiles and 3D Tiles M13, the remaining M7, M8 and M10 entries) |
+
 ## M6 input track: status
 
 The eighth session (owner, 2026-10-22 evening) works on branch `claude/modest-wozniak-067cfl`, pull requests into

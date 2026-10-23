@@ -44,7 +44,7 @@ export function viewFootprint(
 }
 
 /** Points of the eye's horizon on the ellipsoid: the edge of the area the eye can see. */
-export function horizonCircle(camera: CameraState, samples = 48): GeoPosition[] {
+function horizonCircle(camera: CameraState, samples = 48): GeoPosition[] {
   const radius = WGS84.semiMajorAxisMeters;
   const altitude = Math.max(1, camera.altitudeMeters);
   const distanceMeters = radius * Math.acos(radius / (radius + altitude));

@@ -8,7 +8,8 @@ test('with reduced motion a flight fades to its target in 300 ms, and the settin
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openGlobe(page, 'backend=webgl2&lon=9.19&lat=45.46&zoom=12');
+  // A manual clock: the flights advance by frames, so a slow software renderer still draws every step of the path.
+  await openGlobe(page, 'backend=webgl2&lon=9.19&lat=45.46&zoom=12&clockStepMs=16.666666666666668');
   expect(await page.evaluate(() => window.vibeglobePlayground?.globe.reducedMotion)).toBe(true);
   const flight = await page.evaluate(async () => {
     const globe = window.vibeglobePlayground?.globe;

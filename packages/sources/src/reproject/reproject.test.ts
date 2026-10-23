@@ -171,6 +171,16 @@ describe('edges of warped tiles (F226)', () => {
     expect([...rgba]).toEqual([200, 100, 50, 255, 200, 100, 50, 0, 200, 100, 50, 0, 0, 0, 0, 0]);
   });
 
+  it("replaces the badly quantized color of antialiased edge pixels with their opaque neighbors' color", () => {
+    const rgba = new Uint8Array([200, 100, 50, 255, 0, 255, 255, 3, 10, 20, 30, 128, 12, 22, 32, 128]);
+    bleedTransparentEdges(rgba, 2, 2);
+    // Both translucent pixels touch the opaque one; with no opaque neighbor a translucent color would stay.
+    expect([...rgba]).toEqual([200, 100, 50, 255, 200, 100, 50, 3, 200, 100, 50, 128, 200, 100, 50, 128]);
+    const layer = new Uint8Array([10, 20, 30, 128, 12, 22, 32, 128]);
+    bleedTransparentEdges(layer, 2, 1);
+    expect([...layer]).toEqual([10, 20, 30, 128, 12, 22, 32, 128]);
+  });
+
   it('encodes straight RGBA as PNG, color under zero alpha included', async () => {
     const rgba = new Uint8Array([200, 100, 50, 255, 200, 100, 50, 0, 1, 2, 3, 128, 9, 8, 7, 0]);
     const decoded = PNG.sync.read(Buffer.from(await encodeRgbaPng(rgba, 2, 2)));

@@ -27,6 +27,14 @@ export interface LoggedRequest {
   source?: string;
   /** The request's Accept header (F128). */
   accept?: string;
+  /** The query string, `?` included (F253). */
+  query?: string;
+  /** The request's Authorization header (F252). */
+  authorization?: string;
+  /** Whether the request carried cookies (F251). */
+  cookie?: boolean;
+  /** The request's Sec-Fetch-Mode (F251). */
+  fetchMode?: string;
 }
 
 /** The fixture server's log of a session's requests. */

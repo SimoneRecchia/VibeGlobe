@@ -1,6 +1,6 @@
 // Fixture imagery layers of the playground beyond `?imagery=`: overlays (F243–F246) and the fixture credits (F254, F255).
 import type { ImageryBlend, ImageryLayerOptions, ImagerySource, TileRectangleRad } from '@vibeglobe/core';
-import { xyzImagery, type XyzImageryOptions } from '@vibeglobe/sources';
+import { fetchTransport, xyzImagery, type FetchTransportExtras, type XyzImageryOptions } from '@vibeglobe/sources';
 
 /** A small logo for required credits (F255). */
 const CREDIT_LOGO =
@@ -44,11 +44,15 @@ export function overlayLayers(
 ): ImageryLayerOptions[] {
   const spec = params.get('overlays');
   if (!spec) return [];
-  return spec.split(',').map((item) => {
+  // `?overlayHosts=<base>,…` serves each overlay from another base URL, such as another origin (F251, F252).
+  const hosts = (params.get('overlayHosts') ?? '').split(',');
+  return spec.split(',').map((item, index) => {
     const [pattern = 'tiles', opacity = '1', blend = 'normal'] = item.split(':');
+    const host = hosts[index] || base;
     const source = xyzImagery({
       id: `overlay-${pattern}`,
-      url: `${base}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
+      url: `${host}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
+      ...overlayTransport(params, host, pattern),
       tiling,
       minLevel: 0,
       maxLevel: 18,
@@ -58,6 +62,35 @@ export function overlayLayers(
     });
     return { sources: [source], opacity: Number(opacity), blend: blend as ImageryBlend };
   });
+}
+
+/**
+ * The overlays' transport security options (F251–F253): `?overlayAuth=1` sends `Authorization: Bearer <pattern>-<n>`
+ * to the overlay's own origin only, `n` counting renewals; `?overlayCredentials=` sets the fetch credentials mode;
+ * `?overlayKey=` adds a `key` query parameter at fetch time only.
+ */
+function overlayTransport(
+  params: URLSearchParams,
+  host: string,
+  pattern: string,
+): Pick<XyzImageryOptions, 'transport'> {
+  const key = params.get('overlayKey');
+  const mode = params.get('overlayCredentials');
+  let renewals = 1;
+  const extras: FetchTransportExtras = {
+    ...(params.get('overlayAuth') === '1'
+      ? {
+          auth: {
+            origins: [new URL(host, location.href).origin],
+            headers: () => ({ Authorization: `Bearer ${pattern}-${String(renewals)}` }),
+            refresh: () => Promise.resolve(void renewals++),
+          },
+        }
+      : {}),
+    ...(key ? { secretQuery: () => ({ key }) } : {}),
+    ...(mode === 'include' || mode === 'omit' || mode === 'same-origin' ? { credentials: mode } : {}),
+  };
+  return Object.keys(extras).length > 0 ? { transport: fetchTransport(undefined, undefined, extras) } : {};
 }
 
 /**

@@ -1,13 +1,16 @@
 /**
  * Edge bleeding and PNG output of warped tiles (F226). Textures are filtered with straight (not premultiplied) alpha,
  * so a transparent texel's color leaks into its visible neighbors when sampled between them: a canvas leaves
- * transparent pixels black, which draws a dark line along every data edge. Giving transparent pixels the color of
- * their visible neighbors removes it; a canvas cannot keep color at zero alpha, so the tile is encoded as PNG here.
+ * transparent pixels black, which draws a dark line along every data edge, and the antialiased edge pixels' colors
+ * come back from the canvas's premultiplied storage badly quantized (a stray color spot where two zones overlap).
+ * Giving those pixels the color of their opaque neighbors removes both; a canvas cannot keep color at zero alpha, so
+ * the tile is encoded as PNG here.
  */
 
 /**
- * Gives each fully transparent pixel next to a visible one the alpha-weighted mean color of its visible 8-neighbors,
- * `passes` times (each pass reaches one pixel further, covering the coarser mip levels). Alpha stays unchanged.
+ * Gives each pixel that is not opaque, next to an opaque one, the alpha-weighted mean color of its opaque 8-neighbors,
+ * `passes` times (each pass reaches one pixel further, covering the coarser mip levels). Alpha stays unchanged, and
+ * translucent pixels away from opaque ones (a uniformly translucent layer) keep their color.
  */
 export function bleedTransparentEdges(
   rgba: Uint8Array | Uint8ClampedArray,
@@ -15,9 +18,9 @@ export function bleedTransparentEdges(
   heightPx: number,
   passes = 4,
 ): void {
-  // Pixels holding color: visible ones, then those filled by earlier passes.
+  // Pixels holding a reliable color: opaque ones, then those filled by earlier passes.
   const colored = new Uint8Array(widthPx * heightPx);
-  for (let p = 0; p < colored.length; p++) colored[p] = (rgba[p * 4 + 3] ?? 0) > 0 ? 1 : 0;
+  for (let p = 0; p < colored.length; p++) colored[p] = rgba[p * 4 + 3] === 255 ? 1 : 0;
   const filled: number[] = [];
   for (let pass = 0; pass < passes; pass++) {
     filled.length = 0;
@@ -33,7 +36,7 @@ export function bleedTransparentEdges(
             if (nx < 0 || ny < 0 || nx >= widthPx || ny >= heightPx) continue;
             const q = ny * widthPx + nx;
             if (!colored[q]) continue;
-            // Earlier passes' pixels have zero alpha: weight them as barely visible.
+            // Earlier passes' pixels may have zero alpha: weight them as barely visible.
             const w = Math.max(1, rgba[q * 4 + 3] ?? 0);
             r += (rgba[q * 4] ?? 0) * w;
             g += (rgba[q * 4 + 1] ?? 0) * w;

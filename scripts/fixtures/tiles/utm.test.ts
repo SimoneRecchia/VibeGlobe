@@ -17,7 +17,7 @@ describe('UTM fixture imagery (F226)', () => {
   });
 
   it('centres a magenta marker on the pixel where a degree crossing projects', () => {
-    const [cx, cy] = utmForward(12, 43, 33);
+    const [cx, cy] = utmForward(12, 42, 33);
     const request = parseUtmRequest(
       new URLSearchParams(`crs=EPSG:32633&bbox=${cx - 3000},${cy - 2000},${cx + 3000},${cy + 2000}&width=60&height=40`),
     );

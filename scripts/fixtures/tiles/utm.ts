@@ -1,6 +1,7 @@
 // Fixture imagery in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) for client-side reprojection (F226, F227): a
 // WMS 1.3.0-style GetMap answer rendering the `world` color field of each pixel's WGS84 position, with magenta ground
-// control markers centred on every whole degree of longitude and latitude. The transverse Mercator projection is
+// control markers centred on every third whole degree of longitude and latitude (far enough apart to tell at globe
+// zooms). The transverse Mercator projection is
 // Krüger's series to sixth order in n (C. F. F. Karney, "Transverse Mercator with an accuracy of a few nanometers",
 // 2011), written here from the published formulas.
 import { PNG } from 'pngjs';
@@ -88,6 +89,9 @@ export interface UtmImageRequest {
   heightPx: number;
 }
 
+/** The spacing of the markers, degrees: on every multiple of 3° of longitude and latitude. */
+export const MARKER_STEP_DEG = 3;
+
 /** The marker color and size: pure magenta squares of 9 × 9 pixels. */
 export const MARKER_RGB: readonly [number, number, number] = [255, 0, 255];
 export const MARKER_SIZE_PX = 9;
@@ -144,8 +148,8 @@ export function renderUtmImage(request: UtmImageRequest): Uint8Array {
       ];
     }
   }
-  for (let lon = Math.ceil(west); lon <= Math.floor(east); lon++) {
-    for (let lat = Math.ceil(south); lat <= Math.floor(north); lat++) {
+  for (let lon = MARKER_STEP_DEG * Math.ceil(west / MARKER_STEP_DEG); lon <= east; lon += MARKER_STEP_DEG) {
+    for (let lat = MARKER_STEP_DEG * Math.ceil(south / MARKER_STEP_DEG); lat <= north; lat += MARKER_STEP_DEG) {
       const [x, y] = utmForward(lon, lat, zone);
       const px = ((x - minX) / (maxX - minX)) * w;
       const py = ((maxY - y) / (maxY - minY)) * h;

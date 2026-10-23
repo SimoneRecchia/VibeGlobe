@@ -52,6 +52,10 @@ export interface FaultRule {
   gzip?: boolean;
   /** Send the body gzip-compressed without `Content-Encoding`, as `.terrain` files often are (F127). */
   gzipBody?: boolean;
+  /** Answer without CORS headers, so a page of another origin cannot read the tiles (F251). */
+  noCors?: boolean;
+  /** Answer 401 unless the request's Authorization header is exactly this (F252). */
+  requireAuthorization?: string;
 }
 
 /** One request as the server saw it. */
@@ -72,6 +76,14 @@ export interface RequestRecord {
   host?: string;
   /** The connection (HTTP/1.1 socket or HTTP/2 session) the request came on, numbered per server. */
   connection?: number;
+  /** The query string, `?` included, when the request had one (F253). */
+  query?: string;
+  /** The request's Authorization header (F252). */
+  authorization?: string;
+  /** Whether the request carried cookies (the fetch credentials mode, F251). */
+  cookie?: boolean;
+  /** The request's Sec-Fetch-Mode (`cors`, `no-cors`, …): tells a CORS probe from the request it checks (F251). */
+  fetchMode?: string;
 }
 
 interface Session {
@@ -153,6 +165,11 @@ export class FixtureServer {
   private readonly sessions = new Map<string, Session>();
   private readonly cache = new Map<string, Buffer>();
   private readonly connections = new Map<object, number>();
+  /**
+   * The CORS answer of a tile response: the requesting origin, echoed so that requests with credentials are allowed
+   * too (F251); undefined for a `noCors` rule, which answers without CORS headers. Absent: any origin (`*`).
+   */
+  private readonly cors = new WeakMap<ServerResponse, string | undefined>();
 
   private readonly now: () => number;
 
@@ -198,7 +215,7 @@ export class FixtureServer {
       return;
     }
     const match = TILE_PATH.exec(url.pathname);
-    if (match) this.tile(url.pathname, match, req, res);
+    if (match) this.tile(url.pathname, url.search, match, req, res);
     else next();
   };
 
@@ -258,7 +275,7 @@ export class FixtureServer {
     }
   }
 
-  private tile(path: string, match: RegExpExecArray, req: IncomingMessage, res: ServerResponse): void {
+  private tile(path: string, query: string, match: RegExpExecArray, req: IncomingMessage, res: ServerResponse): void {
     const [, id = '', source = '', scheme = '', z = '0', x = '0', y = '0', extension = 'png'] = match;
     const entry = this.session(id);
     const tile: FixtureTile = {
@@ -268,18 +285,7 @@ export class FixtureServer {
       x: Number(x),
       y: Number(y),
     };
-    const host = req.headers.host ?? String(req.headers[':authority'] ?? '');
-    const record: RequestRecord = {
-      path,
-      source,
-      level: tile.level,
-      x: tile.x,
-      y: tile.y,
-      startMs: this.now(),
-      host,
-      connection: this.connectionOf(req),
-      ...(req.headers.accept ? { accept: req.headers.accept } : {}),
-    };
+    const record = this.recordOf(path, query, source, tile, req);
     entry.log.push(record);
     res.on('close', () => {
       if (record.endMs !== undefined) return;
@@ -296,12 +302,17 @@ export class FixtureServer {
     }
     const ruleIndex = entry.rules.findIndex((rule) => matches(rule, source, tile));
     const rule = entry.rules[ruleIndex];
+    this.cors.set(res, rule?.noCors ? undefined : req.headers.origin);
     const respond = async (): Promise<void> => {
       if (res.destroyed || rule?.hang) return;
       const hits = (entry.hits[ruleIndex] ?? 0) + 1;
       if (rule) entry.hits[ruleIndex] = hits;
       const headers: Record<string, string> = {};
       if (rule?.retryAfterS !== undefined) headers['Retry-After'] = String(rule.retryAfterS);
+      if (rule?.requireAuthorization !== undefined && req.headers.authorization !== rule.requireAuthorization) {
+        this.finish(record, res, 401, headers, Buffer.alloc(0));
+        return;
+      }
       if (rule?.status !== undefined && (rule.failTimes === undefined || hits <= rule.failTimes)) {
         this.finish(record, res, rule.status, headers, Buffer.alloc(0));
         return;
@@ -318,6 +329,32 @@ export class FixtureServer {
     };
     if (rule?.latencyMs) setTimeout(() => void respond(), rule.latencyMs);
     else void respond();
+  }
+
+  /** The log record of a tile request, with the headers the tests inspect. */
+  private recordOf(
+    path: string,
+    query: string,
+    source: string,
+    tile: FixtureTile,
+    req: IncomingMessage,
+  ): RequestRecord {
+    const host = req.headers.host ?? String(req.headers[':authority'] ?? '');
+    return {
+      path,
+      source,
+      level: tile.level,
+      x: tile.x,
+      y: tile.y,
+      startMs: this.now(),
+      host,
+      connection: this.connectionOf(req),
+      ...(req.headers.accept ? { accept: req.headers.accept } : {}),
+      ...(query ? { query } : {}),
+      ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
+      cookie: req.headers.cookie !== undefined,
+      ...(typeof req.headers['sec-fetch-mode'] === 'string' ? { fetchMode: req.headers['sec-fetch-mode'] } : {}),
+    };
   }
 
   /** A GetMap image of the UTM fixture (F226), logged like a tile with level, column and row 0. */
@@ -390,9 +427,16 @@ export class FixtureServer {
   ): void {
     record.status = status;
     record.bytes = body.length;
+    const origin = this.cors.has(res) ? this.cors.get(res) : '*';
+    if (origin === undefined) res.removeHeader('Access-Control-Allow-Origin');
     res.writeHead(status, {
       ...headers,
-      'Access-Control-Allow-Origin': '*',
+      ...(origin === undefined
+        ? {}
+        : {
+            'Access-Control-Allow-Origin': origin,
+            ...(origin === '*' ? {} : { 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' }),
+          }),
       'Timing-Allow-Origin': '*',
       'Cache-Control': 'no-store',
       'Content-Length': String(body.length),

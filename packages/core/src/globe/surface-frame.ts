@@ -116,6 +116,7 @@ export class SurfaceFrame {
       callbacks.sourceError?.(new GlobeError('invalid-option', message));
     });
     if ((entries.length === 0 && !terrain) || !workers) return;
+    const blockedByCors = new Set<string>();
     const imagery = new ImageryRuntime(
       entries,
       workers,
@@ -126,7 +127,12 @@ export class SurfaceFrame {
         ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
-          logger.log('warn', tileErrorMessage(event));
+          // A source without CORS headers fails every tile the same way: one error names it (F251).
+          if (event.reason !== 'cors') logger.log('warn', tileErrorMessage(event));
+          else if (!blockedByCors.has(event.sourceId)) {
+            blockedByCors.add(event.sourceId);
+            logger.log('error', tileErrorMessage(event));
+          }
           callbacks.tileError(event);
         },
       },
@@ -345,6 +351,6 @@ export class SurfaceFrame {
 function tileErrorMessage(event: TileErrorEvent): string {
   const tile = `${event.sourceId}: tile ${event.level}/${event.x}/${event.y}`;
   return event.reason === 'cors'
-    ? `${tile} is blocked by CORS: its server answers without Access-Control-Allow-Origin, so the browser cannot use it as a texture`
+    ? `${event.sourceId}: tiles are blocked by CORS: the server answers without Access-Control-Allow-Origin, so the browser cannot use them as textures; the source's tiles count as unavailable (first: tile ${event.level}/${event.x}/${event.y})`
     : `${tile} ${event.reason}`;
 }

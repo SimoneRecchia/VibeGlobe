@@ -31,6 +31,8 @@ export interface FetchTransportExtras {
    * engine, its logs, traces and the debug overlay never see them (F253).
    */
   readonly secretQuery?: () => Readonly<Record<string, string>>;
+  /** The fetch credentials mode (cookies and HTTP authentication) of the source's requests (F251); `omit` by default. */
+  readonly credentials?: RequestCredentials;
 }
 
 /** Names of query parameters whose values are secrets (keys, tokens, signatures, session ids). */
@@ -92,7 +94,7 @@ export function fetchTransport(
         const response = await fetchImpl(url, {
           signal: controller.signal,
           mode: 'cors',
-          credentials: 'omit',
+          credentials: extras.credentials ?? 'omit',
           ...(merged ? { headers: merged } : {}),
         });
         clearTimeout(firstByte);

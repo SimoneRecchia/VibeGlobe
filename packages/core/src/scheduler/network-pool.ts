@@ -12,6 +12,7 @@
  * its slot exactly once, in {@link NetworkPool} itself: consumers never touch the counters.
  */
 import { FAILURE_ABORTED, FAILURE_TRANSIENT, classifyTransportResult, isRateLimited } from './failure-policy.js';
+import { rateRing, rateWaitMs, recordStart, type RateRing } from './rate-ring.js';
 import type { AbortHandle, TileRequest, TileTransport, TimeoutsMs, TransportResult } from './types.js';
 
 /** Coalescing key of a request: source registration, tile key and variant, as a string or an exact number. */
@@ -110,9 +111,8 @@ interface Host {
   inFlight: number;
   consecutiveTransient: number;
   responsesSinceThrottle: number;
-  /** Start times of the last `maxRequestsPerSecond` requests, a ring (empty without a rate limit, F222). */
-  starts: number[];
-  nextStart: number;
+  /** The host's own rate limit (a provider cap on the whole host), or undefined. */
+  rate: RateRing | undefined;
 }
 
 interface Flight {
@@ -150,6 +150,7 @@ export class NetworkPool {
   private readonly queueTask: (callback: () => void) => void;
   private readonly hosts: Host[] = [];
   private readonly hostIndices = new Map<string, number>();
+  private readonly rates: RateRing[] = [];
   private readonly flights = new Map<RequestKey, Flight>();
   private readonly consumerFlights = new Map<number, Flight>();
   private readonly clients: NetworkPoolClient[] = [];
@@ -179,7 +180,7 @@ export class NetworkPool {
     if (known !== undefined) {
       const host = this.hosts[known] as Host;
       if (limit < host.baseLimit) this.setHostLimit(known, limit);
-      if (rate !== undefined && (host.starts.length === 0 || rate < host.starts.length)) setRate(host, rate);
+      if (rate !== undefined && (host.rate === undefined || rate < host.rate.starts.length)) host.rate = rateRing(rate);
       return known;
     }
     const index = this.hosts.length;
@@ -190,10 +191,8 @@ export class NetworkPool {
       inFlight: 0,
       consecutiveTransient: 0,
       responsesSinceThrottle: 0,
-      starts: [],
-      nextStart: 0,
+      rate: rate === undefined ? undefined : rateRing(rate),
     });
-    if (rate !== undefined) setRate(this.hosts[index] as Host, rate);
     this.hostIndices.set(origin, index);
     return index;
   }
@@ -220,22 +219,33 @@ export class NetworkPool {
     return this.host(hostIndex).inFlight;
   }
 
-  /** True when a new request to the host would get a slot now. */
-  hasFreeSlot(hostIndex: number): boolean {
+  /**
+   * A rate group: requests started with its index, on any host, are held to `maxRequestsPerSecond` over any window of
+   * a second (a source's declared rate limit, F222), without slowing other requests to the same hosts (KB-109).
+   */
+  registerRate(maxRequestsPerSecond: number): number {
+    this.rates.push(rateRing(maxRequestsPerSecond));
+    return this.rates.length - 1;
+  }
+
+  /** True when a new request to the host, in rate group `rateIndex` (-1 for none), would get a slot now. */
+  hasFreeSlot(hostIndex: number, rateIndex = -1): boolean {
     const host = this.host(hostIndex);
     return (
-      this.counters.inFlight < this.maxInFlight && host.inFlight < this.hostLimit(hostIndex) && this.rateAllows(host)
+      this.counters.inFlight < this.maxInFlight &&
+      host.inFlight < this.hostLimit(hostIndex) &&
+      this.rateAllows(host.rate) &&
+      this.rateAllows(this.rates[rateIndex])
     );
   }
 
   /**
-   * True when a request to the host may start now under its rate limit: fewer than the limit started in the last
-   * second. Otherwise a refill is scheduled for when the oldest of them leaves the window (F222).
+   * True when a request may start now under a rate limit: fewer than the limit started in the last window. Otherwise
+   * a refill is scheduled for when the oldest of them leaves the window (F222).
    */
-  private rateAllows(host: Host): boolean {
-    if (host.starts.length === 0) return true;
-    const oldest = host.starts[host.nextStart] ?? -Infinity;
-    const waitMs = oldest + RATE_WINDOW_MS - this.options.now();
+  private rateAllows(ring: RateRing | undefined): boolean {
+    if (ring === undefined) return true;
+    const waitMs = rateWaitMs(ring, this.options.now());
     if (waitMs <= 0) return true;
     if (!this.rateTimerArmed) {
       this.rateTimerArmed = true;
@@ -266,7 +276,8 @@ export class NetworkPool {
    * Attaches a consumer to the request for `key`: to the one in flight if any (coalescing, no slot needed), otherwise
    * to a new transport request when the host and the pool have a free slot. Returns a consumer id for
    * {@link NetworkPool.release}, or {@link NO_SLOT} when nothing started; the caller then keeps the tile queued.
-   * The consumer may be called before this returns when the transport completes synchronously.
+   * The consumer may be called before this returns when the transport completes synchronously. `rateIndex` names the
+   * request's rate group ({@link registerRate}), -1 for none.
    */
   request(
     key: RequestKey,
@@ -274,6 +285,7 @@ export class NetworkPool {
     transport: TileTransport,
     consumer: RequestConsumer,
     timeouts: TimeoutsMs = this.defaultTimeouts,
+    rateIndex = -1,
   ): number {
     if (this.disposed) return NO_SLOT;
     const existing = this.flights.get(key);
@@ -282,7 +294,7 @@ export class NetworkPool {
       return this.attach(existing, consumer);
     }
     const host = this.host(tileRequest.hostIndex);
-    if (!this.hasFreeSlot(tileRequest.hostIndex)) return NO_SLOT;
+    if (!this.hasFreeSlot(tileRequest.hostIndex, rateIndex)) return NO_SLOT;
     const flight: Flight = {
       key,
       host,
@@ -298,10 +310,8 @@ export class NetworkPool {
     const id = this.attach(flight, consumer);
     this.flights.set(key, flight);
     host.inFlight++;
-    if (host.starts.length > 0) {
-      host.starts[host.nextStart] = this.options.now();
-      host.nextStart = (host.nextStart + 1) % host.starts.length;
-    }
+    recordStart(host.rate, this.options.now());
+    recordStart(this.rates[rateIndex], this.options.now());
     this.counters.inFlight++;
     this.counters.started++;
     flight.safetyTimer = this.options.setTimer(
@@ -521,18 +531,4 @@ function positiveInteger(value: number | undefined, fallback: number, name: stri
     throw new RangeError(`${name} must be a positive integer, got ${String(value)}.`);
   }
   return value;
-}
-
-/**
- * The window of a host's rate limit (F222): a second plus a margin, because requests reach the server with uneven
- * delays, and two starts just over a second apart here can arrive within the same second there.
- */
-const RATE_WINDOW_MS = 1150;
-
-/** Sets a host's rate limit: the ring of its last start times, empty for none. */
-function setRate(host: Host, maxRequestsPerSecond: number): void {
-  if (!(maxRequestsPerSecond >= 1))
-    throw new RangeError(`maxRequestsPerSecond must be at least 1, got ${String(maxRequestsPerSecond)}`);
-  host.starts = new Array<number>(Math.floor(maxRequestsPerSecond)).fill(-Infinity);
-  host.nextStart = 0;
 }

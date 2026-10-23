@@ -112,5 +112,7 @@ test('a source declaring 10 requests per second never gets more in any second, a
   expect(limited.length).toBeGreaterThan(30);
   for (const at of limited) expect(limited.filter((t) => t >= at && t < at + 1000).length).toBeLessThanOrEqual(10);
   // The other source is not held to the limit: it started more than 10 requests within some second.
-  expect(free.some((at) => free.filter((t) => t >= at && t < at + 1000).length > 10)).toBe(true);
+  const peak = (starts: number[]): number =>
+    Math.max(0, ...starts.map((at) => starts.filter((t) => t >= at && t < at + 1000).length));
+  expect(peak(free), `free source: ${free.length} requests, limited: ${limited.length}`).toBeGreaterThan(10);
 });

@@ -151,6 +151,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly removeClient: () => void;
   private readonly pinnedTotal: number;
   private readonly hostOptions: HostOptions;
+  /** The source's rate group in the network pool, -1 without a declared rate. */
+  private readonly rateIndex: number;
   private pinnedSettled = 0;
   private frame = 0;
   private requested = 0;
@@ -167,8 +169,9 @@ export class ImageryLoader implements NetworkPoolClient {
     this.hostOptions = {
       ...(maxRequestsPerHost === undefined ? {} : { maxInFlight: maxRequestsPerHost }),
       ...(multiplexed === undefined ? {} : { multiplexed }),
-      ...(maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond }),
     };
+    // The source's declared rate holds over all its hosts and leaves other sources on them alone (F222, KB-109).
+    this.rateIndex = maxRequestsPerSecond === undefined ? -1 : options.network.registerRate(maxRequestsPerSecond);
     this.uploads = new UploadQueue<PendingUpload>({ upload: (tile, measuredMs) => this.upload(tile, measuredMs) });
     this.removeClient = options.network.addClient(this);
   }
@@ -439,6 +442,7 @@ export class ImageryLoader implements NetworkPoolClient {
         this.options.source.transport,
         (outcome) => this.received(record, outcome),
         this.options.source.timeoutsMs,
+        this.rateIndex,
       );
       this.heap.pop();
       if (consumer === NO_SLOT) {

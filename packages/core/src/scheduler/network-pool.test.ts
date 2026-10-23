@@ -641,4 +641,32 @@ describe('NetworkPool rate limits (F222)', () => {
     // Three seconds at ten per second.
     expect(starts.length).toBeGreaterThanOrEqual(28);
   });
+
+  it("limits a source's requests on every host it uses, and another source on the same host is not slowed (KB-109)", () => {
+    const { pool, transport, time } = setup({ maxInFlight: 100 });
+    const hosts = [
+      pool.registerHost('https://a.example', { maxInFlight: 50 }),
+      pool.registerHost('https://b.example', { maxInFlight: 50 }),
+    ];
+    const rate = pool.registerRate(10);
+    const limited: number[] = [];
+    const free: number[] = [];
+    let key = 0;
+    for (let step = 0; step < 60; step++) {
+      for (let i = 0; i < 4; i++) {
+        const hostIndex = hosts[i % 2] ?? 0;
+        const request = { url: `l${String(key)}`, hostIndex };
+        if (pool.request(`l${String(key++)}`, request, transport, () => undefined, undefined, rate) !== NO_SLOT)
+          limited.push(time.nowMs);
+        const other = { url: `f${String(key)}`, hostIndex };
+        if (pool.request(`f${String(key++)}`, other, transport, () => undefined) !== NO_SLOT) free.push(time.nowMs);
+      }
+      for (const entry of transport.open) transport.respond(entry, ok(1));
+      time.advance(50);
+    }
+    for (const at of limited) expect(limited.filter((t) => t >= at && t < at + 1000).length).toBeLessThanOrEqual(10);
+    expect(limited.length).toBeGreaterThanOrEqual(28);
+    // The other source started every request it asked for: four per step.
+    expect(free).toHaveLength(240);
+  });
 });

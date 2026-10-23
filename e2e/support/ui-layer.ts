@@ -60,11 +60,19 @@ export async function openUi(page: Page, options: OpenUiOptions = {}): Promise<v
 }
 
 /** The camera's zoom and heading. */
-export async function cameraOf(page: Page): Promise<{ zoom: number; headingDeg: number; lon: number; lat: number }> {
+export async function cameraOf(
+  page: Page,
+): Promise<{ zoom: number; headingDeg: number; tiltDeg: number; lon: number; lat: number }> {
   return page.evaluate(() => {
     const camera = window.vibeglobePlayground?.globe.camera;
     if (camera === undefined) throw new Error('no globe');
-    return { zoom: camera.zoom, headingDeg: camera.headingDeg, lon: camera.longitudeDeg, lat: camera.latitudeDeg };
+    return {
+      zoom: camera.zoom,
+      headingDeg: camera.headingDeg,
+      tiltDeg: camera.tiltDeg,
+      lon: camera.longitudeDeg,
+      lat: camera.latitudeDeg,
+    };
   });
 }
 

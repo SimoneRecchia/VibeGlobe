@@ -328,16 +328,64 @@ async function showModels(globe: Globe): Promise<void> {
   });
 }
 
+/** `?scenario=data-sync`: one of each primitive over Rome, for the zoom from the globe to the street (F366). */
+function syncLayers(): DataLayer[] {
+  return [
+    new DataLayer('polygon', {
+      id: 'sync-polygon',
+      data: [feature('p', { type: 'Polygon', coordinates: [rectangle(12.49, 41.885, 12.5, 41.895)] })],
+      style: { 'fill-color': '#20c040', 'fill-opacity': 1 },
+    }),
+    new DataLayer('polyline', {
+      id: 'sync-line',
+      data: [
+        feature('l', {
+          type: 'LineString',
+          coordinates: [
+            [12.505, 41.885],
+            [12.505, 41.895],
+          ],
+        }),
+      ],
+      style: { 'line-color': '#2050ff', 'line-width': 6 },
+    }),
+    new DataLayer('point', {
+      id: 'sync-point',
+      data: [feature('pt', { type: 'Point', coordinates: [12.51, 41.89] })],
+      style: { 'circle-color': '#ff2020', 'circle-radius': 6 },
+    }),
+    new DataLayer('label', {
+      id: 'sync-label',
+      data: [feature('lb', { type: 'Point', coordinates: [12.495, 41.9] }, { t: 'Roma' })],
+      style: { 'text-field': ['get', 't'], 'text-size': 16, 'text-color': '#ffd000' },
+    }),
+  ];
+}
+
 export function showDataScenario(globe: Globe, name: string): void {
   const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
   const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   if (name === 'data-markers')
     for (const [image, source] of Object.entries(markerImages())) globe.layerTarget()?.addImage?.(image, source);
   const scene = DATA_SCENES[name];
-  const added = scene ? [scene()] : name === 'data-altitudes' ? altitudeLayers() : [];
+  const added = scene
+    ? [scene()]
+    : name === 'data-altitudes'
+      ? altitudeLayers()
+      : name === 'data-sync'
+        ? syncLayers()
+        : [];
   const layers = Object.fromEntries(added.map((layer) => [layer.id, stack.add(layer)]));
-  if (name === 'data-models') {
-    void showModels(globe).then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
+  if (name === 'data-models' || name === 'data-sync') {
+    const models =
+      name === 'data-models'
+        ? showModels(globe)
+        : globe.addModel({
+            url: `${import.meta.env.BASE_URL}models/pyramid.gltf`,
+            position: { longitudeDeg: 12.515, latitudeDeg: 41.89, heightMeters: 0 },
+            scale: 60,
+          });
+    void models.then(() => (window.vibeglobeLayers = { stack, layers, interaction }));
     return;
   }
   window.vibeglobeLayers = { stack, layers, interaction };

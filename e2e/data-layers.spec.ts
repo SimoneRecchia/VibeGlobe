@@ -568,3 +568,52 @@ for (const backend of BACKENDS) {
     await waitForIdle(page);
   });
 }
+
+for (const backend of BACKENDS) {
+  test(`layers stay on their positions through the morph and the tilt while zooming from the globe to the street on ${backend} (F366)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openGlobe(
+      page,
+      `backend=${backend}&scenario=data-sync&lon=12.5&lat=41.89&zoom=3&clockStepMs=16.666666666666668`,
+    );
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    const yellow = ([r, g, b]: Rgb): boolean => r > 200 && g > 170 && b < 90;
+    const redish = ([r, g, b]: Rgb): boolean => r > 90 && r > 2.5 * g && r > 2.5 * b;
+    // Auto mode: the globe flattens from ground zoom 4 to 6.5 and tilts in from 14 (ADR 0034).
+    for (const zoom of [6, 8, 10.5, 12, 13.5, 14.5, 15.5]) {
+      await page.evaluate(
+        (z) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 12.5, latitudeDeg: 41.89, zoom: z }),
+        zoom,
+      );
+      await page.waitForTimeout(400);
+      await waitForIdle(page);
+      const image = await canvasImage(page);
+      const camera = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
+      const label = `zoom ${zoom}, morph ${camera?.morphFactor.toFixed(2) ?? '?'}, tilt ${camera?.tiltDeg.toFixed(0) ?? '?'}`;
+      const [point, line, polygon, text] = await project(page, [
+        [12.51, 41.89],
+        [12.505, 41.89],
+        [12.495, 41.89],
+        [12.495, 41.9],
+      ]);
+      if (zoom < 10.5) {
+        // Within a few pixels of each other, the primitives overlap there (the label on top).
+        const drawn = (rgb: Rgb): boolean => isRed(rgb) || yellow(rgb) || isBlue(rgb) || isGreen(rgb);
+        if (point) expect(near(image, point.xPx, point.yPx, 3, drawn), `${label}: layers`).toBe(true);
+        continue;
+      }
+      if (point) expect(near(image, point.xPx, point.yPx, 1, isRed), `${label}: point`).toBe(true);
+      // Once the features lie apart on the screen: each primitive at its own position.
+      if (line) expect(near(image, line.xPx, line.yPx, 1, isBlue), `${label}: line`).toBe(true);
+      if (polygon) expect(isGreen(pixel(image, polygon.xPx, polygon.yPx)), `${label}: polygon`).toBe(true);
+      if (text) expect(near(image, text.xPx, text.yPx, 6, yellow), `${label}: label`).toBe(true);
+      const apex = await page.evaluate(() =>
+        window.vibeglobePlayground?.globe.geoToScreen({ longitudeDeg: 12.515, latitudeDeg: 41.89, heightMeters: 50 }),
+      );
+      if (apex && apex.xPx > 2 && apex.yPx > 2 && apex.xPx < 478 && apex.yPx < 358)
+        expect(near(image, apex.xPx, apex.yPx, 2, redish), `${label}: model`).toBe(true);
+    }
+  });
+}

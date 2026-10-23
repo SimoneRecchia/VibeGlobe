@@ -6,7 +6,7 @@ import {
   type QuadtreeTile,
 } from '../surface/surface-quadtree.hot.js';
 import type { ImageryLoaderStats } from '../imagery/imagery-loader.hot.js';
-import type { RendererStats, SurfaceStats, SurfaceTileInfo, TerrainStats } from './types.js';
+import type { RendererStats, ResourceCounts, SurfaceStats, SurfaceTileInfo, TerrainStats } from './types.js';
 
 const DEG = 180 / Math.PI;
 const ROOTS = ['mercator', 'north-cap', 'south-cap'] as const;
@@ -69,6 +69,15 @@ export function surfaceStats(
     onBaseImage,
   };
 }
+
+/** Resource counters of a globe without a renderer (before it starts, after it is destroyed). */
+export const NO_RESOURCES: ResourceCounts = Object.freeze({
+  meshes: 0,
+  textures: 0,
+  gpuBytes: 0,
+  vertexArrays: 0,
+  contexts: 0,
+});
 
 /** Renderer counters before a renderer exists. */
 export const NO_RENDERER_STATS: RendererStats = Object.freeze({

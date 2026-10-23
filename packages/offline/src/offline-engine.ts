@@ -277,6 +277,7 @@ class OfflineEngine implements Offline {
   private context(): Parameters<typeof tieredSource>[1] {
     return {
       decide: (sourceId, layerId) => this.policy.resolve({ sourceId, layerId, purpose: 'visible' }),
+      prefetch: (sourceId, layerId) => this.effectiveSwitches(sourceId, layerId).prefetch,
       store: {
         get: (key) => this.store.get(key),
         put: (key, tile) => void this.put(key, tile),

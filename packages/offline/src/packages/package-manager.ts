@@ -56,6 +56,11 @@ export interface PackageManagerOptions {
   readonly localStorage?: Pick<Storage, 'getItem' | 'setItem'>;
   /** Called when a package's data fails its checks while installed or read (F309). */
   readonly onIntegrityError?: (event: { packageId: string; message: string }) => void;
+  /**
+   * Called after a package was installed, updated or removed, with the engine sources whose tiles it holds: pass each
+   * to `globe.reloadSource`, so a running globe drops the tiles it still holds from the old version (F279).
+   */
+  readonly onChange?: (event: { packageId: string; sourceIds: readonly string[] }) => void;
 }
 
 /** The package management API (docs/plan/api.md, `PackageManager`). */
@@ -169,6 +174,15 @@ class Manager implements PackageManager {
     await this.storage.deleteData(versionKey(record.manifest));
     await this.storage.deleteRecord(id);
     await this.load(false);
+    this.changed(record);
+  }
+
+  /** Tells the application which sources a package change affects (`onChange`). */
+  private changed(record: PackageRecord): void {
+    this.options.onChange?.({
+      packageId: record.manifest.id,
+      sourceIds: record.manifest.sources.map((s) => s.sourceId),
+    });
   }
 
   async addServedPackage(manifestUrl: string | URL): Promise<InstalledPackage> {
@@ -282,6 +296,7 @@ class Manager implements PackageManager {
     if (previous && previous.manifest.version !== record.manifest.version)
       await this.storage.deleteData(versionKey(previous.manifest));
     await this.load(false);
+    this.changed(record);
     return describe(record);
   }
 

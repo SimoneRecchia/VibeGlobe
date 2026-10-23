@@ -1,5 +1,5 @@
 /**
- * Tile decoders that run in the engine's workers (`@vibeglobe/core/decoders`): kept out of the main entry so that
+ * Tile decoders that run in the engine's workers (`@vibeglobe/core/decoders`, quantized-mesh and KTX2): kept out of the main entry so that
  * applications load them only with the worker program.
  * @packageDocumentation
  */
@@ -12,3 +12,14 @@ export {
   rasterizeQuantizedMesh,
 } from './terrain/quantized-mesh.js';
 export type { QuantizedMesh } from './terrain/quantized-mesh.js';
+export {
+  chooseKtx2Target,
+  isKtx2,
+  Ktx2Error,
+  KTX2_TARGET_CODES,
+  ktx2GpuBytes,
+  ktx2LevelBytes,
+  ktx2LevelRange,
+  ktx2LevelSize,
+  readKtx2,
+} from './imagery/ktx2.js';

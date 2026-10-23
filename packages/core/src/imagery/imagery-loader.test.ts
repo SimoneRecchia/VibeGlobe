@@ -7,7 +7,7 @@ import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import { ARRIVING, ImageryLoader } from './imagery-loader.hot.js';
-import { imageryDecodeTask, type ImagerySource } from './imagery-source.js';
+import { imageryDecodeTask, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** A transport whose requests the test answers by URL. */
 class ManualTransport implements TileTransport {
@@ -100,6 +100,7 @@ function setUp(
     decoder?: 'image' | 'ktx2';
     workers?: WorkerPool;
     source?: Partial<ImagerySource>;
+    prefetchRing?: boolean;
   } = {},
 ) {
   const tasks: { task: string; input: unknown }[] = [];
@@ -148,6 +149,7 @@ function setUp(
     memory: { residency, ram, frame: () => frame },
     handleBase: 100,
     pinnedLevel: memory.pinnedLevel ?? -1,
+    ...(memory.prefetchRing === undefined ? {} : { prefetchRing: memory.prefetchRing }),
     decodeTask: imageryDecodeTask(source, ['bc']),
     uploadTexture: (handle) => uploaded.push(handle),
     releaseTexture: (handle) => released.push(handle),
@@ -554,5 +556,50 @@ describe('ImageryLoader', () => {
     expect(errors).toEqual(['failed 4/1/1']);
     // From the RAM copy: the tile was downloaded once.
     expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+  });
+
+  it('prefetches the ring around the visible tiles after them, and nothing beyond the view without prefetch (F284, F285)', () => {
+    for (const flags of [LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH, LOAD_KEEP_IN_MEMORY]) {
+      const { transport, runFrame } = setUp(32, {
+        prefetchRing: true,
+        source: { loadingFlags: () => flags, maxRequestsPerHost: 16 },
+      });
+      runFrame([[5, 10, 10]]);
+      if (flags & LOAD_PREFETCH) {
+        expect(transport.started[0]).toBe(url(5, 10, 10));
+        expect(new Set(transport.started.slice(1))).toEqual(
+          new Set(
+            [-1, 0, 1].flatMap((dy) => [-1, 0, 1].filter((dx) => dx || dy).map((dx) => url(5, 10 + dx, 10 + dy))),
+          ),
+        );
+      } else expect(transport.started).toEqual([url(5, 10, 10)]);
+    }
+  });
+
+  it('keeps tiles that left the view in memory with memory reuse, and releases them at once without it (F281, F282)', () => {
+    for (const flags of [LOAD_KEEP_IN_MEMORY, 0]) {
+      const { transport, released, ram, ok, runFrame } = setUp(32, { source: { loadingFlags: () => flags } });
+      runFrame([[5, 0, 0]]);
+      transport.answer(url(5, 0, 0), ok);
+      runFrame([[5, 0, 0]]);
+      // The tile leaves the view: kept on the GPU and in RAM with reuse, released from both without it.
+      runFrame([[5, 3, 3]]);
+      expect(released, `flags ${flags}`).toEqual(flags ? [] : [100]);
+      expect(ram.has(100), `flags ${flags}`).toBe(flags !== 0);
+    }
+  });
+
+  it('forgets every tile on reload: textures and RAM copies released, and the tiles requested again (KB-PT-19, F279)', () => {
+    const { transport, loader, released, ram, ok, runFrame } = setUp(32);
+    runFrame([[5, 0, 0]]);
+    transport.answer(url(5, 0, 0), ok);
+    runFrame([[5, 0, 0]]);
+    expect(runFrame([[5, 0, 0]])).toEqual([100]);
+    loader.reload();
+    expect(released).toEqual([100]);
+    expect(ram.has(100)).toBe(false);
+    // The next frame wants it again: a new request, not the old texture or bytes.
+    expect(runFrame([[5, 0, 0]])).toEqual([-1]);
+    expect(transport.started).toEqual([url(5, 0, 0), url(5, 0, 0)]);
   });
 });

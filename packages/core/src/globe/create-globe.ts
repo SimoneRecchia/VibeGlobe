@@ -14,7 +14,7 @@ import { imageryLayersOf } from './imagery-layers.js';
 import type { ImageryLayers } from '../imagery/imagery-stack.js';
 import type { Credit } from '../imagery/credits.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
-import { NO_RENDERER_STATS } from './diagnostics.js';
+import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
@@ -405,12 +405,12 @@ class GlobeEngine implements Globe {
   }
 
   // Diagnostics delegate to the renderer and the surface frame.
-  readonly resourceCounts = (): ResourceCounts =>
-    this.renderer?.resourceCounts() ?? { meshes: 0, textures: 0, gpuBytes: 0, vertexArrays: 0, contexts: 0 };
+  readonly resourceCounts = (): ResourceCounts => this.renderer?.resourceCounts() ?? NO_RESOURCES;
   readonly rendererStats = (): RendererStats => this.renderer?.stats() ?? NO_RENDERER_STATS;
   readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
   readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
+  readonly reloadSource = (sourceId: string): boolean => this.surfaceFrame.reloadSource(sourceId);
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
   readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });

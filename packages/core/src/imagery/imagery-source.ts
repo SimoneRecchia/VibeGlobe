@@ -36,7 +36,20 @@ export interface TileSource {
   readonly attribution?: readonly Attribution[];
   /** The provider profile's credit rules: a required credit is always shown (F255). */
   readonly profile?: CreditProfile;
+  /**
+   * Optional: the loading features that apply to the source now, as a sum of `LOAD_KEEP_IN_MEMORY` and
+   * `LOAD_PREFETCH` (both when absent). Read every frame, so a change applies at once without a reload (F290);
+   * `@vibeglobe/offline` resolves it from the network mode, the switches and the provider's profile (F271, F281–F285).
+   */
+  loadingFlags?(): number;
 }
+
+/** Tiles stay in RAM and GPU memory after they leave the screen, within the budgets (F281); off: only the working set. */
+export const LOAD_KEEP_IN_MEMORY = 1;
+/** Tiles around the view and at the next level load ahead, after every visible tile (F284). */
+export const LOAD_PREFETCH = 2;
+/** Every loading feature: the default. */
+export const LOAD_ALL = LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH;
 
 /**
  * A tiled imagery source (docs/plan/api.md, M3 plan §2.2). Adapters such as `xyzImagery` in `@vibeglobe/sources`

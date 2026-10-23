@@ -777,6 +777,11 @@ export interface Globe {
   /** The imagery layers (ADR 0038): their order, opacity, visibility and blend mode, changeable at runtime (F243–F246). */
   readonly imageryLayers: ImageryLayers;
   /**
+   * Drops every tile of the imagery or terrain source with this id from GPU and RAM memory, with its no-data and
+   * failure marks, so the view loads it again (a new offline package version, F279). False when no source has the id.
+   */
+  reloadSource(sourceId: string): boolean;
+  /**
    * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
    * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the
    * loader cannot read. Call after `ready`.

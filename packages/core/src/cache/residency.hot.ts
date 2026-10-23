@@ -225,6 +225,19 @@ export class Residency {
     return this.releaseAt(this.single, 0);
   }
 
+  /**
+   * Evicts `keys[at]` now, calling `onEvict`, unless it is kept ({@link isKept}: pinned, busy, or used in the current
+   * frame); false when it was not evicted. With memory reuse off, tiles leave as soon as no frame uses them (F282).
+   */
+  evictAt(keys: ArrayLike<number>, at: number): boolean {
+    const slot = this.map.getAt(keys, at);
+    if (slot === undefined) return false;
+    if (((this.flags[slot] ?? 0) & PINNED) !== 0 || this.isProtected(slot) || this.lastUsed[slot] === this.state[FRAME])
+      return false;
+    this.evict(slot);
+    return true;
+  }
+
   /** True when the key is resident (outside the frame loop). */
   has(key: number): boolean {
     return this.map.has(key);

@@ -13,11 +13,8 @@ import {
   ktx2LevelRange,
   ktx2LevelSize,
   readKtx2,
-  type CompressedLevel,
-  type CompressedTileImage,
-  type Ktx2Info,
-  type Ktx2Target,
-} from '@vibeglobe/core';
+} from '@vibeglobe/core/decoders';
+import type { CompressedLevel, CompressedTileImage, Ktx2Info, Ktx2Target } from '@vibeglobe/core';
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
 /** Input of `transcode-ktx2`: the file (transferred) and the compressed families the device decodes. */

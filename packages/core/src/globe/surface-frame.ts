@@ -322,6 +322,11 @@ export class SurfaceFrame {
     return this.imagery?.stats();
   }
 
+  /** See `Globe.reloadSource`. */
+  reloadSource(sourceId: string): boolean {
+    return this.imagery?.reloadSource(sourceId) ?? false;
+  }
+
   /** The terrain counters, if there is terrain. */
   terrainStats(): TerrainStats | undefined {
     return this.imagery?.terrainStats();

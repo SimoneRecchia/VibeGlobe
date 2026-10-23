@@ -147,6 +147,7 @@ function loaderBase(context: LoaderContext, source: TileSource, handleBase: numb
     memory: context.shared,
     handleBase,
     pinnedLevel,
+    prefetchRing: true,
     ...(observability ? { observability } : {}),
     uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
     releaseTexture: (handle) => renderer.releaseTexture(handle),
@@ -431,6 +432,21 @@ export class ImageryRuntime {
     const loader = emptyLoaderStats();
     this.terrain.loader.addStats(loader);
     return terrainStatsOf(loader, DEFAULT_UPLOAD_BUDGET.maxBytes, this.terrainMs);
+  }
+
+  /** Reloads the loaders of every layer, and the terrain, whose source has this id (`Globe.reloadSource`). */
+  reloadSource(sourceId: string): boolean {
+    let found = false;
+    for (const layer of this.layers)
+      if (layer.source.id === sourceId) {
+        layer.loader.reload();
+        found = true;
+      }
+    if (this.terrain?.source.id === sourceId) {
+      this.terrain.loader.reload();
+      found = true;
+    }
+    return found;
   }
 
   /** The counters of `Globe.imageryStats()`. */

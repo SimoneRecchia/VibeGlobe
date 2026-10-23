@@ -3,7 +3,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { MAX_OVERLAYS, type DrawList } from './draw-list.js';
-import { ARRIVING, type ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, PREFETCH_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -41,11 +41,6 @@ export function stackOf(entries: readonly StackEntry[], layers: readonly Imagery
   let next = 0;
   return entries.map((entry) => ({ entry, chain: entry.sources.map(() => layers[next++] as ImageryLayer) }));
 }
-
-/** ADR 0007's priority classes: visible tiles are class 1 (class 0 is the pinned base). */
-const VISIBLE_CLASS = 1024;
-/** ADR 0007's prefetch class, after visible tiles, flight destination and flight path. */
-const PREFETCH_CLASS = 4 * 1024;
 
 const mapping = new Float64Array(8);
 const centerEcef = new Float64Array(3);
@@ -130,7 +125,7 @@ function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distan
     let source = 0;
     while (source < chain.length - 1 && !hasTile(chain[source] as ImageryLayer, tile)) source++;
     const chosen = chain[source];
-    if (chosen) prefetchChildren(chosen, tile, distance);
+    if (chosen && chosen.loader.prefetching !== false) prefetchChildren(chosen, tile, distance);
   }
 }
 

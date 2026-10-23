@@ -18,7 +18,7 @@ import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/typ
 import type { TileErrorReason } from '../globe/types.js';
 import type { Observability } from '../diagnostics/observability.js';
 import { WorkerTaskError, type WorkerPool, type WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
-import type { TileSource } from './imagery-source.js';
+import { LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type TileSource } from './imagery-source.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import {
   DEAD,
@@ -33,6 +33,13 @@ import {
   UNLOADED,
   type TileRecord,
 } from './tile-table.js';
+
+/** Priority keys of visible tiles (ADR 0007 class 1) start here: lower keys are the pinned base's. */
+export const VISIBLE_CLASS = 1024;
+/** Priority keys of prefetched tiles start here, after every visible tile (ADR 0007). */
+export const PREFETCH_CLASS = 4 * 1024;
+/** Visible tiles per frame whose neighbors are prefetched; more are rare and simply not ringed. */
+const RING_CAPACITY = 1024;
 
 /** Runs an inline decode, turning an exception into the failure a worker task reports for bytes it cannot decode. */
 function runInline(run: () => DecodedTile): WorkerTaskOutcome {
@@ -100,6 +107,11 @@ export interface ImageryLoaderOptions {
   readonly handleBase: number;
   /** Tiles at this level and coarser form the pinned base (-1: none): loaded first, never evicted (F084). */
   readonly pinnedLevel: number;
+  /**
+   * The eight neighbors of every visible tile are wanted at the prefetch class while the source prefetches (F284);
+   * the engine's layers set it, a loader driven tile by tile (tests) leaves it off.
+   */
+  readonly prefetchRing?: boolean;
   /** Traces and debug messages of tiles and requests (F120, F121); none when absent. */
   readonly observability?: Observability;
   uploadTexture(handle: number, tile: DecodedTile): void;
@@ -154,6 +166,12 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
   private pinnedSettled = 0;
+  /** The source's loading features this frame (`LOAD_*`). */
+  private flags = LOAD_ALL;
+  /** Visible tiles wanted this frame (level, x, y, key), whose neighbors are prefetched (F284). */
+  private readonly ring = new Float64Array(4 * RING_CAPACITY);
+  private ringCount = 0;
+  private readonly evictKey = new Float64Array(1);
   private frame = 0;
   private requested = 0;
   private destroyed = false;
@@ -176,6 +194,11 @@ export class ImageryLoader implements NetworkPoolClient {
     this.removeClient = options.network.addClient(this);
   }
 
+  /** Whether the source prefetches now (`loadingFlags`): tiles beyond the view load only when it does (F284, F285). */
+  get prefetching(): boolean {
+    return (this.flags & LOAD_PREFETCH) !== 0;
+  }
+
   /** True once every pinned tile is on the GPU or known to have no data: refinement may begin (F084). */
   get pinnedComplete(): boolean {
     return this.pinnedSettled >= this.pinnedTotal;
@@ -189,6 +212,8 @@ export class ImageryLoader implements NetworkPoolClient {
   /** Starts a frame: tiles not wanted again from now on leave the queue at {@link ImageryLoader.endFrame}. */
   beginFrame(): void {
     this.frame++;
+    this.flags = this.options.source.loadingFlags?.() ?? LOAD_ALL;
+    this.ringCount = 0;
     // The pinned base is always wanted, ahead of every visible tile (ADR 0007 class 0).
     const { rootTilesX, rootTilesY } = this.options.source.tiling;
     for (let level = 0; level <= this.options.pinnedLevel; level++) {
@@ -209,6 +234,13 @@ export class ImageryLoader implements NetworkPoolClient {
     if (record.pinned) priority = level;
     else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
     record.wantedFrame = this.frame;
+    if (priority >= VISIBLE_CLASS && priority < VISIBLE_CLASS + 1024 && this.ringCount < RING_CAPACITY) {
+      const at = 4 * this.ringCount++;
+      this.ring[at] = level;
+      this.ring[at + 1] = x;
+      this.ring[at + 2] = y;
+      this.ring[at + 3] = priority;
+    }
     const state = record.state;
     const handle = this.options.handleBase + record.slot;
     if (state === READY) {
@@ -303,6 +335,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Drops what the frame no longer wants and starts the best queued requests (the scheduling phase, F118). */
   scheduleRequests(): void {
+    if (this.options.prefetchRing === true && (this.flags & LOAD_PREFETCH) !== 0) this.prefetchRing();
     this.dropUnwanted();
     while (this.heap.size > 0 && this.dispatchOne() !== 0);
   }
@@ -357,6 +390,28 @@ export class ImageryLoader implements NetworkPoolClient {
     out.pinnedTotal += this.pinnedTotal;
   }
 
+  /**
+   * Forgets every tile of the source (a new package version, a mode that reaches tiles it could not, KB-PT-19): requests
+   * and decodes in progress are cancelled, GPU textures and RAM copies released, no-data and failure marks cleared,
+   * so the tiles the next frames want load again from the source.
+   */
+  reload(): void {
+    const { residency, ram } = this.options.memory;
+    for (const record of this.table.bySlot) {
+      const handle = this.options.handleBase + record.slot;
+      if (record.state === QUEUED) this.heap.remove(record.slot);
+      else this.cancel(record);
+      if (record.state === READY && residency.release(handle)) this.options.releaseTexture(handle);
+      ram.delete(handle);
+      record.state = UNLOADED;
+      record.retries = 0;
+      record.availabilityUnknown = false;
+    }
+    this.active.length = 0;
+    this.pinnedSettled = 0;
+    this.options.requestFrame();
+  }
+
   /** Cancels everything in flight; the textures are released by the renderer. */
   destroy(): void {
     this.destroyed = true;
@@ -366,12 +421,43 @@ export class ImageryLoader implements NetworkPoolClient {
     this.uploads.clear(closeImage);
   }
 
+  /**
+   * Wants the eight neighbors of every visible tile at the prefetch class, in the visible tiles' order (F284): the ring
+   * just outside the view loads after everything in it.
+   */
+  private prefetchRing(): void {
+    const { rootTilesX, rootTilesY } = this.options.source.tiling;
+    const count = this.ringCount;
+    for (let i = 0; i < count; i++) {
+      const at = 4 * i;
+      const level = this.ring[at] ?? 0;
+      const x = this.ring[at + 1] ?? 0;
+      const y = this.ring[at + 2] ?? 0;
+      const key = PREFETCH_CLASS + (this.ring[at + 3] ?? 0) - VISIBLE_CLASS;
+      const columns = rootTilesX * 2 ** level;
+      const rows = rootTilesY * 2 ** level;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= rows) continue;
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx !== 0 || dy !== 0) this.want(level, (x + dx + columns) % columns, ny, key);
+      }
+    }
+  }
+
   private dropUnwanted(): void {
+    const keep = (this.flags & LOAD_KEEP_IN_MEMORY) !== 0;
     // Queued tiles nobody wanted this frame leave the queue now (ADR 0007).
     for (const record of this.table.bySlot) {
       if (record.state === QUEUED && record.wantedFrame !== this.frame) {
         this.heap.remove(record.slot);
         record.state = UNLOADED;
+      } else if (!keep && record.state === READY && record.wantedFrame !== this.frame && !record.pinned) {
+        // Memory reuse off (F282): a tile no frame uses leaves the GPU and RAM at once; one still drawn (a fallback
+        // ancestor, a fade) is kept by the residency until it is not.
+        const handle = this.options.handleBase + record.slot;
+        this.evictKey[0] = handle;
+        if (this.options.memory.residency.evictAt(this.evictKey, 0)) this.options.memory.ram.delete(handle);
       }
     }
     let cancelling = false;

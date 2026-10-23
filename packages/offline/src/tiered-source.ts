@@ -15,6 +15,8 @@ export interface PackageTile {
 /** What a wrapped source needs from the engine around it (supplied by `createOffline`). */
 export interface TierContext {
   decide(sourceId: string, layerId: string): PolicyDecision;
+  /** Whether tiles around the view of this source (in this layer) may load ahead: the prefetch switch in effect. */
+  prefetch(sourceId: string, layerId: string): boolean;
   readonly store: {
     get(key: string): Promise<CachedTile | undefined>;
     put(key: string, tile: CachedTile): void;
@@ -90,6 +92,10 @@ export function tieredSource(
   const loader = new TileLoader(source, context, options, layerId);
   return {
     ...source,
+    // The engine's memory reuse and prefetch follow the mode, the switches and the provider at every frame (F281–F285,
+    // F290): 1 keeps tiles in memory, 2 prefetches (`LOAD_KEEP_IN_MEMORY`, `LOAD_PREFETCH` of `@vibeglobe/core`).
+    loadingFlags: () =>
+      (context.decide(source.id, layerId).keepInMemory ? 1 : 0) | (context.prefetch(source.id, layerId) ? 2 : 0),
     transport: {
       start(request: TileRequest, timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
         const coord = coordOf(request.url);

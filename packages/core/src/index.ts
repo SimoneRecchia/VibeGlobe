@@ -120,7 +120,7 @@ export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } fr
 export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
-export { inCoverage } from './imagery/imagery-source.js';
+export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
 export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
 export type {
@@ -156,17 +156,6 @@ export type {
   PhaseTimesMs,
   TraceEvent,
 } from './diagnostics/observability.js';
-export {
-  chooseKtx2Target,
-  isKtx2,
-  Ktx2Error,
-  KTX2_TARGET_CODES,
-  ktx2GpuBytes,
-  ktx2LevelBytes,
-  ktx2LevelRange,
-  ktx2LevelSize,
-  readKtx2,
-} from './imagery/ktx2.js';
 export type {
   CompressedLevel,
   CompressedTileImage,

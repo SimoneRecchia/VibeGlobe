@@ -9,6 +9,7 @@ import {
   type TileCoord,
   type TileRequest,
   type TimeoutsMs,
+  type Attribution,
   type VerticalDatum,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
@@ -23,6 +24,8 @@ export interface QuantizedMeshTerrainOptions {
   datum?: VerticalDatum;
   /** `fetch` for `layer.json` and the tiles; the global one by default (injectable for tests). */
   fetchImpl?: typeof fetch;
+  /** Credits shown while the terrain is in view (F235, F254). */
+  attribution?: readonly Attribution[];
   maxRequestsPerHost?: number;
   multiplexed?: boolean;
   timeoutsMs?: TimeoutsMs;
@@ -73,6 +76,7 @@ export async function quantizedMeshTerrain(options: QuantizedMeshTerrainOptions)
     geometricErrorMeters: (level) => levelZeroErrorMeters / 2 ** level,
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
+    ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown' {
       const status = availability.status(coord.level, coord.x, coord.y);

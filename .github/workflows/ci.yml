@@ -214,7 +214,10 @@ jobs:
         timeout-minutes: 15
         env:
           VIBEGLOBE_DEVICE: ci-swiftshader
-        run: npm run bench:probes
+        # The probes record the commit; in the container the checkout belongs to another user (git's safe.directory).
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          npm run bench:probes
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

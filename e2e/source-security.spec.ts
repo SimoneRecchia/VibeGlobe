@@ -88,11 +88,12 @@ test('a source without CORS headers logs one error naming it, its tiles count as
 
 for (const mode of ['include', 'omit'] as const) {
   test(`requests are sent with the source's credentials mode ${mode} (F251)`, async ({ page, context }) => {
-    await context.addCookies([{ name: 'fixture', value: '1', url: OTHER_ORIGIN }]);
+    // A cookie of the tiles' origin (the page's: browsers keep cross-site cookies from cross-origin fetches).
+    await context.addCookies([{ name: 'fixture', value: '1', url: 'http://localhost:5173' }]);
     const session = await fixtureSession(page);
     await openGlobe(
       page,
-      `backend=webgl2&imagery=smooth&overlays=patches:0.5&overlayHosts=${OTHER_ORIGIN}&overlayCredentials=${mode}&session=${session}&lon=12.5&lat=41.9&zoom=6`,
+      `backend=webgl2&imagery=smooth&overlays=patches:0.5&overlayCredentials=${mode}&session=${session}&lon=12.5&lat=41.9&zoom=6`,
     );
     await settle(page);
     const log = (await requestLog(page, session)).filter((r) => r.source === 'patches');
@@ -146,8 +147,8 @@ test('a key the provider requires in the URL is added at fetch time and appears 
 }) => {
   const messages = consoleOf(page);
   const session = await fixtureSession(page);
-  // Some tiles fail, so that errors are logged with their URLs.
-  await setRules(page, session, [{ source: 'patches', minLevel: 6, xRange: [34, 35], status: 500 }]);
+  // Some tiles are corrupt, so that errors are logged for them.
+  await setRules(page, session, [{ source: 'patches', minLevel: 6, xRange: [34, 35], randomBytes: 64 }]);
   await openGlobe(
     page,
     `backend=webgl2&debug=1&imagery=smooth&overlays=patches:0.5&overlayKey=sk_fixture_123&session=${session}&lon=12.5&lat=41.9&zoom=6`,
@@ -160,7 +161,7 @@ test('a key the provider requires in the URL is added at fetch time and appears 
   // The key reached the server…
   expect(patches.length).toBeGreaterThan(0);
   expect(patches.every((r) => r.query?.includes('key=sk_fixture_123'))).toBe(true);
-  expect(patches.some((r) => r.status === 500)).toBe(true);
+  expect(patches.some((r) => r.level === 6 && r.x >= 34 && r.x <= 35)).toBe(true);
   // …and nothing the engine logs, traces or shows.
   const overlay = (await page.locator('.vibeglobe-debug-overlay').textContent()) ?? '';
   expect(messages.some((m) => m.includes('overlay-patches'))).toBe(true);

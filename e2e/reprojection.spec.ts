@@ -99,17 +99,18 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     for (const [phase, mode, zoom, tiltDeg] of [
       ['globe', 'auto', 3, 0],
       ['2d', '2d', 7, 0],
-      ['3d', '3d', 7, 30],
+      ['3d', '3d', 14, 30],
     ] as const) {
       for (const marker of MARKERS) {
-        // The marker a little off the view's center, so that it is not where the view's own rounding hides an offset.
+        // The marker about 30 px off the view's center, so that it is not where the view's own rounding hides an offset.
+        const offsetDeg = (30 * 360) / (256 * 2 ** zoom);
         await page.evaluate(
           ([m, z, t, lon, lat]) => {
             const globe = window.vibeglobePlayground?.globe;
             globe?.setViewMode(m);
-            globe?.jumpTo({ longitudeDeg: lon + 0.37, latitudeDeg: lat + 0.21, zoom: z, tiltDeg: t });
+            globe?.jumpTo({ longitudeDeg: lon, latitudeDeg: lat, zoom: z, tiltDeg: t });
           },
-          [mode, zoom, tiltDeg, marker.longitudeDeg, marker.latitudeDeg] as const,
+          [mode, zoom, tiltDeg, marker.longitudeDeg + offsetDeg, marker.latitudeDeg + offsetDeg / 2] as const,
         );
         await settle(page);
         expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.phase), phase).toBe(phase);

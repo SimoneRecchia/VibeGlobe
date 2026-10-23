@@ -2978,7 +2978,7 @@
         "Assert no one-second window exceeds 10 requests to the limited source while the other source is not slowed down",
         "Assert the view keeps showing parent-tile fallback with zero black pixels while requests are throttled"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F223",

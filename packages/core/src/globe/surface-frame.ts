@@ -45,6 +45,18 @@ const DEFAULT_CLEARANCE_METERS = 10;
 /** ADR 0006's τ_imagery: the largest an imagery texel may look, in render-target pixels. */
 const MAX_TEXEL_ERROR_PX = 1.5;
 
+/**
+ * Render-target pixels per CSS pixel and the largest screen error (CSS pixels) of each surface frame, outside the
+ * class the frame loop writes (F064).
+ */
+const resolutions = new WeakMap<object, Float64Array>();
+
+function resolutionOf(owner: object): Float64Array {
+  let resolution = resolutions.get(owner);
+  if (!resolution) resolutions.set(owner, (resolution = Float64Array.of(1, 1)));
+  return resolution;
+}
+
 /** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
 
@@ -81,6 +93,7 @@ export class SurfaceFrame {
     terrainMinMeters: 0,
     terrainMaxMeters: 0,
     terrainRange: undefined as ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined,
+    fogHaze: undefined as number | undefined,
   };
   /** The imagery runtime, once `startImagery` ran with imagery or terrain. */
   imagery: ImageryRuntime | undefined;
@@ -103,7 +116,7 @@ export class SurfaceFrame {
     private readonly clock: { timeInto(out: Float64Array): void },
     private readonly observability: Observability,
   ) {
-    this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
+    this.setScreenError(options.maxScreenErrorPx ?? 1);
     this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.fadeMs = options.imageryFadeMs ?? DEFAULT_FADE_MS;
     this.clearanceMeters = options.terrainClearanceMeters ?? DEFAULT_CLEARANCE_METERS;
@@ -150,7 +163,7 @@ export class SurfaceFrame {
       terrain,
     );
     this.imagery = imagery;
-    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / motionOf(this).baseTexelErrorPx);
+    imagery.setPixelRatio(resolutionOf(this)[0] ?? 1);
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
@@ -303,13 +316,35 @@ export class SurfaceFrame {
    * render-target pixels, so a sharper canvas gets finer imagery (F109, M3 plan §2.5).
    */
   setPixelRatio(pixelRatio: number): void {
-    this.selection.maxTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
-    motionOf(this).baseTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    resolutionOf(this)[0] = pixelRatio;
+    this.applyTexelError();
     // High-DPI sources switch to their `@2x` tiles (F241).
     if (this.imagery) {
       this.imagery.setPixelRatio(pixelRatio);
       this.imageryChanged();
     }
+  }
+
+  /**
+   * Sets the largest projected geometric error in CSS pixels (F399): imagery texels scale with it, so a coarser
+   * quality loads coarser tiles of both kinds.
+   */
+  setScreenError(maxScreenErrorPx: number): void {
+    resolutionOf(this)[1] = maxScreenErrorPx;
+    this.selection.maxScreenErrorPx = maxScreenErrorPx;
+    this.applyTexelError();
+  }
+
+  /** The haze of fog-aware detail (F395), or undefined while the atmosphere or its fog is off. */
+  setFog(haze: number | undefined): void {
+    this.selection.fogHaze = haze;
+  }
+
+  private applyTexelError(): void {
+    const [pixelRatio = 1, screenErrorPx = 1] = resolutionOf(this);
+    const texelErrorPx = (MAX_TEXEL_ERROR_PX * screenErrorPx) / pixelRatio;
+    this.selection.maxTexelErrorPx = texelErrorPx;
+    motionOf(this).baseTexelErrorPx = texelErrorPx;
   }
 
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */

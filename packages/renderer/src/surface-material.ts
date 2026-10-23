@@ -37,6 +37,7 @@ import {
   type TextureNode,
 } from 'three/webgpu';
 import { makeMorphedEyeRelative } from './eye-relative.js';
+import type { Atmosphere } from './atmosphere/atmosphere.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
 export interface SurfaceDraw {
@@ -196,7 +197,7 @@ function placeMorphed(
   params: Node<'vec4'>,
   morphParams: Node<'vec4'>,
   morphAxes: Node<'mat3'>,
-): void {
+): Node<'vec3'> {
   const tileNormal = attribute('tileNormal', 'vec3');
   const tilePlane = attribute('tilePlane', 'vec4');
   const skirt = tileNormal.length().greaterThan(1.5);
@@ -209,7 +210,7 @@ function placeMorphed(
     tilePlane.y.mul(sigma),
     reliefHeight.mul(tilePlane.w).mul(sigma).add(tilePlane.z).sub(skirtExtra),
   );
-  makeMorphedEyeRelative(material, depthPath, globeOffset, morphAxes.mul(planeLocal), morphParams.x);
+  return makeMorphedEyeRelative(material, depthPath, globeOffset, morphAxes.mul(planeLocal), morphParams.x);
 }
 
 /**
@@ -251,9 +252,13 @@ function overlaySlots(
  * The UV transforms and flags are object-scope uniforms read from each mesh's {@link SurfaceDraw}, and the textures
  * are set per mesh before it draws (see {@link attachSurfaceDraw}), so tiles drawing different data tiles still share
  * the material. `placeholder` only fixes the texture binding's type. The material owns the flat heights of draws
- * without terrain and disposes them with itself.
+ * without terrain and disposes them with itself. With an `atmosphere`, haze and sun lighting shade its color.
  */
-export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
+export function createSurfaceMaterial(
+  placeholder: Texture,
+  depthPath: DepthPath,
+  atmosphere?: Atmosphere,
+): MeshBasicNodeMaterial {
   const tileUv = attribute('tileUv', 'vec3');
   // Per frame (ADR 0008): the morph factor, the relief factor and σ; the anchor's east, north and up axes in ECEF.
   const morphParams = uniform(new Vector4(0, 1, 1, 0));
@@ -312,7 +317,9 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
     composeOverlays(color);
     return color;
   })();
-  placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
+  const eyeRelative = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
+  // Haze and sun lighting (F394, F396): the uniforms live in the atmosphere, so a new one needs a new material.
+  atmosphere?.applyToSurface(material, eyeRelative);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;

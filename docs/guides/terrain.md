@@ -26,7 +26,7 @@ const globe = createGlobe({ container, renderer: createRenderer(), terrain, work
 
 - **Heightmaps** (`heightmapTerrain`): Terrarium (`(R × 256 + G + B / 256) − 32768` m) and Terrain-RGB (`−10000 + (R × 65536 + G × 256 + B) / 10` m), 256 or 512 px, Web Mercator or geographic, XYZ or TMS (`{-y}`), with an optional `coverage`.
 - **Quantized-mesh** (`quantizedMeshTerrain`): gzip-compressed or not, with the oct-encoded normals, water mask and metadata extensions requested only when `layer.json` declares them. Tiles outside the declared availability, including availability declared in parent tiles' metadata, are never requested (F128).
-- **Any other encoding** (F132): write a `TerrainSource` whose `decoder` is `{ kind: 'custom', decode(bytes, coord) }` and returns a `heightGrid(...)`. It runs between frames on the main thread, so keep it cheap; `apps/playground/src/terrain-adapters.ts` has two complete examples (a 24-bit RGB formula and raw float32 tiles).
+- **Any other encoding** (F132): write a `TerrainSource` whose `decoder` is `{ kind: 'custom', decode(bytes, coord) }` and returns a `heightGrid(...)` (from `@vibeglobe/core/decoders`). It runs between frames on the main thread, so keep it cheap; `apps/playground/src/terrain-adapters.ts` has two complete examples (a 24-bit RGB formula and raw float32 tiles).
 
 Decoding, triangulation and gzip inflation run in the workers (F134). Corrupt tiles are reported through the `tile-error` event, and the area keeps its best ancestor (F131).
 
@@ -35,7 +35,7 @@ Decoding, triangulation and gzip inflation run in the workers (F134). Corrupt ti
 Every source declares what its heights are measured from: the WGS84 ellipsoid (the default) or a geoid, as Copernicus DEM uses EGM2008. Geoid heights H are converted to ellipsoidal heights h = H + N before meshing and queries, N interpolated bilinearly in a geoid grid you host (F133):
 
 ```ts
-import { readGeoidFile } from '@vibeglobe/core';
+import { readGeoidFile } from '@vibeglobe/core/decoders';
 
 const model = readGeoidFile(await (await fetch('/geoid/egm2008-15m.bin')).arrayBuffer());
 const terrain = heightmapTerrain({ id: 'dem', url, encoding: 'terrarium', datum: { kind: 'geoid', model } });

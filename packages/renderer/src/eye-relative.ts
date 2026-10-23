@@ -86,13 +86,15 @@ export function makeMorphedEyeRelative(
   globeOffset: Node<'vec3'>,
   planeOffset: Node<'vec3'>,
   morph: Node<'float'>,
-): void {
-  const viewPosition = cameraViewMatrix.mul(vec4(morphedEyeRelative(globeOffset, planeOffset, morph), 1));
+): Node<'vec3'> {
+  const eyeRelative = morphedEyeRelative(globeOffset, planeOffset, morph);
+  const viewPosition = cameraViewMatrix.mul(vec4(eyeRelative, 1));
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
   if (depthPath === 'fragment') {
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
   }
+  return eyeRelative;
 }
 
 /**

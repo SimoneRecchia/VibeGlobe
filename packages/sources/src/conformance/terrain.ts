@@ -1,11 +1,5 @@
-import {
-  decodeHeightmap,
-  heightGrid,
-  sampleHeight,
-  type HeightGrid,
-  type TerrainSource,
-  type TileCoord,
-} from '@vibeglobe/core';
+import { sampleHeight, type TerrainSource, type TileCoord } from '@vibeglobe/core';
+import { decodeHeightmap, heightGrid, type HeightGrid } from '@vibeglobe/core/decoders';
 import { decodeQuantizedMesh, rasterizeQuantizedMesh } from '@vibeglobe/core/decoders';
 import { check, type CheckResult } from './support.js';
 import { describe, fetchTile, runSharedChecks, sourceMetadataChecks, type TiledConformanceSubject } from './tiled.js';

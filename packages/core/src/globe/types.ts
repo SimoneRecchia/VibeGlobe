@@ -12,6 +12,7 @@ import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
 import type { MorphFrame } from '../view/morph.js';
+import type { AtmosphereSettings, QualitySettings, RendererQuality } from './quality-types.js';
 import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewMode, ViewPhase } from '../view/view-state.js';
 import type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
@@ -236,6 +237,10 @@ export interface RendererBackend {
   simulateDeviceLoss(): void;
   /** Test hook: the pixels of the frame just drawn, read in the same task (ADR 0012, Capture). */
   capture(): Promise<FrameCapture>;
+  /** Optional: applies the effects of the quality settings (F397–F399), between frames. */
+  setQuality?(quality: RendererQuality): void;
+  /** Optional: the atmosphere's sun lighting, time and haze (F394, F396). */
+  setAtmosphere?(settings: Required<AtmosphereSettings>): void;
   destroy(): void;
 }
 
@@ -362,8 +367,12 @@ export interface GlobeOptions {
   readonly viewCurves?: ViewCurvesInit;
   /** Multiplies the device pixel ratio (default 1). */
   readonly resolutionScale?: number;
-  /** Largest projected geometric error, in CSS pixels (default 1). */
+  /** Largest projected geometric error, in CSS pixels (default 1); imagery texels scale with it. */
   readonly maxScreenErrorPx?: number;
+  /** Anti-aliasing, anisotropy, atmosphere level and fog at start (see {@link Globe.setQualitySettings}). */
+  readonly quality?: Omit<QualitySettings, 'resolutionScale' | 'maxScreenErrorPx'>;
+  /** The atmosphere's sun lighting, time and haze at start (see {@link Globe.setAtmosphere}). */
+  readonly atmosphere?: AtmosphereSettings;
   /**
    * Coarsest surface level drawn, an integer from 2 (the default) to 8: every visible surface tile is at least this
    * fine. Raising it costs draws and buys nothing visible in M2; benchmarks use it to set the tile count.
@@ -834,6 +843,17 @@ export interface Globe {
    * GPU's largest texture, and 'destroyed' after `destroy()`.
    */
   captureView(size: { readonly widthPx: number; readonly heightPx: number }): Promise<FrameCapture>;
+  /** The quality settings in effect (F399). */
+  readonly qualitySettings: Required<QualitySettings>;
+  /**
+   * Changes level of detail and effects at runtime (F399): the next frame uses them, with no renderer rebuilt.
+   * Invalid values throw 'invalid-option'.
+   */
+  setQualitySettings(settings: QualitySettings): void;
+  /** The atmosphere's scene settings in effect. */
+  readonly atmosphere: Required<AtmosphereSettings>;
+  /** Changes the Sun's time, sun lighting or haze (F394, F396); shown from the next frame, nothing reloads. */
+  setAtmosphere(settings: AtmosphereSettings): void;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */
   destroy(): void;
 }

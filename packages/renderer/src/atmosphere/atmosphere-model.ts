@@ -1,3 +1,4 @@
+import { surfaceVisibility } from '@vibeglobe/core';
 // The atmosphere model shared by the shaders (`atmosphere-nodes.ts`) and the CPU (fog-aware tile detail, tests):
 // single scattering by air molecules (Rayleigh) and aerosols (Mie) in exponential layers over a sphere, integrated along
 // the view ray, with the light path's optical depth from an analytic Chapman function (ADR 0040). Distances in
@@ -34,23 +35,8 @@ export interface LocalRay {
   readonly maxDistanceKm: number;
 }
 
-/** The quality settings of the atmosphere (F399 maps the engine's presets onto these). */
-export interface AtmosphereQuality {
-  /** Samples along each sky ray. */
-  readonly skySamples: number;
-  /** Samples along each surface fragment's ray (haze and fog). */
-  readonly surfaceSamples: number;
-  /** Adds ±1 least-significant-bit noise to the output, which hides 8-bit banding (F392). */
-  readonly dither: boolean;
-}
-
-/** The atmosphere's settings for the engine's quality presets; low suits tablets, ultra a desktop GPU. */
-export const ATMOSPHERE_QUALITY: Readonly<Record<'low' | 'medium' | 'high' | 'ultra', AtmosphereQuality>> = {
-  low: { skySamples: 8, surfaceSamples: 4, dither: true },
-  medium: { skySamples: 12, surfaceSamples: 6, dither: true },
-  high: { skySamples: 16, surfaceSamples: 8, dither: true },
-  ultra: { skySamples: 24, surfaceSamples: 12, dither: true },
-};
+/** The surface visibility comes from core's fog-aware detail (F395), so the selection and this model agree. */
+export { surfaceVisibility };
 
 /**
  * The altitude at distance `d` along a ray leaving altitude `h0` at zenith cosine `mu`, over a sphere of radius `r`:
@@ -81,6 +67,24 @@ export function distanceToAltitude(h0: number, r: number, mu: number, target: nu
   const farRoot = Math.max(a, other);
   return far ? farRoot : near;
 }
+
+/** The quality settings of the atmosphere (F399 maps the engine's presets onto these). */
+export interface AtmosphereQuality {
+  /** Samples along each sky ray. */
+  readonly skySamples: number;
+  /** Samples along each surface fragment's ray (haze and fog). */
+  readonly surfaceSamples: number;
+  /** Adds ±1 least-significant-bit noise to the output, which hides 8-bit banding (F392). */
+  readonly dither: boolean;
+}
+
+/** The atmosphere's settings for the engine's quality presets; low suits tablets, ultra a desktop GPU. */
+export const ATMOSPHERE_QUALITY: Readonly<Record<'low' | 'medium' | 'high' | 'ultra', AtmosphereQuality>> = {
+  low: { skySamples: 8, surfaceSamples: 4, dither: true },
+  medium: { skySamples: 12, surfaceSamples: 6, dither: true },
+  high: { skySamples: 16, surfaceSamples: 8, dither: true },
+  ultra: { skySamples: 24, surfaceSamples: 12, dither: true },
+};
 
 /**
  * The Chapman function Ch(x, mu) for x = (r + h) / H ≫ 1: the optical depth from a point toward the zenith cosine
@@ -113,33 +117,6 @@ export function lightDepth(h: number, r: number, mu: number, scaleKm: number): n
 /** The extinction per km of each color channel at sea level: Rayleigh plus Mie. */
 function extinction(channel: number, rayleighDensity: number, mieDensity: number, haze: number): number {
   return (ATMOSPHERE.rayleighPerKm[channel] ?? 0) * rayleighDensity + ATMOSPHERE.mieExtinctionPerKm * haze * mieDensity;
-}
-
-/**
- * The fraction of light from a surface at the end of a ray that reaches the eye, weighted like luminance (most from
- * green): 1 in clear air, toward 0 where the haze hides the surface. The engine scales a tile's screen-space error by it,
- * so fully hazed tiles near the horizon are not requested at fine levels (F395).
- */
-export function surfaceVisibility(ray: LocalRay, haze = 1, samples = 8): number {
-  const h0 = Math.max(0, ray.eyeAltitudeKm);
-  const exit = distanceToAltitude(h0, ray.radiusKm, ray.viewMu, ATMOSPHERE.topKm, true);
-  const end = Math.min(ray.maxDistanceKm, Number.isNaN(exit) ? 0 : Math.max(0, exit));
-  let rayleigh = 0;
-  let mie = 0;
-  // Samples crowd toward the eye (t²), where the air is densest for views near the ground.
-  for (let i = 0; i < samples; i++) {
-    const a = i / samples;
-    const b = (i + 1) / samples;
-    const d = end * ((a + b) / 2) ** 2;
-    const step = end * (b * b - a * a);
-    const h = Math.max(0, altitudeAlong(h0, ray.radiusKm, ray.viewMu, d));
-    rayleigh += Math.exp(-h / ATMOSPHERE.rayleighScaleHeightKm) * step;
-    mie += Math.exp(-h / ATMOSPHERE.mieScaleHeightKm) * step;
-  }
-  const weights = [0.2126, 0.7152, 0.0722];
-  let visibility = 0;
-  for (let c = 0; c < 3; c++) visibility += (weights[c] ?? 0) * Math.exp(-extinction(c, rayleigh, mie, haze));
-  return visibility;
 }
 
 /** Up, view and Sun as unit vectors in any common frame, for {@link skyRadiance}. */

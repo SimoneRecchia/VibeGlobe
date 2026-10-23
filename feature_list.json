@@ -6275,7 +6275,7 @@
         "Assert each addition, update and removal appears on screen and in the engine's layer and control lists",
         "Assert removed components release their engine resources"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F477",

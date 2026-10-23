@@ -1,7 +1,8 @@
+import type { Globe, ImageryLayerInput } from '@vibeglobe/core';
 import type { DataLayer, Feature, LayerStyle } from '@vibeglobe/layers';
 import type { UiControl } from '@vibeglobe/ui';
 import { defineComponent, inject, onBeforeUnmount, onMounted, watch, type PropType } from 'vue';
-import { EXTRAS_KEY, type GlobeExtras } from './context.js';
+import { EXTRAS_KEY, GLOBE_KEY, type GlobeExtras } from './context.js';
 
 /** The kinds of data layer a {@link VibeDataLayer} draws. */
 export type DataLayerKind = 'point' | 'marker' | 'label' | 'polyline' | 'polygon' | 'circle';
@@ -163,6 +164,64 @@ export const VibeControl = defineComponent({
       return () => {
         stop();
         ui.remove(current.id);
+      };
+    });
+    return () => null;
+  },
+});
+
+/** The id an imagery layer input gets: its own, or its first source's. */
+function layerIdOf(input: ImageryLayerInput): string {
+  return 'request' in input ? input.id : (input.id ?? input.sources[0]?.id ?? '');
+}
+
+/**
+ * An imagery layer of the enclosing globe, added on top of its imagery at runtime (`Globe.imageryLayers.add`): a source,
+ * or a chain of sources with its options. `opacity` and `visible` change it in place, a new `source` replaces it, and
+ * unmounting removes it and releases its tiles.
+ */
+export const VibeImageryLayer = defineComponent({
+  name: 'VibeImageryLayer',
+  props: {
+    source: { type: Object as PropType<ImageryLayerInput>, required: true },
+    opacity: { type: Number, default: 1 },
+    visible: { type: Boolean, default: true },
+  },
+  setup(props) {
+    const engine = inject(GLOBE_KEY, undefined);
+    onAttached('VibeImageryLayer', async () => {
+      // The engine starts after mount: wait for it, then for its imagery.
+      const globe = await new Promise<Globe>((resolve) => {
+        const stop = watch(
+          () => engine?.value,
+          (value) => {
+            if (value === undefined) return;
+            queueMicrotask(() => stop());
+            resolve(value);
+          },
+          { immediate: true },
+        );
+      });
+      await globe.ready;
+      let id = layerIdOf(props.source);
+      const look = (): void => globe.imageryLayers.set(id, { opacity: props.opacity, visible: props.visible });
+      globe.imageryLayers.add(props.source);
+      look();
+      const stops = [
+        watch(() => [props.opacity, props.visible] as const, look),
+        watch(
+          () => props.source,
+          (source) => {
+            globe.imageryLayers.remove(id);
+            id = layerIdOf(source);
+            globe.imageryLayers.add(source);
+            look();
+          },
+        ),
+      ];
+      return () => {
+        for (const stop of stops) stop();
+        globe.imageryLayers.remove(id);
       };
     });
     return () => null;

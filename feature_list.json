@@ -3579,7 +3579,7 @@
         "Run the guide's code examples as tests and assert they pass",
         "Confirm it explains that Apple map data may only be used through Apple's own MapKit and is therefore not offered"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F269",

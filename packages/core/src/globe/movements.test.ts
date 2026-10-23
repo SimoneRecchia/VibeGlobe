@@ -94,61 +94,116 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
     globe.destroy();
   });
 
-  it('announces a jump with the three events in one go (F197)', async () => {
-    const { globe } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
+  it('announces a jump with the three events in one go, settled as completed, the next frame at the target (F197)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
     const events: string[] = [];
     for (const name of ['movestart', 'move', 'moveend'] as const) globe.on(name, () => events.push(name));
-    globe.jumpTo({ zoom: 12 });
+    const jump = globe.jumpTo({ longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 12, headingDeg: 15 });
     expect(events).toEqual(['movestart', 'move', 'moveend']);
+    expect(await jump).toBe('completed');
+    ticks(1);
+    const { longitudeDeg, latitudeDeg, zoom, headingDeg } = globe.camera;
+    for (const [shown, wanted] of [
+      [longitudeDeg, 12.5],
+      [latitudeDeg, 41.9],
+      [zoom, 12],
+      [headingDeg, 15],
+    ] as const)
+      expect(shown).toBeCloseTo(wanted, 12);
+    globe.destroy();
+  });
+
+  it('settles flyTo, easeTo, jumpTo and tours as completed, cancels flights and tours by cancel() or a signal, and moves at most once per frame (F200)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
+    let moves = 0;
+    globe.on('move', () => moves++);
+    const frames = globe.frameNumber;
+    const flight = globe.flyTo({ longitudeDeg: 12, latitudeDeg: 42, zoom: 9 }, { durationMs: 300 });
+    ticks(40);
+    expect(await flight).toBe('completed');
+    expect(moves).toBeLessThanOrEqual(globe.frameNumber - frames);
+    expect(await globe.jumpTo({ zoom: 8 })).toBe('completed');
+    expect(await globe.tour([{ target: { zoom: 9 }, movement: 'jump' }])).toBe('completed');
+    const stops = [{ target: { longitudeDeg: 2, latitudeDeg: 48, zoom: 7 }, durationMs: 500 }];
+    const starts = [
+      (signal?: AbortController) =>
+        globe.flyTo(
+          { longitudeDeg: 100, latitudeDeg: 20 },
+          { durationMs: 2000, ...(signal ? { signal: signal.signal } : {}) },
+        ),
+      (signal?: AbortController) => globe.tour(stops, signal ? { signal: signal.signal } : {}),
+    ];
+    for (const start of starts) {
+      const cancelled = start();
+      ticks(3);
+      cancelled.cancel();
+      expect(await cancelled).toBe('cancelled');
+      const controller = new AbortController();
+      const aborted = start(controller);
+      ticks(2);
+      const stoppedAt = globe.camera.zoom;
+      controller.abort();
+      expect(await aborted).toBe('cancelled');
+      ticks(3);
+      expect(globe.camera.zoom).toBeCloseTo(stoppedAt, 9);
+    }
     globe.destroy();
   });
 });
 
 describe('fitting bounds and tours (F176, F199)', () => {
-  it('fits a city, an antimeridian area and a near-polar area inside the padded viewport, with heading and tilt', async () => {
-    const { globe, ticks } = await started({ longitudeDeg: 0, latitudeDeg: 20, zoom: 3, headingDeg: 30, tiltDeg: 20 });
-    for (const [bounds, padding] of [
-      [{ westDeg: 12.4, southDeg: 41.8, eastDeg: 12.6, northDeg: 42 }, 20],
-      [{ westDeg: 170, southDeg: -20, eastDeg: -170, northDeg: -10 }, 40],
-      [{ westDeg: 10, southDeg: 75, eastDeg: 30, northDeg: 80 }, 10],
-    ] as const) {
-      const movement = globe.fitBounds(bounds, { paddingPx: padding, movement: 'ease', durationMs: 100 });
-      ticks(30);
-      expect(await movement).toBe('completed');
-      let touching = Infinity;
-      for (let i = 0; i <= 8; i++) {
-        const f = i / 8;
-        const width =
-          bounds.eastDeg >= bounds.westDeg ? bounds.eastDeg - bounds.westDeg : bounds.eastDeg + 360 - bounds.westDeg;
-        let lon = bounds.westDeg + f * width;
-        if (lon > 180) lon -= 360;
-        for (const point of [
-          globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.southDeg }),
-          globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.northDeg }),
-        ]) {
-          if (!point) throw new Error('a bound is not on screen');
-          expect(point.xPx).toBeGreaterThanOrEqual(padding - 0.01);
-          expect(point.xPx).toBeLessThanOrEqual(800 - padding + 0.01);
-          expect(point.yPx).toBeGreaterThanOrEqual(padding - 0.01);
-          expect(point.yPx).toBeLessThanOrEqual(600 - padding + 0.01);
-          touching = Math.min(
-            touching,
-            point.xPx - padding,
-            800 - padding - point.xPx,
-            point.yPx - padding,
-            600 - padding - point.yPx,
-          );
+  it.each([
+    [30, 20],
+    [-60, 0],
+    [0, 40],
+  ])(
+    'fits a city, a country, an antimeridian area and a near-polar area inside the padded viewport, heading %d° and tilt %d°',
+    async (headingDeg, tiltDeg) => {
+      const { globe, ticks } = await started({ longitudeDeg: 0, latitudeDeg: 20, zoom: 3, headingDeg, tiltDeg });
+      for (const [bounds, padding] of [
+        [{ westDeg: 12.4, southDeg: 41.8, eastDeg: 12.6, northDeg: 42 }, 20],
+        [{ westDeg: 6.6, southDeg: 36.6, eastDeg: 18.5, northDeg: 47.1 }, 30],
+        [{ westDeg: 170, southDeg: -20, eastDeg: -170, northDeg: -10 }, 40],
+        [{ westDeg: 10, southDeg: 75, eastDeg: 30, northDeg: 80 }, 10],
+      ] as const) {
+        const movement = globe.fitBounds(bounds, { paddingPx: padding, movement: 'ease', durationMs: 100 });
+        ticks(30);
+        expect(await movement).toBe('completed');
+        let touching = Infinity;
+        for (let i = 0; i <= 8; i++) {
+          const f = i / 8;
+          const width =
+            bounds.eastDeg >= bounds.westDeg ? bounds.eastDeg - bounds.westDeg : bounds.eastDeg + 360 - bounds.westDeg;
+          let lon = bounds.westDeg + f * width;
+          if (lon > 180) lon -= 360;
+          for (const point of [
+            globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.southDeg }),
+            globe.geoToScreen({ longitudeDeg: lon, latitudeDeg: bounds.northDeg }),
+          ]) {
+            if (!point) throw new Error('a bound is not on screen');
+            expect(point.xPx).toBeGreaterThanOrEqual(padding - 0.01);
+            expect(point.xPx).toBeLessThanOrEqual(800 - padding + 0.01);
+            expect(point.yPx).toBeGreaterThanOrEqual(padding - 0.01);
+            expect(point.yPx).toBeLessThanOrEqual(600 - padding + 0.01);
+            touching = Math.min(
+              touching,
+              point.xPx - padding,
+              800 - padding - point.xPx,
+              point.yPx - padding,
+              600 - padding - point.yPx,
+            );
+          }
         }
+        // An edge sample touches the padding: as large as it can be.
+        expect(touching).toBeLessThan(2);
+        expect(globe.camera.headingDeg).toBeCloseTo(headingDeg, 6);
       }
-      // An edge sample touches the padding: as large as it can be.
-      expect(touching).toBeLessThan(2);
-      expect(globe.camera.headingDeg).toBeCloseTo(30, 6);
-    }
-    await expect(globe.fitBounds({ westDeg: 0, southDeg: 10, eastDeg: 5, northDeg: 5 })).rejects.toMatchObject({
-      code: 'invalid-coordinate',
-    });
-    globe.destroy();
-  });
+      await expect(globe.fitBounds({ westDeg: 0, southDeg: 10, eastDeg: 5, northDeg: 5 })).rejects.toMatchObject({
+        code: 'invalid-coordinate',
+      });
+      globe.destroy();
+    },
+  );
 
   it('plays the waypoints in order with their dwell times, and settles as completed, cancelled or interrupted', async () => {
     const { globe, ticks } = await started({ longitudeDeg: 0, latitudeDeg: 20, zoom: 3 });

@@ -18,7 +18,7 @@ import { NO_RENDERER_STATS } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
 import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
-import { wireView, type Movements } from './movements.js';
+import { completedMovement, wireView, type Movements } from './movements.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
@@ -42,7 +42,6 @@ import type {
   SurfaceTileInfo,
   ResourceCounts,
   ScreenPoint,
-  ViewInit,
 } from './types.js';
 import {
   DEFAULT_VIEW,
@@ -366,10 +365,11 @@ class GlobeEngine implements Globe {
     this.requestRender();
   }
 
-  jumpTo(target: ViewInit): void {
+  readonly jumpTo: Globe['jumpTo'] = (target) => {
     this.assertAlive();
     this.pendingView = this.movements.jump(target, this.pendingView, this.collapsed) ?? this.pendingView;
-  }
+    return completedMovement();
+  };
 
   readonly easeTo: Globe['easeTo'] = (target, options) => this.movements.start('ease', target, options);
   readonly flyTo: Globe['flyTo'] = (target, options) => this.movements.start('fly', target, options);

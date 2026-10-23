@@ -297,7 +297,8 @@ for (const backend of BACKENDS) {
         'manual',
       ]);
       // From a manual tilt at street zoom, Auto brings the curve's tilt back without a jump, then follows the curves.
-      await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 17, tiltDeg: 40 }));
+      // A manual 0° far from the curve's 50°: the way back to Auto is long enough for a jump to show.
+      await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 17, tiltDeg: 0 }));
       await waitForIdle(page);
       expect((await cameraAfterFrame(page)).viewMode).toBe('manual');
       const tilts = await page.evaluate(
@@ -399,9 +400,10 @@ test('custom curves drive the morph, relief and tilt, and changing them at runti
   // Back to the default curves at runtime: the view eases to them over frames, with no jump in the image.
   await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 2.4 }));
   await waitForIdle(page);
+  // The image before the change, so that a jump in the first changed frame is compared too.
+  let previous = await canvasImage(page);
   await page.evaluate(() => window.vibeglobePlayground?.globe.setViewCurves({}));
   const morphs: number[] = [];
-  let previous = await canvasImage(page);
   let largestShare = 0;
   // Each capture draws exactly one frame: one sample per frame.
   for (let i = 0; i < 40; i++) {

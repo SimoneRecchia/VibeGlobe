@@ -445,3 +445,10 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
   });
   return { viewControl, movements };
 }
+
+/** A movement that has already settled as 'completed': what a jump returns (F197, F200). */
+export function completedMovement(): CameraMovement {
+  const movement = Promise.resolve<MoveOutcome>('completed') as CameraMovement;
+  movement.cancel = () => undefined;
+  return movement;
+}

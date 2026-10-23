@@ -664,10 +664,11 @@ export interface Globe {
   /** Input intents, used by the controls plug-in and available to applications. */
   readonly navigation: NavigationApi;
   /**
-   * Moves the camera in one frame (before `ready`, the start view becomes this one). Invalid input throws a GlobeError
-   * and leaves the camera unchanged.
+   * Moves the camera in one frame (before `ready`, the start view becomes this one), with `movestart`, `move` and
+   * `moveend` (F197); the returned movement has already settled as 'completed', like the other movements' (F200).
+   * Invalid input throws a GlobeError and leaves the camera unchanged.
    */
-  jumpTo(target: ViewInit): void;
+  jumpTo(target: ViewInit): CameraMovement;
   /**
    * Moves the camera to `target` with eased interpolation of center, zoom, heading and tilt, the shorter way round
    * (F198). Fields not given keep their values: the chosen tilt, heading and view mode stay unless given (F201).

@@ -106,6 +106,7 @@ export class Movements {
       view = validateView(target, this.host.currentView());
       durationMs = validDuration(options?.durationMs);
       validSignal(options?.signal);
+      validShape(options);
     } catch (error) {
       return rejected(error);
     }
@@ -126,7 +127,7 @@ export class Movements {
     const animator =
       kind === 'fly' && this.reducedMotion
         ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
-        : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs);
+        : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs, options ?? {});
     return this.begin(animator, options?.signal);
   }
 
@@ -394,6 +395,24 @@ function rejected(error: unknown): CameraMovement {
   const promise = Promise.reject(error) as CameraMovement;
   promise.cancel = () => undefined;
   return promise;
+}
+
+/** A flight's speed and curve, finite and more than 0, and an easing name or function (F195). */
+function validShape(options: MovementOptions | undefined): void {
+  for (const key of ['speed', 'curve'] as const) {
+    const value: unknown = options?.[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0))
+      throw new GlobeError(
+        'invalid-option',
+        `A movement's ${key} must be a finite number above 0, got ${String(value)}`,
+      );
+  }
+  const easing: unknown = options?.easing;
+  if (easing !== undefined && easing !== 'ease-in-out' && easing !== 'linear' && typeof easing !== 'function')
+    throw new GlobeError(
+      'invalid-option',
+      `A movement's easing is 'ease-in-out', 'linear' or a function, got ${String(easing)}`,
+    );
 }
 
 /** A duration in milliseconds, 0 or more and finite, or undefined for the automatic one. */

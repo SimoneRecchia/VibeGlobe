@@ -19,28 +19,34 @@ const R0 = 3;
 const LENGTH = 4;
 /** 0 for a flight, then +1 or −1 for a pure zoom out or in. */
 const ZOOM_SIGN = 5;
+/** The path's ρ: how high it rises (F195). */
+const RHO = 6;
 
 /**
  * A flight path from a view `w0` wide to one `w1` wide whose centers lie `u1` apart. {@link length} is the path's
  * length S in the paper's units; {@link evaluate} gives the width and travelled distance at a fraction of it.
  */
 export class FlightPath {
-  private readonly p = new Float64Array(6);
+  private readonly p = new Float64Array(7);
 
-  /** Sets the path; widths must be positive and the distance at least 0. Allocates nothing. */
-  set(w0: number, w1: number, u1: number): this {
+  /**
+   * Sets the path; widths must be positive and the distance at least 0. `rho` sets how high it rises (the paper's
+   * ρ, 1.42 by default, the value its user study preferred). Allocates nothing.
+   */
+  set(w0: number, w1: number, u1: number, rho = FLIGHT_RHO): this {
     const p = this.p;
+    p[RHO] = rho;
     p[W0] = w0;
     p[W1] = w1;
     p[U1] = u1;
     if (u1 <= PURE_ZOOM_EPSILON * (w0 > w1 ? w0 : w1)) {
       p[ZOOM_SIGN] = w1 >= w0 ? 1 : -1;
-      p[LENGTH] = Math.abs(Math.log(w1 / w0)) / FLIGHT_RHO;
+      p[LENGTH] = Math.abs(Math.log(w1 / w0)) / rho;
       p[R0] = 0;
       return this;
     }
     p[ZOOM_SIGN] = 0;
-    const rho2 = FLIGHT_RHO * FLIGHT_RHO;
+    const rho2 = rho * rho;
     const rho4u2 = rho2 * rho2 * u1 * u1;
     const b0 = (w1 * w1 - w0 * w0 + rho4u2) / (2 * w0 * rho2 * u1);
     const b1 = (w1 * w1 - w0 * w0 - rho4u2) / (2 * w1 * rho2 * u1);
@@ -48,7 +54,7 @@ export class FlightPath {
     const r0 = -Math.asinh(b0);
     const r1 = -Math.asinh(b1);
     p[R0] = r0;
-    p[LENGTH] = (r1 - r0) / FLIGHT_RHO;
+    p[LENGTH] = (r1 - r0) / rho;
     return this;
   }
 
@@ -68,15 +74,16 @@ export class FlightPath {
     const t = out[2] ?? 0;
     const s = t * (p[LENGTH] ?? 0);
     const sign = p[ZOOM_SIGN] ?? 0;
+    const rho = p[RHO] ?? FLIGHT_RHO;
     if (sign !== 0) {
-      out[0] = w0 * Math.exp(sign * FLIGHT_RHO * s);
+      out[0] = w0 * Math.exp(sign * rho * s);
       out[1] = t * (p[U1] ?? 0);
       return;
     }
     const r0 = p[R0] ?? 0;
-    const rho2 = FLIGHT_RHO * FLIGHT_RHO;
+    const rho2 = rho * rho;
     const coshR0 = Math.cosh(r0);
-    out[0] = (w0 * coshR0) / Math.cosh(FLIGHT_RHO * s + r0);
-    out[1] = (w0 / rho2) * (coshR0 * Math.tanh(FLIGHT_RHO * s + r0) - Math.sinh(r0));
+    out[0] = (w0 * coshR0) / Math.cosh(rho * s + r0);
+    out[1] = (w0 / rho2) * (coshR0 * Math.tanh(rho * s + r0) - Math.sinh(r0));
   }
 }

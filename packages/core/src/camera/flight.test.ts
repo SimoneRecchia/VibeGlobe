@@ -55,4 +55,27 @@ describe('van Wijk and Nuij flight path (F195)', () => {
     expect(far).toBeGreaterThan(near);
     expect(near).toBeGreaterThan(0);
   });
+
+  it('moves at a constant perceived speed: ρ²(u′/w)² + (w′/w)²/ρ² stays 1 along the path, for any ρ', () => {
+    for (const rho of [1.42, 0.8, 2.5]) {
+      const path = new FlightPath().set(2000, 3000, 9.7e6, rho);
+      const ds = 1e-5;
+      for (let i = 1; i < 20; i++) {
+        const t = i / 20;
+        const before = at(path, t - ds / 2);
+        const after = at(path, t + ds / 2);
+        const width = at(path, t).width;
+        const step = ds * path.length;
+        const du = (after.travelled - before.travelled) / step / width;
+        const dw = (after.width - before.width) / step / width;
+        expect(rho * rho * du * du + (dw * dw) / (rho * rho), `ρ ${rho} at ${t}`).toBeCloseTo(1, 4);
+      }
+    }
+  });
+
+  it('rises higher with a larger ρ', () => {
+    const low = at(new FlightPath().set(2000, 2000, 9.7e6, 1), 0.5).width;
+    const high = at(new FlightPath().set(2000, 2000, 9.7e6, 2), 0.5).width;
+    expect(high).toBeGreaterThan(low);
+  });
 });

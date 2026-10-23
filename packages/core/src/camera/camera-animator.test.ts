@@ -86,4 +86,33 @@ describe('camera animations (F195, F198, F203)', () => {
     expect(animator.animatesTilt).toBe(false);
     expect(at(animator, camera, 500).tiltDeg).toBeCloseTo(35, 9);
   });
+
+  it('honors the duration, speed, curve and easing options (F195)', () => {
+    const start = (): Camera => cameraAt(9.19, 45.46, 2000);
+    const end = target(139.69, 35.68, 2000, 0);
+    // A given duration, and the automatic one at twice the speed: half as long.
+    expect(new CameraAnimator('fly', start(), end, 0, 2500).durationMs).toBe(2500);
+    const normal = new CameraAnimator('fly', start(), target(10.5, 45.9, 2000, 0), 0, undefined).durationMs;
+    const fast = new CameraAnimator('fly', start(), target(10.5, 45.9, 2000, 0), 0, undefined, { speed: 2.4 })
+      .durationMs;
+    expect(fast).toBeCloseTo(normal / 2, 6);
+    // A larger curve rises higher halfway.
+    const rangeHalfway = (curve: number): number => {
+      const camera = start();
+      const animator = new CameraAnimator('fly', camera, end, 0, 1000, { curve });
+      at(animator, camera, 500);
+      return camera.pose.rangeMeters;
+    };
+    expect(rangeHalfway(2.5)).toBeGreaterThan(rangeHalfway(1));
+    // Linear easing: an ease is halfway (geometrically in range) at half the time; a custom curve is followed.
+    for (const [easing, share] of [
+      ['linear', 0.5],
+      [(t: number) => t * t, 0.25],
+    ] as const) {
+      const camera = cameraAt(0, 0, 1000);
+      const animator = new CameraAnimator('ease', camera, target(0, 0, 16_000, 0), 0, 1000, { easing });
+      at(animator, camera, 500);
+      expect(Math.log(camera.pose.rangeMeters / 1000) / Math.log(16)).toBeCloseTo(share, 9);
+    }
+  });
 });

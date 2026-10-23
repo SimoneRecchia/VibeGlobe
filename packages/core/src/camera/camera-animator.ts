@@ -35,6 +35,18 @@ function easeInOut(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
+const linear = (t: number): number => t;
+
+/** How a movement runs (F195): flight speed and rise, and the timing curve; every field optional. */
+export interface AnimationShape {
+  /** Flight path units per second when no duration is given (default 1.2). */
+  readonly speed?: number;
+  /** The flight path's ρ (default 1.42): greater rises higher. */
+  readonly curve?: number;
+  /** The timing curve on [0, 1]: 'ease-in-out' (default), 'linear', or a function with f(0) = 0 and f(1) = 1. */
+  readonly easing?: 'ease-in-out' | 'linear' | ((t: number) => number);
+}
+
 /**
  * One animated camera movement (F195, F198, F203): from the pose at its start to a target pose, as a function of the
  * engine time, so the camera follows the same trajectory at every frame rate and after stalled frames. `ease`
@@ -49,11 +61,12 @@ export class CameraAnimator {
   private readonly io = new Float64Array(3);
   private readonly a = new Float64Array(3);
   private readonly b = new Float64Array(3);
+  private readonly easing: (t: number) => number;
 
   /**
    * Starts at the camera's current pose toward `target` (radians and meters: longitude, latitude, range, heading, tilt;
    * a NaN tilt keeps the tilt), at engine time `startMs`. A `durationMs` of undefined picks one: proportional to the
-   * flight path for `fly`, 1 s for `ease`.
+   * flight path for `fly` (at `shape.speed`), 1 s for `ease`. `shape` also sets the flight's rise and the timing curve.
    */
   constructor(
     kind: AnimationKind,
@@ -61,8 +74,11 @@ export class CameraAnimator {
     target: Float64Array,
     startMs: number,
     durationMs: number | undefined,
+    shape: AnimationShape = {},
   ) {
     this.kind = kind;
+    const easing = shape.easing ?? 'ease-in-out';
+    this.easing = easing === 'ease-in-out' ? easeInOut : easing === 'linear' ? linear : easing;
     const v = this.v;
     const pose = camera.pose;
     v[LON0] = pose.targetLongitudeRad;
@@ -87,12 +103,20 @@ export class CameraAnimator {
     v[ANGLE] = Math.acos(dot > 1 ? 1 : dot < -1 ? -1 : dot);
     // View widths in ground meters: the visible height at the target, proportional to the range.
     const scale = 2 * Math.tan(camera.fovYRad / 2);
-    this.path.set((v[RANGE0] ?? 1) * scale, (v[RANGE1] ?? 1) * scale, (v[ANGLE] ?? 0) * WGS84.semiMajorAxisMeters);
+    this.path.set(
+      (v[RANGE0] ?? 1) * scale,
+      (v[RANGE1] ?? 1) * scale,
+      (v[ANGLE] ?? 0) * WGS84.semiMajorAxisMeters,
+      shape.curve,
+    );
     v[START_MS] = startMs;
     v[DURATION_MS] =
       durationMs ??
       (kind === 'fly'
-        ? Math.min(MAX_FLIGHT_MS, Math.max(MIN_FLIGHT_MS, (this.path.length / FLIGHT_SPEED_PER_S) * 1000))
+        ? Math.min(
+            MAX_FLIGHT_MS,
+            Math.max(MIN_FLIGHT_MS, (this.path.length / (shape.speed ?? FLIGHT_SPEED_PER_S)) * 1000),
+          )
         : 1000);
   }
 
@@ -116,7 +140,7 @@ export class CameraAnimator {
     const duration = v[DURATION_MS] ?? 0;
     const elapsed = (io[0] ?? 0) - (v[START_MS] ?? 0);
     const t = duration > 0 ? (elapsed >= duration ? 1 : elapsed <= 0 ? 0 : elapsed / duration) : 1;
-    const eased = easeInOut(t);
+    const eased = this.easing(t);
     const pose = camera.pose;
     let along: number;
     if (this.kind === 'fly') {

@@ -584,6 +584,12 @@ export interface MovementOptions {
   readonly durationMs?: number;
   /** Cancels the movement when aborted, as {@link CameraMovement.cancel} does. */
   readonly signal?: AbortSignalLike;
+  /** Flights without a duration: path units per second (default 1.2, more than 0; F195). */
+  readonly speed?: number;
+  /** Flights: van Wijk and Nuij's ρ, how high the flight rises (default 1.42, more than 0; F195). */
+  readonly curve?: number;
+  /** The timing curve: 'ease-in-out' (default), 'linear', or a function on [0, 1] with f(0) = 0 and f(1) = 1. */
+  readonly easing?: 'ease-in-out' | 'linear' | ((t: number) => number);
 }
 
 /**

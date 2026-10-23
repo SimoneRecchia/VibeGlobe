@@ -72,6 +72,8 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
     const { globe } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
     await expect(globe.flyTo({ latitudeDeg: 95 })).rejects.toMatchObject({ code: 'invalid-coordinate' });
     await expect(globe.easeTo({ zoom: 5 }, { durationMs: -1 })).rejects.toMatchObject({ code: 'invalid-option' });
+    for (const options of [{ speed: 0 }, { speed: Number.NaN }, { curve: -1 }, { easing: 'bounce' as 'linear' }])
+      await expect(globe.flyTo({ zoom: 5 }, options)).rejects.toMatchObject({ code: 'invalid-option' });
     expect(globe.camera.zoom).toBeCloseTo(10, 9);
     globe.destroy();
   });

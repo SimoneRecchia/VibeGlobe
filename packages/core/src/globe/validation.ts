@@ -224,6 +224,7 @@ const EVENT_NAMES: ReadonlySet<keyof GlobeEvents> = new Set<keyof GlobeEvents>([
   'backend-fallback',
   'tile-error',
   'credits-change',
+  'imagery-layers-change',
   'error',
   'view-mode-change',
   'movestart',

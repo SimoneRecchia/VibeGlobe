@@ -1,5 +1,6 @@
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
 import { applyPixelRatio } from './imagery-variants.js';
+import { loaderBase, type LoaderBase, type LoaderContext } from './loader-context.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
@@ -9,16 +10,11 @@ import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
-import {
-  ImageryLoader,
-  type DecodeTask,
-  type ImageryLoaderOptions,
-  type TileMemory,
-} from '../imagery/imagery-loader.hot.js';
-import { imageryDecodeTask, type TileSource } from '../imagery/imagery-source.js';
+import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imagery-loader.hot.js';
+import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
-import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
+import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import {
@@ -122,56 +118,25 @@ function releaseNetworkPool(pool: NetworkPool): void {
   pagePool = undefined;
 }
 
-/** What the runtime reports to its engine instance. */
-
-/** What every loader of an engine instance shares. */
-interface LoaderContext {
-  readonly network: NetworkPool;
-  readonly pool: WorkerPool;
-  readonly shared: TileMemory;
-  readonly renderer: RendererBackend;
-  readonly callbacks: ImageryCallbacks;
-  readonly observability: Observability | undefined;
-}
-
-/** A loader's options except its decode task. */
-type LoaderBase = Omit<ImageryLoaderOptions, 'decodeTask'>;
-
-/** The options of a loader of `source` whose texture handles start at `handleBase`. */
-function loaderBase(context: LoaderContext, source: TileSource, handleBase: number, pinnedLevel: number): LoaderBase {
-  const { renderer, callbacks, observability } = context;
-  const host = renderer.host;
-  return {
-    source,
-    network: context.network,
-    workers: context.pool,
-    memory: context.shared,
-    handleBase,
-    pinnedLevel,
-    prefetchRing: true,
-    ...(observability ? { observability } : {}),
-    uploadTexture: (handle, tile) => renderer.uploadTexture(handle, tile),
-    releaseTexture: (handle) => renderer.releaseTexture(handle),
-    requestFrame: () => callbacks.requestFrame(),
-    tileError: (failed, level, x, y, reason) => callbacks.tileError({ sourceId: failed.id, level, x, y, reason }),
-    now: () => host.now(),
-    setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
-    random: Math.random,
-  };
-}
-
 /**
  * The imagery of one engine instance (M3 plan §2.3): a loader per layer over a network pool, a lease on the shared
  * worker pool, and the memory they share (GPU residency and RAM tier, ADR 0007). Each frame wants tiles between the
  * loaders' begin and end inside {@link ImageryRuntime.draw}.
  */
 export class ImageryRuntime {
-  /** Every source's loader, in the order of the stack's chains (texture handles are allocated by this index). */
+  /** Every source's loader; texture handles are allocated by each one's `index` (`Globe.imageryLayers.add`, A2). */
   readonly layers: ImageryLayer[];
-  /** The imagery stack, bottom first (ADR 0038): reordered in place by `Globe.imageryLayers.move`. */
+  /** The imagery stack, bottom first (ADR 0038): changed in place by `Globe.imageryLayers` (move, add, remove). */
   readonly stack: StackLayer[];
-  /** The credits of the sources in view (F254). */
-  readonly credits: RuntimeCredits;
+  /** The credits of the sources in view (F254), built again when a layer is added or removed. */
+  credits: RuntimeCredits;
+  /** What a new loader shares with the others, the terrain's handle index and the next free one (A2). */
+  readonly loaderContext: LoaderContext;
+  readonly terrainIndex: number;
+  nextIndex: number;
+  /** The last render-target pixels per CSS pixel, for layers added later (F241). */
+  pixelRatio = 1;
+  private readonly byIndex = new Map<number, ImageryLoader>();
   /** The terrain layer, when the engine has a terrain source (M4). */
   readonly terrain: TerrainLayer | undefined;
   /** The resident terrain grids, for elevation queries (F144, F145). */
@@ -238,22 +203,49 @@ export class ImageryRuntime {
     const pinned = pinnedLevels(entries, gpuBudgetBytes);
     const pool = this.lease.pool;
     const context: LoaderContext = { network: this.network, pool, shared, renderer, callbacks, observability };
-    const loaderOptions = (source: TileSource, index: number, pinnedLevel: number): LoaderBase =>
-      loaderBase(context, source, index * HANDLES_PER_LAYER, pinnedLevel);
-    this.terrain = terrain && this.terrainLayer(terrain, loaderOptions(terrain, sources.length, TERRAIN_PINNED_LEVEL));
-    this.layers = sources.map((source, index) => ({
-      source,
-      loader: new ImageryLoader({
-        ...loaderOptions(source, index, pinned[index] ?? -1),
-        decodeTask: imageryDecodeTask(source, renderer.capabilities.compressedTextureFormats),
-      }),
-      index,
-    }));
+    this.loaderContext = context;
+    this.terrainIndex = sources.length;
+    this.nextIndex = sources.length + 1;
+    this.terrain =
+      terrain &&
+      this.terrainLayer(
+        terrain,
+        loaderBase(context, terrain, sources.length * HANDLES_PER_LAYER, TERRAIN_PINNED_LEVEL),
+      );
+    this.layers = sources.map((source, index) => this.newLayer(source, index, pinned[index] ?? -1));
     this.stack = stackOf(entries, this.layers);
     this.heights = this.terrain && new TerrainHeights(this.terrain);
-    this.credits = runtimeCredits(sources, terrain, renderer, callbacks, observability);
+    this.credits = this.creditsOf();
     this.texelsPerTile = Math.max(0, ...sources.map((source) => source.tileSizePx));
     this.maxLevel = Math.max(0, ...sources.map((source) => source.maxLevel));
+  }
+
+  /** A loader for `source` under the texture handles of `index`, pinning its base down to `pinnedLevel` (−1: none). */
+  newLayer(source: ImagerySource, index: number, pinnedLevel: number): ImageryLayer {
+    const formats = this.renderer.capabilities.compressedTextureFormats;
+    const loader = new ImageryLoader({
+      ...loaderBase(this.loaderContext, source, index * HANDLES_PER_LAYER, pinnedLevel),
+      decodeTask: imageryDecodeTask(source, formats),
+    });
+    this.byIndex.set(index, loader);
+    return { source, loader, index };
+  }
+
+  /** Forgets a layer's loader: its tiles are released and its requests cancelled (`Globe.imageryLayers.remove`). */
+  dropLayer(layer: ImageryLayer): void {
+    layer.loader.reload();
+    layer.loader.destroy();
+    this.byIndex.delete(layer.index);
+    this.layers.splice(this.layers.indexOf(layer), 1);
+  }
+
+  /** The credits of the current layers and the terrain, by handle index (holes where layers were removed). */
+  creditsOf(): RuntimeCredits {
+    const sources: (ImagerySource | TerrainSource | undefined)[] = [];
+    for (const layer of this.layers) sources[layer.index] = layer.source;
+    if (this.terrain) sources[this.terrainIndex] = this.terrain.source;
+    const { renderer, callbacks, observability } = this.loaderContext;
+    return runtimeCredits(sources, this.terrain ? this.terrainIndex : -1, renderer, callbacks, observability);
   }
 
   /** The terrain layer: its loader keeps CPU copies of the grids for queries and widens the height range. */
@@ -426,6 +418,8 @@ export class ImageryRuntime {
 
   /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
   readonly stackChanged = (): void => ((this.fades.snapNext = true), this.callbacks.requestFrame());
+  /** The list of layers changed: added, removed or moved (`imagery-layers-change`). */
+  readonly layersChanged = (): void => this.callbacks.layersChange?.();
 
   /** The counters of `Globe.terrainStats()`; undefined without terrain. */
   terrainStats(): TerrainStats | undefined {
@@ -437,6 +431,7 @@ export class ImageryRuntime {
 
   /** Picks the high-DPI variants and level shifts for render-target pixels per CSS pixel `pixelRatio` (F240, F241). */
   setPixelRatio(pixelRatio: number): void {
+    this.pixelRatio = pixelRatio;
     Object.assign(this, applyPixelRatio(this.layers, pixelRatio));
   }
 
@@ -489,6 +484,6 @@ export class ImageryRuntime {
 
   private loaderOf(handle: number): ImageryLoader | undefined {
     const index = Math.floor(handle / HANDLES_PER_LAYER);
-    return index === this.layers.length ? this.terrain?.loader : this.layers[index]?.loader;
+    return index === this.terrainIndex ? this.terrain?.loader : this.byIndex.get(index);
   }
 }

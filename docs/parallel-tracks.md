@@ -143,7 +143,9 @@ Their rows live on their branches until the owner merges them; the main session 
 - A (3): `Globe.constraints` returns the constraints as last set (`{}` without any).
 - B (1): `Globe.refreshCredits()` reads the visible sources' `attribution` again and emits `credits-change` when the list changed.
 - B (4): `xyzImagery` with a custom `transport` sets `transportRequired: true` (TB-01).
-- Open, in their milestones: A (2) runtime `imageryLayers.add`/`remove` (M7), A (4) `captureView` (M12), B (3) `displayOnly` refusals (M7), C (1)–(4) once `packages/models` and `packages/quality` are on `main` (M10, M11).
+- A (2): `Globe.imageryLayers.add(input, index?)` adds a layer (a source or `{ id, sources, opacity, visible, blend }`) on a running globe, refusing invalid metadata or a taken layer or source id with a `GlobeError`; `remove(id)` releases its tiles; the `imagery-layers-change` event reports the list after an add, a remove or a move. A globe needs `workers` (and an imagery layer or terrain at start) for layers to be added.
+- B (2): see the source adapters' row above (`maxAgeMs`).
+- Open, in their milestones: A (4) `captureView` (M12), B (3) `displayOnly` refusals (M7), C (1)–(4) once `packages/models` and `packages/quality` are on `main` (M10, M11).
 
 ## Status
 

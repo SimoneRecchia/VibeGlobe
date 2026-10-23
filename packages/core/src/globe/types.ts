@@ -1,6 +1,6 @@
 import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
 import type { LayerRenderTarget } from '../layers/layer-target.js';
-import type { ImageryLayerInput, ImageryLayers } from '../imagery/imagery-stack.js';
+import type { ImageryLayerInput, ImageryLayers, ImageryLayerState } from '../imagery/imagery-stack.js';
 import type { Credit } from '../imagery/credits.js';
 import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
@@ -498,6 +498,8 @@ export interface GlobeEvents {
   'tile-error': TileErrorEvent;
   /** The credits of the sources in view changed (F254): the new list, as {@link Globe.credits} returns it. */
   'credits-change': { readonly credits: readonly Credit[] };
+  /** Imagery layers were added, removed or moved (`Globe.imageryLayers`): the new list, bottom first. */
+  'imagery-layers-change': { readonly layers: readonly ImageryLayerState[] };
   /** The view mode changed: through {@link Globe.setViewMode}, or to 'manual' when a view chose a tilt (F163). */
   'view-mode-change': { readonly mode: ViewMode };
   /** A camera movement began (F200, ADR 0036). */

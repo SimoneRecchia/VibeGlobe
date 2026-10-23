@@ -234,3 +234,50 @@ describe('tile sizes and high-DPI variants (F240, F241)', () => {
     globe.destroy();
   });
 });
+
+describe('imagery layers added and removed at runtime (track A hook 2)', () => {
+  it('adds a layer at an index, loads and draws its tiles, removes one with its textures, and reports each change', async () => {
+    const urlsA: string[] = [];
+    const urlsB: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source(urlsA)],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    const run = async (frames: number): Promise<void> => {
+      for (let frame = 0; frame < frames; frame++) {
+        await settle();
+        renderer.timers.advance(50);
+        renderer.flush();
+      }
+    };
+    await run(30);
+    const changes: string[][] = [];
+    globe.on('imagery-layers-change', ({ layers }) => changes.push(layers.map((layer) => layer.id)));
+    const second: ImagerySource = { ...source(urlsB), id: 'second' };
+    globe.imageryLayers.add({ id: 'roads', sources: [second], opacity: 0.5 }, 0);
+    expect(globe.imageryLayers.list().map((layer) => layer.id)).toEqual(['roads', 'fixture']);
+    await run(30);
+    expect(urlsB.length).toBeGreaterThan(0);
+    const texturesBefore = renderer.textures.size;
+    expect(globe.imageryLayers.remove('fixture')).toBe(true);
+    expect(globe.imageryLayers.remove('fixture')).toBe(false);
+    await run(5);
+    expect(renderer.textures.size).toBeLessThan(texturesBefore);
+    expect(globe.imageryLayers.list().map((layer) => layer.id)).toEqual(['roads']);
+    expect(changes).toEqual([['roads', 'fixture'], ['roads']]);
+    // An id taken or invalid metadata is refused with a typed error.
+    expect(() => globe.imageryLayers.add({ ...second })).toThrowError(/source already has the id "second"/);
+    expect(() => globe.imageryLayers.add({ id: 'roads', sources: [{ ...source([]), id: 'third' }] })).toThrowError(
+      /layer already has the id "roads"/,
+    );
+    expect(() => globe.imageryLayers.add({ ...source([]), id: 'bad', minLevel: 9, maxLevel: 3 })).toThrowError(
+      /minimum level 9 above its maximum 3/,
+    );
+    globe.destroy();
+  });
+});

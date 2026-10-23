@@ -104,6 +104,14 @@ export interface ImageryLayers {
   set(id: string, changes: ImageryLayerChanges): void;
   /** Moves a layer to `index` in the bottom-first order (clamped to the list). */
   move(id: string, index: number): void;
+  /**
+   * Adds a layer at `index` in the bottom-first order (default: on top) on a running globe (track A hook 2). Throws a
+   * `GlobeError` ('invalid-option') for a source with invalid metadata or an id already taken, and before the imagery
+   * starts (after `ready`) or on a globe created without `workers`.
+   */
+  add(input: ImageryLayerInput, index?: number): void;
+  /** Removes a layer and releases its tiles; false when no layer has the id. */
+  remove(id: string): boolean;
 }
 
 /** Blend modes as the renderer's per-draw numbers (`TileDrawOverlay.blends`). */

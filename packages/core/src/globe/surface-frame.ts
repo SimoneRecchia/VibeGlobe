@@ -261,6 +261,13 @@ export class SurfaceFrame {
     this.observability.tracer.record('camera', 'move', subject);
   }
 
+  /** The layers' tile sizes and levels changed (a layer was added or removed): the selection reads them again. */
+  imageryChanged(): void {
+    if (!this.imagery) return;
+    this.selection.imageryTexelsPerTile = this.imagery.texelsPerTile;
+    this.selection.imageryMaxLevel = this.imagery.maxLevel;
+  }
+
   /**
    * Sets render-target pixels per CSS pixel (device pixel ratio × resolution scale): imagery texels are judged in
    * render-target pixels, so a sharper canvas gets finer imagery (F109, M3 plan §2.5).
@@ -270,8 +277,7 @@ export class SurfaceFrame {
     // High-DPI sources switch to their `@2x` tiles (F241).
     if (this.imagery) {
       this.imagery.setPixelRatio(pixelRatio);
-      this.selection.imageryTexelsPerTile = this.imagery.texelsPerTile;
-      this.selection.imageryMaxLevel = this.imagery.maxLevel;
+      this.imageryChanged();
     }
   }
 

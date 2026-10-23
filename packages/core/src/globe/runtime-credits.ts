@@ -18,11 +18,11 @@ export class RuntimeCredits {
   private reported = '[]';
 
   /**
-   * `sources` are the imagery sources then the terrain source, if any; `changed` receives the new list; `warn` logs
+   * `sources` are the imagery and terrain sources by handle index (holes where a layer was removed); `changed` receives the new list; `warn` logs
    * once per source whose required credit the configuration tried to hide.
    */
   constructor(
-    private readonly sources: readonly CreditedSource[],
+    private readonly sources: readonly (CreditedSource | undefined)[],
     private readonly hidden: ReadonlySet<string>,
     private readonly changed: (credits: readonly Credit[]) => void,
     private readonly warn: (message: string) => void,
@@ -58,7 +58,9 @@ export class RuntimeCredits {
 
   /** The credits of the sources the last frame showed (allocates; called on a change and by `Globe.credits()`). */
   list(): Credit[] {
-    const shown = this.sources.filter((_, index) => this.visible.visible(index));
+    const shown = this.sources.filter(
+      (source, index): source is CreditedSource => source !== undefined && this.visible.visible(index),
+    );
     return creditsOf(shown, this.hidden, (sourceId) => {
       if (this.warned.has(sourceId)) return;
       this.warned.add(sourceId);
@@ -77,6 +79,8 @@ export interface ImageryCallbacks {
   creditsChange?(credits: readonly Credit[]): void;
   /** A source was left out for invalid metadata (F220). */
   sourceError?(error: GlobeError): void;
+  /** Imagery layers were added, removed or moved (`Globe.imageryLayers`, track A hook 2). */
+  layersChange?(): void;
   /** Sources whose credits the application hides (`GlobeOptions.hiddenCredits`); required credits stay (F255). */
   readonly hiddenCredits?: readonly string[];
   /** False when the application shows the credits itself (`GlobeOptions.creditsElement`). */
@@ -85,20 +89,20 @@ export interface ImageryCallbacks {
 
 /** The credits of an engine's sources, shown in the renderer's attribution element and reported to the globe. */
 export function runtimeCredits(
-  sources: readonly ImagerySource[],
-  terrain: TerrainSource | undefined,
+  sources: readonly (ImagerySource | TerrainSource | undefined)[],
+  terrainIndex: number,
   renderer: RendererBackend,
   callbacks: ImageryCallbacks,
   observability: Observability | undefined,
 ): RuntimeCredits {
   return new RuntimeCredits(
-    terrain ? [...sources, terrain] : sources,
+    sources,
     new Set(callbacks.hiddenCredits ?? []),
     (credits) => {
       if (callbacks.creditsElement !== false) renderer.host.showCredits?.(credits);
       callbacks.creditsChange?.(credits);
     },
     (message) => observability?.logger.log('warn', message),
-    terrain ? sources.length : -1,
+    terrainIndex,
   );
 }

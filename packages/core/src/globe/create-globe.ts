@@ -225,6 +225,7 @@ class GlobeEngine implements Globe {
       requestFrame: () => this.destroyed || this.requestRender(),
       tileError: (event) => this.emitter.emit('tile-error', event),
       creditsChange: (credits) => this.emitter.emit('credits-change', { credits }),
+      layersChange: () => this.emitter.emit('imagery-layers-change', { layers: this.imageryLayers.list() }),
       sourceError: (error) => this.emitter.emit('error', error),
     });
     // After the terrain starts: its errors set the skirt depths.

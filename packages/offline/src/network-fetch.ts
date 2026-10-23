@@ -1,10 +1,17 @@
 import type { TimeoutsMs } from '@vibeglobe/core';
-import { retryAfterMs } from '@vibeglobe/sources';
+import { expectTiming, retryAfterMs, takeTiming, type NetworkTiming } from '@vibeglobe/sources';
 import { cacheHeadersOf, type CacheHeaders } from './cache-policy.js';
 
 /** How one network request ended, with what the cache needs to know. */
 export type FetchOutcome =
-  | { readonly kind: 'ok'; readonly bytes: ArrayBuffer; readonly contentType: string; readonly headers: CacheHeaders }
+  | {
+      readonly kind: 'ok';
+      readonly bytes: ArrayBuffer;
+      readonly contentType: string;
+      readonly headers: CacheHeaders;
+      /** The response's network timings, when the browser reports them (F300). */
+      readonly timing?: NetworkTiming;
+    }
   | { readonly kind: 'not-modified'; readonly headers: CacheHeaders }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
   /** A redirect or an HTML page where a tile was expected: a captive portal or a misconfigured endpoint (F297). */
@@ -27,7 +34,7 @@ export function looksLikePortal(response: Response): boolean {
   return response.ok && type.startsWith('text/html');
 }
 
-async function outcomeOf(response: Response): Promise<FetchOutcome> {
+async function outcomeOf(response: Response, timedUrl: string | undefined): Promise<FetchOutcome> {
   const headers = cacheHeadersOf(response.headers);
   if (response.status === 304) return { kind: 'not-modified', headers };
   if (looksLikePortal(response)) return { kind: 'portal' };
@@ -38,7 +45,12 @@ async function outcomeOf(response: Response): Promise<FetchOutcome> {
       retryAfterMs: retryAfterMs(response.headers.get('Retry-After'), Date.now()),
     };
   const bytes = await response.arrayBuffer();
-  return { kind: 'ok', bytes, contentType: response.headers.get('Content-Type') ?? '', headers };
+  const contentType = response.headers.get('Content-Type') ?? '';
+  if (timedUrl === undefined) return { kind: 'ok', bytes, contentType, headers };
+  // The timing entry arrives a task after the body (F300).
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const timing = takeTiming(timedUrl);
+  return timing ? { kind: 'ok', bytes, contentType, headers, timing } : { kind: 'ok', bytes, contentType, headers };
 }
 
 /**
@@ -65,6 +77,7 @@ export async function fetchTile(
   const headers = new Headers();
   if (validators?.etag) headers.set('If-None-Match', validators.etag);
   if (validators?.lastModified) headers.set('If-Modified-Since', validators.lastModified);
+  const timed = expectTiming(url);
   try {
     const response = await fetchImpl(url, {
       signal: controller.signal,
@@ -75,12 +88,13 @@ export async function fetchTile(
       cache: 'no-store',
     });
     clearTimeout(firstByte);
-    return await outcomeOf(response);
+    return await outcomeOf(response, timed ? url : undefined);
   } catch {
     return { kind: controller.signal.aborted ? reason : 'network-error' };
   } finally {
     clearTimeout(firstByte);
     clearTimeout(total);
     signal.removeEventListener('abort', onAbort);
+    if (timed) takeTiming(url);
   }
 }

@@ -1,4 +1,5 @@
 import type { AbortHandle, TileRequest, TileTransport, TimeoutsMs, TransportResult } from '@vibeglobe/core';
+import type { NetworkTiming } from './resource-timing.js';
 import { retryAfterMs } from './fetch-transport.js';
 
 /** An HTTP answer that is not a success, raised by the readers behind {@link archiveTransport}. */
@@ -26,7 +27,7 @@ export class NetworkError extends Error {
 export type TileReader = (
   url: string,
   signal: AbortSignal,
-) => Promise<{ bytes: ArrayBuffer; contentType: string; maxAgeMs?: number } | undefined>;
+) => Promise<{ bytes: ArrayBuffer; contentType: string; maxAgeMs?: number; timing?: NetworkTiming } | undefined>;
 
 /**
  * Fetches a range of bytes with `fetchImpl`, raising {@link HttpStatusError} and {@link NetworkError} so that the
@@ -116,6 +117,10 @@ export function archiveTransport(read: TileReader): TileTransport {
                   contentType: tile.contentType,
                   // How long the reader's answer may be reused (its cache headers, F260).
                   ...(tile.maxAgeMs === undefined ? {} : { maxAgeMs: tile.maxAgeMs }),
+                  // The network's own timings, when the reader had them (F300).
+                  ...(tile.timing && !tile.timing.cached
+                    ? { waitMs: tile.timing.waitMs, transferMs: tile.timing.transferMs, endAgoMs: tile.timing.endAgoMs }
+                    : {}),
                 },
           ),
         )

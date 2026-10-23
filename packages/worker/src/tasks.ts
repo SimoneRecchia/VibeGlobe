@@ -36,7 +36,7 @@ function clusterTask(name: string): TaskFunction {
 
 /**
  * A task of a table another package provides, imported on its first use in its own chunk: vector-tile layout of
- * `@vibeglobe/layers/vector-tiles` and glTF parsing of `@vibeglobe/models` (M13, M10).
+ * `@vibeglobe/layers/vector-tiles` (M13).
  */
 function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): TaskFunction {
   return async (input, context) => {
@@ -66,10 +66,5 @@ export const TASKS: TaskTable = Object.freeze({
     'vector-tile',
     () => import('@vibeglobe/layers/vector-tiles').then((module) => module.VECTOR_TILE_TASKS),
     'layout-vector-tile',
-  ),
-  'parse-model': lazyTask(
-    'model',
-    () => import('@vibeglobe/models').then((module) => module.createModelTasks()),
-    'parse-model',
   ),
 });

@@ -4,6 +4,8 @@
  * @module @vibeglobe/sources
  */
 export { fetchTransport, maxAgeOf, redactUrl, retryAfterMs } from './fetch-transport.js';
+export { expectTiming, takeTiming } from './resource-timing.js';
+export type { NetworkTiming } from './resource-timing.js';
 export type { FetchTransportExtras, SourceAuth } from './fetch-transport.js';
 export { xyzImagery } from './xyz-imagery.js';
 export type { XyzImageryOptions } from './xyz-imagery.js';

@@ -19,6 +19,8 @@ export class MotionDetail {
   private readonly lastEye = new Float64Array(3).fill(Number.NaN);
   private lastMs = Number.NaN;
   private speed = 0;
+  /** The factor of the motion alone, before the link's: held while the camera slows. */
+  private motionFactor = 1;
   /** The texel error multiplier of the last frame (1 at rest). */
   factor = 1;
   /** A flight runs: on a slow link it asks for one level coarser from its first frame (F301). */
@@ -50,6 +52,10 @@ export class MotionDetail {
     }
     // Whole levels: 1, 2 or 4 (and 8 on a slow link, F301), so the selection's threshold changes only between them.
     let factor = 2 ** Math.round(Math.log2(Math.min(MAX_FACTOR, 1 + Math.max(0, this.speed - STILL_SPEED) * 2)));
+    // Slowing down keeps the coarse detail until the camera is still, then refines at once: stepping through the
+    // levels between would request tiles that the next level replaces before they show (F090).
+    if (factor > 1 && factor < this.motionFactor) factor = this.motionFactor;
+    this.motionFactor = factor;
     if ((factor > 1 || this.flying) && link !== undefined && link.bitsPerSecond < SLOW_LINK_BPS) factor *= 2;
     this.factor = factor;
     return factor;

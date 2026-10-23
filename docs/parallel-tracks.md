@@ -50,9 +50,9 @@ Extension points (on `main` from the main session's next merge):
   limits, coalescing, cancellation, the measured link) and the engine's worker pool `workers`. The extension places its
   objects camera-relative in `frame(view)` before every draw (offsets from `FrameView.eyeEcef`, ADR 0004) and frees
   them in `dispose()`.
-- **Worker tasks**: the worker program runs `layout-vector-tile` (`VECTOR_TILE_TASKS` of `@vibeglobe/layers/vector-tiles`),
-  `decode-mvt` and `parse-model` (`createModelTasks()` of `@vibeglobe/models`), each loaded on first use; a track adds
-  tasks to its own task table, and asks for its registration in `packages/worker/src/tasks.ts` under "Hook requests".
+- **Worker tasks**: the worker program runs `layout-vector-tile` (`VECTOR_TILE_TASKS` of `@vibeglobe/layers/vector-tiles`)
+  and `decode-mvt`, each loaded on first use; a track adds tasks to its own task table, and asks for its registration
+  in `packages/worker/src/tasks.ts` under "Hook requests". `parse-model` is not registered yet: see C (1) below.
 - **Data and queries**: `Globe.surfaceTiles()`, `Globe.camera`, `Globe.elevationAt` (draping heights), `Globe.credits`
   and the source credits, `Globe.on('frame' | 'camera-change')`, `geoToScreen` and `screenToGeo`.
 
@@ -184,7 +184,7 @@ Their rows live on their branches until the owner merges them; the main session 
 - B (4): `xyzImagery` with a custom `transport` sets `transportRequired: true` (TB-01).
 - A (2): `Globe.imageryLayers.add(input, index?)` adds a layer (a source or `{ id, sources, opacity, visible, blend }`) on a running globe, refusing invalid metadata or a taken layer or source id with a `GlobeError`; `remove(id)` releases its tiles; the `imagery-layers-change` event reports the list after an add, a remove or a move. A globe needs `workers` (and an imagery layer or terrain at start) for layers to be added.
 - B (2): see the source adapters' row above (`maxAgeMs`).
-- C (1): the worker program runs `parse-model` (`createModelTasks()` of `@vibeglobe/models`), loaded on first use; the Draco decoder loads from the package's default location.
+- C (1): reopened (2026-10-23). Registered, `parse-model` put `meshoptimizer`'s decoder into the worker program, and that decoder carries code that starts workers from Blob URLs (its unused `useWorkers`), which the built-bundle check refuses (F100, ADR 0020). The main session registers the task once models decode meshopt without that code (a loader of the decoder's WebAssembly of our own); track E builds against `createModelTasks()` in its own tests meanwhile.
 - Open, in their milestones: A (4) `captureView` (M12), C (2) model meshes in the renderer (M10, with track E's mesh builder), C (3) `Globe.setQualitySettings` and C (4) the playground's quality page (M11). B (3) done (2026-10-23): `captureFrame` and elevation sampling refuse display-only sources (`GlobeError` 'display-only'); F323 completes with track E's 3D Tiles data access.
 
 ## Status

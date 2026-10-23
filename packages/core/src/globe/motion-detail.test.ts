@@ -35,6 +35,19 @@ describe('motion-aware detail (F288, F301)', () => {
     expect(run(motion, camera, clock, 31, 0)).toBe(1);
   });
 
+  it('holds the coarse detail while the camera slows and refines straight to full once still, never in steps (F090)', () => {
+    const camera = new Camera();
+    camera.pose.rangeMeters = 50_000;
+    camera.update();
+    const motion = new MotionDetail();
+    const clock = new Float64Array(1);
+    run(motion, camera, clock, 10, 3);
+    const factors: number[] = [];
+    for (let i = 0; i < 40; i++) factors.push(run(motion, camera, clock, 1, 0));
+    expect(new Set(factors)).toEqual(new Set([4, 1]));
+    expect(factors.at(-1)).toBe(1);
+  });
+
   it('takes one level coarser again while moving on a slow link, and none at rest (F301)', () => {
     const camera = new Camera();
     camera.pose.rangeMeters = 50_000;

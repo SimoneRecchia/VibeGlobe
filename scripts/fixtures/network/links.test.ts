@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backoffViolations, droppingLink, LINKS, lanOnly } from './links.ts';
+import { backoffViolations, LINKS, lanOnly } from './links.ts';
 
 const limits = { maxAttempts: 6, healthMinIntervalMs: 300, isHealthCheck: (key: string) => key.startsWith('health') };
 
@@ -13,20 +13,6 @@ describe('network links', () => {
     expect(fates('offline').every((f) => f === 'disconnected')).toBe(true);
     expect(fates('400kbps').every((f) => f === 'continue')).toBe(true);
     expect(LINKS.find((l) => l.name === '400kbps')?.rules).toEqual([{ linkBytesPerS: 50_000 }]);
-  });
-
-  it('drop the connection for a window of requests and bring it back', () => {
-    const link = droppingLink(3, 6);
-    expect(Array.from({ length: 8 }, (_, i) => link.intercept(i))).toEqual([
-      'continue',
-      'continue',
-      'continue',
-      'disconnected',
-      'disconnected',
-      'disconnected',
-      'continue',
-      'continue',
-    ]);
   });
 
   it('let only the LAN host through in LAN-only mode', () => {

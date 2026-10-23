@@ -31,18 +31,6 @@ export const LINKS: readonly NetworkLink[] = [
   { name: 'latency500ms', rules: [{ latencyMs: 500 }], intercept: () => 'continue' },
 ];
 
-/**
- * A link that drops and returns (F298, F329): connected until request `from`, every request from `from` to `until`
- * (exclusive) fails as on a lost connection, then connected again.
- */
-export function droppingLink(from: number, until: number): NetworkLink {
-  return {
-    name: 'dropping',
-    rules: [{ latencyMs: 30 }],
-    intercept: (index) => (index >= from && index < until ? 'disconnected' : 'continue'),
-  };
-}
-
 /** Whether a request to `url` may leave the machine in LAN-only mode: only the LAN host (here the page's own). */
 export function lanOnly(url: URL, lanHost: string): boolean {
   return url.host === lanHost;

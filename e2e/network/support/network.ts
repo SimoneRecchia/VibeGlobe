@@ -3,7 +3,7 @@
 import { resolve } from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import type { Attempts, NetworkLink } from '../../../scripts/fixtures/network/links.ts';
-import type { PathReport, PathStep } from './frames-page.ts';
+import type { PathReport, PathStep, recordPath as recordInPage } from './frames-page.ts';
 
 export type { PathReport, PathStep };
 
@@ -52,7 +52,7 @@ export async function useLink(page: Page, session: string, link: NetworkLink): P
 export async function recordPath(page: Page, steps: readonly PathStep[], darkBelow: number): Promise<PathReport> {
   return page.evaluate(
     async ([url, s, dark]) => {
-      const recorder = (await import(/* @vite-ignore */ url)) as typeof import('./frames-page.ts');
+      const recorder = (await import(/* @vite-ignore */ url)) as { recordPath: typeof recordInPage };
       const globe = window.offlineHarness?.globe;
       if (!globe) throw new Error('no globe');
       return recorder.recordPath(globe, s, dark);

@@ -5,35 +5,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { backoffViolations, LINKS, lanOnly, type NetworkLink } from '../../scripts/fixtures/network/links.ts';
 import { openHarness, servedTiers, publishFixture, servePackages, startHarness } from '../support/offline.ts';
-import { isHealthCheck, NAVIGATION, recordPath, ROME, sessionId, useLink, type PathReport } from './support/network.ts';
+import { BACKENDS, BLACK_BELOW, expectClean, HEALTH, STEP_MS, worldBase, type Backend } from './support/scenarios.ts';
+import { isHealthCheck, NAVIGATION, recordPath, ROME, sessionId, useLink } from './support/network.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 test.describe.configure({ timeout: 240_000 });
 
-const BACKENDS = ['webgpu', 'webgl2'] as const;
-/** Black: no channel reaches this (the fixture and base imagery always have a brighter channel). */
-const BLACK_BELOW = 8;
-const HEALTH = { minIntervalMs: 300, maxIntervalMs: 4000 };
-const STEP_MS = 1000 / 60;
-const worldBase = (session: string) => ({
-  id: 'world-base',
-  sourceId: 'world',
-  pattern: 'world',
-  session,
-  bounds: { westDeg: -180, southDeg: -85, eastDeg: 180, northDeg: 85 },
-  minLevel: 0,
-  maxLevel: 3,
-  version: '1',
-});
-
-/** Holes, black pixels and pops of the path: all zero, or the first defect for the log. */
-function expectClean(report: PathReport): void {
-  expect([report.holes, report.dark, report.pops], JSON.stringify(report)).toEqual([0, 0, 0]);
-  expect(report.staticFrames).toBeGreaterThan(100);
-}
-
 /** Starts the harness on `backend` with the base package installed and the online source behind `link`. */
-async function startOn(page: Page, backend: (typeof BACKENDS)[number], link: NetworkLink, session: string) {
+async function startOn(page: Page, backend: Backend, link: NetworkLink, session: string) {
   await openHarness(page);
   const sources = [{ id: 'world', pattern: 'world', session }];
   await startHarness(page, { sources, view: ROME, backend });

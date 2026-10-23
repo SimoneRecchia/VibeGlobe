@@ -37,3 +37,11 @@ perfection in edge cases.
 | ----- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | F462  | 10 minutes of randomized navigation in a browser within the GPU and RAM budgets | `tiles3d.test.ts`: 600 frames of random cameras keep `TileContentCache` within its budget (overflow only for tiles in view) |
 | F451  | Style fuzzing with the view never blank (rendered frames)                       | `vector-style.test.ts`: randomly mutated styles load without an exception and keep evaluable layers                         |
+
+## Models and quality track (track C: `packages/models`, `packages/quality`)
+
+| Entry | Step                                                                               | Built and tested meanwhile                                                                                                                                                                  |
+| ----- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F361  | Draco decoder rebuilt as an ES module without dynamic execution (ADR 0020 §7)      | `draco3d` 1.5.9 as published, loaded lazily in the worker with the consumer-hosted `.wasm` (`loadDraco3d(wasmUrl)`); decodes in Chromium's module worker (`e2e/models.spec.ts`)             |
+| F361  | Draco bitstream counts validated before decoding (Draco #1169, memory cap)         | Decoded counts checked against the accessors after decoding, indices range-checked; the declared size limit (`ModelLimits`) applies before decoding; Draco input fuzzed (`corrupt.test.ts`) |
+| F402  | The 5-minute load hovering around the threshold, in the browser on the real engine | The same governor over a simulated 5-minute hovering load in Node (`governor.test.ts`); the browser run covers lowering and the step-by-step recovery (`e2e/quality.spec.ts`)               |

@@ -5303,7 +5303,7 @@
         "Start on the reference desktop and reference tablet and verify the chosen presets",
         "Pass an explicit preset in the configuration and verify it overrides detection"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F401",

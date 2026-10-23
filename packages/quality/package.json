@@ -1,0 +1,22 @@
+{
+  "name": "@vibeglobe/quality",
+  "version": "0.0.0",
+  "description": "VibeGlobe quality: quality presets, capability-based start-up choice and the adaptive frame-time governor.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.0.0"
+  }
+}

@@ -523,8 +523,11 @@ function positiveInteger(value: number | undefined, fallback: number, name: stri
   return value;
 }
 
-/** The window of a host's rate limit (F222). */
-const RATE_WINDOW_MS = 1000;
+/**
+ * The window of a host's rate limit (F222): a second plus a margin, because requests reach the server with uneven
+ * delays, and two starts just over a second apart here can arrive within the same second there.
+ */
+const RATE_WINDOW_MS = 1150;
 
 /** Sets a host's rate limit: the ring of its last start times, empty for none. */
 function setRate(host: Host, maxRequestsPerSecond: number): void {

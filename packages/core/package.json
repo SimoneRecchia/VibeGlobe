@@ -15,6 +15,11 @@
       "types": "./dist/decoders.d.ts",
       "source": "./src/decoders.ts",
       "default": "./dist/decoders.js"
+    },
+    "./geodesy": {
+      "types": "./dist/geodesy.d.ts",
+      "source": "./src/geodesy.ts",
+      "default": "./dist/geodesy.js"
     }
   },
   "files": [

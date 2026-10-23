@@ -3,7 +3,7 @@
 // being committed. Needs `npm run build`. `--file <path>` reads a local copy (plain or gzip).
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { geodesicDirect, geodesicInverse } from '@vibeglobe/core';
+import { geodesicDirect, geodesicInverse } from '@vibeglobe/core/geodesy';
 
 const URL_SHORT = 'https://sourceforge.net/projects/geographiclib/files/testdata/GeodTest-short.dat.gz/download';
 const DISTANCE_TOLERANCE_METERS = 1e-4;

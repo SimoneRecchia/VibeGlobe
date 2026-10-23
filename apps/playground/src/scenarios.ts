@@ -1,4 +1,5 @@
-import { geodesicDirect, type DebugShape, type GeoPosition, type Globe } from '@vibeglobe/core';
+import type { DebugShape, GeoPosition, Globe } from '@vibeglobe/core';
+import { geodesicDirect } from '@vibeglobe/core/geodesy';
 
 /** A point `forwardMeters` along `headingDeg` and `rightMeters` to its right from (lon, lat), at a height. */
 function offset(

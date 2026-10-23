@@ -4,7 +4,8 @@
  * redraws on each camera change: a few dozen picks and one 2D path, measured in `lastUpdateMs`. It is never added
  * unless the application adds it.
  */
-import { geodesicDirect, WGS84, type CameraState, type GeoPosition } from '@vibeglobe/core';
+import { WGS84, type CameraState, type GeoPosition } from '@vibeglobe/core';
+import { geodesicDirect } from '@vibeglobe/core/geodesy';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame } from './dom.js';
 

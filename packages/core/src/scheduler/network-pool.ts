@@ -5,7 +5,7 @@
  * enforces them as a last resort (F092); and refills a freed slot at once from the best queued request of its clients.
  *
  * The pool keeps no queue: a client (one tile scheduler per engine instance) asks for a slot with
- * {@link NetworkPool.request} and keeps the record queued when it gets {@link NO_SLOT}. When a slot frees, the pool asks
+ * {@link NetworkPool.request} and keeps the record queued when it gets `NO_SLOT`. When a slot frees, the pool asks
  * every client for its best queued priority on that host and grants the slot to the lowest (ADR 0007 §Structure).
  *
  * Every exit path of a request (success, failure, timeout, abort, a throwing transport or consumer, disposal) releases
@@ -283,7 +283,7 @@ export class NetworkPool {
   /**
    * Attaches a consumer to the request for `key`: to the one in flight if any (coalescing, no slot needed), otherwise
    * to a new transport request when the host and the pool have a free slot. Returns a consumer id for
-   * {@link NetworkPool.release}, or {@link NO_SLOT} when nothing started; the caller then keeps the tile queued.
+   * {@link NetworkPool.release}, or `NO_SLOT` when nothing started; the caller then keeps the tile queued.
    * The consumer may be called before this returns when the transport completes synchronously. `rateIndex` names the
    * request's rate group ({@link registerRate}), -1 for none.
    */

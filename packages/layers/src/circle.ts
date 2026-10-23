@@ -1,4 +1,5 @@
-import { geodesicDirect, type FeatureGeometry } from '@vibeglobe/core';
+import type { FeatureGeometry } from '@vibeglobe/core';
+import { geodesicDirect } from '@vibeglobe/core/geodesy';
 import type { Position } from './geojson.js';
 
 /** Outline vertices of a circle or ellipse: fine enough that its chords stay within 0.1% of the radius. */

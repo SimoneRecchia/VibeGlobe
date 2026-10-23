@@ -110,12 +110,6 @@ export {
   unprojectGeographicRad,
 } from './projections/geographic.js';
 export type { LonLatDeg, ProjectedPointMeters } from './projections/types.js';
-export { geodesicInverse } from './geodesy/geodesic-inverse.js';
-export type { GeodesicInverseResult } from './geodesy/geodesic-inverse.js';
-export { geodesicDirect } from './geodesy/geodesic-direct.js';
-export type { GeodesicDirectResult } from './geodesy/geodesic-direct.js';
-export { geodesicPathLengthMeters, geodesicPolygonArea } from './geodesy/geodesic-polygon.js';
-export type { GeodesicPoint, GeodesicPolygonArea } from './geodesy/geodesic-polygon.js';
 export { childTiles, MAX_TILE_LEVEL, packTileKey, parentTile, unpackTileKey } from './tiling/tile-key.js';
 export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';

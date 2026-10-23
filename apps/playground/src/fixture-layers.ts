@@ -46,14 +46,17 @@ export function overlayLayers(
   if (!spec) return [];
   // `?overlayHosts=<base>,…` serves each overlay from another base URL, such as another origin (F251, F252).
   const hosts = (params.get('overlayHosts') ?? '').split(',');
+  // `?overlayTiling=` cuts the overlays in another scheme than the base imagery (F225).
+  const scheme = params.get('overlayTiling');
+  const overlayTiling = scheme === 'geographic' || scheme === 'mercator' ? scheme : tiling;
   return spec.split(',').map((item, index) => {
     const [pattern = 'tiles', opacity = '1', blend = 'normal'] = item.split(':');
     const host = hosts[index] || base;
     const source = xyzImagery({
       id: `overlay-${pattern}`,
-      url: `${host}fixture-tiles/${session}/${pattern}/${tiling}/{z}/{x}/{y}.png`,
+      url: `${host}fixture-tiles/${session}/${pattern}/${overlayTiling}/{z}/{x}/{y}.png`,
       ...overlayTransport(params, host, pattern),
-      tiling,
+      tiling: overlayTiling,
       minLevel: 0,
       maxLevel: 18,
       // `?overlayCoverage=italy` limits the overlays to a box around Italy (F254).

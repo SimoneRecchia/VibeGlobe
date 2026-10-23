@@ -314,3 +314,46 @@ test('a drag released at speed is announced as user movement, then as inertia, w
     else if (event.startsWith('move:')) expect(++moves).toBe(1);
   }
 });
+
+for (const movement of ['flyTo', 'easeTo'] as const) {
+  test(`${movement} follows the same trajectory with the engine clock at 30, 60, 120 and 144 Hz (F203)`, async ({
+    page,
+  }) => {
+    // Four page loads and about 700 frames drawn on the software GPU.
+    test.setTimeout(120_000);
+    const posesAt = async (hz: number) => {
+      await openGlobe(page, `backend=webgl2&lon=10&lat=45&zoom=4&clockStepMs=${1000 / hz}`);
+      return page.evaluate(
+        ({ kind }) =>
+          new Promise<number[][]>((resolve) => {
+            const globe = window.vibeglobePlayground?.globe;
+            if (!globe) throw new Error('no globe');
+            const samples: number[][] = [];
+            // A movement starts at the clock time of the call: the last frame's.
+            const startMs = globe.timeMs;
+            globe.on('frame', () => {
+              const elapsed = globe.timeMs - startMs;
+              // Every rate draws a frame at 500, 1000 and 1500 ms after the start.
+              for (const at of [500, 1000, 1500])
+                if (Math.abs(elapsed - at) < 1e-6) {
+                  const c = globe.camera;
+                  samples.push([at, c.longitudeDeg, c.latitudeDeg, c.zoom, c.headingDeg]);
+                }
+            });
+            const target = { longitudeDeg: 30, latitudeDeg: 30, zoom: 5, headingDeg: 40 };
+            const run =
+              kind === 'flyTo' ? globe.flyTo(target, { durationMs: 2000 }) : globe.easeTo(target, { durationMs: 2000 });
+            void run.then(() => resolve(samples));
+          }),
+        { kind: movement },
+      );
+    };
+    const reference = await posesAt(60);
+    expect(reference.map((sample) => sample[0])).toEqual([500, 1000, 1500]);
+    for (const hz of [30, 120, 144]) {
+      const poses = await posesAt(hz);
+      expect(poses.map((sample) => sample[0])).toEqual([500, 1000, 1500]);
+      poses.forEach((pose, i) => pose.forEach((value, k) => expect(value).toBeCloseTo(reference[i]?.[k] ?? 0, 6)));
+    }
+  });
+}

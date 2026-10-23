@@ -2737,7 +2737,7 @@
         "Assert the camera states at equal timestamps match within tolerance",
         "Inject a 250 ms stall mid-animation and assert the camera continues from the time-correct position without overshoot"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F204",

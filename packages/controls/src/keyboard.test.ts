@@ -36,6 +36,14 @@ describe('keyboard (F181, F187, F174, F213)', () => {
       return h.camera.centerY;
     };
     expect(distance(30)).toBeCloseTo(distance(144), 6);
+    // A 250 ms stall in the middle lands at the same place.
+    const stalled = controlsHarness();
+    stalled.key('keydown', 'ArrowUp');
+    stalled.frame(1000 / 60);
+    stalled.run(400);
+    stalled.frame(250);
+    stalled.run(1000);
+    expect(stalled.camera.centerY).toBeCloseTo(distance(60), 6);
   });
 
   it('rotates with Shift+Left/Right and tilts with Shift+Up/Down', () => {

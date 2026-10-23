@@ -81,6 +81,17 @@ describe('inertia (F179, ADR 0009 §6)', () => {
     for (const hz of [30, 120, 144]) expect(at(hz)).toBeCloseTo(reference, 6);
   });
 
+  it('continues from the time-correct position after a 250 ms stall, without overshoot (F203)', () => {
+    const { h, released, releasedMs } = fling(0);
+    h.run(releasedMs + 100);
+    h.frame(250);
+    // 350 ms after the release, as if no frame had stalled.
+    const offset = (ms: number) => -200 * (1 - Math.exp(-ms / 200));
+    expect(h.camera.centerX - released).toBeCloseTo(offset(h.globe.timeMs - releasedMs), 6);
+    h.run(h.globe.timeMs + 3000);
+    expect(h.camera.centerX - released).toBeGreaterThanOrEqual(-200 - 1e-6);
+  });
+
   it('is quartered under reduced motion', () => {
     const h = controlsHarness({ reducedMotion: 'reduce' });
     h.pointer('pointerdown', { x: 100, y: 300, t: 0 });

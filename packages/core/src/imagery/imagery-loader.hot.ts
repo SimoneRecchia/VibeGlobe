@@ -510,7 +510,7 @@ export class ImageryLoader implements NetworkPoolClient {
       this.options.setTimer(() => this.options.requestFrame(), decision.nextEligibleMs - this.options.now());
     } else {
       record.state = DEAD;
-      this.reportError(record, 'failed');
+      this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
     }
     this.settlePinned(record);
     this.options.requestFrame();

@@ -6,6 +6,8 @@
 // (VGEOID1), and GET /fixture-tiles/{session}/terrain/{scheme}/layer.json. Per-session fault rules: POST
 // /_fixture/{session}/rules; the session's layer.json: POST /_fixture/{session}/layer; request log: GET
 // /_fixture/{session}/log; DELETE /_fixture/{session} resets all three. A session id per test keeps tests independent.
+// UTM imagery (F226): GET /fixture-tiles/{session}/wms-utm?CRS=EPSG:32632&BBOX=minx,miny,maxx,maxy&WIDTH=..&HEIGHT=..
+// (WMS 1.3.0 parameters, EPSG:32632 or EPSG:32633), logged with source `wms-utm` and the query in `path`.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { encodeKtx2 } from './ktx2.ts';
@@ -18,6 +20,7 @@ import {
   type FixtureScheme,
   type FixtureTile,
 } from './generate.ts';
+import { encodeUtmPng, parseUtmRequest } from './utm.ts';
 
 /** A fault applied to the tiles it matches (all given conditions must hold); the first matching rule applies. */
 export interface FaultRule {
@@ -97,6 +100,7 @@ const SCHEMES: readonly string[] = ['mercator', 'geographic'];
 const TILE_PATH =
   /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
+const WMS_UTM_PATH = /^\/fixture-tiles\/([\w-]+)\/wms-utm$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
 /** Terrain file extensions and their encodings. */
 const TERRAIN: Readonly<Record<string, TerrainEncoding>> = {
@@ -186,6 +190,11 @@ export class FixtureServer {
           'Cache-Control': 'no-store',
         })
         .end(body);
+      return;
+    }
+    const utm = WMS_UTM_PATH.exec(url.pathname);
+    if (utm) {
+      this.utmImage(utm[1] ?? '', url, req, res);
       return;
     }
     const match = TILE_PATH.exec(url.pathname);
@@ -309,6 +318,24 @@ export class FixtureServer {
     };
     if (rule?.latencyMs) setTimeout(() => void respond(), rule.latencyMs);
     else void respond();
+  }
+
+  /** A GetMap image of the UTM fixture (F226), logged like a tile with level, column and row 0. */
+  private utmImage(id: string, url: URL, req: IncomingMessage, res: ServerResponse): void {
+    const record: RequestRecord = {
+      path: url.pathname + url.search,
+      source: 'wms-utm',
+      level: 0,
+      x: 0,
+      y: 0,
+      startMs: this.now(),
+      host: req.headers.host ?? String(req.headers[':authority'] ?? ''),
+      connection: this.connectionOf(req),
+    };
+    this.session(id).log.push(record);
+    const request = parseUtmRequest(url.searchParams);
+    if (request) this.finish(record, res, 200, { 'Content-Type': 'image/png' }, encodeUtmPng(request));
+    else this.finish(record, res, 400, { 'Content-Type': 'text/plain' }, Buffer.from('bad GetMap request'));
   }
 
   /**

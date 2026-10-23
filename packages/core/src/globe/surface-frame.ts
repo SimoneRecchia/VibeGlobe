@@ -26,6 +26,7 @@ import { displayedHeightMeters } from '../terrain/displayed-height.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel, terrainHeightRange } from '../terrain/terrain-draws.js';
 import type {
   GeoPosition,
+  TileErrorEvent,
   GlobeOptions,
   ImageryStats,
   RendererBackend,
@@ -125,7 +126,7 @@ export class SurfaceFrame {
         ...(options.hiddenCredits ? { hiddenCredits: options.hiddenCredits } : {}),
         requestFrame: () => callbacks.requestFrame(),
         tileError: (event) => {
-          logger.log('warn', `${event.sourceId}: tile ${event.level}/${event.x}/${event.y} ${event.reason}`);
+          logger.log('warn', tileErrorMessage(event));
           callbacks.tileError(event);
         },
       },
@@ -338,4 +339,12 @@ export class SurfaceFrame {
   stats(): SurfaceStats {
     return surfaceStats(this.tiles, this.draws, this.selection);
   }
+}
+
+/** The log line of a tile that failed for good; a CORS failure names its cause and the fix (F251). */
+function tileErrorMessage(event: TileErrorEvent): string {
+  const tile = `${event.sourceId}: tile ${event.level}/${event.x}/${event.y}`;
+  return event.reason === 'cors'
+    ? `${tile} is blocked by CORS: its server answers without Access-Control-Allow-Origin, so the browser cannot use it as a texture`
+    : `${tile} ${event.reason}`;
 }

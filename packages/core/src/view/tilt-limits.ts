@@ -49,7 +49,7 @@ function measure(sky: boolean): void {
     const turn = Math.asin((range * Math.sin(t)) / distance);
     const ratio = A / distance;
     const dip = Math.acos(ratio < 1 ? ratio : 1);
-    io[MEASURE] = (1 - m) * (HALF_PI - t - turn - dip) + m * (HALF_PI - t);
+    io[MEASURE] = (1 - m) * (HALF_PI - t + turn - dip) + m * (HALF_PI - t);
   } else io[MEASURE] = (1 - m) * (distance - A) + m * (range * cos + targetHeight) - (io[GROUND] ?? 0);
 }
 

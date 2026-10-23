@@ -2,24 +2,28 @@
 // view in the globe, 2D and 3D phases, and meet at 12°E without gap or seam.
 import { expect, test, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
-import { canvasImage, geoToScreen, openGlobe, waitForIdle } from './support/globe.ts';
+import { canvasImage, geoToScreen, nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
 import { fixtureSession } from './support/imagery.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
 /** Waits until no imagery tile is queued, loading or decoding and the engine is idle. */
 async function settle(page: Page): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const stats = window.vibeglobePlayground?.globe.imageryStats();
-          return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : 1;
-        }),
-      { timeout: 60_000 },
-    )
-    .toBe(0);
-  await waitForIdle(page);
+  // After a frame, so that the view's tiles are asked for; again after idle, for tiles that idle frame asked for.
+  await nextFrame(page);
+  for (let pass = 0; pass < 2; pass++) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const stats = window.vibeglobePlayground?.globe.imageryStats();
+            return stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : 1;
+          }),
+        { timeout: 60_000 },
+      )
+      .toBe(0);
+    await waitForIdle(page);
+  }
 }
 
 /** How magenta a pixel is (the fixture's ground control markers), 0–1. */

@@ -2070,7 +2070,7 @@
         "Configure custom curves in the playground and assert the reported morph, tilt and relief follow them",
         "Change the curves at runtime and assert the view adapts without a jump (frame differencing)"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F151",
@@ -2108,7 +2108,7 @@
         "Assert through the public camera state: phase 2D map, morph factor 1, applied tilt 0°, relief factor within the configured 2D range",
         "Capture screenshots and assert they match a reference mosaic of the same Web Mercator tiles within the visual tolerance (parallels and meridians straight and perpendicular)"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F154",
@@ -2121,7 +2121,7 @@
         "Assert the applied tilt increases monotonically to the configured automatic tilt and the relief factor reaches 1",
         "Capture screenshots at fixed zoom levels and assert the diff against the baselines is within the visual tolerance"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F155",
@@ -2170,7 +2170,7 @@
         "Compute the geodesic distance between two picked points with the core geodesic API in each phase and assert identical results",
         "Assert no public measurement or picking API accepts or returns projected plane coordinates"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F159",
@@ -2207,7 +2207,7 @@
         "Zoom through every phase and assert the applied tilt equals the curve value in every frame",
         "After a manual tilt, select Auto and assert the tilt returns to the curve value without a jump and follows the curves again"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F162",
@@ -2220,7 +2220,7 @@
         "Assert the applied tilt is 0° in every frame and the morph factor follows the zoom curve",
         "Assert rotation still works and the heading persists"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F163",
@@ -2233,7 +2233,7 @@
         "Assert the Auto control is visible next to the 2D/3D toggle and reflects the active mode",
         "Repeat through the public API and assert identical results and mode-change events"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F164",
@@ -2258,7 +2258,7 @@
         "Assert the camera never enters the terrain, the applied tilt is reduced only while required and returns to 70° once clear",
         "Assert the chosen tilt stays 70° throughout and every transition is free of jumps"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F166",
@@ -2271,7 +2271,7 @@
         "Zoom back in and assert the applied tilt returns to 60° without a jump",
         "Assert the chosen tilt remains 60° throughout"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F167",

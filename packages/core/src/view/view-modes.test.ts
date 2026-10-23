@@ -172,7 +172,8 @@ describe('temporary tilt clamps (F165, F166)', () => {
     globe.jumpTo({ zoom: 2 });
     frames(1);
     const clamped = globe.camera.tiltDeg;
-    expect(clamped).toBeLessThan(30);
+    // At zoom 2 the horizon would sit below the top third at 60°: the limit is about 45° (KB-108).
+    expect(clamped).toBeLessThan(50);
     expect(globe.camera.chosenTiltDeg).toBeCloseTo(60, 9);
     globe.jumpTo({ zoom: 15 });
     const tilts: number[] = [];

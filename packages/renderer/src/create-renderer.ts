@@ -1,3 +1,4 @@
+import type { GltfLoaderFactory } from './layer-models.js';
 import { GlobeError, type RendererFactory, type RenderHost } from '@vibeglobe/core';
 import type { BackendChoice, DepthChoice } from './three-backend.js';
 
@@ -32,6 +33,8 @@ export interface RendererOptions {
    * decodes (default: all of them; [] forces RGBA8). For tests, and for drivers that emulate a family (ADR 0020).
    */
   readonly compressedTextures?: readonly string[];
+  /** The glTF loader for `Globe.addModel` (F361): `gltfLoader` from `@vibeglobe/renderer/gltf`; without it, no models. */
+  readonly gltf?: GltfLoaderFactory;
 }
 
 /**
@@ -55,15 +58,28 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     ]);
     if (offscreen) {
       if (!options.host) throw new GlobeError('invalid-option', 'An OffscreenCanvas renderer needs a host');
-      return ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, events, settings);
+      return withModels(
+        await ThreeBackend.create({ kind: 'offscreen', canvas }, options.host, events, settings),
+        options,
+      );
     }
     const element = container as HTMLElement;
     const { createBrowserHost } = hostModule ?? (await import('./browser-host.js'));
-    return ThreeBackend.create(
+    const backend = await ThreeBackend.create(
       { kind: 'element', container: element, canvas: canvas as HTMLCanvasElement | undefined },
       options.host ?? createBrowserHost(element),
       events,
       settings,
     );
+    return withModels(backend, options);
   };
+}
+
+/** Gives a backend the application's glTF loader for models (F361), if any. */
+function withModels<T extends { readonly models: { loaderFactory: GltfLoaderFactory | undefined } }>(
+  backend: T,
+  options: RendererOptions,
+): T {
+  backend.models.loaderFactory = options.gltf;
+  return backend;
 }

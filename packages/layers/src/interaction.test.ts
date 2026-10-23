@@ -4,7 +4,7 @@ import { frameAt, point } from './__fixtures__/test-support.js';
 import { DataLayer } from './data-layer.js';
 import { InteractionController, type PickProvider } from './interaction.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 /** A pick provider over a recorded target: a screen point `{ xPx: n }` hits feature index n of batch 1 (n < 0: none). */
 function provider(target: RecordingRenderTarget, delays: number[] = []): PickProvider {

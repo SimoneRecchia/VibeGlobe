@@ -4,7 +4,8 @@ import type { Feature } from './geojson.js';
 import { LabelLayer } from './label-layer.js';
 import { LabelPlacer, type CollisionBox, type PlacementInput } from './label-placement.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget, estimatedTextMeasurer } from './render-target.js';
+import { estimatedTextMeasurer } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 /** 10,000 labels of mixed priorities packed into a dense area around Rome. */
 function denseLabels(count: number): Feature[] {

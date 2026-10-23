@@ -4,13 +4,7 @@
  * collision, the picking id scheme and feature interaction (ADR 0029).
  * @module @vibeglobe/layers
  */
-export {
-  ATTRIBUTE_COMPONENTS,
-  ANCHORS,
-  BATCH_ATTRIBUTES,
-  RecordingRenderTarget,
-  estimatedTextMeasurer,
-} from './render-target.js';
+export { ATTRIBUTE_COMPONENTS, ANCHORS, BATCH_ATTRIBUTES, estimatedTextMeasurer } from './render-target.js';
 export type {
   BatchAttribute,
   BatchDescriptor,
@@ -20,7 +14,6 @@ export type {
   FeatureGeometry,
   LayerRenderTarget,
   Placement,
-  RecordedWrite,
   ScreenProjector,
   TextMeasurer,
 } from './render-target.js';

@@ -12,9 +12,17 @@ import {
   type Object3D,
   type Scene,
 } from 'three/webgpu';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const RAD = Math.PI / 180;
+
+/** What a glTF loader does for models: three.js's `GLTFLoader` (`@vibeglobe/renderer/gltf`). */
+export interface GltfLoader {
+  parseAsync(data: ArrayBuffer, path: string): Promise<{ scene: Object3D }>;
+  loadAsync(url: string): Promise<{ scene: Object3D }>;
+}
+
+/** Creates a glTF loader, on the first model added. */
+export type GltfLoaderFactory = () => Promise<GltfLoader>;
 
 interface Model {
   readonly root: Object3D;
@@ -62,16 +70,22 @@ function place(model: Model, pose: ModelPose, view: FrameView): void {
  */
 export class LayerModels implements ModelRenderer {
   private readonly models = new Map<number, Model>();
-  private readonly loader = new GLTFLoader();
+  /** The glTF loader, created on the first model; none unless the application gave `createRenderer` one. */
+  private loader: GltfLoader | undefined;
+  /** Set from `createRenderer({ gltf })`. */
+  loaderFactory: GltfLoaderFactory | undefined;
   private nextId = 1;
 
   constructor(private readonly scene: Scene) {}
 
   /** See {@link ModelRenderer}. */
   async load(source: { readonly url?: string; readonly data?: ArrayBuffer }): Promise<number> {
-    const gltf = source.data
-      ? await this.loader.parseAsync(source.data, '')
-      : await this.loader.loadAsync(source.url ?? '');
+    if (!this.loaderFactory)
+      throw new Error(
+        "Models need the glTF loader: createRenderer({ gltf: gltfLoader }) from '@vibeglobe/renderer/gltf'",
+      );
+    const loader = (this.loader ??= await this.loaderFactory());
+    const gltf = source.data ? await loader.parseAsync(source.data, '') : await loader.loadAsync(source.url ?? '');
     const root = gltf.scene;
     root.matrixAutoUpdate = false;
     root.frustumCulled = false;

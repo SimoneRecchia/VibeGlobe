@@ -4,7 +4,7 @@ import type { GeoPosition } from '@vibeglobe/core';
 import { localClusterEngine, type ClusterItem } from './cluster.js';
 import { ClusterLayer } from './cluster-layer.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 

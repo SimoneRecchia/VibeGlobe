@@ -273,6 +273,8 @@ function startGlobe(
       depth,
       canvas: target,
       gpuTiming: params.has('gpuTiming'),
+      // Models (F361) load the glTF loader on the first model only.
+      gltf: async () => (await import('@vibeglobe/renderer/gltf')).gltfLoader(),
       // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
       ...(params.has('compressed')
         ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }

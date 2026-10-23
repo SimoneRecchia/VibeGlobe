@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./gltf": {
+      "types": "./dist/gltf.d.ts",
+      "source": "./src/gltf.ts",
+      "default": "./dist/gltf.js"
     }
   },
   "files": [

@@ -3,7 +3,7 @@ import { frameAt, point, randomPoints } from './__fixtures__/test-support.js';
 import { DataLayer } from './data-layer.js';
 import type { Feature } from './geojson.js';
 import { LayerStack } from './layer-stack.js';
-import { RecordingRenderTarget } from './render-target.js';
+import { RecordingRenderTarget } from './testing.js';
 
 function setup(layer: DataLayer): { target: RecordingRenderTarget; stack: LayerStack; handle: { id: number } } {
   const target = new RecordingRenderTarget();

@@ -238,23 +238,30 @@
       },
       "paint": {
         "line-color": [
-          "match",
-          ["get", "class"],
-          "motorway",
-          "#e892a2",
-          "trunk",
-          "#f9b29c",
-          "primary",
-          "#fcd6a4",
-          "secondary",
-          "#f7fabf",
-          "tertiary",
-          "#ffffff",
-          "minor",
-          "#ffffff",
-          "service",
-          "#ffffff",
-          "#ffffff"
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#ff3b30",
+          ["boolean", ["feature-state", "hover"], false],
+          "#ff9500",
+          [
+            "match",
+            ["get", "class"],
+            "motorway",
+            "#e892a2",
+            "trunk",
+            "#f9b29c",
+            "primary",
+            "#fcd6a4",
+            "secondary",
+            "#f7fabf",
+            "tertiary",
+            "#ffffff",
+            "minor",
+            "#ffffff",
+            "service",
+            "#ffffff",
+            "#ffffff"
+          ]
         ],
         "line-width": [
           "interpolate",
@@ -508,23 +515,30 @@
       },
       "paint": {
         "line-color": [
-          "match",
-          ["get", "class"],
-          "motorway",
-          "#e892a2",
-          "trunk",
-          "#f9b29c",
-          "primary",
-          "#fcd6a4",
-          "secondary",
-          "#f7fabf",
-          "tertiary",
-          "#ffffff",
-          "minor",
-          "#ffffff",
-          "service",
-          "#ffffff",
-          "#ffffff"
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#ff3b30",
+          ["boolean", ["feature-state", "hover"], false],
+          "#ff9500",
+          [
+            "match",
+            ["get", "class"],
+            "motorway",
+            "#e892a2",
+            "trunk",
+            "#f9b29c",
+            "primary",
+            "#fcd6a4",
+            "secondary",
+            "#f7fabf",
+            "tertiary",
+            "#ffffff",
+            "minor",
+            "#ffffff",
+            "service",
+            "#ffffff",
+            "#ffffff"
+          ]
         ],
         "line-width": [
           "interpolate",
@@ -765,23 +779,30 @@
       },
       "paint": {
         "line-color": [
-          "match",
-          ["get", "class"],
-          "motorway",
-          "#e892a2",
-          "trunk",
-          "#f9b29c",
-          "primary",
-          "#fcd6a4",
-          "secondary",
-          "#f7fabf",
-          "tertiary",
-          "#ffffff",
-          "minor",
-          "#ffffff",
-          "service",
-          "#ffffff",
-          "#ffffff"
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#ff3b30",
+          ["boolean", ["feature-state", "hover"], false],
+          "#ff9500",
+          [
+            "match",
+            ["get", "class"],
+            "motorway",
+            "#e892a2",
+            "trunk",
+            "#f9b29c",
+            "primary",
+            "#fcd6a4",
+            "secondary",
+            "#f7fabf",
+            "tertiary",
+            "#ffffff",
+            "minor",
+            "#ffffff",
+            "service",
+            "#ffffff",
+            "#ffffff"
+          ]
         ],
         "line-width": [
           "interpolate",
@@ -878,15 +899,22 @@
       "minzoom": 13,
       "paint": {
         "fill-extrusion-color": [
-          "match",
-          ["get", "building"],
-          "church",
-          "#d9b38c",
-          "industrial",
-          "#c9c3d6",
-          "commercial",
-          "#e0c9c0",
-          "#d9d0c9"
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#ff3b30",
+          ["boolean", ["feature-state", "hover"], false],
+          "#ff9500",
+          [
+            "match",
+            ["get", "building"],
+            "church",
+            "#d9b38c",
+            "industrial",
+            "#c9c3d6",
+            "commercial",
+            "#e0c9c0",
+            "#d9d0c9"
+          ]
         ],
         "fill-extrusion-opacity": 1
       }
@@ -939,7 +967,14 @@
         "text-max-width": 8
       },
       "paint": {
-        "text-color": ["match", ["get", "class"], "country", "#5a4a7a", "#222222"],
+        "text-color": [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#ff3b30",
+          ["boolean", ["feature-state", "hover"], false],
+          "#ff9500",
+          ["match", ["get", "class"], "country", "#5a4a7a", "#222222"]
+        ],
         "text-halo-color": "#ffffff",
         "text-halo-width": 1.5
       }

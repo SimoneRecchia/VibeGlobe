@@ -8,7 +8,7 @@ import { geodeticToEcef, type FrameView } from '@vibeglobe/core';
 import { tileToLonLat } from './globe-vertices.js';
 import { GlyphSource } from './glyph-source.js';
 import { labelAnchors, UNITS_PER_PX, type LabelAnchor } from './label-anchors.js';
-import { BUCKET_EXTENT, type Bucket } from './layout-tile.js';
+import { BUCKET_EXTENT, type Bucket, type BucketFeature } from './layout-tile.js';
 import { placeGlyphsAlongLine } from './line-labels.js';
 import type { StyleLayer } from './style-layer.js';
 import {
@@ -54,11 +54,18 @@ export interface PlacedLabel {
   readonly text: string;
   readonly boxes: readonly ScreenBox[];
   readonly opacity: number;
+  /** The style source, the feature and the anchor's position, for picking (F459). */
+  readonly source: string;
+  readonly feature: BucketFeature;
+  readonly position: { readonly longitudeDeg: number; readonly latitudeDeg: number };
 }
 
 interface Candidate extends SymbolCandidate {
   readonly layerId: string;
   readonly text: string;
+  readonly source: string;
+  readonly feature: BucketFeature;
+  readonly position: { readonly longitudeDeg: number; readonly latitudeDeg: number };
   readonly glyphs: readonly GlyphQuad[];
   readonly opacity: number;
 }
@@ -106,6 +113,8 @@ export class LabelPlacer {
     private readonly view: LabelView,
     readonly glyphs: GlyphSource,
     private readonly atlas: VectorAtlas,
+    private readonly stateOf: (source: string, id: number) => Readonly<Record<string, unknown>> | undefined = () =>
+      undefined,
   ) {}
 
   /** The labels placed by the last frame. */
@@ -142,7 +151,17 @@ export class LabelPlacer {
       if (opacity <= 0 || seen.has(c.id)) continue;
       seen.add(c.id);
       for (const g of c.glyphs) this.quads.add(g, opacity * c.opacity);
-      if (placed.has(c.id)) shown.push({ id: c.id, layerId: c.layerId, text: c.text, boxes: c.boxes, opacity });
+      if (placed.has(c.id))
+        shown.push({
+          id: c.id,
+          layerId: c.layerId,
+          text: c.text,
+          boxes: c.boxes,
+          opacity,
+          source: c.source,
+          feature: c.feature,
+          position: c.position,
+        });
     }
     this.placedLabels = shown;
     return { quads: this.quads.result(), animating };
@@ -196,7 +215,8 @@ export class LabelPlacer {
       const shaping = this.shaping(source, anchor.label, zoom, anchor.onLine !== undefined);
       if (shaping === undefined) continue;
       const size = Number(layer.layout('text-size', zoom, feature)) || 16;
-      const paint = (name: string) => layer.paint(name, zoom, feature);
+      const state = feature?.id === undefined ? undefined : this.stateOf(layer.source ?? '', feature.id);
+      const paint = (name: string) => layer.paint(name, zoom, feature, state);
       const style = {
         scale: size / 24,
         fill: linearColor(paint('text-color'), Number(paint('text-opacity') ?? 1)),
@@ -221,6 +241,9 @@ export class LabelPlacer {
         text: label.text,
         glyphs,
         opacity: source.opacity,
+        source: layer.source ?? '',
+        feature: feature ?? { id: undefined, type: 'Point', properties: {} },
+        position: { longitudeDeg: lon ?? 0, latitudeDeg: lat ?? 0 },
       });
     }
     return out;

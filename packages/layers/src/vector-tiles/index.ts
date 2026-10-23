@@ -81,7 +81,15 @@ export {
 } from './globe-vertices.js';
 export type { GlobeVertices } from './globe-vertices.js';
 export { addVectorTiles } from './vector-tile-layer.js';
-export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-layer.js';
+export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
+export { pickVectorFeatures } from './vector-picking.js';
+export type { DrawnTile, PickContext, PickedVectorFeature } from './vector-picking.js';
+export { VectorInteraction } from './vector-interaction.js';
+export type { VectorFeatureEvent } from './vector-interaction.js';
+export { LabelPlacer } from './label-placer.js';
+export type { LabelSource, LabelView, PlacedLabel } from './label-placer.js';
+export { GlyphSource, LOCAL_FONT_STACK } from './glyph-source.js';
+export type { SpriteImage } from './glyph-source.js';
 export { VectorTileLoader } from './tile-loader.js';
 export type { LoadedTile, TileLoaderOptions, WantedTile } from './tile-loader.js';
 export { meshGeometry } from './tile-meshes.js';

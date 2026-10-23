@@ -42,7 +42,11 @@ export function showVectorTiles(globe: Globe, params: URLSearchParams): Promise<
   const hooks: VectorTilesHooks = {
     layer: undefined,
     error: undefined,
-    ready: addVectorTiles(globe, { style: styleUrl(name), target: createVectorTileTarget }),
+    ready: addVectorTiles(globe, {
+      style: styleUrl(name),
+      target: createVectorTileTarget,
+      element: document.querySelector<HTMLElement>('#app') ?? undefined,
+    }),
   };
   hooks.ready.then(
     (layer) => (hooks.layer = layer),

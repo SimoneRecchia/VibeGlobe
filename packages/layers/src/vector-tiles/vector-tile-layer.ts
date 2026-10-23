@@ -6,7 +6,10 @@
  * F442), in style-layer order with fades at zoom limits and on visibility changes (F447), with paint mixed between
  * integer zooms (F440). Runtime style changes re-evaluate paint in place or lay out again from the kept bytes (F450).
  */
-import type { FrameView, Globe, RenderExtensionContext, TileTransport } from '@vibeglobe/core';
+import type { FrameView, Globe, RenderExtensionContext, ScreenPoint } from '@vibeglobe/core';
+import type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
+import { VectorInteraction, type VectorFeatureEvent } from './vector-interaction.js';
+import { pickVectorFeatures, type DrawnTile, type PickedVectorFeature } from './vector-picking.js';
 import { fetchTransport } from '@vibeglobe/sources';
 import { GlyphSource } from './glyph-source.js';
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
@@ -20,22 +23,10 @@ import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-sty
 import { json, resolveSource, tileUrl, type SourceInfo } from './style-sources.js';
 import type { StyleLayer } from './style-layer.js';
 import type { VectorLayerDraws, VectorMesh, VectorTileTarget } from './vector-target.js';
+
+export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
 import { sampledTiles, viewTargets } from './view-tiles.js';
 import { BUCKET_EXTENT, type Bucket } from './layout-tile.js';
-
-/** Options of {@link addVectorTiles}. */
-export interface VectorTilesOptions {
-  /** The style: its JSON, or the URL to fetch it from. */
-  readonly style: unknown;
-  /** Creates the renderer's target from `context.renderer` (`createVectorTileTarget` of the renderer). */
-  readonly target: (renderer: unknown) => VectorTileTarget;
-  /** The transport of tile, TileJSON, glyph and sprite requests; `fetchTransport()` by default. */
-  readonly transport?: TileTransport;
-  /** `fetch` for the style, TileJSON, glyph and sprite documents; the global one by default. */
-  readonly fetch?: typeof fetch;
-  /** A CSS font family drawn locally for characters the style's glyphs lack (CJK, F448). */
-  readonly localFontFamily?: string;
-}
 
 /** A source of the style, resolved (TileJSON read). */
 interface ResolvedSource extends SourceInfo {
@@ -54,25 +45,6 @@ interface TileMesh {
   readonly bucket: Bucket;
   paint: MeshPaint;
   paintKey: string;
-}
-
-/** A vector tile layer on a globe. */
-export interface VectorTileLayer {
-  /** The style, changeable at runtime (paint, layout, filters, layers; F450). */
-  readonly style: VectorStyle;
-  /** Sets feature-state of a feature (F446): its paint follows on the next frame. */
-  setFeatureState(
-    feature: { readonly source: string; readonly id: number | string },
-    state: Record<string, unknown>,
-  ): void;
-  /** The labels the last frame placed, with their screen boxes (F449). */
-  placedLabels(): readonly PlacedLabel[];
-  /** Every tile URL requested so far, per source (tests: F442, F450). */
-  requestLog(source?: string): readonly string[];
-  /** Diagnostics: the drawn tiles of the last frame, as `z/x/y` of the drawn tile → target. */
-  drawnTiles(): readonly { readonly tile: string; readonly target: string; readonly standIn: boolean }[];
-  /** Removes the layer and frees its resources. */
-  remove(): void;
 }
 
 /** Logs a problem the way the engine's log does (until extensions can use it: hook request D (1)). */
@@ -116,6 +88,14 @@ class Runtime implements VectorTileLayer {
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
   private placer: LabelPlacer | undefined;
+  private drawnTilesWithBuckets: DrawnTile[] = [];
+  private readonly interaction = new VectorInteraction(
+    (point) => this.queryRenderedFeatures(point),
+    (feature, state) => {
+      if (feature.id !== undefined) this.setFeatureState({ source: feature.source, id: feature.id }, state);
+    },
+  );
+  private detachPointer: (() => void) | undefined;
 
   constructor(
     private readonly globe: Globe,
@@ -125,6 +105,7 @@ class Runtime implements VectorTileLayer {
   ) {}
 
   start(): this {
+    if (this.options.element !== undefined) this.detachPointer = this.interaction.attach(this.options.element);
     this.removeExtension = this.globe.addRenderExtension((context) => this.extension(context));
     this.unsubscribe = this.style.onChange((change) => this.changed(change));
     return this;
@@ -138,6 +119,24 @@ class Runtime implements VectorTileLayer {
     this.featureStates.set(key, { ...this.featureStates.get(key), ...state });
     this.paintVersion++;
     this.globe.requestRender();
+  }
+
+  queryRenderedFeatures(point: ScreenPoint): PickedVectorFeature[] {
+    return pickVectorFeatures(
+      {
+        screenToGeo: (p) => this.globe.screenToGeo(p),
+        geoToScreen: (p) => this.globe.geoToScreen(p),
+        zoom: this.globe.camera.zoom,
+        layers: this.style.layers,
+        drawn: this.drawnTilesWithBuckets,
+        labels: this.placedLabels(),
+      },
+      point,
+    );
+  }
+
+  on(listener: (event: VectorFeatureEvent) => void): () => void {
+    return this.interaction.on(listener);
   }
 
   placedLabels(): readonly PlacedLabel[] {
@@ -154,6 +153,7 @@ class Runtime implements VectorTileLayer {
   }
 
   remove(): void {
+    this.detachPointer?.();
     this.unsubscribe?.();
     this.removeExtension?.();
     this.removeExtension = undefined;
@@ -172,7 +172,9 @@ class Runtime implements VectorTileLayer {
       this.options.localFontFamily,
     );
     void glyphs.loadSprite(this.style.sprite, globalThis.devicePixelRatio ?? 1);
-    this.placer = new LabelPlacer(this.globe, glyphs, target.atlas);
+    this.placer = new LabelPlacer(this.globe, glyphs, target.atlas, (source, id) =>
+      this.featureStates.get(`${source}|${id}`),
+    );
     for (const [id, source] of this.resolved) {
       if (source === undefined) continue;
       const loader = new VectorTileLoader({
@@ -251,6 +253,7 @@ class Runtime implements VectorTileLayer {
     this.targets = targets;
     const draws = new Map<string, readonly SourceDraw[]>();
     this.lastDrawn = [];
+    this.drawnTilesWithBuckets = [];
     for (const source of this.sources.values()) {
       const layers = this.style.layers.filter((l) => l.source === source.id).map((l) => l.json);
       source.loader.setLayers(layers, this.layoutVersion);
@@ -266,8 +269,11 @@ class Runtime implements VectorTileLayer {
         source.id,
         sourceDraws.map((d) => ({ tile: d.tile, clip: clipOf(d.tile, d.target) })),
       );
-      for (const d of sourceDraws)
+      for (const d of sourceDraws) {
         this.lastDrawn.push({ tile: tileKey(d.tile), target: tileKey(d.target), standIn: d.standIn });
+        const buckets = source.loader.get(d.tile)?.buckets ?? [];
+        this.drawnTilesWithBuckets.push({ source: source.id, tile: d.tile, clip: clipOf(d.tile, d.target), buckets });
+      }
     }
     return draws;
   }

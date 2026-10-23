@@ -45,7 +45,8 @@ function observing(): boolean {
 
 /** A request to `url` starts: its timing entry is kept when it arrives. False when no timings can be had. */
 export function expectTiming(url: string): boolean {
-  if (typeof PerformanceObserver === 'undefined' || !observing()) return false;
+  // Browsers only (a page or a worker): Node reports no timings for the fetches of tests and tools.
+  if (globalThis.location === undefined || typeof PerformanceObserver === 'undefined' || !observing()) return false;
   expected.add(absolute(url));
   return true;
 }

@@ -2,9 +2,10 @@ import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/
 
 /**
  * The part of the engine's public API the controls use beyond `NavigationApi`: the home command and the view-mode
- * toggle for their keys. Rotation, the clock and the applied camera come through `NavigationApi` itself.
+ * toggle for their keys, and the fit the zoom box uses. Rotation, the clock and the applied camera come through
+ * `NavigationApi` itself.
  */
-export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo'>> & {
+export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' | 'fitBounds'>> & {
   /** The home command (F194), used by the Home key when the engine has it. */
   goHome?(): unknown;
   /** The view-mode toggle (F163), used by the 2, 3 and A keys when the engine has it. */

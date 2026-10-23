@@ -3,6 +3,8 @@
 import { createControls, type ControlsOptions, type NavigationControls } from '@vibeglobe/controls';
 import { createGlobe, type CameraState, type GeoPosition, type Globe, type ScreenPoint } from '@vibeglobe/core';
 import { createRenderer } from '@vibeglobe/renderer';
+import { heightmapTerrain } from '@vibeglobe/sources';
+import { createWorkers } from '@vibeglobe/worker';
 
 /** One drawn frame as the recorder saw it. */
 export interface RecordedFrame {
@@ -56,6 +58,16 @@ const view = {
   tiltDeg: number('tilt') ?? 0,
 };
 const clockStepMs = number('clockStepMs');
+// `?terrain=terrarium` adds the fixture terrain (its 4,000 m peak at 6.86°, 45.83°), for gestures over relief.
+const terrain =
+  params.get('terrain') === 'terrarium'
+    ? heightmapTerrain({
+        id: 'fixture-terrain',
+        url: `${location.origin}/fixture-tiles/controls/terrain/mercator/{z}/{x}/{y}.terrarium.png`,
+        encoding: 'terrarium',
+        maxLevel: 14,
+      })
+    : undefined;
 const globe = createGlobe({
   container,
   renderer: createRenderer({ backend: backend === 'webgpu' || backend === 'webgl2' ? backend : 'auto', canvas }),
@@ -63,8 +75,12 @@ const globe = createGlobe({
   baseImageryUrl: '/imagery/natural-earth-4096.jpg',
   view,
   ...(clockStepMs === undefined ? {} : { manualClockStepMs: clockStepMs }),
+  ...(terrain ? { terrain, workers: createWorkers() } : {}),
 });
 controls.connect(globe);
+// `?viewMode=2d|3d|auto` starts in that view mode (M5).
+const viewMode = params.get('viewMode');
+if (viewMode === '2d' || viewMode === '3d' || viewMode === 'auto') globe.setViewMode(viewMode);
 
 /** Pointers down, by id, in canvas pixels. */
 const down = new Map<number, ScreenPoint>();

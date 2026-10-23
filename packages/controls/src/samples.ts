@@ -1,5 +1,8 @@
 const CAPACITY = 16;
 
+/** The longest window the event cadence may stretch the velocity window to: slower events are not a drag. */
+const MAX_WINDOW_MS = 300;
+
 /**
  * Timestamped samples of up to four channels (for example x, y, log2 of a finger distance, an angle), kept in a ring
  * of preallocated arrays for the velocity at release (ADR 0009 §3 and §6).
@@ -36,16 +39,19 @@ export class SampleRing {
   }
 
   /**
-   * Velocity per millisecond of each channel over the samples within `windowMs` of the latest one, written to `out`,
-   * for a release at `releaseMs`. A release more than `windowMs` after the latest sample, or fewer than two samples in the
-   * window, give zero: a release after holding still does not coast. The window ends at the latest motion, not at the
-   * release, so slow event delivery (a busy main thread) still measures the drag.
+   * Velocity per millisecond of each channel over the samples within the window of the latest one, written to `out`,
+   * for a release at `releaseMs`. The window is `windowMs`, stretched to 1.5 times the interval between the last two
+   * samples when events come slower (a busy main thread, a slow device; at most 300 ms), so the drag is still measured
+   * (KB-121). A release more than the window after the latest sample, or fewer than two samples in it, give zero: a
+   * release after holding still does not coast. The window ends at the latest motion, not at the release.
    */
   velocity(windowMs: number, out: Float64Array, releaseMs: number): void {
     out.fill(0);
     if (this.count < 2) return;
     const last = (this.head - 1 + CAPACITY) % CAPACITY;
     const lastTime = this.times[last] ?? 0;
+    const cadenceMs = lastTime - (this.times[(last - 1 + CAPACITY) % CAPACITY] ?? 0);
+    windowMs = Math.max(windowMs, Math.min(1.5 * cadenceMs, MAX_WINDOW_MS));
     if (releaseMs - lastTime > windowMs) return;
     let first = last;
     for (let n = 1; n < this.count; n++) {

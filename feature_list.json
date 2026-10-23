@@ -2300,7 +2300,7 @@
         "In every frame pick the coordinate under the cursor and assert it stays within 1 px of the cursor",
         "Assert each notch animates over several frames with eased velocity, and that a wheel event over empty sky zooms toward the screen center"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F169",
@@ -2364,7 +2364,7 @@
         "Manually check on the reference tablet",
         "Pinch through the globe-to-flat morph range and assert the geographic point under the finger midpoint stays within 1 px of it in every frame"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F174",
@@ -2426,7 +2426,7 @@
         "Assert the globe never flips or jumps when the drag passes near a pole",
         "Under touch emulation drag with one finger and assert the same behavior"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F179",
@@ -2477,7 +2477,7 @@
         "Assert the heading changes with horizontal motion, the tilt with vertical motion, and the center target stays fixed",
         "Assert no context menu appears and the new tilt and heading become the chosen values"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F183",
@@ -2515,7 +2515,7 @@
         "Assert pinch, twist and two-finger pan gestures do not trigger tilt",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F186",
@@ -2539,7 +2539,7 @@
         "Assert the heading changes with Left/Right and the tilt with Up/Down, eased, with no stutter",
         "Assert the resulting tilt and heading become the chosen values"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F188",
@@ -2858,7 +2858,7 @@
         "Perform zoom in and out, pan, rotate, tilt, reset north, home and view-mode changes using only keyboard events",
         "Assert the key map is documented and that keys typed into a text input elsewhere on the page do not move the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F214",

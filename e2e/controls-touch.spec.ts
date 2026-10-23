@@ -201,6 +201,46 @@ test('a twist combined with pinch and pan keeps the midpoint content under the m
   expect((await camera(page)).headingDeg).toBeLessThan(-20);
 });
 
+test('pinch stays anchored at the finger midpoint in the 2D view, the tilted 3D view and through the globe-to-flat morph (F173)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  for (const query of [
+    `lon=10&lat=45&zoom=5&viewMode=2d&${SIZE}`,
+    `lon=10&lat=45&zoom=8&tilt=45&viewMode=3d&${SIZE}`,
+    // Auto mode from ground zoom about 4 to 5.3: the morph runs from 4 to 6.5 (M5).
+    `lon=10&lat=20&zoom=4&viewMode=auto&${SIZE}`,
+  ]) {
+    await openControls(page, query);
+    const touch = await Touch.create(page);
+    const from = [
+      { id: 1, x: 120, y: 120 },
+      { id: 2, x: 200, y: 120 },
+    ];
+    const under = await positionAt(page, mid(from));
+    const zoom = groundZoom(await camera(page));
+    await record(page, [under as GeoPosition]);
+    await touch.start(from);
+    await glide(
+      touch,
+      from,
+      [
+        { id: 1, x: 80, y: 120 },
+        { id: 2, x: 240, y: 120 },
+      ],
+      12,
+      page,
+    );
+    await touch.end();
+    await settle(page);
+    expect(
+      maxDrift(await frames(page), () => mid(from)),
+      query,
+    ).toBeLessThan(1);
+    expect(groundZoom(await camera(page)) - zoom, query).toBeGreaterThan(0.75);
+  }
+});
+
 test('a two-finger vertical drag tilts, and pinch, twist and pan do not (F185)', async ({ page }) => {
   await openControls(page, `lon=10&lat=45&zoom=8&${SIZE}`);
   const touch = await Touch.create(page);
@@ -223,6 +263,7 @@ test('a two-finger vertical drag tilts, and pinch, twist and pan do not (F185)',
   await settle(page);
   const tilted = await camera(page);
   expect(tilted.tiltDeg).toBeGreaterThan(10);
+  expect(tilted.chosenTiltDeg, 'the tilt becomes the chosen one').toBeCloseTo(tilted.tiltDeg, 6);
   expect(tilted.longitudeDeg).toBeCloseTo(10, 6);
   expect(tilted.headingDeg).toBeCloseTo(0, 9);
 

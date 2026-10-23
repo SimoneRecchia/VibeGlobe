@@ -185,7 +185,17 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
       // Visible before prefetch: the next level under the center (ADR 0007 class 4) starts after every visible tile.
       const prefetch = after.filter((request) => request.level === target + 1);
       expect(prefetch.length).toBeGreaterThan(0);
-      const lastVisible = Math.max(...after.filter((request) => request.level <= target).map((r) => r.startMs));
+      // Visible: the tiles drawn at the end and their ancestors (the ring around them is prefetch too, F284).
+      const drawn = await page.evaluate(() =>
+        (window.vibeglobePlayground?.globe.surfaceTiles() ?? []).map((t) => [t.level, t.x, t.y] as const),
+      );
+      const visible = (r: LoggedRequest): boolean =>
+        drawn.some(
+          ([level, x, y]) => r.level <= level && x >> (level - r.level) === r.x && y >> (level - r.level) === r.y,
+        );
+      const lastVisible = Math.max(
+        ...after.filter((request) => request.level <= target && visible(request)).map((r) => r.startMs),
+      );
       for (const request of prefetch) expect(request.startMs).toBeGreaterThanOrEqual(lastVisible);
     });
   });

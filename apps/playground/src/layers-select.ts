@@ -35,7 +35,11 @@ export function selectLayers(): DataLayer[] {
   return [
     new DataLayer('point', {
       id: 'sel-point',
-      data: [feature('pt', { type: 'Point', coordinates: [12.35, 42.0] })],
+      data: [
+        feature('pt', { type: 'Point', coordinates: [12.35, 42.0] }),
+        // Under the polygon, an upper layer (F380: the topmost is picked).
+        feature('pt2', { type: 'Point', coordinates: [12.68, 42.02] }),
+      ],
       style: { 'circle-color': selectable('#ff2020'), 'circle-radius': 8 },
     }),
     new DataLayer('polyline', {

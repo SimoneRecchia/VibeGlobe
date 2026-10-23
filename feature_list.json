@@ -5053,7 +5053,7 @@
         "Click overlapping features and verify the topmost one is reported",
         "Manually verify tapping on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F381",

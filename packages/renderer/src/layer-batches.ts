@@ -241,7 +241,7 @@ export class LayerBatches implements LayerRenderTarget {
     const view = this.lastView;
     if (!view) return Promise.resolve(0);
     // Features draw over models: a model is picked only where no feature is.
-    const id = pickAt(this.batches.values(), view, point.xPx, point.yPx);
+    const id = pickAt(this.batches.values(), view, point.xPx, point.yPx, (batch) => this.groundOf(batch));
     return Promise.resolve(id !== 0 ? id : this.models.pickAt(view, point.xPx, point.yPx));
   }
 

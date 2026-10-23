@@ -3,6 +3,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage, nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
+import { waitForStreaming } from './support/imagery.ts';
 
 test.use({ viewport: { width: 480, height: 360 } });
 
@@ -193,5 +194,93 @@ for (const backend of BACKENDS) {
       expect(hovered(after, target, at), `${target.layer} hover style removed`).toBe(false);
     }
     expect(await page.evaluate(() => (window as unknown as { recorded: string[] }).recorded)).toEqual(expected);
+  });
+}
+
+for (const backend of BACKENDS) {
+  test(`clicking and tapping every primitive emits click with the feature, layer, coordinates and elevation, the topmost of overlapping ones, on ${backend} (F380)`, async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const context = await browser.newContext({ viewport: { width: 480, height: 360 }, hasTouch: true });
+    const page = await context.newPage();
+    await openGlobe(page, `backend=${backend}&scenario=data-select`);
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await page.evaluate(() => {
+      const globe = window.vibeglobePlayground?.globe;
+      const layers = window.vibeglobeLayers;
+      if (!globe || !layers) throw new Error('no layers');
+      const recorded: string[] = [];
+      (window as unknown as { recorded: string[] }).recorded = recorded;
+      const models = (layers as { models?: (typeof layers.layers)[string] }).models;
+      for (const layer of [...Object.values(layers.layers), ...(models ? [models] : [])])
+        layer.on('click', ({ feature, position }) =>
+          recorded.push(
+            `${feature.layerId}/${String(feature.id)} ${position?.longitudeDeg.toFixed(3) ?? '-'},${position?.latitudeDeg.toFixed(3) ?? '-'} ${String(position?.heightMeters ?? '-')}`,
+          ),
+        );
+      // The playground's buttons sit over the canvas's top corners; a tap near one is snapped to it (touch adjustment).
+      for (const id of ['#camera-controls', '#view-modes'])
+        document.querySelector<HTMLElement>(id)?.style.setProperty('display', 'none');
+      globe.setViewMode('2d');
+      globe.jumpTo({ longitudeDeg: 12.5, latitudeDeg: 41.88, zoom: 9 });
+    });
+    await page.waitForTimeout(500);
+    await waitForIdle(page);
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    const recorded = () => page.evaluate(() => (window as unknown as { recorded: string[] }).recorded);
+    const expected: string[] = [];
+    // Every primitive by mouse and by touch, and where a point lies under the polygon (an upper layer, opaque) the
+    // polygon, which is drawn on top there.
+    const targets = [...TARGETS, { layer: 'sel-polygon', id: 'pg', at: [12.68, 42.02] } as const];
+    for (const input of ['mouse', 'touch'] as const)
+      for (const target of targets) {
+        const at = await screen(page, target.at);
+        if (input === 'mouse') await page.mouse.click(box.x + at.xPx, box.y + at.yPx);
+        else await page.touchscreen.tap(box.x + at.xPx, box.y + at.yPx);
+        // Without terrain the ground is the ellipsoid: elevation 0.
+        expected.push(`${target.layer}/${target.id} ${target.at[0].toFixed(3)},${target.at[1].toFixed(3)} 0`);
+        await expect.poll(recorded, `${input} ${target.layer}`).toHaveLength(expected.length);
+      }
+    expect(await recorded()).toEqual(expected);
+    await context.close();
+  });
+
+  test(`a click on a ground-clamped point over terrain carries the terrain's elevation on ${backend} (F380)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openGlobe(
+      page,
+      `backend=${backend}&terrain=terrarium&scenario=data-clamped&lon=6.86&lat=45.78&zoom=9.8&tilt=45`,
+    );
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
+    await waitForStreaming(page);
+    const result = await page.evaluate(() => {
+      const globe = window.vibeglobePlayground?.globe;
+      if (!globe) throw new Error('no globe');
+      document.querySelector<HTMLElement>('#camera-controls')?.style.setProperty('display', 'none');
+      // Point c44 at (6.81°, 45.80°), on the mountain's flank.
+      const ground = globe.elevationAt({ longitudeDeg: 6.81, latitudeDeg: 45.8 });
+      const at = globe.geoToScreen({ longitudeDeg: 6.81, latitudeDeg: 45.8, heightMeters: ground.heightMeters });
+      return { at, ground: ground.heightMeters };
+    });
+    if (!result.at) throw new Error('off screen');
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    const click = page.evaluate(
+      () =>
+        new Promise<{ id: string; heightMeters: number | undefined }>((resolve) =>
+          window.vibeglobeLayers?.layers['clamped']?.on('click', ({ feature, position }) =>
+            resolve({ id: String(feature.id), heightMeters: position?.heightMeters }),
+          ),
+        ),
+    );
+    await page.mouse.click(box.x + result.at.xPx, box.y + result.at.yPx);
+    const event = await click;
+    expect(event.id).toBe('c44');
+    expect(Math.abs((event.heightMeters ?? NaN) - result.ground)).toBeLessThan(30);
+    expect(result.ground).toBeGreaterThan(1000);
   });
 }

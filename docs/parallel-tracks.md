@@ -93,6 +93,11 @@ last column (landed on `main`, or why not) and announces any change to the sourc
 | 2026-10-22 | Data layers (M10)       | `core` and `controls`: pointer events offered to `InteractionController` before the camera gestures, so a press on a draggable feature (`pointerDown` answers true) does not pan the map; `screenToGeo` with terrain height for event positions (F380, F382, F383)                                                                                                                                                                                                                                    | Partly: `createGlobeLayers(globe, { element })` routes pointer events to the interaction controller (hover, click, selection); offering them before the camera gestures so a feature drag does not pan (F382) waits for the M6 input session's `packages/controls`                                 |
 | 2026-10-22 | Data layers (M10)       | `worker`: tasks in the shared pool for `ClusterEngine` (supercluster index and per-zoom diffs, `packages/layers/src/cluster.ts`) and `VectorFormatAdapter.parse` (F371, F373, F375)                                                                                                                                                                                                                                                                                                                   |                                                                                                                                                                                                                                                                                                    |
 | 2026-10-22 | Main session → M6 input | `packages/controls`: under the reduced-motion setting (F214) drag and touch inertia is disabled; the engine exposes it as `Globe.reducedMotion`, followed at runtime (flights already fade). F214's e2e test checks inertia once this lands                                                                                                                                                                                                                                                           | Open: for the M6 input session                                                                                                                                                                                                                                                                     |
+| 2026-10-22 | M6 input                | (1) `packages/core` `NavigationApi`: `orbit(deltaHeadingDeg, deltaTiltDeg)` about the screen-center target, allocation-free, writing the chosen heading and tilt and applying the maximum tilt; and a heading change about a screen point for the two-finger twist (F182–F185, F187). Meanwhile the controls call `Globe.jumpTo({ headingDeg, tiltDeg })` through `controls.connect(globe)` and re-anchor the twist with `dragTo`, which allocates a view per rotating frame.                         |                                                                                                                                                                                                                                                                                                    |
+| 2026-10-22 | M6 input                | (2) `packages/core` `NavigationApi`: read access to the engine clock (`timeMs`) and the applied heading and tilt, so inertia and held keys run on engine time without `connect(globe)` (F179, F181, F203). Meanwhile they read `Globe.timeMs` and `Globe.camera` of the connected globe, and the host clock without one.                                                                                                                                                                              |                                                                                                                                                                                                                                                                                                    |
+| 2026-10-22 | M6 input                | (3) `packages/core` frame loop: a `requestUpdate` made inside `Controls.update` (or `update` returning true) keeps the next frame coming; today the frame clears `dirty` after `update`, so the request is lost. Meanwhile the controls ask again from a microtask after the frame.                                                                                                                                                                                                                   |                                                                                                                                                                                                                                                                                                    |
+| 2026-10-22 | M6 input                | (4) `packages/core`: tell the controls when an API movement starts (for example an optional `Controls.interrupt()`), so inertia, a smoothed wheel zoom or held keys stop when `flyTo` or `easeTo` starts (F202).                                                                                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                    |
+| 2026-10-22 | M6 input                | (5) `apps/playground`, `packages/vue`, `packages/web-component`: call `controls.connect(globe)` after `createGlobe` (rotate and tilt gestures are off without it), and wire the playground's +/- buttons to `controls.zoomIn()` / `controls.zoomOut()` (F174).                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                                                                                    |
 
 ## Status
 
@@ -316,3 +321,78 @@ Passing: F473, F477–F484, F486, F487.
 | F488  | Every engine feature group of PLAN.md (Map experience through Security): the Nuxt example gains a page per group as each lands.                                                                                             |
 | F555  | Network modes and offline packages (F271, F292, M8) and attribution (F254) for the guide's sections, and publishing to npm (owner question 17 in `docs/open-questions.md`) for "installation from the public npm registry". |
 | F490  | The entries above; M14's acceptance belongs to the main session.                                                                                                                                                            |
+
+## M6 input track: status
+
+The eighth session (owner, 2026-10-22 evening) works on branch `claude/modest-wozniak-067cfl`, pull requests into
+`main`, merged by the owner. It owns `packages/controls`: mouse, trackpad, touch and keyboard input, the gesture
+recognizers and their conflicts, inertia, and their settings (ADR 0009 points 3, 4 and 6). Camera animations (`flyTo`,
+`easeTo`, `jumpTo`, tours, orbit, fit to bounds), the constraints, the chosen/applied stage and everything in `core` and
+`renderer` stay with the main session; this track drives the camera only through the engine's public API. Its browser
+tests run on its own harness page on the playground's dev server (`e2e/support/controls.html`), since the playground
+is the main session's.
+
+### Entries of this track
+
+| Entry | What                                                     |
+| ----- | -------------------------------------------------------- |
+| F168  | Smooth, time-based wheel zoom anchored at the cursor     |
+| F169  | Trackpad scroll and pinch zoom                           |
+| F170  | Double-click zooms in one level                          |
+| F171  | Double-tap zooms in one level                            |
+| F172  | Two-finger tap zooms out one level                       |
+| F173  | Pinch zoom anchored at the finger midpoint               |
+| F174  | Zoom-in and zoom-out commands (keys, controls API)       |
+| F175  | Shift+drag zoom box, Escape cancels                      |
+| F178  | Drag pan keeps the grabbed point under the pointer       |
+| F179  | Time-based drag inertia; no coast after holding still    |
+| F180  | Two-finger pan                                           |
+| F181  | Arrow keys pan with eased start and stop                 |
+| F182  | Right-drag rotates and tilts about the center target     |
+| F183  | Ctrl+drag rotates and tilts like right-drag              |
+| F184  | Two-finger twist rotates, combined with pinch and pan    |
+| F185  | Two-finger vertical drag tilts, exclusive of the others  |
+| F186  | Adding or lifting fingers continues without a jump       |
+| F187  | Shift+arrows rotate and tilt                             |
+| F189  | Input over the map never scrolls or zooms the host page  |
+| F213  | Every navigation action operable with the keyboard alone |
+
+Every other M6 entry is the main session's (animations, fit to bounds, orbit, compass and orientation commands, home,
+constraints, reduced motion of flights, frame-rate independence of animations, coordinate entry, the geocoder and the
+acceptance F217). Their input side (any input stops a running animation, inertia shortened under reduced motion,
+keyboard pan replayed at several refresh rates) is built and unit-tested here.
+
+### Hook requests of this track
+
+Rows in "Hook requests" above use the track name "M6 input" (numbered 1–5).
+
+### Status of this track's entries
+
+The browser specs are `e2e/controls-mouse.spec.ts`, `e2e/controls-keyboard.spec.ts` and `e2e/controls-touch.spec.ts`
+(Chromium, touch through CDP); the key map and options are in `docs/guides/controls.md`.
+
+| Entry | Status  | Remaining step and blocker                                                                                                                 |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| F168  | failing | Wheel zoom in the 2D view (M5 morph) and the tilted 3D view with terrain (M4), both on the main branch, not on `main` yet; globe view done |
+| F169  | pending | Manual macOS trackpad and Windows touchpad check (`docs/open-questions.md`)                                                                |
+| F170  | passing |                                                                                                                                            |
+| F171  | pending | Reference tablet                                                                                                                           |
+| F172  | pending | Reference tablet                                                                                                                           |
+| F173  | failing | Pinch in the 2D and 3D views and through the globe-to-flat morph (M5, not on `main` yet); then the reference tablet                        |
+| F174  | failing | The playground's +/- buttons (hook 5) and zooming through the morph range (M5); keys and `controls.zoomIn/zoomOut` done                    |
+| F175  | passing |                                                                                                                                            |
+| F178  | failing | Drags in the 2D view (M5, not on `main` yet); globe, tilted, antimeridian, near-pole and one-finger drags done                             |
+| F179  | passing |                                                                                                                                            |
+| F180  | pending | Reference tablet                                                                                                                           |
+| F181  | passing |                                                                                                                                            |
+| F182  | failing | "Becomes the chosen tilt and heading": the chosen values exist with M5 (`CameraState.chosenTiltDeg`), not on `main` yet                    |
+| F183  | passing |                                                                                                                                            |
+| F184  | pending | Reference tablet                                                                                                                           |
+| F185  | failing | The chosen tilt (M5, as F182); then the reference tablet                                                                                   |
+| F186  | pending | Reference tablet                                                                                                                           |
+| F187  | failing | The chosen tilt and heading (M5, as F182)                                                                                                  |
+| F189  | passing |                                                                                                                                            |
+| F213  | failing | Home and view-mode keys call `goHome` (F194) and `setViewMode` (F163), on the main branch, not on `main` yet; the rest done                |
+
+Each failing entry above passes once `main` carries M4, M5 and the M6 movement API: the controls already call those
+APIs when the connected globe has them, and the specs gain the 2D, terrain and chosen-value steps then.

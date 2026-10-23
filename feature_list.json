@@ -2312,7 +2312,7 @@
         "Assert the zoom changes in proportion to the deltas with no stepping (no frame-to-frame jump above threshold) and stays anchored within 1 px",
         "Manually check on a macOS trackpad and a Windows precision touchpad and record the result"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F170",
@@ -2324,7 +2324,7 @@
         "Assert the zoom increases by exactly one level at the end of the animation and the clicked coordinate stays within 1 px of the pointer",
         "Assert a single click does not zoom"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F171",
@@ -2337,7 +2337,7 @@
         "Assert a single tap and a tap followed by a drag do not trigger it",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F172",
@@ -2350,7 +2350,7 @@
         "Assert two-finger touches that move beyond the tap tolerance or last beyond the tap duration do not trigger it",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F173",
@@ -2389,7 +2389,7 @@
         "On release assert the box's geographic corners are inside the viewport and the view fills the box's larger dimension within tolerance",
         "Press Escape during a box drag and assert nothing moves"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F176",
@@ -2440,7 +2440,7 @@
         "Assert inertia on the globe continues along the drag's great-circle direction",
         "Repeat with a one-finger touch drag and release and assert the same inertia behavior"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F180",
@@ -2453,7 +2453,7 @@
         "Assert release with velocity produces the same inertia as a mouse drag",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F181",
@@ -2465,7 +2465,7 @@
         "Assert the view pans in the matching screen direction with eased acceleration and deceleration and no stutter",
         "Assert the keys do nothing when focus is outside the map"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F182",
@@ -2489,7 +2489,7 @@
         "Assert the heading and tilt change exactly as for an equivalent right-drag",
         "Assert releasing Ctrl mid-drag ends the rotation without a jump"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F184",
@@ -2502,7 +2502,7 @@
         "Assert small unintended twists during a pinch below the rotation threshold do not rotate",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F185",
@@ -2527,7 +2527,7 @@
         "Record the camera per frame and assert no frame-to-frame change above the jump threshold at each finger change",
         "Manually check on the reference tablet"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F187",
@@ -2563,7 +2563,7 @@
         "Wheel, pinch and touch-drag over the map and assert the window scroll position and visual viewport scale do not change",
         "Wheel outside the map and assert the page scrolls normally"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F190",

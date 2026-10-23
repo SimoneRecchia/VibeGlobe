@@ -1,4 +1,7 @@
 import type { FrameCapture, Globe, ViewInit } from '@vibeglobe/core';
+import { checkPops } from './pops.js';
+
+export { countPops } from './pops.js';
 
 /**
  * The frame-stepped scenario harness of M3 (plan §4.2, ADR 0012): a scenario is a view per frame index, with hold
@@ -38,6 +41,8 @@ export interface ScenarioReport {
   /** Pixels that changed in one drawn frame faster than a 250 ms fade allows (F105). */
   pops: number;
   firstPopFrame: number;
+  /** The first popped pixel, in device pixels, with its color before and after: where to look in CI's logs. */
+  firstPop: { xPx: number; yPx: number; before: number[]; after: number[] } | undefined;
   /** Tiles whose terrain went back to a coarser level while the camera held still: a tile released early (F139). */
   terrainDrops: number;
   firstTerrainDropFrame: number;
@@ -250,9 +255,6 @@ const SCENARIOS: Record<string, FrameScenario> = {
   ),
 };
 
-/** Per channel, the most a pixel may change in one drawn frame: a 250 ms fade at 60 Hz, plus rounding (plan §4.2). */
-const FADE_STEP = 255 / 15;
-const POP_SLACK = 4;
 /** Rows checked for holes, and the step of the coarse scan that finds the globe in a row. */
 const ROW_STEP_PX = 2;
 const SCAN_STEP_PX = 24;
@@ -317,21 +319,6 @@ export function checkFrame(
   }
 }
 
-/** Pixels that changed in one frame faster than a fade allows (F105, F563). */
-export function countPops(previous: Pick<FrameCapture, 'rgba'>, capture: Pick<FrameCapture, 'rgba'>): number {
-  const limit = FADE_STEP + POP_SLACK;
-  let pops = 0;
-  for (let i = 0; i < capture.rgba.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      if (Math.abs((capture.rgba[i + c] ?? 0) - (previous.rgba[i + c] ?? 0)) > limit) {
-        pops++;
-        break;
-      }
-    }
-  }
-  return pops;
-}
-
 /**
  * Plays scenario `name` frame by frame, drawing and reading each frame, and reports holes, pops in still windows and,
  * with `darkBelow`, dark pixels.
@@ -348,6 +335,7 @@ export function emptyReport(frames = 1): ScenarioReport {
     firstDarkFrame: -1,
     pops: 0,
     firstPopFrame: -1,
+    firstPop: undefined,
     terrainDrops: 0,
     firstTerrainDropFrame: -1,
     minReliefAboveHorizonPx: -1,
@@ -467,9 +455,7 @@ export async function recordScenario(
       checkFrame(globe, capture, view, report, frame, darkBelow);
       if (previous && !next && frame > stillSince) {
         report.staticFrames++;
-        const pops = countPops(previous, capture);
-        report.pops += pops;
-        if (pops > 0 && report.firstPopFrame < 0) report.firstPopFrame = frame;
+        checkPops(report, frame, previous, capture);
       }
       measureMotion(globe, scenario, report, frame, next && previous, capture);
       if (terrain) {

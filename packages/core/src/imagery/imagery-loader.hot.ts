@@ -175,6 +175,10 @@ export class ImageryLoader implements NetworkPoolClient {
   private frame = 0;
   private requested = 0;
   private destroyed = false;
+  /** 2 while a high-DPI source's `@2x` tiles are wanted (F241). */
+  pixelRatio = 1;
+  /** Surface levels finer than the source's tiles: 1 for tiles of 512 texels, which serve the next level (F240). */
+  levelShift = 0;
 
   constructor(private readonly options: ImageryLoaderOptions) {
     const { tiling } = options.source;
@@ -503,7 +507,7 @@ export class ImageryLoader implements NetworkPoolClient {
       const slot = this.heap.peek();
       const record = slot >= 0 ? this.table.bySlot[slot] : undefined;
       if (!record || (!record.pinned && !this.pinnedComplete)) break;
-      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 });
+      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 }, this.pixelRatio);
       if (request === 'noData') {
         this.heap.pop();
         record.state = NO_DATA;

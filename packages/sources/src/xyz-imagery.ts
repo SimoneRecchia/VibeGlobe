@@ -18,8 +18,8 @@ export interface XyzImageryOptions {
   /** Unique per engine instance. */
   id: string;
   /**
-   * URL template with `{z}`, `{x}` and `{y}`, `{-y}` for TMS rows counted from the south, and `{s}` for a host from
-   * `subdomains`.
+   * URL template with `{z}`, `{x}` and `{y}`, `{-y}` for TMS rows counted from the south, `{s}` for a host from
+   * `subdomains`, and `{r}`, which becomes `@2x` on high-DPI canvases and nothing elsewhere (F241).
    */
   url: string;
   /** Tiling scheme: Web Mercator XYZ (default) or the two-root geographic pyramid. */
@@ -79,7 +79,8 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.transparent ? { transparent: true } : {}),
     ...(options.profile ? { profile: options.profile } : {}),
-    request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
+    ...(options.url.includes('{r}') ? { highDpi: true } : {}),
+    request(coord: TileCoord, out: TileRequest, pixelRatio = 1): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';
       const rows = tiling.rootTilesY * 2 ** coord.level;
@@ -89,7 +90,8 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
         .replace('{x}', String(coord.x))
         .replace('{-y}', String(rows - 1 - coord.y))
         .replace('{y}', String(coord.y))
-        .replace('{s}', subdomains[hostIndex] ?? '');
+        .replace('{s}', subdomains[hostIndex] ?? '')
+        .replace('{r}', pixelRatio > 1 ? '@2x' : '');
       out.hostIndex = hostIndex;
       return out;
     },

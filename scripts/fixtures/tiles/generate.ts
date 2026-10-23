@@ -12,10 +12,22 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * 1 px edge stripe; `smooth` the color field alone, continuous across every tile edge (seam checks, F110, F111);
  * `tiles` alternating colors per tile parity, contrasting at every tile edge (F106); `stripes` one-texel dark and
  * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
+ * `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
  * `red`, `green`, `blue` and `shade` one color everywhere ({@link SOLID_COLORS}).
  */
 export type FixturePattern =
-  'world' | 'levels' | 'border' | 'smooth' | 'tiles' | 'stripes' | 'patches' | 'red' | 'green' | 'blue' | 'shade';
+  | 'world'
+  | 'levels'
+  | 'border'
+  | 'smooth'
+  | 'tiles'
+  | 'stripes'
+  | 'patches'
+  | 'checker'
+  | 'red'
+  | 'green'
+  | 'blue'
+  | 'shade';
 
 /** The single colors of the `red`, `green`, `blue` and `shade` (a flat hillshade) patterns: layer stacking (F243–F246). */
 export const SOLID_COLORS: Readonly<Record<string, readonly [number, number, number]>> = {
@@ -36,6 +48,8 @@ export interface FixtureTile {
 }
 
 const MAX_LAT = Math.atan(Math.sinh(Math.PI));
+/** Cells of the `checker` pattern across the Web Mercator world. */
+const CHECKER_CELLS = 4096;
 const MIN_CHANNEL = 40;
 
 /** The longitude and latitude (radians) of a point of a tile, `u` and `v` from 0 to 1 across it (v from the north). */
@@ -103,6 +117,12 @@ export function renderTile(tile: FixtureTile): Uint8Array {
       } else if (tile.pattern === 'stripes') {
         const value = i % 2 === 0 ? 240 : MIN_CHANNEL;
         color = [value, value, value];
+      } else if (tile.pattern === 'checker') {
+        const { lonRad, latRad } = fixturePosition(tile, u, v);
+        const mx = (lonRad + Math.PI) / (2 * Math.PI);
+        const my = (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
+        const dark = (Math.floor(mx * CHECKER_CELLS) + Math.floor(my * CHECKER_CELLS)) % 2 === 0;
+        color = dark ? [60, 70, 90] : [230, 220, 200];
       } else if (tile.pattern === 'patches') {
         color = [...(PATCH_COLORS[(tile.x + 3 * tile.y) % PATCH_COLORS.length] ?? [128, 128, 128])];
       } else if (tile.pattern === 'smooth') {

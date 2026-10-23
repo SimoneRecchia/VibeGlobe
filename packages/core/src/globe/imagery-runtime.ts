@@ -1,4 +1,5 @@
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
+import { applyPixelRatio } from './imagery-variants.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
 import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
@@ -184,9 +185,9 @@ export class ImageryRuntime {
   /** Main-thread terrain work done since the last frame outside `draw` (F134): charged to the next frame's time. */
   private chargedMs = 0;
   /** Texels along a tile edge of the finest layer, for the selection's texel refinement. */
-  readonly texelsPerTile: number;
-  /** The finest level any layer serves. */
-  readonly maxLevel: number;
+  texelsPerTile: number;
+  /** The finest surface level any layer serves. */
+  maxLevel: number;
   private readonly network: NetworkPool;
   private readonly lease: WorkerPoolLease;
   private readonly residency: Residency;
@@ -432,6 +433,11 @@ export class ImageryRuntime {
     const loader = emptyLoaderStats();
     this.terrain.loader.addStats(loader);
     return terrainStatsOf(loader, DEFAULT_UPLOAD_BUDGET.maxBytes, this.terrainMs);
+  }
+
+  /** Picks the high-DPI variants and level shifts for render-target pixels per CSS pixel `pixelRatio` (F240, F241). */
+  setPixelRatio(pixelRatio: number): void {
+    Object.assign(this, applyPixelRatio(this.layers, pixelRatio));
   }
 
   /** Reloads the loaders of every layer, and the terrain, whose source has this id (`Globe.reloadSource`). */

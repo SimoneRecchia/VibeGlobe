@@ -144,6 +144,7 @@ export class SurfaceFrame {
       terrain,
     );
     this.imagery = imagery;
+    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / (this.selection.maxTexelErrorPx ?? MAX_TEXEL_ERROR_PX));
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
@@ -266,6 +267,12 @@ export class SurfaceFrame {
    */
   setPixelRatio(pixelRatio: number): void {
     this.selection.maxTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    // High-DPI sources switch to their `@2x` tiles (F241).
+    if (this.imagery) {
+      this.imagery.setPixelRatio(pixelRatio);
+      this.selection.imageryTexelsPerTile = this.imagery.texelsPerTile;
+      this.selection.imageryMaxLevel = this.imagery.maxLevel;
+    }
   }
 
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */

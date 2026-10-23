@@ -11,7 +11,7 @@ import {
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { chainSources, credits, overlayLayers } from './fixture-layers.js';
+import { chainSources, credits, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
@@ -165,11 +165,11 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
   // `&subdomains=localhost,127.0.0.1` for two hosts, F089, or the HTTP/2 one with `&multiplexed=1`, F096).
   const base = params.get('tileBase') ?? import.meta.env.BASE_URL;
   // `?ktx2=etc1s|uastc` serves KTX2 tiles with a full mip chain instead of PNG (F104).
-  const ktx2 = params.get('ktx2');
-  const extension = ktx2 === 'etc1s' || ktx2 === 'uastc' ? `${ktx2}.ktx2` : 'png';
+  const extension = ['etc1s', 'uastc'].includes(params.get('ktx2') ?? '') ? `${params.get('ktx2')}.ktx2` : 'png';
   // `?imageryTiling=geographic` serves the imagery in the geographic scheme (F141).
   const imageryTiling = params.get('imageryTiling') === 'geographic' ? 'geographic' : 'mercator';
-  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}.${extension}`;
+  const { tileSizePx, variant } = tileVariant(params);
+  const url = `${base}fixture-tiles/${session}/${pattern}/${imageryTiling}/{z}/{x}/{y}${variant}.${extension}`;
   // `?assets=<path>/` serves the engine's assets from another base URL: the worker program and the base image (F100).
   const workers = assets === null ? createWorkers() : createWorkers({ url: `${assets}vibeglobe-worker.js` });
   const number = (name: string): number | undefined => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -178,6 +178,7 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     id: `fixture-${pattern}`,
     url,
     tiling: imageryTiling,
+    tileSizePx,
     minLevel: number('imageryMin') ?? 0,
     maxLevel: number('imageryMax') ?? 18,
     ...(params.has('subdomains') ? { subdomains: (params.get('subdomains') ?? '').split(',') } : {}),

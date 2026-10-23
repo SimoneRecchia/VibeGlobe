@@ -141,3 +141,85 @@ describe('source metadata (F220)', () => {
     globe.destroy();
   });
 });
+
+describe('tile sizes and high-DPI variants (F240, F241)', () => {
+  /** The finest imagery level drawn once `globe`'s imagery has settled; every tile's texels stay within 1.5 px. */
+  async function settledLevel(
+    globe: ReturnType<typeof createGlobe>,
+    renderer: ReturnType<typeof fakeRenderer>['renderer'],
+  ): Promise<number> {
+    for (let frame = 0; frame < 30; frame++) {
+      await settle();
+      renderer.timers.advance(16);
+      renderer.flush();
+    }
+    for (const tile of globe.surfaceTiles()) expect(tile.texelErrorPx).toBeLessThanOrEqual(1.5);
+    return Math.max(...globe.surfaceTiles().map((tile) => tile.imageryLevel ?? -1));
+  }
+
+  function variantSource(urls: string[], tileSizePx: number, highDpi: boolean): ImagerySource {
+    return {
+      ...source(urls),
+      tileSizePx,
+      ...(highDpi ? { highDpi: true } : {}),
+      request: (coord, out, pixelRatio = 1) => {
+        out.url = `/tiles/${coord.level}/${coord.x}/${coord.y}${pixelRatio > 1 ? '@2x' : ''}.png`;
+        out.hostIndex = 0;
+        return out;
+      },
+    };
+  }
+
+  async function levelFor(tileSizePx: number, highDpi: boolean, resolutionScale: number): Promise<number> {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [variantSource([], tileSizePx, highDpi)],
+      workers: instantWorkers(),
+      resolutionScale,
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    const level = await settledLevel(globe, renderer);
+    globe.destroy();
+    return level;
+  }
+
+  it('draws 512-pixel tiles one level coarser than 256-pixel tiles at the same view, as densely on screen', async () => {
+    expect(await levelFor(512, false, 1)).toBe((await levelFor(256, false, 1)) - 1);
+  });
+
+  it('draws @2x tiles on a 2x canvas at the level of 1x tiles on a 1x canvas, where 1x tiles refine one level', async () => {
+    const level = await levelFor(256, true, 1);
+    expect(await levelFor(256, true, 2)).toBe(level);
+    expect(await levelFor(256, false, 2)).toBe(level + 1);
+  });
+
+  it('requests @2x tiles only above one render-target pixel per CSS pixel, switching with the resolution scale', async () => {
+    const urls: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [variantSource(urls, 256, true)],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    await settledLevel(globe, renderer);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.some((url) => url.includes('@2x'))).toBe(false);
+    urls.length = 0;
+    globe.setResolutionScale(2);
+    await settledLevel(globe, renderer);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((url) => url.includes('@2x'))).toBe(true);
+    urls.length = 0;
+    globe.setResolutionScale(1);
+    await settledLevel(globe, renderer);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.some((url) => url.includes('@2x'))).toBe(false);
+    globe.destroy();
+  });
+});

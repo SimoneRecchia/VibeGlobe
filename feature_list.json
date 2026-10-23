@@ -3211,7 +3211,7 @@
         "Assert the pixel difference between the two is within the visual-test tolerance and on-screen texel density matches within 10%",
         "Assert the 512-pixel source requests about one quarter as many tiles for the same view"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F241",
@@ -3224,7 +3224,7 @@
         "Assert @2x tiles are requested only at device pixel ratio 2 and that fixture labels appear at the same CSS size in both screenshots",
         "Assert changing the resolution scale setting changes which variant is requested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F242",

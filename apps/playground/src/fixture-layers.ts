@@ -125,3 +125,13 @@ export function chainSources(
     });
   });
 }
+
+/**
+ * The fixture imagery's tile size and URL suffix: `?imageryTileSize=512` serves the same tiles at 512 pixels (F240),
+ * `?imageryHiDpi=1` adds `@2x` variants through the `{r}` template field (F241).
+ */
+export function tileVariant(params: URLSearchParams): { tileSizePx: number; variant: string } {
+  const tileSizePx = params.get('imageryTileSize') === '512' ? 512 : 256;
+  const variant = tileSizePx === 512 ? '@2x' : params.get('imageryHiDpi') === '1' ? '{r}' : '';
+  return { tileSizePx, variant };
+}

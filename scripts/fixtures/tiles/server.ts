@@ -103,6 +103,7 @@ const PATTERNS: readonly string[] = [
   'tiles',
   'stripes',
   'patches',
+  'checker',
   'red',
   'green',
   'blue',
@@ -110,7 +111,7 @@ const PATTERNS: readonly string[] = [
 ];
 const SCHEMES: readonly string[] = ['mercator', 'geographic'];
 const TILE_PATH =
-  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
+  /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;
 const WMS_UTM_PATH = /^\/fixture-tiles\/([\w-]+)\/wms-utm$/;
 const CONTROL_PATH = /^\/_fixture\/([\w-]+)(?:\/(rules|log|layer))?$/;
@@ -284,6 +285,8 @@ export class FixtureServer {
       level: Number(z),
       x: Number(x),
       y: Number(y),
+      // `{y}@2x.png`: the same tile at 512 pixels, a high-DPI variant or a 512-pixel pyramid (F240, F241).
+      ...(path.includes('@2x.') ? { sizePx: 512 } : {}),
     };
     const record = this.recordOf(path, query, source, tile, req);
     entry.log.push(record);
@@ -398,7 +401,7 @@ export class FixtureServer {
     meshExtensions: QuantizedMeshExtensions = {},
   ): Promise<Buffer> {
     const variant = JSON.stringify(meshExtensions);
-    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}.${extension}${variant}`;
+    const key = `${tile.pattern}/${tile.scheme}/${tile.level}/${tile.x}/${tile.y}@${tile.sizePx ?? 256}.${extension}${variant}`;
     let body = this.cache.get(key);
     if (!body) {
       const encoding = TERRAIN[extension];

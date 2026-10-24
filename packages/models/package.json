@@ -12,10 +12,15 @@
       "default": "./dist/index.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "LICENSE.md",
     "!dist/tsconfig.tsbuildinfo",
-    "!dist/__fixtures__"
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
     "@vibeglobe/core": "0.0.0",

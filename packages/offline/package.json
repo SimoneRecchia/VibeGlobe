@@ -16,9 +16,15 @@
       "default": "./dist/cache-worker.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!dist/**/__fixtures__"
   ],
   "devDependencies": {
     "@types/sql.js": "1.4.11",

@@ -22,8 +22,14 @@
       "default": "./dist/geodesy.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!dist/**/__fixtures__"
   ]
 }

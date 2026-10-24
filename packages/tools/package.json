@@ -12,10 +12,16 @@
       "default": "./dist/index.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "LICENSE.md",
     "!dist/tsconfig.tsbuildinfo",
-    "configs"
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "configs",
+    "!dist/**/__fixtures__"
   ],
   "bin": {
     "vibeglobe-data": "./dist/bin.js"

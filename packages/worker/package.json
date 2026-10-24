@@ -16,13 +16,19 @@
       "default": "./dist/vibeglobe-worker.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "LICENSE.md",
     "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
     "wasm/vibeglobe-basis.wasm",
     "wasm/meshopt-decoder.wasm",
     "wasm/licenses",
-    "wasm/third-party.json"
+    "wasm/third-party.json",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
     "@vibeglobe/core": "0.0.0",

@@ -1,6 +1,6 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 21:20 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 22:00 UTC)
 
 Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
 after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32, #35, #36, #37, #38; #39 open (F249, F358, full-CI fixes). Tracks
@@ -23,12 +23,14 @@ Since the takeover:
   manual tilt is KB-170 (the terrain limit's rate in a fast zoom). Open: KB-097 (F167), KB-110 (F137, hardening
   backlog), KB-138 (M11), KB-144 (F378), KB-163 (F395: the 25% target is open question 32), KB-170 (F167), KB-171
   (F359's budget gate flaky in this container, also on the committed code). Track G's TG-01, TG-04 to TG-06 (M15).
-- Full CI run 40119880914 (66fafeb): F052, F399, F429, F231 specs updated to intended changes, KB-172 fixed, F395's
-  timeout raised; new full run started on 9d2a4fa. F329 waits for it.
-- F453: `download.geofabrik.de` is still refused in this container (the policy change applies to new sessions).
-
-Open, breadth first: F148, F167, F329 (CI run), F378, F389, F395 (question 32), F403, F453, F472; M15 and track G's
-bugs.
+- Full CI run 40119880914 (66fafeb) and 40130319391 (9d2a4fa): F052, F399, F429, F231, F248 specs updated to intended
+  changes (`docs/test-changes.md`); KB-172 fixed; F064's regression from F358 (a boxed pixel ratio, per-frame closures)
+  fixed; label fields keep the engine drawing until they show (F379); labels under 14 px drawn from a 12 px field
+  (F360 in other fonts); tile means measured lazily (F249). F101/F102 and F142 fail locally on 66fafeb too (not a
+  regression of these commits); full run 40135695755 started on 440634c. F378 pending (KB-144 fixed). Hook H (2)
+  done.
+  Open, breadth first: F148, F167, F329 (CI run), F389, F395 (question 32), F403, F453, F472; M15 and track G's
+  bugs.
 
 ## Track H, packaging and release (2026-10-24)
 

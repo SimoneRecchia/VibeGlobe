@@ -93,7 +93,7 @@ export class Constraints {
     const v = this.values;
     const south = v[SOUTH] ?? Number.NaN;
     if (south !== south) return;
-    end[0] = clampLongitude(end[0] ?? 0, v);
+    clampLongitude(end, v);
     end[1] = Math.min(Math.max(end[1] ?? 0, south), v[NORTH] ?? 0);
   }
 
@@ -126,7 +126,8 @@ export class Constraints {
     if (south === south) {
       if (pose.targetLatitudeRad < south) pose.targetLatitudeRad = south;
       if (pose.targetLatitudeRad > (v[NORTH] ?? 0)) pose.targetLatitudeRad = v[NORTH] ?? 0;
-      pose.targetLongitudeRad = clampLongitude(pose.targetLongitudeRad, v);
+      lonIo[0] = pose.targetLongitudeRad;
+      if (clampLongitude(lonIo, v)) pose.targetLongitudeRad = lonIo[0] ?? pose.targetLongitudeRad;
     }
     const minZoom = v[MIN_ZOOM] ?? Number.NaN;
     const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
@@ -142,16 +143,24 @@ export class Constraints {
   }
 }
 
-/** Clamps a longitude into [west, east], across the antimeridian when east < west, to the nearer edge. */
-function clampLongitude(lon: number, v: Float64Array): number {
+/** Where a longitude is clamped (KB-132): a double passed to or returned from a call that is not inlined is boxed. */
+const lonIo = new Float64Array(1);
+
+/**
+ * Clamps the longitude in `io[0]` into [west, east], across the antimeridian when east < west, to the nearer edge;
+ * returns true when it moved.
+ */
+function clampLongitude(io: Float64Array, v: Float64Array): boolean {
+  const lon = io[0] ?? 0;
   const west = v[WEST] ?? 0;
   const east = v[EAST] ?? 0;
   const inside = west <= east ? lon >= west && lon <= east : lon >= west || lon <= east;
-  if (inside) return lon;
+  if (inside) return false;
   // Distances to each edge, going round the shorter way.
   let toWest = Math.abs(lon - west);
   if (toWest > Math.PI) toWest = 2 * Math.PI - toWest;
   let toEast = Math.abs(lon - east);
   if (toEast > Math.PI) toEast = 2 * Math.PI - toEast;
-  return toWest < toEast ? west : east;
+  io[0] = toWest < toEast ? west : east;
+  return true;
 }

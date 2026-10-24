@@ -6208,7 +6208,7 @@
         "Assert zero holes or black pixels after the root tile has loaded",
         "Record the results in the benchmark history"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F472",

@@ -55,3 +55,4 @@ Conventions:
 | [0101](0101-ui-controls-on-the-engine-api.md)        | UI controls on the engine's public API: shared layers, the attribution, drawing input and the audit engine  | Accepted (decided by agent; owner may revisit)                    |
 | [0121](0121-gltf-models-package.md)                  | glTF models: a renderer-neutral description decoded in workers                                              | Accepted (decided by agent; owner may revisit)                    |
 | [0122](0122-quality-presets-and-adaptive-quality.md) | Quality presets, start-up choice and adaptive quality                                                       | Accepted (decided by agent; owner may revisit)                    |
+| [0151](0151-network-simulation-suite.md)             | Network simulation suite: links as fault rules plus browser interception, frames checked in the page        | Accepted (decided by agent; owner may revisit)                    |

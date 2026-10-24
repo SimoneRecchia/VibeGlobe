@@ -1,7 +1,7 @@
 // The device-loss scenario of F512, shared by its default spec and its known-bug spec: 50 GPU device losses (WebGPU)
 // or WebGL context losses per backend at random moments of flights, eases, jumps (tile uploads) and view-mode
 // changes, each recovered without a page reload. The same view, drawn before and after the recoveries, shows the same
-// layers, and no renderer object, device or context is kept per loss.
+// layers, and no device or context is kept; the renderer count per loss fails on TG-01 and runs as a known bug.
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage, expectCompleteGlobe, openGlobe, waitForIdle } from '../../support/globe.ts';
@@ -142,12 +142,13 @@ async function loseDuringNavigation(page: Page, losses: number, seed: number) {
 
 /**
  * Registers the scenario on both backends for a playground page with `query` (its layers): `scene` names them in the
- * test titles.
+ * test titles. `countRenderers` adds the check that no renderer object is kept per loss (TG-01 until fixed).
  */
-export function deviceLossTests(scene: string, query: string): void {
+export function deviceLossTests(scene: string, query: string, countRenderers: boolean): void {
+  const leak = countRenderers ? 'or a renderer kept per loss' : 'or a leaked context';
   test.use({ viewport: { width: 320, height: 240 } });
   for (const backend of BACKENDS) {
-    test(`50 ${backend === 'webgpu' ? 'device' : 'context'} losses at random moments of navigation recover ${scene} without a reload or a leak on ${backend} (F512)`, async ({
+    test(`50 ${backend === 'webgpu' ? 'device' : 'context'} losses at random moments of navigation recover ${scene} without a reload ${leak} on ${backend} (F512)`, async ({
       page,
     }) => {
       const losses = scaled(50);
@@ -180,11 +181,12 @@ export function deviceLossTests(scene: string, query: string): void {
       await expectCompleteGlobe(page);
       // Every layer restored: the imagery and the data layers draw the same view as before.
       expect(changedFraction(before.image, after.image)).toBeLessThan(CHANGED_FRACTION);
-      // No leak: one device or context, no renderer object kept per loss (three.js's module-level output node may keep
-      // the last lost renderer, KB-045), and GPU memory within the default 512 MiB budget.
+      // No leak: one device or context, GPU memory within the default 512 MiB budget, and (with `countRenderers`) no
+      // renderer object kept per loss (three.js's module-level output node may keep the last lost renderer, KB-045).
       expect(after.contexts).toBe(1);
-      for (const name of PER_RENDERER)
-        expect(after.renderers[name], name).toBeLessThanOrEqual((before.renderers[name] ?? 0) + 1);
+      if (countRenderers)
+        for (const name of PER_RENDERER)
+          expect(after.renderers[name], name).toBeLessThanOrEqual((before.renderers[name] ?? 0) + 1);
       expect(after.gpuBytes).toBeLessThanOrEqual(512 * 1024 * 1024);
       expect(unexpected(errors)).toEqual([]);
     });

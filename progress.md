@@ -28,8 +28,8 @@ and `scripts/robustness/` (ADR 0161, ADR 0162; numbers 0161–0169).
 - Passing: F499 (100 mount and unmount cycles leave heap, GPU objects, workers and listeners at the empty page's
   baseline, both backends), F511 (quota errors and eviction mid-path, both backends), F515 (hidden tab during a flight
   and idle, 1 and 10 minutes simulated, both backends).
-- Built, waiting for the full-length run: F517 (1000 engines destroyed after random delays, during start-up and
-  loading; 100 and 300 cycles pass on both backends).
+- Passing: F517 (1000 engines destroyed after random delays, half of them during start-up: heap, nodes, listeners and
+  GPU objects back to the empty page's baseline, both backends; 37 min on WebGL2, 66 min on WebGPU in the container).
 - Failing on engine bugs, for the main session (`docs/known-bugs.md`, Track G; their checks in
   `e2e/robustness/known-bugs/*.bug.ts` or the fuzz suite's `knownBugs`): F512 (TG-01, a renderer kept per GPU loss after
   a camera movement), F510 (TG-04 vector tiles and TG-05 imagery tiles not fetched again after faults), F513 (TG-02

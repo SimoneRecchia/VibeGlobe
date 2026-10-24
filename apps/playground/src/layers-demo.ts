@@ -370,6 +370,7 @@ const LAZY_SCENES: Record<string, (globe: Globe) => Promise<void>> = {
   'data-formats': async (globe) => (await import('./layers-formats.js')).showFormats(globe),
   'data-stream': async (globe) => (await import('./layers-stream.js')).showStream(globe),
   'live-feed': async (globe) => (await import('./layers-live.js')).showLiveFeed(globe),
+  'data-markers-lod': async (globe) => (await import('./layers-lod.js')).showMarkerLod(globe),
   'data-street': async (globe) => (await import('./layers-street.js')).showStreet(globe),
   'data-cluster': async (globe) =>
     (await import('./layers-cluster.js')).showCluster(

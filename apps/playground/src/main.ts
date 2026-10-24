@@ -23,6 +23,7 @@ import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
 import { exposeTestHooks } from './test-hooks.js';
+import { cacheLine, surfaceLine } from './overlay-lines.js';
 
 const OVERLAY_REFRESH_MS = 250;
 /** Engine log messages collected with `?logSink=1` (F120). */
@@ -413,31 +414,20 @@ async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<Frame
     const compiles = info.length > 0 ? rendererStats.pipelineCompiles : -1;
     // Draw calls and pipeline changes of the last frame (F103).
     const draws = `draw calls ${rendererStats.drawCalls} · pipeline switches ${rendererStats.pipelineSwitches}`;
-    // The surface selection: drawn tiles and what culling skipped (F086, F087).
-    const selection = globe.surfaceStats();
-    const surface =
-      `tiles ${selection.tiles} · level ≤ ${selection.maxLevel} · culled: frustum ${selection.culledByFrustum}, ` +
-      `horizon ${selection.culledByHorizon} · imagery from ancestor ${selection.fromAncestor}, base ${selection.onBaseImage}` +
-      // The largest projected texel of any drawn tile, which the selection keeps at or below 1.5 px (F081).
-      ` · texel ≤ ${Math.max(0, ...globe.surfaceTiles().map((tile) => tile.texelErrorPx)).toFixed(2)} px`;
-    // The imagery caches: RAM hits (F097) and memory against the budgets (F098).
+    const surface = surfaceLine(globe);
     const imagery = globe.imageryStats();
-    const mb = (bytes: number): string => (bytes / 1048576).toFixed(1);
-    const cache = imagery
-      ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
-        `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
-        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted} · bandwidth ` +
-        `${(imagery.bandwidthBitsPerSecond / 1e6).toFixed(2)} Mbps · latency ${imagery.latencyMs.toFixed(0)} ms`
-      : '';
-    if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
+    const cache = imagery ? cacheLine(imagery) : '';
+    const extra = window.vibeglobeDebugRows?.() ?? []; // Rows of the running scenario (F374).
+    if (compiles === pipelineCompiles && surface + cache + draws + extra.join() === surfaceInfo) return;
     pipelineCompiles = compiles;
-    surfaceInfo = surface + cache + draws;
+    surfaceInfo = surface + cache + draws + extra.join();
     overlay.setInfo([
       ...info,
       ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
       ['draws', draws],
       ['surface', surface],
       ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
+      ...extra,
     ]);
   });
 }

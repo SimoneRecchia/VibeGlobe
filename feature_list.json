@@ -4979,7 +4979,7 @@
         "Verify through the debug overlay that far or dense markers use the simplified representation and near ones the full marker",
         "Verify the switch is a cross-fade with no pop by frame differencing and draw calls stay within the documented budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F375",

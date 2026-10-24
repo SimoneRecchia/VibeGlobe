@@ -18,6 +18,8 @@ Open:
 3. **KB-132**: the Node allocation test (`frame-allocation.test.ts`) fails about one run in five under load.
 4. The full CI run on the branch head (workflow_dispatch) decides what else is red.
 
+5. **F395**: in the playground's tilted view (zoom 9, tilt 80) fog saves about 22% of the requests beyond the pinned base (153 vs 196; denser `?haze=2` does not change it), short of the entry's 25%: only the distant levels 5–8 are spared. Next: check that `haze` reaches the selection's `fogHaze`, then whether the visibility at a tile's closest point is too generous.
+
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
 ## Track F, network simulation suite (2026-10-23)

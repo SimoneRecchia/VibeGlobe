@@ -12,7 +12,7 @@ import {
   type GlobeExtras,
   type NetworkModeTarget,
 } from '@vibeglobe/vue';
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { FEATURE_GROUPS } from '../../utils/feature-groups';
 
 const route = useRoute();
@@ -26,6 +26,10 @@ const points: Feature[] = [
   { type: 'Feature', id: 'rome', geometry: { type: 'Point', coordinates: [12.5, 41.9] }, properties: {} },
   { type: 'Feature', id: 'milan', geometry: { type: 'Point', coordinates: [9.19, 45.46] }, properties: {} },
 ];
+
+// The page's own setup (sources, controls) can finish after the globe is ready: the checks wait for it (F488).
+let setUp: () => void = () => undefined;
+const pageSetUp = new Promise<void>((resolve) => (setUp = resolve));
 
 onMounted(async () => {
   const forced = new URLSearchParams(location.search).get('backend');
@@ -42,12 +46,18 @@ onMounted(async () => {
   if (group.value?.id === 'navigation' || group.value?.id === 'security') controls.value = [new ui.ZoomControl()];
   if (group.value?.id === 'ui')
     controls.value = [new ui.ZoomControl(), new ui.CompassControl(), new ui.ScaleBarControl()];
+  setUp();
 });
 
 async function onReady(): Promise<void> {
   const globe = globeComponent.value?.globe;
   const extras = globeComponent.value?.extras;
   if (globe === undefined || extras === undefined || group.value === undefined) return;
+  // The controls set up last are mounted by the next tick and added once the globe's UI has loaded: awaiting the same
+  // load after them, the checks see them added.
+  await pageSetUp;
+  await nextTick();
+  if (controls.value.length > 0) await extras.ui();
   const { checksFor } = await import('../../utils/feature-checks');
   const checks = checksFor(group.value.id, { globe, extras, ...(offline.value ? { offline: offline.value } : {}) });
   (window as unknown as { featureChecks: unknown }).featureChecks = {

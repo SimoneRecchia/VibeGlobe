@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
-import { decodeHeightmap } from '@vibeglobe/core';
+import { decodeHeightmap } from '@vibeglobe/core/decoders';
 import { decodeQuantizedMesh, rasterizeQuantizedMesh } from '@vibeglobe/core/decoders';
 import { fixturePosition, type FixtureTile } from './generate.ts';
 import { fixtureHeightMeters, terrainTile } from './terrain.ts';

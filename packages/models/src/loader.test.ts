@@ -8,8 +8,9 @@ import {
   type ModelTaskRunner,
   type WorkerPoolLike,
 } from './index.js';
+import { meshopt } from './__fixtures__/khronos.js';
 
-const tasks = createModelTasks();
+const tasks = createModelTasks({ meshopt });
 const context = { isCancelled: () => false };
 
 /** Runs a task as a worker would: input and output cross a structured-clone boundary with their transfer lists. */

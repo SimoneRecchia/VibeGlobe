@@ -1,8 +1,8 @@
 /**
  * The screenshot control (F416): a PNG of the current view, taken once the view has loaded (the engine's `idle`), from
  * the engine's own frame (`Globe.captureFrame`), with the credits of the visible sources (`Globe.credits()`: text and
- * logos, required ones first) drawn into its bottom-right corner. Sizes other than the canvas's are scaled from the
- * canvas frame until the engine can render a view at another size (track A's hook request 4).
+ * logos, required ones first) drawn into its bottom-right corner. Sizes other than the canvas's are rendered by the
+ * engine at that size (`Globe.captureView`), with tiles at the image's resolution.
  */
 import type { Credit, Globe } from '@vibeglobe/core';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
@@ -95,25 +95,19 @@ async function drawCredits(
  */
 export async function captureView(globe: Globe, size: ScreenshotSize = { scale: 1 }): Promise<Blob> {
   await viewLoaded(globe);
-  const frame = await globe.captureFrame();
-  const credits = globe.credits();
+  let frame = await globe.captureFrame();
+  const canvasHeightPx = frame.heightPx;
   const widthPx = 'scale' in size ? Math.round(frame.widthPx * size.scale) : size.widthPx;
   const heightPx = 'scale' in size ? Math.round(frame.heightPx * size.scale) : size.heightPx;
-  const source = document.createElement('canvas');
-  source.width = frame.widthPx;
-  source.height = frame.heightPx;
-  source.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(frame.rgba), frame.widthPx), 0, 0);
+  if (widthPx !== frame.widthPx || heightPx !== frame.heightPx) frame = await globe.captureView({ widthPx, heightPx });
+  const credits = globe.credits();
   const output = document.createElement('canvas');
   output.width = widthPx;
   output.height = heightPx;
   const context = output.getContext('2d');
   if (context === null) throw new Error('No 2D canvas context');
-  // Cover the output, keeping the frame's aspect ratio: a different aspect crops the frame's sides or top and bottom.
-  const cover = Math.max(widthPx / frame.widthPx, heightPx / frame.heightPx);
-  const drawnWidth = frame.widthPx * cover;
-  const drawnHeight = frame.heightPx * cover;
-  context.drawImage(source, (widthPx - drawnWidth) / 2, (heightPx - drawnHeight) / 2, drawnWidth, drawnHeight);
-  await drawCredits(context, credits, widthPx, heightPx, Math.max(1, heightPx / Math.max(1, frame.heightPx)));
+  context.putImageData(new ImageData(new Uint8ClampedArray(frame.rgba), widthPx), 0, 0);
+  await drawCredits(context, credits, widthPx, heightPx, Math.max(1, heightPx / Math.max(1, canvasHeightPx)));
   return new Promise((resolve, reject) =>
     output.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('The PNG could not be encoded'))), 'image/png'),
   );

@@ -122,6 +122,11 @@ export class LabelPlacer {
   #lastPlacementMs = -Infinity;
   #lastFrameMs: number | undefined;
   #forced = true;
+  /** Labels still fading toward their last decision: frames are needed until they arrive. */
+  #fading = false;
+  /** The view a pass last started in (zoom, then the first label's screen point), and whether it changed since. */
+  readonly #view = [Number.NaN, Number.NaN, Number.NaN];
+  #viewChanged = false;
   /** Placement passes run (instrumentation of collision cost, F359). */
   passes = 0;
   /** Work of the last pass, in milliseconds of wall-clock time, over all its frames. */
@@ -139,9 +144,13 @@ export class LabelPlacer {
     this.#budgetMs = options.budgetMs ?? 4;
   }
 
-  /** Whether placement is unfinished: a pass in progress, or frames drawn since the last one (ask for a frame). */
+  /**
+   * Whether placement needs frames (ask for one): a pass in progress or forced, labels still fading, or a view that
+   * changed since the last pass. Frames drawn for other reasons with the view standing still ask for none, so the
+   * engine goes idle (F359).
+   */
   get pending(): boolean {
-    return this.#pass !== undefined || this.#stale || this.#forced;
+    return this.#pass !== undefined || this.#forced || this.#fading || (this.#stale && this.#viewChanged);
   }
 
   /** Requests a pass on the next update (labels were added, removed or changed). */
@@ -161,10 +170,12 @@ export class LabelPlacer {
    */
   update(nowMs: number, projector: ScreenProjector, labels: () => Iterable<PlacementInput>): boolean {
     let ended = false;
+    this.#noteView(projector, labels);
     if (this.#pass === undefined) {
       const due = this.#forced || (this.#stale && nowMs - this.#lastPlacementMs >= this.#intervalMs);
       if (due) {
         this.#pass = this.#start(labels());
+        this.#viewChanged = false;
         this.#forced = false;
         this.#stale = false;
       } else if (this.#lastFrameMs !== undefined) this.#stale = true;
@@ -175,11 +186,28 @@ export class LabelPlacer {
     const elapsed = this.#lastFrameMs === undefined ? 0 : Math.max(0, nowMs - this.#lastFrameMs);
     this.#lastFrameMs = nowMs;
     const step = this.#fadeMs > 0 ? elapsed / this.#fadeMs : 1;
+    let fading = false;
     for (const state of this.#states.values()) {
       if (state.opacity < state.target) state.opacity = Math.min(state.target, state.opacity + step);
       else if (state.opacity > state.target) state.opacity = Math.max(state.target, state.opacity - step);
+      fading ||= state.opacity !== state.target;
     }
+    this.#fading = fading;
     return ended;
+  }
+
+  /** Notes whether the view differs from the one the last pass started in: its zoom or the first label's position. */
+  #noteView(projector: ScreenProjector, labels: () => Iterable<PlacementInput>): void {
+    const first = labels()[Symbol.iterator]().next();
+    const point = first.done === true ? undefined : projector.geoToScreen(first.value);
+    const zoom = projector.zoom();
+    const x = point?.xPx ?? Number.NaN;
+    const y = point?.yPx ?? Number.NaN;
+    const [z0, x0, y0] = this.#view;
+    if (!Object.is(z0, zoom) || !Object.is(x0, x) || !Object.is(y0, y)) this.#viewChanged = true;
+    this.#view[0] = zoom;
+    this.#view[1] = x;
+    this.#view[2] = y;
   }
 
   /** Current opacity of a label (0 until it has been placed and faded in). */

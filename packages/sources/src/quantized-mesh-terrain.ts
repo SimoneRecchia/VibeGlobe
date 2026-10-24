@@ -1,8 +1,6 @@
+import { readLayerJson, readRanges, TerrainAvailability } from '@vibeglobe/core/decoders';
 import {
   GEOGRAPHIC_TILING,
-  readLayerJson,
-  readRanges,
-  TerrainAvailability,
   WEB_MERCATOR_TILING,
   WGS84,
   type TerrainSource,

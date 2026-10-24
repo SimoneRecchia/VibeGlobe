@@ -130,6 +130,40 @@ describe('label placement and collision', () => {
     expect(placer.passes).toBeLessThanOrEqual(1200 / 300 + 1);
   });
 
+  it('asks for no more frames once placed and faded while the view stands still, and again when it moves (F359)', () => {
+    const placer = new LabelPlacer(estimatedTextMeasurer, { fadeDurationMs: 100, placementIntervalMs: 100 });
+    const labels = (): PlacementInput[] => [
+      {
+        id: 'a',
+        longitudeDeg: 0,
+        latitudeDeg: 0,
+        heightMeters: 0,
+        text: 'A',
+        sizePx: 16,
+        anchor: 0,
+        offsetXEm: 0,
+        offsetYEm: 0,
+        sortKey: 0,
+        enabled: true,
+      },
+    ];
+    let t = 0;
+    for (; placer.pending && t < 2000; t += 16) placer.update(t, flatProjector(10), labels);
+    expect(placer.opacity('a')).toBe(1);
+    // A frame drawn for another reason (an upload, a tile) asks for at most the frames of one sliced pass: the engine,
+    // which draws only frames asked for, goes idle.
+    for (let external = 0; external < 3; external++) {
+      t += 200;
+      placer.update(t, flatProjector(10), labels);
+      let requested = 0;
+      for (; placer.pending && requested < 10; requested++) placer.update((t += 16), flatProjector(10), labels);
+      expect(requested).toBeLessThanOrEqual(2);
+    }
+    // A zoom changes the view: placement is due again.
+    placer.update(t, flatProjector(11), labels);
+    expect(placer.pending).toBe(true);
+  });
+
   it('uploads label fade as the visibility factor', () => {
     const target = new RecordingRenderTarget();
     const stack = new LayerStack(target);

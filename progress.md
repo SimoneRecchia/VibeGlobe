@@ -20,6 +20,26 @@ Open:
 
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
+## Track G, robustness (2026-10-24)
+
+Branch `ccr-671551d2-ftc2w5`, pull request SimoneRecchia/VibeGlobe#34 into `main` (the owner merges). Owns `e2e/robustness/`
+and `scripts/robustness/` (ADR 0161, ADR 0162; numbers 0161–0169).
+
+- Passing: F511 (quota errors and eviction mid-path, both backends), F515 (hidden tab during a flight and idle, 1 and 10
+  minutes simulated, both backends).
+- Built, waiting for the full-length run (CI's manual run): F499 (100 mount and unmount cycles, flat heap, GPU objects,
+  workers and listeners, both backends), F517 (1000 engines destroyed after random delays, during start-up and loading).
+- Failing on engine bugs, for the main session (`docs/known-bugs.md`, Track G; their checks in
+  `e2e/robustness/known-bugs/*.bug.ts` or the fuzz suite's `knownBugs`): F512 (TG-01, a renderer kept per GPU loss after
+  a camera movement), F510 (TG-04 vector tiles and TG-05 imagery tiles not fetched again after faults), F513 (TG-02
+  `validateManifest`, TG-03 `VectorStyle.load` with a `"__proto__"` operator).
+- Failing on real devices or hours (`docs/hardening-backlog.md`): F509 (4 hours on the reference desktop; the 6-minute
+  soak passes), F514 (a real window between monitors; the emulated change passes), F516 (real sleep; the simulated
+  lifecycle passes).
+- Hook requests: none. Headless Chromium cannot hide a page, freeze it or dispatch DPR media events: the specs simulate
+  them (ADR 0161).
+- About 7 hours of agent time.
+
 ## Track F, network simulation suite (2026-10-23)
 
 Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner merges). Owns `e2e/network/`,

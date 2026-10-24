@@ -31,3 +31,5 @@ export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
 export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
 export type { MeasuredGrid } from './terrain/grid-size.js';
 export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
+export { buildTileMesh } from './surface/surface-mesh.js';
+export { geoidModel } from './terrain/vertical-datum.js';

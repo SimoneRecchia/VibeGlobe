@@ -58,7 +58,9 @@ test('the Draco decoder loads from the URL the page configures (F463)', async ({
   const custom = 'http://localhost:5173/custom-decoders/draco_decoder.wasm';
   await openCity(page, `backend=webgl2&tiles3d=draco&decoders=${encodeURIComponent(custom)}&${VIEW}`);
   await settleTiles(page);
-  expect(served).toEqual([custom]);
+  // Each of the engine's workers loads the decoder once, from the configured URL.
+  expect(served.length).toBeGreaterThan(0);
+  expect(new Set(served)).toEqual(new Set([custom]));
   expect(await page.evaluate(() => window.vibeglobeTiles3d?.extension.stats().failed)).toBe(0);
 });
 

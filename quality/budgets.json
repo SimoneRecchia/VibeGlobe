@@ -56,6 +56,11 @@
       "frameTimeP95Ms": 17.2,
       "cpuFrameP95Ms": 6,
       "gpuFrameP95Ms": 10
+    },
+    "3dtiles-city": {
+      "scenario": "3dtiles-city",
+      "frameTimeP95Ms": 17.2,
+      "cpuFrameP95Ms": 6
     }
   },
   "packages": {

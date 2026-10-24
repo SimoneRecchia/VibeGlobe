@@ -2121,7 +2121,7 @@
         "Assert the applied tilt increases monotonically to the configured automatic tilt and the relief factor reaches 1",
         "Capture screenshots at fixed zoom levels and assert the diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F155",
@@ -2938,7 +2938,7 @@
         "Assert the custom imagery and terrain render with zero black pixels after the base has loaded, and the custom vector and 3D adapters deliver their parsed content through the public API at the expected coordinates",
         "Run the shared runtime contract test against every built-in adapter and every custom adapter and assert all pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F220",
@@ -4257,7 +4257,7 @@
         "Call each data-access API (tile data access, pixel readback, elevation sampling, package export) on a Google fixture source",
         "Assert each call is refused with an error naming the Google profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F324",
@@ -5214,7 +5214,7 @@
         "Run temporal glitch detection on the sky and atmosphere regions and verify no frame-to-frame jump above threshold at any phase boundary",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F394",
@@ -5252,7 +5252,7 @@
         "Capture screenshots and verify the terminator position and terrain shading direction match the sun direction on WebGPU and forced WebGL2",
         "Verify lighting is off unless enabled and changing the time updates the view without a full reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F397",
@@ -5278,7 +5278,7 @@
         "Verify the anisotropy level equals the device maximum reported by capability detection, unless the quality preset lowers it",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F399",
@@ -6208,7 +6208,7 @@
         "Assert zero holes or black pixels after the root tile has loaded",
         "Record the results in the benchmark history"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F472",

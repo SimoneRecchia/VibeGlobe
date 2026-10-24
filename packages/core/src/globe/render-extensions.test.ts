@@ -3,6 +3,10 @@ import type { Credit } from '../imagery/credits.js';
 import { addExtension, type RenderExtension, type RenderExtensionContext } from './render-extensions.js';
 import { refuseDisplayOnlySource, refuseExtensionReadback } from './display-only.js';
 import { runtimeCredits } from './runtime-credits.js';
+import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
+import { createGlobe } from './create-globe.js';
+import { GlobeError } from './errors.js';
+import { fakeRenderer } from './test-renderer.js';
 import type { RendererBackend } from './types.js';
 
 describe('render extensions (M13 hook)', () => {
@@ -95,5 +99,33 @@ describe('render extensions (M13 hook)', () => {
     expect(() => refuseDisplayOnlySource('pickTile', google)).toThrowError(/display only under the 'google' profile/);
     remove();
     expect(() => refuseExtensionReadback('captureFrame', renderer)).not.toThrow();
+  });
+
+  it('gives an extension the worker and request pools on a globe with workers but no imagery, released on destroy, and reports its problems (track D hooks 1, 4)', async () => {
+    let terminated = 0;
+    const workers: WorkerEndpointFactory = {
+      url: 'test://extension-workers',
+      create: () => ({ post: () => undefined, terminate: () => void terminated++ }),
+      inline: () => Promise.resolve({}),
+    };
+    const { renderer, factory } = fakeRenderer();
+    Object.assign(renderer, { extensions: { context: {}, add: () => () => undefined } });
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', workers });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    let context: RenderExtensionContext | undefined;
+    globe.addRenderExtension((given) => ((context = given), { frame: () => undefined, dispose: () => undefined }));
+    expect(context?.workers).toBeDefined();
+    expect(context?.network).toBeDefined();
+    // A problem the extension reports is the globe's error event (track D hook 1).
+    const errors: string[] = [];
+    globe.on('error', (error) => void errors.push(error.message));
+    context?.report(new GlobeError('invalid-option', 'layer "roads": unknown property'));
+    expect(errors).toEqual(['layer "roads": unknown property']);
+    globe.destroy();
+    // The pool's only lease is released: its worker is terminated.
+    expect(terminated).toBe(1);
   });
 });

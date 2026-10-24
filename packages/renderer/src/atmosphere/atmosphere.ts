@@ -190,17 +190,18 @@ export class Atmosphere {
 
   /**
    * Wraps a surface material's color (linear RGB) in the haze and sun lighting; `eyeRelative` is the fragment's position
-   * relative to the eye in meters, world axes, as the surface's vertex stage computes it (`eyeRelativePosition`).
+   * relative to the eye in meters, world axes, as the surface's vertex stage computes it (`eyeRelativePosition`), and
+   * `reliefMeters` the terrain height it was raised by, whose slopes the Sun shades.
    */
-  surfaceColor(color: Node<'vec3'>, eyeRelative: Node<'vec3'>): Node<'vec3'> {
-    return surfaceColor(this.uniforms, color, varying(eyeRelative));
+  surfaceColor(color: Node<'vec3'>, eyeRelative: Node<'vec3'>, reliefMeters?: Node<'float'>): Node<'vec3'> {
+    return surfaceColor(this.uniforms, color, varying(eyeRelative), reliefMeters && varying(reliefMeters));
   }
 
   /** Applies {@link Atmosphere.surfaceColor} to a material whose color node is set and whose vertices are eye-relative. */
-  applyToSurface(material: NodeMaterial, eyeRelative: Node<'vec3'>): void {
+  applyToSurface(material: NodeMaterial, eyeRelative: Node<'vec3'>, reliefMeters?: Node<'float'>): void {
     const color = material.colorNode as Node<'vec4'> | null;
     if (!color) return;
-    material.colorNode = vec4(this.surfaceColor(color.xyz, eyeRelative), color.w);
+    material.colorNode = vec4(this.surfaceColor(color.xyz, eyeRelative, reliefMeters), color.w);
   }
 
   /**

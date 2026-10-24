@@ -29,8 +29,9 @@ export interface RendererOptions {
    */
   readonly gpuTiming?: boolean;
   /**
-   * Multisampled anti-aliasing of the canvas (default true, F397). False draws without, for comparisons and devices too
-   * slow for it.
+   * Allows multisampled anti-aliasing of the canvas (default true, F397), which `QualitySettings.antialias: 'msaa4'`
+   * (the default) asks for. False draws without it whatever the quality settings, for comparisons and devices too slow
+   * for it.
    */
   readonly antialias?: boolean;
   /**

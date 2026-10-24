@@ -53,3 +53,10 @@ export async function chooseWebGPU(
   }
   return webgpu;
 }
+
+/** The global scope a drawing surface lives in: the page's window, or the worker's global scope. */
+export function surfaceScope(surface: DrawingSurface): typeof globalThis {
+  return surface.kind === 'element'
+    ? ((surface.container.ownerDocument.defaultView ?? globalThis) as typeof globalThis)
+    : globalThis;
+}

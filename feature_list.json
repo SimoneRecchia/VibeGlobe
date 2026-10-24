@@ -6624,7 +6624,7 @@
         "Assert it is within the initial-bundle budget",
         "Enable each optional module at runtime and assert its code is fetched only at that moment"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F504",

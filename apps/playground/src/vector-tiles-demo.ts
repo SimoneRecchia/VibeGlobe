@@ -13,7 +13,11 @@ const SCENARIOS: Readonly<Record<string, { style: string; view?: ViewInit; mode?
   'mvt-globe-zoom': { style: 'streets', view: { longitudeDeg: 9.19, latitudeDeg: 45.465, zoom: 1.5 } },
   'mvt-city': { style: 'streets', view: { longitudeDeg: 9.19, latitudeDeg: 45.465, zoom: 15, tiltDeg: 45 } },
   'mvt-labels': { style: 'streets', view: { longitudeDeg: 9.19, latitudeDeg: 45.466, zoom: 15 }, mode: '2d' },
-  'mvt-terrain': { style: 'streets', view: { longitudeDeg: 6.86, latitudeDeg: 45.66, zoom: 11.5, tiltDeg: 60 } },
+  'mvt-terrain': {
+    style: 'streets',
+    view: { longitudeDeg: 6.86, latitudeDeg: 45.675, zoom: 12.5, tiltDeg: 60 },
+    mode: '3d',
+  },
 };
 
 /** What tests read: the layer, once loaded, and its loading error if any. */

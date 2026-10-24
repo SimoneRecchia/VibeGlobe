@@ -20,6 +20,26 @@ export default defineConfig({
     conditions: ['source', ...defaultClientConditions],
   },
   plugins: [fixtureTiles()],
+  // Pre-bundled at start-up, with the test harness pages scanned too: a dependency the dev server discovers only when
+  // a page imports it (sql.js and draco3d load lazily) makes it reload that page, in the middle of a test.
+  optimizeDeps: {
+    entries: ['index.html', '../../e2e/support/*.html'],
+    include: [
+      '@maplibre/maplibre-gl-style-spec',
+      '@noble/hashes/sha2.js',
+      '@noble/hashes/utils.js',
+      'draco3d',
+      'earcut',
+      'fflate',
+      'pbf',
+      'pmtiles',
+      'proj4',
+      'rbush',
+      'sql.js',
+      'supercluster',
+      'txml',
+    ],
+  },
   server: {
     port: Number(process.env['PLAYGROUND_PORT'] ?? 5173),
     strictPort: true,

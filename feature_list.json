@@ -6425,7 +6425,7 @@
         "Run the example's Playwright suite on both backends",
         "Assert every feature check passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F489",

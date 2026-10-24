@@ -1,9 +1,12 @@
 import { fc, test } from '@fast-check/vitest';
-import { WEB_MERCATOR_TILING, type TileRequest, type TransportResult } from '@vibeglobe/core';
+import { WEB_MERCATOR_TILING, type TileCoord, type TileRequest, type TransportResult } from '@vibeglobe/core';
 import { transformCoordinates } from '@vibeglobe/gis';
 import { describe, expect, it } from 'vitest';
 import { PNG } from 'pngjs';
 import { bleedTransparentEdges, encodeRgbaPng } from './edge-bleed.js';
+import { failures, runTiledConformance } from '../conformance/index.js';
+import { CUSTOM_PROFILE } from '../metadata.js';
+import { fetchTransport } from '../fetch-transport.js';
 import { reprojectedImagery, type WarpImage } from './reprojected-imagery.js';
 import { applyAffine, planWarp, solveAffine, tilePointLonLat, type SourceBbox, type Triangle } from './warp-math.js';
 import { wmsGetMapUrl } from './wms-get-map.js';
@@ -144,6 +147,43 @@ describe('reprojectedImagery (F226)', () => {
     abort();
     abort();
     expect(results).toEqual([{ kind: 'aborted' }]);
+  });
+});
+
+describe('reprojectedImagery conformance (F223, F226)', () => {
+  it('passes the tiled conformance suite', async () => {
+    const bytes = new TextEncoder().encode('png');
+    // The service has no image east of 700 000 m (tiles there answer 404).
+    const service: typeof fetch = (input) => {
+      const [minX = 0] = (new URL(String(input)).searchParams.get('BBOX') ?? '').split(',').map(Number);
+      if (minX > 700_000) return Promise.resolve(new Response(null, { status: 404 }));
+      return Promise.resolve(new Response(bytes.slice(), { headers: { 'Content-Type': 'image/png' } }));
+    };
+    const coord = (level: number, x: number, y: number): TileCoord => ({ root: 0, level, x, y });
+    const results = await runTiledConformance({
+      name: 'reprojected',
+      create: (fetchImpl) =>
+        reprojectedImagery({
+          id: 'utm',
+          sourceCrs: 'EPSG:32632',
+          toSource: toUtm32,
+          fromSource: fromUtm32,
+          bounds: BOUNDS,
+          image: (bbox, width, height) => `https://wms.test/map?BBOX=${bbox.join(',')}&WIDTH=${width}&HEIGHT=${height}`,
+          maxLevel: 16,
+          // The warp passes the bytes through: the suite compares them with the fixture's.
+          warpImage: (image) => Promise.resolve(image),
+          transport: fetchTransport(fetchImpl),
+          attribution: [{ text: '© Fixture' }],
+          profile: CUSTOM_PROFILE,
+        }),
+      fixture: service,
+      // Around 9°E 44°N, and near 11.9°E 44.3°N (east of 700 000 m in zone 32).
+      tiles: [coord(8, 134, 93), coord(10, 537, 372)].map((c) => ({ coord: c, bytes })),
+      missing: [coord(12, 2183, 1490)],
+      outside: [coord(3, 7, 2)],
+    });
+    expect(failures(results)).toEqual([]);
   });
 });
 

@@ -453,6 +453,58 @@ describe('ImageryLoader', () => {
     expect(errors).toEqual(['failed 4/2/2']);
   });
 
+  it('gives a tile that loaded after retries its full retries again when it is next requested (KB-160)', () => {
+    const { transport, errors, timers, runFrame, loader, uploaded, ok } = setUp(6, { ramBytes: 0 });
+    const fail = { kind: 'status', status: 500, retryAfterMs: undefined } as const;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), fail);
+      timers.advance(40_000);
+    }
+    runFrame([[4, 2, 2]]);
+    transport.answer(url(4, 2, 2), ok);
+    runFrame([[4, 2, 2]]);
+    expect(uploaded).toHaveLength(1);
+    loader.evicted((uploaded[0] ?? 0) - 100);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), fail);
+      timers.advance(40_000);
+    }
+    // Five requests before the success, then the first request and four retries again.
+    expect(transport.started).toHaveLength(10);
+    expect(errors).toEqual(['failed 4/2/2']);
+  });
+
+  it('requests a tile whose retries ran out during an outage again once the source answers another tile (KB-162)', () => {
+    const { transport, errors, timers, runFrame, loader, ok } = setUp();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), { kind: 'network-error' });
+      timers.advance(40_000);
+    }
+    expect(loader.failed(4, 2, 2)).toBe(true);
+    // The source is back: another tile loads, and the dead one is requested again.
+    runFrame([[4, 2, 3]]);
+    transport.answer(url(4, 2, 3), ok);
+    expect(loader.failed(4, 2, 2)).toBe(false);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(6);
+    expect(errors).toEqual(['failed 4/2/2']);
+  });
+
+  it('never requests a corrupt tile again, even once the source answers others (F112, KB-162)', () => {
+    const { transport, timers, runFrame, loader, ok } = setUp();
+    runFrame([[4, 2, 2]]);
+    transport.answer(url(4, 2, 2), { kind: 'ok', bytes: new ArrayBuffer(1), contentType: 'image/png' });
+    expect(loader.failed(4, 2, 2)).toBe(true);
+    runFrame([[4, 2, 3]]);
+    transport.answer(url(4, 2, 3), ok);
+    timers.advance(5000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(1);
+  });
+
   it('shares one request between two loaders wanting the same tile (F095)', () => {
     const timers = new FakeTimers();
     const transport = new ManualTransport();

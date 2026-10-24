@@ -147,6 +147,8 @@ export class ImageryRuntime {
   private readonly fades = new ImageryFades();
   /** Terrain height transitions (ADR 0006 §4, F138): the same mechanism as imagery's cross-fades. */
   private readonly terrainFades = new ImageryFades();
+  /** The overlay slots' cross-fades (KB-155). */
+  private readonly overlayFades = [new ImageryFades(), new ImageryFades()];
   /** Keeps a texture still faded from resident this frame. */
   private readonly keepTexture = (handle: number): void => {
     if (handle !== BASE_TEXTURE) this.loaderOf(handle)?.markDrawn(handle);
@@ -349,7 +351,10 @@ export class ImageryRuntime {
 
   /** True while a tile of the last frame was cross-fading: the engine keeps drawing (F105). */
   get fading(): boolean {
-    return this.fades.fading || this.terrainFades.fading;
+    const overlays = this.overlayFades;
+    return (
+      this.fades.fading || this.terrainFades.fading || overlays[0]?.fading === true || overlays[1]?.fading === true
+    );
   }
 
   /**
@@ -372,6 +377,10 @@ export class ImageryRuntime {
     if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
     if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
+    for (let slot = 0; slot < list.overlays.length; slot++) {
+      const overlay = list.overlays[slot];
+      if (overlay) this.overlayFades[slot]?.apply(list, overlay, nowMs, fadeMs, this.keepTexture);
+    }
     const terrain = this.terrain;
     const host = this.renderer.host;
     let terrainStart = terrain ? host.now() : 0;
@@ -406,7 +415,11 @@ export class ImageryRuntime {
   }
 
   /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
-  readonly stackChanged = (): void => ((this.fades.snapNext = true), this.callbacks.requestFrame());
+  readonly stackChanged = (): void => {
+    this.fades.snapNext = true;
+    for (const fades of this.overlayFades) fades.snapNext = true;
+    this.callbacks.requestFrame();
+  };
   /** The list of layers changed: added, removed or moved (`imagery-layers-change`). */
   readonly layersChanged = (): void => this.callbacks.layersChange?.();
 

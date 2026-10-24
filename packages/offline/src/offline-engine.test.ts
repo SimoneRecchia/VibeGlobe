@@ -219,6 +219,18 @@ describe('the offline engine', () => {
     expect(text(await load(source, tile(4, 1, 1)))).toBe('tile');
   });
 
+  it('a failed download waits for a health check that takes longer than 3 s (KB-161)', async () => {
+    // The tile fails at once; the check of its endpoint fails only after 3.5 s (within its 5 s limit).
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      if (!String(input).endsWith('/0/0/0.png')) throw new TypeError('Failed to fetch');
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch;
+    const offline = engine({ fetch: fetchImpl });
+    expect((await load(offline.source(fixture()), tile(4, 1, 1))).kind).toBe('aborted');
+    expect(offline.connectivity).toBe('offline');
+  }, 10_000);
+
   it('marks only the dead endpoint unreachable and backs its checks off (F297)', async () => {
     const net = fakeNetwork((url) => (url.startsWith('https://dead.test') ? 'down' : {}));
     const offline = engine({ fetch: net.fetchImpl, healthChecks: { minIntervalMs: 20, maxIntervalMs: 200 } });
@@ -398,5 +410,36 @@ describe('tier counters and aborted requests (TB-03)', () => {
     expect(results).toEqual(['aborted']);
     expect(served).toEqual([]);
     expect(offline.stats('slow').package).toBe(0);
+  });
+
+  it('keeps each wrapped source on its own host, so per-host limits stay per host (KB-156)', () => {
+    const offline = engine({});
+    const origin = (source: ImagerySource): string | undefined =>
+      /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(
+        (source.request(tile(3, 1, 2), { url: '', hostIndex: 0 }) as { url: string }).url,
+      )?.[0];
+    const a = offline.source(xyzImagery({ id: 'a', url: 'https://a.test/{z}/{x}/{y}.png' }));
+    const b = offline.source(xyzImagery({ id: 'b', url: 'https://b.test/{z}/{x}/{y}.png' }));
+    expect([origin(a), origin(b)]).toEqual(['vibeglobe-tile://a.test', 'vibeglobe-tile://b.test']);
+  });
+
+  it('passes a tile whose availability is not known yet through as unknown, not as a request that fails (KB-157)', () => {
+    const offline = engine({});
+    const later: ImagerySource = { ...fixture('later'), request: () => 'unknown' };
+    expect(offline.source(later).request(tile(5, 1, 1), { url: '', hostIndex: 0 })).toBe('unknown');
+  });
+
+  it('names the sources to reload when it leaves offline-only mode, whose misses read as no data (KB-158)', () => {
+    const offline = engine({});
+    offline.source(fixture('a'));
+    offline.source(fixture('b'));
+    const events: { mode: string; sourceIds?: readonly string[] }[] = [];
+    offline.on('mode-change', (event) => events.push(event));
+    offline.setMode('offline');
+    offline.setMode('hybrid');
+    expect(events).toEqual([
+      { mode: 'offline', sourceIds: [] },
+      { mode: 'hybrid', sourceIds: ['a', 'b'] },
+    ]);
   });
 });

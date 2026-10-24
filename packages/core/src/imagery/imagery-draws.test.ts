@@ -166,6 +166,15 @@ describe('drawImagery', () => {
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([70, 5]);
   });
 
+  it("magnifies a source's ancestor where its own tile fails and no later source covers the tile (KB-149)", () => {
+    const failing = fakeLayer({ 5: 70 }, [6, 7, 8]);
+    const elsewhere = fakeLayer({ 5: 80 });
+    const away = { westRad: -1.2, southRad: -0.6, eastRad: -1.0, northRad: -0.4 };
+    const chain = [failing.layer, { ...elsewhere.layer, source: { ...elsewhere.layer.source, coverage: [away] } }];
+    const list = drawStack([stacked(chain)], tile(8, 130, 90));
+    expect([list.textures[0], list.imageryLevels[0]]).toEqual([70, 5]);
+  });
+
   it('draws nothing of a source outside its coverage, not even a magnified ancestor (F094, F254)', () => {
     const covered = fakeLayer({ 2: 50 });
     const italy = { westRad: 0.11, southRad: 0.62, eastRad: 0.32, northRad: 0.83 };

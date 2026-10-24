@@ -303,6 +303,10 @@ const harness: OfflineHarness = {
     for (const { switches, scope } of next.switchScopes ?? []) offline.setSwitches(switches, scope);
     for (const type of ['connectivity-change', 'storage-lost', 'warning', 'mode-change'] as const)
       offline.on(type, (payload) => harness.events.push({ type, payload }));
+    // Back from offline-only mode, the misses read as no data load again (KB-158).
+    offline.on('mode-change', ({ sourceIds }) => {
+      for (const id of sourceIds) harness.globe?.reloadSource(id);
+    });
     const manager = createPackageManager(offline, {
       adapters,
       onIntegrityError: (event) => harness.integrityErrors.push(`${event.packageId}: ${event.message}`),

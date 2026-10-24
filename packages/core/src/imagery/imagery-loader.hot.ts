@@ -169,6 +169,8 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
   private pinnedSettled = 0;
+  /** Tiles dead from network failures (`retries` -1), requested again after the source's next success (KB-162). */
+  private outageDead = 0;
   /** The source's loading features this frame (`LOAD_*`). */
   private flags = LOAD_ALL;
   /** Visible tiles wanted this frame (level, x, y, key), whose neighbors are prefetched (F284). */
@@ -444,6 +446,7 @@ export class ImageryLoader implements NetworkPoolClient {
     }
     this.active.length = 0;
     this.pinnedSettled = 0;
+    this.outageDead = 0;
     this.options.requestFrame();
   }
 
@@ -629,6 +632,7 @@ export class ImageryLoader implements NetworkPoolClient {
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
+      if (this.outageDead > 0) this.reviveOutageDead();
       record.freshUntilMs =
         result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
           ? this.options.now() + result.maxAgeMs
@@ -655,10 +659,25 @@ export class ImageryLoader implements NetworkPoolClient {
       this.options.setTimer(() => this.options.requestFrame(), decision.nextEligibleMs - this.options.now());
     } else {
       record.state = DEAD;
+      // Retried and still failing: an outage, not the tile (KB-162).
+      if (record.retries > 0) {
+        record.retries = -1;
+        this.outageDead++;
+      }
       this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
     }
     this.settlePinned(record);
     this.options.requestFrame();
+  }
+
+  /** The source answered again: its tiles dead from network failures may load now (KB-162). */
+  private reviveOutageDead(): void {
+    this.outageDead = 0;
+    for (const record of this.table.bySlot)
+      if (record.state === DEAD && record.retries < 0) {
+        record.state = UNLOADED;
+        record.retries = 0;
+      }
   }
 
   /** Backs a tile off after a decode that failed for a reason other than its bytes, or reports it for good. */
@@ -765,6 +784,7 @@ export class ImageryLoader implements NetworkPoolClient {
     residency.touch(handle, this.options.memory.frame());
     if (record.pinned) residency.setPinned(handle, true);
     record.state = READY;
+    record.retries = 0;
     this.observe(record, 'tile', 'ready');
     this.settlePinned(record);
   }

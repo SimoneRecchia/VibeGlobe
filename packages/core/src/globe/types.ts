@@ -172,10 +172,7 @@ export interface TileDrawLayer {
  * An overlay slot of every draw (F244, F246): imagery above the draw's own, shown with an opacity and a blend mode.
  * `opacities[i]` 0 means draw `i` shows nothing in this slot.
  */
-export interface TileDrawOverlay {
-  readonly textures: Int32Array;
-  readonly uvTransforms: Float32Array;
-  readonly geographic: Uint8Array;
+export interface TileDrawOverlay extends TileDrawLayer {
   readonly opacities: Float32Array;
   /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
   readonly blends: Uint8Array;

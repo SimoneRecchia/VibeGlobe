@@ -228,32 +228,35 @@ describe('wmsImagery (F231, F227)', () => {
     expect(failed).toEqual({ kind: 'status', status: 400, retryAfterMs: undefined });
   });
 
-  it('passes the tiled conformance suite', async () => {
-    const bytes = new TextEncoder().encode('png');
-    const service: typeof fetch = (input) => {
-      const bbox = query(String(input)).get('BBOX') ?? '';
-      // The fixture server has no data for the tile whose BBOX starts at 626172.1357 (level 6, column 33).
-      if (bbox.startsWith('626172.1357')) return Promise.resolve(new Response(null, { status: 404 }));
-      return Promise.resolve(new Response(bytes.slice(), { headers: { 'Content-Type': 'image/png' } }));
-    };
-    const results = await runTiledConformance({
-      name: 'wms',
-      create: (fetchImpl) =>
-        wmsImagery({
-          id: 'w',
-          capabilities: SYNTHETIC,
-          layers: ['ortho'],
-          gutterPx: 0,
-          cropImage: identityCrop,
-          transport: fetchTransport(fetchImpl),
-        }),
-      fixture: service,
-      tiles: [coord(6, 34, 23), coord(2, 2, 1)].map((c) => ({ coord: c, bytes })),
-      missing: [coord(6, 33, 23)],
-      outside: [coord(3, 1, 3)],
+  for (const gutterPx of [0, undefined])
+    it(`passes the tiled conformance suite ${gutterPx === 0 ? 'without a gutter' : 'with the default gutter'}`, async () => {
+      const bytes = new TextEncoder().encode('png');
+      const service: typeof fetch = (input) => {
+        const [minX = 0, , maxX = 0] = (query(String(input)).get('BBOX') ?? '').split(',').map(Number);
+        // The fixture server has no data for the tile of level 6, column 33 (626 172 m to 1 252 344 m east).
+        const centerX = (minX + maxX) / 2;
+        if (centerX > 626172.1357 && centerX < 1252344.2714)
+          return Promise.resolve(new Response(null, { status: 404 }));
+        return Promise.resolve(new Response(bytes.slice(), { headers: { 'Content-Type': 'image/png' } }));
+      };
+      const results = await runTiledConformance({
+        name: 'wms',
+        create: (fetchImpl) =>
+          wmsImagery({
+            id: 'w',
+            capabilities: SYNTHETIC,
+            layers: ['ortho'],
+            ...(gutterPx === undefined ? {} : { gutterPx }),
+            cropImage: identityCrop,
+            transport: fetchTransport(fetchImpl),
+          }),
+        fixture: service,
+        tiles: [coord(6, 34, 23), coord(2, 2, 1)].map((c) => ({ coord: c, bytes })),
+        missing: [coord(6, 33, 23)],
+        outside: [coord(3, 1, 3)],
+      });
+      expect(failures(results)).toEqual([]);
     });
-    expect(failures(results)).toEqual([]);
-  });
 
   it('never crashes on fuzzed capabilities documents', async () => {
     const results = await runParserConformance({

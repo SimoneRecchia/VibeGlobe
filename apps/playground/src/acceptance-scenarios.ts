@@ -26,9 +26,10 @@ export const ACCEPTANCE_SCENARIOS: Record<string, FrameScenario> = {
   'mixed-stack': segments(
     [
       { longitudeDeg: 4, latitudeDeg: 46, zoom: 3 },
-      { longitudeDeg: 7.5, latitudeDeg: 45.5, zoom: 9 },
-      { longitudeDeg: 13, latitudeDeg: 43, zoom: 9 },
-      { ...ROME, zoom: 9 },
+      // The pan at zoom 7 (5 px a frame): across the terrain box's and the UTM raster's edges.
+      { longitudeDeg: 7.5, latitudeDeg: 45.5, zoom: 7 },
+      { longitudeDeg: 13, latitudeDeg: 43, zoom: 7 },
+      { ...ROME, zoom: 7 },
       { ...ROME, zoom: 13 },
       // Out like a flight: up first, across at a low zoom, then down a little.
       { ...ROME, zoom: 6 },

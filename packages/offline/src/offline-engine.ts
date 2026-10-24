@@ -26,8 +26,11 @@ export interface OfflineEvents {
   'connectivity-change': { connectivity: Connectivity; unreachable: readonly string[] };
   /** The browser deleted stored data (F275): the persistent cache, packages, or both. */
   'storage-lost': { cache: boolean; packages: readonly string[]; reason: string };
-  /** The network mode changed. */
-  'mode-change': { mode: NetworkMode };
+  /**
+   * The network mode changed. Leaving offline-only mode, `sourceIds` names every wrapped source: pass each to
+   * `globe.reloadSource`, as the tiles missed while offline read as no data (KB-158). Empty otherwise.
+   */
+  'mode-change': { mode: NetworkMode; sourceIds: readonly string[] };
   /** A problem the engine worked around (a full store, missing storage); reported once per kind. */
   warning: { code: 'quota' | 'storage-unavailable' | 'profile-rule'; message: string };
 }
@@ -139,6 +142,8 @@ class OfflineEngine implements Offline {
   private currentMode: NetworkMode;
   private readonly switches = new SwitchBoard();
   private readonly rules = new Map<string, ProviderRules>();
+  /** The ids of the sources wrapped by {@link source}, in order. */
+  private readonly wrapped = new Set<string>();
   private readonly policy: NetworkPolicy;
   private readonly store: CacheStore;
   private readonly monitor: ConnectivityMonitor;
@@ -176,6 +181,8 @@ class OfflineEngine implements Offline {
         this.wake();
         this.emit('connectivity-change', { connectivity, unreachable });
       },
+      // A failed download waits for its check, which may find the endpoint as it was.
+      onCheck: () => this.wake(),
     });
     // Only the built-in store outlives the page; a memory or custom store is not checked.
     if (options.store === undefined || options.store === 'main-thread') void this.checkCacheEviction();
@@ -192,10 +199,11 @@ class OfflineEngine implements Offline {
 
   setMode(mode: NetworkMode): void {
     if (mode === this.currentMode) return;
+    const wasOffline = this.currentMode === 'offline';
     this.currentMode = mode;
     this.wake();
     if (mode !== 'offline') this.monitor.checkAll();
-    this.emit('mode-change', { mode });
+    this.emit('mode-change', { mode, sourceIds: wasOffline ? [...this.wrapped] : [] });
   }
 
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void {
@@ -224,6 +232,7 @@ class OfflineEngine implements Offline {
       for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);
     }
     this.registerEndpoint(source);
+    this.wrapped.add(source.id);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
     // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
     // package its tiles came from (F306).
@@ -328,6 +337,7 @@ class OfflineEngine implements Offline {
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
+      checkTimeoutMs: this.monitor.timeoutMs,
       waitForChange: (maxMs) =>
         new Promise<void>((resolve) => {
           const waiter = (): void => {

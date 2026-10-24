@@ -30,6 +30,8 @@ export interface TierContext {
   reportFailure(endpoint: string): void;
   /** Resolves when connectivity or the mode changes, or after `maxMs`. */
   waitForChange(maxMs: number): Promise<void>;
+  /** How long a health check can take: a failed download waits this long for the check it triggered. */
+  readonly checkTimeoutMs: number;
   /** True in offline-only mode. */
   offlineOnly(): boolean;
   count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
@@ -63,8 +65,8 @@ export function tileKey(sourceId: string, coord: TileCoord): string {
 
 const FAILED_NETWORK: TransportResult = { kind: 'network-error' };
 const FAILED_TIMEOUT: TransportResult = { kind: 'timeout' };
-/** How long a failed download waits for the health check it triggered before the failure counts. */
-const CHECK_WAIT_MS = 3000;
+/** How long a failed download waits beyond the health check's time limit before the failure counts (M8 #5a). */
+const CHECK_MARGIN_MS = 1000;
 
 const NO_HEADERS = { cacheControl: null, expires: null, date: null, etag: null, lastModified: null };
 
@@ -80,11 +82,11 @@ let wrapperCount = 0;
  * own GPU and RAM tiers sit above, unchanged. The source keeps its id, levels and coverage.
  */
 export function tieredSource(source: TileSource, context: TierContext, options: TieredSourceOptions = {}): TileSource {
-  const prefix = `vibeglobe-tile:${++wrapperCount}/`;
+  const wrapper = ++wrapperCount;
   const layerId = options.layerId ?? source.id;
   const scratch: TileRequest = { url: '', hostIndex: 0 };
   const coordOf = (url: string): TileCoord | undefined => {
-    const [root, level, x, y] = url.slice(prefix.length).split('/').map(Number);
+    const [root, level, x, y] = url.split('/').slice(-4).map(Number);
     if (level === undefined || x === undefined || y === undefined || (root !== 0 && root !== 1 && root !== 2))
       return undefined;
     return { root, level, x, y };
@@ -108,8 +110,12 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
       },
     },
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown' {
-      if (source.request(coord, out) === 'noData') return 'noData';
-      out.url = `${prefix}${coord.root}/${coord.level}/${coord.x}/${coord.y}`;
+      // Availability not known yet stays unknown: a request now would read as no data for good (KB-157).
+      const real = source.request(coord, out);
+      if (real === 'noData' || real === 'unknown') return real;
+      // The tile's own host, so the engine keeps each host's request limits for the wrapped source too (KB-156).
+      const host = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(real.url)?.[1] ?? 'local';
+      out.url = `vibeglobe-tile://${host}/${String(wrapper)}/${coord.root}/${coord.level}/${coord.x}/${coord.y}`;
       return out;
     },
   };
@@ -178,7 +184,7 @@ class TileLoader {
       // failure (which would make it probe the host one request at a time, slowing cached and packaged tiles too);
       // a failure on a reachable endpoint does, and the engine backs off (F298, F315).
       if (!stored) {
-        await this.context.waitForChange(CHECK_WAIT_MS);
+        await this.context.waitForChange(this.context.checkTimeoutMs + CHECK_MARGIN_MS);
         if (this.context.reachable(endpoint) && !signal.aborted) return result;
       }
     }

@@ -38,7 +38,10 @@ offline.destroy();
 | `online`           | never          | yes                                                    |
 | `offline`          | yes            | never, not even health checks (air-gapped sites)       |
 
-The mode changes at runtime; new requests follow it at once.
+The mode changes at runtime; new requests follow it at once. In offline-only mode a tile no tier holds reads as no data;
+back in another mode, the `mode-change` event names every wrapped source in `sourceIds`: pass each to
+`globe.reloadSource`, so those tiles load again (`offline.on('mode-change', ({ sourceIds }) => sourceIds.forEach((id) =>
+globe.reloadSource(id)))`).
 
 ```ts
 import { createOffline } from '@vibeglobe/offline';

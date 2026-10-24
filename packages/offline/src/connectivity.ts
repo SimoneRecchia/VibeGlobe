@@ -18,6 +18,8 @@ export interface ConnectivityOptions extends HealthCheckTiming {
   readonly enabled: () => boolean;
   /** Called when the overall connectivity changes. */
   readonly onChange: (connectivity: Connectivity, unreachable: readonly string[]) => void;
+  /** Called after every check, whether or not it changed the state. */
+  readonly onCheck?: () => void;
 }
 
 /** The reachability of one endpoint. */
@@ -29,6 +31,8 @@ interface Endpoint {
   lastCheckMs: number;
   waitMs: number;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** When the pending check runs. */
+  dueMs: number;
   checking: boolean;
 }
 
@@ -79,6 +83,7 @@ export class ConnectivityMonitor {
       lastCheckMs: Number.NEGATIVE_INFINITY,
       waitMs: this.minIntervalMs,
       timer: undefined,
+      dueMs: Number.POSITIVE_INFINITY,
       checking: false,
     });
   }
@@ -119,11 +124,19 @@ export class ConnectivityMonitor {
     globalThis.removeEventListener?.('offline', this.onOffline);
   }
 
+  /** Time limit of one check. */
+  get timeoutMs(): number {
+    return this.options.timeoutMs ?? 5000;
+  }
+
   private schedule(name: string, entry: Endpoint, delayMs: number): void {
     if (this.destroyed || entry.checking || !this.options.enabled()) return;
     const earliest = entry.lastCheckMs + this.minIntervalMs - Date.now();
     const wait = Math.max(delayMs, earliest, 0);
-    if (entry.timer !== undefined) return;
+    // A pending check stays unless this one is due sooner (KB-159: an online event brings a backed-off check forward).
+    if (entry.timer !== undefined && entry.dueMs <= Date.now() + wait) return;
+    clearTimeout(entry.timer);
+    entry.dueMs = Date.now() + wait;
     entry.timer = setTimeout(() => {
       entry.timer = undefined;
       void this.check(name, entry);
@@ -138,6 +151,7 @@ export class ConnectivityMonitor {
     entry.checking = false;
     if (this.destroyed) return;
     this.mark(name, entry, reachable ? 'reachable' : 'unreachable');
+    this.options.onCheck?.();
     if (!reachable) {
       // Back off while the endpoint stays down: 2 s, 4 s, … up to the maximum.
       this.schedule(name, entry, entry.waitMs);
@@ -148,7 +162,7 @@ export class ConnectivityMonitor {
   private async probe(url: string): Promise<boolean> {
     const fetchImpl = this.options.fetch ?? ((input, init) => fetch(input, init));
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 5000);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await fetchImpl(url, {
         signal: controller.signal,

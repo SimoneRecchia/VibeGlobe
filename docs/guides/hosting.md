@@ -39,7 +39,7 @@ createGlobe({
 
 The worker program must be one self-contained module. Bundlers that resolve `new URL('@vibeglobe/worker/vibeglobe-worker.js', import.meta.url)` (Vite, webpack 5, Rollup) emit it into your build as `vibeglobe-worker-<hash>.js`: serve that file under your base path as `vibeglobe-worker.js`, or point `createWorkers({ url })` at the emitted name. The unbundled files in `node_modules/@vibeglobe/worker/dist/` import other packages by name and cannot be served as they are.
 
-The worker program loads its WebAssembly (`vibeglobe-basis-<hash>.wasm`, `meshopt-decoder-<hash>.wasm`) from its own directory. With Vite's default `base: '/'` the build writes those URLs into the worker as `/assets/…`, so they stay there when the worker moves: build with `base: './'` to serve the emitted `assets/` folder (the worker, its WebAssembly and their chunks) under another path, as `examples/minimal-globe` does (F531).
+The worker program loads its WebAssembly (`vibeglobe-basis-<hash>.wasm`, `meshopt-decoder-<hash>.wasm`) from its own directory. With Vite's default `base: '/'` the build writes those URLs into the worker as `/assets/…`, so they stay there when the worker moves: build with `base: './'` to serve the emitted `assets/` folder (the worker, its WebAssembly and their chunks) under another path, as `examples/minimal-globe` does (F531). An application with only imagery and terrain can import `createWorkers` from `@vibeglobe/worker/basic`, whose program (`vibeglobe-worker-basic-<hash>.js`) needs neither `@vibeglobe/layers` nor `@vibeglobe/models` installed (ADR 0172).
 
 ## HTTP requirements
 

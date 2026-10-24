@@ -1,11 +1,11 @@
 // Builds the consumer projects in examples/ outside the repository, from the packed tarballs (or, with --registry, from
 // the public npm registry), serves them under a strict Content Security Policy and checks them in Chromium.
 //
-//   node scripts/release/check-consumers.ts [F503] [F531] [F532]   (F503 and F531 by default; F532 when named)
+//   node scripts/release/check-consumers.ts [F503] [F531] [F532]   (all three by default)
 //     F503  the initial bundle of a core-and-renderer app within budget, each optional module fetched only when enabled
 //     F531  worker and WebAssembly load in a Vite and a Nuxt build with no asset configuration, then from a separate
 //           static server; nothing needs 'unsafe-eval'
-//     F532  only the core, the renderer, one imagery source and the worker installed; renders and navigates
+//     F532  only the core, the renderer, one imagery source and the basic worker installed; renders and navigates
 //   node scripts/release/check-consumers.ts --registry <version>   F559: the same consumer installed from npm
 //
 // Run `npm run build` first. Third-party dependencies come from the public registry, with no credentials.
@@ -329,9 +329,7 @@ const registryVersion = registryIndex >= 0 ? args[registryIndex + 1] : undefined
 const entries = new Set(
   args.filter((arg, index) => /^F\d+$/.test(arg) && (registryIndex < 0 || index !== registryIndex + 1)),
 );
-// F532 runs only when named until hook request H (1) lands: its install check fails on @vibeglobe/worker's dependency on
-// @vibeglobe/layers, an engine change (docs/test-changes.md, 2026-10-24).
-if (entries.size === 0) for (const entry of ['F503', 'F531']) entries.add(entry);
+if (entries.size === 0) for (const entry of ['F503', 'F531', 'F532']) entries.add(entry);
 if (registryVersion !== undefined) entries.add('F559');
 const MINIMAL_ENGINE = ['@vibeglobe/core', '@vibeglobe/renderer', '@vibeglobe/sources', '@vibeglobe/worker'];
 

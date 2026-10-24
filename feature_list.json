@@ -6998,7 +6998,7 @@
         "Assert installation pulls no layers, UI, offline, Vue or Web Component packages",
         "Assert the app renders the globe and navigates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F533",

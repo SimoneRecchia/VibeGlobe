@@ -1,32 +1,16 @@
 /**
  * Every built-in task by name: the table the worker program registers, and the one the inline executor loads lazily
- * after repeated worker start failures (ADR 0011 rule 6). Later increments add tasks from `sources` and `layers`.
+ * after repeated worker start failures (ADR 0011 rule 6). The basic program registers `BASIC_TASKS` alone (ADR 0172).
  */
-import { decodeImage } from './decode-image.js';
-import { decodeTerrain } from './decode-terrain.js';
+import { BASIC_TASKS } from './basic-tasks.js';
 import type { TaskFunction, TaskTable } from './protocol.js';
-import { transcodeKtx2 } from './transcode-ktx2.js';
 import { compileWasm } from './wasm.js';
 
 /** meshoptimizer's decoder module, shipped next to the worker program without its JavaScript (F100). */
 const MESHOPT_URL = new URL('../wasm/meshopt-decoder.wasm', import.meta.url);
 
-let vectorTasks: Promise<TaskTable> | undefined;
 let clusterTasks: Promise<TaskTable> | undefined;
 const lazyTables = new Map<string, Promise<TaskTable>>();
-
-/**
- * A vector task of `@vibeglobe/sources/vector` (F371, M13): the parsers load on the first such task, in their own
- * chunk, so workers that only decode imagery never load them.
- */
-function vectorTask(name: string): TaskFunction {
-  return async (input, context) => {
-    vectorTasks ??= import('@vibeglobe/sources/vector').then((module) => module.VECTOR_TASKS);
-    const task = (await vectorTasks)[name];
-    if (!task) throw Object.assign(new Error(`no vector task ${name}`), { code: 'unknown-task' });
-    return task(input, context);
-  };
-}
 
 /** A clustering task of `@vibeglobe/layers` (F373), loaded like the vector tasks on the first one. */
 function clusterTask(name: string): TaskFunction {
@@ -52,15 +36,9 @@ function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): 
   };
 }
 
-/** The built-in tasks. */
+/** The built-in tasks: the basic ones and those of `@vibeglobe/layers` and `@vibeglobe/models` (ADR 0172). */
 export const TASKS: TaskTable = Object.freeze({
-  'decode-image': decodeImage,
-  'decode-terrain': decodeTerrain,
-  'transcode-ktx2': transcodeKtx2,
-  'parse-geojson': vectorTask('parse-geojson'),
-  'parse-kml': vectorTask('parse-kml'),
-  'parse-gpx': vectorTask('parse-gpx'),
-  'decode-mvt': vectorTask('decode-mvt'),
+  ...BASIC_TASKS,
   'cluster-load': clusterTask('cluster-load'),
   'cluster-items': clusterTask('cluster-items'),
   'cluster-expansion': clusterTask('cluster-expansion'),

@@ -55,7 +55,7 @@ jobs:
       - name: Consumer projects from the tarballs (F503, F531, F532)
         run: |
           npx tsc -b && npm run build:browser -w @vibeglobe/web-component
-          node scripts/release/check-consumers.ts F503 F531
+          node scripts/release/check-consumers.ts F503 F531 F532
       - name: No reference to the first consumer (F559)
         run: node scripts/release/check-cube.ts
       - uses: actions/upload-artifact@v7

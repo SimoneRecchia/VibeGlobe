@@ -27,6 +27,7 @@ import * as ui from '@vibeglobe/ui';
 import * as vue from '@vibeglobe/vue';
 import * as webComponent from '@vibeglobe/web-component';
 import { createWorkers } from '@vibeglobe/worker';
+import * as basicWorkers from '@vibeglobe/worker/basic';
 
 const ellipsoid: Ellipsoid = WGS84;
 
@@ -68,4 +69,5 @@ export const entryPoints = {
   ui,
   vue,
   webComponent,
+  basicWorkers,
 };

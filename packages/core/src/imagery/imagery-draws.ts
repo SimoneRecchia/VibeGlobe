@@ -162,7 +162,8 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      if (fallback < 0 && mapInto(layer, tile)) fallback = k;
+      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142).
+      if (fallback < 0 && mapInto(layer, tile) && !unavailableAtMapping(layer)) fallback = k;
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -195,6 +196,11 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const level = shifted < 0 ? 0 : shifted < source.maxLevel ? shifted : source.maxLevel;
   if (source.tiling.crs === 'EPSG:3857') return tile.root === MERCATOR_ROOT && mapMercator(tile, level, mapping, 0);
   return mapGeographic(tile, level, mapping, 0);
+}
+
+/** True when the source's tile in `mapping` (from {@link mapInto}) is known missing or failing. */
+function unavailableAtMapping(layer: ImageryLayer): boolean {
+  return layer.loader.unavailable(mapping[MAPPING_LEVEL] ?? 0, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
 }
 
 /** True when a source can give the tile at the surface's level now: within its levels, mapped, and not missing or failing. */

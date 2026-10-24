@@ -151,6 +151,14 @@ describe('drawImagery', () => {
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([40, 8]);
   });
 
+  it('magnifies the next source where the detail source before it has no tile, coverage undeclared (KB-142)', () => {
+    // A high-detail build answers 404 outside its area: the world's level-8 tile is magnified there, not nothing.
+    const detail = fakeLayer({}, [9, 10, 11, 12]);
+    const world = fakeLayer({ 8: 60 }, [], 8);
+    const list = drawStack([stacked([detail.layer, world.layer])], tile(12, 2124, 1456));
+    expect([list.textures[0], list.imageryLevels[0]]).toEqual([60, 8]);
+  });
+
   it('draws nothing of a source outside its coverage, not even a magnified ancestor (F094, F254)', () => {
     const covered = fakeLayer({ 2: 50 });
     const italy = { westRad: 0.11, southRad: 0.62, eastRad: 0.32, northRad: 0.83 };

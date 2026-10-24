@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "commit": "7436a3318cb3bba23b3a2d050b3fa61c35146b19",
+  "date": "2026-10-24T23:26:10.112Z",
+  "device": {
+    "name": "macbook-apple-m5-macos-26-6-2",
+    "os": "darwin 25.6.0",
+    "browser": "firefox 157.0",
+    "gpu": "hardware"
+  },
+  "method": {
+    "viewport": {
+      "width": 480,
+      "height": 360
+    },
+    "warmUpMs": 5000,
+    "driveMs": 10000,
+    "load": "30 ms task every 100 ms"
+  },
+  "results": [
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": false,
+      "frames": 1161,
+      "frameIntervalP50Ms": 8,
+      "frameIntervalP95Ms": 10,
+      "inputs": 1164,
+      "inputLatencyP50Ms": 8,
+      "inputLatencyP95Ms": 9
+    },
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": true,
+      "frames": 954,
+      "frameIntervalP50Ms": 8,
+      "frameIntervalP95Ms": 34,
+      "inputs": 957,
+      "inputLatencyP50Ms": 8,
+      "inputLatencyP95Ms": 34
+    },
+    {
+      "backend": "webgl2",
+      "mode": "main",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 0.5,
+      "misalignmentMaxPx": 0.72
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": false,
+      "frames": 1195,
+      "frameIntervalP50Ms": 8,
+      "frameIntervalP95Ms": 9,
+      "inputs": 1200,
+      "inputLatencyP50Ms": 16,
+      "inputLatencyP95Ms": 17
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": true,
+      "frames": 950,
+      "frameIntervalP50Ms": 8,
+      "frameIntervalP95Ms": 26,
+      "inputs": 955,
+      "inputLatencyP50Ms": 16,
+      "inputLatencyP95Ms": 33
+    },
+    {
+      "backend": "webgl2",
+      "mode": "worker",
+      "load": false,
+      "screenshots": 15,
+      "misalignmentP50Px": 0.41,
+      "misalignmentMaxPx": 2.5
+    }
+  ]
+}

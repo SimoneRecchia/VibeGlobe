@@ -1,0 +1,7 @@
+
+> vibeglobe@0.0.0 bench:micro
+> node benchmarks/micro.ts
+
+eye-relative-5000-draws    median 0.0355 ms · p95 0.0366 ms
+Results: /Users/s1imone/WebstormProjects/VibeGlobe/benchmarks/results/macbook-apple-m5-macos-26-6-2/micro-2026-10-24T23-18-23-473Z.json
+

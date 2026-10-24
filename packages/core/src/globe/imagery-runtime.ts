@@ -100,7 +100,8 @@ function terrainDecodeTask(
 /** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
 let pagePool: { pool: NetworkPool; users: number } | undefined;
 
-function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
+/** Takes a share of the page's network pool (also for render extensions on a globe without imagery, track D hook 4). */
+export function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
   pagePool ??= {
     pool: new NetworkPool({
       now: () => host.now(),
@@ -114,7 +115,8 @@ function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
   return pagePool.pool;
 }
 
-function releaseNetworkPool(pool: NetworkPool): void {
+/** Releases a share taken with {@link acquireNetworkPool}. */
+export function releaseNetworkPool(pool: NetworkPool): void {
   if (pagePool?.pool !== pool || --pagePool.users > 0) return;
   pool.dispose();
   pagePool = undefined;

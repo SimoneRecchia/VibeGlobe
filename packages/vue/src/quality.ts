@@ -17,8 +17,11 @@ export function watchQualityPreset(engine: Globe, preset: () => QualityPresetCho
   const apply = (choice: QualityPresetChoice | undefined): void => {
     if (choice === undefined || stopped) return;
     if (controller) {
-      if (choice !== 'auto') controller.setPreset(choice);
-      return;
+      if (choice !== 'auto') return controller.setPreset(choice);
+      // 'auto' chooses from the device: a new controller does (KB-148).
+      controller.destroy();
+      controller = undefined;
+      starting = undefined;
     }
     starting ??= engine.ready
       .then(() => import('@vibeglobe/quality'))

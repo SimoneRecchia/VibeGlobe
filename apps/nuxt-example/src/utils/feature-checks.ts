@@ -196,6 +196,15 @@ const GROUP_CHECKS: Record<string, (context: CheckContext) => Checks> = {
       globe.diagnostics.setPhaseTiming(false);
       return times.render >= 0 && globe.surfaceStats().tiles > 0 && globe.rendererStats().drawCalls > 0;
     },
+    // The page sets the `qualityPreset` prop to 'low': adaptive quality applies it, then adapts from there.
+    'adaptive quality preset': async () => {
+      for (let i = 0; i < 50; i++) {
+        const settings = globe.qualitySettings;
+        if (settings.resolutionScale <= 0.5 && settings.atmosphere !== 'off') return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return false;
+    },
   }),
   security: () => ({
     'no third-party requests': async () =>

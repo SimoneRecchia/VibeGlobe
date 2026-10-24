@@ -110,6 +110,7 @@ onBeforeUnmount(() => {
         :longitude-deg="12.5"
         :latitude-deg="41.9"
         :zoom="5"
+        :quality-preset="group?.id === 'debugging' ? 'low' : undefined"
         @ready="onReady"
       >
         <template v-if="group?.id === 'data-layers'">

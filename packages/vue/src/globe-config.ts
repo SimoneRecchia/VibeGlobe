@@ -83,8 +83,11 @@ export function watchClicks(element: HTMLElement, globe: Globe, onClick: (event:
   };
 }
 
-/** The view fields that differ from the camera by more than rounding, or undefined when none do. */
-export function changedView(camera: Globe['camera'], view: ViewInit): ViewInit | undefined {
+/**
+ * The view fields that differ from the camera by more than rounding, or undefined when none do. With the `previous`
+ * props, only fields whose prop changed count: the others stay where the user navigated (KB-146).
+ */
+export function changedView(camera: Globe['camera'], view: ViewInit, previous?: ViewInit): ViewInit | undefined {
   const changed: Record<string, number> = {};
   const fields = [
     ['longitudeDeg', camera.longitudeDeg],
@@ -95,6 +98,7 @@ export function changedView(camera: Globe['camera'], view: ViewInit): ViewInit |
   ] as const;
   for (const [field, current] of fields) {
     const wanted = view[field];
+    if (previous !== undefined && previous[field] === wanted) continue;
     if (wanted !== undefined && Math.abs(wanted - current) > 1e-9) changed[field] = wanted;
   }
   return Object.keys(changed).length > 0 ? changed : undefined;

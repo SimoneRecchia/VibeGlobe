@@ -54,6 +54,22 @@ export function newCameraState(): MutableCameraState {
   };
 }
 
+/**
+ * Writes the frame event's payload (F378): its frame number, the tiles drawn and the camera's Mercator zoom, without a
+ * camera state object. Allocates nothing.
+ */
+export function writeFramePayload(
+  camera: Camera,
+  out: { frameNumber: number; tiles: number; zoom: number },
+  frameNumber: number,
+  tiles: number,
+): void {
+  out.frameNumber = frameNumber;
+  out.tiles = tiles;
+  const groundZoom = groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
+  out.zoom = mercatorZoomFromGroundZoom(groundZoom, camera.pose.targetLatitudeRad);
+}
+
 /** Writes the camera's public state into `out` and returns it; allocates nothing, so the frame loop can use it. */
 export function writeCameraState(camera: Camera, out: MutableCameraState, view?: ViewState): MutableCameraState {
   const { pose } = camera;

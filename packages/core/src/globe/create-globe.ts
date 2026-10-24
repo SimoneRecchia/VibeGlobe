@@ -5,7 +5,8 @@ import { extendGlobe, releaseExtensionPools, type ExtensionParts } from './rende
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
+import { applyView, newCameraState, readCameraState, requestedCameraState } from './camera-state.js';
+import { writeCameraState, writeFramePayload } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { debugMeshesOf } from './debug-mesh.js';
@@ -82,7 +83,7 @@ class GlobeEngine implements Globe {
   frameNumber = 0;
   /** The debug quads, kept for a renderer that does not exist yet. */
   private debugMeshes: DebugMeshData[] = [];
-  private readonly framePayload = { frameNumber: 0, tiles: 0 };
+  private readonly framePayload = { frameNumber: 0, tiles: 0, zoom: 0.5 };
   private readonly idlePayload = { frameNumber: 0 };
   private readonly cameraPayload = newCameraState();
   /** The capture, quality and extension helpers in one field: each new field changes the class's layout (F064). */
@@ -345,8 +346,7 @@ class GlobeEngine implements Globe {
     const count = this.surfaceFrame.drawn();
     this.frameNumber++;
     if (this.emitter.has('frame')) {
-      this.framePayload.frameNumber = this.frameNumber;
-      this.framePayload.tiles = count;
+      writeFramePayload(this.cam, this.framePayload, this.frameNumber, count);
       this.emitter.emit('frame', this.framePayload);
     }
     if (this.emitter.has('camera-change'))

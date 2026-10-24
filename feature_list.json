@@ -5027,7 +5027,7 @@
         "Record frame times for 60 seconds while panning and zooming",
         "Verify p95 frame time is at most 16.7 ms on the reference desktop and the per-frame JavaScript heap allocation stays at zero in the render loop"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F379",

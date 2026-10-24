@@ -1,9 +1,10 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 18:00 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 21:20 UTC)
 
 Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
-after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32, #35, #36, #37, #38. Tracks D, E, F, G and H are merged.
+after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32, #35, #36, #37, #38; #39 open (F249, F358, full-CI fixes). Tracks
+D, E, F, G and H are merged.
 
 Owner decisions of 2026-10-24, done:
 
@@ -16,15 +17,18 @@ Owner decisions of 2026-10-24, done:
 Since the takeover:
 
 - Passing: F416, F401, F402, F474, F385, F398, F219, F323, F154, F396, F393, F339, F264, F488, F551, F374,
-  **F490 (M14)**, **F554 (M9)**, **F269 (M7)**, F566, F567, F572, F573, each milestone after a fresh-context review
+  **F490 (M14)**, **F554 (M9)**, **F269 (M7)**, F566, F567, F572, F573, F249 (ADR 0044), F358 (ADR 0045), each milestone after a fresh-context review
   and its fix check. F438 (M12) is pending its manual tablet and desktop step (review and fix check done).
-- Bugs fixed: KB-133 to KB-169 (except KB-163), DP-002 to DP-006, TH-01. KB-153 fixed (both causes); what remains of
-  F167 manual tilt is KB-170 (the terrain limit's rate in a fast zoom). Open: KB-097 (F167), KB-110 (F137, hardening
-  backlog), KB-132 (option (a) under way, owner's 2-hour box from 17:50 UTC, then the 16 B/frame tolerance), KB-138
-  (M11), KB-144 (F378), KB-163 (F395: 7–13% saved, not 25%), KB-170 (F167). Track G's TG-01 to TG-06 (M15).
+- Bugs fixed: KB-132 to KB-169 (except KB-163), KB-172, DP-002 to DP-006, TH-01, TG-02, TG-03. What remains of F167
+  manual tilt is KB-170 (the terrain limit's rate in a fast zoom). Open: KB-097 (F167), KB-110 (F137, hardening
+  backlog), KB-138 (M11), KB-144 (F378), KB-163 (F395: the 25% target is open question 32), KB-170 (F167), KB-171
+  (F359's budget gate flaky in this container, also on the committed code). Track G's TG-01, TG-04 to TG-06 (M15).
+- Full CI run 40119880914 (66fafeb): F052, F399, F429, F231 specs updated to intended changes, KB-172 fixed, F395's
+  timeout raised; new full run started on 9d2a4fa. F329 waits for it.
 - F453: `download.geofabrik.de` is still refused in this container (the policy change applies to new sessions).
 
-Open, breadth first: F148, F167, F249, F329 (KB-132), F358, F378, F389, F395, F403, F453, F472; M15 and track G's bugs.
+Open, breadth first: F148, F167, F329 (CI run), F378, F389, F395 (question 32), F403, F453, F472; M15 and track G's
+bugs.
 
 ## Track H, packaging and release (2026-10-24)
 

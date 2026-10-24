@@ -106,7 +106,7 @@ export function planeCenterOf(lonRad: number, latRad: number): Float64Array {
 }
 
 /** Writes a vertex's plane endpoint data (see {@link TileMeshData.planes}). */
-export function writePlane(
+function writePlane(
   planes: Float32Array,
   index: number,
   lonRad: number,
@@ -126,7 +126,7 @@ export function writePlane(
 }
 
 /** Writes the unit ellipsoid normal at a geodetic position. */
-export function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
+function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
   const cosLat = Math.cos(latRad);
   normals[index * 3] = cosLat * Math.cos(lonRad);
   normals[index * 3 + 1] = cosLat * Math.sin(lonRad);

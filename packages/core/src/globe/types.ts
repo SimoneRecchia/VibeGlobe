@@ -480,8 +480,11 @@ export type { ImageryStats };
 export interface GlobeEvents {
   /** The first complete frame was drawn. */
   ready: { readonly backend: BackendName };
-  /** A frame was drawn. The payload object is reused: read it inside the handler, do not keep it. */
-  frame: { readonly frameNumber: number; readonly tiles: number };
+  /**
+   * A frame was drawn, with the camera's zoom (as `Globe.camera.zoom`, without a new state object). The payload object
+   * is reused: read it inside the handler, do not keep it.
+   */
+  frame: { readonly frameNumber: number; readonly tiles: number; readonly zoom: number };
   /** Rendering stopped because nothing changes. The payload object is reused: read it inside the handler. */
   idle: { readonly frameNumber: number };
   /** The camera moved, once per drawn frame. The payload object is reused: read it inside the handler, do not keep it. */

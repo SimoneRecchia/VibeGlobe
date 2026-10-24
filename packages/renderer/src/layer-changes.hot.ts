@@ -67,3 +67,30 @@ export class FeatureChanges {
     this.flags = grown;
   }
 }
+
+/** A buffer attribute's update ranges as three.js reads them: a `length` and indexed ranges. */
+export interface RangeList {
+  length: number;
+  [index: number]: { start: number; count: number };
+}
+
+const rangeLists = new WeakMap<object, RangeList>();
+
+/**
+ * The update-range list of `attribute`, made stable on first use (KB-144): three.js empties its array after every
+ * upload (`length = 0`), which drops the array's storage, so the next frame's ranges allocated it again. This list
+ * keeps its storage; the attribute's `clearUpdateRanges` only resets its length.
+ */
+export function stableRanges(attribute: { updateRanges: unknown; clearUpdateRanges(): void }): RangeList {
+  let list = rangeLists.get(attribute);
+  if (list === undefined) {
+    const own: RangeList = { length: 0 };
+    attribute.updateRanges = own;
+    attribute.clearUpdateRanges = () => {
+      own.length = 0;
+    };
+    rangeLists.set(attribute, own);
+    list = own;
+  }
+  return list;
+}

@@ -27,7 +27,7 @@ import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { FieldWaits, LabelSdf } from './label-sdf.js';
-import { FeatureChanges } from './layer-changes.hot.js';
+import { FeatureChanges, stableRanges } from './layer-changes.hot.js';
 import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import type { QuadImages } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
@@ -312,12 +312,7 @@ export class LayerBatches implements LayerRenderTarget {
       for (const batch of this.batchList) if (batch.kind === 'marker') batch.dirty = true;
     }
     // Label fields arrived: the labels waiting for them are rewritten; the atlas started over: labels are rebuilt.
-    if (this.labels)
-      this.waits.settle(
-        this.labels,
-        (batch, feature) => this.changed(batch, feature, feature + 1),
-        () => this.batchList.forEach((batch) => (batch.dirty ||= batch.kind === 'label')),
-      );
+    if (this.labels) this.waits.settle(this.labels, this.rewriteWaiting, this.rebuildLabels);
     const batches = this.batchList;
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
@@ -408,6 +403,12 @@ export class LayerBatches implements LayerRenderTarget {
     if (!ok) this.rebuild(batch);
   }
 
+  /** For {@link FieldWaits.settle}, created once: a closure made each frame would allocate (F064). */
+  private readonly rewriteWaiting = (batch: Batch, feature: number): void => this.changed(batch, feature, feature + 1);
+  private readonly rebuildLabels = (): void => {
+    for (const batch of this.batchList) if (batch.kind === 'label') batch.dirty = true;
+  };
+
   /** The batch {@link LayerBatches.rewrite} drains, for {@link LayerBatches.rewriteRun}. */
   private rewriting: Batch | undefined;
 
@@ -421,14 +422,14 @@ export class LayerBatches implements LayerRenderTarget {
     for (let i = 0; i < QUAD_ATTRIBUTES.length; i++) {
       const [name, size] = QUAD_ATTRIBUTES[i] ?? ['', 0];
       const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
-      // As `addUpdateRange`, with range objects of a pool: three.js empties the list after each upload.
-      const ranges = attribute.updateRanges as UpdateRange[];
+      // As `addUpdateRange`, with range objects of a pool, into a list three.js empties without dropping its storage.
+      const ranges = stableRanges(attribute);
       const pool = batch.rangePools[i] ?? [];
       const range = pool[ranges.length] ?? { start: 0, count: 0 };
       if (pool[ranges.length] === undefined) pool.push(range);
       range.start = first * 4 * size;
       range.count = (end - first) * 4 * size;
-      ranges.push(range);
+      ranges[ranges.length++] = range;
       attribute.needsUpdate = true;
     }
     this.rangeUploads++;

@@ -364,3 +364,34 @@ describe('flight destination preloading (F286, F285)', () => {
     expect(urls.filter((url) => /\/tiles\/(9|10)\/(45[0-9]|9[01][0-9])\//.test(url))).toEqual([]);
   });
 });
+
+describe('provider warnings (KB-PT-07, F267)', () => {
+  it("logs a profile's warning once per engine instance, however many of its sources are added", async () => {
+    const logged: string[] = [];
+    const warning = 'public servers are for light use only';
+    const profiled = (id: string): ImagerySource => ({ ...source([]), id, profile: { id: 'osm-public', warning } });
+    const open = async () => {
+      const { renderer, factory } = fakeRenderer();
+      const globe = createGlobe({
+        container: {},
+        renderer: factory,
+        baseImageryUrl: 'world.jpg',
+        imagery: [profiled('a'), profiled('b')],
+        workers: instantWorkers(),
+        logSink: ({ level, message }) => level === 'warn' && logged.push(message),
+      });
+      for (let frame = 0; frame < 5; frame++) {
+        await settle();
+        renderer.timers.advance(50);
+        renderer.flush();
+      }
+      return globe;
+    };
+    const globe = await open();
+    globe.imageryLayers.add({ id: 'c', sources: [profiled('c')] });
+    expect(logged).toEqual([warning]);
+    // Another engine instance warns again.
+    await open();
+    expect(logged).toEqual([warning, warning]);
+  });
+});

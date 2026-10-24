@@ -476,7 +476,7 @@ if (params.get('experiment') === 'gpu-probes') {
   // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.
   if (scenario?.startsWith('3dtiles-'))
     void globe.ready.then(async () => (await import('./tiles3d-tour.js')).showTiles3D(globe, app, params));
-  if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
+  if (scenario?.startsWith('data-') || scenario?.startsWith('draped-') || scenario === 'live-feed')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
   // Quality presets, adaptive quality, an artificial GPU load and the atmosphere (M11), loaded only when asked for.
   if (['quality', 'gpuLoad', 'atmosphere', 'sun', 'haze', 'fog'].some((name) => params.has(name)))

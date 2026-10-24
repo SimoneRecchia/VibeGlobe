@@ -33,13 +33,48 @@ async function place(page: Page, input: Input, xPx: number, yPx: number, finish 
     await touch(page, xPx, yPx);
     if (finish) await touch(page, xPx, yPx);
   } else {
+    await moveCursor(page, xPx, yPx);
     await page.keyboard.press('Enter');
     if (finish) await page.keyboard.press('Enter');
   }
 }
 
+/** Moves the focused drawing cursor to a screen point, 40 px a step with Shift, then 8 px. */
+async function moveCursor(page: Page, xPx: number, yPx: number): Promise<void> {
+  const [x, y] = await page
+    .locator(':focus')
+    .evaluate((element: HTMLElement) => [Number.parseFloat(element.style.left), Number.parseFloat(element.style.top)]);
+  for (const [delta, positive, negative] of [
+    [xPx - (x ?? 0), 'ArrowRight', 'ArrowLeft'],
+    [yPx - (y ?? 0), 'ArrowDown', 'ArrowUp'],
+  ] as const) {
+    const key = delta > 0 ? positive : negative;
+    for (let i = 0; i < Math.floor(Math.abs(delta) / 40); i++) await page.keyboard.press(`Shift+${key}`);
+    for (let i = 0; i < Math.round((Math.abs(delta) % 40) / 8); i++) await page.keyboard.press(key);
+  }
+}
+
+/** Drags from a screen point by `dxPx` with the mouse or a finger (keyboard: picks at the cursor, then moves left). */
+async function drag(page: Page, input: Input, xPx: number, yPx: number, dxPx: number): Promise<void> {
+  if (input === 'mouse') {
+    await page.mouse.move(xPx, yPx);
+    await page.mouse.down();
+    await page.mouse.move(xPx + dxPx, yPx, { steps: 5 });
+    await page.mouse.up();
+  } else if (input === 'touch') await touch(page, xPx, yPx, dxPx);
+  else {
+    await moveCursor(page, xPx, yPx);
+    await page.keyboard.press('Enter');
+    for (let i = 0; i < Math.round(Math.abs(dxPx) / 8); i++)
+      await page.keyboard.press(dxPx > 0 ? 'ArrowRight' : 'ArrowLeft');
+    await page.keyboard.press('Enter');
+  }
+}
+
 /** Waits for the next movement started by a control (the API) to end. */
 async function movementEnd(page: Page, action: () => Promise<void>): Promise<void> {
+  // Not the end of an earlier control's flight.
+  await waitForIdle(page);
   await page.evaluate(() => {
     const globe = window.vibeglobePlayground?.globe;
     const holder = window as unknown as { ended?: boolean };
@@ -107,7 +142,8 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
       test.setTimeout(180_000);
       await context.grantPermissions(['geolocation']);
       await context.setGeolocation({ latitude: 45.07, longitude: 7.69, accuracy: 300 });
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      // The Italian runs with reduced motion (quick fades), the English ones with every animation.
+      if (language === 'it') await page.emulateMedia({ reducedMotion: 'reduce' });
       await openEverything(page, language, theme);
       expect(await page.locator('.vg-ui').getAttribute('lang')).toBe(language);
       expect(await page.locator('.vg-ui').getAttribute('data-theme')).toBe(theme);
@@ -125,7 +161,26 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
         await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ headingDeg: 60 }));
         await waitForIdle(page);
         await activate(page, input, button(page, 'compass'));
-        await expect.poll(async () => (await cameraOf(page)).headingDeg).toBeCloseTo(0, 6);
+        // Degrees from north either way.
+        const heading = async (): Promise<number> => {
+          const h = (((await cameraOf(page)).headingDeg % 360) + 360) % 360;
+          return Math.min(h, 360 - h);
+        };
+        await expect.poll(heading).toBeCloseTo(0, 6);
+        // Rotating: a drag of the compass, or a key to face east.
+        const box = await button(page, 'compass').boundingBox();
+        if (box === null) throw new Error('no compass');
+        if (input === 'keyboard') await button(page, 'compass').press('e');
+        else if (input === 'touch') await touch(page, box.x + box.width / 2, box.y + box.height / 2, -40);
+        else {
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2, { steps: 5 });
+          await page.mouse.up();
+        }
+        await expect.poll(heading).toBeGreaterThan(5);
+        await activate(page, input, button(page, 'compass'));
+        await expect.poll(heading).toBeCloseTo(0, 6);
       });
 
       await test.step('view mode and tilt', async () => {
@@ -184,7 +239,13 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
         const first = await format();
         await activate(page, input, button(page, 'readout-format'));
         await expect.poll(format).not.toBe(first);
-        await expect(page.locator('.vg-ui__readout-coordinates')).not.toHaveText('');
+        const coordinates = page.locator('.vg-ui__readout-coordinates');
+        await expect(coordinates).not.toHaveText('');
+        const shown = await coordinates.textContent();
+        // The position under the pointer or a held finger (the keyboard's part is the format switch above).
+        if (input === 'mouse') await page.mouse.move(400, 300);
+        else if (input === 'touch') await touch(page, 400, 300, 0, 600);
+        if (input !== 'keyboard') await expect(coordinates).not.toHaveText(shown ?? '');
         await expect(page.locator('.vg-ui__scale')).toHaveAttribute('aria-label', /\d/);
       });
 
@@ -232,12 +293,18 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
       });
 
       await test.step('measurement', async () => {
+        const readout = page.locator('.vg-ui__measure-readout');
         await activate(page, input, button(page, 'draw-line', 'measure'));
         await place(page, input, 560, 400);
-        if (input === 'keyboard') for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
         await place(page, input, 640, 400, true);
-        await expect(page.locator('.vg-ui__measure-readout')).toContainText(TEXT[language].length);
-        await activate(page, input, button(page, 'draw-line', 'measure'));
+        await expect(readout).toContainText(TEXT[language].length);
+        await activate(page, input, button(page, 'draw-polygon', 'measure'));
+        await place(page, input, 560, 440);
+        await place(page, input, 640, 440);
+        await place(page, input, 600, 500);
+        await activate(page, input, button(page, 'draw-finish', 'measure'));
+        await expect(readout).toContainText('²');
+        await activate(page, input, button(page, 'draw-polygon', 'measure'));
       });
 
       await test.step('drawing', async () => {
@@ -247,10 +314,50 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
               (window.vibeglobeUi?.layer.get('draw') as unknown as { tool: { features(): unknown[] } }).tool.features()
                 .length,
           );
+        const types = (): Promise<string[]> =>
+          page.evaluate(() =>
+            (
+              window.vibeglobeUi?.layer.get('draw') as unknown as {
+                tool: { features(): { geometry: { type: string } }[] };
+              }
+            ).tool
+              .features()
+              .map((f) => f.geometry.type),
+          );
         await activate(page, input, button(page, 'draw-point', 'draw'));
         await place(page, input, 700, 420);
         await expect.poll(points).toBe(1);
-        await activate(page, input, button(page, 'draw-point', 'draw'));
+        await activate(page, input, button(page, 'draw-line', 'draw'));
+        await place(page, input, 680, 360);
+        await place(page, input, 760, 360, true);
+        await activate(page, input, button(page, 'draw-polygon', 'draw'));
+        await place(page, input, 680, 460);
+        await place(page, input, 760, 460);
+        await place(page, input, 720, 520);
+        await activate(page, input, button(page, 'draw-finish', 'draw'));
+        await expect.poll(types).toEqual(['Point', 'LineString', 'Polygon']);
+        // Editing: select the polygon by an edge, then drag its first vertex.
+        const vertex = async (): Promise<number[]> =>
+          page.evaluate(
+            () =>
+              (
+                window.vibeglobeUi?.layer.get('draw') as unknown as {
+                  tool: { features(): { geometry: { coordinates: number[][][] } }[] };
+                }
+              ).tool.features()[2]?.geometry.coordinates[0]?.[0] ?? [],
+          );
+        const before = await vertex();
+        const screen = await page.evaluate(
+          ([lon, lat]) =>
+            window.vibeglobePlayground?.globe.geoToScreen({ longitudeDeg: lon ?? 0, latitudeDeg: lat ?? 0 }),
+          before,
+        );
+        if (screen === undefined) throw new Error('vertex off screen');
+        await activate(page, input, button(page, 'draw-edit', 'draw'));
+        await place(page, input, screen.xPx + 20, screen.yPx);
+        await drag(page, input, screen.xPx, screen.yPx, -32);
+        await expect.poll(async () => (await vertex())[0]).toBeLessThan(before[0] ?? 0);
+        await activate(page, input, button(page, 'draw-edit', 'draw'));
       });
 
       await test.step('fullscreen', async () => {

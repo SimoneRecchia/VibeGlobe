@@ -76,6 +76,11 @@ export class LabelSdf {
     return this.version + this.atlas.generation;
   }
 
+  /** Whether fields are being generated: labels wait for them, so the engine keeps drawing until they arrive. */
+  get generating(): boolean {
+    return this.pending.size > 0;
+  }
+
   /** Called when fields generated off the frame have been added to the atlas. */
   onReady(listener: () => void): void {
     this.listener = listener;

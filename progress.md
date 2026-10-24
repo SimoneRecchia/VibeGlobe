@@ -20,6 +20,22 @@ Open:
 
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
+## Track F, network simulation suite (2026-10-23)
+
+Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner merges). Owns `e2e/network/`,
+`scripts/fixtures/tiles/link.ts` and `scripts/fixtures/network/` (ADR 0151; numbers 0151–0159).
+
+- F315: the navigation scenario on fully offline, 400 kbps, flaky, 500 ms latency and LAN-only links on WebGPU and
+  forced WebGL2, every frame checked for holes, black pixels and pops, retries bounded with backoff
+  (`e2e/network/links.spec.ts`). Stays `failing`: only frame times within budget on the reference hardware remain
+  (`docs/hardening-backlog.md`, open question 2).
+- F329's scenario specs, all passing on both backends: the network suite (`links.spec.ts`), connectivity dropping
+  mid-pan and returning after a flight (`drop-return.spec.ts`), both offline setups in offline-only mode
+  (`offline-setups.spec.ts`), and the three network modes with the loading switches all on and all off
+  (`modes.spec.ts`; the full 16-combination matrix with its request and storage checks stays
+  `e2e/offline-matrix.spec.ts`). F329's acceptance (known bugs, the fresh-context review) is the main session's.
+- Hook requests: none.
+
 ## Current state
 
 - **M2 Globe core complete** (F078 passing, 2026-10-21: the full CI suite green on 9679fe0, reviews closed by ADR 0021, no open bug). Passing in M2: F042–F064, F066–F074, F076–F078; pending owner steps: F065, F075.
@@ -37,6 +53,14 @@ Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` p
 - **2026-10-23 afternoon and evening (main session):** tracks A, B and C merged into the branch; round-3 hooks for tracks D, E and F (render extensions with network and workers, `layout-vector-tile`; `parse-model` reopened for CSP, see `docs/parallel-tracks.md` C (1)); core moved geodesics to `@vibeglobe/core/geodesy` to keep its 60 KB budget. Passing now: F285, F302, F303 (adaptive loading), F260 (Google cache lifetimes), F355 (extrusions on slopes, heights within 1%), F367 (no street-level jitter of data primitives). Built with leftovers in `docs/hardening-backlog.md`: F286, F287, F288, F300 (Firefox and WebKit), F301. Hooks answered: B (2) and B (3) (display-only refusals; F323 completes with track E's 3D Tiles data access). Bugs: KB-131 fixed (detail stayed coarse after a jump); KB-132 open (allocation test fails about one run in ten). The first full CI run of the day found regressions of the adaptive-loading work (F090, F320–F324, CSP F100), fixed; F413 and F426 timed out on `main` too (flights at four frames a second), their timeout raised with the reason recorded.
 - Hours: about 8 hours of agent time on 2026-10-23 after the morning (11:30–19:30 UTC). Monday (26 October 08:00 Europe/Rome) is not reachable for every entry: M10 (renderer items F358, F374, F375, F378), M11 wiring (atmosphere, quality settings) and M12's larger-than-canvas capture (F416) remain for the main session, with M13 in tracks D and E; the hardening-only leftovers wait for the two hardening weeks.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
+
+## Track E: 3D Tiles (`packages/renderer/src/tiles3d`, `packages/sources/src/tiles3d`)
+
+Branch `claude/keen-davinci-ym90tk`; entries, blockers and hook requests E (1)–(5) in `docs/parallel-tracks.md` ("E. 3D Tiles track: status"); ADR 0141.
+
+- **2026-10-23:** Passing: F461 (no holes while streaming, both backends, slow link; debug overlay), F462 (center-first requests through the page's pool within host limits, cancellation in flights, LRU budget; the 10-minute navigation ran once), F464 (no street-level jitter, WGS84 alignment), F465 (globe, flattening, 2D and 3D phases), F466 (picking with batch tables and 1.1 property tables), F467 (no z-fighting on terrain: a 0.1% relative depth pull). Pending owner steps: F468 (run with a real key), F469 (three-hour real session). Failing with blockers: F463 (hook E (1), `parse-model` in the worker program), F470 (hook E (2), extension credits in the engine's attribution), F471 (reference devices; hook E (5), benchmark history).
+- Found and fixed while building (before commit, no known bug left open): every in-flight request was cancelled each frame (a loading tile is not re-requested by traversal); rigid per-tileset placement drifted on the flat map (0.4% north–south Mercator stretch) and failed for Google's whole-Earth root: tiles are now placed by the local derivative of the frame's mapping at each tile's center (sub-millimeter); render extensions receive `network` and `workers` only on a globe with tiled imagery, so the scenarios use `imagery=world`.
+- About 6 hours of agent time.
 
 ## Track B: source adapters and offline (`packages/sources`, `packages/offline`)
 

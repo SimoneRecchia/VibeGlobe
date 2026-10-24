@@ -26,7 +26,6 @@
     {
       "path": "../../packages/layers"
     },
-
     {
       "path": "../../packages/gis"
     },
@@ -38,6 +37,9 @@
     },
     {
       "path": "../../packages/quality"
+    },
+    {
+      "path": "../../packages/models"
     }
   ]
 }

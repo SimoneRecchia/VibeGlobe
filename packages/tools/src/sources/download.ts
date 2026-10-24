@@ -76,6 +76,11 @@ async function streamTo(response: Response, path: string): Promise<number> {
   return total;
 }
 
+/** Names a download the lock file does not pin, with the checksum to pin it (DP-006). */
+function reportUnpinned(context: DownloadContext, key: string, expected: string | undefined, checksum: string): void {
+  if (expected === undefined) context.report(`unpinned ${key}: add "${key}": "${checksum}" to the lock file`);
+}
+
 /** Downloads one file into `<folder>/<key>`, resuming a partial download, verifying the lock checksum. */
 export async function downloadFile(file: SourceFile, context: DownloadContext): Promise<DownloadResult> {
   const target = join(context.folder, file.key);
@@ -122,6 +127,7 @@ export async function downloadFile(file: SourceFile, context: DownloadContext): 
   rmSync(partial, { force: true });
   context.log.record(STEP, file.key, checksum);
   context.report(`downloaded ${file.key} (${bytes.length} bytes${offset > 0 ? `, resumed at ${offset}` : ''})`);
+  reportUnpinned(context, file.key, expected, checksum);
   return { key: file.key, status: 'downloaded', transferred, sha256: checksum };
 }
 
@@ -155,6 +161,7 @@ async function downloadWindow(
   writeAtomic(target, result.file);
   context.log.record(STEP, file.key, checksum);
   context.report(`read ${file.key}: ${result.tiles} internal tiles, ${result.transferred} bytes`);
+  reportUnpinned(context, file.key, expected, checksum);
   return { key: file.key, status: 'downloaded', transferred: result.transferred, sha256: checksum };
 }
 

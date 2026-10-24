@@ -94,3 +94,34 @@ describe('VibeGlobe under server-side rendering', () => {
     error.mockRestore();
   });
 });
+
+describe('camera props (F474)', () => {
+  it('a changed camera prop moves only its own field, keeping where the user navigated the others (KB-146)', async () => {
+    const { changedView } = await import('./globe-config.js');
+    // The user panned to 20° E; the parent then changes only the zoom prop.
+    const camera = { longitudeDeg: 20, latitudeDeg: 41.9, zoom: 5, headingDeg: 0, tiltDeg: 0 } as Globe['camera'];
+    const previous = { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 5 };
+    expect(changedView(camera, { ...previous, zoom: 6 }, previous)).toEqual({ zoom: 6 });
+    // Without a previous value every prop applies (the first watch, or a new prop).
+    expect(changedView(camera, { longitudeDeg: 12.5 })).toEqual({ longitudeDeg: 12.5 });
+  });
+});
+
+describe('VibeDataLayer features (F476)', () => {
+  it('replaces features without ids instead of adding them next to the previous ones (KB-147)', async () => {
+    const { replaceFeatures } = await import('./children.js');
+    const ids = new Set<string | number>();
+    const layer = {
+      addFeatures: (features: readonly { id?: string | number }[]) => {
+        for (const f of features) ids.add(f.id ?? `generated-${String(ids.size)}`);
+      },
+      removeFeature: (id: string | number) => ids.delete(id),
+    };
+    const point = (lon: number) =>
+      ({ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, 0] }, properties: {} }) as const;
+    let shown = replaceFeatures(layer, [], [point(12.5)], 'dots');
+    shown = replaceFeatures(layer, shown, [point(14)], 'dots');
+    replaceFeatures(layer, shown, [point(15)], 'dots');
+    expect(ids.size).toBe(1);
+  });
+});

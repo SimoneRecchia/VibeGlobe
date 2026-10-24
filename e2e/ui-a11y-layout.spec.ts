@@ -141,14 +141,17 @@ test.describe('reduced motion (F436)', () => {
     });
     expect(fade).toBeLessThanOrEqual(400);
     // The tilt slider sets the tilt at once.
+    // The slider only needs the zoom applied, not the zoom-10 tiles loaded (waiting for them overran the timeout).
     await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 10 }));
-    await waitForIdle(page);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.locator('.vg-ui__tilt-track').focus();
     await page.keyboard.press('End');
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.chosenTiltDeg)).toBeCloseTo(85, 6);
 
-    // Back to normal: transitions and animated steps return.
+    // Back to normal: transitions and animated steps return (back at the first view, whose tiles are loaded).
+    await page.evaluate((zoom) => window.vibeglobePlayground?.globe.jumpTo({ zoom, tiltDeg: 0 }), start + 1);
+    await waitForIdle(page);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     expect(await transition()).toBe('0.15s');
     const before = await page.evaluate(() => window.vibeglobePlayground?.globe.camera.zoom ?? NaN);

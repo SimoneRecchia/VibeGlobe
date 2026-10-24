@@ -55,7 +55,12 @@ function routePointer(element: HTMLElement, interaction: InteractionController, 
 export function createGlobeLayers(globe: Globe, options: { readonly element?: HTMLElement } = {}): GlobeLayers {
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
-  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
+  const element = options.element;
+  const projector = {
+    geoToScreen: globe.geoToScreen.bind(globe),
+    zoom: () => globe.camera.zoom,
+    ...(element ? { viewportPx: () => ({ widthPx: element.clientWidth, heightPx: element.clientHeight }) } : {}),
+  };
   let inFrame = false;
   let detached = false;
   let flushQueued = false;

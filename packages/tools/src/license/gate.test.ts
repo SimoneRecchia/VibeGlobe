@@ -19,6 +19,10 @@ describe('license gate', () => {
     expect(checkSource('d', 'fixture', xyz('https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'))?.profile).toBe(
       'openstreetmap-tile-servers',
     );
+    // The tile servers' short alias (DP-005).
+    expect(checkSource('d', 'fixture', xyz('https://tile.osm.org/{z}/{x}/{y}.png'))?.profile).toBe(
+      'openstreetmap-tile-servers',
+    );
     expect(checkSource('d', 'fixture', xyz('https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}'))?.profile).toBe(
       'google-maps-platform',
     );

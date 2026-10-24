@@ -24,6 +24,7 @@ import { releaseMesh } from './release-mesh.js';
 import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
+import { FeatureChanges } from './layer-changes.hot.js';
 import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
@@ -33,8 +34,10 @@ const LAYER_RENDER_ORDER = 1000;
 
 interface Batch extends BatchContents {
   readonly descriptor: BatchDescriptor;
-  /** Feature ranges [first, end) changed since the last frame, rewritten in place when the layout allows. */
-  readonly ranges: [number, number][];
+  /** Features changed since the last frame, rewritten in place when the layout allows. */
+  readonly changes: FeatureChanges;
+  /** Update ranges handed to three.js, one pool per quad attribute, reused every frame (F378). */
+  readonly rangePools: UpdateRange[][];
   capacity: number;
   order: number;
   visible: boolean;
@@ -110,7 +113,8 @@ export class LayerBatches implements LayerRenderTarget {
       order: 0,
       visible: true,
       dirty: true,
-      ranges: [],
+      changes: new FeatureChanges(),
+      rangePools: QUAD_ATTRIBUTES.map(() => []),
       attributes: new Map(),
       uniforms: new Map(),
       strings: new Map(),
@@ -176,6 +180,9 @@ export class LayerBatches implements LayerRenderTarget {
   /** See {@link LayerRenderTarget}. */
   setUniform(handle: BatchHandle, attribute: BatchAttribute, value: Float64Array | undefined): void {
     const batch = this.get(handle);
+    const current = batch.uniforms.get(attribute);
+    // The layers send layer-wide values again as the zoom changes: an unchanged one rebuilds nothing (F378).
+    if (value ? current !== undefined && sameValues(current, value) : current === undefined) return;
     if (value) batch.uniforms.set(attribute, Float64Array.from(value));
     else batch.uniforms.delete(attribute);
     batch.dirty = true;
@@ -203,7 +210,7 @@ export class LayerBatches implements LayerRenderTarget {
    */
   private changed(batch: Batch, first: number, end: number): void {
     if (batch.dirty) return;
-    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.ranges.push([first, end]);
+    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.changes.mark(first, end);
     else batch.dirty = true;
   }
 
@@ -290,7 +297,7 @@ export class LayerBatches implements LayerRenderTarget {
       const batch = batches[i];
       if (!batch) continue;
       if (batch.dirty) this.rebuild(batch);
-      else if (batch.ranges.length > 0) this.rewrite(batch);
+      else if (!batch.changes.empty) this.rewrite(batch);
       const mesh = batch.mesh;
       if (!mesh || !batch.arrays) continue;
       mesh.visible = batch.visible;
@@ -350,28 +357,48 @@ export class LayerBatches implements LayerRenderTarget {
     return material;
   }
 
-  /** Rewrites the changed feature ranges of a quad batch and uploads only those vertices (F376, F377). */
+  /**
+   * Rewrites the changed features of a quad batch and uploads only their vertices, one upload per run of consecutive
+   * features (F376–F378); rebuilds the batch when its arrays do not hold them.
+   */
   private rewrite(batch: Batch): void {
-    const { arrays, mesh } = batch;
-    for (const [first, end] of batch.ranges.splice(0)) {
-      const ground = this.groundOf(batch);
-      if (!arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.atlas, ground)) {
-        this.rebuild(batch);
-        return;
-      }
-      for (const [name, size] of QUAD_ATTRIBUTES) {
-        const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
-        attribute.addUpdateRange(first * 4 * size, (end - first) * 4 * size);
-        attribute.needsUpdate = true;
-      }
-      this.rangeUploads++;
-      this.uploadedVertices += (end - first) * 4;
-    }
+    this.rewriting = batch;
+    const ok = batch.changes.drain(this.rewriteRun);
+    this.rewriting = undefined;
+    if (!ok) this.rebuild(batch);
   }
+
+  /** The batch {@link LayerBatches.rewrite} drains, for {@link LayerBatches.rewriteRun}. */
+  private rewriting: Batch | undefined;
+
+  /** Rewrites and uploads one run [first, end) of the batch being rewritten; false when the batch must be rebuilt. */
+  private readonly rewriteRun = (first: number, end: number): boolean => {
+    const batch = this.rewriting;
+    const arrays = batch?.arrays;
+    const mesh = batch?.mesh;
+    if (!batch || !arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.atlas, this.groundOf(batch)))
+      return false;
+    for (let i = 0; i < QUAD_ATTRIBUTES.length; i++) {
+      const [name, size] = QUAD_ATTRIBUTES[i] ?? ['', 0];
+      const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
+      // As `addUpdateRange`, with range objects of a pool: three.js empties the list after each upload.
+      const ranges = attribute.updateRanges as UpdateRange[];
+      const pool = batch.rangePools[i] ?? [];
+      const range = pool[ranges.length] ?? { start: 0, count: 0 };
+      if (pool[ranges.length] === undefined) pool.push(range);
+      range.start = first * 4 * size;
+      range.count = (end - first) * 4 * size;
+      ranges.push(range);
+      attribute.needsUpdate = true;
+    }
+    this.rangeUploads++;
+    this.uploadedVertices += (end - first) * 4;
+    return true;
+  };
 
   private rebuild(batch: Batch): void {
     batch.dirty = false;
-    batch.ranges.length = 0;
+    batch.changes.clear();
     this.rebuilds++;
     this.disposeMesh(batch);
     const arrays = buildLayerArrays(batch, this.atlas, this.groundOf(batch));
@@ -422,4 +449,17 @@ function setOtherEndpoint(geometry: BufferGeometry, other: NonNullable<LayerArra
   geometry.setAttribute('otherNormal', new InterleavedBufferAttribute(buffer, 3, 3));
   geometry.setAttribute('otherPlane', new InterleavedBufferAttribute(buffer, 4, 6));
   geometry.setAttribute('otherHeight', new InterleavedBufferAttribute(buffer, 1, 10));
+}
+
+/** A range of a buffer attribute's components to upload, as three.js keeps them. */
+interface UpdateRange {
+  start: number;
+  count: number;
+}
+
+/** True when two attribute values hold the same components. */
+function sameValues(a: Float64Array, b: Float64Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

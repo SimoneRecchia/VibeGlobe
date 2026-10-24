@@ -21,7 +21,10 @@ export interface CopernicusDemSource {
   type: 'copernicus-dem';
   /** Bucket URL, `https://copernicus-dem-30m.s3.amazonaws.com`. */
   baseUrl: string;
-  /** Dataset release the bucket serves (pinned for reproducibility). */
+  /**
+   * Dataset release the bucket serves. The bucket holds only its current release, so the lock file's checksums pin
+   * it: a newer release fails the download instead of changing the outputs.
+   */
   release: string;
   /** Grid spacing: 1 arc second (GLO-30) or 3 arc seconds (GLO-90). */
   arcSeconds: 1 | 3;

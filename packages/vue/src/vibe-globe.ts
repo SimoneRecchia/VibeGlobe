@@ -126,8 +126,8 @@ function startGlobe(
     watch(live.layers, (looks) => applyLayers(engine, looks), { deep: true }),
     watch(live.network, applyNetwork),
     watchQualityPreset(engine, live.quality),
-    watch(view, (next) => {
-      const changed = changedView(engine.camera, next);
+    watch(view, (next, previous) => {
+      const changed = changedView(engine.camera, next, previous);
       if (changed) engine.jumpTo(changed);
     }),
   ];

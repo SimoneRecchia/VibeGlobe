@@ -65,6 +65,24 @@ describe('defineVibeGlobe', () => {
     expect(element.hasAttribute('zoom')).toBe(false);
   });
 
+  it('applies only the attribute that changed, keeping the view the user navigated to (KB-145)', async () => {
+    defineVibeGlobe('test-globe');
+    const element = document.createElement('test-globe') as InstanceType<ReturnType<typeof defineVibeGlobe>>;
+    element.setAttribute('center', '12.5, 41.9');
+    element.setAttribute('zoom', '4');
+    document.body.append(element);
+    const globe = element.globe as unknown as { camera: { longitudeDeg: number }; jumpTo: ReturnType<typeof vi.fn> };
+    // The user pans away from the center attribute.
+    globe.camera.longitudeDeg = 20;
+    element.setAttribute('theme', 'dark');
+    element.setAttribute('lang', 'it');
+    expect(globe.jumpTo).not.toHaveBeenCalled();
+    element.setAttribute('zoom', '6');
+    expect(globe.jumpTo).toHaveBeenCalledExactlyOnceWith({ zoom: 6 });
+    element.remove();
+    await Promise.resolve();
+  });
+
   it('keeps properties set before the element was defined (PT-01)', () => {
     const element = document.createElement('early-globe') as InstanceType<ReturnType<typeof defineVibeGlobe>>;
     const imagery = [{ id: 'early' }] as unknown as typeof element.imagery;

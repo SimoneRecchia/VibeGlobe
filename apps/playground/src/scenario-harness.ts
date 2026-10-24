@@ -57,8 +57,11 @@ export interface ScenarioReport {
    */
   maxChangedShare: number;
   maxChangedFrame: number;
-  /** With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase and heading. */
-  samples: [number, number, number, number, string, string, number][];
+  /**
+   * With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase, heading
+   * and the eye's height above the ellipsoid (meters).
+   */
+  samples: [number, number, number, number, string, string, number, number][];
 }
 
 /** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
@@ -104,6 +107,8 @@ const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9 };
 const TOKYO = { longitudeDeg: 139.7, latitudeDeg: 35.7 };
 /** Places of the fixture terrain (M4): the 4,000 m peak's valley, and the 1,500 m ridge along 46.5° N. */
 const ALPS = { longitudeDeg: 6.86, latitudeDeg: 45.7 };
+/** On the fixture peak's southern flank (scripts/fixtures/tiles/terrain.ts), 8 km from its summit, facing it. */
+const FLANK = { longitudeDeg: 6.86, latitudeDeg: 45.76 };
 const RIDGE = { longitudeDeg: 8.5, latitudeDeg: 46.42 };
 
 /** An orbit around `center`: the heading turns through `headings` at each zoom and tilt. */
@@ -216,6 +221,18 @@ const SCENARIOS: Record<string, FrameScenario> = {
       [
         { ...ROME, zoom: 1 },
         { ...ROME, zoom: 18 },
+      ],
+      170,
+      2,
+    ),
+    samples: true,
+  },
+  // The same zoom down onto the fixture relief, with `?terrain=terrarium` (the M5 acceptance with terrain, F167).
+  'zoom-globe-to-street-relief': {
+    ...segments(
+      [
+        { ...FLANK, zoom: 1 },
+        { ...FLANK, zoom: 18 },
       ],
       170,
       2,
@@ -398,8 +415,8 @@ function measureMotion(
   }
   if (!scenario.samples) return;
   const camera = globe.camera;
-  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg } = camera;
-  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg]);
+  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg, altitudeMeters } = camera;
+  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg, altitudeMeters]);
 }
 
 /**

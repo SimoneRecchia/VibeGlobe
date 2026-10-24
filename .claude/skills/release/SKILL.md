@@ -33,7 +33,8 @@ It writes `.release/report.json` (what would be published), `.release/CHANGELOG-
 Then the consumer projects, from the same tarballs:
 
 ```sh
-node scripts/release/check-consumers.ts F503 F531 F532   # lazy modules, asset loading (Vite, Nuxt), minimal install
+node scripts/release/check-consumers.ts F503 F531        # lazy modules, asset loading (Vite, Nuxt)
+node scripts/release/check-consumers.ts F532             # minimal install: fails until hook request H (1) lands
 node scripts/release/check-cube.ts                         # nothing refers to Cube (F559)
 ```
 

@@ -6794,7 +6794,7 @@
         "Assert no uncaught error, no console error and no unhandled promise rejection",
         "Assert heap, workers, listeners and GPU resources return to baseline"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F518",

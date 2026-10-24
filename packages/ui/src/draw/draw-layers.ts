@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * How the drawing tools show their shapes, through the data layers (`@vibeglobe/layers`): polygons draped on the
  * terrain with their outline, lines draped on the terrain, points clamped to the ground (F364, F365, F351), the

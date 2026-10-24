@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The meshes of vector tile layers (ADR 0131): one per tile, style layer and part (a fill and its outline, F445), built
  * on first use, repainted in place when the paint or the zoom pair changes (F440, F446, F450), draped again when finer

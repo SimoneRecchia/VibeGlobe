@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Fog-aware detail (F395, ADR 0040): the fraction of light from a surface point that reaches the eye through the
  * atmosphere's haze. The selection multiplies a tile's errors by it, so fully hazed tiles near the horizon are not

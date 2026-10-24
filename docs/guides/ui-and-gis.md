@@ -19,6 +19,8 @@ ui.setTheme('dark');
 ui.setLanguage('it');
 ```
 
+The overview minimap has an entry point of its own, so applications without it do not load it: `import { MinimapControl } from '@vibeglobe/ui/minimap'`.
+
 Every control implements `UiControl` (`id`, `position`, `mount(context)`, `localize()`, `destroy()`). An application's own control implements the same interface and receives the globe (public API only), the map container and the translator; built-in controls can be extended by subclassing.
 
 ## Keyboard
@@ -53,6 +55,8 @@ The controls are styled only through CSS variables, so an application restyles t
 | `--vg-ui-marker-color`, `--vg-ui-marker-outline-color` (geolocation marker; read when it is drawn)             | #1a73e8, white                     | same               |
 | `--vg-ui-drawing-color`, `--vg-ui-drawing-handle-color` (drawn and measured shapes; read when a tool is added) | #d93025, white                     | same               |
 | `--vg-ui-minimap-footprint-color` (read on each minimap update)                                                | #ff4040                            | same               |
+
+The colours of what controls draw on the map are read when a control creates its map layers (the drawing tools when added, the geolocation marker when first shown), the minimap's on every update: set them before adding the control.
 
 `THEME_VARIABLES` exports the exact values. Both built-in themes meet WCAG 2.1 AA contrast.
 

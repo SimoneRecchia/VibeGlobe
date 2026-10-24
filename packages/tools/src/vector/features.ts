@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Which OpenStreetMap objects become vector-tile features (F341): roads, places and buildings, each with the lowest
  * zoom at which it appears and the attributes the engine uses (building height and levels where present).

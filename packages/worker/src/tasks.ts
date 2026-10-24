@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Every built-in task by name: the table the worker program registers, and the one the inline executor loads lazily
  * after repeated worker start failures (ADR 0011 rule 6). The basic program registers `BASIC_TASKS` alone (ADR 0172).

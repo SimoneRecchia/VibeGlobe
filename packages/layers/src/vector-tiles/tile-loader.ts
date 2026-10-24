@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Loads vector tiles for the renderer (F442, F443; ADR 0131): requests through the page's request pool when the
  * engine gives one (per-host limits, coalescing, cancellation), else straight through the transport; lays tiles out

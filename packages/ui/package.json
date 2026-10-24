@@ -2,7 +2,7 @@
   "name": "@vibeglobe/ui",
   "version": "0.0.0",
   "description": "VibeGlobe ui: optional ready-made UI controls, theming and translations.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./minimap": {
+      "types": "./dist/minimap.d.ts",
+      "source": "./src/minimap.ts",
+      "default": "./dist/minimap.js"
     }
   },
   "types": "./dist/index.d.ts",

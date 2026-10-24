@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The tasks of the basic worker program (ADR 0172): image, terrain and KTX2 decoding and the vector parsers of
  * `@vibeglobe/sources`, everything an application with imagery and terrain needs. It imports nothing from

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Size and cost estimates computed before any download (F334, F552, F307): exact tile counts per zoom level, output
  * bytes from each dataset's measured average tile size, download bytes and requester-pays cost.

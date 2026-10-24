@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Public types of the worker pool (ADR 0011): task requests and outcomes, options, events and the pool interface.
  * The implementation is in `worker-pool.ts`.

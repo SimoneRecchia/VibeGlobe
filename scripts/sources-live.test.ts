@@ -34,7 +34,13 @@ describe('live source suite (F223, F549)', () => {
 
   it('runs Google with a key within the request budget, which stays far below the free monthly caps', async () => {
     const { fetch } = servers();
-    const report = await runLiveSuite({ googleApiKey: GOOGLE_FIXTURE_KEY, fetch, googleBaseUrl: GOOGLE, osmUrl: OSM });
+    const report = await runLiveSuite({
+      googleApiKey: GOOGLE_FIXTURE_KEY,
+      googleBillingRegion: 'other',
+      fetch,
+      googleBaseUrl: GOOGLE,
+      osmUrl: OSM,
+    });
     expect([report.failed, report.stoppedBy]).toEqual([[], undefined]);
     expect(report.ran).toHaveLength(3);
     const budget =
@@ -52,5 +58,26 @@ describe('live source suite (F223, F549)', () => {
     const report = await runLiveSuite({ googleApiKey: GOOGLE_FIXTURE_KEY, fetch, googleBaseUrl: GOOGLE, osmUrl: OSM });
     expect(report.stoppedBy).toMatch(/quota error from google\.fixture\.test \(HTTP 429\): the live run stops here/);
     expect(report.requests).toEqual({ 'google.fixture.test': 1 });
+  });
+
+  it('never requests satellite tiles or Street View for an EEA billing account, and says why (ADR 0031)', async () => {
+    const { fetch } = servers();
+    const requested: string[] = [];
+    const spy: typeof fetch = (input, init) => {
+      requested.push(String(input instanceof Request ? input.url : input));
+      return fetch(input, init);
+    };
+    const report = await runLiveSuite({
+      googleApiKey: GOOGLE_FIXTURE_KEY,
+      fetch: spy,
+      googleBaseUrl: GOOGLE,
+      osmUrl: OSM,
+    });
+    expect([report.failed, report.stoppedBy]).toEqual([[], undefined]);
+    expect(report.ran[0]).toBe('Google Map Tiles API 2D (roadmap, terrain)');
+    expect(report.skipped.map((s) => s.endpoint)).toEqual(
+      expect.arrayContaining(['Google Map Tiles API 2D satellite', 'Google Map Tiles API Street View']),
+    );
+    expect(requested.some((url) => /streetview|satellite/i.test(url))).toBe(false);
   });
 });

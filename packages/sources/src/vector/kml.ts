@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { unzipSync } from 'fflate';
 import { attribute, childText, element, elements, parseXml, text, type XmlElement } from '../xml.js';
 import type { FeatureIssue, Geometry, Position, VectorFeature } from './features.js';

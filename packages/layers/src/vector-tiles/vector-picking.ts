@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Picking of vector tile features (F459, ADR 0131), on the CPU from the laid-out buckets the frame drew: labels by
  * their placed boxes, buildings by their projected outline (top and base), lines within half their width plus a few

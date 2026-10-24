@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @packageDocumentation
  * Optional ready-made UI controls, theming and translations. The engine runs without this package; an application adds
@@ -49,8 +51,6 @@ export { BookmarksControl } from './controls/bookmarks.js';
 export type { Bookmark, BookmarksControlOptions } from './controls/bookmarks.js';
 export { ScreenshotControl, captureView } from './controls/screenshot.js';
 export type { ScreenshotControlOptions, ScreenshotSize } from './controls/screenshot.js';
-export { MinimapControl, viewFootprint } from './controls/minimap.js';
-export type { MinimapControlOptions } from './controls/minimap.js';
 export { DrawControl } from './controls/draw.js';
 export type { DrawControlOptions } from './controls/draw.js';
 export { MeasureControl, measureShape } from './controls/measure.js';

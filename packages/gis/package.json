@@ -2,7 +2,7 @@
   "name": "@vibeglobe/gis",
   "version": "0.0.0",
   "description": "VibeGlobe gis: coordinate parsing and formatting, reference-system transforms, geodesic measurement and view-state serialization.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

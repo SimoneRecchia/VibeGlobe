@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The `transcode-ktx2` task (ADR 0020 rules 2–4): KTX2 bytes in, a tile in the GPU format the device decodes out. The
  * reader in core validates the file and predicts every level's size before the transcoder runs; the transcoder is

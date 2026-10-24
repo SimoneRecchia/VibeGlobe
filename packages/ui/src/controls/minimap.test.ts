@@ -30,15 +30,27 @@ describe('the minimap footprint (F417, KB-169)', () => {
     }
   });
 
+  it('winds once around the eye when its nadir is in view and only one edge shows ground', () => {
+    const eye = camera(0, 0, 1e7);
+    // The globe touches only the right edge: three ground samples, then sky along the other edges.
+    const samples = [undefined, at(60, 20), at(65, 0), at(60, -20), undefined, undefined, undefined, undefined];
+    const azimuths = footprintOutline(eye, samples, true).map(
+      (point) => geodesicInverse(0, 0, point.longitudeDeg, point.latitudeDeg).initialAzimuthDeg,
+    );
+    // Points all around the eye, west included, not a sliver on the east side.
+    expect(azimuths.some((a) => a < -60)).toBe(true);
+    expect(azimuths.length).toBeGreaterThan(20);
+  });
+
   it('draws the whole horizon when no edge shows ground', () => {
     expect(footprintOutline(camera(0, 0, 1e7), [undefined, undefined]).length).toBeGreaterThan(40);
   });
 
   it('finds the pole a footprint goes around, and unwraps one across the antimeridian', () => {
     const around = footprintOutline(camera(10, 70, 5e6), [undefined]);
-    expect(unwrapOutline(around).pole).toBe(1);
+    expect(unwrapOutline(around).aroundPole).toBe(true);
     const across = unwrapOutline([at(179, 10), at(-179, 10), at(-179, 12), at(179, 12)]);
-    expect(across.pole).toBe(0);
+    expect(across.aroundPole).toBe(false);
     expect(across.longitudesDeg).toEqual([179, 181, 181, 179]);
   });
 });

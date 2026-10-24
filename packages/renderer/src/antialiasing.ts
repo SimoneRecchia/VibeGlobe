@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The canvas's anti-aliasing (F397, KB-140). A three.js renderer takes its canvas's multisampling at creation only, so
  * the renderer keeps it (where `RendererOptions.antialias` allows it) and `msaa4` draws to the canvas directly; `none`

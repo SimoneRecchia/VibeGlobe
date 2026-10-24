@@ -42,3 +42,7 @@ Notes:
 ## Update 2026-10-22
 
 The owner chose the ESA WorldCover 2021 Sentinel-2 composite as the detailed imagery source instead of Sentinel-2 cloudless 2016, whose originals are no longer downloadable (ADR 0026). Its row `esa-worldcover-s2-2021` was added to the table on 2026-10-22, after reading the project's licence section and the AWS Open Data registry entry. The shipped configurations no longer use `s2cloudless-2016`; its row stays because the profile remains for builds that have the 2016 originals.
+
+## Amendment 2026-10-24: the owner's reading
+
+The owner read the license pages from an unrestricted network on 2026-10-24 (open question 23) and confirmed every row: Natural Earth is in the public domain; the Copernicus DEM on AWS needs no account and is not requester-pays; OpenStreetMap is ODbL, credited as "© OpenStreetMap contributors" (or "OpenStreetMap") linked to the copyright page; Sentinel-2 cloudless 2016 is CC BY 4.0, and the 2018–2025 editions are CC BY-NC-SA. No setting changes.

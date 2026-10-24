@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Raster, hillshade and heatmap style layers (F445, ADR 0133): textured tile squares that follow the globe, the morph
  * and the terrain like the background. Raster and raster-dem tiles are requested through the transport and decoded on

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Geometry of vector tile meshes (ADR 0131): the attributes interleaved into two vertex buffers, the fixed geometry
  * and the paint (colors, parameters and draping heights, rewritten in place on paint and terrain changes), so a mesh

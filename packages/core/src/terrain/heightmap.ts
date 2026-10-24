@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Heightmap terrain encodings (F129, F130) and the height grid every terrain source is decoded to (ADR 0006 §5). Pure
  * functions over RGBA bytes: the worker decodes the PNG, these turn its pixels into heights, in Node for the tests.

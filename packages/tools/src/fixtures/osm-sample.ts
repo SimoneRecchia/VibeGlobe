@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The synthetic OpenStreetMap extract of the sample area (the Mont Blanc tile of zoom 10, astride the Italian–French
  * border): a town and a village with a street grid, a primary road crossing the border, and buildings with and

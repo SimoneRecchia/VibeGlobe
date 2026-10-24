@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vector tiles on the globe (M13, ADR 0131): `addVectorTiles` loads a MapLibre style without edits (F444) and draws
  * it through a render extension (`Globe.addRenderExtension`). Each frame it derives the vector tiles of the view from

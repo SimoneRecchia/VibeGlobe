@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @packageDocumentation
  * Framework-agnostic core of VibeGlobe: math, WGS84 geodesy, camera, tiling, scheduling, cache and events.

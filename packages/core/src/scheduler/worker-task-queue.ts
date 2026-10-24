@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The worker pool's task queue: a binary min-heap of task records ordered by priority (lower first) and then by
  * submission order, which knows each record's position so a record can be removed or re-prioritized in O(log n).

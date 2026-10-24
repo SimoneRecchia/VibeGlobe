@@ -449,7 +449,7 @@ test.describe('the minimap (F417)', () => {
     await page.evaluate(() => {
       const handle = window.vibeglobeUi;
       if (handle === undefined) throw new Error('no ui');
-      handle.layer.add(new handle.ui.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
+      handle.layer.add(new handle.minimap.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
     });
     const footprint = async (): Promise<{ corners: number[][]; expected: number[][]; costMs: number }> =>
       page.evaluate(() => {
@@ -457,7 +457,7 @@ test.describe('the minimap (F417)', () => {
         const globe = window.vibeglobePlayground?.globe;
         const app = document.getElementById('app');
         if (handle === undefined || globe === undefined || app === null) throw new Error('no ui');
-        const control = handle.layer.get('minimap') as InstanceType<typeof handle.ui.MinimapControl>;
+        const control = handle.layer.get('minimap') as InstanceType<typeof handle.minimap.MinimapControl>;
         let costMs = 0;
         for (let i = 0; i < 10; i++) {
           control.update();
@@ -506,7 +506,7 @@ test.describe('the minimap (F417)', () => {
       const handle = window.vibeglobeUi;
       const globe = window.vibeglobePlayground?.globe;
       if (handle === undefined || globe === undefined) throw new Error('no ui');
-      const control = handle.layer.get('minimap') as InstanceType<typeof handle.ui.MinimapControl>;
+      const control = handle.layer.get('minimap') as InstanceType<typeof handle.minimap.MinimapControl>;
       control.update();
       const eye = { longitudeDeg: globe.camera.eyeLongitudeDeg, latitudeDeg: globe.camera.eyeLatitudeDeg };
       const r = 6378137;

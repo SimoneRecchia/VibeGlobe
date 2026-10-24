@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The glyph and icon atlas of vector tile labels (F448, ADR 0132), exported for data-layer labels too (F358): signed
  * distance field glyphs (the glyph PBF format: one byte per texel, 0.75 at the outline, 1/8 per texel at 24 px) and

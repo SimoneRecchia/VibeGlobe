@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The label quads of a frame (ADR 0132): growable arrays reused from frame to frame, four vertices per glyph, in the
  * layout of the target's text material.

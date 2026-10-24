@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The public layer plug-in interface (F388): built-in layers and application layers implement {@link Layer}, and the
  * {@link LayerStack} drives them: attach when added, one `frame` per drawn frame, order and visibility changes, detach

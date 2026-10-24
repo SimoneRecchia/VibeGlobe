@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Resumable steps (F335): every completed item (a download, an intermediate or encoded tile) is written atomically and
  * then appended to a JSON-lines log with its SHA-256. A rerun skips an item only when its file still matches.

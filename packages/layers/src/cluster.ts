@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Point clustering through supercluster (ISC; ADR 0029) behind an asynchronous interface, so the index can be built in
  * the shared worker pool once the worker package hosts it (docs/parallel-tracks.md, hook request); until then

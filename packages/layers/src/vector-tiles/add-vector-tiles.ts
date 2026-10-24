@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * `addVectorTiles` (ADR 0131): loads a MapLibre style without edits (F444), its URL or its JSON, validates it with
  * JSON paths (F451), reads its sources (TileJSON, GeoJSON data), and starts the layer's runtime.

@@ -70,9 +70,18 @@ const GOOGLE_TILES = [
   ...[...Array(11).keys()].map((i) => tileAt(12.4922, 41.8902, 4 + i)),
 ];
 
-async function google(key: string, fetchImpl: typeof fetch, report: LiveReport, baseUrl?: string): Promise<void> {
-  const common = { apiKey: key, billingRegion: 'eea' as const, fetch: fetchImpl, ...(baseUrl ? { baseUrl } : {}) };
-  for (const mapType of ['roadmap', 'satellite', 'terrain'] as const) {
+async function google(
+  key: string,
+  fetchImpl: typeof fetch,
+  report: LiveReport,
+  billingRegion: 'eea' | 'other',
+  baseUrl?: string,
+): Promise<void> {
+  const common = { apiKey: key, billingRegion, fetch: fetchImpl, ...(baseUrl ? { baseUrl } : {}) };
+  // An EEA billing account gets neither satellite tiles nor Street View (Map Tiles API EEA terms, ADR 0031).
+  const eea = billingRegion === 'eea';
+  const mapTypes = eea ? (['roadmap', 'terrain'] as const) : (['roadmap', 'satellite', 'terrain'] as const);
+  for (const mapType of mapTypes) {
     const source = await googleImagery({ ...common, id: `live-${mapType}`, mapType });
     await tiles(source, GOOGLE_TILES);
     const copyright = await source.viewportCopyright({
@@ -84,7 +93,13 @@ async function google(key: string, fetchImpl: typeof fetch, report: LiveReport, 
     });
     if (!copyright) throw new Error(`no viewport copyright for ${mapType}`);
   }
-  report.ran.push('Google Map Tiles API 2D (roadmap, satellite, terrain)');
+  report.ran.push(`Google Map Tiles API 2D (${mapTypes.join(', ')})`);
+  if (eea) {
+    const reason = 'not available to EEA billing accounts (Map Tiles API EEA terms, ADR 0031)';
+    report.skipped.push({ endpoint: 'Google Map Tiles API 2D satellite', reason });
+    report.skipped.push({ endpoint: 'Google Map Tiles API Street View', reason });
+    return;
+  }
   const streetView = await googleStreetView(common);
   const pano = await streetView.metadata({ latitudeDeg: 41.8902, longitudeDeg: 12.4922, radiusMeters: 100 });
   if (!pano) throw new Error('no Street View panorama near the Colosseum');
@@ -117,6 +132,8 @@ async function openStreetMap(fetchImpl: typeof fetch, report: LiveReport, url?: 
 /** Options of {@link runLiveSuite}; tests point the endpoints at fixtures. */
 export interface LiveOptions {
   readonly googleApiKey?: string;
+  /** The billing region of the key's account (default 'eea', the owner's: `GOOGLE_BILLING_REGION`). */
+  readonly googleBillingRegion?: 'eea' | 'other';
   readonly fetch?: typeof fetch;
   readonly googleBaseUrl?: string;
   readonly osmUrl?: string;
@@ -130,7 +147,14 @@ export async function runLiveSuite(options: LiveOptions): Promise<LiveReport> {
     [
       'Google Map Tiles API',
       options.googleApiKey
-        ? () => google(options.googleApiKey ?? '', fetchImpl, report, options.googleBaseUrl)
+        ? () =>
+            google(
+              options.googleApiKey ?? '',
+              fetchImpl,
+              report,
+              options.googleBillingRegion ?? 'eea',
+              options.googleBaseUrl,
+            )
         : undefined,
       'GOOGLE_MAPS_API_KEY is not set: the Google live tests did not run (the fixture suites did)',
     ],
@@ -154,7 +178,8 @@ export async function runLiveSuite(options: LiveOptions): Promise<LiveReport> {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const key = process.env['GOOGLE_MAPS_API_KEY'];
-  const report = await runLiveSuite(key ? { googleApiKey: key } : {});
+  const region = process.env['GOOGLE_BILLING_REGION'] === 'other' ? 'other' : 'eea';
+  const report = await runLiveSuite(key ? { googleApiKey: key, googleBillingRegion: region } : {});
   for (const line of report.ran) console.log(`ran      ${line}`);
   for (const s of report.skipped) console.log(`skipped  ${s.endpoint}: ${s.reason}`);
   for (const f of report.failed) console.log(`FAILED   ${f.endpoint}: ${f.reason}`);

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The reset-to-globe and home-view buttons (F423): flights through the engine's `resetToGlobe` (F193) and `goHome`
  * (F194), which follow the view-mode rules, fade under reduced motion (F214) and yield to any user input.

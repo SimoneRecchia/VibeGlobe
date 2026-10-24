@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Installs the ui stylesheet in the document or shadow root that holds a UI layer, while any UI layer or debug panel
  * there uses it: a page, or each `<vibe-globe>` element's shadow tree (F485).

@@ -2,7 +2,7 @@
   "name": "@vibeglobe/controls",
   "version": "0.0.0",
   "description": "VibeGlobe controls: input handling, gestures and navigation logic.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

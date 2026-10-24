@@ -24,12 +24,12 @@ async function openEverything(
   await page.evaluate(() => {
     const handle = window.vibeglobeUi;
     if (handle === undefined) throw new Error('no ui');
-    const { ui, layer } = handle;
+    const { ui, minimap, layer } = handle;
     layer.add(new ui.DrawControl());
     layer.add(new ui.MeasureControl());
     layer.add(new ui.BookmarksControl());
     layer.add(new ui.ScreenshotControl());
-    layer.add(new ui.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
+    layer.add(new minimap.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
   });
   await waitForIdle(page);
 }

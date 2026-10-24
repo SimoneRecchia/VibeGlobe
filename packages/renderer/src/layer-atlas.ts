@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { LinearFilter, SRGBColorSpace, Texture } from 'three/webgpu';
 
 /** A drawn region of the atlas: texture coordinates and its size in CSS pixels. */

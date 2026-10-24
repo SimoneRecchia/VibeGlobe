@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Drained every frame while tiles arrive, and reprioritized with the selection; a binary heap over typed
  * arrays with tile keys and priorities read from arrays the caller holds, so the frame path allocates nothing

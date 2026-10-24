@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Paint of vector tile meshes (F440, F446, F450; ADR 0131): each feature's paint evaluated at the two integer zooms
  * around the camera's, so the renderer mixes them continuously, and written per vertex. Colors stay sRGB, as the style

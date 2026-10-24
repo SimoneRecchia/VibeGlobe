@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The screenshot control (F416): a PNG of the current view, taken once the view has loaded (the engine's `idle`), from
  * the engine's own frame (`Globe.captureFrame`), with the credits of the visible sources (`Globe.credits()`: text and
@@ -45,6 +47,15 @@ function loadImage(src: string): Promise<HTMLImageElement | undefined> {
     image.onerror = () => resolve(undefined);
     image.src = src;
   });
+}
+
+/**
+ * Throws when a required credit's logo did not load (a host without CORS headers): the export would miss it, against
+ * the provider's terms (KB-167).
+ */
+export function assertRequiredLogos(items: readonly { credit: Credit; logo: unknown }[]): void {
+  const missing = items.find(({ credit, logo }) => credit.required && credit.logo && !logo);
+  if (missing) throw new Error(`The required logo of "${missing.credit.text}" did not load`);
 }
 
 /**
@@ -97,6 +108,7 @@ async function drawCredits(
       return { credit, logo, logoWidth, textWidth: context.measureText(credit.text).width };
     }),
   );
+  assertRequiredLogos(loaded);
   const basePad = Math.round(basePx / 2);
   const widths = loaded.map((item) => item.textWidth + (item.logo ? item.logoWidth + basePad : 0));
   const layout = layoutCredits(widths, widthPx - 2 * basePad, basePx);

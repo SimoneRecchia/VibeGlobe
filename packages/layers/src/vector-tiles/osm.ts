@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * OpenStreetMap roads and places for vector-tile styles (F453, F454; ADR 0041). Works with raw OpenStreetMap tags
  * (`highway`, `bridge`, `tunnel`, `layer`, `place`, `name:xx`) and the OpenMapTiles schema the data pipeline writes

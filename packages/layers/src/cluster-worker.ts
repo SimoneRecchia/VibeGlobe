@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Clustering in a worker (F373, F375): the `cluster-*` tasks keep each index in the worker that built it, so the
  * {@link workerClusterEngine} runs them in a pool of its own with one worker (the shared pool may send consecutive

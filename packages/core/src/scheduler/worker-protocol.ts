@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Messages between the worker pool and the worker program, and the task contract shared by the worker program and the
  * inline executor (ADR 0011 rules 2, 3, 5 and 6). `@vibeglobe/worker` mirrors these shapes in its `protocol.ts`: both

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * One layer of a MapLibre Style Specification style, compiled by the specification's own expression engine
  * (`@maplibre/maplibre-gl-style-spec`, ISC; ADR 0041): its filter, paint and layout properties with the

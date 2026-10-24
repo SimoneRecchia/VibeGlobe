@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Google Photorealistic 3D Tiles (F468–F470, F323; ADR 0031, ADR 0141) through the Map Tiles API with the customer's
  * own key: the root tileset (`v1/3dtiles/root.json`) starts a session, whose token Google writes into the tileset's
@@ -10,7 +12,12 @@
 import type { AbortHandle, TileTransport, TimeoutsMs, TransportResult } from '@vibeglobe/core';
 import { retryAfterMs } from '../fetch-transport.js';
 import { SourceConfigError } from '../metadata.js';
-import { googleProfile, type GoogleProfile, type GoogleSourceOptions } from './google-provider.js';
+import {
+  assertAvailableInRegion,
+  googleProfile,
+  type GoogleProfile,
+  type GoogleSourceOptions,
+} from './google-provider.js';
 
 /** Options of {@link google3dTiles}. */
 export interface Google3DTilesOptions extends Omit<GoogleSourceOptions, 'language' | 'region'> {
@@ -122,6 +129,7 @@ async function result(response: Response): Promise<TransportResult> {
 export function google3dTiles(options: Google3DTilesOptions): Google3DTiles {
   if (!options.apiKey) throw new SourceConfigError('missing-api-key', 'Google 3D Tiles: apiKey is required');
   const profile = googleProfile(options.billingRegion, options.logoUrl);
+  assertAvailableInRegion(profile.billingRegion, 'photorealistic-3d-tiles');
   const base = (options.baseUrl ?? 'https://tile.googleapis.com/').replace(/\/?$/, '/');
   const url = `${base}v1/3dtiles/root.json`;
   const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));

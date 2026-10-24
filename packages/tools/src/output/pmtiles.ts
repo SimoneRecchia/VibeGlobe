@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * PMTiles v3 writing and reading (https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md), written from the
  * specification: tiles in Hilbert order, deduplicated by SHA-256, runs of identical tiles merged, gzip-compressed

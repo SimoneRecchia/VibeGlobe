@@ -1,4 +1,4 @@
-// Google Photorealistic 3D Tiles (F468–F470, F323) in the `3dtiles-google` scenario. Without GOOGLE_MAPS_API_KEY in
+// Google Photorealistic 3D Tiles (F468–F470, F572, F573, F323) in the `3dtiles-google` scenario. Without a key in
 // the environment the Map Tiles API is the stand-in of `fixtures/tiles3d/google-3d-mock.ts` (the CI flow); with it,
 // the first test runs against Google itself over Rome. The key comes only from the environment, never from the
 // repository.
@@ -10,7 +10,9 @@ import { cityPoint, openCity, settleTiles, startCoverage, stopCoverage } from '.
 test.use({ viewport: { width: 320, height: 240 } });
 test.setTimeout(180_000);
 
-const REAL_KEY = process.env['GOOGLE_MAPS_API_KEY'];
+// Only a key of a billing account outside the EEA gets Photorealistic 3D Tiles (ADR 0031): with an EEA account (the
+// owner's, the default) the flow runs against the stand-in.
+const REAL_KEY = process.env['GOOGLE_BILLING_REGION'] === 'other' ? process.env['GOOGLE_MAPS_API_KEY'] : undefined;
 const MOCK_KEY = 'mock-key';
 const CORS = { 'Access-Control-Allow-Origin': '*' };
 
@@ -72,6 +74,30 @@ test('without a key the scenario explains what to configure and the globe keeps 
   });
   await waitForIdle(page);
   expect(await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0)).toBeGreaterThan(before);
+  expect(errors).toEqual([]);
+});
+
+test('an EEA billing account is refused with the EEA terms named, and the globe keeps working (F572)', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().startsWith('https://tile.googleapis.com/')) requests.push(request.url());
+  });
+  await page.goto(
+    `/?scenario=3dtiles-google&imagery=world&backend=webgl2&googleKey=${MOCK_KEY}&googleRegion=eea&${view(0, 0, 12, 0)}`,
+  );
+  await page.waitForFunction(() => window.vibeglobePlayground !== undefined);
+  await page.evaluate(async () => window.vibeglobePlayground?.globe.ready);
+  await expect(page.locator('.vg-tiles3d-message')).toContainText('European Economic Area');
+  await expect(page.locator('.vg-tiles3d-message')).toContainText('developers.google.com/maps/comms/eea/map-tiles');
+  await page.evaluate(async () => {
+    await window.vibeglobePlayground?.globe.jumpTo({ zoom: 10 });
+  });
+  await waitForIdle(page);
+  expect(requests).toEqual([]);
   expect(errors).toEqual([]);
 });
 

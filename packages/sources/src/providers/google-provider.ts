@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { WEB_MERCATOR_TILING, type TileCoord, type TileRequest } from '@vibeglobe/core';
 import { archiveTransport, HttpStatusError, NetworkError, readBody } from '../archive-transport.js';
 import { maxAgeOf, retryAfterMs } from '../fetch-transport.js';
@@ -37,11 +39,37 @@ export function googleProfile(billingRegion: GoogleBillingRegion | undefined, lo
     forbids: new Set(['persistentCache', 'prefetch', 'offlinePackaging'] as const),
     respectCacheHeaders: true,
     displayOnly: true,
-    requiredAttribution: logoUrl ? { text: 'Google', logo: { src: logoUrl, alt: 'Google' } } : { text: 'Google' },
+    // The attribution policy of 2026-10-21 (ADR 0031): the "Google Maps" logo, labeled so; the text where space is short.
+    requiredAttribution: logoUrl
+      ? { text: 'Google Maps', logo: { src: logoUrl, alt: 'Google Maps' } }
+      : { text: 'Google Maps' },
     storableIds: billingRegion === 'eea' ? (['placeId', 'panoId'] as const) : (['placeId'] as const),
     termsUrl: billingRegion === 'eea' ? GOOGLE_EEA_TERMS : GOOGLE_TERMS,
     termsAdr: 'docs/adr/0031-google-maps-platform-terms.md',
   });
+}
+
+/** The Map Tiles API EEA guide, read for the owner on 2026-10-24 (ADR 0031). */
+const GOOGLE_EEA_MAP_TILES = 'https://developers.google.com/maps/comms/eea/map-tiles';
+/** What the EEA terms withhold from billing accounts in the European Economic Area. */
+const EEA_WITHHELD = {
+  satellite: '2D satellite tiles',
+  'photorealistic-3d-tiles': 'Photorealistic 3D Tiles',
+  'street-view': 'Street View tiles',
+} as const;
+
+/**
+ * Refuses, with a configuration error naming the EEA terms, a Map Tiles product that billing accounts in the European
+ * Economic Area do not get (projects created or modified after 8 July 2025): 2D satellite tiles, Photorealistic 3D Tiles
+ * (Google answers 403) and Street View tiles, which may not be used with any map. Roadmap and terrain remain.
+ */
+export function assertAvailableInRegion(region: GoogleBillingRegion, product: keyof typeof EEA_WITHHELD): void {
+  if (region !== 'eea') return;
+  throw new SourceConfigError(
+    'not-available-in-eea',
+    `Google source: ${EEA_WITHHELD[product]} are not available to billing accounts in the European Economic Area ` +
+      `(Map Tiles API EEA terms, ${GOOGLE_EEA_MAP_TILES}); use 'roadmap' or 'terrain'`,
+  );
 }
 
 /** What every Google source needs. */
@@ -257,6 +285,8 @@ function copyrightReader(session: GoogleSession): (view: GoogleViewport) => Prom
  */
 export async function googleImagery(options: GoogleImageryOptions): Promise<GoogleImagerySource> {
   const profile = googleProfile(options.billingRegion, options.logoUrl);
+  if (options.mapType === 'satellite') assertAvailableInRegion(profile.billingRegion, 'satellite');
+  if (options.layerTypes?.includes('layerStreetview')) assertAvailableInRegion(profile.billingRegion, 'street-view');
   const session = new GoogleSession(options, {
     mapType: options.mapType,
     ...(options.layerTypes ? { layerTypes: options.layerTypes } : {}),
@@ -270,7 +300,7 @@ export async function googleImagery(options: GoogleImageryOptions): Promise<Goog
       `Google source '${options.id}': cannot create a session (${String(error)})`,
     );
   }
-  const logo: Attribution = profile.requiredAttribution ?? { text: 'Google' };
+  const logo: Attribution = profile.requiredAttribution ?? { text: 'Google Maps' };
   let attribution: readonly Attribution[] = [logo];
   return {
     id: options.id,

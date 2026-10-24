@@ -200,7 +200,9 @@ test.describe('the Google logo and credits (F259)', () => {
       }) => {
         await page.setViewportSize({ width, height });
         await mountGoogle(page);
-        await expect.poll(() => googleCredits(page)).toContainEqual({ text: 'Google', shown: true, logo: 'shown' });
+        await expect
+          .poll(() => googleCredits(page))
+          .toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
         for (const credit of await googleCredits(page)) expect(credit, credit.text).toMatchObject({ shown: true });
       });
     }
@@ -209,7 +211,7 @@ test.describe('the Google logo and credits (F259)', () => {
     // The regression test of TB-02 (docs/known-bugs.md): the logo inside the credits element stays pinned.
     await page.setViewportSize({ width: 800, height: 600 });
     await mountGoogle(page, ['google']);
-    await expect.poll(() => googleCredits(page)).toContainEqual({ text: 'Google', shown: true, logo: 'shown' });
+    await expect.poll(() => googleCredits(page)).toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
     await page.addStyleTag({
       content:
         '.vg-credits, .vg-credit img { display: none !important; visibility: hidden !important; opacity: 0 !important; }' +
@@ -218,7 +220,7 @@ test.describe('the Google logo and credits (F259)', () => {
     await page.evaluate(() => window.vibeglobeSources?.globe?.requestRender());
     await expect
       .poll(() => googleCredits(page), { message: 'after the page CSS' })
-      .toContainEqual({ text: 'Google', shown: true, logo: 'shown' });
+      .toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
   });
 });
 
@@ -325,7 +327,7 @@ test('the Google copyrights of each settled view are requested once and shown, f
   ] as const) {
     await jump(page, view);
     await expectNoEmptyPixels(page, await settledSourceFrame(page, 18));
-    await expect.poll(shown).toEqual(['Google', provider]);
+    await expect.poll(shown).toEqual(['Google Maps', provider]);
   }
   const idle = await page.evaluate(() => (window as unknown as { counters: { idle: number } }).counters.idle);
   // One request per settled view (and the first view), never one per drawn frame.

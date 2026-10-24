@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Restoring a serialized view (F414, F415) on a globe through its public API. */
 import type { Globe } from '@vibeglobe/core';
 import { normalizeViewState, type ViewState } from '@vibeglobe/gis';

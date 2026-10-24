@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The UI layer over a globe: places controls in the map's corners, applies the theme and the language, and lets the
  * application add, remove, replace and extend controls one by one (F418). The engine runs without any of it.

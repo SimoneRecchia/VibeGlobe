@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A clustered point or marker layer (F373): the shown features are the clusters and single points of the current
  * integer zoom, styled like any point layer (clusters carry `cluster`, `cluster_id`, `point_count` and

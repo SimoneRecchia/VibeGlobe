@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The three.js side of vector tiles (ADR 0131): meshes built from laid-out buckets, drawn each frame in style-layer
  * order with one draw per target square (a stand-in ancestor is drawn once per square it covers, clipped to it), and

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The main-thread executor the worker pool switches to after repeated worker start failures (ADR 0011 rule 6): the
  * same task functions, one task at a time, each started in its own macrotask so the page renders between tasks.

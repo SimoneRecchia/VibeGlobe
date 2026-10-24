@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { surfaceVisibility } from '@vibeglobe/core';
 // The atmosphere model shared by the shaders (`atmosphere-nodes.ts`) and the CPU (fog-aware tile detail, tests):
 // single scattering by air molecules (Rayleigh) and aerosols (Mie) in exponential layers over a sphere, integrated along

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The endpoint factory both worker programs share (ADR 0011, ADR 0172): option checks, the same-origin rule, worker
 // start-up and messaging. The entries (`index.ts`, `basic.ts`) only add the literal `new Worker(new URL(…))` of their
 // program, so a bundler emits only the program an application imports.

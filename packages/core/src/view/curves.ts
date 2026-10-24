@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError } from '../globe/errors.js';
 
 /** A zoom band over which a curve rises from 0 to 1, in ground zoom (ADR 0008: independent of latitude). */

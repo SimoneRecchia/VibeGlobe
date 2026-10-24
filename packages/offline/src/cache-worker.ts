@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The cache worker program (F273): hosts the IndexedDB tile store so its transactions run off the main thread. The
  * page talks to it through `workerStore()`.

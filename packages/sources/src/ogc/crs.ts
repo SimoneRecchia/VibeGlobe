@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Reference system identifiers as OGC services write them, reduced to one code: `EPSG:3857` (with its historical
  * aliases), `EPSG:4326` (latitude first in WMS 1.3.0 and WMTS), `CRS:84` (longitude first), or `EPSG:<n>`.

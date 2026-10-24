@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vector tiles (M13, computational parts; ADR 0041): MapLibre style evaluation and validation, layer fades,
  * tessellation, text shaping, label placement and building extrusion. The renderer draws what these modules build.

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Mesh data of one laid-out bucket (ADR 0131): the worker's globe attributes with the tile units, line extrusions,
  * building heights and circle corners in the layout the renderer's vector materials read. Paint is added by

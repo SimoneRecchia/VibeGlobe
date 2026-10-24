@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The vector tiles a view needs (F441, F442; ADR 0131), from the surface tiles the engine drew: a Web Mercator
  * surface tile of level L (256-pixel tiles) is covered by the vector tile of zoom L − 1 (512-pixel tiles, the style

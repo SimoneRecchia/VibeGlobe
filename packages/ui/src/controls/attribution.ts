@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The attribution control (F424): the credits of the sources the last frame showed (`Globe.credits()`), updated on the
  * engine's `credits-change` event, which comes with the frame whose sources changed. On narrow maps it collapses to an

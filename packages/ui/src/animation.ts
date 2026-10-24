@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Short camera animations of the controls (a zoom step, a turn to north), through the engine's public `jumpTo`, one
  * step per drawn frame on the engine clock (`Globe.timeMs`, whose steps the engine caps at 100 ms: ADR 0009), so a slow

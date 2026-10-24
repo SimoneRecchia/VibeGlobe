@@ -1,7 +1,15 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { HttpStatusError } from '../archive-transport.js';
 import { retryAfterMs } from '../fetch-transport.js';
 import { type Attribution, SourceConfigError } from '../metadata.js';
-import { type GoogleProfile, googleProfile, GoogleSession, type GoogleSourceOptions } from './google-provider.js';
+import {
+  assertAvailableInRegion,
+  type GoogleProfile,
+  googleProfile,
+  GoogleSession,
+  type GoogleSourceOptions,
+} from './google-provider.js';
 
 /** Where to look for a panorama: its id, or a position and a search radius. */
 export type StreetViewQuery =
@@ -66,6 +74,7 @@ function parseMetadata(json: Record<string, unknown>): StreetViewMetadata | unde
  */
 export async function googleStreetView(options: GoogleSourceOptions): Promise<GoogleStreetView> {
   const profile = googleProfile(options.billingRegion, options.logoUrl);
+  assertAvailableInRegion(profile.billingRegion, 'street-view');
   const session = new GoogleSession(options, { mapType: 'streetview' });
   try {
     await session.token();
@@ -90,7 +99,7 @@ export async function googleStreetView(options: GoogleSourceOptions): Promise<Go
   };
   return {
     profile,
-    attribution: [profile.requiredAttribution ?? { text: 'Google' }],
+    attribution: [profile.requiredAttribution ?? { text: 'Google Maps' }],
     async metadata(query) {
       const response = await get(`v1/streetview/metadata?${queryString(query)}`);
       return response ? parseMetadata((await response.json()) as Record<string, unknown>) : undefined;

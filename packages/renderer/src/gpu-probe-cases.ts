@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Cases and reference arithmetic of the GPU probes (ADR 0004 and 0005 verification): the views, the tracked vertices
  * and what float64 says the GPU must produce. Kept free of three.js so it runs in unit tests.

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition } from '@vibeglobe/core';
 import type { MutablePoint, ReleaseVelocity } from './animators.js';
 import { type GestureContext, TapDetector } from './gesture-context.js';

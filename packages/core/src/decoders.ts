@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Tile decoders that run in the engine's workers (`@vibeglobe/core/decoders`: heightmaps, quantized-mesh and KTX2),
  * the height grids of custom terrain decoders, the geoid file format and the quantized-mesh `layer.json` reader: kept

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vertical datums of terrain sources (F133). Heights above a geoid (for example EGM2008, used by Copernicus DEM) are
  * converted to WGS84 ellipsoidal heights with h = H + N, where N is the geoid undulation, bilinearly interpolated in a

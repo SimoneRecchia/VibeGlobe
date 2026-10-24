@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Independent check of terrain tiles (F339): heights decoded from the output at random points are compared with the
  * same interpolation computed from source pixels that GDAL reads, in its pinned Docker image, from the downloaded DEM

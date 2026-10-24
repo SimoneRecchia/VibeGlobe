@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vector tile rendering for the three.js renderer (M13, ADR 0131): the mesh target that
  * `@vibeglobe/layers/vector-tiles` draws through, and the SDF atlas and text material of labels (ADR 0132), which

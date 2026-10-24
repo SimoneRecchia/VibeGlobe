@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The compass control (F420): shows the heading, turns to north on press, rotates the map on drag. */
 import { CameraTween } from '../animation.js';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';

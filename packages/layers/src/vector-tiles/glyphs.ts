@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Glyphs and sprites of a style (F448): glyph-range URLs requested only for the code points a label uses, the glyph
  * PBF format (signed-distance-field bitmaps with metrics, 256 code points per range), font-stack fallback, and sprite

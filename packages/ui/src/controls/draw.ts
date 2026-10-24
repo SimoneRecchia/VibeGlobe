@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The drawing control (F407–F410): a toolbar for points, lines, polygons and editing, operable with mouse, touch and
  * keyboard, over the drawing tool (`tool`: shapes as GeoJSON, events, commands). A keyboard cursor over the map

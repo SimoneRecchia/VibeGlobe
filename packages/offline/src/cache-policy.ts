@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * How long a downloaded tile may be reused (F277): `Cache-Control` and `Expires` decide, `no-store` is never
  * persisted, and a per-source override can only shorten what the headers allow.

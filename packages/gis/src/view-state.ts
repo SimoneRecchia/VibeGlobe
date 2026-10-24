@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The camera state as text: a URL fragment parameter and JSON, exact to the last bit (numbers are written in their
  * shortest round-trip form). Malformed input is rejected; out-of-range values are clamped or wrapped.

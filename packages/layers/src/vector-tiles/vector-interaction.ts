@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Hover and click on vector tile features (F459): pointer events of an element (mouse, pen and touch alike) picked on
  * the CPU (`vector-picking.ts`), turned into `hover`, `hoverend` and `click` events with the feature's layer,

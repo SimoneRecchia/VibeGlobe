@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Geodesic measurement on the WGS84 ellipsoid, built on core's geodesics (Karney), and the readout text of lengths and
  * areas with automatic unit scaling.

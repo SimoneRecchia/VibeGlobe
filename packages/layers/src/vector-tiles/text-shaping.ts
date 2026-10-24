@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Text shaping for symbol layers (F448, F449), original code (ADR 0041): glyphs laid out from their advances at the
  * glyph servers' 24 px em, lines broken at `text-max-width` at spaces and at ideographic break opportunities (CJK has

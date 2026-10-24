@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** A credit a source asks for: text, an optional link and an optional logo (docs/plan/api.md, `Attribution`). */
 export interface Attribution {
   readonly text: string;

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * glTF decoding of 3D Tiles content (F463; ADR 0141): the `parse-model` task of `@vibeglobe/models` on the engine's
  * worker pool (Draco, meshopt; their decoders load in the worker on the first content that needs them). While the

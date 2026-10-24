@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Mouse, touch and keyboard input of the drawing tools (F407–F410). Pointer listeners sit on the map container in the
  * capture phase, ahead of the navigation controls: a tap places a vertex and lets the press through (a tap neither pans

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The renderer-neutral description of a glTF model (F361, ADR 0121): flat typed arrays, materials as plain numbers,
  * images as encoded bytes, and one instance per node that shows a mesh. Coordinates are the model's own: glTF's

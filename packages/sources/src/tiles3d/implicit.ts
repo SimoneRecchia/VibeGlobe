@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * 3D Tiles implicit tiling (F460; ADR 0041): subtree files (binary `subt` or JSON) with tile, content and child-subtree
  * availability (bitstreams or constants), Morton indexing, and the expansion of an implicit tile into its available

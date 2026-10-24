@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Translations of the UI strings: English and Italian built in, more languages and single-string overrides registered
  * by the application at runtime. A key missing from a language falls back to English.

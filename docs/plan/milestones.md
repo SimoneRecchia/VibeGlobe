@@ -18,7 +18,7 @@ Research first: precision, depth, terrain and imagery levels of detail, tile sch
 6. Benchmark harness with budgets (frame CPU/GPU, memory, bundle size per package) that fails on breach.
 7. Documentation site scaffold; ADR and progress-log conventions (already started in session 1).
 8. Playground shell with a scenario hook and the debug overlay skeleton (backend selection arrives with the renderer in M2).
-9. Owner decisions of 2026-10-20 (ADR 0015): rename to VibeGlobe, PolyForm Noncommercial license with the contributor documents, CI split into a fast job on every push and the full suite on `main` and nightly (F542–F545).
+9. Owner decisions of 2026-10-20 (ADR 0015): rename to VibeGlobe, PolyForm Noncommercial license with the contributor documents (replaced by MPL-2.0 and the DCO on 2026-10-24, ADR 0043), CI split into a fast job on every push and the full suite on `main` and nightly (F542–F545).
 
 ## M2 Globe core
 

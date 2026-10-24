@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { enuFrame, morphPointInto, type FrameView, type ModelPose, type ModelRenderer } from '@vibeglobe/core';
 import { projectLayerPoint } from '@vibeglobe/core/layers';
 import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';

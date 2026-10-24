@@ -6,11 +6,14 @@ import type { Page } from '@playwright/test';
 import type * as GisModule from '@vibeglobe/gis';
 import type * as LayersModule from '@vibeglobe/layers';
 import type * as UiModule from '@vibeglobe/ui';
+import type * as MinimapModule from '@vibeglobe/ui/minimap';
 import { openGlobe } from './globe.ts';
 
 /** What the tests reach on the page (`window.vibeglobeUi`). */
 interface UiTestHandle {
   readonly ui: typeof UiModule;
+  /** `@vibeglobe/ui/minimap`, the minimap's own entry point. */
+  readonly minimap: typeof MinimapModule;
   readonly gis: typeof GisModule;
   readonly layer: UiModule.Ui;
   /** `@vibeglobe/layers`, loaded on demand by {@link loadLayers}. */
@@ -24,6 +27,7 @@ declare global {
 }
 
 const UI_ENTRY = `/@fs${resolve('packages/ui/src/index.ts')}`;
+const MINIMAP_ENTRY = `/@fs${resolve('packages/ui/src/minimap.ts')}`;
 const GIS_ENTRY = `/@fs${resolve('packages/gis/src/index.ts')}`;
 const LAYERS_ENTRY = `/@fs${resolve('packages/layers/src/index.ts')}`;
 
@@ -51,8 +55,9 @@ export interface OpenUiOptions {
 export async function openUi(page: Page, options: OpenUiOptions = {}): Promise<void> {
   await openGlobe(page, options.query ?? '');
   await page.evaluate(
-    async ({ uiEntry, gisEntry, debug, theme, language, defaults }) => {
+    async ({ uiEntry, minimapEntry, gisEntry, debug, theme, language, defaults }) => {
       const ui = (await import(/* @vite-ignore */ uiEntry)) as typeof UiModule;
+      const minimap = (await import(/* @vite-ignore */ minimapEntry)) as typeof MinimapModule;
       const gis = (await import(/* @vite-ignore */ gisEntry)) as typeof GisModule;
       const globe = window.vibeglobePlayground?.globe;
       const container = document.getElementById('app');
@@ -60,10 +65,11 @@ export async function openUi(page: Page, options: OpenUiOptions = {}): Promise<v
       const layer = ui.createUi(globe, container, { theme, ...(language === undefined ? {} : { language }) });
       if (defaults === 'all') ui.addAllControls(layer, { debug });
       else if (defaults) ui.addDefaultControls(layer, { debug });
-      window.vibeglobeUi = { ui, gis, layer };
+      window.vibeglobeUi = { ui, minimap, gis, layer };
     },
     {
       uiEntry: UI_ENTRY,
+      minimapEntry: MINIMAP_ENTRY,
       gisEntry: GIS_ENTRY,
       debug: options.debug ?? false,
       theme: options.theme ?? 'light',

@@ -2,7 +2,7 @@
   "name": "@vibeglobe/layers",
   "version": "0.0.0",
   "description": "VibeGlobe layers: data layers: primitives, labels, styling, picking and draping.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

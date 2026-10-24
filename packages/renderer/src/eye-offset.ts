@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Writes T = origin − eye, computed in float64, as two float32 parts (ADR 0004 §3): high = fround(T) and
  * low = fround(T − high). The shader evaluates (offset + high) + low, whose first sum is exact near the eye, so a vertex

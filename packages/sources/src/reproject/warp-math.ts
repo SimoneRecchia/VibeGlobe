@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The pure geometry of client-side reprojection (F226): where a target tile falls in a source reference system, which
  * source image to fetch for it, and the piecewise-affine warp (a grid of triangles, each with the affine map from

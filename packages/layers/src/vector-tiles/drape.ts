@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Draping vector tiles on the terrain (F452, ADR 0131): the terrain height under every vertex, from the terrain in
  * memory (`Globe.elevationAt`, interpolated as the surface shows it). Heights are exact per vertex, so the vertices two

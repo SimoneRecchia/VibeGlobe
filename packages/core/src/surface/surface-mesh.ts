@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { cappedMercatorInto, mercatorScaleInto } from '../view/morph.js';

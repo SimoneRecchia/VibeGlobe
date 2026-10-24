@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The ui package's stylesheet. Every color, font and size comes from a documented CSS variable ({@link THEME_VARIABLES}),
  * so an application restyles every control by setting variables on the `.vg-ui` element, in a rule of its own
@@ -46,12 +48,19 @@ const LIGHT = {
   '--vg-ui-debug-color': '#ffffff',
   '--vg-ui-debug-background': 'rgba(0, 0, 0, 0.75)',
   '--vg-ui-debug-font-size': '12px',
-  /** What controls draw on the map, read when they draw it: the geolocation marker and its accuracy circle. */
+  /**
+   * What controls draw on the map, read when a control creates its map layers (the minimap: on every update): the
+   * geolocation marker and its accuracy circle.
+   */
   '--vg-ui-marker-color': '#1a73e8',
   '--vg-ui-marker-outline-color': '#ffffff',
   /** Drawn and measured shapes, and the fill of their edit handles. */
   '--vg-ui-drawing-color': '#d93025',
   '--vg-ui-drawing-handle-color': '#ffffff',
+  /** Provider logos in the attribution: height and clear space (Google's policy: 16–19 px, 10 px around, 5 px below). */
+  '--vg-ui-logo-height': '16px',
+  '--vg-ui-logo-clear': '10px',
+  '--vg-ui-logo-clear-bottom': '5px',
   /** The minimap's view footprint (its fill is the same color, translucent). */
   '--vg-ui-minimap-footprint-color': '#ff4040',
 } as const;
@@ -149,7 +158,7 @@ export const RULES_CSS = `
 .vg-ui__attribution[data-expanded="false"] .vg-ui__credit:not(.vg-ui__credit--required){display:none}
 .vg-ui__credit{display:flex;align-items:center;gap:calc(var(--vg-ui-spacing) / 2)}
 .vg-ui__credit a{color:inherit}
-.vg-ui__credit-logo{height:var(--vg-ui-icon-size)}
+.vg-ui__credit-logo{height:var(--vg-ui-logo-height);margin:var(--vg-ui-logo-clear) var(--vg-ui-logo-clear) var(--vg-ui-logo-clear-bottom)}
 .vg-ui__panel{padding:var(--vg-ui-spacing);border-top:var(--vg-ui-border-width) solid var(--vg-ui-border-color);min-width:calc(var(--vg-ui-panel-width) / 2)}
 .vg-ui__layers-group{border:0;margin:0;padding:0}
 .vg-ui__layers-group legend{font-weight:600;padding:0}

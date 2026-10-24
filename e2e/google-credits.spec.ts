@@ -91,7 +91,7 @@ for (const viewport of [
       ui.addDefaultControls(ui.createUi(globe, container), { debug: true });
     }, `/@fs${process.cwd()}/packages/ui/src/index.ts`);
     await settledSourceFrame(page, 18);
-    await expect.poll(async () => (await creditVisibility(page)).map((c) => c.text)).toContain('Google');
+    await expect.poll(async () => (await creditVisibility(page)).map((c) => c.text)).toContain('Google Maps');
     const check = async (): Promise<void> => {
       const credits = await creditVisibility(page);
       expect(credits.some((credit) => credit.logo)).toBe(true);

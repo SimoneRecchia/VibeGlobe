@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The upload cost model of ADR 0007 §Uploads and ADR 0020 §5: predicts how long a GPU upload takes from its size, so the
  * upload queue can stay within its per-frame time budget. One instance per renderer backend (WebGPU and WebGL2 differ),

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The text material of labels (F448, F449, ADR 0132), exported for data-layer labels too (F358): screen-space quads
  * whose corners are given in CSS pixels (placement and collision run on the CPU), shaded from an {@link SdfAtlas}.

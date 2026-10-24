@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Entry of the basic worker program (ADR 0172): the module worker of `@vibeglobe/worker/basic`, running only the basic
  * tasks (imagery, terrain, KTX2, vector parsers), so it imports nothing from `@vibeglobe/layers` or `@vibeglobe/models`. It installs the message handler and posts the `ready` handshake as soon as the module has evaluated.

@@ -37,8 +37,8 @@ describe('Google profile (F256, F261)', () => {
     ]);
     expect([other.storableIds, other.termsUrl]).toEqual([['placeId'], 'https://cloud.google.com/maps-platform/terms']);
     expect(other.requiredAttribution).toEqual({
-      text: 'Google',
-      logo: { src: 'https://app.test/google-logo.png', alt: 'Google' },
+      text: 'Google Maps',
+      logo: { src: 'https://app.test/google-logo.png', alt: 'Google Maps' },
     });
     expect(() => googleProfile(undefined)).toThrow(SourceConfigError);
   });
@@ -49,6 +49,7 @@ describe('googleImagery (F257, F258)', () => {
     const server = googleFixture(tileBytes);
     const source = await googleImagery({
       ...base,
+      billingRegion: 'other',
       id: 'g',
       mapType: 'satellite',
       language: 'it-IT',
@@ -132,8 +133,8 @@ describe('googleImagery (F257, F258)', () => {
     idle?.();
     await settle();
     expect(server.requests.filter((r) => r.url.includes('/tile/v1/viewport'))).toHaveLength(2);
-    expect(source.attribution.map((a) => a.text)).toEqual(['Google', fixtureCopyright(8)]);
-    expect(refreshes.at(0)).toEqual(['Google', fixtureCopyright(-10)]);
+    expect(source.attribution.map((a) => a.text)).toEqual(['Google Maps', fixtureCopyright(8)]);
+    expect(refreshes.at(0)).toEqual(['Google Maps', fixtureCopyright(-10)]);
     stop();
     expect(idle).toBeUndefined();
   });
@@ -155,23 +156,38 @@ describe('googleImagery (F257, F258)', () => {
           source.profile.forbids.has('prefetch') && source.profile.forbids.has('offlinePackaging')
             ? undefined
             : 'prefetch or packaging allowed',
-        (source) => (source.attribution.some((a) => a.text === 'Google') ? undefined : 'no Google attribution'),
+        (source) => (source.attribution.some((a) => a.text === 'Google Maps') ? undefined : 'no Google attribution'),
       ],
     });
     expect(failures(results)).toEqual([]);
   });
 });
 
+describe('the EEA terms of the Map Tiles API (ADR 0031, owner reading 2026-10-24)', () => {
+  it('refuses satellite tiles, the Street View layer and Street View for an EEA billing account, naming the EEA terms', async () => {
+    const server = googleFixture(tileBytes);
+    await expect(googleImagery({ ...base, id: 's', mapType: 'satellite', fetch: server.fetch })).rejects.toThrow(
+      /not available to billing accounts in the European Economic Area.*eea\/map-tiles/,
+    );
+    await expect(
+      googleImagery({ ...base, id: 'r', mapType: 'roadmap', layerTypes: ['layerStreetview'], fetch: server.fetch }),
+    ).rejects.toThrow(/Street View tiles are not available/);
+    await expect(googleStreetView({ ...base, fetch: server.fetch })).rejects.toThrow(/Street View tiles/);
+    // Roadmap and terrain remain.
+    await expect(googleImagery({ ...base, id: 't', mapType: 'terrain', fetch: server.fetch })).resolves.toBeDefined();
+  });
+});
+
 describe('googleStreetView (F262)', () => {
   it('reads metadata and panorama tiles with the session token, never cached, under the Google profile', async () => {
     const server = googleFixture(tileBytes);
-    const streetView = await googleStreetView({ ...base, fetch: server.fetch });
+    const streetView = await googleStreetView({ ...base, billingRegion: 'other', fetch: server.fetch });
     expect(server.requests[0]?.body).toMatchObject({ mapType: 'streetview' });
     const near = await streetView.metadata({ latitudeDeg: 45.83, longitudeDeg: 6.86, radiusMeters: 50 });
     expect(near).toMatchObject({ panoId: 'pano-near', tileWidthPx: 512, copyright: '© 2024 Google' });
     expect(await streetView.metadata({ panoId: 'missing' })).toBeUndefined();
     const spy = vi.fn(server.fetch);
-    const cached = await googleStreetView({ ...base, fetch: spy });
+    const cached = await googleStreetView({ ...base, billingRegion: 'other', fetch: spy });
     expect(new Uint8Array((await cached.tile('pano-near', 2, 1, 0)) ?? new ArrayBuffer(0))).toEqual(
       new Uint8Array([0xff, 0xd8, 0xff]),
     );
@@ -179,11 +195,25 @@ describe('googleStreetView (F262)', () => {
     expect(String(url)).toMatch(/\/v1\/streetview\/tiles\/2\/1\/0\?panoId=pano-near&session=session-\d+&key=/);
     expect(init?.cache).toBe('no-store');
     expect(streetView.profile.forbids.has('persistentCache')).toBe(true);
-    expect(streetView.attribution).toEqual([{ text: 'Google' }]);
+    expect(streetView.attribution).toEqual([{ text: 'Google Maps' }]);
   });
 });
 
 describe('openStreetMapImagery (F263–F267)', () => {
+  it('refuses subdomain URLs and links a way to report map issues (ADR 0032, owner reading 2026-10-24)', () => {
+    const identity = { appName: 'App', appUrl: 'https://app.test/', warn: () => undefined };
+    expect(() =>
+      openStreetMapImagery({ ...identity, url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' }),
+    ).toThrow(/without subdomains/);
+    expect(() =>
+      openStreetMapImagery({ ...identity, url: 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' }),
+    ).toThrow(/without subdomains/);
+    expect(openStreetMapImagery(identity).attribution).toContainEqual({
+      text: 'Report a map issue',
+      url: 'https://www.openstreetmap.org/fixthemap',
+    });
+  });
+
   it('requires the application to identify itself and maps the ADR 0032 rules', () => {
     expect(() => openStreetMapImagery({ appName: '', appUrl: 'https://app.test/', warn: () => undefined })).toThrow(
       SourceConfigError,
@@ -204,6 +234,7 @@ describe('openStreetMapImagery (F263–F267)', () => {
     expect([...OSM_PUBLIC_PROFILE.forbids].sort()).toEqual(['offlinePackaging', 'persistentCache', 'prefetch']);
     expect(source.attribution).toEqual([
       { text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' },
+      { text: 'Report a map issue', url: 'https://www.openstreetmap.org/fixthemap' },
     ]);
   });
 

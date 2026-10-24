@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The public types of vector tile layers (ADR 0131). */
 import type { ScreenPoint, TileTransport } from '@vibeglobe/core';
 import type { PlacedLabel } from './label-placer.js';

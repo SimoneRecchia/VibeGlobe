@@ -2,7 +2,7 @@
   "name": "@vibeglobe/vue",
   "version": "0.0.0",
   "description": "VibeGlobe vue: vue 3 adapter: components and composables, SSR-safe.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Where 3D Tiles content is drawn in a frame (F464, F465; ADR 0141). The renderer's world space is relative to the
  * eye (ADR 0004) and, during the globe-to-flat morph, morphed (ADR 0008). Content is placed rigidly about an anchor:

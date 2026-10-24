@@ -34,7 +34,7 @@ release is made (\`node scripts/release/changelog.ts\`, run by the release workf
 `;
 
 /** The category of a commit and whether it breaks the public API. */
-export function classify(commit: Commit): { category: Category; breaking: boolean; text: string } {
+function classify(commit: Commit): { category: Category; breaking: boolean; text: string } {
   const breakingFooter = /^BREAKING[ -]CHANGE:/m.test(commit.body);
   const conventional = CONVENTIONAL.exec(commit.subject);
   if (conventional) {
@@ -79,7 +79,7 @@ export function addEntry(changelog: string, version: string, entry: string): str
 }
 
 /** The commits since the newest release tag (`v*`) reachable from HEAD, or the whole history before the first release. */
-export function commitsSinceLastRelease(cwd: string = ROOT_DIR): Commit[] {
+function commitsSinceLastRelease(cwd: string = ROOT_DIR): Commit[] {
   let range = 'HEAD';
   try {
     const tag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*', 'HEAD'], {

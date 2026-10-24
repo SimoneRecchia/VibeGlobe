@@ -6914,7 +6914,7 @@
         "Assert CHANGELOG.md has an entry for each released version with categorized changes",
         "Assert breaking changes are marked"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F527",
@@ -7036,7 +7036,7 @@
         "Assert publishing happens only from CI with the npm token stored as a CI secret",
         "Assert the workflow publishes only after the owner has approved the release"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F535",
@@ -7048,7 +7048,7 @@
         "Check it covers version bump, changelog, tags, publishing and post-release checks",
         "Follow it for a dry-run release and assert it completes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F536",
@@ -7072,7 +7072,7 @@
         "Assert the globe renders",
         "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F537",

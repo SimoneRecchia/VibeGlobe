@@ -4,7 +4,11 @@ import { createRenderer } from '@vibeglobe/renderer';
 import { heightmapTerrain } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 
-export async function enable(globe: Globe, container: HTMLElement, backend: 'auto' | 'webgpu' | 'webgl2'): Promise<string> {
+export async function enable(
+  globe: Globe,
+  container: HTMLElement,
+  backend: 'auto' | 'webgpu' | 'webgl2',
+): Promise<string> {
   const view = globe.camera;
   globe.destroy();
   const terrain = heightmapTerrain({

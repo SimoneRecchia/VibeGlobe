@@ -20,6 +20,26 @@ Open:
 
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
+## Track H, packaging and release (2026-10-24)
+
+Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns
+`scripts/release/`, `examples/`, `.github/workflows/release.yml`, `.claude/skills/release/` and the build fields of the
+packages' `package.json` (ADR 0171; numbers 0171–0179).
+
+- Passing: F503 (321.7 KB gzip before the first frame, budget 351 KB; six optional modules fetched only when enabled),
+  F519 (`scripts/release/assets.json`, notices of data files), F526 (changelog from the history), F530 (tarballs and a
+  strict consumer), F531 (Vite and Nuxt builds, assets from a separate static server, no `'unsafe-eval'`), F535 (the
+  release skill, dry run followed to the end).
+- Pending owner steps: F558 (the approved publish from CI), F559 (install from npm once published); question 17.
+- Failing: F532, only because `@vibeglobe/worker` depends on `@vibeglobe/layers` (hook request H (1) in
+  `docs/parallel-tracks.md`); it renders and navigates with core, renderer, sources and worker.
+- Hook requests: H (1) above; H (2) `@types/three` as a dependency of `@vibeglobe/renderer` (consumers install it
+  meanwhile). Known bug TH-01 (a failed transcoder load is cached for the session) is the worker package's.
+- Commands: `node scripts/release/check-tarballs.ts`, `node scripts/release/check-consumers.ts [F503] [F531] [F532]`
+  (`VIBEGLOBE_CHROMIUM_PATH` in cloud containers, `VIBEGLOBE_RELEASE_KEEP=1` keeps the built projects),
+  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-cube.ts`.
+- About 3 hours of agent time.
+
 ## Track F, network simulation suite (2026-10-23)
 
 Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner merges). Owns `e2e/network/`,

@@ -78,7 +78,10 @@ export function publishOrder(manifests: readonly Manifest[]): string[] {
 
 function run(cwd: string, command: string, args: readonly string[], env: NodeJS.ProcessEnv = process.env): string {
   console.log(`$ ${command} ${args.join(' ')}`);
-  return execFileSync(command, args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  const output = execFileSync(command, args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  // Machine-readable answers are parsed by the caller; everything else is the step's log.
+  if (!args.includes('--json') && command !== 'git') process.stdout.write(output);
+  return output;
 }
 
 function readManifests(cwd: string): { path: string; manifest: Manifest }[] {

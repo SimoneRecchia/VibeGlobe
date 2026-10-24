@@ -62,6 +62,11 @@ export class Constraints {
   /** The constraints as last set, validated (`Globe.constraints`). */
   settings: CameraConstraints = {};
   readonly values = new Float64Array(9).fill(Number.NaN);
+  /**
+   * Whether zoom limits or bounds are set: without, {@link apply} reads nothing (KB-132: a frame's reads of the values
+   * allocate whenever the function runs unoptimized).
+   */
+  private clamps = false;
 
   /** Replaces the constraints (validated), passing the maximum tilt on to `view` when given. */
   set(constraints: CameraConstraints, view?: { setMaxTilt(maxTiltRad: number): void }): void {
@@ -77,6 +82,8 @@ export class Constraints {
       v[EAST] = constraints.bounds.eastDeg * RAD;
       v[NORTH] = constraints.bounds.northDeg * RAD;
     }
+    this.clamps =
+      constraints.bounds !== undefined || constraints.minZoom !== undefined || constraints.maxZoom !== undefined;
     view?.setMaxTilt(this.maxTiltRad);
   }
 
@@ -119,6 +126,7 @@ export class Constraints {
 
   /** Clamps the camera's range to the zoom limits and its target into the bounds. Does not update the camera. */
   apply(camera: Camera): void {
+    if (!this.clamps) return;
     const v = this.values;
     const pose = camera.pose;
     // Bounds first: the zoom limits depend on the latitude.

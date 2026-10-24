@@ -5278,7 +5278,7 @@
         "Verify the anisotropy level equals the device maximum reported by capability detection, unless the quality preset lowers it",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F399",

@@ -311,7 +311,7 @@ export class ThreeBackend implements RendererBackend {
 
   private createImageryResources(): void {
     if (!this.imagery) return;
-    const texture = createBaseTexture(this.imagery, this.capabilities.maxAnisotropy);
+    const texture = createBaseTexture(this.imagery, this.anisotropy ?? this.capabilities.maxAnisotropy);
     this.imageryTexture?.dispose();
     this.imageryTexture = texture;
     this.material?.dispose();
@@ -380,6 +380,7 @@ export class ThreeBackend implements RendererBackend {
   /** Applies the effects of the engine's quality settings (F398, F399): anisotropy and the atmosphere level. */
   setQuality(quality: RendererQuality): Promise<void> | undefined {
     this.anisotropy = quality.anisotropy;
+    if (!this.destroyed) this.tileTextures.refilter(this.renderer, this.imageryTexture);
     // The atmosphere appearing or going away rebuilds the surface material that it shades.
     if (!this.atmosphere.setQuality(quality, this.depthPath) || this.destroyed || !this.imageryTexture)
       return undefined;

@@ -8,6 +8,7 @@ import { WGS84 } from '../geodesy/wgs84.js';
 import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import { MAX_TILE_LEVEL } from '../tiling/tile-key.js';
 import { cappedMercatorInto, wrapDeltaInto, type MorphFrame } from '../view/morph.js';
+import { fogVisibilityInto } from './fog.js';
 
 /** ADR 0006 §1: the surface is one Web Mercator quadtree plus two geographic polar caps. This is the Mercator root. */
 export const MERCATOR_ROOT = 0;
@@ -86,6 +87,11 @@ export interface QuadtreeSelectionOptions {
    * (KB-077).
    */
   terrainRange?: ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined;
+  /**
+   * The atmosphere's haze while fog is on (F395, ADR 0040), undefined otherwise: a tile's errors are multiplied by the
+   * fraction of light from its nearest point that reaches the eye, so hazed tiles near the horizon stay coarse.
+   */
+  fogHaze?: number | undefined;
   /** Written by each selection: tiles skipped as outside the view frustum (F086) and beyond the horizon (F087). */
   culledByFrustum?: number;
   culledByHorizon?: number;
@@ -160,6 +166,8 @@ const lonSin = new Float64Array(3);
 const lonCos = new Float64Array(3);
 /** The tile center relative to the eye. */
 const offset = new Float64Array(3);
+/** The fog test's distance and haze in, its visibility out (see {@link fogVisibilityInto}). */
+const fog = new Float64Array(3);
 /** The ellipsoid normal at the tile center. */
 const normal = new Float64Array(3);
 /** Per-tile measures written by measureTile. */
@@ -337,7 +345,16 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
       return;
     }
   }
-  const screenError = ((measure[SAG] ?? 0) / distance) * state.pixelsPerRadian;
+  // Errors divided by the distance, the distance divided by the fog's visibility: hazed tiles count as farther (F395).
+  let errorDistance = distance;
+  if (options.fogHaze !== undefined) {
+    fog[0] = closest;
+    fog[1] = options.fogHaze;
+    fogVisibilityInto(camera.eyeEcef, offset, fog);
+    const visibility = fog[2] ?? 1;
+    errorDistance = distance / (visibility > 1e-3 ? visibility : 1e-3);
+  }
+  const screenError = ((measure[SAG] ?? 0) / errorDistance) * state.pixelsPerRadian;
   const maxLevel = options.maxLevel < MAX_TILE_LEVEL ? options.maxLevel : MAX_TILE_LEVEL;
   const refine =
     level < (options.minLevel ?? MIN_LEVEL) ||
@@ -345,10 +362,10 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
       (screenError > options.maxScreenErrorPx ||
         radius > RADIUS_TO_DISTANCE * distance ||
         (level < (options.imageryMaxLevel ?? 0) &&
-          ((measure[TEXEL] ?? 0) / distance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
+          ((measure[TEXEL] ?? 0) / errorDistance) * state.pixelsPerRadian > (options.maxTexelErrorPx ?? 1.5)) ||
         (level < (relief[LEVEL_LIMIT] ?? 0) &&
           (((options.terrainErrorMeters?.[level] ?? 0) * (relief[ERROR_SCALE] ?? 1) * (relief[HEIGHT_SCALE] ?? 1)) /
-            distance) *
+            errorDistance) *
             state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {

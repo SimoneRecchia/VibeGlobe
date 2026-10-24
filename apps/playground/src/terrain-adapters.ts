@@ -4,7 +4,6 @@
  * entry points (`e2e/terrain-sources.spec.ts` checks it).
  */
 import {
-  heightGrid,
   heightmapGeometricErrorMeters,
   WEB_MERCATOR_TILING,
   WGS84,
@@ -12,6 +11,7 @@ import {
   type TileCoord,
   type TileRequest,
 } from '@vibeglobe/core';
+import { heightGrid } from '@vibeglobe/core/decoders';
 import { fetchTransport } from '@vibeglobe/sources';
 
 /** Samples per tile edge of both encodings. */

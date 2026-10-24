@@ -19,9 +19,18 @@ export {
   rangeForGroundZoom,
 } from './camera/zoom.js';
 export { createGlobe } from './globe/create-globe.js';
+export { surfaceVisibility } from './surface/fog.js';
+export type { FogRay } from './surface/fog.js';
 export { GlobeError } from './globe/errors.js';
 export { refuseDisplayOnly } from './globe/display-only.js';
 export type { GlobeErrorCode } from './globe/errors.js';
+export type {
+  AntialiasMode,
+  AtmosphereLevel,
+  AtmosphereSettings,
+  QualitySettings,
+  RendererQuality,
+} from './globe/quality-types.js';
 export type {
   BackendName,
   DepthPath,
@@ -128,12 +137,6 @@ export type {
   ImageryLayerState,
   ImagerySourceInfo,
 } from './imagery/imagery-stack.js';
-export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
-export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
-export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
-export type { MeasuredGrid } from './terrain/grid-size.js';
-export { readLayerJson, readRanges, TerrainAvailability } from './terrain/layer-json.js';
-export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
 export { sampleHeight } from './terrain/sample-height.js';
 export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';
 export type { TerrainDecoder, TerrainSource } from './terrain/terrain-source.js';
@@ -141,7 +144,6 @@ export type { ElevationSample } from './terrain/terrain-heights.js';
 export type { AbortSignalLike } from './globe/imagery-runtime.js';
 export { geoidModel, toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
 export type { GeoidModel, VerticalDatum } from './terrain/vertical-datum.js';
-export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
 export { FRAME_PHASES } from './diagnostics/observability.js';
 export type {
   FramePhase,

@@ -5,7 +5,7 @@
  * here, before the grid size is chosen (F133). Gzip-compressed bytes (a server that sends `.terrain` files compressed
  * without `Content-Encoding`) are inflated first (F127).
  */
-import { chooseGrid, decodeHeightmap, type HeightGrid } from '@vibeglobe/core';
+import { chooseGrid, decodeHeightmap, type HeightGrid } from '@vibeglobe/core/decoders';
 import { decodeQuantizedMesh, meshGridErrorMeters, rasterizeQuantizedMesh } from '@vibeglobe/core/decoders';
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 

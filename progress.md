@@ -1,26 +1,19 @@
 # Progress
 
-## Handoff (2026-10-23 ~21:15 UTC, main session moving to another account)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-23 evening)
 
-Branch `claude/happy-galileo-b07j98`; pull request SimoneRecchia/VibeGlobe#25 (into `main`, squash only) is **open, not merged**: Fast checks fail on bbf4758 and again on cee7d3c in `packages/core/src/globe/terrain-globe.test.ts`, so this is a real failure, not a flake. At line 669 (F126, "selects the stored set of terrain tiles for scripted cameras") the snapshot gets four `mercator/10/532-533/362-363` tiles at level 7 instead of 8. At line 555 the expected `{ code: 'resource-failed' }` error is undefined. Both are probably caused by today's motion-detail changes (the coarse factor held while the camera slows, and jumps).
+Taken over from the previous account at about 21:00 UTC. Pull request SimoneRecchia/VibeGlobe#26 (the previous branch plus KB-133) is squash-merged into `main`; SimoneRecchia/VibeGlobe#25 is closed, its branch retired. Open: SimoneRecchia/VibeGlobe#27 (this branch). Tracks D (vector tiles), E (3D Tiles) and F (network simulation) start from `main` (owner, 2026-10-23): their folders are theirs; answer their "Hook requests".
 
-What I was doing: closing the regressions of the full CI runs after today's adaptive-loading work (motion-aware detail, flight settle, Resource Timing bandwidth estimate), then picking the next M10/M12/M14 entries. The last full CI run (workflow_dispatch on bbf4758, run 40021954210) was still running.
+Done since the takeover: KB-133 (elevation queries boxed doubles on a loaded machine; the failing allocation test then broke two more terrain tests), the F322 flake (the offline harness retries a reset fetch once), F416 (`Globe.captureView`, hook A (4)), hook C (3) (`Globe.setQualitySettings`, `Globe.setAtmosphere`, the atmosphere wired into the renderer, off by default; fog-aware detail in the selection), hook C (1) (`parse-model` in the worker program with meshoptimizer's WebAssembly alone, for track E). Core's main entry moved its terrain decoding helpers to `@vibeglobe/core/decoders` to stay within 60 KB (59.1 KB now).
 
-Next steps, in order:
+Still open from the previous session's last full CI run (40021954210 on bbf4758; notes of the retired branch, commits 4f6e358, 7e3bee0, 6aa92b9):
 
-1. Fix `terrain-globe.test.ts:555` and `:669` (F126): reproduce with `npx vitest run packages/core/src/globe/terrain-globe.test.ts` (and under `npx vitest run packages/core`), then compare with the commit before 2844131 (motion hold) and bbf4758 (`jumpTo` announces jumps via `MovementsHost.cameraJumped`, `MotionDetail.jumped`). Fix with a regression test first if it is a bug.
-2. Read the result of the full CI run 40021954210 (or start a new `workflow_dispatch` of `ci.yml` on the branch). Expected failure: F287 only (a failing entry, docs/hardening-backlog.md). Earlier runs today also showed F322 and F090 (fixed since), F413/F426 (timeouts raised).
-3. Once Fast checks are green, merge #25 into `main` (squash), then run `npx tsc -b --force`. Tracks D, E and F of round 3 start from `main` after this merge (the owner was waiting for it).
-4. Continue the entries: F416 (`Globe.captureView` larger than the canvas: off-screen tiled rendering with a view-offset camera; the UI's screenshot control uses it, hook A (4)); C (3) `Globe.setQualitySettings` and C (4) the quality page (M11, unblocks F399 and the Vue `qualityPreset` prop of F474); M11 atmosphere wiring (docs/parallel-tracks.md "Atmosphere hook"); F358 data-layer labels with track D's SDF atlas once it lands; F374 marker level of detail; C (1) `parse-model` in the worker program (needs a meshopt WebAssembly loader of our own without Blob workers, F100); KB-132 (allocation test flaky about 1 in 10).
-5. At the end of each milestone: fresh-context review (correctness only), full CI run, `progress.md` hours and Monday estimate.
+1. **F064 allocation regression** (`e2e/globe-allocation.spec.ts:202`, failed on retry too): 83 bytes per frame against 12, at `motion-detail.ts` `update`, `view-control.ts` `get timeMs`, `controls/src/camera-port.ts` `beginFrame` and `renderer/src/extensions.ts` `frame`. Fix without allocations (packages/core/CLAUDE.md: no new fields on per-frame classes, no doubles passed as arguments; KB-133 and the `FrameEvents` attempt of this session showed both effects).
+2. **F359** (`e2e/data-label-collision.spec.ts:99`, fails at `waitForIdle`) and **F385** (`e2e/data-layer-removal.spec.ts:184`, 240 s timeout in `vibeglobeCycle`), both backends, on retry too; the probe `deterministic-mode` reported "first frame: nothing within 60000 ms". Hypothesis to check first: the engine no longer goes idle since KB-131 (frames keep running while the motion factor is above 1, or the motion hold keeps it above 1).
+3. **F488 flaky** (`e2e/nuxt-features.spec.ts:55`, webgpu: "security: CSP-safe styles" failed once, passed on retry): needs a root cause.
+4. **F287** (path requests drawn 70–85% of the required 95%): in docs/hardening-backlog.md, but its test fails the full suite, which the goal's final check needs green.
 
-Render-extension hook (on the branch, not yet on `main`): `Globe.addRenderExtension(create)` (core `render-extensions.ts`); the context gives `renderer` (three.js `ThreeExtensionContext` from `@vibeglobe/renderer`: `scene`, `depthPath()`), `requestRender`, `network` (the page's `NetworkPool`) and `workers`; `frame(view)` runs before every draw, `dispose()` on destroy. Worker program tasks: `layout-vector-tile` registered; `parse-model` removed again (C (1) reopened, see docs/parallel-tracks.md).
-
-Next round of parallel tracks (docs/parallel-tracks.md, "Candidate tracks ... round 3"), confirmed to the owner, to start once #25 is merged: D vector tile rendering (F440–F459; also exports its SDF atlas and text material for F358), E 3D Tiles (F461–F471; its Google data access must use `refuseDisplayOnly`, F323), F network simulation suite (F315, F329's scenario specs; owns `scripts/fixtures/tiles/link.ts`, which this session rewrote as a round-robin queue).
-
-Open pull requests: SimoneRecchia/VibeGlobe#25 (this branch).
-
-Pending owner steps: docs/open-questions.md (2 and 13–17): reference desktop and tablet (frame-time budgets: F167, F378, F389, F399–F403, F438's manual step, the hardening-backlog rows), real dataset downloads (F339, F551, F554), EGM2008 grid (F133), npm publishing (F555), the live OpenStreetMap run (F264 step 4, `test:live-sources` workflow), Google API key runs, KB-110 (F137 and F148: ask the owner, as directed at the end of M5).
+Next after these: the atmosphere entries end to end (F391–F396: playground switches, specs on the engine's views), C (4) the playground's quality page (F399–F402), F397 anti-aliasing modes, F398 anisotropy, M10 renderer items (F358, F374, F375, F378), KB-132.
 
 ## Current state
 

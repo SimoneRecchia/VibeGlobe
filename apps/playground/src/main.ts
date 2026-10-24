@@ -1,7 +1,6 @@
 import { createControls } from '@vibeglobe/controls';
 import {
   createGlobe,
-  readGeoidFile,
   WGS84,
   type Globe,
   type GlobeOptions,
@@ -10,6 +9,7 @@ import {
   type ViewInit,
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
+import { readGeoidFile } from '@vibeglobe/core/decoders';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
 import { sourceLines } from './source-lines.js';
 import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';

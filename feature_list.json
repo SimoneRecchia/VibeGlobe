@@ -5239,7 +5239,7 @@
         "Verify the fog-enabled run requests at least 25% fewer tiles over the scenario (the measured reduction is recorded in the ADR) with no visible difference in the fogged region",
         "Verify no black or empty pixels appear near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F396",
@@ -5341,7 +5341,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F404",
@@ -6223,7 +6223,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F473",
@@ -7262,6 +7262,19 @@
         "Record frames across the renewal and assert no holes or blank frames"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F574",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Fog-aware detail: a tile entirely inside full fog is never requested at a fine level, and the tilted fog scenario requests measurably fewer tiles than the same run at full detail.",
+      "steps": [
+        "Unit-test the level selection with fog: a tile whose nearest point lies beyond the full-fog distance is not refined below the fog's coarse level, while a tile partly inside the visible range is",
+        "Run the same tilted flight scenario with fog-aware detail on and off and record every tile request with its level and position",
+        "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
+        "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
+      ],
+      "status": "failing"
     }
   ]
 }

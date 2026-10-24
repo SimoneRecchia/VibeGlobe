@@ -10,8 +10,14 @@ import { SdfAtlas, type AtlasRect } from './vector-tiles/sdf-atlas.js';
 import { sdfFromCoverage } from './vector-tiles/local-glyphs.js';
 import type { SdfReply, SdfRequest } from './label-sdf-worker.js';
 
-/** The size labels are rasterized at, CSS pixels: entries scale by `sizePx / LABEL_REFERENCE_PX`. */
-export const LABEL_REFERENCE_PX = 16;
+/**
+ * The size a label of `sizePx` is rasterized at, CSS pixels: 12 below 14 px, whose thin strokes scaled down from a
+ * larger field shimmer as they move (F360), and 16 above, whose detail a 12 px field loses (a CJK glyph's end strokes,
+ * F357). Entries scale by `sizePx / labelReferencePx(sizePx)`.
+ */
+export function labelReferencePx(sizePx: number): number {
+  return sizePx < 14 ? 12 : 16;
+}
 /** Field units per texel (`sdfFromCoverage`: radius 8 texels, 0.75 at the outline). */
 export const SDF_UNITS_PER_TEXEL = 1 / 8;
 /** Texels around the text, at the reference size: the widest halo the field reaches (0.75 / ⅛ = 6 texels). */
@@ -59,7 +65,7 @@ export class LabelSdf {
   private measureFont = '';
   private worker: Worker | undefined | null;
   /** Texts sent to the worker and not in the atlas yet, kept to finish them here if the worker fails. */
-  private readonly pending = new Map<string, { text: string; font: string }>();
+  private readonly pending = new Map<string, { text: string; font: string; reference: number }>();
   /** Replies waiting to be added: together, so the atlas texture is uploaded once per batch, not per reply. */
   private readonly replies: SdfReply[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -92,8 +98,9 @@ export class LabelSdf {
    * field's buffer, which the halo and the text's anti-aliasing never fill.
    */
   measure(text: string, sizePx: number, font: string): { widthPx: number; heightPx: number } {
-    const { width } = this.texels(text, font);
-    const scale = sizePx / LABEL_REFERENCE_PX;
+    const reference = labelReferencePx(sizePx);
+    const { width } = this.texels(text, font, reference);
+    const scale = sizePx / reference;
     return {
       widthPx: (width - 2 * LABEL_BUFFER_TEXELS) * scale + 2 * BOX_PAD_PX,
       heightPx: sizePx * LINE_HEIGHT + 2 * BOX_PAD_PX,
@@ -104,20 +111,20 @@ export class LabelSdf {
    * The atlas rect (texels) of a text's field, or undefined while it is generated (requested on the first call) or
    * where it cannot be (no canvas, wider than the atlas).
    */
-  entry(text: string, font: string): AtlasRect | undefined {
-    const key = `${font}\n${text}`;
+  entry(text: string, font: string, reference: number): AtlasRect | undefined {
+    const key = `${String(reference)}\n${font}\n${text}`;
     const cached = this.atlas.get(key);
     if (cached || this.pending.has(key) || !this.context) return cached;
-    const request = this.rasterize(key, text, font);
+    const request = this.rasterize(key, text, font, reference);
     if (!request) return undefined;
     if (this.worker === undefined) this.worker = this.connect();
     if (this.worker) {
       // The text stays here, to draw it again here if the worker fails.
-      this.pending.set(key, { text, font });
+      this.pending.set(key, { text, font, reference });
       this.worker.postMessage(request, [request.coverage.buffer]);
       return undefined;
     }
-    return this.generateHere(key, text, font, request);
+    return this.generateHere(key, text, font, reference, request);
   }
 
   /**
@@ -129,10 +136,11 @@ export class LabelSdf {
     sizePx: number,
     font: string,
   ): { u0: number; v0: number; u1: number; v1: number; widthPx: number; heightPx: number } | undefined {
-    const rect = this.entry(text, font);
+    const reference = labelReferencePx(sizePx);
+    const rect = this.entry(text, font, reference);
     if (!rect) return undefined;
     const size = this.atlas.size;
-    const scale = sizePx / LABEL_REFERENCE_PX;
+    const scale = sizePx / reference;
     return {
       u0: rect.x / size,
       v0: rect.y / size,
@@ -154,23 +162,23 @@ export class LabelSdf {
     this.atlas.dispose();
   }
 
-  private texels(text: string, font: string): { width: number; height: number } {
+  private texels(text: string, font: string, reference: number): { width: number; height: number } {
     const context = this.context;
-    const css = `${String(LABEL_REFERENCE_PX)}px ${font ? `${font}, ` : ''}${LABEL_FONT}`;
+    const css = `${String(reference)}px ${font ? `${font}, ` : ''}${LABEL_FONT}`;
     // Parsing a font is slower than measuring: labels of one layer share theirs.
     if (context && css !== this.measureFont) context.font = this.measureFont = css;
-    const advance = context ? context.measureText(text).width : text.length * LABEL_REFERENCE_PX * 0.6;
+    const advance = context ? context.measureText(text).width : text.length * reference * 0.6;
     return {
       width: Math.ceil(advance) + 2 * LABEL_BUFFER_TEXELS,
-      height: Math.ceil(LABEL_REFERENCE_PX * LINE_HEIGHT) + 2 * LABEL_BUFFER_TEXELS,
+      height: Math.ceil(reference * LINE_HEIGHT) + 2 * LABEL_BUFFER_TEXELS,
     };
   }
 
   /** The coverage of a text at the reference size, with the buffer around it. */
-  private rasterize(key: string, text: string, font: string): SdfRequest | undefined {
+  private rasterize(key: string, text: string, font: string, reference: number): SdfRequest | undefined {
     const context = this.context;
     if (!context) return undefined;
-    const { width, height } = this.texels(text, font);
+    const { width, height } = this.texels(text, font, reference);
     if (width + 2 > this.atlas.size || height + 2 > this.atlas.size) return undefined;
     const canvas = context.canvas;
     if (canvas.width < width || canvas.height < height) {
@@ -178,7 +186,7 @@ export class LabelSdf {
       canvas.height = Math.max(canvas.height, height);
     }
     // Resizing resets the context's state.
-    context.font = this.measureFont = `${String(LABEL_REFERENCE_PX)}px ${font ? `${font}, ` : ''}${LABEL_FONT}`;
+    context.font = this.measureFont = `${String(reference)}px ${font ? `${font}, ` : ''}${LABEL_FONT}`;
     context.clearRect(0, 0, width, height);
     context.textBaseline = 'middle';
     context.textAlign = 'left';
@@ -201,7 +209,7 @@ export class LabelSdf {
       this.worker = null;
       clearTimeout(this.flushTimer);
       this.flush();
-      for (const [key, { text, font }] of this.pending) this.generateHere(key, text, font);
+      for (const [key, { text, font, reference }] of this.pending) this.generateHere(key, text, font, reference);
       this.pending.clear();
       this.arrived();
     };
@@ -213,7 +221,8 @@ export class LabelSdf {
     key: string,
     text: string,
     font: string,
-    request = this.rasterize(key, text, font),
+    reference: number,
+    request = this.rasterize(key, text, font, reference),
   ): AtlasRect | undefined {
     if (!request) return undefined;
     this.generated.inline++;

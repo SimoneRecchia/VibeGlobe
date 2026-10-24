@@ -24,7 +24,7 @@ import {
   type Triangle,
 } from './layer-subdivision.js';
 import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
-import { LABEL_BUFFER_TEXELS, LABEL_REFERENCE_PX, SDF_UNITS_PER_TEXEL } from './label-sdf.js';
+import { LABEL_BUFFER_TEXELS, labelReferencePx, SDF_UNITS_PER_TEXEL } from './label-sdf.js';
 import { writePointQuad } from './layer-points.hot.js';
 
 /** The vertex arrays of a layer mesh, sized for its vertices (ADR 0037). */
@@ -210,7 +210,8 @@ function anchorShift(anchor: number, w: number, h: number): [number, number] {
  * alpha with the feature's opacity): 16 bits a value, which interpolation across the quad keeps to well under one.
  */
 function labelShading(batch: BatchContents, feature: number): { corner: [number, number]; halo: [number, number] } {
-  const perPx = (SDF_UNITS_PER_TEXEL * LABEL_REFERENCE_PX) / Math.max(valueOf(batch, 'sizePx', feature), 1e-3);
+  const sizePx = Math.max(valueOf(batch, 'sizePx', feature), 1e-3);
+  const perPx = (SDF_UNITS_PER_TEXEL * labelReferencePx(sizePx)) / sizePx;
   // One texel inside the field's reach, where its value is still above 0 (a halo out to 0 would fill the quad).
   const haloTexels = Math.min(
     LABEL_BUFFER_TEXELS - 1,

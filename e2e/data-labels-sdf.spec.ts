@@ -143,8 +143,9 @@ for (const backend of BACKENDS)
               ).renderer?.layers?.stats().labelFields,
           );
           measured.push(`fields ${JSON.stringify(fields)}`);
-          // Every field from the worker, each text once: "Sharp" serves every size, "Zoom" every zoom.
-          expect(fields).toEqual({ worker: 2, inline: 0 });
+          // Every field from the worker, each text once per reference size (ADR 0045): "Sharp" at 12 px for 8 and
+          // 12 px, at 16 px for 16 to 64 px; "Zoom" (20 px) at every zoom.
+          expect(fields).toEqual({ worker: 3, inline: 0 });
         }
       } finally {
         await context.close();

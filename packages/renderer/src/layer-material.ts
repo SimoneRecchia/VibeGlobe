@@ -181,7 +181,7 @@ const OUTLINE = 0.75;
 
 /**
  * A label's text from its distance field (F358, ADR 0045): the fill where the field passes the outline and the halo
- * out to its width (`corner.z` − 3, field units), each anti-aliased over about one device pixel (from the field units
+ * out to its width (`corner.z` − 3, field units), each anti-aliased over about two device pixels (from the field units
  * per CSS pixel, `corner.w`, and the pixel ratio: a screen-space derivative of the 8-bit field is too noisy, and moves
  * text in pixel steps), so the edge stays crisp and moves smoothly at any size and pixel ratio. The fill is the color; the halo's sRGB bytes are packed in `uv.zw` (red × 256 + green,
  * blue × 256 + alpha, `labelShading`).

@@ -1,6 +1,6 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 morning)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 midday)
 
 Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
 after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32. Open: SimoneRecchia/VibeGlobe#35. Tracks D, E, F and H are
@@ -8,27 +8,20 @@ merged; tracks G (robustness) and H's follow-ups work in their own folders.
 
 Since the takeover:
 
-- Passing: F416, F401, F402, F474, F385, F398, F219 (custom adapters of four kinds outside `packages/`), F323, F154,
-  F396 (sun lighting: terminator and slopes), F393 (sky through the zoom), F339 (real Copernicus DEM in the playground),
-  F264 (the live OpenStreetMap run), F488 (Nuxt example: atmosphere and an offline package added), F551 (sample builds
-  as source chains).
-- Bugs fixed: KB-133 to KB-137, KB-139, KB-141 (sun lighting without fog), KB-142 (chains magnifying a source that
-  answered 404). Open: KB-110 (CI-only pops, F137 in the hardening backlog), KB-132 (watch), KB-138, KB-140.
-- Hardening backlog additions: F137, F287, F397.
+- Passing: F416, F401, F402, F474, F385, F398, F219, F323, F154, F396, F393, F339, F264, F488, F551, F374,
+  **F490 (M14 accepted)** and **F554 (M9 accepted)**, each after a fresh-context review and its fix check.
+- Bugs fixed: KB-133 to KB-137, KB-139, KB-141 to KB-150, DP-002 to DP-006 (M9 review: stale tiles after a
+  configuration change, vector builds holding whole extracts, the `tile.osm.org` alias, unpinned downloads).
+  KB-149 was a regression of KB-142 found by the full CI run 40085859274. Open: KB-110 (F137 in the hardening
+  backlog), KB-132 (watch), KB-138, KB-140, KB-144 (F378). TD-02 (F450's filter latency on CI) is recorded for
+  track D.
+- Core's bundle stands at 61,437 of its 61,440 bytes: any core growth needs an equal saving (open question, F249,
+  F395).
 - Data builds in this container (ignored by git): `packages/tools/node_modules/.vibeglobe-data/` holds the
-  test-mont-blanc terrain and both configurations' samples; Docker starts with `sudo dockerd` for `vibeglobe-data
-verify`.
+  test-mont-blanc terrain and both configurations' samples; Docker starts with `sudo -n dockerd`.
 
-Open, breadth first:
-
-1. **F395**: over an 8 s tilted flight across the Alps fog saves 15% of all requests (19% beyond the pinned base levels
-   0–3), short of 25%; only the distant levels 5–8 are spared. The "no visible difference" step also needs a way to draw
-   fog with full detail, which the public API does not have.
-2. **F358** (time box spent): one signed distance field per label fails F360's stability check (centroid 1.0–1.4 px).
-   Options: per-glyph fields at the step's size, or bitmaps below 16 device pixels and fields above.
-3. **F249** tone harmonization (ADR 0039 option 1: feathered boundary plus per-source color adjustments).
-4. **F374** marker level of detail, **F378** live feed (the p95 step needs the reference desktop).
-5. The acceptances: F148, F167, F217, F269, F329, F389, F403, F438, F472, F490, F554 (each with a fresh-context review).
+Open, breadth first (failing M4–M14 entries outside the hardening backlog): F148, F167, F217, F249 (core budget),
+F269, F329 (KB-138), F358 (SDF labels), F378 (KB-144), F389, F395 (core budget), F403, F438, F453, F472.
 
 ## Track H, packaging and release (2026-10-24)
 

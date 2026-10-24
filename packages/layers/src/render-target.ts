@@ -25,6 +25,8 @@ export interface ScreenProjector {
   geoToScreen(position: GeoPosition): ScreenPoint | undefined;
   /** The current zoom (Web Mercator zoom, continuous). */
   zoom(): number;
+  /** The view's size in CSS pixels, when known (`createGlobeLayers` with an `element`): `geoToScreen` gives points outside it too. */
+  viewportPx?(): { readonly widthPx: number; readonly heightPx: number };
 }
 
 /** Size of a laid-out text, from the renderer's glyph metrics (label collision boxes). */

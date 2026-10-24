@@ -13,7 +13,9 @@ export interface CheckContext {
   readonly offline?: {
     readonly mode: string;
     setMode(mode: 'online' | 'offline' | 'hybrid'): void;
-    stats(id?: string): { network: number };
+    stats(id?: string): { network: number; package: number };
+    /** Installs an offline package of the area around Tokyo, downloaded in the browser; resolves its tile count. */
+    installArea(): Promise<number>;
   };
 }
 
@@ -81,6 +83,23 @@ const GROUP_CHECKS: Record<string, (context: CheckContext) => Checks> = {
   }),
   rendering: ({ globe }) => ({
     'complete frame': () => drawnCenter(globe),
+    'atmosphere and sun lighting': async () => {
+      await idle(globe);
+      const plain = await globe.captureFrame();
+      globe.setQualitySettings({ atmosphere: 'medium' });
+      globe.setAtmosphere({ sunLighting: true, timeMs: Date.parse('2026-06-21T18:00:00Z') });
+      // The atmosphere's materials compile before it is drawn, longer than idle's quiet time on some backends.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await idle(globe);
+      const lit = await globe.captureFrame();
+      globe.setAtmosphere({ sunLighting: false });
+      globe.setQualitySettings({ atmosphere: 'off' });
+      await idle(globe);
+      let changed = 0;
+      for (let i = 0; i < plain.rgba.length; i += 4)
+        if (Math.abs((plain.rgba[i] ?? 0) - (lit.rgba[i] ?? 0)) > 16) changed++;
+      return globe.qualitySettings.atmosphere === 'off' && changed > plain.rgba.length / 40;
+    },
     'resolution scale': async () => {
       const full = (await globe.captureFrame()).widthPx;
       globe.setResolutionScale(0.5);
@@ -122,6 +141,17 @@ const GROUP_CHECKS: Record<string, (context: CheckContext) => Checks> = {
     'tile tiers': async () => {
       await idle(globe);
       return (offline?.stats('generated').network ?? 0) > 0;
+    },
+    'offline package': async () => {
+      if (offline === undefined) return false;
+      const tiles = await offline.installArea();
+      // Offline, a view of the package's area, never shown before (so not in the cache tiers), reads the package.
+      offline.setMode('offline');
+      globe.jumpTo({ longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 5 });
+      await idle(globe);
+      const fromPackage = offline.stats('generated').package;
+      offline.setMode('hybrid');
+      return tiles > 0 && fromPackage > 0;
     },
   }),
   'data-layers': ({ globe, extras }) => ({
@@ -165,6 +195,15 @@ const GROUP_CHECKS: Record<string, (context: CheckContext) => Checks> = {
       const times = globe.diagnostics.phaseTimesMs();
       globe.diagnostics.setPhaseTiming(false);
       return times.render >= 0 && globe.surfaceStats().tiles > 0 && globe.rendererStats().drawCalls > 0;
+    },
+    // The page sets the `qualityPreset` prop to 'low': adaptive quality applies it, then adapts from there.
+    'adaptive quality preset': async () => {
+      for (let i = 0; i < 50; i++) {
+        const settings = globe.qualitySettings;
+        if (settings.resolutionScale <= 0.5 && settings.atmosphere !== 'off') return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return false;
     },
   }),
   security: () => ({

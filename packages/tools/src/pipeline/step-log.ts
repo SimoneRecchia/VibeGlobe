@@ -33,17 +33,47 @@ export type ItemState = 'done' | 'missing' | 'corrupt';
 export class StepLog {
   private readonly entries = new Map<string, string>();
 
-  constructor(private readonly path: string) {
-    if (!existsSync(path)) return;
+  /** Whether the log was written for another fingerprint: everything but the downloads was dropped. */
+  readonly changed: boolean = false;
+
+  /**
+   * Opens the log of `path`. With a fingerprint (of the dataset's configuration, `work`, and of its source alone,
+   * `source`), a log written for another configuration keeps only its downloads, and only when the source is the same:
+   * the rest is redone (DP-002).
+   */
+  constructor(
+    private readonly path: string,
+    fingerprint?: { readonly work: string; readonly source: string },
+  ) {
+    if (!existsSync(path)) {
+      if (fingerprint !== undefined) this.#start(fingerprint);
+      return;
+    }
+    let logged: { work?: string; source?: string } = {};
     for (const line of readFileSync(path, 'utf8').split('\n')) {
       if (line.trim() === '') continue;
       try {
-        const entry = JSON.parse(line) as Entry;
-        this.entries.set(`${entry.step}\u0000${entry.key}`, entry.sha256);
+        const entry = JSON.parse(line) as Entry | { fingerprint: { work?: string; source?: string } };
+        if ('fingerprint' in entry) logged = entry.fingerprint;
+        else this.entries.set(`${entry.step}\u0000${entry.key}`, entry.sha256);
       } catch {
         // A process killed while appending leaves a partial last line: the item is simply redone.
       }
     }
+    if (fingerprint === undefined || logged.work === fingerprint.work) return;
+    this.changed = true;
+    const sameSource = logged.source === fingerprint.source;
+    const kept = [...this.entries].filter(([key]) => sameSource && key.startsWith('download\u0000'));
+    this.entries.clear();
+    this.#start(fingerprint);
+    for (const [key, checksum] of kept) {
+      const [step = '', item = ''] = key.split('\u0000');
+      this.record(step, item, checksum);
+    }
+  }
+
+  #start(fingerprint: { readonly work: string; readonly source: string }): void {
+    writeAtomic(this.path, `${JSON.stringify({ fingerprint })}\n`);
   }
 
   /** The checksum logged for an item. */

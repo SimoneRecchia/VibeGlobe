@@ -44,6 +44,8 @@ export type { FeatureEvent, FrameContext, Layer, LayerContext, LayerEvents, Pick
 export { LayerStack } from './layer-stack.js';
 export type { LayerPosition } from './layer-stack.js';
 export { DataLayer } from './data-layer.js';
+export { MarkerLodLayer } from './marker-lod-layer.js';
+export type { MarkerLodLayerOptions, MarkerLodOptions, MarkerLodStats } from './marker-lod-layer.js';
 export type { DataLayerOptions, DataLayerStats, FeatureUpdate, LayerData } from './data-layer.js';
 export { LabelLayer } from './label-layer.js';
 export type { LabelLayerOptions } from './label-layer.js';

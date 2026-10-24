@@ -2,7 +2,7 @@
  * A dataset build from a configuration file: license gate, estimate and confirmation before any download, then the
  * download, convert, tile and package steps of each dataset, each resumable (ADR 0024).
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { type LoadedConfig, datasetArea, loadConfig } from '../config/load.js';
 import type { DatasetConfig } from '../config/schema.js';
@@ -16,7 +16,8 @@ import type { AwsCredentials } from '../sources/sigv4.js';
 import { coverage } from '../tiles/area.js';
 import { writeBaseImage } from './base-image.js';
 import { type DatasetFolders, convertSources, rasterMosaic, tileRasterDataset } from './raster-dataset.js';
-import { StepLog } from './step-log.js';
+import { StepLog, sha256 } from './step-log.js';
+import { PIPELINE_VERSION } from '../version.js';
 import { tileVectorDataset } from './vector-dataset.js';
 
 /** The steps of a build, in order. */
@@ -96,15 +97,28 @@ async function confirm(options: BuildOptions, estimate: BuildEstimate): Promise<
   return options.ask('Proceed with the download and build? [y/N] ');
 }
 
-function folders(options: BuildOptions, dataset: DatasetConfig): DatasetFolders {
-  const root = options.outDir;
+/** What the logged work of a dataset depends on: its configuration, area, tools and the pipeline (DP-002). */
+function fingerprint(loaded: LoadedConfig, dataset: DatasetConfig, sample: boolean): { work: string; source: string } {
+  const hash = (value: unknown): string => sha256(new TextEncoder().encode(JSON.stringify(value)));
+  const area = datasetArea(loaded, dataset, sample);
   return {
-    downloads: join(root, 'downloads', dataset.id),
-    work: join(root, 'work', dataset.id),
-    tiles: join(root, 'output', dataset.id),
-    log: new StepLog(join(root, 'steps', `${dataset.id}.log`)),
-    report: (line) => options.report(`[${dataset.id}] ${line}`),
+    work: hash({ dataset, area, tools: loaded.config.tools, pipeline: PIPELINE_VERSION }),
+    source: hash({ source: dataset.source, sourceVersion: dataset.sourceVersion }),
   };
+}
+
+function folders(loaded: LoadedConfig, options: BuildOptions, dataset: DatasetConfig): DatasetFolders {
+  const root = options.outDir;
+  const report = (line: string): void => options.report(`[${dataset.id}] ${line}`);
+  const log = new StepLog(join(root, 'steps', `${dataset.id}.log`), fingerprint(loaded, dataset, options.sample));
+  const work = join(root, 'work', dataset.id);
+  const tiles = join(root, 'output', dataset.id);
+  if (log.changed) {
+    // Tiles of the earlier configuration (another zoom range or area) must not stay in the outputs.
+    report('configuration changed since the logged work: converting and tiling again');
+    for (const folder of [work, tiles]) rmSync(folder, { recursive: true, force: true });
+  }
+  return { downloads: join(root, 'downloads', dataset.id), work, tiles, log, report };
 }
 
 function lockOf(loaded: LoadedConfig): Record<string, string> {
@@ -120,7 +134,7 @@ async function buildDataset(
 ): Promise<{ transferred: number; built: number; skipped: number; outputs: string[] }> {
   const area = datasetArea(loaded, dataset, options.sample);
   const files: SourceFile[] = sourceFiles(dataset, { kind: 'bbox', bbox: coverage(area, dataset.minZoom) });
-  const f = folders(options, dataset);
+  const f = folders(loaded, options, dataset);
   const lock = lockOf(loaded);
   const downloadContext = { folder: f.downloads, log: f.log, fetch: options.fetch, lock, report: f.report };
   const results = await downloadAll(files, {

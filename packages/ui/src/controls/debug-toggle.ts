@@ -1,5 +1,5 @@
 /** The debug panel toggle (F428): shows and hides the debug overlay with the performance HUD. */
-import { FrameStats } from '@vibeglobe/core';
+import { FrameStats } from '@vibeglobe/core/diagnostics';
 import { createDebugOverlay, type DebugOverlay } from '../debug/debug-overlay.js';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame, icon, iconButton, ICONS, label } from './dom.js';

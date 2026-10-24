@@ -43,6 +43,11 @@ export function stackOf(entries: readonly StackEntry[], layers: readonly Imagery
 }
 
 const mapping = new Float64Array(8);
+
+/** A slot of {@link mapping} (all eight always exist). */
+function mapped(slot: number): number {
+  return mapping[slot] ?? 0;
+}
 const centerEcef = new Float64Array(3);
 const screen = new Float64Array(2);
 /** Overlays found for a draw, top first: handle, geographic, opacity, blend and the four UV numbers each. */
@@ -81,32 +86,32 @@ export function drawImagery(
       if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
       const chosen = wantChain(entry.chain, tile, distance);
       if (based || chosen < 0) continue;
-      const loader = entry.chain[chosen]?.loader;
-      const handle = mapping[MAPPING_HANDLE] ?? -1;
-      loader?.markDrawn(handle);
-      const geographic = entry.chain[chosen]?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
+      const drawn = entry.chain[chosen];
+      const handle = mapped(MAPPING_HANDLE);
+      drawn?.loader.markDrawn(handle);
+      const geographic = drawn?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
       if (isOpaque(entry.entry)) {
         based = true;
-        visible?.mark(entry.chain[chosen]?.index ?? 0);
+        visible?.mark(drawn?.index ?? 0);
         list.textures[index] = handle;
         list.geographic[index] = geographic;
-        list.imageryLevels[index] = mapping[MAPPING_LEVEL] ?? -1;
+        list.imageryLevels[index] = mapped(MAPPING_LEVEL);
         const at = index * 4;
-        list.uvTransforms[at] = mapping[MAPPING_SCALE_U] ?? 1;
-        list.uvTransforms[at + 1] = mapping[MAPPING_SCALE_V] ?? 1;
-        list.uvTransforms[at + 2] = mapping[MAPPING_OFFSET_U] ?? 0;
-        list.uvTransforms[at + 3] = mapping[MAPPING_OFFSET_V] ?? 0;
+        list.uvTransforms[at] = mapped(MAPPING_SCALE_U);
+        list.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
+        list.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
+        list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
       } else if (overlays < MAX_OVERLAYS) {
-        visible?.mark(entry.chain[chosen]?.index ?? 0);
+        visible?.mark(drawn?.index ?? 0);
         const at = overlays * 8;
         found[at] = handle;
         found[at + 1] = geographic;
         found[at + 2] = entry.entry.opacity;
         found[at + 3] = BLEND_CODES[entry.entry.blend];
-        found[at + 4] = mapping[MAPPING_SCALE_U] ?? 1;
-        found[at + 5] = mapping[MAPPING_SCALE_V] ?? 1;
-        found[at + 6] = mapping[MAPPING_OFFSET_U] ?? 0;
-        found[at + 7] = mapping[MAPPING_OFFSET_V] ?? 0;
+        found[at + 4] = mapped(MAPPING_SCALE_U);
+        found[at + 5] = mapped(MAPPING_SCALE_V);
+        found[at + 6] = mapped(MAPPING_OFFSET_U);
+        found[at + 7] = mapped(MAPPING_OFFSET_V);
         overlays++;
       }
     }
@@ -162,7 +167,9 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      if (fallback < 0 && mapInto(layer, tile)) fallback = k;
+      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless it is the
+      // last one: then its ancestors are the last resort (KB-149).
+      if (fallback < 0 && mapInto(layer, tile) && !(chain[k + 1] && unavailableAtMapping(layer))) fallback = k;
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -197,21 +204,24 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   return mapGeographic(tile, level, mapping, 0);
 }
 
+/** True when the source's tile in `mapping` (from {@link mapInto}) is known missing or failing. */
+function unavailableAtMapping(layer: ImageryLayer): boolean {
+  return layer.loader.unavailable(mapped(MAPPING_LEVEL), mapped(MAPPING_X), mapped(MAPPING_Y));
+}
+
 /** True when a source can give the tile at the surface's level now: within its levels, mapped, and not missing or failing. */
 function hasTile(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const source = layer.source;
   if (tile.level > topLevel(layer) || !mapInto(layer, tile)) return false;
-  const level = mapping[MAPPING_LEVEL] ?? 0;
-  if (level < source.minLevel) return false;
-  return !layer.loader.unavailable(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
+  return mapped(MAPPING_LEVEL) >= source.minLevel && !unavailableAtMapping(layer);
 }
 
 /** The deepest resident tile of a source for a tile, without requesting any (handle in `mapping`), or -1. */
 function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
-  for (let current = mapping[MAPPING_LEVEL] ?? 0; current >= source.minLevel; current--) {
-    const handle = layer.loader.readyHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
+  for (let current = mapped(MAPPING_LEVEL); current >= source.minLevel; current--) {
+    const handle = layer.loader.readyHandle(current, mapped(MAPPING_X), mapped(MAPPING_Y));
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;
       return handle;
@@ -227,9 +237,9 @@ function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
  */
 function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: number): void {
   if (tile.level >= topLevel(layer) || !mapInto(layer, tile)) return;
-  const level = mapping[MAPPING_LEVEL] ?? 0;
-  const x = 2 * (mapping[MAPPING_X] ?? 0);
-  const y = 2 * (mapping[MAPPING_Y] ?? 0);
+  const level = mapped(MAPPING_LEVEL);
+  const x = 2 * mapped(MAPPING_X);
+  const y = 2 * mapped(MAPPING_Y);
   const key = PREFETCH_CLASS + level + 1 + 2 * distance;
   for (let child = 0; child < 4; child++) layer.loader.want(level + 1, x + (child & 1), y + (child >> 1), key);
 }
@@ -242,13 +252,13 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
-  const wanted = mapping[MAPPING_LEVEL] ?? 0;
+  const wanted = mapped(MAPPING_LEVEL);
   const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
   for (let current = wanted; current >= lowest; current--) {
-    const x = mapping[MAPPING_X] ?? 0;
-    const y = mapping[MAPPING_Y] ?? 0;
+    const x = mapped(MAPPING_X);
+    const y = mapped(MAPPING_Y);
     // The wanted tile and every second ancestor are requested; the others are only looked up.
     const handle =
       !arriving && (wanted - current) % 2 === 0
@@ -291,9 +301,9 @@ export function preloadImagery(stack: readonly StackLayer[], tiles: readonly Qua
       for (let k = 0; k < layer.chain.length; k++) {
         const source = layer.chain[k];
         if (!source || !hasTile(source, tile)) continue;
-        const level = mapping[MAPPING_LEVEL] ?? 0;
+        const level = mapped(MAPPING_LEVEL);
         if (source.loader.preloading)
-          source.loader.want(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0, PRELOAD_CLASS + level);
+          source.loader.want(level, mapped(MAPPING_X), mapped(MAPPING_Y), PRELOAD_CLASS + level);
         break;
       }
     }

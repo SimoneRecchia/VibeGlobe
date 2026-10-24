@@ -23,6 +23,7 @@ import {
 } from './layer-subdivision.js';
 import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
 import type { TextStyle } from './layer-atlas.js';
+import { writePointQuad } from './layer-points.hot.js';
 
 /** The vertex arrays of a layer mesh, sized for its vertices (ADR 0037). */
 export interface LayerArrays {
@@ -336,6 +337,11 @@ export function rewriteQuads(
   ground: LayerGround | undefined,
 ): boolean {
   if (end * 4 > arrays.vertices) return false;
+  if (batch.kind === 'point') {
+    // Points have no image: the allocation-free path of live feeds (F378).
+    for (let feature = first; feature < end; feature++) writePointQuad(batch, arrays, feature, ground);
+    return true;
+  }
   for (let feature = first; feature < end; feature++) {
     const q = quadVertices(batch, feature, images);
     const height = q.height + (ground?.heightAt(q.lon, q.lat) ?? 0);

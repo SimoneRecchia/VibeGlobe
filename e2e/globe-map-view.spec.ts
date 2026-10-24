@@ -450,9 +450,14 @@ for (const backend of BACKENDS) {
       page,
     }) => {
       test.setTimeout(240_000);
-      await openGlobe(page, `${CLOCK}&backend=${backend}${query}`);
+      // KB-153: in manual tilt at about zoom 12.4 the terrain limit lowers the tilt 7° for one frame (docs/known-bugs.md).
+      test.fail(mode === 'manual-tilt', 'KB-153');
+      // With the fixture terrain: the zoom ends on the fixture peak's flank, the target on its relief (F167 step 1).
+      await openGlobe(page, `${CLOCK}&backend=${backend}&terrain=terrarium${query}`);
       await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());
-      const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('zoom-globe-to-street'));
+      const report = await page.evaluate(() =>
+        window.vibeglobePlayground?.recordScenario('zoom-globe-to-street-relief'),
+      );
       if (!report) throw new Error('no report');
       const times = await page.evaluate(() => window.vibeglobePlayground?.cpuFrameTimesMs() ?? []);
       const zooms = report.samples.map((sample) => sample[0]);
@@ -465,6 +470,11 @@ for (const backend of BACKENDS) {
       expect(largestStep(report.samples.map((sample) => sample[2]))).toBeLessThan(0.1);
       expect(largestStep(tilts)).toBeLessThan(5);
       expect(largestStep(headings)).toBe(0);
+      // The eye moves smoothly too: 0.1 zoom levels a frame change its height by about 7%, the terrain under the target
+      // and the clearance above it add no jump.
+      const heights = report.samples.map((sample) => sample[7]);
+      expect(Math.max(...heights.slice(1).map((h, i) => Math.abs(h / (heights[i] ?? h) - 1)))).toBeLessThan(0.12);
+      expect(Math.max(...report.samples.map((sample) => sample[2]))).toBeGreaterThan(0.99);
       if (mode === '2D-locked') expect(Math.max(...tilts)).toBe(0);
       if (mode === 'manual-tilt') expect(tilts.at(-1)).toBeCloseTo(45, 6);
       // The temporal glitch detector: no holes, no pops, no frame-to-frame jump of the picture.

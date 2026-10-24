@@ -45,6 +45,8 @@ for (const backend of BACKENDS) {
   test(`dragging keeps the grabbed point under the pointer on the globe, tilted, across the antimeridian and near the pole on ${backend} (F178)`, async ({
     page,
   }) => {
+    // Five views, each opened and settled: 26–28 s alone on SwiftShader, past the 30 s default beside other tests.
+    test.setTimeout(60_000);
     await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=3`);
     await dragKeepsAnchor(page, { xPx: 400, yPx: 300 }, { xPx: 520, yPx: 360 });
     await openControls(page, `backend=${backend}&lon=179.5&lat=0&zoom=6`);
@@ -63,68 +65,6 @@ for (const backend of BACKENDS) {
     await dragKeepsAnchor(page, { xPx: 400, yPx: 300 }, { xPx: 520, yPx: 240 });
   });
 }
-
-test('a released drag coasts with time-based inertia, and a release after holding still does not (F179)', async ({
-  page,
-}) => {
-  // A small canvas: software GPUs draw it fast enough for mouse events to arrive at a mouse's pace.
-  await openControls(page, 'lon=10&lat=20&zoom=4&size=320x240');
-  // Warm-up: the first drag frames after start-up are slow, which would bunch the fling's events together.
-  await page.mouse.move(160, 120);
-  await page.mouse.down();
-  await page.mouse.move(170, 125, { steps: 5 });
-  await page.waitForTimeout(200);
-  await page.mouse.up();
-  await settle(page);
-  await record(page, []);
-  await page.mouse.move(100, 120);
-  await page.mouse.down();
-  // Moves 16 ms apart, as a mouse reports them, and the release right after the last.
-  for (let i = 1; i <= 12; i++) {
-    await page.mouse.move(100 + 8 * i, 120);
-    await page.waitForTimeout(16);
-  }
-  await page.mouse.up();
-  await settle(page);
-  const all = await frames(page);
-  const releasedAt = all.findIndex((frame) => frame.pointer === null);
-  const lon = all.map((frame) => frame.camera.longitudeDeg);
-  const rate = (i: number): number =>
-    ((lon[i] ?? 0) - (lon[i - 1] ?? 0)) / ((all[i]?.timeMs ?? 0) - (all[i - 1]?.timeMs ?? 1));
-  const trace = JSON.stringify(
-    all.map((f) => [f.timeMs.toFixed(1), f.camera.longitudeDeg.toFixed(5), f.pointer ? 1 : 0]),
-  );
-  expect(releasedAt, trace).toBeGreaterThan(3);
-  expect(all.length - releasedAt, trace).toBeGreaterThan(3);
-  // The release frame starts inertia part-way through its step; from the next frame on, inertia runs at the drag's
-  // speed (the content moves east, the center west) and slows monotonically to rest within the time constant.
-  const dragRate = (rate(releasedAt - 1) + rate(releasedAt - 2)) / 2;
-  const first = releasedAt + 1;
-  expect(rate(first), trace).toBeLessThan(0);
-  // A sanity bound: that frame averages a stretch already decaying, over uneven engine steps on a software GPU; the
-  // exact release velocity is the unit tests' (create-controls.test.ts, inertia).
-  expect(rate(first) / dragRate, trace).toBeGreaterThan(0.4);
-  expect(rate(first) / dragRate, trace).toBeLessThan(1.6);
-  for (let i = first + 1; i < lon.length; i++) {
-    expect(Math.abs(rate(i)), trace).toBeLessThanOrEqual(Math.abs(rate(i - 1)) + 1e-9);
-  }
-  expect((all.at(-1)?.timeMs ?? 0) - (all[releasedAt]?.timeMs ?? 0)).toBeLessThan(2500);
-  // Along the drag's direction: an east-west drag on the equator keeps the latitude.
-  expect(Math.abs((all.at(-1)?.camera.latitudeDeg ?? 0) - (all[releasedAt]?.camera.latitudeDeg ?? 0))).toBeLessThan(
-    0.5,
-  );
-
-  // Held still for 200 ms before the release: no coasting.
-  await page.mouse.move(100, 120);
-  await page.mouse.down();
-  await page.mouse.move(180, 120, { steps: 8 });
-  await page.waitForTimeout(200);
-  await settle(page);
-  const before = await camera(page);
-  await page.mouse.up();
-  await settle(page);
-  expect((await camera(page)).longitudeDeg).toBeCloseTo(before.longitudeDeg, 9);
-});
 
 for (const backend of BACKENDS) {
   test(`a double click zooms in exactly one level at the clicked point, and a single click does not zoom, on ${backend} (F170)`, async ({

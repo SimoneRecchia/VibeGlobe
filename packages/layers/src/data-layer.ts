@@ -5,6 +5,7 @@
 import type { FeatureGeometry, GeoPosition, ScreenPoint } from '@vibeglobe/core';
 import { anchorNear, type Project } from './anchors.js';
 import { FeatureStore, type FeatureId } from './feature-store.js';
+import type { DataLayerStats, FeatureUpdate } from './data-layer-types.js';
 import { ellipseGeometry } from './circle.js';
 import {
   anchorOf,
@@ -64,25 +65,10 @@ export interface DataLayerOptions {
   readonly orderOffset?: number;
 }
 
-/** A change to one feature. */
-export interface FeatureUpdate {
-  /** New position (points, markers, labels) as a geographic position or GeoJSON coordinates. */
-  readonly position?: GeoPosition | readonly number[];
-  readonly geometry?: Geometry;
-  /** Replaces the properties when `replace` is true, otherwise merges into them. */
-  readonly properties?: Readonly<Record<string, unknown>>;
-  readonly replace?: boolean;
-}
-
 let generatedIds = 0;
 const scratch = new Float64Array(4);
 
-/** Counters for instrumentation (F372, F376): style evaluations and full re-evaluations of the layer. */
-export interface DataLayerStats {
-  featureEvaluations: number;
-  /** Times every feature was re-evaluated (zoom-dependent per-feature styles while zooming, a new style). */
-  fullEvaluations: number;
-}
+export type { DataLayerStats, FeatureUpdate } from './data-layer-types.js';
 
 /** A layer of one primitive kind. */
 export class DataLayer implements Layer {
@@ -213,12 +199,25 @@ export class DataLayer implements Layer {
 
   /** Moves one feature (the allocation-free path for live feeds, F378). */
   setFeaturePosition(id: FeatureId, longitudeDeg: number, latitudeDeg: number, heightMeters = 0): boolean {
+    return this.#writeVector(id, 'position', longitudeDeg, latitudeDeg, heightMeters, 0);
+  }
+
+  /**
+   * Recolors one feature with straight RGBA in 0–1, allocating nothing (the style path for live feeds, F378). The color
+   * holds until the feature's style is evaluated again (a property or feature-state change, a zoom-dependent style).
+   */
+  setFeatureColor(id: FeatureId, red: number, green: number, blue: number, alpha = 1): boolean {
+    return this.#writeVector(id, 'color', red, green, blue, alpha);
+  }
+
+  #writeVector(id: FeatureId, attribute: 'position' | 'color', a: number, b: number, c: number, d: number): boolean {
     const index = this.store.indexOf(id);
     if (index === undefined) return false;
-    scratch[0] = longitudeDeg;
-    scratch[1] = latitudeDeg;
-    scratch[2] = heightMeters;
-    this.store.set('position', index, scratch);
+    scratch[0] = a;
+    scratch[1] = b;
+    scratch[2] = c;
+    scratch[3] = d;
+    this.store.set(attribute, index, scratch);
     return true;
   }
 

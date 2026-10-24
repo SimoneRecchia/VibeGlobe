@@ -131,6 +131,7 @@ function fakeDocument(overlays: FakeOverlay[], reducedMotion: boolean, hostNow: 
   return {
     ...fakeTarget(),
     defaultView: {
+      ...fakeTarget(),
       performance: { now: hostNow },
       matchMedia: () => ({ matches: reducedMotion }),
     },
@@ -252,6 +253,8 @@ export function controlsHarness(
     overlays,
     prevented: () => prevented,
     fire: (type: string, event: object) => fire(element, type, event),
+    /** Fires an event at the window (`blur` when the page loses focus). */
+    fireWindow: (type: string) => fire(doc.defaultView, type, {}),
     pointer,
     key,
     /** Advances the engine clock by `dtMs` and runs one frame's update. */

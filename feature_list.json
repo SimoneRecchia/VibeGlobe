@@ -2910,7 +2910,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F218",
@@ -3532,7 +3532,7 @@
         "Assert the profile honors the servers' cache headers and never sends no-cache request headers",
         "Run the opt-in live test at low volume, as the policy allows"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F265",
@@ -4488,7 +4488,7 @@
         "Load the output in the playground through the terrain adapter and verify relief displays with no cracks on WebGPU and forced WebGL2",
         "Verify the output attribution includes the Copernicus DEM notice with the modification statement"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F340",
@@ -4542,7 +4542,7 @@
         "Run the estimate command on both full configurations and confirm it completes without downloading anything",
         "Add a new test region with only a new configuration file and confirm it builds without code changes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F343",
@@ -4634,7 +4634,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F348",
@@ -4979,7 +4979,7 @@
         "Verify through the debug overlay that far or dense markers use the simplified representation and near ones the full marker",
         "Verify the switch is a cross-fade with no pop by frame differencing and draw calls stay within the documented budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F375",
@@ -6425,7 +6425,7 @@
         "Run the example's Playwright suite on both backends",
         "Assert every feature check passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F489",
@@ -6465,7 +6465,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F491",

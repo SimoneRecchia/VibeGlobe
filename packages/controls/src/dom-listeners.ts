@@ -64,6 +64,9 @@ function pointerListeners(element: HTMLElement, port: CameraPort, r: Recognizers
     event.preventDefault();
   };
   const onMove = (event: PointerEvent): void => {
+    // A mouse over the map reports Ctrl even when the key went down before the page had focus (KB-151); a trackpad
+    // pinch sets ctrlKey on its wheel events only.
+    if (event.pointerType === 'mouse') r.wheel.ctrlHeld = event.ctrlKey;
     const { xPx, yPx } = localPoint(element, event);
     if (event.pointerType === 'touch') request(r.touch.move(event.pointerId, xPx, yPx, event.timeStamp));
     else if (event.pointerId === r.mouse.pointerId) request(r.mouse.move(xPx, yPx, event.timeStamp, event.ctrlKey));
@@ -113,7 +116,8 @@ function otherListeners(element: HTMLElement, port: CameraPort, context: Gesture
   const onGesture = (event: GestureEventLike): void => {
     event.preventDefault();
     if (event.type === 'gesturestart') return r.wheel.gestureStart();
-    if (event.type !== 'gesturechange') return;
+    // iOS and iPadOS Safari send these for a two-finger touch too, which the touch gestures already apply (KB-152).
+    if (event.type !== 'gesturechange' || r.touch.active) return;
     const rect = element.getBoundingClientRect();
     const xPx = (event.clientX ?? rect.left + element.clientWidth / 2) - rect.left;
     const yPx = (event.clientY ?? rect.top + element.clientHeight / 2) - rect.top;
@@ -122,8 +126,12 @@ function otherListeners(element: HTMLElement, port: CameraPort, context: Gesture
   const onContextMenu = (event: Event): void => {
     if (context.options.gestures.dragRotate) event.preventDefault();
   };
+  // A Ctrl released elsewhere (Ctrl+L, Ctrl+Tab) sends its keyup there: forgotten when the window loses focus (KB-151).
+  const onWindowBlur = (): void => void (r.wheel.ctrlHeld = false);
   const doc = element.ownerDocument;
+  const view = doc.defaultView;
   return [
+    ...(view ? ([[view, 'blur', onWindowBlur]] as Listener[]) : []),
     [element, 'keydown', onKeyDown as EventListener],
     [element, 'keyup', onKeyUp as EventListener],
     [element, 'blur', onBlur],

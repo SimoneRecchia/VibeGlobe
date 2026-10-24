@@ -180,6 +180,14 @@ describe('runBuild', { timeout: 30_000 }, () => {
     pmtiles.close();
   });
 
+  it('names every download the lock file does not pin, with its checksum (DP-006)', async () => {
+    const options = setup([terrain], { until: 'download' });
+    await runBuild(options);
+    expect(options.lines).toContain(
+      `[terrain] unpinned Copernicus_DSM_COG_10_N45_00_E006_00_DEM.tif: add "Copernicus_DSM_COG_10_N45_00_E006_00_DEM.tif": "${sha256(DEM)}" to the lock file`,
+    );
+  });
+
   it('resumes without redoing verified work and regenerates corrupted downloads and tiles', async () => {
     const first = setup([terrain]);
     await runBuild(first);
@@ -196,6 +204,18 @@ describe('runBuild', { timeout: 30_000 }, () => {
     expect(second.lines.some((l) => /corrupt intermediate tile 14\//.test(l))).toBe(true);
     expect(result.tilesBuilt).toBe(1);
     expect(outputChecksums(join(first.outDir, 'output'))).toEqual(reference);
+  });
+
+  it('rebuilds from scratch when the configuration changed since the logged work, keeping no stale tile (DP-002)', async () => {
+    const first = setup([terrain]);
+    await runBuild(first);
+    const changed = { ...terrain, maxZoom: 13 };
+    const resumed = setup([changed], { outDir: first.outDir });
+    await runBuild(resumed);
+    const clean = setup([changed]);
+    await runBuild(clean);
+    expect(resumed.lines.some((l) => /configuration changed/.test(l))).toBe(true);
+    expect(outputChecksums(join(resumed.outDir, 'output'))).toEqual(outputChecksums(join(clean.outDir, 'output')));
   });
 
   it('rebuilds identical outputs from the same configuration in clean folders (F343)', async () => {

@@ -5990,7 +5990,7 @@
         "Switch the label language between English and Italian and assert names use name:en or name:it with a fallback to name",
         "Assert place labels do not flicker during the zoom (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F455",

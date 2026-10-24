@@ -1,4 +1,5 @@
-import { projectLayerPoint, type FrameView, type LayerGround } from '@vibeglobe/core';
+import { type FrameView, type LayerGround } from '@vibeglobe/core';
+import { projectLayerPoint } from '@vibeglobe/core/layers';
 import { valueOf, type BatchContents } from './layer-geometry.js';
 
 /** How far from a feature's drawn shape a pointer still picks it, CSS pixels. */

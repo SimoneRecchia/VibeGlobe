@@ -79,6 +79,18 @@ describe('wmsImagery (F231, F227)', () => {
     expect(box[0]).toBeCloseTo(-20037508.3428 / 8, 2);
   });
 
+  it('declares itself transparent unless asked for an opaque background, so the layers below show (KB-154)', async () => {
+    const overlay = await wmsImagery({ id: 'w', url: 'https://wms.test/map', layers: ['labels'], transport: never });
+    const opaque = await wmsImagery({
+      id: 'o',
+      url: 'https://wms.test/map',
+      layers: ['ortho'],
+      transparent: false,
+      transport: never,
+    });
+    expect([overlay.transparent, opaque.transparent]).toEqual([true, false]);
+  });
+
   it('puts latitude first for EPSG:4326 in 1.3.0 only, and names SRS in 1.1.1', async () => {
     const v130 = await urlOf(
       { id: 'a', capabilities: AASG, layers: ['Wellheader'], preferredCrs: 'EPSG:4326', gutterPx: 0 },

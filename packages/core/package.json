@@ -20,6 +20,16 @@
       "types": "./dist/geodesy.d.ts",
       "source": "./src/geodesy.ts",
       "default": "./dist/geodesy.js"
+    },
+    "./layers": {
+      "types": "./dist/layers.d.ts",
+      "source": "./src/layers.ts",
+      "default": "./dist/layers.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.ts",
+      "source": "./src/diagnostics.ts",
+      "default": "./dist/diagnostics.js"
     }
   },
   "types": "./dist/index.d.ts",

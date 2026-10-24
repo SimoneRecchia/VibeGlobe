@@ -1,5 +1,7 @@
 import type { FrameCapture, Globe, ViewInit } from '@vibeglobe/core';
+import { ACCEPTANCE_SCENARIOS } from './acceptance-scenarios.js';
 import { checkPops } from './pops.js';
+import { segments, type FrameScenario } from './scenario-paths.js';
 
 export { countPops } from './pops.js';
 
@@ -8,16 +10,6 @@ export { countPops } from './pops.js';
  * windows (no view) between moves; the harness draws and reads every frame through `captureFrame()` and runs the
  * detectors in the page, so no frame crosses into the test. Loaded only when a test asks for it.
  */
-
-/** A frame-stepped scenario: how many frames, and the view of each (undefined: the camera holds still). */
-interface FrameScenario {
-  readonly frames: number;
-  view(frame: number): ViewInit | undefined;
-  /** Measure, in every frame, how far the terrain rises above the ellipsoid's horizon (F142). */
-  readonly relief?: boolean;
-  /** Record the camera state of every frame: zoom, morph and relief factors, applied tilt (M5). */
-  readonly samples?: boolean;
-}
 
 /** The globe element's size in CSS pixels, which `screenToGeo` and `geoToScreen` use. */
 interface CssSize {
@@ -64,30 +56,6 @@ export interface ScenarioReport {
   samples: [number, number, number, number, string, string, number, number][];
 }
 
-/** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
-function segments(views: readonly ViewInit[], motion: number, hold: number): FrameScenario {
-  const step = motion + hold;
-  return {
-    frames: (views.length - 1) * step + hold,
-    view(frame) {
-      const segment = Math.floor(frame / step);
-      const into = frame - segment * step;
-      const from = views[segment];
-      const to = views[segment + 1];
-      if (!from || !to || into >= motion) return frame === 0 ? views[0] : undefined;
-      const t = (into + 1) / motion;
-      const mixed: Record<string, number> = {};
-      // Only the fields both views give: a view without a tilt leaves the view mode's tilt (M5).
-      for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
-        const a = (from as Record<string, number | undefined>)[key];
-        const b = (to as Record<string, number | undefined>)[key];
-        if (a !== undefined && b !== undefined) mixed[key] = a + (b - a) * t;
-      }
-      return mixed as ViewInit;
-    },
-  };
-}
-
 /** Plays scenarios one after the other. */
 function chain(...parts: FrameScenario[]): FrameScenario {
   return {
@@ -107,8 +75,6 @@ const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9 };
 const TOKYO = { longitudeDeg: 139.7, latitudeDeg: 35.7 };
 /** Places of the fixture terrain (M4): the 4,000 m peak's valley, and the 1,500 m ridge along 46.5° N. */
 const ALPS = { longitudeDeg: 6.86, latitudeDeg: 45.7 };
-/** On the fixture peak's southern flank (scripts/fixtures/tiles/terrain.ts), 8 km from its summit, facing it. */
-const FLANK = { longitudeDeg: 6.86, latitudeDeg: 45.76 };
 const RIDGE = { longitudeDeg: 8.5, latitudeDeg: 46.42 };
 
 /** An orbit around `center`: the heading turns through `headings` at each zoom and tilt. */
@@ -123,6 +89,7 @@ function orbit(
 
 /** The frame-stepped scenarios by name. */
 const SCENARIOS: Record<string, FrameScenario> = {
+  ...ACCEPTANCE_SCENARIOS,
   // From orbit to street level over Rome, turning while it zooms (F105).
   'zoom-orbit-to-street': segments(
     [2, 4, 6, 8, 10, 12, 14, 16].map((zoom, i) => ({
@@ -221,18 +188,6 @@ const SCENARIOS: Record<string, FrameScenario> = {
       [
         { ...ROME, zoom: 1 },
         { ...ROME, zoom: 18 },
-      ],
-      170,
-      2,
-    ),
-    samples: true,
-  },
-  // The same zoom down onto the fixture relief, with `?terrain=terrarium` (the M5 acceptance with terrain, F167).
-  'zoom-globe-to-street-relief': {
-    ...segments(
-      [
-        { ...FLANK, zoom: 1 },
-        { ...FLANK, zoom: 18 },
       ],
       170,
       2,

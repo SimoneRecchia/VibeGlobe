@@ -229,6 +229,8 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
     pixelRatio: 1,
     ...(coverage ? { coverage: [coverage] } : {}),
     decoder: 'image',
+    // The layers below show through what the server leaves transparent (KB-154).
+    transparent: options.transparent !== false,
     transportRequired: true,
     transport: wmsTransport(
       options.transport ?? fetchTransport(),

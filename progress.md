@@ -20,6 +20,8 @@ Open:
 
 5. **F395**: in the playground's tilted view (zoom 9, tilt 80) fog saves about 22% of the requests beyond the pinned base (153 vs 196; denser `?haze=2` does not change it), short of the entry's 25%: only the distant levels 5–8 are spared. Next: check that `haze` reaches the selection's `fogHaze`, then whether the visibility at a tile's closest point is too generous.
 
+6. **F358** (time box spent 2026-10-24): labels drawn as one signed distance field per text (track D's `sdfFromCoverage`, shaded with fill, halo and `fwidth` anti-aliasing) at a 24 px base, or at the step above the label's device size (12–96 px in √2 steps), make the F360 stability check fail: the text's centroid moves up to 1.0–1.4 px beyond its anchor (the bitmap labels: 0.3 px panning, 0.7 px zooming), because the distance field loses the hinted stems and the ground shows through thin strokes as it scrolls. Also found: at a 32 px base the 2048 atlas started over every frame (about 2,300 labels in view). Options: per-glyph fields at the step's size with one quad per glyph (track D's layout), or bitmaps below 16 device pixels and fields above. The patch is not committed.
+
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
 ## Track F, network simulation suite (2026-10-23)

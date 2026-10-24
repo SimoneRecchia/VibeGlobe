@@ -13,7 +13,7 @@ const chromiumPath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
 const CHROMIUM = { ...devices['Desktop Chrome'], ...(chromiumPath ? {} : { channel: 'chromium' }) };
 /** Tests whose results depend on having the machine to themselves. */
 const MEASURES_THE_MACHINE =
-  /globe-allocation\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts|hud-overhead\.spec\.ts/;
+  /globe-allocation\.spec\.ts|controls-inertia\.spec\.ts|imagery-timing\.spec\.ts|globe-leaks\.spec\.ts|adapter-leaks\.spec\.ts|hud-overhead\.spec\.ts/;
 /** Without Docker (CI's container shards), the LAN host test runs elsewhere (CI's lan job). */
 const NEEDS_DOCKER = process.env['VIBEGLOBE_NO_DOCKER'] === '1' ? [/offline-lan\.spec\.ts/] : [];
 /**

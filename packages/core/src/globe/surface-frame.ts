@@ -66,9 +66,6 @@ const LIFT_SETTLED_METERS = 1e-3;
 /** The sample `terrainHeightRad` writes. */
 const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
 
-/** During a flight a visible tile loads once wanted this long: the moving view would show it only for a moment (F287). */
-const FLIGHT_SETTLE_MS = 400;
-
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
  * draw list the renderer draws, reusing every array (ADR 0018). Keeps what the last drawn frame selected for the
@@ -265,7 +262,8 @@ export class SurfaceFrame {
     if (imagery)
       for (const layer of imagery.layers) {
         layer.loader.prefetchPaused = motion > 1 || imagery.preload.flying;
-        layer.loader.settleMs = imagery.preload.flying ? FLIGHT_SETTLE_MS : 0;
+        // A flight requests no visible tile: the view ahead and the destination load instead (F287).
+        layer.loader.settleMs = imagery.preload.flying ? Number.POSITIVE_INFINITY : 0;
       }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
@@ -298,6 +296,12 @@ export class SurfaceFrame {
     this.imagery.preload.flying = end !== undefined && flight;
     if (end) this.imagery.preload.select(camera, end, this.selection);
     else this.imagery.preload.clear();
+    this.imagery.ahead.clear();
+  }
+
+  /** Each frame of a flight: loads the tiles of the pose it will have in about a second (F287). */
+  preloadAhead(end: Float64Array, camera: Camera): void {
+    this.imagery?.ahead.select(camera, end, this.selection);
   }
 
   /** The camera jumped: no motion for motion-aware detail (F085). */

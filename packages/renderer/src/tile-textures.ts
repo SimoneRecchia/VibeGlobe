@@ -157,6 +157,25 @@ export class TileTextures {
     }
   }
 
+  /**
+   * Gives every texture held the current anisotropy (F398: a quality preset changed it): those with another level are
+   * created and uploaded again from their kept images, as after a device loss, and `base` (the world image) is
+   * filtered again. Height grids are not filtered so.
+   */
+  refilter(renderer: WebGPURenderer, base?: Texture): void {
+    const level = this.anisotropy();
+    if (base && base.anisotropy !== level) {
+      base.anisotropy = level;
+      base.needsUpdate = true;
+    }
+    for (const entry of this.entries) {
+      if (!entry || isHeights(entry.tile.image) || entry.texture.anisotropy === level) continue;
+      entry.texture.dispose();
+      entry.texture = this.create(entry.tile);
+      renderer.initTexture(entry.texture);
+    }
+  }
+
   /** Releases everything. */
   clear(): void {
     for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);

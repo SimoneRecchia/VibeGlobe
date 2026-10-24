@@ -83,7 +83,10 @@ export class EngineQuality {
 
   /** The quality settings in effect. */
   get settings(): Required<QualitySettings> {
-    return { ...this.quality, resolutionScale: this.parts.resolutionScale() };
+    // The anisotropy applied: the device's maximum caps the level asked for (F398).
+    const max = this.parts.renderer()?.capabilities.maxAnisotropy;
+    const anisotropy = max === undefined ? this.quality.anisotropy : Math.min(this.quality.anisotropy, max);
+    return { ...this.quality, anisotropy, resolutionScale: this.parts.resolutionScale() };
   }
 
   /** The atmosphere's scene settings in effect. */

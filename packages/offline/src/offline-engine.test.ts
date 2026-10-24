@@ -14,10 +14,10 @@ interface Served {
 
 /** A fake network: answers by URL, records every request with its revalidation header. */
 function fakeNetwork(answer: (url: string) => Served | 'down') {
-  const requests: { url: string; ifNoneMatch: string | null }[] = [];
+  const requests: { url: string; ifNoneMatch: string | null; atMs: number }[] = [];
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    requests.push({ url, ifNoneMatch: new Headers(init?.headers).get('If-None-Match') });
+    requests.push({ url, ifNoneMatch: new Headers(init?.headers).get('If-None-Match'), atMs: Date.now() });
     const served = answer(url);
     if (served === 'down') throw new TypeError('Failed to fetch');
     const response = new Response(served.status === 304 ? null : (served.body ?? 'tile'), {
@@ -228,10 +228,12 @@ describe('the offline engine', () => {
     await expect.poll(() => offline.connectivity).toBe('degraded');
     expect(text(await load(live, tile(2, 0, 0)))).toBe('tile');
     await new Promise((resolve) => setTimeout(resolve, 400));
-    const checks = net.requests.filter((r) => r.url.startsWith('https://dead.test/0/0/0')).map((r) => r.url);
-    // 20, 40, 80, 160, 200 ms waits: about five checks in 400 ms, never one per frame.
+    const checks = net.requests.filter((r) => r.url.startsWith('https://dead.test/0/0/0')).map((r) => r.atMs);
     expect(checks.length).toBeGreaterThanOrEqual(3);
-    expect(checks.length).toBeLessThanOrEqual(7);
+    // The waits double from 20 ms up to 200 ms, never one per frame; a busy machine only delays timers (2 ms of slack
+    // for the timer's rounding).
+    for (let i = 1; i < checks.length; i++)
+      expect((checks[i] ?? 0) - (checks[i - 1] ?? 0)).toBeGreaterThanOrEqual(Math.min(20 * 2 ** (i - 1), 200) - 2);
   });
 });
 

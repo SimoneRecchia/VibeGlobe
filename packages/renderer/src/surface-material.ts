@@ -197,7 +197,7 @@ function placeMorphed(
   params: Node<'vec4'>,
   morphParams: Node<'vec4'>,
   morphAxes: Node<'mat3'>,
-): Node<'vec3'> {
+): { eyeRelative: Node<'vec3'>; reliefMeters: Node<'float'> } {
   const tileNormal = attribute('tileNormal', 'vec3');
   const tilePlane = attribute('tilePlane', 'vec4');
   const skirt = tileNormal.length().greaterThan(1.5);
@@ -210,7 +210,14 @@ function placeMorphed(
     tilePlane.y.mul(sigma),
     reliefHeight.mul(tilePlane.w).mul(sigma).add(tilePlane.z).sub(skirtExtra),
   );
-  return makeMorphedEyeRelative(material, depthPath, globeOffset, morphAxes.mul(planeLocal), morphParams.x);
+  const eyeRelative = makeMorphedEyeRelative(
+    material,
+    depthPath,
+    globeOffset,
+    morphAxes.mul(planeLocal),
+    morphParams.x,
+  );
+  return { eyeRelative, reliefMeters: reliefHeight };
 }
 
 /**
@@ -317,9 +324,10 @@ export function createSurfaceMaterial(
     composeOverlays(color);
     return color;
   })();
-  const eyeRelative = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
-  // Haze and sun lighting (F394, F396): the uniforms live in the atmosphere, so a new one needs a new material.
-  atmosphere?.applyToSurface(material, eyeRelative);
+  const { eyeRelative, reliefMeters } = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
+  // Haze and sun lighting (F394, F396), slopes shaded by the relief drawn: the uniforms live in the atmosphere, so a
+  // new one needs a new material.
+  atmosphere?.applyToSurface(material, eyeRelative, reliefMeters);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;

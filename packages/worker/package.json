@@ -20,12 +20,14 @@
     "dist",
     "!dist/tsconfig.tsbuildinfo",
     "wasm/vibeglobe-basis.wasm",
+    "wasm/meshopt-decoder.wasm",
     "wasm/licenses",
     "wasm/third-party.json"
   ],
   "dependencies": {
     "@vibeglobe/core": "0.0.0",
     "@vibeglobe/sources": "0.0.0",
-    "@vibeglobe/layers": "0.0.0"
+    "@vibeglobe/layers": "0.0.0",
+    "@vibeglobe/models": "0.0.0"
   }
 }

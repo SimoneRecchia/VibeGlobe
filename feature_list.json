@@ -5114,7 +5114,7 @@
         "Verify GPU and RAM memory return to their baseline within tolerance after each cycle",
         "Verify no listeners, workers or timers remain from removed layers"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F386",
@@ -5505,7 +5505,7 @@
         "Verify the live view keeps rendering without stutter during export",
         "Export a view containing Google content and assert the export follows the Google terms ADR and always includes the Google logo and attributions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F417",

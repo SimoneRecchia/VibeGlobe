@@ -2,6 +2,7 @@
 // bookmarks (F415), screenshots (F416) and the minimap (F417).
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waitForIdle } from './support/globe.ts';
+import { fixtureSession } from './support/imagery.ts';
 import { openUi, touch } from './support/ui-layer.ts';
 
 test.use({ viewport: { width: 640, height: 480 }, hasTouch: true });
@@ -328,6 +329,113 @@ test.describe('screenshot (F416)', () => {
     await page.locator('.vg-ui__button--screenshot').click();
     expect((await download).suggestedFilename()).toBe('vibeglobe.png');
   });
+});
+
+test.describe('screenshot larger than the canvas (F416)', () => {
+  for (const backend of ['webgpu', 'webgl2'] as const)
+    test(`exports the canvas size, 2x and 4096 × 4096, complete, matching the view, with the credits, on ${backend}`, async ({
+      page,
+    }) => {
+      test.setTimeout(240_000);
+      const session = await fixtureSession(page);
+      await openUi(page, {
+        query: `backend=${backend}&session=${session}&imagery=world&requiredCredit=fixture-world&lon=7.66&lat=45.07&zoom=5`,
+      });
+      await waitForIdle(page);
+      const result = await page.evaluate(async () => {
+        const handle = window.vibeglobeUi;
+        const globe = window.vibeglobePlayground?.globe;
+        if (handle === undefined || globe === undefined) throw new Error('no ui');
+        const frame = await globe.captureFrame();
+        const sizes = [];
+        for (const scale of [1, 2]) {
+          const bitmap = await createImageBitmap(await handle.ui.captureView(globe, { scale }));
+          sizes.push([bitmap.width / frame.widthPx, bitmap.height / frame.heightPx]);
+        }
+        // The live view keeps drawing frames while the large image's tiles load.
+        let frames = 0;
+        const stop = globe.on('frame', () => frames++);
+        const blob = await handle.ui.captureView(globe, { widthPx: 4096, heightPx: 4096 });
+        stop();
+        const bitmap = await createImageBitmap(blob);
+        const full = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');
+        if (full === null) throw new Error('no 2d');
+        full.drawImage(bitmap, 0, 0);
+        const pixels = full.getImageData(0, 0, bitmap.width, bitmap.height).data;
+        let empty = 0;
+        let black = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if ((pixels[i + 3] ?? 0) < 255) empty++;
+          else if ((pixels[i] ?? 0) + (pixels[i + 1] ?? 0) + (pixels[i + 2] ?? 0) < 24) black++;
+        }
+        // The credits strip in the bottom-right corner: light, with dark text and the required logo.
+        const strip = full.getImageData(bitmap.width - 1200, bitmap.height - 120, 1200, 120).data;
+        let dark = 0;
+        for (let i = 0; i < strip.length; i += 4) if ((strip[i] ?? 0) < 100) dark++;
+        const corner = Array.from(full.getImageData(bitmap.width - 3, bitmap.height - 3, 1, 1).data);
+        return {
+          sizes,
+          width: bitmap.width,
+          height: bitmap.height,
+          empty,
+          black,
+          dark,
+          corner,
+          frames,
+          credits: globe.credits().map((credit) => [credit.text, credit.logo !== undefined]),
+        };
+      });
+      console.log(`[F416] ${backend}: ${JSON.stringify({ ...result, corner: result.corner.join(',') })}`);
+      expect(result.sizes).toEqual([
+        [1, 1],
+        [2, 2],
+      ]);
+      expect([result.width, result.height]).toEqual([4096, 4096]);
+      expect(result.empty).toBe(0);
+      expect(result.black).toBe(0);
+      expect(result.credits).toContainEqual(['Required world', true]);
+      expect(Math.min(...result.corner.slice(0, 3))).toBeGreaterThan(200);
+      expect(result.dark).toBeGreaterThan(200);
+      expect(result.frames).toBeGreaterThanOrEqual(3);
+      // The image shows the view: on the base imagery, the same at every resolution (the fixture tiles draw their own
+      // borders, denser at finer levels), the canvas frame and the image reduced to 64 × 64 line up, no shift better.
+      await openUi(page, { query: `backend=${backend}&lon=12.5&lat=42&zoom=4` });
+      await waitForIdle(page);
+      const match = await page.evaluate(async () => {
+        const globe = window.vibeglobePlayground?.globe;
+        if (globe === undefined) throw new Error('no globe');
+        const reduce = (frame: { widthPx: number; heightPx: number; rgba: Uint8ClampedArray }): Uint8ClampedArray => {
+          const full = new OffscreenCanvas(frame.widthPx, frame.heightPx);
+          full.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(frame.rgba), frame.widthPx), 0, 0);
+          const side = Math.min(frame.widthPx, frame.heightPx);
+          const small = new OffscreenCanvas(64, 64).getContext('2d');
+          if (small === null) throw new Error('no 2d');
+          small.drawImage(full, (frame.widthPx - side) / 2, (frame.heightPx - side) / 2, side, side, 0, 0, 64, 64);
+          return small.getImageData(0, 0, 64, 64).data;
+        };
+        const theirs = reduce(await globe.captureFrame());
+        const ours = reduce(await globe.captureView({ widthPx: 1600, heightPx: 1600 }));
+        const difference = (dx: number, dy: number): number => {
+          let sum = 0;
+          let counted = 0;
+          for (let y = 2; y < 62; y++)
+            for (let x = 2; x < 62; x++)
+              for (let c = 0; c < 3; c++) {
+                sum += Math.abs((ours[((y + dy) * 64 + x + dx) * 4 + c] ?? 0) - (theirs[(y * 64 + x) * 4 + c] ?? 0));
+                counted++;
+              }
+          return sum / counted;
+        };
+        let bestShifted = Number.POSITIVE_INFINITY;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++)
+            if (dx !== 0 || dy !== 0) bestShifted = Math.min(bestShifted, difference(dx, dy));
+        return { difference: difference(0, 0), bestShifted };
+      });
+      console.log(`[F416] ${backend} view match: ${JSON.stringify(match)}`);
+      expect(match.difference).toBeLessThan(6);
+      expect(match.difference).toBeLessThan(match.bestShifted);
+    });
 });
 
 test.describe('the minimap (F417)', () => {

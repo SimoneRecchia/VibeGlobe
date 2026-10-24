@@ -23,6 +23,8 @@ interface CompiledComponent {
   license: string;
   licenseFile: string;
   url: string;
+  /** The binary it is compiled into (default `vibeglobe-basis.wasm`). */
+  file?: string;
 }
 
 const COMPILED_DIR = join(ROOT_DIR, 'packages/worker/wasm');
@@ -30,7 +32,7 @@ const compiled = JSON.parse(readFileSync(join(COMPILED_DIR, 'third-party.json'),
 const compiledSections = compiled.map((component) => {
   const text = readFileSync(join(COMPILED_DIR, component.licenseFile), 'utf8').trim();
   return (
-    `## ${component.name} ${component.version}\n\nCompiled into \`@vibeglobe/worker\`'s \`vibeglobe-basis.wasm\`; ` +
+    `## ${component.name} ${component.version}\n\nCompiled into \`@vibeglobe/worker\`'s \`${component.file ?? 'vibeglobe-basis.wasm'}\`; ` +
     `source: ${component.url}\n\nLicense: ${component.license}\n\n\`\`\`text\n${text}\n\`\`\`\n`
   );
 });

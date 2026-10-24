@@ -26,7 +26,7 @@ export { isGlb, parseGlb } from './glb.js';
 export type { GlbChunks } from './glb.js';
 export { createModelLoader, poolRunner } from './loader.js';
 export type { ModelFetch, ModelLoader, ModelLoaderOptions, ModelTaskRunner, WorkerPoolLike } from './loader.js';
-export { loadMeshoptDecoder } from './meshopt.js';
+export { loadMeshoptDecoder, meshoptWasmDecoder } from './meshopt.js';
 export type { MeshoptDecoderLike, MeshoptLoader } from './meshopt.js';
 export { parseModel, readDocument } from './parse.js';
 export type { ModelLimits, ParseModelOptions } from './parse.js';

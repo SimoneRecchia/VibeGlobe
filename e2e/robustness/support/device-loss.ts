@@ -9,6 +9,10 @@ import { heapObjects, trackGpuObjects } from '../../support/leaks.ts';
 import { collectErrors, runSeed, scaled, unexpected } from './probes.ts';
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
+/** A small imagery budget (F098's `?gpuBudgetMB=`), so the cache fills during the run and its bound means something. */
+const GPU_BUDGET_MB = 96;
+/** GPU memory beyond the loaded view's: the imagery budget plus slack for the surface meshes and data layers. */
+const GPU_GROWTH_BYTES = (GPU_BUDGET_MB + 32) * 1024 * 1024;
 /** Rome: the view compared before and after the losses. */
 const HOME = { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 9, headingDeg: 0, tiltDeg: 0 };
 /** A recovered frame may differ by anti-aliasing and the cross-fade's last steps, never by a missing layer. */
@@ -82,6 +86,7 @@ const RECOVERY_WINDOW_MS = 61_000;
  * forced, each at a random moment 0–1500 ms into a movement whenever the recovery limit allows one, and waits for each
  * recovery and for every movement to settle. Returns the recoveries counted and the movements' outcomes.
  */
+// eslint-disable-next-line max-lines-per-function -- its page function runs serialized in the page and cannot call helpers
 async function loseDuringNavigation(page: Page, losses: number, seed: number) {
   return page.evaluate(
     async ({ losses, seed, windowMs }) => {
@@ -97,6 +102,11 @@ async function loseDuringNavigation(page: Page, losses: number, seed: number) {
       };
       let restored = 0;
       globe.on('device-restored', () => restored++);
+      // The engine's limit counts losses when it handles them: the spacing follows its `device-lost` events.
+      const handledMs: number[] = [];
+      globe.on('device-lost', () => handledMs.push(performance.now()));
+      const errors: string[] = [];
+      globe.on('error', (error) => errors.push(`${error.code}: ${error.message}`));
       const place = () => ({
         longitudeDeg: -180 + random() * 360,
         latitudeDeg: -70 + random() * 140,
@@ -117,7 +127,7 @@ async function loseDuringNavigation(page: Page, losses: number, seed: number) {
         else globe.setViewMode((['2d', '3d', 'auto'] as const)[Math.floor(random() * 3)] ?? 'auto');
         await new Promise((resolve) => setTimeout(resolve, random() * 1500));
         const now = performance.now();
-        const recent = lossTimesMs.filter((time) => now - time < windowMs).length;
+        const recent = handledMs.filter((time) => now - time < windowMs).length;
         if (recent < 3) {
           lossKinds[kind] = (lossKinds[kind] ?? 0) + 1;
           lossTimesMs.push(now);
@@ -125,7 +135,10 @@ async function loseDuringNavigation(page: Page, losses: number, seed: number) {
           globe.simulateDeviceLoss();
           const deadline = performance.now() + 30_000;
           while (restored === before && performance.now() < deadline) await new Promise((r) => setTimeout(r, 20));
-          if (restored === before) throw new Error(`loss ${lossTimesMs.length} (${kind}) not recovered within 30 s`);
+          if (restored === before)
+            throw new Error(
+              `loss ${lossTimesMs.length} (${kind}) not recovered within 30 s: ${JSON.stringify({ lost: handledMs.length, restored, errors })}`,
+            );
         }
         if (movement) {
           movements++;
@@ -158,7 +171,7 @@ export function deviceLossTests(scene: string, query: string, countRenderers: bo
       test.setTimeout(2_400_000);
       const errors = await collectErrors(page);
       await page.addInitScript(trackGpuObjects);
-      await openGlobe(page, `backend=${backend}&${query}&lon=12.5&lat=41.9&zoom=9`);
+      await openGlobe(page, `backend=${backend}&${query}&gpuBudgetMB=${GPU_BUDGET_MB}&lon=12.5&lat=41.9&zoom=9`);
       const navigations = await page.evaluate(() => performance.getEntriesByType('navigation').length);
       const cdp = await page.context().newCDPSession(page);
       await settleHome(page);
@@ -181,13 +194,14 @@ export function deviceLossTests(scene: string, query: string, countRenderers: bo
       await expectCompleteGlobe(page);
       // Every layer restored: the imagery and the data layers draw the same view as before.
       expect(changedFraction(before.image, after.image)).toBeLessThan(CHANGED_FRACTION);
-      // No leak: one device or context, GPU memory within the default 512 MiB budget, and (with `countRenderers`) no
+      // No leak: one device or context, GPU memory within the loaded view's plus the imagery budget, and (with
+      // `countRenderers`) no
       // renderer object kept per loss (three.js's module-level output node may keep the last lost renderer, KB-045).
       expect(after.contexts).toBe(1);
       if (countRenderers)
         for (const name of PER_RENDERER)
           expect(after.renderers[name], name).toBeLessThanOrEqual((before.renderers[name] ?? 0) + 1);
-      expect(after.gpuBytes).toBeLessThanOrEqual(512 * 1024 * 1024);
+      expect(after.gpuBytes).toBeLessThanOrEqual(before.gpuBytes + GPU_GROWTH_BYTES);
       expect(unexpected(errors)).toEqual([]);
     });
   }

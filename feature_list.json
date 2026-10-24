@@ -4488,7 +4488,7 @@
         "Load the output in the playground through the terrain adapter and verify relief displays with no cracks on WebGPU and forced WebGL2",
         "Verify the output attribution includes the Copernicus DEM notice with the modification statement"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F340",

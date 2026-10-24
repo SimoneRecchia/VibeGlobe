@@ -2,7 +2,7 @@
 // layer toggles) for `VIBEGLOBE_SOAK_MINUTES` on both backends: 6 minutes with small cache budgets in the default run,
 // 4 hours on the reference desktop for the entry (docs/hardening-backlog.md). The JS heap after a forced collection,
 // the engine's GPU bytes and the frame times are sampled every 15 s: no crash or console error, no upward heap trend
-// after the warm-up half, GPU memory within its budget, and the late p95 frame time no worse than the early one.
+// after the warm-up (every view visited once), GPU memory within its budget, and the late p95 frame time no worse than the early one.
 import { expect, test, type Page } from '@playwright/test';
 import { openGlobe } from '../support/globe.ts';
 import { collectErrors, runSeed, seeded, unexpected } from './support/probes.ts';
@@ -34,29 +34,50 @@ interface Sample {
   p95Ms: number;
 }
 
-/** One random action on the page's globe, awaited until its movement settles. */
-async function act(page: Page, roll: number[]): Promise<string> {
+/** The views movements go to: 6 places at 3 zooms, so the tile caches can be filled by visiting each once. */
+const VIEWS = 6 * 3;
+
+/**
+ * One random action on the page's globe, awaited until its movement settles: flights, eases and jumps between a
+ * fixed set of places and zooms, view-mode changes, imagery and data layer toggles. Returns the action and, for a
+ * movement to a place, the index of its view.
+ */
+async function act(page: Page, roll: number[]): Promise<{ action: string; view?: number }> {
   return page.evaluate(async ([kind = 0, a = 0, b = 0, c = 0]) => {
     const globe = window.vibeglobePlayground?.globe;
     if (!globe) throw new Error('no globe');
-    const place = { longitudeDeg: -180 + a * 360, latitudeDeg: -60 + b * 120, zoom: 2 + c * 10 };
-    if (kind < 0.25) return globe.flyTo(place, { durationMs: 1000 + a * 2000 });
-    if (kind < 0.45)
-      return globe.easeTo({ zoom: 2 + c * 12, headingDeg: a * 360, tiltDeg: b * 50 }, { durationMs: 600 });
-    if (kind < 0.6) return globe.jumpTo(place);
+    const places = [
+      [12.5, 41.9],
+      [2.35, 48.85],
+      [-74, 40.7],
+      [139.7, 35.7],
+      [-43.2, -22.9],
+      [151.2, -33.9],
+    ] as const;
+    const placeIndex = Math.min(places.length - 1, Math.floor(a * places.length));
+    const zoomIndex = Math.min(2, Math.floor(c * 3));
+    const [longitudeDeg, latitudeDeg] = places[placeIndex] ?? places[0];
+    const place = { longitudeDeg, latitudeDeg, zoom: [3, 5, 7][zoomIndex] ?? 3 };
+    const view = placeIndex * 3 + zoomIndex;
+    if (kind < 0.25) return { action: await globe.flyTo(place, { durationMs: 1000 + b * 2000 }), view };
+    if (kind < 0.45) {
+      const heading = { headingDeg: Math.floor(b * 4) * 90, tiltDeg: Math.floor(b * 3) * 20 };
+      return { action: await globe.easeTo(heading, { durationMs: 600 }) };
+    }
+    if (kind < 0.6) return { action: await globe.jumpTo(place), view };
     if (kind < 0.7) {
       globe.setViewMode((['2d', '3d', 'auto'] as const)[Math.floor(a * 3)] ?? 'auto');
-      return 'view-mode';
+      return { action: 'view-mode' };
     }
     if (kind < 0.85) {
       const layer = globe.imageryLayers.list()[0];
       if (layer) globe.imageryLayers.set(layer.id, { visible: !layer.visible });
-      return 'imagery-toggle';
+      return { action: 'imagery-toggle' };
     }
     const layers = Object.values(window.vibeglobeLayers?.layers ?? {});
     const layer = layers[Math.floor(a * layers.length)];
     layer?.setVisible(b < 0.5);
-    return 'data-toggle';
+    return { action: 'data-toggle' };
   }, roll);
 }
 
@@ -94,7 +115,8 @@ for (const backend of BACKENDS) {
   test(`${MINUTES} min of randomized navigation on ${backend}: no crash or error, no heap trend, GPU memory in budget, stable p95 frame time (F509)`, async ({
     page,
   }) => {
-    test.setTimeout(MINUTES * 60_000 * 2 + 120_000);
+    // The run extends to at most three times its length until the steady state has enough samples.
+    test.setTimeout(MINUTES * 60_000 * 3 + 180_000);
     const seed = runSeed();
     console.log(`[robustness] F509 ${backend} seed ${seed}, ${MINUTES} min`);
     const random = seeded(seed);
@@ -118,19 +140,27 @@ for (const backend of BACKENDS) {
     const samples: Sample[] = [];
     const actions: Record<string, number> = {};
     let nextSample = started + SAMPLE_MS;
-    while (Date.now() - started < MINUTES * 60_000) {
-      const outcome = await act(page, [random(), random(), random(), random()]);
-      actions[outcome] = (actions[outcome] ?? 0) + 1;
+    // The warm-up ends once every view was visited: the caches then hold what the navigation needs, and a heap trend
+    // afterwards is a leak. Its length depends on the machine's frame rate, so it is counted in views, not minutes.
+    const visited = new Set<number>();
+    let warm: number | undefined;
+    const steady = (): number => (warm === undefined ? 0 : samples.length - warm);
+    const elapsedMs = (): number => Date.now() - started;
+    while (elapsedMs() < MINUTES * 60_000 || (steady() < 6 && elapsedMs() < MINUTES * 3 * 60_000)) {
+      const { action, view } = await act(page, [random(), random(), random(), random()]);
+      actions[action] = (actions[action] ?? 0) + 1;
+      if (view !== undefined) visited.add(view);
       if (Date.now() >= nextSample) {
-        samples.push(await sample(page, (Date.now() - started) / 60_000));
+        samples.push(await sample(page, elapsedMs() / 60_000));
         nextSample += SAMPLE_MS;
+        if (warm === undefined && visited.size === VIEWS) warm = samples.length;
       }
     }
-    console.log(`[robustness] F509 ${backend}: ${JSON.stringify({ actions, samples })}`);
+    console.log(`[robustness] F509 ${backend}: ${JSON.stringify({ actions, warmSample: warm, samples })}`);
     expect(crashed).toBe(false);
-    expect(samples.length).toBeGreaterThanOrEqual(4);
-    // No upward heap trend once the caches have filled (the first half is the warm-up).
-    const settled = samples.slice(Math.floor(samples.length / 2));
+    // No upward heap trend in the steady state, after the warm-up.
+    expect(steady(), 'samples after every view was visited').toBeGreaterThanOrEqual(6);
+    const settled = samples.slice(warm);
     expect(slope(settled.map((s) => [s.minute, s.heapBytes]))).toBeLessThan(HEAP_TREND_BYTES_PER_MIN);
     for (const s of samples) expect(s.gpuBytes).toBeLessThanOrEqual(loadedGpuBytes + GPU_GROWTH_BYTES);
     // Frame time stable: the last third's median p95 no worse than the first third's by more than the drift.

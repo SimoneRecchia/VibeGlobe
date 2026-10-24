@@ -21,6 +21,7 @@ import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
+import { customAdapters } from './custom-adapters.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
@@ -268,7 +269,7 @@ const quantizedMesh =
 function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
   const imagery = fixtureImagery();
   const terrain = fixtureTerrain();
-  return { ...terrain, ...imagery };
+  return { ...terrain, ...imagery, ...customAdapters(params) };
 }
 
 /** Creates one engine instance in a container with its own canvas. */

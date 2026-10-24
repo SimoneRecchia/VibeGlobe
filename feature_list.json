@@ -2938,7 +2938,7 @@
         "Assert the custom imagery and terrain render with zero black pixels after the base has loaded, and the custom vector and 3D adapters deliver their parsed content through the public API at the expected coordinates",
         "Run the shared runtime contract test against every built-in adapter and every custom adapter and assert all pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F220",

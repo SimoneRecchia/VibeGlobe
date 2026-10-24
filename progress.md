@@ -15,6 +15,22 @@ Still open from the previous session's last full CI run (40021954210 on bbf4758;
 
 Next after these: the atmosphere entries end to end (F391–F396: playground switches, specs on the engine's views), C (4) the playground's quality page (F399–F402), F397 anti-aliasing modes, F398 anisotropy, M10 renderer items (F358, F374, F375, F378), KB-132.
 
+## Track F, network simulation suite (2026-10-23)
+
+Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner merges). Owns `e2e/network/`,
+`scripts/fixtures/tiles/link.ts` and `scripts/fixtures/network/` (ADR 0151; numbers 0151–0159).
+
+- F315: the navigation scenario on fully offline, 400 kbps, flaky, 500 ms latency and LAN-only links on WebGPU and
+  forced WebGL2, every frame checked for holes, black pixels and pops, retries bounded with backoff
+  (`e2e/network/links.spec.ts`). Stays `failing`: only frame times within budget on the reference hardware remain
+  (`docs/hardening-backlog.md`, open question 2).
+- F329's scenario specs, all passing on both backends: the network suite (`links.spec.ts`), connectivity dropping
+  mid-pan and returning after a flight (`drop-return.spec.ts`), both offline setups in offline-only mode
+  (`offline-setups.spec.ts`), and the three network modes with the loading switches all on and all off
+  (`modes.spec.ts`; the full 16-combination matrix with its request and storage checks stays
+  `e2e/offline-matrix.spec.ts`). F329's acceptance (known bugs, the fresh-context review) is the main session's.
+- Hook requests: none.
+
 ## Current state
 
 - **M2 Globe core complete** (F078 passing, 2026-10-21: the full CI suite green on 9679fe0, reviews closed by ADR 0021, no open bug). Passing in M2: F042–F064, F066–F074, F076–F078; pending owner steps: F065, F075.

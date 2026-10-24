@@ -64,6 +64,14 @@ perfection in edge cases.
 | F361  | Draco bitstream counts validated before decoding (Draco #1169, memory cap)         | Decoded counts checked against the accessors after decoding, indices range-checked; the declared size limit (`ModelLimits`) applies before decoding; Draco input fuzzed (`corrupt.test.ts`) |
 | F402  | The 5-minute load hovering around the threshold, in the browser on the real engine | The same governor over a simulated 5-minute hovering load in Node (`governor.test.ts`); the browser run covers lowering and the step-by-step recovery (`e2e/quality.spec.ts`)               |
 
+## Track F, network simulation suite (M8)
+
+This row replaces track B's F315 row above: popping is now checked.
+
+| Entry | Built and checked                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Remaining (hardening)                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| F315  | The navigation scenario (zoom, pan, flight) on fully offline, 400 kbps (shared link), flaky (one request in five reset), 500 ms latency and LAN-only links, on WebGPU and forced WebGL2, every frame on the manual clock: no hole, black pixel or pop, detail delivered, at most five attempts in a row of failures (ADR 0007), each retry in a later frame than its failure, health checks spaced (`e2e/network/links.spec.ts`, ADR 0151); runs in CI's sharded end-to-end job | Frame times within budget on those links, on the reference desktop and tablet (open question 2) |
+
 ## 3D Tiles track (track E: `packages/renderer/src/tiles3d`, `packages/sources/src/tiles3d`)
 
 Each remaining step and what it waits for (hook requests E (1)–(6) in `docs/parallel-tracks.md`, ADR 0141).

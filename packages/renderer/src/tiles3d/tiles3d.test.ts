@@ -94,7 +94,7 @@ function create(options: Partial<Tiles3DOptions> = {}, transport = fixtureTransp
     transport,
     modelTasks: createModelTasks(),
     ...options,
-  })({ renderer: context, requestRender: () => renders++ });
+  })({ renderer: context, requestRender: () => renders++, setCredits: () => undefined });
   return { extension, scene, transport, renders: () => renders };
 }
 

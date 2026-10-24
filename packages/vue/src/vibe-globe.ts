@@ -34,6 +34,7 @@ import {
   type GlobeConfig,
   type GlobeExtraOptions,
 } from './globe-config.js';
+import { watchQualityPreset, type QualityPresetChoice } from './quality.js';
 
 const FILL = 'position:absolute;inset:0';
 
@@ -87,6 +88,7 @@ function startGlobe(
   live: {
     layers: () => readonly LayerLook[] | undefined;
     network: () => readonly [NetworkModeTarget | undefined, NetworkMode | undefined];
+    quality: () => QualityPresetChoice | undefined;
   },
 ): (() => void)[] {
   const controls = config.controls ? createControls() : undefined;
@@ -123,6 +125,7 @@ function startGlobe(
     watch(viewMode, applyMode),
     watch(live.layers, (looks) => applyLayers(engine, looks), { deep: true }),
     watch(live.network, applyNetwork),
+    watchQualityPreset(engine, live.quality),
     watch(view, (next) => {
       const changed = changedView(engine.camera, next);
       if (changed) engine.jumpTo(changed);
@@ -133,7 +136,7 @@ function startGlobe(
 /**
  * The globe component. On the server and before mount it renders only its `placeholder` slot; the engine starts in
  * `onMounted`, so importing and server-rendering it never touches the browser or the GPU. Camera props update the
- * running engine in place (`jumpTo`), and so does `viewMode` (`setViewMode`); the other props configure the engine when it starts. The default slot renders
+ * running engine in place (`jumpTo`), and so do `viewMode` (`setViewMode`), `layers`, `networkMode` and `qualityPreset`; the other props configure the engine when it starts. The default slot renders
  * once the engine exists, with the engine available to its components through {@link useGlobe}.
  *
  * Events: `ready` (the engine drew its first frame, with the backend), `load` (the first view finished loading),
@@ -170,6 +173,12 @@ export const VibeGlobe = defineComponent({
     offline: { type: Object as PropType<NetworkModeTarget>, default: undefined },
     /** The network mode of `offline` (F271), changed at runtime with no reload of the engine. */
     networkMode: { type: String as PropType<NetworkMode>, default: undefined },
+    /**
+     * The quality preset (`@vibeglobe/quality`, F399), with adaptive quality: 'low', 'medium', 'high', 'ultra' or
+     * 'auto' (chosen from the device). Changes switch the running engine's preset in place; unset keeps the engine's
+     * own settings, and `@vibeglobe/quality` is then never loaded.
+     */
+    qualityPreset: { type: String as PropType<QualityPresetChoice | undefined>, default: undefined },
   },
   emits: {
     ready: (payload: GlobeEvents['ready']) => typeof payload === 'object',
@@ -206,6 +215,7 @@ export const VibeGlobe = defineComponent({
       stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view, () => props.viewMode, {
         layers: () => props.layers,
         network: () => [props.offline, props.networkMode] as const,
+        quality: () => props.qualityPreset,
       });
     });
 

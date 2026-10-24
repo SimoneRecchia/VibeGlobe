@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Camera } from '../camera/camera.js';
-import { MotionDetail } from './motion-detail.js';
+import { SLOW_LINK_BPS } from '../scheduler/bandwidth.js';
+import { MotionDetail, SLOW_LINK_BPS_HERE } from './motion-detail.js';
 
 /** Steps `motion` over `frames` frames of 16 ms, moving the camera target east by `rangesPerS` view ranges per second. */
 function run(
@@ -16,7 +17,8 @@ function run(
     clock[0] = (clock[0] ?? 0) + 16;
     camera.pose.targetLongitudeRad += (rangesPerS * 0.016 * camera.pose.rangeMeters) / 6_378_137;
     camera.update();
-    factor = motion.update(camera, clock, link);
+    motion.update(camera, clock, link);
+    factor = motion.factor;
   }
   return factor;
 }
@@ -76,5 +78,9 @@ describe('motion-aware detail (F288, F301)', () => {
     flight.flying = true;
     expect(run(flight, camera, clock, 10, 0, slow)).toBe(2);
     expect(run(flight, camera, clock, 10, 0, { bitsPerSecond: 50e6 })).toBe(1);
+  });
+
+  it("uses the bandwidth estimator's slow-link threshold", () => {
+    expect(SLOW_LINK_BPS_HERE).toBe(SLOW_LINK_BPS);
   });
 });

@@ -1,6 +1,7 @@
 import type { CreditProfile } from '../imagery/credits.js';
 import { GlobeError } from './errors.js';
 import type { ImageryRuntime } from './imagery-runtime.js';
+import { extensionCredits } from './runtime-credits.js';
 
 /** A source as its provider profile describes it. */
 interface ProfiledSource {
@@ -34,4 +35,19 @@ export function refuseDisplayOnly(
     if (!layer.entry.visible || layer.entry.opacity <= 0) continue;
     for (const { source } of layer.chain) if (source.profile?.displayOnly === true) throw refusal(api, source);
   }
+}
+
+/**
+ * Throws when `api` would read the data of `source`, a display-only source that a render extension draws itself, such
+ * as Google's 3D Tiles (F323, ADR 0031; track E hook 6).
+ */
+export function refuseDisplayOnlySource(api: string, source: ProfiledSource): void {
+  if (source.profile?.displayOnly === true) throw refusal(api, source);
+}
+
+/** Throws when `api` would read pixels back while a render extension draws a display-only source's content. */
+export function refuseExtensionReadback(api: string, renderer: object | undefined): void {
+  if (!renderer) return;
+  for (const sources of extensionCredits.get(renderer)?.values() ?? [])
+    for (const source of sources) refuseDisplayOnlySource(api, source);
 }

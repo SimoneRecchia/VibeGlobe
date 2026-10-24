@@ -12,4 +12,5 @@ export type { GlobeClickEvent, GlobeExtraOptions } from './globe-config.js';
 export { VibeControl, VibeDataLayer, VibeImageryLayer, VibeMarker } from './children.js';
 export type { DataLayerKind } from './children.js';
 export type { LayerLook, NetworkMode, NetworkModeTarget, ToggleMode } from './vibe-globe.js';
+export type { QualityPresetChoice } from './quality.js';
 export type { GlobeExtras } from './context.js';

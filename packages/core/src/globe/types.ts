@@ -237,8 +237,11 @@ export interface RendererBackend {
   simulateDeviceLoss(): void;
   /** Test hook: the pixels of the frame just drawn, read in the same task (ADR 0012, Capture). */
   capture(): Promise<FrameCapture>;
-  /** Optional: applies the effects of the quality settings (F397–F399), between frames. */
-  setQuality?(quality: RendererQuality): void;
+  /**
+   * Optional: applies the effects of the quality settings (F397–F399), between frames. A promise resolves when an
+   * effect that needed compiling is drawn from the next frame, which the engine then requests.
+   */
+  setQuality?(quality: RendererQuality): Promise<void> | undefined;
   /** Optional: the atmosphere's sun lighting, time and haze (F394, F396). */
   setAtmosphere?(settings: Required<AtmosphereSettings>): void;
   destroy(): void;
@@ -274,6 +277,8 @@ export interface NavigationApi {
   coasting: boolean;
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
   readonly timeMs: number;
+  /** Writes {@link NavigationApi.timeMs} to `out[0]`: per-frame code reads it without a returned double (F064). */
+  timeInto(out: Float64Array): void;
   /** The applied heading and tilt, degrees. */
   readonly headingDeg: number;
   readonly tiltDeg: number;

@@ -18,24 +18,33 @@ const NOMINAL_FRAME_MS = 1000 / 60;
 /** How long a measurement of slow frames holds before animations are tried again. */
 const SLOW_VERDICT_MS = 5000;
 
+/** Indices of {@link CameraPort.times}. */
+export const FRAME_MS = 0;
+const PREVIOUS_FRAME = 1;
+const FRAME_END_HOST = 2;
+const MEASURED_HOST = 3;
+
 /** Every camera change the recognizers make goes through here. */
 export class CameraPort {
   globe: ConnectedGlobe | undefined;
-  /** Engine time of the previous frame's update, where animations started since then begin. */
-  previousFrameMs = NaN;
-  private frameMs = NaN;
+  /**
+   * The times written every frame, in an array: a returned double, or a double field turned tagged, allocates on every
+   * frame (F064, ADR 0018). Indices: the engine time of the frame now starting ({@link FRAME_MS}, set by
+   * {@link CameraPort.beginFrame}), of the previous frame's update, the host time when the last animation frame's task
+   * ended, and when the host intervals were last measured.
+   */
+  readonly times = Float64Array.of(Number.NaN, Number.NaN, 0, Number.NEGATIVE_INFINITY);
+  /** Where the engine clock is read into. */
+  private readonly clock = new Float64Array(1);
   private frameQueued = false;
   /** True when the controls asked for the frame now starting, to continue an animation. */
   private continued = false;
-  /** Host time when the last animation frame's task ended. */
-  private frameEndHostMs = 0;
   /** The last two host intervals from the end of an animation frame to the start of the next, and when measured. */
   private readonly intervalsMs = new Float64Array(2);
-  private measuredHostMs = -Infinity;
   private readonly requestNow = (): void => {
     this.frameQueued = false;
     this.continued = true;
-    this.frameEndHostMs = this.hostNow();
+    this.times[FRAME_END_HOST] = this.hostNow();
     this.navigation.requestUpdate();
   };
 
@@ -44,26 +53,35 @@ export class CameraPort {
     private readonly hostNow: () => number,
   ) {}
 
-  /** Engine time, which inertia and smoothing run on (`NavigationApi.timeMs`). */
-  nowMs(): number {
-    return this.navigation.timeMs;
+  /** Engine time of the previous frame's update, where animations started since then begin. */
+  get previousFrameMs(): number {
+    return this.times[PREVIOUS_FRAME] ?? Number.NaN;
   }
 
-  /** Starts a frame's update; returns its engine time. */
-  beginFrame(): number {
+  /** Engine time, which inertia and smoothing run on (`NavigationApi.timeInto`). */
+  nowMs(): number {
+    this.navigation.timeInto(this.clock);
+    return this.clock[0] ?? 0;
+  }
+
+  /** Starts a frame's update: its engine time is `times[FRAME_MS]` from here. */
+  beginFrame(): void {
     // The host clock is read only in animation frames: idle frames allocate nothing (ADR 0018).
     if (this.continued) {
       const host = this.hostNow();
       this.intervalsMs[0] = this.intervalsMs[1] ?? 0;
-      this.intervalsMs[1] = host - this.frameEndHostMs;
-      this.measuredHostMs = host;
+      this.intervalsMs[1] = host - (this.times[FRAME_END_HOST] ?? 0);
+      this.times[MEASURED_HOST] = host;
     }
     this.continued = false;
-    const now = this.nowMs();
+    const times = this.times;
+    this.navigation.timeInto(this.clock);
+    const now = this.clock[0] ?? 0;
+    const last = times[FRAME_MS] ?? Number.NaN;
     // Without an earlier frame, one nominal frame back: input shows in the first frame after it.
-    this.previousFrameMs = Number.isNaN(this.frameMs) ? now - NOMINAL_FRAME_MS : this.frameMs;
-    this.frameMs = now;
-    return now;
+    // `last !== last` is Number.isNaN without a builtin call, which can box its argument (F064).
+    times[PREVIOUS_FRAME] = last !== last ? now - NOMINAL_FRAME_MS : last;
+    times[FRAME_MS] = now;
   }
 
   /**
@@ -76,7 +94,7 @@ export class CameraPort {
     return (
       (this.intervalsMs[0] ?? 0) >= limit &&
       (this.intervalsMs[1] ?? 0) >= limit &&
-      this.hostNow() - this.measuredHostMs < SLOW_VERDICT_MS
+      this.hostNow() - (this.times[MEASURED_HOST] ?? Number.NEGATIVE_INFINITY) < SLOW_VERDICT_MS
     );
   }
 

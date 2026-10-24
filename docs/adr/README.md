@@ -56,3 +56,4 @@ Conventions:
 | [0121](0121-gltf-models-package.md)                  | glTF models: a renderer-neutral description decoded in workers                                              | Accepted (decided by agent; owner may revisit)                    |
 | [0122](0122-quality-presets-and-adaptive-quality.md) | Quality presets, start-up choice and adaptive quality                                                       | Accepted (decided by agent; owner may revisit)                    |
 | [0131](0131-vector-tile-rendering.md)                | Vector tile rendering: a render extension over renderer-neutral buckets                                     | Accepted (decided by agent; owner may revisit)                    |
+| [0132](0132-vector-tile-labels.md)                   | Vector tile labels: CPU placement, one SDF atlas, a screen-space text material                              | Accepted (decided by agent; owner may revisit)                    |

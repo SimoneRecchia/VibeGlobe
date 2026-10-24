@@ -39,6 +39,11 @@ export interface VectorTileLayer {
   requestLog(source?: string): readonly string[];
   /** Diagnostics: the drawn tiles of the last frame, as `z/x/y` of the drawn tile → target. */
   drawnTiles(): readonly { readonly tile: string; readonly target: string; readonly standIn: boolean }[];
+  /**
+   * Main-thread time of the last frame's vector tile work in milliseconds: tile choice, draping, paint, label
+   * placement and uploads (F443; decoding and tessellation run in the workers).
+   */
+  frameTimeMs(): number;
   /** Every feature drawn under a screen point, topmost first (labels, then layers from the top down; F459). */
   queryRenderedFeatures(point: ScreenPoint): PickedVectorFeature[];
   /**

@@ -96,6 +96,7 @@ class Runtime implements VectorTileLayer {
   private placer: LabelPlacer | undefined;
   private readonly grounds: TileGrounds;
   private drapePending = false;
+  private msLastFrame = 0;
   private drawnTilesWithBuckets: DrawnTile[] = [];
   private readonly interaction = new VectorInteraction(
     (point) => this.queryRenderedFeatures(point),
@@ -172,6 +173,10 @@ class Runtime implements VectorTileLayer {
     return [...this.sources.values()].flatMap((s) => s.loader.requestLog);
   }
 
+  frameTimeMs(): number {
+    return this.msLastFrame;
+  }
+
   drawnTiles(): readonly { readonly tile: string; readonly target: string; readonly standIn: boolean }[] {
     return this.lastDrawn;
   }
@@ -230,6 +235,12 @@ class Runtime implements VectorTileLayer {
   }
 
   private frame(view: FrameView, context: RenderExtensionContext): void {
+    const start = performance.now();
+    this.drawFrame(view, context);
+    this.msLastFrame = performance.now() - start;
+  }
+
+  private drawFrame(view: FrameView, context: RenderExtensionContext): void {
     const target = this.target;
     if (target === undefined) return;
     const zoom = this.globe.camera.zoom;

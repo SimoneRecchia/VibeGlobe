@@ -5,7 +5,7 @@
  * `@vibeglobe/layers/vector-tiles`, which decides what to draw; it decides nothing itself.
  */
 import type { FrameView } from '@vibeglobe/core';
-import { BufferAttribute, BufferGeometry, Group, Mesh, Vector4, type MeshBasicNodeMaterial } from 'three/webgpu';
+import { BufferAttribute, BufferGeometry, Group, Mesh, type MeshBasicNodeMaterial } from 'three/webgpu';
 import { placeTile } from '../eye-relative.js';
 import type { ThreeExtensionContext } from '../extensions.js';
 import { rasterizeSdfGlyphs } from './local-glyphs.js';
@@ -16,6 +16,7 @@ import {
   createVectorMaterial,
   setVectorFrame,
   setVectorLayer,
+  createDrawUniforms,
   type VectorDrawUniforms,
   type VectorMeshKind,
 } from './vector-material.js';
@@ -163,15 +164,17 @@ export class ThreeVectorTarget {
       this.root.children.push(group);
     }
     if (this.labelMesh !== undefined) this.root.children.push(this.labelMesh);
+    for (const layer of layers) this.material(layer);
+    for (const material of this.materials.values())
+      setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
     for (const layer of layers) {
       const material = this.material(layer);
-      setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
-      setVectorLayer(material, layer.opacity, layer.zoomT, layer.dash, layer.heightScale);
       for (const draw of layer.draws) {
         const mesh = draw.mesh as ThreeVectorMesh;
         if (mesh.disposed) continue;
         const object = this.object(mesh, material, this.group(layer.layerId));
         const uniforms = object.userData['vectorDraw'] as VectorDrawUniforms;
+        setVectorLayer(uniforms, layer.opacity, layer.zoomT, layer.dash, layer.heightScale);
         uniforms.clip.set(draw.clip[0], draw.clip[1], draw.clip[2], draw.clip[3]);
         uniforms.tile.set(draw.pxPerUnit, 0, 0, 0);
         placeTile(object, mesh.data, view);
@@ -191,15 +194,10 @@ export class ThreeVectorTarget {
     this.pendingLabels = labels;
   }
 
-  /** Frees a layer's materials (the layer was removed from the style). */
+  /** Frees a layer's group (the layer was removed from the style); its meshes go with their tiles. */
   removeLayer(layerId: string): void {
     this.groups.get(layerId)?.removeFromParent();
     this.groups.delete(layerId);
-    for (const [key, material] of this.materials) {
-      if (!key.startsWith(`${layerId}\u0000`)) continue;
-      material.dispose();
-      this.materials.delete(key);
-    }
   }
 
   /** Frees every mesh, material and texture. */
@@ -222,7 +220,8 @@ export class ThreeVectorTarget {
   }
 
   private material(layer: VectorLayerDraws): MeshBasicNodeMaterial {
-    const key = `${layer.layerId}\u0000${layer.kind}\u0000${layer.solid === false ? 't' : 's'}`;
+    // One material, so one shader program, per kind: a layer appearing compiles nothing (F443).
+    const key = `${layer.kind}\u0000${layer.solid === false ? 't' : 's'}`;
     let material = this.materials.get(key);
     if (material === undefined) {
       material = createVectorMaterial(layer.kind, this.context.depthPath(), { solid: layer.solid !== false });
@@ -250,8 +249,7 @@ export class ThreeVectorTarget {
       object.matrixAutoUpdate = false;
       object.matrixWorldAutoUpdate = false;
       object.frustumCulled = false;
-      const uniforms: VectorDrawUniforms = { clip: new Vector4(), tile: new Vector4() };
-      object.userData['vectorDraw'] = uniforms;
+      object.userData['vectorDraw'] = createDrawUniforms();
       mesh.objects.push(object);
       group.add(object);
     } else if (object.material !== material) {

@@ -48,6 +48,21 @@ export interface VectorDrawUniforms {
   readonly clip: Vector4;
   /** CSS pixels per tile unit at the current zoom, then 0, 0, 0. */
   readonly tile: Vector4;
+  /** The layer's values, set with {@link setVectorLayer}: per object, so every layer of a kind shares one program. */
+  readonly layer: Vector4;
+  readonly dash: Vector4;
+  readonly dashInfo: Vector4;
+}
+
+/** Per-draw values to keep in `object.userData.vectorDraw` of a new object. */
+export function createDrawUniforms(): VectorDrawUniforms {
+  return {
+    clip: new Vector4(),
+    tile: new Vector4(),
+    layer: new Vector4(1, 0, 1, 0),
+    dash: new Vector4(),
+    dashInfo: new Vector4(),
+  };
 }
 
 /**
@@ -81,9 +96,9 @@ function createUniforms(): Uniforms {
     morphParams: uniform(new Vector4(0, 1, 1, 0)),
     morphAxes: uniform(new Matrix3()),
     viewport: uniform(new Vector2(1, 1)),
-    layer: uniform(new Vector4(1, 0, 0, 0)),
-    dash: uniform(new Vector4(0, 0, 0, 0)),
-    dashInfo: uniform(new Vector4(0, 0, 0, 0)),
+    layer: uniform(new Vector4(1, 0, 0, 0)).onObjectUpdate(({ object }) => drawOf(object)?.layer),
+    dash: uniform(new Vector4(0, 0, 0, 0)).onObjectUpdate(({ object }) => drawOf(object)?.dash),
+    dashInfo: uniform(new Vector4(0, 0, 0, 0)).onObjectUpdate(({ object }) => drawOf(object)?.dashInfo),
     clip: uniform(new Vector4(-1e9, -1e9, 1e9, 1e9)).onObjectUpdate(({ object }) => drawOf(object)?.clip),
     tile: uniform(new Vector4(1, 0, 0, 0)).onObjectUpdate(({ object }) => drawOf(object)?.tile),
   } as unknown as Uniforms;
@@ -295,8 +310,8 @@ function circleMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMateria
 }
 
 /**
- * A material for one kind of vector mesh; its uniforms are in `userData.vectorUniforms`, set each frame with
- * {@link setVectorFrame} and {@link setVectorLayer}. Solid extrusions write depth; everything else blends without.
+ * A material for one kind of vector mesh, shared by every layer of that kind: its frame uniforms are in
+ * `userData.vectorUniforms`, set with {@link setVectorFrame}; layer and draw values are read per object. Solid extrusions write depth; everything else blends without.
  */
 export function createVectorMaterial(
   kind: VectorMeshKind,
@@ -336,26 +351,25 @@ export function setVectorFrame(
   (u.viewport as unknown as Valued<Vector2>).value.set(widthPx, heightPx);
 }
 
-/** Sets a material's layer uniforms: opacity (with its fade), the zoom factor between A and B, and the dash pattern. */
+/**
+ * Sets an object's layer values: opacity (with its fade), the zoom factor between A and B, the height scale of
+ * extrusions, and the dash pattern in line widths.
+ */
 export function setVectorLayer(
-  material: MeshBasicNodeMaterial,
+  uniforms: VectorDrawUniforms,
   opacity: number,
   zoomT: number,
   dashWidths?: readonly number[],
   heightScale = 1,
 ): void {
-  const u = uniformsOf(material);
-  if (u === undefined) return;
-  (u.layer as unknown as Valued<Vector4>).value.set(opacity, zoomT, heightScale, 0);
-  const dash = (u.dash as unknown as Valued<Vector4>).value;
-  const info = (u.dashInfo as unknown as Valued<Vector4>).value;
+  uniforms.layer.set(opacity, zoomT, heightScale, 0);
   if (dashWidths === undefined || dashWidths.length < 2) {
-    info.set(0, 0, 0, 0);
+    uniforms.dashInfo.set(0, 0, 0, 0);
     return;
   }
   const d = [0, 1, 2, 3].map((i) => Math.max(0, dashWidths[i] ?? 0));
-  dash.set(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0, d[3] ?? 0);
-  info.set(
+  uniforms.dash.set(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0, d[3] ?? 0);
+  uniforms.dashInfo.set(
     d.reduce((a, b) => a + b, 0),
     1,
     0,

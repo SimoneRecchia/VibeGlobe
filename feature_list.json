@@ -5847,7 +5847,7 @@
         "Assert main-thread CPU time per frame stays within the per-frame budget documented in docs/plan",
         "Assert no long task (over 50 ms) occurs on the main thread while tiles load"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F444",

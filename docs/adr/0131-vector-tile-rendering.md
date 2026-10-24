@@ -57,6 +57,14 @@ up, under data layers (1000 and up) and over the surface. The `background` layer
 ## Consequences
 
 - `@vibeglobe/renderer` gains the `./vector-tiles` export (hook request D (2)).
+- One material, and so one shader program, per mesh kind (fill, line, extrusion, circle; solid or translucent
+  extrusions): a layer's opacity, zoom factor, dash and height scale are per-object uniforms, so a layer appearing
+  during navigation compiles nothing (each program build was a 50–200 ms main-thread task on WebGL2, F443).
+- Main-thread budget (F443): the vector tile work of a frame (tile choice, draping, paint, mesh creation, label
+  placement) stays within 4 ms p95 while moving, inside the engine's 6 ms frame (`docs/plan/quality.md`), with no
+  main-thread task over 50 ms; decoding and tessellation run only in the workers. `VectorTileLayer.frameTimeMs()`
+  reports it. The engine gives extensions its workers only on a globe with tiled imagery or terrain (hook request
+  D (4)); elsewhere layout runs inline.
 - Labels are drawn by the same target as screen-space quads (ADR 0132).
 - Engine log and `error` events of style problems need a hook (D (1)); until then problems are kept on the style
   (`VectorStyle.problems`) and written to the console.

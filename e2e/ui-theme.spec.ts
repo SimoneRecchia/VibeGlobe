@@ -394,3 +394,20 @@ test('every control meets WCAG 2.1 AA contrast in both themes, backed against an
     expect(failures, theme).toEqual([]);
   }
 });
+
+test.describe('the cascade of the theme variables (M12 review)', () => {
+  test('a page rule on .vg-ui restyles the controls in either theme, and reduced motion holds in the dark theme (KB-164, KB-165)', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openUi(page, { theme: 'dark' });
+    const zoomIn = page.locator('.vg-ui__button--zoom-in');
+    // KB-164: the dark block also set the transition duration, over the reduced-motion override.
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+    // KB-165: the theme's own declarations came after the page's sheets and beat them.
+    await page.addStyleTag({ content: '.vg-ui{--vg-ui-color:rgb(255, 0, 0)}' });
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 0, 0)');
+    await page.evaluate(() => window.vibeglobeUi?.layer.setTheme('light'));
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 0, 0)');
+  });
+});

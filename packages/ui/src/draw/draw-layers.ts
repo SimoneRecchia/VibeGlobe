@@ -6,9 +6,11 @@
 import type { DataLayer, Feature, GlobeLayers } from '@vibeglobe/layers';
 import { toFeature, type DrawnShape, type LonLat } from './geometry.js';
 
-/** Colors of the drawn shapes. */
-const COLOR = '#d93025';
-const HANDLE_FILL = '#ffffff';
+/** Colors of the drawn shapes and of the edit handles' fill (`--vg-ui-drawing-color`, `--vg-ui-drawing-handle-color`). */
+export interface DrawColors {
+  readonly shape: string;
+  readonly handle: string;
+}
 
 /** An edit handle: a vertex of a shape, or the midpoint of one of its edges. */
 export interface Handle {
@@ -28,7 +30,12 @@ export class DrawLayers {
   readonly #handles: DataLayer;
   #handleCount = 0;
 
-  constructor(layers: GlobeLayers, module: typeof import('@vibeglobe/layers'), prefix: string) {
+  constructor(
+    layers: GlobeLayers,
+    module: typeof import('@vibeglobe/layers'),
+    prefix: string,
+    { shape: COLOR, handle: HANDLE_FILL }: DrawColors,
+  ) {
     this.#layers = layers;
     const { stack } = layers;
     this.#fills = stack.add(

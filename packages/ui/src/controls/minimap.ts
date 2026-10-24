@@ -4,8 +4,9 @@
  * redraws on each camera change: a few dozen picks and one 2D path, measured in `lastUpdateMs`. It is never added
  * unless the application adds it.
  */
+import { themeValue } from '../theme/value.js';
 import { WGS84, type CameraState, type GeoPosition } from '@vibeglobe/core';
-import { geodesicDirect } from '@vibeglobe/core/geodesy';
+import { geodesicDirect, geodesicInverse } from '@vibeglobe/core/geodesy';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame } from './dom.js';
 
@@ -28,7 +29,17 @@ export function viewFootprint(
   heightPx: number,
   samplesPerEdge: number,
 ): GeoPosition[] {
-  const points: GeoPosition[] = [];
+  return edgeSamples(screenToGeo, widthPx, heightPx, samplesPerEdge).filter((point) => point !== undefined);
+}
+
+/** {@link viewFootprint}'s samples, `undefined` where the edge shows no ground. */
+function edgeSamples(
+  screenToGeo: (point: { xPx: number; yPx: number }) => GeoPosition | undefined,
+  widthPx: number,
+  heightPx: number,
+  samplesPerEdge: number,
+): (GeoPosition | undefined)[] {
+  const points: (GeoPosition | undefined)[] = [];
   const edges: readonly (readonly [number, number, number, number])[] = [
     [0, 0, widthPx, 0],
     [widthPx, 0, widthPx, heightPx],
@@ -38,28 +49,79 @@ export function viewFootprint(
   for (const [x0, y0, x1, y1] of edges)
     for (let i = 0; i < samplesPerEdge; i++) {
       const t = i / samplesPerEdge;
-      const position = screenToGeo({ xPx: x0 + (x1 - x0) * t, yPx: y0 + (y1 - y0) * t });
-      if (position !== undefined) points.push(position);
+      points.push(screenToGeo({ xPx: x0 + (x1 - x0) * t, yPx: y0 + (y1 - y0) * t }));
     }
   return points;
 }
 
-/** Points of the eye's horizon on the ellipsoid: the edge of the area the eye can see. */
-function horizonCircle(camera: CameraState, samples = 48): GeoPosition[] {
+/** An angle difference in [-180, 180) degrees. */
+const wrap180 = (deg: number): number => (((deg % 360) + 540) % 360) - 180;
+
+/** `steps` + 1 points of the eye's horizon on the ellipsoid from one azimuth to another (degrees, clockwise). */
+function horizonArc(camera: CameraState, fromDeg: number, toDeg: number, steps = 12): GeoPosition[] {
   const radius = WGS84.semiMajorAxisMeters;
   const altitude = Math.max(1, camera.altitudeMeters);
   const distanceMeters = radius * Math.acos(radius / (radius + altitude));
   const points: GeoPosition[] = [];
-  for (let i = 0; i < samples; i++) {
+  for (let i = 0; i <= steps; i++) {
     const { longitudeDeg, latitudeDeg } = geodesicDirect(
       camera.eyeLongitudeDeg,
       camera.eyeLatitudeDeg,
-      (360 * i) / samples,
+      fromDeg + ((toDeg - fromDeg) * i) / steps,
       distanceMeters,
     );
     points.push({ longitudeDeg, latitudeDeg });
   }
   return points;
+}
+
+/**
+ * The visible area's outline from the view's edge samples (`undefined` where an edge shows no ground): the samples,
+ * and the horizon where the edges show sky or space, as the short arc between the ground points on either side (a
+ * tilted view's far edge, KB-169); the whole horizon when no edge shows ground (the globe phase).
+ */
+export function footprintOutline(camera: CameraState, samples: readonly (GeoPosition | undefined)[]): GeoPosition[] {
+  const azimuth = (point: GeoPosition): number =>
+    geodesicInverse(camera.eyeLongitudeDeg, camera.eyeLatitudeDeg, point.longitudeDeg, point.latitudeDeg)
+      .initialAzimuthDeg;
+  const start = samples.findIndex((point) => point !== undefined);
+  if (start < 0) return horizonArc(camera, 0, 352.5, 47);
+  const outline: GeoPosition[] = [];
+  for (let k = 0; k < samples.length; k++) {
+    const point = samples[(start + k) % samples.length];
+    if (point !== undefined) {
+      outline.push(point);
+      continue;
+    }
+    let end = k;
+    while (samples[(start + end + 1) % samples.length] === undefined) end++;
+    const before = outline.at(-1);
+    const after = samples[(start + end + 1) % samples.length];
+    if (before !== undefined && after !== undefined) {
+      const from = azimuth(before);
+      const turn = wrap180(azimuth(after) - from);
+      outline.push(...horizonArc(camera, from, from + turn));
+    }
+    k = end;
+  }
+  return outline;
+}
+
+/**
+ * The outline's longitudes, each unwrapped from the one before (so a footprint across the antimeridian stays one
+ * shape), and the pole the outline goes around (1 north, -1 south, 0 none: its longitudes turn by a full 360°, KB-169).
+ */
+export function unwrapOutline(points: readonly GeoPosition[]): { longitudesDeg: number[]; pole: number } {
+  const longitudesDeg: number[] = [];
+  let previous = points[0]?.longitudeDeg ?? 0;
+  for (const point of points) {
+    previous += wrap180(point.longitudeDeg - previous);
+    longitudesDeg.push(previous);
+  }
+  const first = longitudesDeg[0] ?? 0;
+  const last = longitudesDeg.at(-1) ?? 0;
+  const turn = last + wrap180(first - last) - first;
+  return { longitudesDeg, pole: Math.abs(turn) > 180 ? Math.sign(points[0]?.latitudeDeg ?? 1) : 0 };
 }
 
 /** A canvas with the world and the footprint outline. */
@@ -133,34 +195,44 @@ export class MinimapControl implements UiControl {
     if (context === undefined || canvas === undefined || draw === undefined || draw === null) return;
     const started = performance.now();
     const { container, globe } = context;
-    const edges = viewFootprint(
+    const edges = edgeSamples(
       (point) => globe.screenToGeo(point),
       container.clientWidth,
       container.clientHeight,
       this.#samples,
     );
-    // Space along an edge (the globe phase, a view up to the horizon): the visible area reaches the horizon.
-    this.#footprint = edges.length === 4 * this.#samples ? edges : horizonCircle(globe.camera);
+    this.#footprint = footprintOutline(globe.camera, edges);
     const { width, height } = canvas;
     draw.clearRect(0, 0, width, height);
     if (this.#world !== undefined) draw.drawImage(this.#world, 0, 0);
     const points = this.#footprint;
     if (points.length >= 2) {
-      // Longitudes unwrapped around the first point, so a footprint across the antimeridian stays one shape.
-      const first = points[0]?.longitudeDeg ?? 0;
-      const x = (longitudeDeg: number): number => ((longitudeDeg - first + 540) % 360) - 180 + first;
+      const { longitudesDeg, pole } = unwrapOutline(points);
+      const px = (longitudeDeg: number): number => ((longitudeDeg + 180) / 360) * width;
       draw.beginPath();
-      for (const [index, point] of points.entries()) {
-        const px = ((x(point.longitudeDeg) + 180) / 360) * width;
-        const py = ((90 - point.latitudeDeg) / 180) * height;
-        if (index === 0) draw.moveTo(px, py);
-        else draw.lineTo(px, py);
+      // Once per world copy the unwrapped outline may reach, so the part past the map's edge shows on the other side.
+      for (const shift of [-360, 0, 360]) {
+        for (const [index, point] of points.entries()) {
+          const x = px((longitudesDeg[index] ?? 0) + shift);
+          const y = ((90 - point.latitudeDeg) / 180) * height;
+          if (index === 0) draw.moveTo(x, y);
+          else draw.lineTo(x, y);
+        }
+        // Around a pole, the outline closes along the map's top or bottom edge (KB-169).
+        if (pole !== 0) {
+          const y = pole > 0 ? 0 : height;
+          draw.lineTo(px((longitudesDeg.at(-1) ?? 0) + shift), y);
+          draw.lineTo(px((longitudesDeg[0] ?? 0) + shift), y);
+        }
+        draw.closePath();
       }
-      draw.closePath();
-      draw.fillStyle = 'rgba(255, 64, 64, 0.25)';
+      const color = themeValue(context.container, '--vg-ui-minimap-footprint-color');
+      draw.fillStyle = color;
+      draw.globalAlpha = 0.25;
       draw.fill();
+      draw.globalAlpha = 1;
       draw.lineWidth = Math.max(1, width / this.#widthPx) * 1.5;
-      draw.strokeStyle = '#ff4040';
+      draw.strokeStyle = color;
       draw.stroke();
     }
     this.#lastUpdateMs = performance.now() - started;

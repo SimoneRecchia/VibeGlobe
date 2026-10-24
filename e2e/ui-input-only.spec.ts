@@ -113,7 +113,7 @@ async function openEverything(page: Page, language: string, theme: 'light' | 'da
     );
     handle.layer.add(new handle.ui.BookmarksControl());
     handle.layer.add(new handle.ui.ScreenshotControl());
-    handle.layer.add(new handle.ui.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
+    handle.layer.add(new handle.minimap.MinimapControl({ imageUrl: '/imagery/natural-earth-4096.jpg' }));
     handle.layer.add(new handle.ui.MeasureControl());
     handle.layer.add(new handle.ui.DrawControl());
   });

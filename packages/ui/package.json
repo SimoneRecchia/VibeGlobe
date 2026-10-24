@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./minimap": {
+      "types": "./dist/minimap.d.ts",
+      "source": "./src/minimap.ts",
+      "default": "./dist/minimap.js"
     }
   },
   "types": "./dist/index.d.ts",

@@ -51,8 +51,6 @@ export { BookmarksControl } from './controls/bookmarks.js';
 export type { Bookmark, BookmarksControlOptions } from './controls/bookmarks.js';
 export { ScreenshotControl, captureView } from './controls/screenshot.js';
 export type { ScreenshotControlOptions, ScreenshotSize } from './controls/screenshot.js';
-export { MinimapControl, viewFootprint } from './controls/minimap.js';
-export type { MinimapControlOptions } from './controls/minimap.js';
 export { DrawControl } from './controls/draw.js';
 export type { DrawControlOptions } from './controls/draw.js';
 export { MeasureControl, measureShape } from './controls/measure.js';

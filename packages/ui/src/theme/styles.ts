@@ -48,7 +48,10 @@ const LIGHT = {
   '--vg-ui-debug-color': '#ffffff',
   '--vg-ui-debug-background': 'rgba(0, 0, 0, 0.75)',
   '--vg-ui-debug-font-size': '12px',
-  /** What controls draw on the map, read when they draw it: the geolocation marker and its accuracy circle. */
+  /**
+   * What controls draw on the map, read when a control creates its map layers (the minimap: on every update): the
+   * geolocation marker and its accuracy circle.
+   */
   '--vg-ui-marker-color': '#1a73e8',
   '--vg-ui-marker-outline-color': '#ffffff',
   /** Drawn and measured shapes, and the fill of their edit handles. */

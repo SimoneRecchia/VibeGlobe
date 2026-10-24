@@ -50,6 +50,15 @@ function loadImage(src: string): Promise<HTMLImageElement | undefined> {
 }
 
 /**
+ * Throws when a required credit's logo did not load (a host without CORS headers): the export would miss it, against
+ * the provider's terms (KB-167).
+ */
+export function assertRequiredLogos(items: readonly { credit: Credit; logo: unknown }[]): void {
+  const missing = items.find(({ credit, logo }) => credit.required && credit.logo && !logo);
+  if (missing) throw new Error(`The required logo of "${missing.credit.text}" did not load`);
+}
+
+/**
  * The credits' rows, top row first: each credit (`widths`, logo and text) goes on the current row while it fits in
  * `maxWidth`, else starts a new one (KB-168). Returns the rows as index lists, the scale every width must shrink by
  * so that the widest credit alone fits, and the widest row's width.
@@ -99,6 +108,7 @@ async function drawCredits(
       return { credit, logo, logoWidth, textWidth: context.measureText(credit.text).width };
     }),
   );
+  assertRequiredLogos(loaded);
   const basePad = Math.round(basePx / 2);
   const widths = loaded.map((item) => item.textWidth + (item.logo ? item.logoWidth + basePad : 0));
   const layout = layoutCredits(widths, widthPx - 2 * basePad, basePx);

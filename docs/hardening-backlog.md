@@ -33,12 +33,13 @@ perfection in edge cases.
 
 ## Atmosphere track (M11)
 
-| Entry      | Step                               | What remains                                                                                                                             |
-| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| F391–F396  | Real GPUs and the reference tablet | The sky and haze march (ADR 0040) timed on the reference desktop and tablet within the GPU budget; Hillaire LUTs if the tablet misses it |
-| F391, F393 | Firefox and Safari                 | The harness checks in the cross-browser job once the engine draws the atmosphere (the container has Chromium only)                       |
-| F392       | Banding on large real displays     | The dithering checked by eye on an 8-bit desktop monitor at 4K; the automated measure runs at 480 × 320 on SwiftShader                   |
-| F394       | Edge cases                         | Haze over high mountains seen from below their summits (ground below the eye's horizon), polar views                                     |
+| Entry      | Step                               | What remains                                                                                                                                                                                                                                   |
+| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F397       | Real GPUs                          | Anti-aliasing (MSAA) smooths terrain silhouettes, thin lines and extrusions on both backends with no shimmer in a slow pan (`e2e/antialiasing.spec.ts`); its GPU cost within the per-frame budget is timed on the reference desktop and tablet |
+| F391–F396  | Real GPUs and the reference tablet | The sky and haze march (ADR 0040) timed on the reference desktop and tablet within the GPU budget; Hillaire LUTs if the tablet misses it                                                                                                       |
+| F391, F393 | Firefox and Safari                 | The harness checks in the cross-browser job once the engine draws the atmosphere (the container has Chromium only)                                                                                                                             |
+| F392       | Banding on large real displays     | The dithering checked by eye on an 8-bit desktop monitor at 4K; the automated measure runs at 480 × 320 on SwiftShader                                                                                                                         |
+| F394       | Edge cases                         | Haze over high mountains seen from below their summits (ground below the eye's horizon), polar views                                                                                                                                           |
 
 ## Vector tiles and 3D Tiles track (M13)
 

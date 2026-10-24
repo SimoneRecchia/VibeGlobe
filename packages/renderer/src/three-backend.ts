@@ -38,6 +38,9 @@ import { BackendCounters } from './backend-counters.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import { releaseMesh } from './release-mesh.js';
 import { SceneAtmosphere } from './atmosphere/scene-atmosphere.js';
+import type { BackendSettings } from './backend-settings.js';
+
+export type { BackendSettings } from './backend-settings.js';
 import {
   RecoveryLimiter,
   createFailureMessage,
@@ -63,16 +66,6 @@ export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
  * uses hardware reversed-Z.
  */
 export type DepthChoice = 'auto' | 'fragment';
-
-/** How a backend is set up: the {@link RendererOptions} it uses. */
-export interface BackendSettings {
-  readonly choice: BackendChoice;
-  readonly depth: DepthChoice;
-  /** Measures each frame's GPU time with timestamp queries where the device offers them (benchmarks only). */
-  readonly gpuTiming: boolean;
-  /** The compressed families KTX2 imagery may use, among the device's; undefined for all of them. */
-  readonly compressedTextures: readonly string[] | undefined;
-}
 
 /**
  * Where the backend draws (ADR 0011): a canvas it manages inside a page container (an existing one, or one it
@@ -182,7 +175,7 @@ export class ThreeBackend implements RendererBackend {
     const canvas = this.canvases.next(webgpu);
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
-      antialias: true,
+      antialias: this.settings.antialias,
       // three.js turns this off on WebGL2 without EXT_clip_control; the engine then writes depth itself.
       reversedDepthBuffer: webgpu || this.settings.depth === 'auto',
       forceWebGL,

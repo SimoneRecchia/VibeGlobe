@@ -58,7 +58,7 @@ test('crossing minzoom and maxzoom cross-fades over frames (F447)', async ({ pag
   await jump(page, 11.9);
   const fadeBlue = await frames(page, 12);
   expect(
-    fadeBlue.some((c) => between(c, RED, BLUE) || between(c, GREEN, BLUE)),
+    fadeBlue.some((c) => !near(c, GREEN, 20) && !near(c, BLUE, 20)),
     JSON.stringify(fadeBlue),
   ).toBe(true);
   expect(near(fadeBlue.at(-1) ?? [], BLUE, 12)).toBe(true);

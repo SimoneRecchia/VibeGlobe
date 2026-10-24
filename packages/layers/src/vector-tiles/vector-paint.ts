@@ -1,6 +1,7 @@
 /**
  * Paint of vector tile meshes (F440, F446, F450; ADR 0131): each feature's paint evaluated at the two integer zooms
- * around the camera's, so the renderer mixes them continuously, and written per vertex. A paint change or a
+ * around the camera's, so the renderer mixes them continuously, and written per vertex. Colors stay sRGB, as the style
+ * specification interpolates them; the renderer converts to linear light after mixing. A paint change or a
  * feature-state change rewrites these arrays in place; the geometry stays (no new layout, no new download).
  */
 import type { Bucket, BucketFeature } from './layout-tile.js';
@@ -26,6 +27,13 @@ export function meshKindOf(type: string): VectorMeshKind | undefined {
 
 const toLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
+/** A style color as straight sRGB RGBA with an opacity factor; transparent when missing. */
+export function srgbColor(value: unknown, opacity = 1): [number, number, number, number] {
+  const c = value as StyleColor | undefined;
+  if (c === undefined || typeof c.r !== 'number') return [0, 0, 0, 0];
+  return [c.r, c.g, c.b, c.a * opacity];
+}
+
 /** A style color (straight sRGB) as straight linear RGBA with an opacity factor; transparent when missing. */
 export function linearColor(value: unknown, opacity = 1): [number, number, number, number] {
   const c = value as StyleColor | undefined;
@@ -48,24 +56,24 @@ function featurePaint(
   const p = (name: string) => layer.paint(name, zoom, feature, state);
   switch (layer.type) {
     case 'fill':
-      return { color: linearColor(p('fill-color'), num(p('fill-opacity'), 1)), params: [0, 0, 0, 0] };
+      return { color: srgbColor(p('fill-color'), num(p('fill-opacity'), 1)), params: [0, 0, 0, 0] };
     case 'line': {
       const width = num(p('line-width'), 1);
       const gap = num(p('line-gap-width'));
       // With a gap, two lines of `width` border it (casings); otherwise one line centered on the path.
       const params = gap > 0 ? [width, num(p('line-blur')), gap / 2, 0] : [width / 2, num(p('line-blur')), 0, 0];
-      return { color: linearColor(p('line-color'), num(p('line-opacity'), 1)), params };
+      return { color: srgbColor(p('line-color'), num(p('line-opacity'), 1)), params };
     }
     case 'fill-extrusion':
-      return { color: linearColor(p('fill-extrusion-color'), 1), params: [0, 0, 0, 0] };
+      return { color: srgbColor(p('fill-extrusion-color'), 1), params: [0, 0, 0, 0] };
     case 'background':
-      return { color: linearColor(p('background-color'), num(p('background-opacity'), 1)), params: [0, 0, 0, 0] };
+      return { color: srgbColor(p('background-color'), num(p('background-opacity'), 1)), params: [0, 0, 0, 0] };
     case 'circle': {
       const opacity = num(p('circle-opacity'), 1);
       return {
-        color: linearColor(p('circle-color'), opacity),
+        color: srgbColor(p('circle-color'), opacity),
         params: [num(p('circle-radius'), 5), num(p('circle-blur')), num(p('circle-stroke-width')), 0],
-        stroke: linearColor(p('circle-stroke-color'), num(p('circle-stroke-opacity'), 1) * opacity),
+        stroke: srgbColor(p('circle-stroke-color'), num(p('circle-stroke-opacity'), 1) * opacity),
       };
     }
     default:

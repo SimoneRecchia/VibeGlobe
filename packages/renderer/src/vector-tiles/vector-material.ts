@@ -2,7 +2,7 @@
  * Materials of vector tile meshes (ADR 0131): fills, lines extruded across their screen direction with dashes,
  * building extrusions with flat-shaded walls, and circles. Every vertex follows the surface's precision and morph path
  * (ADR 0004, ADR 0008), with ground heights draped on the terrain and scaled by its relief, and heights above the
- * ground scaled on the flat map by the Mercator scale factor (F458). Paint values come per vertex at the two integer
+ * ground scaled on the flat map by the Mercator scale factor (F458). Paint values (sRGB colors) come per vertex at the two integer
  * zooms around the camera's (A and B) and are mixed by the layer's zoom factor, so they change continuously (F440).
  * Each draw keeps only the fragments inside its target tile's square (`clip`), so neighboring tiles and stand-in
  * ancestors cover every point exactly once (F440, F442).
@@ -116,6 +116,16 @@ function mixAB(name: 'vtColor' | 'vtParams', u: Uniforms): Node<'vec4'> {
   return a.add(b.sub(a).mul(u.layer.y));
 }
 
+/**
+ * Straight sRGB RGBA to linear light (the output is encoded back to sRGB): paint is mixed in sRGB, as the style
+ * specification interpolates colors, and converted after mixing.
+ */
+function linearRgba(srgb: Node<'vec4'>): Node<'vec4'> {
+  // A cubic fit of the sRGB curve (within 0.5% of it; exact at 0 and 1), without a branch.
+  const c = srgb.xyz;
+  return vec4(c.mul(c.mul(c.mul(0.305306011).add(0.682171111)).add(0.012522878)), srgb.w);
+}
+
 /** 1 inside the draw's target square, else 0, from the vertex's interpolated tile position. */
 function insideClip(u: Uniforms): Node<'float'> {
   const p = varying(attribute('vtTile', 'vec2'));
@@ -161,7 +171,7 @@ function fillMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial 
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const material = new MeshBasicNodeMaterial();
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
-  const color = varying(mixAB('vtColor', u));
+  const color = linearRgba(varying(mixAB('vtColor', u)));
   material.colorNode = vec4(color.xyz, color.w.mul(u.layer.x).mul(insideClip(u)));
   return finish(material, viewPosition, depthPath, false);
 }
@@ -205,7 +215,7 @@ function lineMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial 
     ),
   );
   alpha = alpha.mul(dashMask(u, varying(line.z), halfWidthV));
-  const color = varying(mixAB('vtColor', u));
+  const color = linearRgba(varying(mixAB('vtColor', u)));
   material.colorNode = vec4(color.xyz, color.w.mul(alpha).mul(u.layer.x).mul(insideClip(u)));
   return finish(material, viewPosition, depthPath, false);
 }
@@ -245,7 +255,7 @@ function extrusionMaterial(u: Uniforms, depthPath: DepthPath, solid: boolean): M
   // Vertical gradient: walls darken toward their base (`fill-extrusion-vertical-gradient`); roofs, at the top, get 1.
   // (A `select` on a boolean inside this varying made roofs vanish on WebGL2, so none is used.)
   const gradient = min(float(1), float(0.7).add(above.div(max(attribute('vtTop', 'float'), 1)).mul(0.3)));
-  const color = varying(mixAB('vtColor', u));
+  const color = linearRgba(varying(mixAB('vtColor', u)));
   const lit = color.xyz.mul(varying(shade.mul(gradient)));
   const alpha = color.w.mul(u.layer.x).mul(insideClip(u));
   // Solid extrusions blend nothing: their alpha only carries the clip, which the alpha test discards.
@@ -275,8 +285,8 @@ function circleMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMateria
   const r = length(varying(corner)).mul(varying(outer.add(1)));
   const edge = float(1).sub(smoothstep(varying(outer).sub(0.5), varying(outer).add(0.5), r));
   const strokeT = smoothstep(varying(params.x).sub(0.5), varying(params.x).add(0.5), r);
-  const fill = varying(mixAB('vtColor', u));
-  const stroke = varying(attribute('vtStroke', 'vec4'));
+  const fill = linearRgba(varying(mixAB('vtColor', u)));
+  const stroke = linearRgba(varying(attribute('vtStroke', 'vec4')));
   const rgb = fill.xyz.add(stroke.xyz.sub(fill.xyz).mul(strokeT));
   const a = fill.w.add(stroke.w.sub(fill.w).mul(strokeT));
   material.colorNode = vec4(rgb, a.mul(edge).mul(u.layer.x).mul(insideClip(u)));

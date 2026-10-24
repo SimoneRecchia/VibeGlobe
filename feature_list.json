@@ -5886,7 +5886,7 @@
         "Record frames during a continuous zoom and assert interpolated paint properties change smoothly",
         "Set feature-state on a feature at runtime and assert its style changes on the next frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F447",

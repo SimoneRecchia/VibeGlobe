@@ -147,7 +147,8 @@ for (const backend of BACKENDS) {
     const cycles = scaled(1000);
     const seed = runSeed();
     console.log(`[robustness] F517 ${backend} seed ${seed} cycles ${cycles}`);
-    test.setTimeout(1_800_000);
+    // About 3 s per cycle on the container's software GPU (WebGPU start-ups are the slow ones), with room to spare.
+    test.setTimeout(600_000 + cycles * 4000);
     await expectNoGrowth(page, browser, backend, cycles, async () => {
       const beforeReady = await rapidCycles(page, backend, cycles, seed, 500);
       console.log(`[robustness] F517 ${backend}: ${beforeReady} of ${cycles} destroyed before ready`);

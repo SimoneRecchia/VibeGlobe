@@ -201,7 +201,8 @@ test.describe('third-party terrain adapters (F132)', () => {
     const source = readFileSync(new URL('../apps/playground/src/terrain-adapters.ts', import.meta.url), 'utf8');
     const imports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
     expect(imports.length).toBeGreaterThan(0);
-    for (const specifier of imports) expect(['@vibeglobe/core', '@vibeglobe/sources']).toContain(specifier);
+    for (const specifier of imports)
+      expect(['@vibeglobe/core', '@vibeglobe/core/decoders', '@vibeglobe/sources']).toContain(specifier);
   });
 });
 

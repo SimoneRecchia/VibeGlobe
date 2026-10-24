@@ -61,10 +61,20 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
   let flushQueued = false;
   // A change outside a frame (data streamed in, a style set) is written to the renderer before the next frame, so
   // that frame shows it (F372); changes during a frame's step are drawn by the frame they ask for.
+  // A layer asking for a frame from this step (labels fading, KB-135) gets the next frame, not another flush: the
+  // clock does not advance between microtasks, so flushing again would never end.
   const flush = (): void => {
     flushQueued = false;
     if (detached || inFrame) return;
-    stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+    step();
+  };
+  const step = (): void => {
+    inFrame = true;
+    try {
+      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+    } finally {
+      inFrame = false;
+    }
   };
   const stack = new LayerStack(target, () => {
     if (!inFrame && !flushQueued) {
@@ -77,14 +87,7 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
     pick: (point) => target.pick?.(point) ?? Promise.resolve(0),
     screenToGeo: (point) => globe.screenToGeo(point),
   });
-  const offFrame = globe.on('frame', () => {
-    inFrame = true;
-    try {
-      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
-    } finally {
-      inFrame = false;
-    }
-  });
+  const offFrame = globe.on('frame', step);
   const offPointer = options.element
     ? routePointer(options.element, interaction, (position, onGround) =>
         globe.geoToScreen(

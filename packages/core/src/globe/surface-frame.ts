@@ -1,6 +1,6 @@
 import type { LayerGround } from '../layers/layer-target.js';
 import { refuseDisplayOnly } from './display-only.js';
-import { motionOf } from './motion-detail.js';
+import { BASE_TEXEL, FACTOR, motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -257,9 +257,10 @@ export class SurfaceFrame {
     const selectionStart = timed ? imagery.now() : 0;
     // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
     motionOf(this).flying = imagery?.preload.flying === true;
-    const motion = motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    const motion = motionOf(this).state[FACTOR] ?? 1;
     // Written only when it changes: a new double in the options' field would allocate every frame (F064).
-    const texelErrorPx = motionOf(this).baseTexelErrorPx * motion;
+    const texelErrorPx = (motionOf(this).state[BASE_TEXEL] ?? 1.5) * motion;
     if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
     if (imagery)
       for (const layer of imagery.layers) {
@@ -430,7 +431,7 @@ export class SurfaceFrame {
    */
   get fading(): boolean {
     const imagery = this.imagery;
-    return imagery !== undefined && (imagery.fading || motionOf(this).factor > 1);
+    return imagery !== undefined && (imagery.fading || (motionOf(this).state[FACTOR] ?? 1) > 1);
   }
 
   /** True while imagery the view wants is still loading. */

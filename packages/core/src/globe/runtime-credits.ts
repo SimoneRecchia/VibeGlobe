@@ -27,6 +27,8 @@ export class RuntimeCredits {
     private readonly changed: (credits: readonly Credit[]) => void,
     private readonly warn: (message: string) => void,
     private readonly terrainIndex: number,
+    /** Sources render extensions credit for what they draw (`RenderExtensionContext.setCredits`, track E hook 2). */
+    private readonly extra: () => readonly CreditedSource[] = () => [],
   ) {
     this.visible = new VisibleSources(sources.length);
   }
@@ -61,6 +63,7 @@ export class RuntimeCredits {
     const shown = this.sources.filter(
       (source, index): source is CreditedSource => source !== undefined && this.visible.visible(index),
     );
+    shown.push(...this.extra());
     return creditsOf(shown, this.hidden, (sourceId) => {
       if (this.warned.has(sourceId)) return;
       this.warned.add(sourceId);
@@ -89,6 +92,12 @@ export interface ImageryCallbacks {
   readonly adaptiveRequests?: boolean;
 }
 
+/**
+ * The sources render extensions credit (`RenderExtensionContext.setCredits`, track E hook 2), by renderer and then by
+ * extension: kept outside the credits, which the runtime builds again when a layer is added or removed.
+ */
+export const extensionCredits = new WeakMap<object, Map<object, readonly CreditedSource[]>>();
+
 /** The credits of an engine's sources, shown in the renderer's attribution element and reported to the globe. */
 export function runtimeCredits(
   sources: readonly (ImagerySource | TerrainSource | undefined)[],
@@ -106,5 +115,6 @@ export function runtimeCredits(
     },
     (message) => observability?.logger.log('warn', message),
     terrainIndex,
+    () => [...(extensionCredits.get(renderer)?.values() ?? [])].flat(),
   );
 }

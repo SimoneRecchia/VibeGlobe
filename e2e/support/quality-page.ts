@@ -89,6 +89,10 @@ const quality = createQuality(
     on: (event, handler) => globe.on(event, handler),
     setResolutionScale: (scale) => globe.setResolutionScale(scale),
     requestRender: () => globe.requestRender(),
+    // Level of detail and effects too (hook C (3)), except the atmosphere: on the software GPU of the test browsers it
+    // slows real frames about sixfold, and the synthetic clock with them. The playground's quality page applies it
+    // (e2e/quality-playground.spec.ts).
+    setQualitySettings: (settings) => globe.setQualitySettings({ ...settings, atmosphere: 'off' }),
   },
   {
     preset,

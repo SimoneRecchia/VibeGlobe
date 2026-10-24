@@ -105,14 +105,14 @@ test('a captive portal counts as unreachable and is never used as tiles; package
   await page.evaluate((spec) => window.offlineHarness?.installFixture(spec), ROME_PACKAGE);
   expect(await page.evaluate(() => navigator.onLine)).toBe(true);
   await expect.poll(() => connectivity(page), { timeout: 20_000 }).toBe('offline');
-  const before = await servedCount(page);
+  // The restart clears the served log: what it lists next is the new globe's.
   await page.evaluate(() => window.offlineHarness?.restartGlobe());
   await page.evaluate((v) => window.offlineHarness?.globe?.jumpTo(v), ROME_VIEW);
   await settle(page, 3000);
   expect(await emptyPixelsNow(page)).toBe(0);
   const tiers = await page.evaluate(() => window.offlineHarness?.served.map((e) => e.tier) ?? []);
   expect(tiers).not.toContain('network');
-  expect(tiers.slice(before)).toContain('package');
+  expect(tiers).toContain('package');
 });
 
 test('a single dead endpoint is marked unreachable alone, and its checks back off (F297)', async ({ page }) => {

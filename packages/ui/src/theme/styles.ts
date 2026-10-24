@@ -111,8 +111,8 @@ export const RULES_CSS = `
 .vg-ui [hidden]{display:none !important}
 .vg-ui__corner > *{pointer-events:auto}
 .vg-ui__corner{position:absolute;display:flex;flex-direction:column;gap:var(--vg-ui-spacing);padding:var(--vg-ui-spacing);max-width:100%}
-.vg-ui__corner--top-left{top:0;left:0;align-items:flex-start}
-.vg-ui__corner--top-right{top:0;right:0;align-items:flex-end}
+.vg-ui__corner--top-left{top:0;left:0;align-items:flex-start;box-sizing:border-box;flex-wrap:wrap;align-content:flex-start}
+.vg-ui__corner--top-right{top:0;right:0;align-items:flex-end;box-sizing:border-box;flex-wrap:wrap-reverse;align-content:flex-start}
 .vg-ui__corner--bottom-left{bottom:0;left:0;align-items:flex-start;flex-direction:column-reverse}
 .vg-ui__corner--bottom-right{bottom:0;right:0;align-items:flex-end;flex-direction:column-reverse}
 .vg-ui__control{pointer-events:auto;display:flex;flex-direction:column;background:var(--vg-ui-background);border:var(--vg-ui-border-width) solid var(--vg-ui-border-color);border-radius:var(--vg-ui-border-radius);box-shadow:var(--vg-ui-shadow)}

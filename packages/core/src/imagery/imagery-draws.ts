@@ -156,6 +156,8 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
  */
 function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance: number): number {
   let fallback = -1;
+  // The first source mapping the area although its tile there is missing or failing: the last resort (KB-149).
+  let failing = -1;
   // Levels an earlier source serves are its own: a later source is asked only for finer ones (F247).
   let floor = 0;
   for (let k = 0; k < chain.length; k++) {
@@ -163,7 +165,10 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
       // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142).
-      if (fallback < 0 && mapInto(layer, tile) && !unavailableAtMapping(layer)) fallback = k;
+      if (fallback < 0 && mapInto(layer, tile)) {
+        if (!unavailableAtMapping(layer)) fallback = k;
+        else if (failing < 0) failing = k;
+      }
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -175,6 +180,7 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     }
     return -1;
   }
+  if (fallback < 0) fallback = failing;
   const covering = chain[fallback];
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }

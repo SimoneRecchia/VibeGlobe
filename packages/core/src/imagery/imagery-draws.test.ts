@@ -159,6 +159,13 @@ describe('drawImagery', () => {
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([60, 8]);
   });
 
+  it("magnifies a lone source's ancestor where its own tile fails, with no other source (KB-149, F242)", () => {
+    // Tiles from level 6 on fail to decode: the level-5 tile is magnified, not nothing.
+    const only = fakeLayer({ 5: 70 }, [6, 7, 8]);
+    const list = drawStack([stacked([only.layer])], tile(8, 130, 90));
+    expect([list.textures[0], list.imageryLevels[0]]).toEqual([70, 5]);
+  });
+
   it('draws nothing of a source outside its coverage, not even a magnified ancestor (F094, F254)', () => {
     const covered = fakeLayer({ 2: 50 });
     const italy = { westRad: 0.11, southRad: 0.62, eastRad: 0.32, northRad: 0.83 };

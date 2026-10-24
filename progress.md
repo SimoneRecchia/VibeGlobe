@@ -49,6 +49,14 @@ Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner 
 - Hours: about 8 hours of agent time on 2026-10-23 after the morning (11:30–19:30 UTC). Monday (26 October 08:00 Europe/Rome) is not reachable for every entry: M10 (renderer items F358, F374, F375, F378), M11 wiring (atmosphere, quality settings) and M12's larger-than-canvas capture (F416) remain for the main session, with M13 in tracks D and E; the hardening-only leftovers wait for the two hardening weeks.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## Track E: 3D Tiles (`packages/renderer/src/tiles3d`, `packages/sources/src/tiles3d`)
+
+Branch `claude/keen-davinci-ym90tk`; entries, blockers and hook requests E (1)–(5) in `docs/parallel-tracks.md` ("E. 3D Tiles track: status"); ADR 0141.
+
+- **2026-10-23:** Passing: F461 (no holes while streaming, both backends, slow link; debug overlay), F462 (center-first requests through the page's pool within host limits, cancellation in flights, LRU budget; the 10-minute navigation ran once), F464 (no street-level jitter, WGS84 alignment), F465 (globe, flattening, 2D and 3D phases), F466 (picking with batch tables and 1.1 property tables), F467 (no z-fighting on terrain: a 0.1% relative depth pull). Pending owner steps: F468 (run with a real key), F469 (three-hour real session). Failing with blockers: F463 (hook E (1), `parse-model` in the worker program), F470 (hook E (2), extension credits in the engine's attribution), F471 (reference devices; hook E (5), benchmark history).
+- Found and fixed while building (before commit, no known bug left open): every in-flight request was cancelled each frame (a loading tile is not re-requested by traversal); rigid per-tileset placement drifted on the flat map (0.4% north–south Mercator stretch) and failed for Google's whole-Earth root: tiles are now placed by the local derivative of the frame's mapping at each tile's center (sub-millimeter); render extensions receive `network` and `workers` only on a globe with tiled imagery, so the scenarios use `imagery=world`.
+- About 6 hours of agent time.
+
 ## Track B: source adapters and offline (`packages/sources`, `packages/offline`)
 
 Branch `claude/laughing-tesla-a6tkm3`, pull request SimoneRecchia/VibeGlobe#20; entries, blockers and hook requests (1)–(5) in `docs/parallel-tracks.md` ("Track B, source adapters and offline: status").

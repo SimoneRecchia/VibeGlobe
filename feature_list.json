@@ -6081,7 +6081,7 @@
         "Repeat with a slow network profile and assert still no holes",
         "Check the debug overlay shows each tile's level and screen-space error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F462",
@@ -6094,7 +6094,7 @@
         "Run 10 minutes of randomized navigation and assert GPU and RAM use stay within the configured budgets",
         "Assert evicted tiles reload correctly when revisited"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F463",
@@ -6120,7 +6120,7 @@
         "Assert surveyed reference points in the tileset project onto the same pixels as markers placed at their WGS84 coordinates",
         "Repeat on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F465",
@@ -6132,7 +6132,7 @@
         "Assert by frame differencing that tileset geometry does not jump during the morph",
         "Capture the same view in each phase and compare positions and colors within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F466",
@@ -6144,7 +6144,7 @@
         "Assert the click event carries the expected feature properties",
         "Assert the reported coordinates and height match the fixture's known positions within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F467",
@@ -6156,7 +6156,7 @@
         "Record frames while orbiting at street level and assert no shimmer where the tileset meets the terrain (temporal z-fighting analysis)",
         "Assert terrain does not show through the tileset surface in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F468",
@@ -6169,7 +6169,7 @@
         "In CI, run the same flow against a mock Map Tiles server",
         "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F469",
@@ -6182,7 +6182,7 @@
         "Record frames across the renewal and assert no holes or blank frames",
         "Manually keep a real session open beyond three hours on the reference desktop and record the renewal in the test log"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F470",

@@ -471,6 +471,9 @@ if (params.get('experiment') === 'gpu-probes') {
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
+  // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.
+  if (scenario?.startsWith('3dtiles-'))
+    void globe.ready.then(async () => (await import('./tiles3d-demo.js')).showTiles3DScenario(globe, app, params));
   if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
   if (experiment === 'main') instrumentMainThread(globe, app);

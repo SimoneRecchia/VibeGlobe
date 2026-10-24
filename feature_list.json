@@ -5214,7 +5214,7 @@
         "Run temporal glitch detection on the sky and atmosphere regions and verify no frame-to-frame jump above threshold at any phase boundary",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F394",

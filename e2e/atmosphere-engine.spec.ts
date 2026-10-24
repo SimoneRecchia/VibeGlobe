@@ -206,3 +206,57 @@ for (const backend of ['webgpu', 'webgl2'] as const)
     expect(ratio(morning)).toBeGreaterThan(1.15);
     expect(ratio(evening)).toBeLessThan(1 / 1.15);
   });
+
+/** A step this many times its neighbors' change is a jump (temporal glitch detection, as F397's shimmer check). */
+const JUMP = 3;
+/** Changes below this mean level difference (of 255) are never jumps: dithering and sub-level drift. */
+const JUMP_FLOOR = 2;
+
+/** The mean color of the frame's top tenth: space and the limb's glow from orbit, the sky above a tilted horizon. */
+function skyBand(image: PNG): [number, number, number] {
+  const rows = Math.floor(image.height / 10);
+  const sum = [0, 0, 0];
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < image.width; x++)
+      for (let c = 0; c < 3; c++) sum[c] = (sum[c] ?? 0) + (image.data[(y * image.width + x) * 4 + c] ?? 0);
+  return sum.map((v) => v / (rows * image.width)) as [number, number, number];
+}
+
+for (const backend of ['webgpu', 'webgl2'] as const)
+  test(`F393: sky and haze change smoothly through a zoom from the globe to an oblique street view on ${backend}`, async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await openGlobe(page, `backend=${backend}&imagery=world&atmosphere=high&lon=12.5&lat=41.9&zoom=2`);
+    const box = await page.locator('#globe').boundingBox();
+    if (!box) throw new Error('no canvas');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const samples: { zoom: number; tiltDeg: number; phase: string; sky: [number, number, number] }[] = [];
+    // Wheel steps of a third of a level through every phase boundary: the morph to flat (4–6.5), the relief (10–15)
+    // and the automatic tilt (14–16.5); each frame once its tiles have loaded, so imagery arrival is not measured.
+    for (let step = 0; step < 48; step++) {
+      await page.mouse.wheel(0, -100);
+      await waitForStreaming(page);
+      const camera = await page.evaluate(() => {
+        const c = window.vibeglobePlayground?.globe.camera;
+        return { zoom: c?.zoom ?? 0, tiltDeg: c?.tiltDeg ?? 0, phase: String(c?.phase ?? '') };
+      });
+      samples.push({ ...camera, sky: skyBand(await canvasImage(page)) });
+    }
+    const last = samples.at(-1);
+    expect(last?.zoom ?? 0).toBeGreaterThan(17);
+    expect(last?.tiltDeg ?? 0).toBeGreaterThan(40);
+    const changes = samples.slice(1).map((s, i) => {
+      const before = samples[i]?.sky ?? s.sky;
+      return Math.max(...s.sky.map((v, c) => Math.abs(v - (before[c] ?? 0))));
+    });
+    console.log(
+      `[atmosphere] F393 ${backend}: sky band changes ${changes.map((c, i) => `${(samples[i + 1]?.zoom ?? 0).toFixed(1)}:${c.toFixed(1)}`).join(' ')}`,
+    );
+    for (let i = 0; i < changes.length; i++) {
+      const neighbors = Math.max(changes[i - 1] ?? 0, changes[i + 1] ?? 0, JUMP_FLOOR);
+      expect(changes[i] ?? 0, `the sky at zoom ${(samples[i + 1]?.zoom ?? 0).toFixed(2)}`).toBeLessThan(
+        neighbors * JUMP,
+      );
+    }
+  });

@@ -2121,7 +2121,7 @@
         "Assert the applied tilt increases monotonically to the configured automatic tilt and the relief factor reaches 1",
         "Capture screenshots at fixed zoom levels and assert the diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F155",

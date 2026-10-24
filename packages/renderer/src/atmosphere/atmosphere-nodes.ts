@@ -5,6 +5,9 @@ import {
   If,
   Loop,
   clamp,
+  cross,
+  dFdx,
+  dFdy,
   dot,
   exp,
   float,
@@ -254,17 +257,45 @@ export function skyColor(u: AtmosphereUniforms, worldRay: Vec3Node): Vec3Node {
 }
 
 /**
+ * The cosine of the Sun's angle to the surface at a fragment (F396): to the normal of the relief, from the screen-space
+ * gradient of its height over the surface it was raised from (the mesh's own tessellation cancels out, so a surface
+ * without relief gets the sphere's zenith exactly). `fromCenter` is the fragment's position from the sphere's center
+ * and `reliefKm` the height it was raised by, both in km.
+ */
+function reliefIncidence(scaled: Vec3Node, fromCenter: Vec3Node, reliefKm: FloatNode, sun: Vec3Node): FloatNode {
+  const up = normalize(fromCenter);
+  const dhx = dFdx(reliefKm);
+  const dhy = dFdy(reliefKm);
+  // Screen-space tangents of the surface below the relief, and the height's gradient along it: g·a = dh/dx, g·b = dh/dy.
+  const a = dFdx(scaled).sub(up.mul(dhx));
+  const b = dFdy(scaled).sub(up.mul(dhy));
+  const c = cross(a, b);
+  const gradient = cross(b, c)
+    .mul(dhx)
+    .add(cross(c, a).mul(dhy))
+    .div(max(dot(c, c), 1e-30));
+  return dot(normalize(up.sub(gradient)), sun);
+}
+
+/**
  * A surface color seen through the atmosphere (F394), lit by the Sun when lighting is on (F396): the color times the
  * light reaching it, dimmed by the transmittance to the eye, plus the light the air scatters toward the eye on the way.
  * `eyeRelative` is the fragment's position relative to the eye in meters, world axes (`eyeRelativePosition`).
  */
-export function surfaceColor(u: AtmosphereUniforms, color: Vec3Node, eyeRelative: Vec3Node): Vec3Node {
+export function surfaceColor(
+  u: AtmosphereUniforms,
+  color: Vec3Node,
+  eyeRelative: Vec3Node,
+  reliefMeters?: FloatNode,
+): Vec3Node {
   return Fn(() => {
-    const scaled = eyeRelative.mul(n<'vec3'>(u.axisScale)).mul(0.001);
-    const distance = length(scaled);
-    const dir = scaled.div(max(distance, 1e-6));
+    // Variables before the march: a node is assigned where it is first used, and inside the loop it would stay zero
+    // for the sun lighting below whenever the loop runs no step (fog off, KB-141).
+    const scaled = eyeRelative.mul(n<'vec3'>(u.axisScale)).mul(0.001).toVar();
+    const distance = length(scaled).toVar();
+    const dir = scaled.div(max(distance, 1e-6)).toVar();
     const span = raySpan(u, dir);
-    const end = min(distance, span.end);
+    const end = min(distance, span.end).toVar();
     const scattering = march(u, dir, min(span.start, end), end, n<'int'>(u.surfaceSamples));
     // The surface's zenith and altitude, as for a sample at the end of the ray.
     const h0 = n<'float'>(u.eyeAltitudeKm);
@@ -288,7 +319,12 @@ export function surfaceColor(u: AtmosphereUniforms, color: Vec3Node, eyeRelative
         .negate(),
     )
       .mul(light.z)
-      .mul(max(sunMu, 0));
+      .mul(
+        max(
+          reliefMeters ? reliefIncidence(scaled, r.add(h0).mul(up).add(scaled), reliefMeters.mul(0.001), sun) : sunMu,
+          0,
+        ),
+      );
     const lit = mix(vec3(1), sunlight.mul(1 - NIGHT_AMBIENT).add(NIGHT_AMBIENT), n<'float'>(u.lighting));
     const seen = color.mul(lit).mul(exp(scattering.depth.negate())).add(toDisplay(scattering.radiance));
     return dither(u, seen);

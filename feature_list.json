@@ -5252,7 +5252,7 @@
         "Capture screenshots and verify the terminator position and terrain shading direction match the sun direction on WebGPU and forced WebGL2",
         "Verify lighting is off unless enabled and changing the time updates the view without a full reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F397",

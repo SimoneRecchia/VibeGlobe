@@ -22,7 +22,8 @@ import { backgroundBucket, meshGeometry } from './tile-meshes.js';
 import { ancestorAt, retainedTiles, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
 import { meshKindOf, meshPaint, zoomBracket, type MeshPaint } from './vector-paint.js';
 import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
-import { json, resolveSource, tileUrl, type SourceInfo } from './style-sources.js';
+import { json, resolveSource, tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
+import { geojsonTransport } from './geojson-tiles.js';
 import type { StyleLayer } from './style-layer.js';
 import type { VectorLayerDraws, VectorMesh, VectorTileTarget } from './vector-target.js';
 
@@ -60,24 +61,27 @@ function warn(text: string): void {
 
 /** Loads a style and draws it on the globe; resolves once the style and its sources are read. Call after `ready`. */
 export async function addVectorTiles(globe: Globe, options: VectorTilesOptions): Promise<VectorTileLayer> {
-  const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+  const baseFetch = options.fetch ?? ((input, init) => fetch(input, init));
   const base =
     typeof options.style === 'string'
       ? new URL(options.style, globalThis.location?.href).href
       : globalThis.location?.href;
-  const styleJson = typeof options.style === 'string' ? await json(base ?? options.style, fetchImpl) : options.style;
+  const styleJson = typeof options.style === 'string' ? await json(base ?? options.style, baseFetch) : options.style;
+  const transform = options.transformUrl;
+  const fetchImpl: typeof fetch =
+    transform === undefined ? baseFetch : (input, init) => baseFetch(transform(String(input)), init);
   const style = VectorStyle.load(styleJson);
   for (const problem of style.problems) warn(`style ${problem.path}: ${problem.message}`);
   const resolved = new Map<string, SourceInfo | undefined>();
   for (const [id, source] of Object.entries(style.sources)) {
     try {
-      resolved.set(id, await resolveSource(source, base, fetchImpl));
+      resolved.set(id, await resolveSource(source, base, fetchImpl, id));
     } catch (error) {
       style.problems.push({ path: `sources.${id}`, message: String(error) });
       warn(`style source ${id}: ${String(error)}`);
     }
   }
-  return new Runtime(globe, options, style, resolved).start();
+  return new Runtime(globe, { ...options, fetch: fetchImpl }, style, resolved).start();
 }
 
 /** One layer's runtime. */
@@ -191,7 +195,7 @@ class Runtime implements VectorTileLayer {
   private extension(context: RenderExtensionContext) {
     const target = this.options.target(context.renderer);
     this.target = target;
-    const transport = this.options.transport ?? fetchTransport();
+    const transport = transformedTransport(this.options.transport ?? fetchTransport(), this.options.transformUrl);
     const fetchImpl = this.options.fetch ?? ((input, init) => fetch(input, init));
     const glyphs = new GlyphSource(
       this.style.glyphs,
@@ -207,8 +211,9 @@ class Runtime implements VectorTileLayer {
     for (const [id, source] of this.resolved) {
       if (source === undefined) continue;
       const loader = new VectorTileLoader({
-        transport,
-        network: context.network,
+        // GeoJSON tiles are cut locally: no request pool.
+        transport: source.geojson === undefined ? transport : geojsonTransport(source.geojson),
+        network: source.geojson === undefined ? context.network : undefined,
         workers: context.workers,
         onReady: () => context.requestRender(),
       });

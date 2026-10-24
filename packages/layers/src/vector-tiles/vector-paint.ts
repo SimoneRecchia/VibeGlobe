@@ -28,7 +28,7 @@ export function meshKindOf(type: string): VectorMeshKind | undefined {
 const toLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
 /** A style color as straight sRGB RGBA with an opacity factor; transparent when missing. */
-export function srgbColor(value: unknown, opacity = 1): [number, number, number, number] {
+function srgbColor(value: unknown, opacity = 1): [number, number, number, number] {
   const c = value as StyleColor | undefined;
   if (c === undefined || typeof c.r !== 'number') return [0, 0, 0, 0];
   return [c.r, c.g, c.b, c.a * opacity];

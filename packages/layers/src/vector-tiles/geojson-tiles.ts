@@ -213,19 +213,29 @@ export function encodeGeoJsonTile(shapes: readonly Shape[], z: number, x: number
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-/** A transport that answers `geojson://<source>/{z}/{x}/{y}` requests from the source's data, synchronously. */
+/** A transport that answers `geojson://<source>/{z}/{x}/{y}` requests from the source's data. */
 export function geojsonTransport(data: unknown): TileTransport {
   const shapes = geojsonShapes(data);
   return {
     start(request: TileRequest, _timeouts: unknown, done: (result: TransportResult) => void): AbortHandle {
-      const [z = 0, x = 0, y = 0] = request.url.split('/').slice(-3).map(Number);
-      const bytes = encodeGeoJsonTile(shapes, z, x, y);
-      done(
-        bytes === undefined
-          ? { kind: 'status', status: 204, retryAfterMs: undefined }
-          : { kind: 'ok', bytes, contentType: 'application/x-protobuf' },
-      );
-      return () => undefined;
+      // Answered after `start` returns, as a network request is: the caller records the request first.
+      let ended = false;
+      queueMicrotask(() => {
+        if (ended) return;
+        ended = true;
+        const [z = 0, x = 0, y = 0] = request.url.split('/').slice(-3).map(Number);
+        const bytes = encodeGeoJsonTile(shapes, z, x, y);
+        done(
+          bytes === undefined
+            ? { kind: 'status', status: 204, retryAfterMs: undefined }
+            : { kind: 'ok', bytes, contentType: 'application/x-protobuf' },
+        );
+      });
+      return () => {
+        if (ended) return;
+        ended = true;
+        done({ kind: 'aborted' });
+      };
     },
   };
 }

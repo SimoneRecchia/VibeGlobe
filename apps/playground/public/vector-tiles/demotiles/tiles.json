@@ -1,8 +1,6 @@
 {
   "tilejson": "3.0.0",
-  "tiles": [
-    "{z}/{x}/{y}.pbf"
-  ],
+  "tiles": ["{z}/{x}/{y}.pbf"],
   "minzoom": 0,
   "maxzoom": 3
 }

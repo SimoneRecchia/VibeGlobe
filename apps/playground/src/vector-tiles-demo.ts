@@ -31,6 +31,21 @@ function styleUrl(name: string): string {
   return /[/.]/.test(name) ? name : `${import.meta.env.BASE_URL}vector-tiles/styles/${name}.json`;
 }
 
+const DEMOTILES = 'https://demotiles.maplibre.org/';
+
+/**
+ * The fixture files that stand in for MapLibre's demotiles host (F444): its tiles and its glyphs (Inter Bold for
+ * Open Sans Semibold), so `?vectorStyle=demotiles` loads that style unchanged.
+ */
+function fixtureUrl(url: string): string {
+  if (!url.startsWith(DEMOTILES)) return url;
+  const rest = url.slice(DEMOTILES.length);
+  const local = `${location.origin}${import.meta.env.BASE_URL}vector-tiles/`;
+  if (rest.startsWith('tiles/')) return `${local}demotiles/${rest.slice('tiles/'.length)}`;
+  if (rest.startsWith('font/')) return `${local}glyphs/Inter%20Bold/${rest.split('/').pop() ?? ''}`;
+  return url;
+}
+
 /** Shows the style the page's URL asks for, once the globe is ready. */
 export async function show(globe: Globe): Promise<VectorTileLayer> {
   await globe.ready;
@@ -52,6 +67,7 @@ export function showVectorTiles(globe: Globe, params: URLSearchParams): Promise<
       element: document.querySelector<HTMLElement>('#app') ?? undefined,
       // Characters the fixture glyphs lack (CJK) are drawn from the system's fonts (F448).
       localFontFamily: 'sans-serif',
+      transformUrl: fixtureUrl,
     }),
   };
   hooks.ready.then(

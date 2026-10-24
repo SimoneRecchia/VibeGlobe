@@ -53,15 +53,13 @@ export function demotilesFeatures(): GeoFeature[] {
     [
       [-180, 0],
       [0, 180],
-    ].map(
-      ([from = 0, to = 0]): GeoFeature => ({
-        layer: 'geolines',
-        minzoom: 0,
-        type: 'LineString',
-        coordinates: [Array.from({ length: 19 }, (_, k): [number, number] => [from + ((to - from) * k) / 18, lat])],
-        properties: { name },
-      }),
-    ),
+    ].map(([from = 0, to = 0]): GeoFeature => ({
+      layer: 'geolines',
+      minzoom: 0,
+      type: 'LineString',
+      coordinates: [Array.from({ length: 19 }, (_, k): [number, number] => [from + ((to - from) * k) / 18, lat])],
+      properties: { name },
+    })),
   );
   return [...countries, ...centroids, ...geolines];
 }

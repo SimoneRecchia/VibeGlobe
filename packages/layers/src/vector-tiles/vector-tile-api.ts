@@ -18,6 +18,11 @@ export interface VectorTilesOptions {
   readonly fetch?: typeof fetch;
   /** The element whose pointer events hover and click features (the globe's container); none without it. */
   readonly element?: HTMLElement | undefined;
+  /**
+   * Rewrites every URL the style leads to (TileJSON, tiles, glyphs, sprites) before it is requested, so a style loads
+   * unchanged against another host (F444; MapLibre's `transformRequest`). The style's own URL is not rewritten.
+   */
+  readonly transformUrl?: (url: string) => string;
   /** A CSS font family drawn locally for characters the style's glyphs lack (CJK, F448). */
   readonly localFontFamily?: string;
 }

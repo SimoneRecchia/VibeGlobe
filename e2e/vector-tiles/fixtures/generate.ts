@@ -43,8 +43,9 @@ function writeDemotiles(): number {
         write(join(OUT, 'demotiles', String(z), String(x), `${y}.pbf`), bytes);
         count++;
       }
-  const tilejson = { tilejson: '3.0.0', tiles: ['{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: DEMOTILES_MAX_ZOOM };
-  write(join(OUT, 'demotiles', 'tiles.json'), `${JSON.stringify(tilejson, null, 2)}\n`);
+  // As Prettier formats it.
+  const tilejson = `{\n  "tilejson": "3.0.0",\n  "tiles": ["{z}/{x}/{y}.pbf"],\n  "minzoom": 0,\n  "maxzoom": ${DEMOTILES_MAX_ZOOM}\n}\n`;
+  write(join(OUT, 'demotiles', 'tiles.json'), tilejson);
   return count;
 }
 

@@ -16,8 +16,10 @@ const layer = await addVectorTiles(globe, {
 });
 ```
 
-The style loads without edits: its sources (tile URL templates or TileJSON), `glyphs` and `sprite` URLs are read as
-they are, relative URLs resolved against the style's URL. Tiles are requested through the engine's request pool (its
+The style loads without edits: its sources (tile URL templates, TileJSON, or GeoJSON data cut into tiles locally),
+`glyphs` and `sprite` URLs are read as they are, relative URLs resolved against the style's URL. `transformUrl` maps
+them to another host without editing the style (MapLibre's `transformRequest`); the playground's
+`?vectorStyle=demotiles` loads MapLibre's demotiles style (BSD-3-Clause) unchanged this way, from fixture tiles. Tiles are requested through the engine's request pool (its
 per-host limits, coalescing and cancellation), laid out in the engine's workers, and kept with their bytes.
 
 ## Runtime changes

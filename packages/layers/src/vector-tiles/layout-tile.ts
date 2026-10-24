@@ -253,8 +253,16 @@ function layoutSymbols(
   const labels: BucketLabel[] = [];
   const ranges: Record<string, Set<number>> = {};
   const alongLines = layer.layout('symbol-placement', zoom) !== 'point';
+  const tokens = !Array.isArray(layer.json.layout?.['text-field']);
   features.forEach((feature, index) => {
-    const text = String(layer.layout('text-field', zoom, feature) ?? '');
+    const transform = layer.layout('text-transform', zoom, feature);
+    const raw = String(layer.layout('text-field', zoom, feature) ?? '');
+    // Legacy token strings (`"{name}"`, also inside zoom functions) read feature properties; expressions do not.
+    const field = tokens
+      ? raw.replace(/\{([^{}]+)\}/g, (_, key: string) => String(feature.properties[key] ?? ''))
+      : raw;
+    const text =
+      transform === 'uppercase' ? field.toUpperCase() : transform === 'lowercase' ? field.toLowerCase() : field;
     const icon = String(layer.layout('icon-image', zoom, feature) ?? '');
     if (text === '' && icon === '') return;
     const font = (layer.layout('text-font', zoom, feature) as string[] | undefined)?.join(',') ?? '';

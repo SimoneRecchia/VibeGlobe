@@ -1,0 +1,34 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture buildings",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "building",
+      "type": "fill-extrusion",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-extrusion-color": ["case", ["boolean", ["feature-state", "selected"], false], "#0000ff", "#ff0000"],
+        "fill-extrusion-opacity": 1
+      }
+    }
+  ]
+}

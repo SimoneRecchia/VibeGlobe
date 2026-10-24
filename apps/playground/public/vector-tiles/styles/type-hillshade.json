@@ -1,0 +1,36 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: hillshade layers",
+  "sources": {
+    "dem": {
+      "type": "raster-dem",
+      "tiles": ["/vector-tiles/dem/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "encoding": "terrarium",
+      "minzoom": 9,
+      "maxzoom": 12,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f0ead8"
+      }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "dem",
+      "paint": {
+        "hillshade-exaggeration": 0.6,
+        "hillshade-shadow-color": "#3a2a10",
+        "hillshade-highlight-color": "#ffffff"
+      }
+    }
+  ]
+}

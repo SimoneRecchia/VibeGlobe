@@ -73,6 +73,15 @@ Branch `claude/vigilant-hawking-h8r4u4`; owned entries, blockers and hook reques
 - Pending: F400 (reference desktop and tablet). Failing with blockers: F361 (hooks 1–2: worker registration, renderer drawing `ModelDescription`), F399 (hook 3: runtime level of detail and effects; reference desktop), F401 and F402 (hook 4: a real GPU load in the playground; 5-minute browser run in the hardening backlog).
 - About 3 hours of agent time (2026-10-23).
 
+## Track D: vector tile rendering (`packages/renderer/src/vector-tiles/`, `packages/layers/src/vector-tiles/`)
+
+Branch `claude/keen-feynman-ic048f`, pull request SimoneRecchia/VibeGlobe#31; hook requests D (1)–(4) in `docs/parallel-tracks.md`; ADRs 0131 (rendering), 0132 (labels, SDF atlas and text material for F358), 0133 (raster-like layers).
+
+- **2026-10-24:** Passing: F441, F442, F443, F446, F447, F448, F449, F450, F454, F456, F457, F458, F459. Only their `@baseline` views remain (hook request D (3), `docs/hardening-backlog.md`): F440, F444 (MapLibre's demotiles style, BSD-3-Clause, unchanged), F445 (every layer type, raster, hillshade and heatmap included), F452, F455. Blocked: F451 on hook request D (1) (engine log and `error` event for extensions); F453 on the data pipeline's Italy OpenStreetMap tiles, whose source host this environment refuses (open question 25); its checks on the fixture city pass (`e2e/vector-tiles/osm-roads.spec.ts`).
+- Bug found and fixed: TD-01 (shown labels faded down every other frame). Found by F443's trace: the engine gives extensions its workers only with tiled imagery or terrain (hook request D (4)); one shader program per mesh kind removed the 50–200 ms program builds when a layer first appeared.
+- Notes: the `@baseline` tests fail in a full CI run until the baselines workflow records them (D (3)). Fixtures: `node e2e/vector-tiles/fixtures/generate.ts [--tiles]`. Vite can keep serving stale modules after scripted edits: restart it before a run.
+- About 14 hours of agent time (2026-10-23 and 24).
+
 ## A. UI, GIS and framework adapters track (2026-10-23)
 
 Branch `claude/confident-ride-i2h6il`, pull request SimoneRecchia/VibeGlobe#21; entries, blockers and hook requests in

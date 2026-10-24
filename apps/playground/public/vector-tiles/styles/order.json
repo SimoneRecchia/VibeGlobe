@@ -1,0 +1,56 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture layer order",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "sprite": "/vector-tiles/sprite",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "park-red",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["==", ["get", "class"], "park"],
+      "paint": {
+        "fill-color": "#ff0000"
+      }
+    },
+    {
+      "id": "park-green",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["==", ["get", "class"], "park"],
+      "minzoom": 13,
+      "paint": {
+        "fill-color": "#00ff00"
+      }
+    },
+    {
+      "id": "park-blue",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["==", ["get", "class"], "park"],
+      "maxzoom": 12,
+      "paint": {
+        "fill-color": "#0000ff"
+      }
+    }
+  ]
+}

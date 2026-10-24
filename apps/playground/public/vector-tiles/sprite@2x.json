@@ -1,0 +1,30 @@
+{
+  "dot": {
+    "x": 0,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 2
+  },
+  "square": {
+    "x": 32,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 2
+  },
+  "triangle": {
+    "x": 64,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 2
+  },
+  "hatch": {
+    "x": 96,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 2
+  }
+}

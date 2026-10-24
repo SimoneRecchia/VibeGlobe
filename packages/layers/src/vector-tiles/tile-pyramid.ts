@@ -128,3 +128,15 @@ export function tilesToDraw(
 export function retainedTiles(draws: readonly TileDraw[]): Set<string> {
   return new Set(draws.filter((d) => d.standIn).map((d) => tileKey(d.tile)));
 }
+
+/** Units per tile side of vector tile buckets (`BUCKET_EXTENT`). */
+const EXTENT_UNITS = 4096;
+
+/** The square of `target` in the units of `tile` (its ancestor or itself). */
+export function clipOf(tile: TileId, target: TileId): [number, number, number, number] {
+  const scale = 2 ** (target.z - tile.z);
+  const size = EXTENT_UNITS / scale;
+  const x = (target.x - tile.x * scale) * size;
+  const y = (target.y - tile.y * scale) * size;
+  return [x, y, x + size, y + size];
+}

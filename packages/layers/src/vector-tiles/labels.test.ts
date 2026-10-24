@@ -221,6 +221,14 @@ describe('symbol collision, priorities, cross-tile ids and fades (F449, F454)', 
     expect(fader.update(330, new Set([2])).get(1)).toBeCloseTo(0.9, 6);
   });
 
+  it('keeps a fully shown label shown while it stays placed (TD-01)', () => {
+    const fader = new SymbolFader(300);
+    fader.update(0, new Set([1]));
+    expect(fader.update(300, new Set([1])).get(1)).toBe(1);
+    expect(fader.update(400, new Set([1])).get(1)).toBe(1);
+    expect(fader.update(500, new Set([1])).get(1)).toBe(1);
+  });
+
   it('ranks places by class, capital status and population', () => {
     const rome = placePriority({ class: 'city', capital: 2, population: 2_800_000 });
     const milan = placePriority({ class: 'city', population: 1_400_000 });

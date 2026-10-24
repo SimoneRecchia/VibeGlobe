@@ -39,10 +39,43 @@ function viewLoaded(globe: Globe): Promise<void> {
 function loadImage(src: string): Promise<HTMLImageElement | undefined> {
   return new Promise((resolve) => {
     const image = new Image();
+    // A logo from another origin (an application CDN) must not taint the export (KB-167).
+    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = () => resolve(undefined);
     image.src = src;
   });
+}
+
+/**
+ * The credits' rows, top row first: each credit (`widths`, logo and text) goes on the current row while it fits in
+ * `maxWidth`, else starts a new one (KB-168). Returns the rows as index lists, the scale every width must shrink by
+ * so that the widest credit alone fits, and the widest row's width.
+ */
+export function layoutCredits(
+  widths: readonly number[],
+  maxWidth: number,
+  gap: number,
+): { rows: number[][]; scale: number; widthPx: number } {
+  const largest = Math.max(0, ...widths);
+  const scale = largest > maxWidth ? maxWidth / largest : 1;
+  const rows: number[][] = [];
+  let row: number[] = [];
+  let used = 0;
+  let widest = 0;
+  for (const [index, width] of widths.entries()) {
+    const needed = (row.length === 0 ? 0 : gap * scale) + width * scale;
+    if (row.length > 0 && used + needed > maxWidth) {
+      rows.push(row);
+      row = [];
+      used = 0;
+    }
+    used += row.length === 0 ? width * scale : needed;
+    widest = Math.max(widest, used);
+    row.push(index);
+  }
+  if (row.length > 0) rows.push(row);
+  return { rows, scale, widthPx: widest };
 }
 
 /** Draws the credits as a strip in the bottom-right corner of a 2D context, sized for the image's scale. */
@@ -54,36 +87,46 @@ async function drawCredits(
   scale: number,
 ): Promise<void> {
   if (credits.length === 0) return;
-  const fontPx = Math.max(11, Math.round(11 * scale));
-  const pad = Math.round(fontPx / 2);
-  const gap = fontPx;
-  const logoHeight = Math.round(fontPx * 1.3);
-  context.font = `${fontPx}px system-ui, sans-serif`;
-  const items = await Promise.all(
+  const basePx = Math.max(11, Math.round(11 * scale));
+  context.font = `${basePx}px system-ui, sans-serif`;
+  const baseLogo = Math.round(basePx * 1.3);
+  const loaded = await Promise.all(
     credits.map(async (credit) => {
       const logo = credit.logo ? await loadImage(credit.logo.src) : undefined;
-      const logoWidth = logo ? (logo.naturalWidth / Math.max(1, logo.naturalHeight)) * logoHeight : 0;
+      const logoWidth = logo ? (logo.naturalWidth / Math.max(1, logo.naturalHeight)) * baseLogo : 0;
       return { credit, logo, logoWidth, textWidth: context.measureText(credit.text).width };
     }),
   );
-  const contentWidth =
-    items.reduce((sum, item) => sum + item.textWidth + (item.logo ? item.logoWidth + pad : 0), 0) +
-    gap * (items.length - 1);
-  const stripWidth = Math.min(widthPx, contentWidth + 2 * pad);
-  const stripHeight = logoHeight + 2 * pad;
+  const basePad = Math.round(basePx / 2);
+  const widths = loaded.map((item) => item.textWidth + (item.logo ? item.logoWidth + basePad : 0));
+  const layout = layoutCredits(widths, widthPx - 2 * basePad, basePx);
+  // Every credit fits in the image, wrapped onto rows, the font smaller if one alone is wider (KB-168).
+  const fontPx = basePx * layout.scale;
+  const pad = basePad * layout.scale;
+  const gap = fontPx;
+  const logoHeight = baseLogo * layout.scale;
+  const rowHeight = logoHeight + pad;
+  context.font = `${fontPx}px system-ui, sans-serif`;
+  const stripWidth = Math.min(widthPx, layout.widthPx + 2 * pad);
+  const stripHeight = layout.rows.length * rowHeight + pad;
   context.fillStyle = 'rgba(255, 255, 255, 0.85)';
   context.fillRect(widthPx - stripWidth, heightPx - stripHeight, stripWidth, stripHeight);
   context.fillStyle = '#222222';
   context.textBaseline = 'middle';
-  let x = widthPx - stripWidth + pad;
-  const middle = heightPx - stripHeight / 2;
-  for (const item of items) {
-    if (item.logo) {
-      context.drawImage(item.logo, x, middle - logoHeight / 2, item.logoWidth, logoHeight);
-      x += item.logoWidth + pad;
+  for (const [r, row] of layout.rows.entries()) {
+    let x = widthPx - stripWidth + pad;
+    const middle = heightPx - stripHeight + pad / 2 + rowHeight * r + rowHeight / 2;
+    for (const index of row) {
+      const item = loaded[index];
+      if (item === undefined) continue;
+      if (item.logo) {
+        const logoWidth = item.logoWidth * layout.scale;
+        context.drawImage(item.logo, x, middle - logoHeight / 2, logoWidth, logoHeight);
+        x += logoWidth + pad;
+      }
+      context.fillText(item.credit.text, x, middle);
+      x += item.textWidth * layout.scale + gap;
     }
-    context.fillText(item.credit.text, x, middle);
-    x += item.textWidth + gap;
   }
 }
 

@@ -1,4 +1,4 @@
-// Scenarios of the milestone acceptances that need their own stack or terrain (F167, F269).
+// Scenarios of the milestone acceptances and checks that need their own stack, terrain or path (F167, F269, F395).
 import { segments, type FrameScenario } from './scenario-paths.js';
 
 const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9 };
@@ -26,9 +26,10 @@ export const ACCEPTANCE_SCENARIOS: Record<string, FrameScenario> = {
   'mixed-stack': segments(
     [
       { longitudeDeg: 4, latitudeDeg: 46, zoom: 3 },
-      { longitudeDeg: 7.5, latitudeDeg: 45.5, zoom: 9 },
-      { longitudeDeg: 13, latitudeDeg: 43, zoom: 9 },
-      { ...ROME, zoom: 9 },
+      // The pan at zoom 7 (5 px a frame): across the terrain box's and the UTM raster's edges.
+      { longitudeDeg: 7.5, latitudeDeg: 45.5, zoom: 7 },
+      { longitudeDeg: 13, latitudeDeg: 43, zoom: 7 },
+      { ...ROME, zoom: 7 },
       { ...ROME, zoom: 13 },
       // Out like a flight: up first, across at a low zoom, then down a little.
       { ...ROME, zoom: 6 },
@@ -37,5 +38,15 @@ export const ACCEPTANCE_SCENARIOS: Record<string, FrameScenario> = {
     ],
     90,
     2,
+  ),
+  // F395: a low tilted flight toward the horizon, the distance fogged: east along the Po valley, turning, at 85° tilt.
+  'tilted-flight': segments(
+    [
+      { longitudeDeg: 8, latitudeDeg: 45, zoom: 12, tiltDeg: 85, headingDeg: 60 },
+      { longitudeDeg: 8.3, latitudeDeg: 45.1, zoom: 12.5, tiltDeg: 85, headingDeg: 90 },
+      { longitudeDeg: 8.6, latitudeDeg: 45.05, zoom: 12, tiltDeg: 85, headingDeg: 120 },
+    ],
+    90,
+    10,
   ),
 };

@@ -15,6 +15,7 @@ const QUALITY_RULES: Readonly<Record<keyof QualitySettings, Rule>> = {
   antialias: ['none', 'fxaa', 'msaa4'],
   atmosphere: ['off', 'low', 'medium', 'high', 'ultra'],
   fog: true,
+  fogAwareDetail: true,
 };
 
 const ATMOSPHERE_RULES: Readonly<Record<keyof AtmosphereSettings, Rule>> = {
@@ -71,6 +72,7 @@ export class EngineQuality {
       antialias: quality.antialias ?? 'msaa4',
       atmosphere: quality.atmosphere ?? 'off',
       fog: quality.fog ?? true,
+      fogAwareDetail: quality.fogAwareDetail ?? true,
     };
     this.sky = {
       sunLighting: false,
@@ -125,7 +127,8 @@ export class EngineQuality {
 
   /** Fog-aware detail (F395) follows the fog the renderer draws: on while the atmosphere and its fog are. */
   private applyFog(): void {
-    const on = this.quality.atmosphere !== 'off' && this.quality.fog;
+    const { atmosphere, fog, fogAwareDetail } = this.quality;
+    const on = atmosphere !== 'off' && fog && fogAwareDetail;
     this.parts.surface().setFog(on ? this.sky.haze : undefined);
   }
 

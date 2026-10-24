@@ -51,7 +51,7 @@ function mapped(slot: number): number {
 const centerEcef = new Float64Array(3);
 const screen = new Float64Array(2);
 /** Overlays found for a draw, top first: handle, geographic, opacity, blend and the four UV numbers each. */
-const found = new Float64Array(MAX_OVERLAYS * 8);
+const found = new Float64Array(MAX_OVERLAYS * 9);
 
 /**
  * Textures the surface tiles of a frame with the imagery stack (M3 plan §2.5, ADR 0038). For each drawn tile and
@@ -85,7 +85,11 @@ export function drawImagery(
       const entry = layers[layer];
       if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
       const chosen = wantChain(entry.chain, tile, distance);
-      if (based || chosen < 0) continue;
+      if (based) continue;
+      if (chosen < 0) {
+        overlays = keepSlot(entry, overlays);
+        continue;
+      }
       const drawn = entry.chain[chosen];
       const handle = mapped(MAPPING_HANDLE);
       drawn?.loader.markDrawn(handle);
@@ -103,16 +107,7 @@ export function drawImagery(
         list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
       } else if (overlays < MAX_OVERLAYS) {
         visible?.mark(drawn?.index ?? 0);
-        const at = overlays * 8;
-        found[at] = handle;
-        found[at + 1] = geographic;
-        found[at + 2] = entry.entry.opacity;
-        found[at + 3] = BLEND_CODES[entry.entry.blend];
-        found[at + 4] = mapped(MAPPING_SCALE_U);
-        found[at + 5] = mapped(MAPPING_SCALE_V);
-        found[at + 6] = mapped(MAPPING_OFFSET_U);
-        found[at + 7] = mapped(MAPPING_OFFSET_V);
-        overlays++;
+        overlays = addOverlay(entry, overlays, handle, geographic);
       }
     }
     writeOverlays(list, index, overlays);
@@ -134,6 +129,33 @@ function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distan
   }
 }
 
+/** Adds a layer's tile in `mapping` to the overlays found for a draw; returns their count. */
+function addOverlay(layer: StackLayer, overlays: number, handle: number, geographic: number): number {
+  const at = overlays * 9;
+  found[at] = handle;
+  found[at + 1] = geographic;
+  found[at + 2] = layer.entry.opacity;
+  found[at + 3] = BLEND_CODES[layer.entry.blend];
+  found[at + 4] = mapped(MAPPING_SCALE_U);
+  found[at + 5] = mapped(MAPPING_SCALE_V);
+  found[at + 6] = mapped(MAPPING_OFFSET_U);
+  found[at + 7] = mapped(MAPPING_OFFSET_V);
+  found[at + 8] = mapped(MAPPING_LEVEL);
+  return overlays + 1;
+}
+
+/**
+ * A translucent layer still loading keeps its overlay slot, empty: the layers' slots do not shift when its tile arrives,
+ * so each slot's cross-fade stays within one layer (KB-155). Returns the overlays found so far.
+ */
+function keepSlot(layer: StackLayer, overlays: number): number {
+  if (isOpaque(layer.entry) || overlays >= MAX_OVERLAYS) return overlays;
+  found[overlays * 9] = -1;
+  found[overlays * 9 + 2] = 0;
+  found[overlays * 9 + 8] = -1;
+  return overlays + 1;
+}
+
 /** Writes the overlays found for draw `index` into the list's slots, bottom first; the slots left empty show nothing. */
 function writeOverlays(list: DrawList, index: number, overlays: number): void {
   for (let slot = 0; slot < list.overlays.length; slot++) {
@@ -141,10 +163,13 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
     if (!overlay) continue;
     if (slot >= overlays) {
       overlay.opacities[index] = 0;
+      overlay.textures[index] = -1;
+      overlay.levels[index] = -1;
       continue;
     }
-    const at = (overlays - 1 - slot) * 8;
+    const at = (overlays - 1 - slot) * 9;
     overlay.textures[index] = found[at] ?? -1;
+    overlay.levels[index] = found[at + 8] ?? -1;
     overlay.geographic[index] = found[at + 1] ?? 0;
     overlay.opacities[index] = found[at + 2] ?? 0;
     overlay.blends[index] = found[at + 3] ?? 0;
@@ -167,9 +192,10 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless it is the
-      // last one: then its ancestors are the last resort (KB-149).
-      if (fallback < 0 && mapInto(layer, tile) && !(chain[k + 1] && unavailableAtMapping(layer))) fallback = k;
+      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless no later
+      // source can map the tile: then its ancestors are the last resort (KB-149).
+      if (fallback < 0 && mapInto(layer, tile) && !(unavailableAtMapping(layer) && laterMaps(chain, k, tile)))
+        fallback = k;
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -202,6 +228,15 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const level = shifted < 0 ? 0 : shifted < source.maxLevel ? shifted : source.maxLevel;
   if (source.tiling.crs === 'EPSG:3857') return tile.root === MERCATOR_ROOT && mapMercator(tile, level, mapping, 0);
   return mapGeographic(tile, level, mapping, 0);
+}
+
+/** True when a source after `k` in the chain can map the tile (overwrites `mapping`). */
+function laterMaps(chain: readonly ImageryLayer[], k: number, tile: QuadtreeTile): boolean {
+  for (let j = k + 1; j < chain.length; j++) {
+    const later = chain[j];
+    if (later && mapInto(later, tile)) return true;
+  }
+  return false;
 }
 
 /** True when the source's tile in `mapping` (from {@link mapInto}) is known missing or failing. */

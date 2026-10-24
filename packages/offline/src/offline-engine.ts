@@ -26,8 +26,11 @@ export interface OfflineEvents {
   'connectivity-change': { connectivity: Connectivity; unreachable: readonly string[] };
   /** The browser deleted stored data (F275): the persistent cache, packages, or both. */
   'storage-lost': { cache: boolean; packages: readonly string[]; reason: string };
-  /** The network mode changed. */
-  'mode-change': { mode: NetworkMode };
+  /**
+   * The network mode changed. Leaving offline-only mode, `sourceIds` names every wrapped source: pass each to
+   * `globe.reloadSource`, as the tiles missed while offline read as no data (KB-158). Empty otherwise.
+   */
+  'mode-change': { mode: NetworkMode; sourceIds: readonly string[] };
   /** A problem the engine worked around (a full store, missing storage); reported once per kind. */
   warning: { code: 'quota' | 'storage-unavailable' | 'profile-rule'; message: string };
 }
@@ -139,13 +142,16 @@ class OfflineEngine implements Offline {
   private currentMode: NetworkMode;
   private readonly switches = new SwitchBoard();
   private readonly rules = new Map<string, ProviderRules>();
+  /** The ids of the sources wrapped by {@link source}, in order. */
+  private readonly wrapped = new Set<string>();
   private readonly policy: NetworkPolicy;
   private readonly store: CacheStore;
   private readonly monitor: ConnectivityMonitor;
   private readonly handlers = new Map<keyof OfflineEvents, Set<(payload: never) => void>>();
   private readonly counters = new Map<string, TierCounters>();
   private readonly warned = new Set<string>();
-  private waiters: (() => void)[] = [];
+  /** Waits for a change, each for any change or for a check of its endpoint. */
+  private waiters: { readonly endpoint: string | undefined; readonly wake: () => void }[] = [];
   private packageReader: PackageReader | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly onServe: OfflineOptions['onServe'];
@@ -173,9 +179,12 @@ class OfflineEngine implements Offline {
       fetch: this.fetchImpl,
       enabled: () => this.currentMode !== 'offline',
       onChange: (connectivity, unreachable) => {
-        this.wake();
+        // A wait for one endpoint's check ends with that check (KB-161), not with another endpoint's change.
+        this.wake(null);
         this.emit('connectivity-change', { connectivity, unreachable });
       },
+      // A failed download waits for its endpoint's check, which may find it as it was.
+      onCheck: (endpoint) => this.wake(endpoint),
     });
     // Only the built-in store outlives the page; a memory or custom store is not checked.
     if (options.store === undefined || options.store === 'main-thread') void this.checkCacheEviction();
@@ -192,10 +201,11 @@ class OfflineEngine implements Offline {
 
   setMode(mode: NetworkMode): void {
     if (mode === this.currentMode) return;
+    const wasOffline = this.currentMode === 'offline';
     this.currentMode = mode;
     this.wake();
     if (mode !== 'offline') this.monitor.checkAll();
-    this.emit('mode-change', { mode });
+    this.emit('mode-change', { mode, sourceIds: wasOffline ? [...this.wrapped] : [] });
   }
 
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void {
@@ -224,6 +234,7 @@ class OfflineEngine implements Offline {
       for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);
     }
     this.registerEndpoint(source);
+    this.wrapped.add(source.id);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
     // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
     // package its tiles came from (F306).
@@ -328,11 +339,15 @@ class OfflineEngine implements Offline {
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
-      waitForChange: (maxMs) =>
+      longestCheckMs: this.monitor.longestCheckMs,
+      waitForChange: (maxMs, endpoint) =>
         new Promise<void>((resolve) => {
-          const waiter = (): void => {
-            clearTimeout(timer);
-            resolve();
+          const waiter = {
+            endpoint,
+            wake: (): void => {
+              clearTimeout(timer);
+              resolve();
+            },
           };
           // A wait that times out leaves the list, which would otherwise grow for the whole outage.
           const timer = setTimeout(() => {
@@ -406,10 +421,13 @@ class OfflineEngine implements Offline {
     this.emit('warning', { code, message });
   }
 
-  private wake(): void {
+  /** Ends every wait; with `endpoint`, only those for a check of it; with null, only those for any change. */
+  private wake(endpoint?: string | null): void {
     const waiters = this.waiters;
-    this.waiters = [];
-    for (const wake of waiters) wake();
+    const ends = (w: { readonly endpoint: string | undefined }): boolean =>
+      endpoint === undefined || w.endpoint === (endpoint ?? undefined);
+    this.waiters = waiters.filter((w) => !ends(w));
+    for (const waiter of waiters) if (ends(waiter)) waiter.wake();
   }
 
   private emit<E extends keyof OfflineEvents>(event: E, payload: OfflineEvents[E]): void {

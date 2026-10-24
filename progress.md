@@ -1,27 +1,28 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 midday)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 16:00 UTC)
 
 Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
-after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32. Open: SimoneRecchia/VibeGlobe#35. Tracks D, E, F and H are
-merged; tracks G (robustness) and H's follow-ups work in their own folders.
+after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32, #35, #36. Tracks D, E, F and H are merged; tracks G
+(robustness) and H's follow-ups work in their own folders.
 
 Since the takeover:
 
 - Passing: F416, F401, F402, F474, F385, F398, F219, F323, F154, F396, F393, F339, F264, F488, F551, F374,
-  **F490 (M14 accepted)** and **F554 (M9 accepted)**, each after a fresh-context review and its fix check.
-- Bugs fixed: KB-133 to KB-137, KB-139, KB-141 to KB-150, DP-002 to DP-006 (M9 review: stale tiles after a
-  configuration change, vector builds holding whole extracts, the `tile.osm.org` alias, unpinned downloads).
-  KB-149 was a regression of KB-142 found by the full CI run 40085859274. Open: KB-110 (F137 in the hardening
-  backlog), KB-132 (watch), KB-138, KB-140, KB-144 (F378). TD-02 (F450's filter latency on CI) is recorded for
-  track D.
-- Core's bundle stands at 61,437 of its 61,440 bytes: any core growth needs an equal saving (open question, F249,
-  F395).
+  **F490 (M14 accepted)**, **F554 (M9 accepted)** and **F269 (M7 accepted)**, each after a fresh-context review and its
+  fix check.
+- Bugs fixed: KB-133 to KB-137, KB-139 to KB-162 (except KB-153), DP-002 to DP-006, TH-01. The M7 and M8 reviews and
+  their fix checks are done: overlay cross-fades (KB-155), chain fallbacks (KB-149, KB-162), WMS transparency
+  (KB-154), offline wrapper hosts, pass-through and reloads (KB-156 to KB-158), health checks (KB-159, KB-161), retry
+  counts (KB-160). Open: KB-097 and KB-153 (F167), KB-110 (F137, hardening backlog), KB-132 (M8, ten runs in a row
+  under way), KB-138 (M11), KB-144 (F378). TD-02 is track D's.
+- Core's bundle: 59.76 of its 60 KB gzip after moving `FrameStats` and `projectLayerPoint` to subpath entry points.
 - Data builds in this container (ignored by git): `packages/tools/node_modules/.vibeglobe-data/` holds the
   test-mont-blanc terrain and both configurations' samples; Docker starts with `sudo -n dockerd`.
 
-Open, breadth first (failing M4–M14 entries outside the hardening backlog): F148, F167, F217, F249 (core budget),
-F269, F329 (KB-138), F358 (SDF labels), F378 (KB-144), F389, F395 (core budget), F403, F438, F453, F472.
+Open, breadth first (failing M4–M14 entries outside the hardening backlog): F148, F167, F249 (core budget), F329
+(KB-132), F358 (SDF labels), F378 (KB-144), F389, F395 (core budget), F403, F438, F453, F472. F217 is pending (the
+reference tablet).
 
 ## Track G, robustness (2026-10-24)
 

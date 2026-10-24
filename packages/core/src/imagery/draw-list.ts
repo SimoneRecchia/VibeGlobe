@@ -55,18 +55,17 @@ export class DrawLayer implements TileDrawLayer {
 /** Overlays a draw can show above its base imagery (F244, F246): further visible layers are left out. */
 export const MAX_OVERLAYS = 2;
 
-/** One overlay slot's per-draw arrays (`TileDrawList.overlays`). */
-export class OverlaySlot implements TileDrawOverlay {
-  textures: Int32Array;
-  uvTransforms: Float32Array;
-  geographic: Uint8Array;
+/**
+ * One overlay slot's per-draw arrays (`TileDrawList.overlays`): a layer's, with the `from` imagery of its cross-fades
+ * (KB-155), and the overlay's opacity and blend mode.
+ */
+export class OverlaySlot extends DrawLayer implements TileDrawOverlay {
   opacities: Float32Array;
   blends: Uint8Array;
 
   constructor(capacity: number) {
-    this.textures = new Int32Array(capacity).fill(-1);
-    this.uvTransforms = new Float32Array(capacity * 4);
-    this.geographic = new Uint8Array(capacity);
+    super(capacity);
+    this.textures.fill(-1);
     this.opacities = new Float32Array(capacity);
     this.blends = new Uint8Array(capacity);
   }

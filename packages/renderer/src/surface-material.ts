@@ -69,6 +69,14 @@ export interface SurfaceDraw {
    * (blend 0, blend 1, 0, 0), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2 screen).
    */
   readonly overlays: Matrix4;
+  /** The imagery each overlay slot cross-fades from (KB-155); unset where it fades in from nothing. */
+  overlayFrom0: Texture | undefined;
+  overlayFrom1: Texture | undefined;
+  /**
+   * The overlays' fades, by column: the two `from` UV transforms; (from geographic 0, from geographic 1, fade 0, fade
+   * 1), the fades as the base imagery's (1 only the slot's own imagery); (from set 0, from set 1, 0, 0).
+   */
+  readonly overlayFades: Matrix4;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -77,7 +85,16 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
 }
 
 /** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */
-const PER_DRAW_TEXTURES = ['surfaceTexture', 'fromTexture', 'heights', 'fromHeights', 'overlay0', 'overlay1'] as const;
+const PER_DRAW_TEXTURES = [
+  'surfaceTexture',
+  'fromTexture',
+  'heights',
+  'fromHeights',
+  'overlay0',
+  'overlay1',
+  'overlayFrom0',
+  'overlayFrom1',
+] as const;
 
 /**
  * Attaches a draw state to a new surface mesh. Its textures reach the shared texture nodes just before the mesh is
@@ -95,9 +112,21 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     overlay0: undefined,
     overlay1: undefined,
     overlays: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    overlayFrom0: undefined,
+    overlayFrom1: undefined,
+    overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
   };
   object.userData['surfaceDraw'] = draw;
-  const values = [draw.texture, draw.fromTexture, draw.heights, draw.fromHeights, draw.overlay0, draw.overlay1];
+  const values = [
+    draw.texture,
+    draw.fromTexture,
+    draw.heights,
+    draw.fromHeights,
+    draw.overlay0,
+    draw.overlay1,
+    draw.overlayFrom0,
+    draw.overlayFrom1,
+  ];
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
     values[0] = draw.texture;
     values[1] = draw.fromTexture;
@@ -105,6 +134,8 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     values[3] = draw.fromHeights;
     values[4] = draw.overlay0;
     values[5] = draw.overlay1;
+    values[6] = draw.overlayFrom0;
+    values[7] = draw.overlayFrom1;
     for (let i = 0; i < PER_DRAW_TEXTURES.length; i++) {
       const node = material.userData[PER_DRAW_TEXTURES[i] ?? ''] as { value: Texture } | undefined;
       // Draws without terrain use the material's flat heights; empty overlay slots keep their texture (opacity 0).
@@ -232,18 +263,44 @@ function overlaySlots(
   tileUv: Node<'vec3'>,
 ): (color: Node<'vec4'>) => void {
   const overlays = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlays);
+  const fades = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayFades);
   const looks = column(overlays, 2);
   const blends = column(overlays, 3);
+  const fadeLooks = column(fades, 2);
+  const fromSet = column(fades, 3);
   const slots = [0, 1].map((slot) => {
     const own = placeholderLike(placeholder);
-    material.addEventListener('dispose', () => own.dispose());
+    const fromOwn = placeholderLike(placeholder);
+    material.addEventListener('dispose', () => {
+      own.dispose();
+      fromOwn.dispose();
+    });
     const node = texture(own, mapUv(tileUv, column(overlays, slot), slot === 0 ? looks.x : looks.y));
+    const fromNode = texture(fromOwn, mapUv(tileUv, column(fades, slot), slot === 0 ? fadeLooks.x : fadeLooks.y));
     material.userData[`overlay${String(slot)}`] = node;
-    return { node, opacity: slot === 0 ? looks.z : looks.w, blend: slot === 0 ? blends.x : blends.y };
+    material.userData[`overlayFrom${String(slot)}`] = fromNode;
+    return {
+      node,
+      fromNode,
+      hasFrom: slot === 0 ? fromSet.x : fromSet.y,
+      fade: slot === 0 ? fadeLooks.z : fadeLooks.w,
+      opacity: slot === 0 ? looks.z : looks.w,
+      blend: slot === 0 ? blends.x : blends.y,
+    };
   });
   return (color) => {
-    for (const { node, opacity, blend } of slots) {
+    for (const { node: own, fromNode, hasFrom, fade, opacity, blend } of slots) {
       If(opacity.greaterThan(0), () => {
+        // The slot's imagery cross-fades from what it showed, or fades in from nothing (KB-155); like the base
+        // imagery's, only fading draws sample the second texture.
+        const node = own.toVar();
+        If(fade.lessThan(1), () => {
+          const from = vec4(0).toVar();
+          If(hasFrom.greaterThan(0.5), () => {
+            from.assign(fromNode);
+          });
+          node.assign(mix(from, node, fade));
+        });
         const over = node.xyz;
         const multiplied = color.xyz.mul(over);
         const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
@@ -377,6 +434,7 @@ function applyOverlays(
   textures: { get(handle: number): Texture | undefined },
 ): void {
   const o = draw.overlays.elements;
+  const f = draw.overlayFades.elements;
   for (let slot = 0; slot < 2; slot++) {
     const overlay = draws.overlays[slot];
     const shown = overlay && (overlay.opacities[i] ?? 0) > 0 ? textures.get(overlay.textures[i] ?? -1) : undefined;
@@ -386,6 +444,15 @@ function applyOverlays(
     o[10 + slot] = shown && overlay ? (overlay.opacities[i] ?? 0) : 0;
     o[12 + slot] = overlay?.blends[i] ?? 0;
     for (let c = 0; c < 4; c++) o[slot * 4 + c] = overlay?.uvTransforms[i * 4 + c] ?? 0;
+    // The cross-fade (KB-155): from the imagery the slot showed, or from nothing when it had none.
+    const fade = overlay?.fades[i] ?? 1;
+    const from = shown && overlay && fade < 1 ? textures.get(overlay.fromTextures[i] ?? -1) : undefined;
+    if (slot === 0) draw.overlayFrom0 = from;
+    else draw.overlayFrom1 = from;
+    f[8 + slot] = overlay?.fromGeographic[i] ?? 0;
+    f[10 + slot] = shown ? fade : 1;
+    f[12 + slot] = from ? 1 : 0;
+    for (let c = 0; c < 4; c++) f[slot * 4 + c] = overlay?.fromUvTransforms[i * 4 + c] ?? 0;
   }
 }
 

@@ -172,10 +172,7 @@ export interface TileDrawLayer {
  * An overlay slot of every draw (F244, F246): imagery above the draw's own, shown with an opacity and a blend mode.
  * `opacities[i]` 0 means draw `i` shows nothing in this slot.
  */
-export interface TileDrawOverlay {
-  readonly textures: Int32Array;
-  readonly uvTransforms: Float32Array;
-  readonly geographic: Uint8Array;
+export interface TileDrawOverlay extends TileDrawLayer {
   readonly opacities: Float32Array;
   /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
   readonly blends: Uint8Array;
@@ -655,6 +652,12 @@ export interface SurfaceStats {
   readonly onBaseImage: number;
 }
 
+/** Options of `Globe.reloadSource`. */
+export interface ReloadOptions {
+  /** Forget only the tiles found missing, keeping every tile drawn (default false: drop every tile). */
+  readonly missingOnly?: boolean;
+}
+
 /** A globe engine instance. */
 export interface Globe {
   /** Resolves after the first complete frame; rejects with a GlobeError when the engine cannot start. */
@@ -823,9 +826,11 @@ export interface Globe {
   readonly imageryLayers: ImageryLayers;
   /**
    * Drops every tile of the imagery or terrain source with this id from GPU and RAM memory, with its no-data and
-   * failure marks, so the view loads it again (a new offline package version, F279). False when no source has the id.
+   * failure marks, so the view loads it again (a new offline package version, F279). With `missingOnly`, forgets only
+   * the tiles it found missing and keeps every tile drawn (offline-only mode left, KB-158). False when no source has the
+   * id.
    */
-  reloadSource(sourceId: string): boolean;
+  reloadSource(sourceId: string, options?: ReloadOptions): boolean;
   /**
    * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
    * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the

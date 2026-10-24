@@ -21,6 +21,11 @@ export interface QualitySettings {
   readonly atmosphere?: AtmosphereLevel;
   /** Haze and fog over the surface while the atmosphere is on (F394, F395; default true). */
   readonly fog?: boolean;
+  /**
+   * Loads coarser tiles where the fog hides the ground (F395; default true, while the fog is drawn); false loads full
+   * detail under the fog too.
+   */
+  readonly fogAwareDetail?: boolean;
 }
 
 /** The atmosphere's scene settings (F394, F396); its level is a quality setting. Fields not given keep their value. */

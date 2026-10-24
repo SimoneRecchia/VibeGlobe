@@ -12,6 +12,7 @@ import {
   decideAfterResult,
   FAILURE_ABORTED,
   FAILURE_NO_DATA,
+  FAILURE_TRANSIENT,
 } from '../scheduler/failure-policy.js';
 import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } from '../scheduler/network-pool.js';
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
@@ -64,6 +65,8 @@ export const ARRIVING = -2;
 const UNWANTED_FRAMES = 2;
 /** Decodes that fail for a reason other than the bytes (worker crash, timeout) are retried this often, backing off. */
 const MAX_DECODE_RETRIES = 3;
+/** How long after its retries ran out a tile that may have failed in an outage waits for its last round (KB-162). */
+const OUTAGE_RETRY_MS = 300_000;
 const DECODE_RETRY_MS = 500;
 /** A tile the GPU budget refused waits this long before it is tried again (no re-decoding every frame). */
 const REFUSED_RETRY_MS = 1000;
@@ -169,6 +172,11 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
   private pinnedSettled = 0;
+  /**
+   * Tiles whose retries ran out on transient failures (`retries` -1): once each, they get one more round of retries
+   * after the source's next network success, or after {@link OUTAGE_RETRY_MS} in a view that asks it nothing (KB-162).
+   */
+  private outageDead = 0;
   /** The source's loading features this frame (`LOAD_*`). */
   private flags = LOAD_ALL;
   /** Visible tiles wanted this frame (level, x, y, key), whose neighbors are prefetched (F284). */
@@ -428,11 +436,16 @@ export class ImageryLoader implements NetworkPoolClient {
   /**
    * Forgets every tile of the source (a new package version, a mode that reaches tiles it could not, KB-PT-19): requests
    * and decodes in progress are cancelled, GPU textures and RAM copies released, no-data and failure marks cleared,
-   * so the tiles the next frames want load again from the source.
+   * so the tiles the next frames want load again from the source. With `missingOnly`, only the no-data marks go, the
+   * tiles drawn stay (a miss of offline-only mode, KB-158).
    */
-  reload(): void {
+  reload(missingOnly = false): void {
     const { residency, ram } = this.options.memory;
     for (const record of this.table.bySlot) {
+      if (missingOnly) {
+        if (record.state === NO_DATA) record.state = UNLOADED;
+        continue;
+      }
       const handle = this.options.handleBase + record.slot;
       if (record.state === QUEUED) this.heap.remove(record.slot);
       else this.cancel(record);
@@ -440,10 +453,12 @@ export class ImageryLoader implements NetworkPoolClient {
       ram.delete(handle);
       record.state = UNLOADED;
       record.retries = 0;
+      record.revived = false;
       record.availabilityUnknown = false;
     }
     this.active.length = 0;
     this.pinnedSettled = 0;
+    this.outageDead = 0;
     this.options.requestFrame();
   }
 
@@ -629,6 +644,7 @@ export class ImageryLoader implements NetworkPoolClient {
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
+      if (this.outageDead > 0 && result.cached !== true) this.reviveOutageDead();
       record.freshUntilMs =
         result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
           ? this.options.now() + result.maxAgeMs
@@ -655,9 +671,29 @@ export class ImageryLoader implements NetworkPoolClient {
       this.options.setTimer(() => this.options.requestFrame(), decision.nextEligibleMs - this.options.now());
     } else {
       record.state = DEAD;
+      // Out of retries on transient failures: maybe an outage, so one more round once the source is back (KB-162).
+      if (decision.failureClass === FAILURE_TRANSIENT && !record.revived) {
+        record.retries = -1;
+        if (this.outageDead++ === 0)
+          this.options.setTimer(() => {
+            if (!this.destroyed && this.outageDead > 0) this.reviveOutageDead();
+          }, OUTAGE_RETRY_MS);
+      }
       this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
     }
     this.settlePinned(record);
+    this.options.requestFrame();
+  }
+
+  /** The source answered again: its tiles dead from network failures may load now (KB-162). */
+  private reviveOutageDead(): void {
+    this.outageDead = 0;
+    for (const record of this.table.bySlot)
+      if (record.state === DEAD && record.retries < 0) {
+        record.state = UNLOADED;
+        record.retries = 0;
+        record.revived = true;
+      }
     this.options.requestFrame();
   }
 
@@ -765,6 +801,8 @@ export class ImageryLoader implements NetworkPoolClient {
     residency.touch(handle, this.options.memory.frame());
     if (record.pinned) residency.setPinned(handle, true);
     record.state = READY;
+    record.retries = 0;
+    record.revived = false;
     this.observe(record, 'tile', 'ready');
     this.settlePinned(record);
   }

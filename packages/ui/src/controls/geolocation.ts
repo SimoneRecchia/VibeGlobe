@@ -4,6 +4,7 @@
  * marker follows later positions without moving the camera. A denied or unavailable position shows a translated
  * message and leaves the map as it is.
  */
+import { themeValue } from '../theme/value.js';
 import type { DataLayer, Feature } from '@vibeglobe/layers';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { formatLength } from '@vibeglobe/gis';
@@ -146,19 +147,20 @@ export class GeolocationControl implements UiControl {
       import('@vibeglobe/layers'),
     ]);
     if (this.#marker !== undefined || !this.active) return this.#marker;
+    const color = themeValue(context.container, '--vg-ui-marker-color');
     const circle = layers.stack.add(
       circleLayer({
         id: `${this.id}-accuracy`,
-        style: { 'fill-color': '#1a73e8', 'fill-opacity': 0.2, 'fill-outline-color': '#1a73e8' },
+        style: { 'fill-color': color, 'fill-opacity': 0.2, 'fill-outline-color': color },
       }),
     );
     const point = layers.stack.add(
       pointLayer({
         id: `${this.id}-position`,
         style: {
-          'circle-color': '#1a73e8',
+          'circle-color': color,
           'circle-radius': 7,
-          'circle-stroke-color': '#ffffff',
+          'circle-stroke-color': themeValue(context.container, '--vg-ui-marker-outline-color'),
           'circle-stroke-width': 2,
         },
       }),

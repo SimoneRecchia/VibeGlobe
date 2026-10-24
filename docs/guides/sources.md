@@ -268,7 +268,7 @@ const google = await googleImagery({
   id: 'google',
   apiKey: myRestrictedKey, // the customer's own key, restricted to their sites
   billingRegion: 'eea', // or 'other': the terms differ, and there is no default
-  mapType: 'satellite',
+  mapType: 'roadmap', // EEA accounts get roadmap and terrain only
   language: 'it-IT',
   region: 'IT',
   logoUrl: '/assets/google-logo.png',
@@ -282,7 +282,9 @@ const copyright = await google.viewportCopyright({
 });
 ```
 
-The adapter creates and renews Map Tiles API sessions itself. `followGoogleCopyrights(globe, google)` keeps the credits on the copyrights Google returns for each settled view: one viewport request per settled view, never per frame, shown after the logo through `globe.refreshCredits()`. The Google profile forbids the persistent cache, prefetch and offline packaging, reuses tiles in memory only while Google's cache headers allow it, and requires Google's logo and the viewport's copyrights to stay visible ([ADR 0031](../adr/0031-google-maps-platform-terms.md)). `googleStreetView` reads Street View metadata and panorama tiles under the same profile.
+The adapter creates and renews Map Tiles API sessions itself. `followGoogleCopyrights(globe, google)` keeps the credits on the copyrights Google returns for each settled view: one viewport request per settled view, never per frame, shown after the logo through `globe.refreshCredits()`. The Google profile forbids the persistent cache, prefetch and offline packaging, reuses tiles in memory only while Google's cache headers allow it, and requires Google's logo and the viewport's copyrights to stay visible ([ADR 0031](../adr/0031-google-maps-platform-terms.md)). `googleStreetView` reads Street View metadata and panorama tiles under the same profile. The logo and its text say "Google Maps", 16 px high with 10 px of clear space (5 px below).
+
+Billing accounts in the European Economic Area get neither 2D satellite tiles, Street View nor Photorealistic 3D Tiles ([Map Tiles API EEA guide](https://developers.google.com/maps/comms/eea/map-tiles)): with `billingRegion: 'eea'`, `mapType: 'satellite'`, the `layerStreetview` layer, `googleStreetView` and `google3dTiles` throw a `SourceConfigError` (`not-available-in-eea`) that names those terms.
 
 ### OpenStreetMap public servers
 

@@ -180,7 +180,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
 
 /** Hosts that always refuse, whatever profile a configuration names (public OSM tiles, Google). */
 export const FORBIDDEN_HOSTS: readonly { pattern: RegExp; profile: string }[] = [
-  { pattern: /(^|\.)tile\.openstreetmap\.(org|de|fr)$/i, profile: 'openstreetmap-tile-servers' },
+  { pattern: /(^|\.)tile\.(openstreetmap\.(org|de|fr)|osm\.org)$/i, profile: 'openstreetmap-tile-servers' },
   { pattern: /(^|\.)(googleapis|google|gstatic|ggpht)\.com$/i, profile: 'google-maps-platform' },
 ];
 

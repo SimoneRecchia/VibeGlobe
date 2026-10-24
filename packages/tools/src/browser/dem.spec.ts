@@ -2,10 +2,11 @@
 // public AWS Open Data bucket when its output is missing (`vibeglobe-data build test-mont-blanc.json --dataset
 // terrain`; about 140 MB downloaded once, resumed and checksummed), is loaded through the engine's Terrarium adapter.
 // VIBEGLOBE_TOOLS_DEM=<folder> uses another build's folder.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
-import { runBuild } from '../pipeline/build.js';
+import { loadConfig } from '../config/load.js';
+import { estimateBuild, runBuild } from '../pipeline/build.js';
 
 const CONFIG = join(import.meta.dirname, '../../configs/test-mont-blanc.json');
 const FOLDER =
@@ -92,6 +93,26 @@ async function holes(page: Page): Promise<number> {
     }
   return count;
 }
+
+/** Bytes of a file, or of every file under a folder. */
+function bytesOf(path: string): number {
+  if (!statSync(path).isDirectory()) return statSync(path).size;
+  return readdirSync(path, { recursive: true, encoding: 'utf8' })
+    .map((name) => join(path, name))
+    .filter((file) => statSync(file).isFile())
+    .reduce((sum, file) => sum + statSync(file).size, 0);
+}
+
+test('the real build output and download sizes are within 30% of the estimate (F334, F552)', () => {
+  const estimate = estimateBuild(loadConfig(CONFIG), { sample: false, datasets: ['terrain'] });
+  const output = bytesOf(OUTPUT) + bytesOf(join(FOLDER, 'output', 'terrain.pmtiles'));
+  const downloaded = bytesOf(join(FOLDER, 'downloads', 'terrain'));
+  console.log(
+    `[estimate] output ${output} of ${estimate.outputBytes}, download ${downloaded} of ${estimate.downloadBytes}`,
+  );
+  expect(Math.abs(output / estimate.outputBytes - 1)).toBeLessThan(0.3);
+  expect(Math.abs(downloaded / estimate.downloadBytes - 1)).toBeLessThan(0.3);
+});
 
 test('the output carries the Copernicus DEM notice with the modification statement (F339)', () => {
   const metadata = JSON.parse(readFileSync(join(OUTPUT, 'metadata.json'), 'utf8')) as {

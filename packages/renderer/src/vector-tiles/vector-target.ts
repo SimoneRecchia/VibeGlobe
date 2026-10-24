@@ -165,8 +165,7 @@ export class ThreeVectorTarget {
     }
     if (this.labelMesh !== undefined) this.root.children.push(this.labelMesh);
     for (const layer of layers) this.material(layer);
-    for (const material of this.materials.values())
-      setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
+    for (const material of this.materials.values()) setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
     for (const layer of layers) {
       const material = this.material(layer);
       for (const draw of layer.draws) {

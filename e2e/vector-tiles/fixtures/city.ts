@@ -208,3 +208,23 @@ export function towers(): GeoFeature[] {
     id: 30_000 + i,
   }));
 }
+
+/** Points of interest with sprite icons and names in several scripts (F448), east of the labels' view. */
+export function pois(): GeoFeature[] {
+  const list: readonly (readonly [string, string, number, number])[] = [
+    ['Café Über', 'dot', 9.212, 45.458],
+    ['Москва', 'square', 9.218, 45.458],
+    ['Αθήνα', 'triangle', 9.224, 45.458],
+    ['東京', 'dot', 9.212, 45.4555],
+    ['Ελλάδα', 'square', 9.218, 45.4555],
+    ['北京', 'triangle', 9.224, 45.4555],
+  ];
+  return list.map(([name, cls, lon, lat], i) => ({
+    layer: 'poi',
+    minzoom: 14,
+    type: 'Point',
+    coordinates: [[[lon, lat]]],
+    properties: { name, class: cls },
+    id: 9000 + i,
+  }));
+}

@@ -1,11 +1,12 @@
 /**
  * The text material of labels (F448, F449, ADR 0132), exported for data-layer labels too (F358): screen-space quads
  * whose corners are given in CSS pixels (placement and collision run on the CPU), shaded from an {@link SdfAtlas}.
- * Glyphs are signed distance fields drawn crisp at any size and pixel density, with a halo; icons are RGBA images.
+ * Glyphs are signed distance fields drawn crisp at any size and pixel density, with a halo; icons are RGBA images
+ * (premultiplied sRGB in the atlas).
  * Labels are drawn over the scene without depth testing: placement already hid those behind the globe.
  *
  * Attributes per vertex: `labelScreen` (x, y CSS pixels from the top left), `labelUv` (atlas texels), `labelFill` and
- * `labelHalo` (straight linear RGBA), `labelParams` (glyph scale = text size / 24, halo width in CSS pixels, opacity,
+ * `labelHalo` (straight linear RGBA; an icon's opacity in the fill's alpha), `labelParams` (glyph scale = text size / 24, halo width in CSS pixels, opacity,
  * 1 for an icon).
  */
 import { attribute, float, max, smoothstep, texture, uniform, varying, vec2, vec4 } from 'three/tsl';
@@ -45,7 +46,10 @@ export function createTextMaterial(atlas: Texture, atlasSize: number): MeshBasic
   const alpha = fa.add(ha);
   const rgb = fill.xyz.mul(fa).add(halo.xyz.mul(ha)).div(max(alpha, 1e-4));
   const icon = p.w.greaterThan(0.5);
-  const iconColor = vec4(sample.xyz, sample.w.mul(p.z));
+  // Icons are premultiplied sRGB: straight color, then linear light (a cubic fit of the sRGB curve).
+  const s = sample.xyz.div(max(sample.w, 1e-4));
+  const linear = s.mul(s.mul(s.mul(0.305306011).add(0.682171111)).add(0.012522878));
+  const iconColor = vec4(linear, sample.w.mul(p.z).mul(fill.w));
   material.colorNode = icon.select(iconColor, vec4(rgb, alpha.mul(p.z))) as Node<'vec4'>;
   material.transparent = true;
   material.depthTest = false;

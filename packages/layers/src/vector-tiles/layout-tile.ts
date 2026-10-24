@@ -17,6 +17,9 @@ import { toTargetTile, type OverzoomTransform, type TileId } from './tile-pyrami
 
 /** Extent every bucket is expressed in, whatever the source layer's extent. */
 export const BUCKET_EXTENT = 4096;
+/** The layer of a GeoJSON source's tiles, which its style layers read (they have no `source-layer`; F444). */
+export const GEOJSON_LAYER = '_geojsonTileLayer';
+
 /** Clip buffer around the tile, in bucket units (MapLibre's default buffer is 128 of 4096 too). */
 export const BUCKET_BUFFER = 128;
 
@@ -47,6 +50,8 @@ export interface BucketGeometry {
 export interface BucketLabel {
   readonly feature: number;
   readonly text: string;
+  /** The sprite icon drawn at a point anchor (`icon-image`), if any. */
+  readonly icon?: string;
   /** Point anchor, or the line the label follows (`symbol-placement: line`), in bucket units. */
   readonly anchor?: TilePoint;
   readonly line?: readonly TilePoint[];
@@ -250,7 +255,8 @@ function layoutSymbols(
   const alongLines = layer.layout('symbol-placement', zoom) !== 'point';
   features.forEach((feature, index) => {
     const text = String(layer.layout('text-field', zoom, feature) ?? '');
-    if (text === '') return;
+    const icon = String(layer.layout('icon-image', zoom, feature) ?? '');
+    if (text === '' && icon === '') return;
     const font = (layer.layout('text-font', zoom, feature) as string[] | undefined)?.join(',') ?? '';
     const set = (ranges[font] ??= new Set());
     for (const start of glyphRanges(text)) set.add(start);
@@ -260,7 +266,7 @@ function layoutSymbols(
       } else if (part[0] !== undefined) {
         const [x, y] = part[0];
         if (x >= 0 && y >= 0 && x < BUCKET_EXTENT && y < BUCKET_EXTENT)
-          labels.push({ feature: index, text, anchor: part[0] });
+          labels.push({ feature: index, text, anchor: part[0], ...(icon === '' ? {} : { icon }) });
       }
     }
   });
@@ -302,7 +308,7 @@ export function layoutVectorTile(input: LayoutInput): Bucket[] {
   for (const json of input.layers) {
     const layer = new StyleLayer(json);
     // Hidden layers are laid out too, so showing them again needs no new layout (F447, F450).
-    const source = tile.layers.find((l) => l.name === layer.sourceLayer);
+    const source = tile.layers.find((l) => l.name === (layer.sourceLayer ?? GEOJSON_LAYER));
     if (source === undefined) continue;
     const bucket = layoutLayer(layer, source, input, clip);
     buckets.push(input.tile === undefined ? bucket : placed(bucket, input.tile));

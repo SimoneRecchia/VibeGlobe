@@ -5912,7 +5912,7 @@
         "Assert text from 10 to 32 px is crisp and glyph ranges are requested only for characters in use",
         "Render labels with Latin, Cyrillic, Greek and CJK characters and assert each renders or falls back to a configured font without missing boxes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F449",

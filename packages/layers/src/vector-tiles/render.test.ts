@@ -41,6 +41,7 @@ const TILE = encodeMvt({
       properties: { class: 'primary' },
     },
   ],
+  poi: [{ id: 3, type: 'Point', geometry: [[[1000, 1000]]], properties: { class: 'dot' } }],
 });
 
 const ecef = (lon: number, lat: number) => {
@@ -99,6 +100,14 @@ describe('globe placement of vector tiles (F441)', () => {
     expect((fill?.indices.length ?? 0) / 3).toBeGreaterThan(2);
     expect(fill?.globe?.positions.length).toBe(((fill?.positions.length ?? 0) / 2) * 3);
     expect(line?.side?.planes.length).toBe(((line?.positions.length ?? 0) / 2) * 4);
+  });
+
+  it('keeps a symbol with an icon and no text, with its sprite icon (F448)', () => {
+    const layers = [
+      { id: 'poi', type: 'symbol', source: 's', 'source-layer': 'poi', layout: { 'icon-image': ['get', 'class'] } },
+    ];
+    const [bucket] = layoutVectorTile({ bytes: TILE, layers, zoom: 2 });
+    expect(bucket?.labels).toEqual([{ feature: 0, text: '', anchor: [1000, 1000], icon: 'dot' }]);
   });
 });
 

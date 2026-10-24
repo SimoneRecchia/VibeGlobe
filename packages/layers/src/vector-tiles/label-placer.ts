@@ -235,13 +235,18 @@ export class LabelPlacer {
         halo: linearColor(paint('text-halo-color')),
         haloWidthPx: Number(paint('text-halo-width') ?? 0),
       };
+      const icon = anchor.onLine === undefined ? this.iconQuad(label.icon, screen, layer, zoom, feature) : undefined;
+      if (icon === null) continue;
       const glyphs =
         anchor.onLine === undefined
           ? this.pointGlyphs(shaping, screen, style)
           : this.lineGlyphs(shaping, anchor, source, zoom, style);
-      if (glyphs === undefined || glyphs.length === 0) continue;
+      if (glyphs === undefined || glyphs.length + (icon === undefined ? 0 : 1) === 0) continue;
       const boxes =
-        anchor.onLine === undefined ? [this.pointBox(shaping, screen, style.scale)] : glyphs.map((g) => g.box);
+        anchor.onLine === undefined
+          ? [...(glyphs.length > 0 ? [this.pointBox(shaping, screen, style.scale)] : []), ...(icon ? [icon.box] : [])]
+          : glyphs.map((g) => g.box);
+      if (icon !== undefined) glyphs.unshift(icon);
       out.push({
         id: anchor.id,
         boxes,
@@ -259,6 +264,42 @@ export class LabelPlacer {
       });
     }
     return out;
+  }
+
+  /**
+   * The quad of a point label's sprite icon, centered on its anchor at `icon-size` in CSS pixels (the sprite's own
+   * pixel ratio taken out, so the 2x sheet draws at the same size, F448); undefined without an icon, null while the
+   * sprite loads.
+   */
+  private iconQuad(
+    name: string | undefined,
+    screen: { xPx: number; yPx: number },
+    layer: StyleLayer,
+    zoom: number,
+    feature: BucketFeature | undefined,
+  ): GlyphQuad | null | undefined {
+    if (name === undefined) return undefined;
+    const image = this.glyphs.icon(name);
+    if (image === undefined) return null;
+    const key = `icon|${name}|${image.icon.pixelRatio}`;
+    const rect = this.atlas.get(key) ?? this.atlas.addRgba(key, image.pixels, image.width, image.height);
+    if (rect === undefined) return null;
+    const size = Number(layer.layout('icon-size', zoom, feature) ?? 1) / image.icon.pixelRatio;
+    const w = image.width * size;
+    const h = image.height * size;
+    const x = screen.xPx - w / 2;
+    const y = screen.yPx - h / 2;
+    const opacity = Number(layer.paint('icon-opacity', zoom, feature) ?? 1);
+    return {
+      rect,
+      corners: [x, y, x + w, y, x + w, y + h, x, y + h],
+      box: { minX: x, minY: y, maxX: x + w, maxY: y + h },
+      scale: 1,
+      fill: [1, 1, 1, opacity],
+      halo: [0, 0, 0, 0],
+      haloWidthPx: 0,
+      icon: true,
+    };
   }
 
   private pointBox(shaping: Shaping, screen: { xPx: number; yPx: number }, scale: number): ScreenBox {

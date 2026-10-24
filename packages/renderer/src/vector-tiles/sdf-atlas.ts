@@ -53,12 +53,16 @@ export class SdfAtlas {
 
   /** Adds an RGBA image (`width` × `height` × 4 bytes, straight alpha); returns its rect, or the existing one. */
   addRgba(key: string, pixels: ArrayLike<number>, width: number, height: number): AtlasRect | undefined {
-    return this.add(key, width, height, (i) => [
-      pixels[i * 4] ?? 0,
-      pixels[i * 4 + 1] ?? 0,
-      pixels[i * 4 + 2] ?? 0,
-      pixels[i * 4 + 3] ?? 0,
-    ]);
+    // Premultiplied, so filtering at an icon's edge does not mix in the black of its transparent texels.
+    return this.add(key, width, height, (i) => {
+      const a = (pixels[i * 4 + 3] ?? 0) / 255;
+      return [
+        Math.round((pixels[i * 4] ?? 0) * a),
+        Math.round((pixels[i * 4 + 1] ?? 0) * a),
+        Math.round((pixels[i * 4 + 2] ?? 0) * a),
+        pixels[i * 4 + 3] ?? 0,
+      ];
+    });
   }
 
   /** Frees the texture. */

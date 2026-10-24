@@ -1,7 +1,7 @@
 // Generates the vector tile fixtures of the playground (ADR 0131), once, into apps/playground/public/vector-tiles/:
 // the MVT pyramid (tiles.ts), the glyph ranges of the fixture font stacks (SDF glyphs drawn by the renderer's own
 // rasterizer in Chromium, from the OFL-licensed Inter font installed on the machine), and the sprite sheets at 1x and
-// 2x. Run: `node e2e/vector-tiles/fixtures/generate.ts` (after `npm run build`); commit the output.
+// 2x. Run: `node e2e/vector-tiles/fixtures/generate.ts [--tiles]` (after `npm run build`); commit the output.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { chromium } from '@playwright/test';
 import { PNG } from 'pngjs';
 import ts from 'typescript';
 import { ProtoWriter } from './proto.ts';
+import { demotilesFeatures } from './demotiles.ts';
 import { encodeTile, tileList } from './tiles.ts';
 
 const ROOT = new URL('../../../', import.meta.url).pathname;
@@ -26,6 +27,25 @@ export const RANGES = [0, 256, 768, 1024];
 function write(path: string, bytes: Uint8Array | string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, bytes);
+}
+
+/** The deepest zoom of the demotiles fixture tiles (F444): the whole world at every zoom up to it. */
+const DEMOTILES_MAX_ZOOM = 3;
+
+function writeDemotiles(): number {
+  const features = demotilesFeatures();
+  let count = 0;
+  for (let z = 0; z <= DEMOTILES_MAX_ZOOM; z++)
+    for (let x = 0; x < 2 ** z; x++)
+      for (let y = 0; y < 2 ** z; y++) {
+        const bytes = encodeTile(z, x, y, features);
+        if (bytes === undefined) continue;
+        write(join(OUT, 'demotiles', String(z), String(x), `${y}.pbf`), bytes);
+        count++;
+      }
+  const tilejson = { tilejson: '3.0.0', tiles: ['{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: DEMOTILES_MAX_ZOOM };
+  write(join(OUT, 'demotiles', 'tiles.json'), `${JSON.stringify(tilejson, null, 2)}\n`);
+  return count;
 }
 
 function writeTiles(): number {
@@ -131,9 +151,13 @@ function writeSprites(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   rmSync(join(OUT, 'tiles'), { recursive: true, force: true });
-  rmSync(join(OUT, 'glyphs'), { recursive: true, force: true });
-  console.log(`tiles: ${writeTiles()}`);
-  writeSprites();
-  await writeGlyphs();
-  console.log('glyphs and sprites written');
+  rmSync(join(OUT, 'demotiles'), { recursive: true, force: true });
+  console.log(`tiles: ${writeTiles()}, demotiles: ${writeDemotiles()}`);
+  // `--tiles` writes only the tiles (the glyphs and sprites do not depend on the geography).
+  if (!process.argv.includes('--tiles')) {
+    rmSync(join(OUT, 'glyphs'), { recursive: true, force: true });
+    writeSprites();
+    await writeGlyphs();
+    console.log('glyphs and sprites written');
+  }
 }

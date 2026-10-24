@@ -50,6 +50,8 @@ export function showVectorTiles(globe: Globe, params: URLSearchParams): Promise<
       style: styleUrl(name),
       target: createVectorTileTarget,
       element: document.querySelector<HTMLElement>('#app') ?? undefined,
+      // Characters the fixture glyphs lack (CJK) are drawn from the system's fonts (F448).
+      localFontFamily: 'sans-serif',
     }),
   };
   hooks.ready.then(

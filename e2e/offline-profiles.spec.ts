@@ -236,12 +236,18 @@ test('Google tiles are never prefetched or preloaded, while other sources in the
   const seen = await drawn(page);
   expect(google.length).toBeGreaterThan(0);
   expect(beyondView(google, seen), 'Google tiles requested outside every drawn view').toEqual([]);
-  expect(
-    beyondView(
-      requests.filter((p) => p.includes('/f322-world/')),
-      seen,
-    ).length,
-  ).toBeGreaterThan(0);
+  // The other source keeps prefetch; it prefetches while the engine does not judge the link slow (F302: under
+  // 1.5 Mbps no source prefetches, and a busy page on a software GPU measures that even from the local server; KB-138).
+  expect((await effective(page, 'world'))?.prefetch).toBe(true);
+  expect((await effective(page, 'google'))?.prefetch).toBe(false);
+  const bandwidth = await page.evaluate(() => window.offlineHarness?.globe?.imageryStats()?.bandwidthBitsPerSecond);
+  if (!(bandwidth !== undefined && bandwidth < 1.5e6))
+    expect(
+      beyondView(
+        requests.filter((p) => p.includes('/f322-world/')),
+        seen,
+      ).length,
+    ).toBeGreaterThan(0);
 });
 
 test('the OpenStreetMap public servers are neither prefetched in bulk nor packaged (F324)', async ({ page }) => {

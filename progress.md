@@ -23,6 +23,27 @@ Since the takeover:
 Open, breadth first (failing M4–M14 entries outside the hardening backlog): F148, F167, F217, F249 (core budget),
 F269, F329 (KB-138), F358 (SDF labels), F378 (KB-144), F389, F395 (core budget), F403, F438, F453, F472.
 
+## Track G, robustness (2026-10-24)
+
+Branch `ccr-671551d2-ftc2w5`, pull request SimoneRecchia/VibeGlobe#34 into `main` (the owner merges). Owns `e2e/robustness/`
+and `scripts/robustness/` (ADR 0161, ADR 0162; numbers 0161–0169).
+
+- Passing: F499 (100 mount and unmount cycles leave heap, GPU objects, workers and listeners at the empty page's
+  baseline, both backends), F511 (quota errors and eviction mid-path, both backends), F515 (hidden tab during a flight
+  and idle, 1 and 10 minutes simulated, both backends).
+- F517 fails on TG-06: 1000 engines destroyed after random delays stay flat in this container on both backends (37 and
+  66 min), but CI's faster WebGPU start-ups retain about 60 engines; WebGL2 passes in both places.
+- Failing on engine bugs (TG-01 to TG-06), for the main session (`docs/known-bugs.md`, Track G; their checks in
+  `e2e/robustness/known-bugs/*.bug.ts` or the fuzz suite's `knownBugs`): F512 (TG-01, a renderer kept per GPU loss after
+  a camera movement), F510 (TG-04 vector tiles and TG-05 imagery tiles not fetched again after faults), F513 (TG-02
+  `validateManifest`, TG-03 `VectorStyle.load` with a `"__proto__"` operator).
+- Failing on real devices or hours (`docs/hardening-backlog.md`): F509 (4 hours on the reference desktop; the 6-minute
+  soak passes), F514 (a real window between monitors; the emulated change passes), F516 (real sleep; the simulated
+  lifecycle passes).
+- Hook requests: none. Headless Chromium cannot hide a page, freeze it or dispatch DPR media events: the specs simulate
+  them (ADR 0161).
+- About 7 hours of agent time.
+
 ## Track H, packaging and release (2026-10-24)
 
 Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns

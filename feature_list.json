@@ -6575,7 +6575,7 @@
         "Measure JS heap after forced garbage collection, GPU resource counters, worker count and listener count before and after",
         "Assert no growth beyond the documented tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F500",
@@ -6722,7 +6722,7 @@
         "Assert the engine reports the condition through its events and logs and continues from memory, packages and network",
         "Assert no blank frame and no uncaught error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F512",
@@ -6770,7 +6770,7 @@
         "Assert no frames are rendered or requests made beyond the throttled rate while hidden",
         "Assert the view resumes at the correct camera state, the flight completes or resumes smoothly, and tiles refresh"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F516",

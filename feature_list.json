@@ -6249,7 +6249,7 @@
         "Assert the engine instance and canvas are the same object before and after (no remount)",
         "Assert from the request log that unchanged sources are not downloaded again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F475",

@@ -128,6 +128,16 @@ test('reactive props change the running engine in place, without a remount or do
   await set(page, { networkMode: 'hybrid' });
   await page.evaluate(() => window.adapterExample?.globes()[0]?.jumpTo({ zoom: 6.5 }));
   await expect.poll(() => tiles.length).toBeGreaterThan(before);
+  // Quality preset: the running engine takes each preset's settings (resolution scale, level of detail).
+  for (const [preset, scale, screenError] of [
+    ['low', 0.5, 4],
+    ['ultra', 1.25, 0.75],
+  ] as const) {
+    await set(page, { qualityPreset: preset });
+    await expect
+      .poll(() => page.evaluate(() => window.adapterExample?.globes()[0]?.qualitySettings))
+      .toMatchObject({ resolutionScale: scale, maxScreenErrorPx: screenError });
+  }
   // Same engine, same canvas; no tile requested twice.
   const same = await page.evaluate(() => {
     const [globe, canvas] = (window as unknown as { kept: unknown[] }).kept;

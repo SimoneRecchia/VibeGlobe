@@ -15,6 +15,7 @@ import {
   type GlobeExtras,
   type LayerLook,
   type NetworkMode,
+  type QualityPresetChoice,
   type ToggleMode,
 } from '@vibeglobe/vue';
 import { nextTick, reactive, ref, shallowRef } from 'vue';
@@ -33,6 +34,7 @@ const layers = ref<LayerLook[]>([
   { id: 'levels', visible: true, opacity: 0.5 },
 ]);
 const networkMode = ref<NetworkMode>('hybrid');
+const qualityPreset = ref<QualityPresetChoice>();
 const children = reactive({ points: false, marker: false, zoom: false, scale: false, overlay: false });
 // A green overlay added at runtime on top of the globe's imagery (F476).
 const overlaySource = xyzImagery({ id: 'overlay', url: fixtureTiles('green'), maxLevel: 18 });
@@ -52,6 +54,7 @@ const live = {
     viewMode?: ToggleMode;
     layers?: LayerLook[];
     networkMode?: NetworkMode;
+    qualityPreset?: QualityPresetChoice;
     children?: Partial<typeof children>;
     points?: Feature[];
     marker?: Partial<typeof marker>;
@@ -61,6 +64,7 @@ const live = {
     if (changes.viewMode) viewMode.value = changes.viewMode;
     if (changes.layers) layers.value = changes.layers;
     if (changes.networkMode) networkMode.value = changes.networkMode;
+    if (changes.qualityPreset) qualityPreset.value = changes.qualityPreset;
     if (changes.children) Object.assign(children, changes.children);
     if (changes.points) points.value = changes.points;
     if (changes.marker) Object.assign(marker, changes.marker);
@@ -97,6 +101,7 @@ window.adapterExample = {
       :layers="layers"
       :offline="offline"
       :network-mode="networkMode"
+      :quality-preset="qualityPreset"
       @ready="events.push({ source: 'first', type: 'ready', payload: $event })"
     >
       <CameraReadout />

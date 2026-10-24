@@ -1,0 +1,32 @@
+{
+  "device": "macbook-apple-m5-macos-26-6-2",
+  "date": "2026-10-24T23-08-09-717Z",
+  "commit": "7436a3318cb3bba23b3a2d050b3fa61c35146b19",
+  "os": "darwin 25.6.0 arm64",
+  "cpu": "Apple M5",
+  "memoryGiB": 32,
+  "gpu": "see the benchmark reports",
+  "browsers": [
+    "chromium",
+    "chrome",
+    "firefox",
+    "webkit"
+  ],
+  "reports": [
+    "micro-2026-10-24T23-18-23-473Z.json",
+    "offscreen-2026-10-24T23-21-27-415Z.json",
+    "offscreen-2026-10-24T23-24-34-442Z.json",
+    "offscreen-2026-10-24T23-26-10-112Z.json",
+    "offscreen-2026-10-24T23-29-25-177Z.json"
+  ],
+  "outcomes": {
+    "build": true,
+    "e2e": false,
+    "bench": false,
+    "bench-micro": true,
+    "offscreen-chromium": true,
+    "offscreen-chrome": true,
+    "offscreen-firefox": true,
+    "offscreen-webkit": true
+  }
+}

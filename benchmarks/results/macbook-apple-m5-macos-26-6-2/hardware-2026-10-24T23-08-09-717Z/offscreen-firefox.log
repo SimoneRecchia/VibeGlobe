@@ -1,0 +1,12 @@
+
+> vibeglobe@0.0.0 bench:offscreen
+> node benchmarks/offscreen.ts --browser firefox --hardware
+
+{"backend":"webgl2","mode":"main","load":false,"frames":1161,"frameIntervalP50Ms":8,"frameIntervalP95Ms":10,"inputs":1164,"inputLatencyP50Ms":8,"inputLatencyP95Ms":9}
+{"backend":"webgl2","mode":"main","load":true,"frames":954,"frameIntervalP50Ms":8,"frameIntervalP95Ms":34,"inputs":957,"inputLatencyP50Ms":8,"inputLatencyP95Ms":34}
+{"backend":"webgl2","mode":"main","load":false,"screenshots":15,"misalignmentP50Px":0.5,"misalignmentMaxPx":0.72}
+{"backend":"webgl2","mode":"worker","load":false,"frames":1195,"frameIntervalP50Ms":8,"frameIntervalP95Ms":9,"inputs":1200,"inputLatencyP50Ms":16,"inputLatencyP95Ms":17}
+{"backend":"webgl2","mode":"worker","load":true,"frames":950,"frameIntervalP50Ms":8,"frameIntervalP95Ms":26,"inputs":955,"inputLatencyP50Ms":16,"inputLatencyP95Ms":33}
+{"backend":"webgl2","mode":"worker","load":false,"screenshots":15,"misalignmentP50Px":0.41,"misalignmentMaxPx":2.5}
+Results: /Users/s1imone/WebstormProjects/VibeGlobe/benchmarks/results/macbook-apple-m5-macos-26-6-2/offscreen-2026-10-24T23-26-10-112Z.json
+

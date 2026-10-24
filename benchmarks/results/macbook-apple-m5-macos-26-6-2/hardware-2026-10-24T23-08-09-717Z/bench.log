@@ -1,0 +1,20 @@
+
+> vibeglobe@0.0.0 bench
+> node benchmarks/run.ts
+
+frame-loop       frame p95 (median of 5) 16.80 ms · cpu p95 0.100 ms · heap 6.2 MB · first frame 145 ms · draws 27 · gpu p95 n/a
+debug-overlay    frame p95 (median of 5) 16.70 ms · cpu p95 0.200 ms · heap 6.6 MB · first frame 146 ms · draws 27 · gpu p95 n/a
+drag-200-webgl2  frame p95 (median of 5) 16.70 ms · cpu p95 4.900 ms · heap 11.0 MB · first frame 234 ms · draws 359 · gpu p95 4.284 ms
+drag-400-webgl2  frame p95 (median of 5) 16.80 ms · cpu p95 5.100 ms · heap 8.7 MB · first frame 222 ms · draws 146 · gpu p95 3.802 ms
+drag-800-webgl2  frame p95 (median of 5) 16.70 ms · cpu p95 6.600 ms · heap 22.1 MB · first frame 310 ms · draws 1425 · gpu p95 7.676 ms
+drag-200-webgpu  frame p95 (median of 5) 16.70 ms · cpu p95 4.300 ms · heap 10.6 MB · first frame 174 ms · draws 359 · gpu p95 2.129 ms
+drag-400-webgpu  frame p95 (median of 5) 16.80 ms · cpu p95 4.900 ms · heap 8.6 MB · first frame 158 ms · draws 146 · gpu p95 1.758 ms
+drag-800-webgpu  frame p95 (median of 5) 16.80 ms · cpu p95 5.700 ms · heap 22.2 MB · first frame 273 ms · draws 1425 · gpu p95 4.133 ms
+drag-400-webgl2-fragment frame p95 (median of 5) 16.70 ms · cpu p95 5.200 ms · heap 8.7 MB · first frame 222 ms · draws 146 · gpu p95 4.246 ms
+3dtiles-city     frame p95 (median of 5) 16.70 ms · cpu p95 0.000 ms · heap 8.1 MB · first frame 145 ms · draws 21 · gpu p95 n/a
+stream-path      tiles 1405 · requests 1736 · failed 0 · GPU 468.3 MB · RAM 4.0 MB
+stream-path      frame p95 (median of 5) 16.80 ms · cpu p95 0.000 ms · heap 20.9 MB · first frame 223 ms · draws 29 · gpu p95 n/a
+cold start       first frame p90 over 10 runs 146 ms (cache disabled)
+Results: /Users/s1imone/WebstormProjects/VibeGlobe/benchmarks/results/macbook-apple-m5-macos-26-6-2/2026-10-24T23-18-22-964Z.json
+
+BUDGET  drag-800-webgl2: median cpu p95 6.600 ms > 6 ms

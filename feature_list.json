@@ -6624,7 +6624,7 @@
         "Assert it is within the initial-bundle budget",
         "Enable each optional module at runtime and assert its code is fetched only at that moment"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F504",
@@ -6818,7 +6818,7 @@
         "Assert each has a recorded license that is permissive (MIT, BSD, Apache-2.0, ISC, OFL for fonts, public domain or compatible data licenses)",
         "Assert each appears in the generated third-party notices"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F520",
@@ -6914,7 +6914,7 @@
         "Assert CHANGELOG.md has an entry for each released version with categorized changes",
         "Assert breaking changes are marked"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F527",
@@ -6974,7 +6974,7 @@
         "Install the tarballs in a strict TypeScript consumer project and run the type checker",
         "Assert no errors and no reference to source files outside the tarballs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F531",
@@ -6986,7 +6986,7 @@
         "Configure custom asset URLs pointing to a separate static server and assert assets load from there",
         "Assert no asset is inlined in a way that requires unsafe-eval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F532",
@@ -6998,7 +6998,7 @@
         "Assert installation pulls no layers, UI, offline, Vue or Web Component packages",
         "Assert the app renders the globe and navigates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F533",
@@ -7036,7 +7036,7 @@
         "Assert publishing happens only from CI with the npm token stored as a CI secret",
         "Assert the workflow publishes only after the owner has approved the release"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F535",
@@ -7048,7 +7048,7 @@
         "Check it covers version bump, changelog, tags, publishing and post-release checks",
         "Follow it for a dry-run release and assert it completes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F536",
@@ -7072,7 +7072,7 @@
         "Assert the globe renders",
         "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F537",

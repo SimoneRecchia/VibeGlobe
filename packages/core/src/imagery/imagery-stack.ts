@@ -22,6 +22,12 @@ export interface ImageryLayerOptions {
   readonly visible?: boolean;
   /** Default 'normal'. */
   readonly blend?: ImageryBlend;
+  /**
+   * Matches the tones of the chain's sources (F249, ADR 0044): a later source's colors are scaled toward the first
+   * source's where both show, so neither a switch nor a boundary between them shows (default true; false shows the
+   * sources' own colors).
+   */
+  readonly harmonize?: boolean;
 }
 
 /** A layer of `GlobeOptions.imagery`: a single source, or a layer with a chain of sources and its look. */
@@ -53,6 +59,8 @@ export interface ImageryLayerState {
   readonly opacity: number;
   readonly visible: boolean;
   readonly blend: ImageryBlend;
+  /** Whether the chain's tones are matched (F249). */
+  readonly harmonize: boolean;
   /** The layer's sources in priority order (F220). */
   readonly sources: readonly ImagerySourceInfo[];
 }
@@ -93,6 +101,7 @@ export interface ImageryLayerChanges {
   readonly opacity?: number;
   readonly visible?: boolean;
   readonly blend?: ImageryBlend;
+  readonly harmonize?: boolean;
 }
 
 /**
@@ -128,6 +137,7 @@ export interface StackEntry {
   opacity: number;
   visible: boolean;
   blend: ImageryBlend;
+  harmonize: boolean;
 }
 
 function isSource(input: ImageryLayerInput): input is ImagerySource {
@@ -145,6 +155,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
         opacity: 1,
         visible: true,
         blend: 'normal',
+        harmonize: true,
       };
     const first = input.sources[0];
     if (!first) throw new RangeError('An imagery layer needs at least one source');
@@ -155,6 +166,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
       opacity: 1,
       visible: true,
       blend: 'normal',
+      harmonize: true,
     };
     applyChanges(entry, input);
     return entry;
@@ -169,7 +181,8 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
 
 /** Applies changes to a layer; throws `RangeError` for an opacity outside 0–1 or an unknown blend mode. */
 export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): void {
-  const { opacity, visible, blend } = changes;
+  const { opacity, visible, blend, harmonize } = changes;
+  if (harmonize !== undefined) entry.harmonize = harmonize;
   if (opacity !== undefined) {
     if (!(opacity >= 0 && opacity <= 1)) throw new RangeError(`Opacity ${String(opacity)} is not between 0 and 1`);
     entry.opacity = opacity;

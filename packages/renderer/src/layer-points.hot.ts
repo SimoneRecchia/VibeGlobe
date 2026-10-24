@@ -5,8 +5,8 @@
  * batch's typed arrays and writes the mesh's, allocating nothing (the general quad path builds arrays per feature).
  * @benchmark e2e/globe-allocation.spec.ts
  */
-import { ATTRIBUTE_COMPONENTS, writeLayerVertex, type BatchAttribute, type LayerGround } from '@vibeglobe/core';
-import { nearestLon, originLonDeg, wrappedLon } from './layer-antimeridian.js';
+import { ATTRIBUTE_COMPONENTS, writeLayerVertexAt, type BatchAttribute, type LayerGround } from '@vibeglobe/core';
+import { wrappedLon } from './layer-antimeridian.js';
 import type { BatchContents } from './layer-contents.js';
 import type { LayerArrays } from './layer-geometry.js';
 
@@ -20,6 +20,10 @@ const DEFAULT_COLOR = Float64Array.of(1, 1, 1, 1);
 const DEG = Math.PI / 180;
 /** The feature's linear RGBA. */
 const rgba = new Float64Array(4);
+/** The anchor's longitude on the flat map's branch nearest the batch origin and its latitude, degrees. */
+const anchorDeg = new Float64Array(2);
+/** Meters of the plane center per degree of longitude (`originLonDeg`). */
+const DEG_PER_PLANE_METER = 180 / Math.PI / 6_378_137;
 
 /** The array an attribute's values come from: its uniform override, or the features' own values, or none. */
 function columnOf(batch: BatchContents, attribute: BatchAttribute): Float64Array | undefined {
@@ -35,7 +39,8 @@ function baseOf(batch: BatchContents, attribute: BatchAttribute, feature: number
  * Writes the four vertices of point `feature` into `arrays`, as `buildQuads` lays them out: the anchor on the ground
  * when there is one, the color in linear light with its opacity, the corners offset in pixels by the radius, anchor,
  * offset and rotation (a hidden point collapses to its anchor, transparent). Attribute values are read inline from the
- * typed arrays: a function returning a double boxes it where V8 does not inline it.
+ * typed arrays: a function returning a double boxes it where V8 does not inline it, and so does an optional read
+ * (`column?.[i] ?? d`, a union with undefined), so absent columns are tested first (KB-144).
  */
 export function writePointQuad(
   batch: BatchContents,
@@ -45,37 +50,42 @@ export function writePointQuad(
 ): void {
   const position = columnOf(batch, 'position');
   const p = baseOf(batch, 'position', feature);
-  const lonDeg = position?.[p] ?? 0;
-  const latDeg = position?.[p + 1] ?? 0;
-  let height = position?.[p + 2] ?? 0;
+  const lonDeg = position === undefined ? 0 : (position[p] ?? 0);
+  const latDeg = position === undefined ? 0 : (position[p + 1] ?? 0);
+  let height = position === undefined ? 0 : (position[p + 2] ?? 0);
   if (ground !== undefined) height += ground.heightAt(wrappedLon(lonDeg), latDeg);
   const visible = columnOf(batch, 'visible');
-  const shown = visible?.[baseOf(batch, 'visible', feature)] ?? 1;
+  const shown = visible === undefined ? 1 : (visible[baseOf(batch, 'visible', feature)] ?? 1);
   const opacity = columnOf(batch, 'opacity');
-  const alpha = (opacity?.[baseOf(batch, 'opacity', feature)] ?? 1) * shown;
+  const alpha = (opacity === undefined ? 1 : (opacity[baseOf(batch, 'opacity', feature)] ?? 1)) * shown;
   const color = columnOf(batch, 'color');
   const k = baseOf(batch, 'color', feature);
   for (let c = 0; c < 3; c++) {
-    const value = color?.[k + c] ?? DEFAULT_COLOR[c] ?? 1;
+    const value = color === undefined ? (DEFAULT_COLOR[c] ?? 1) : (color[k + c] ?? DEFAULT_COLOR[c] ?? 1);
     // Style colors are sRGB (CSS); the renderer blends in linear light.
     rgba[c] = shown > 0 ? (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) : 0;
   }
-  rgba[3] = shown > 0 ? (color?.[k + 3] ?? 1) * alpha : 0;
+  rgba[3] = shown > 0 ? (color === undefined ? 1 : (color[k + 3] ?? 1)) * alpha : 0;
   const size = columnOf(batch, 'sizePx');
-  const radius = shown > 0 ? (size?.[baseOf(batch, 'sizePx', feature)] ?? 8) : 0;
+  const radius = shown > 0 ? (size === undefined ? 8 : (size[baseOf(batch, 'sizePx', feature)] ?? 8)) : 0;
   const anchors = columnOf(batch, 'anchor');
-  const anchor = anchors?.[baseOf(batch, 'anchor', feature)] ?? 0;
+  const anchor = anchors === undefined ? 0 : (anchors[baseOf(batch, 'anchor', feature)] ?? 0);
   const offset = columnOf(batch, 'offsetPx');
   const o = baseOf(batch, 'offsetPx', feature);
-  const dx = (offset?.[o] ?? 0) + (ANCHOR_X[anchor] ?? 0) * radius;
-  const dy = -(offset?.[o + 1] ?? 0) + (ANCHOR_Y[anchor] ?? 0) * radius;
+  const dx = (offset === undefined ? 0 : (offset[o] ?? 0)) + (ANCHOR_X[anchor] ?? 0) * radius;
+  const dy = -(offset === undefined ? 0 : (offset[o + 1] ?? 0)) + (ANCHOR_Y[anchor] ?? 0) * radius;
   const rotation = columnOf(batch, 'rotationDeg');
-  const angle = -(rotation?.[baseOf(batch, 'rotationDeg', feature)] ?? 0) * DEG;
+  const angle = -(rotation === undefined ? 0 : (rotation[baseOf(batch, 'rotationDeg', feature)] ?? 0)) * DEG;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   // The four corners share the anchor's attributes: computed once, copied to the other three.
   const v0 = feature * 4;
-  writeLayerVertex(arrays, v0, nearestLon(lonDeg, originLonDeg(arrays.origin)), latDeg, arrays.origin);
+  // `nearestLon` and `originLonDeg` inline, and the position in an array: doubles passed to or returned by a call V8
+  // does not inline are boxed, about 100 bytes a point (KB-144).
+  const referenceDeg = (arrays.origin.planeCenter[0] ?? 0) * DEG_PER_PLANE_METER;
+  anchorDeg[0] = lonDeg + 360 * Math.round((referenceDeg - lonDeg) / 360);
+  anchorDeg[1] = latDeg;
+  writeLayerVertexAt(arrays, v0, anchorDeg, arrays.origin);
   for (let corner = 0; corner < 4; corner++) {
     const v = v0 + corner;
     if (corner > 0) {
@@ -94,7 +104,9 @@ export function writePointQuad(
     arrays.corners[v * 4 + 1] = shown > 0 ? dy + x * sin + y * cos : 0;
     arrays.corners[v * 4 + 2] = shown > 0 ? sx : 2;
     arrays.corners[v * 4 + 3] = shown > 0 ? sy : 2;
-    arrays.uvs[v * 2] = -1;
-    arrays.uvs[v * 2 + 1] = -1;
+    arrays.uvs[v * 4] = -1;
+    arrays.uvs[v * 4 + 1] = -1;
+    arrays.uvs[v * 4 + 2] = 0;
+    arrays.uvs[v * 4 + 3] = 0;
   }
 }

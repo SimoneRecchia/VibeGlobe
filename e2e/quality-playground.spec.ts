@@ -54,8 +54,10 @@ for (const backend of ['webgpu', 'webgl2'] as const)
       const drawn = await frames(page, 3);
       const expected = QUALITY_PRESETS[preset];
       const applied = await page.evaluate(() => window.vibeglobePlayground?.globe.qualitySettings);
+      // `fogAwareDetail` is no preset's: it keeps its default, on (F395).
       expect(applied, preset).toEqual({
         ...expected,
+        fogAwareDetail: true,
         anisotropy: expected.anisotropy === 'max' ? maxAnisotropy : Math.min(expected.anisotropy, maxAnisotropy),
       });
       // The drawing buffer follows the preset's resolution scale from the next frame; the camera kept moving.

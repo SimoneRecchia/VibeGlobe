@@ -39,6 +39,7 @@ import {
   type TextureNode,
 } from 'three/webgpu';
 import { makeMorphedEyeRelative } from './eye-relative.js';
+import type { ToneMatcher } from './tone-matching.js';
 import type { Atmosphere } from './atmosphere/atmosphere.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
@@ -63,6 +64,11 @@ export interface SurfaceDraw {
    * depth (terrain coarser than the tile's level, `TileDrawList.terrain.skirtMeters`).
    */
   readonly params: Vector4;
+  /**
+   * The tone gains of the draw's imagery (column 0, rgb) and of the imagery it fades from (column 1), 1 without tone
+   * matching (F249, ADR 0044).
+   */
+  readonly tones: Matrix4;
   /** The imagery of the two overlay slots (ADR 0038), drawn above the tile's own; unset where a slot is empty. */
   overlay0: Texture | undefined;
   overlay1: Texture | undefined;
@@ -111,6 +117,7 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     fromHeights: undefined,
     transforms: new Matrix4().set(1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
     params: new Vector4(15, 1, 1, 0),
+    tones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0),
     overlay0: undefined,
     overlay1: undefined,
     overlays: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -336,6 +343,7 @@ export function createSurfaceMaterial(
   const uv = mapUv(tileUv, column(transforms, 0), flag(params.x, 1));
   const fromUv = mapUv(tileUv, column(transforms, 1), flag(params.x, 2));
   const material = new MeshBasicNodeMaterial();
+  const tones = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.tones);
   const map = texture(placeholder, uv);
   // Textures of their own, as bindings are shared between nodes made from the same texture; tiny, so the bindings
   // cost no copy on the GPU. Every draw points them at real textures.
@@ -376,9 +384,10 @@ export function createSurfaceMaterial(
   // rasterizer the extra fetch costs about half a frame.
   const composeOverlays = overlaySlots(material, placeholder, tileUv);
   material.colorNode = Fn(() => {
-    const color = map.toVar();
+    // Each imagery with its source's tone gain (F249): 1 unless the layer matches its chain's tones.
+    const color = map.mul(vec4(column(tones, 0).xyz, 1)).toVar();
     If(fade.lessThan(1), () => {
-      color.assign(mix(fromMap.sqrt(), color.sqrt(), fade).pow2());
+      color.assign(mix(fromMap.mul(vec4(column(tones, 1).xyz, 1)).sqrt(), color.sqrt(), fade).pow2());
     });
     composeOverlays(color);
     return color;
@@ -403,9 +412,10 @@ export function applyDraw(
   draw: SurfaceDraw,
   draws: TileDrawList,
   i: number,
-  textures: { get(handle: number): Texture | undefined },
+  textures: { get(handle: number): Texture | undefined; readonly tones?: ToneMatcher },
   base: Texture,
 ): void {
+  textures.tones?.apply(draws, i, draw.tones.elements);
   const terrain = draws.terrain;
   draw.texture = textures.get(draws.textures[i] ?? -1) ?? base;
   draw.fromTexture = textures.get(draws.fromTextures[i] ?? -1) ?? base;

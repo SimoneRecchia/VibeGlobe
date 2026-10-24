@@ -203,3 +203,49 @@ test('the frame loop allocates nothing in steady-state motion and no GC pause ca
   expect(report.libraryBytesPerFrame).toBeLessThan(LIBRARY_BYTES_PER_FRAME);
   expect(longest, JSON.stringify(report)).toBeLessThan(MAX_GC_PAUSE_MS);
 });
+
+declare global {
+  interface Window {
+    /** `apps/playground/src/layers-live.ts`. */
+    vibeglobeLiveFeed?: { updates(): number; stop(): void };
+  }
+}
+
+test('a live feed of 10,000 updates a second on 100,000 points allocates nothing in the render loop (F378)', async ({
+  page,
+}) => {
+  test.setTimeout(330_000);
+  await openGlobe(page, 'backend=webgpu&scenario=live-feed&lon=6&lat=47&zoom=5');
+  await page.waitForFunction(() => window.vibeglobeLiveFeed !== undefined);
+  // The control of F064: an empty requestAnimationFrame callback, whose boxed timestamp V8 counts as the engine's too.
+  await page.evaluate(() => {
+    const control = (): void => {
+      requestAnimationFrame(control);
+    };
+    requestAnimationFrame(control);
+  });
+  // Warm-up, as F064: the rewrite path reaches the optimizing tier.
+  await page.waitForTimeout(120_000);
+  const session = await page.context().newCDPSession(page);
+  const updatesBefore = await page.evaluate(() => window.vibeglobeLiveFeed?.updates() ?? 0);
+  const allocations = await sampleAllocations(page, session, 40_000);
+  const updates = (await page.evaluate(() => window.vibeglobeLiveFeed?.updates() ?? 0)) - updatesBefore;
+  const engine = [...allocations.sites].filter(([site]) => ENGINE_SOURCE.test(site)).sort((a, b) => b[1] - a[1]);
+  const report = {
+    sampledFrames: allocations.frames,
+    updatesPerFrame: updates / Math.max(1, allocations.frames),
+    engineSites: engine.slice(0, 20),
+    engineBytesPerFrame: bytesPerFrame(allocations.sites, ENGINE_SOURCE, allocations.frames),
+    controlBytesPerFrame: bytesPerFrame(allocations.sites, /:control:/, allocations.frames),
+  };
+  await test.info().attach('allocations', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+  console.log(`[F378] ${JSON.stringify(report)}`);
+  expect(allocations.frames).toBeGreaterThan(100);
+  // The feed kept its rate: 10,000 updates a second.
+  expect(updates).toBeGreaterThan(9_000 * 40);
+  // The renderer rewrites every changed point each frame without allocating: under one byte per update (a boxed number
+  // is 16), counting everything the engine allocated. (At the few frames a second the software GPU draws 100,000 points
+  // at, the once-a-frame functions do not reach the optimizing tier in the warm-up; F064 checks them at its steady
+  // state.)
+  expect(report.engineBytesPerFrame / report.updatesPerFrame, JSON.stringify(report)).toBeLessThan(1);
+});

@@ -7,7 +7,7 @@ import { manyPointsLayer, pickLayers } from './layers-many.js';
 import { dragLayers, dragModels, selectLayers, selectModels } from './layers-select.js';
 import type { ModelLayer } from '@vibeglobe/layers/models';
 import { denseLabels } from './layers-dense.js';
-import { labelsLayer, styledLayers, zoomLayers } from './layers-styled.js';
+import { labelSizesLayer, labelsLayer, styledLayers, zoomLayers } from './layers-styled.js';
 import { markerImages } from './marker-images.js';
 import {
   createGlobeLayers,
@@ -398,6 +398,7 @@ export function showDataScenario(globe: Globe, name: string): void {
     'data-fit': () => fitLayers(globe),
     'data-zoom': zoomLayers,
     'data-antimeridian': antimeridianLayers,
+    'data-label-sizes': () => [labelSizesLayer()],
   };
   const single = DATA_SCENES[name];
   const added = single ? [single()] : (scenes[name]?.() ?? []);

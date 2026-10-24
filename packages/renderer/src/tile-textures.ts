@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { CompressedTileImage, DecodedTile, Ktx2Target } from '@vibeglobe/core';
+import { ToneMatcher } from './tone-matching.js';
 import {
   ClampToEdgeWrapping,
   CompressedTexture,
@@ -100,6 +101,9 @@ export class TileTextures {
   private bytes = 0;
   private compressed = 0;
 
+  /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
+  readonly tones = new ToneMatcher();
+
   constructor(private readonly anisotropy: () => number) {}
 
   /** Number of textures held. */
@@ -116,6 +120,9 @@ export class TileTextures {
   get gpuBytes(): number {
     return this.bytes;
   }
+
+  /** The decoded image under a handle, if any (tone matching measures it on first use, F249). */
+  readonly imageOf = (handle: number): unknown => this.entries[handle]?.tile.image;
 
   /** The texture under a handle, if any. */
   get(handle: number): Texture | undefined {
@@ -140,6 +147,7 @@ export class TileTextures {
     entry.texture.dispose();
     if (closeImage) (entry.tile.image as { close?: () => void }).close?.();
     this.entries[handle] = undefined;
+    this.tones.release(handle);
     this.count--;
     this.bytes -= entry.tile.gpuBytes;
     if (isCompressed(entry.tile.image)) this.compressed--;

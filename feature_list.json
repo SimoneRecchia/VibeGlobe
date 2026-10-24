@@ -3328,7 +3328,7 @@
         "Assert frame-difference analysis shows no visible jump when the active source switches",
         "Disable harmonization for the layer and assert the raw source colors are shown"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F250",
@@ -4777,7 +4777,7 @@
         "Zoom continuously while recording frames and verify text shows no blur steps or shimmer by frame differencing",
         "Verify glyphs are generated or loaded off the main thread and cached in an atlas"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F359",
@@ -5027,7 +5027,7 @@
         "Record frame times for 60 seconds while panning and zooming",
         "Verify p95 frame time is at most 16.7 ms on the reference desktop and the per-frame JavaScript heap allocation stays at zero in the render loop"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F379",

@@ -1,14 +1,18 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { geodeticToEcef } from '../geodesy/ecef.js';
-import { planeCenterOf, writeNormal, writePlane } from '../surface/surface-mesh.js';
+import { geodeticArrayToEcef, geodeticToEcef } from '../geodesy/ecef.js';
+import { planeCenterOf } from '../surface/surface-mesh.js';
 import type { LayerRenderTarget } from './layer-target.js';
 import type { ModelRenderer } from './models.js';
 import type { FrameView } from '../globe/types.js';
-import { morphPointInto } from '../view/morph.js';
+import { cappedMercatorInto, mercatorScaleInto, morphPointInto } from '../view/morph.js';
 
 const RAD = Math.PI / 180;
 const vertex = new Float64Array(3);
+const at = new Float64Array(2);
+const vertexGeodetic = new Float64Array(3);
+const mercator = new Float64Array(2);
+const scale = new Float64Array(2);
 
 /** Where a layer batch's vertices are measured from (ADR 0037): an ECEF origin and a plane center, both float64. */
 export interface LayerOrigin {
@@ -44,12 +48,41 @@ export function writeLayerVertex(
   latitudeDeg: number,
   origin: LayerOrigin,
 ): void {
-  const lonRad = longitudeDeg * RAD;
-  const latRad = latitudeDeg * RAD;
-  geodeticToEcef(lonRad, latRad, 0, vertex);
+  at[0] = longitudeDeg;
+  at[1] = latitudeDeg;
+  writeLayerVertexAt(out, index, at, origin);
+}
+
+/**
+ * {@link writeLayerVertex} with the position (longitude and latitude in degrees) read from `position[0..1]`: per-frame
+ * callers (a live feed's rewritten points, F378) pass doubles in arrays, never as call arguments, which V8 boxes where it
+ * does not inline the call (ADR 0018). Allocates nothing.
+ */
+export function writeLayerVertexAt(
+  out: LayerVertices,
+  index: number,
+  position: Float64Array,
+  origin: LayerOrigin,
+): void {
+  const lonRad = (position[0] ?? 0) * RAD;
+  const latRad = (position[1] ?? 0) * RAD;
+  vertexGeodetic[0] = lonRad;
+  vertexGeodetic[1] = latRad;
+  vertexGeodetic[2] = 0;
+  geodeticArrayToEcef(vertexGeodetic, vertex);
   for (let i = 0; i < 3; i++) out.positions[index * 3 + i] = (vertex[i] ?? 0) - (origin.originEcef[i] ?? 0);
-  writeNormal(out.normals, index, lonRad, latRad);
-  writePlane(out.planes, index, lonRad, latRad, 0, origin.planeCenter);
+  // The unit ellipsoid normal, and the capped Mercator offset with its scale k(φ) (`writeNormal`, `writePlane`).
+  const cosLat = Math.cos(latRad);
+  out.normals[index * 3] = cosLat * Math.cos(lonRad);
+  out.normals[index * 3 + 1] = cosLat * Math.sin(lonRad);
+  out.normals[index * 3 + 2] = Math.sin(latRad);
+  cappedMercatorInto(vertexGeodetic, mercator);
+  scale[0] = latRad;
+  mercatorScaleInto(scale);
+  out.planes[index * 4] = (mercator[0] ?? 0) - (origin.planeCenter[0] ?? 0);
+  out.planes[index * 4 + 1] = (mercator[1] ?? 0) - (origin.planeCenter[1] ?? 0);
+  out.planes[index * 4 + 2] = 0;
+  out.planes[index * 4 + 3] = scale[1] ?? 1;
 }
 
 /** A layer target whose every call also asks for a frame, so a change shows on the next frame (ADR 0037). */

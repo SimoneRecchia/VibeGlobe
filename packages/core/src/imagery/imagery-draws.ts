@@ -99,6 +99,8 @@ export function drawImagery(
       if (isOpaque(entry.entry)) {
         based = true;
         visible?.mark(drawn?.index ?? 0);
+        // Tone matching between the chain's sources (F249): which one this draw shows.
+        list.toneSources[index] = entry.entry.harmonize && entry.chain.length > 1 ? layer * 8 + chosen : -1;
         list.textures[index] = handle;
         list.geographic[index] = geographic;
         list.imageryLevels[index] = mapped(MAPPING_LEVEL);

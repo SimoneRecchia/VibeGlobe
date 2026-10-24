@@ -54,6 +54,7 @@ function stacked(chain: ImageryLayer[], look: Partial<StackEntry> = {}): StackLa
     transparent: false,
     opacity: 1,
     visible: true,
+    harmonize: true,
     blend: 'normal',
   };
   return { entry: { ...entry, ...look }, chain };

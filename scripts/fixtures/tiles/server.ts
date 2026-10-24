@@ -109,6 +109,7 @@ const PATTERNS: readonly string[] = [
   'levels',
   'border',
   'smooth',
+  'toned',
   'tiles',
   'stripes',
   'patches',

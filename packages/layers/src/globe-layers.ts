@@ -58,9 +58,12 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
   const element = options.element;
+  // The zoom of the last frame drawn, from the frame event (no camera state object a frame, F378); a change between
+  // frames is flushed at it, and the next frame steps at its own.
+  const frameZoom = Float64Array.of(globe.camera.zoom);
   const projector = {
     geoToScreen: globe.geoToScreen.bind(globe),
-    zoom: () => globe.camera.zoom,
+    zoom: () => frameZoom[0] ?? 0,
     ...(element ? { viewportPx: () => ({ widthPx: element.clientWidth, heightPx: element.clientHeight }) } : {}),
   };
   let inFrame = false;
@@ -75,10 +78,11 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
     if (detached || inFrame) return;
     step();
   };
-  const step = (): void => {
+  const step = (event?: { readonly zoom: number }): void => {
     inFrame = true;
+    if (event) frameZoom[0] = event.zoom;
     try {
-      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+      stack.frame({ nowMs: globe.timeMs, zoom: frameZoom[0] ?? 0, projector });
     } finally {
       inFrame = false;
     }

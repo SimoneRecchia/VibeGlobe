@@ -40,13 +40,13 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
+    "@types/three": "0.186.0",
     "@vibeglobe/core": "0.0.0",
     "@vibeglobe/models": "0.0.0",
     "earcut": "3.2.4",
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@types/three": "0.186.0",
     "@vibeglobe/sources": "0.0.0"
   }
 }

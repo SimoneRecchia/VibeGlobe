@@ -21,6 +21,8 @@ export class DrawLayer implements TileDrawLayer {
   seeded: Uint8Array;
   /** Skirt depth added to the mesh's own, meters (terrain shown from a coarser level than the tile's, M4 review). */
   skirtMeters: Float32Array;
+  /** The source of each draw's imagery for tone matching, `layer × 8 + chain index`, or -1 (F249). */
+  toneSources: Int16Array;
 
   constructor(capacity: number) {
     this.textures = new Int32Array(capacity);
@@ -33,6 +35,7 @@ export class DrawLayer implements TileDrawLayer {
     this.fades = new Float32Array(capacity);
     this.seeded = new Uint8Array(capacity);
     this.skirtMeters = new Float32Array(capacity);
+    this.toneSources = new Int16Array(capacity).fill(-1);
   }
 
   /** Draw `index` shows `texture` (with no fade yet) through the transform in `transform[0..3]`. */
@@ -101,6 +104,10 @@ export class DrawList implements TileDrawList {
   get textures(): Int32Array {
     return this.imagery.textures;
   }
+  /** The tone-matching source of each draw's imagery (F249). */
+  get toneSources(): Int16Array {
+    return this.imagery.toneSources;
+  }
   /** Imagery UV transforms, four per draw. */
   get uvTransforms(): Float32Array {
     return this.imagery.uvTransforms;
@@ -166,6 +173,7 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     list.textures[index] = BASE_TEXTURE;
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;
+    list.toneSources[index] = -1;
     list.fromTextures[index] = BASE_TEXTURE;
     list.fromGeographic[index] = 1;
     list.fades[index] = 1;

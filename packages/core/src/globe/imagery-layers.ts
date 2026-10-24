@@ -59,6 +59,7 @@ class ImageryLayersController implements ImageryLayers {
       opacity: entry.opacity,
       visible: entry.visible,
       blend: entry.blend,
+      harmonize: entry.harmonize,
       sources: entry.sources.map(sourceInfo),
     }));
   }

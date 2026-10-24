@@ -211,5 +211,11 @@ export {
   type LayerRenderTarget,
   type Placement,
 } from './layers/layer-target.js';
-export { layerOrigin, writeLayerVertex, type LayerOrigin, type LayerVertices } from './layers/layer-geometry.js';
+export {
+  layerOrigin,
+  writeLayerVertex,
+  writeLayerVertexAt,
+  type LayerOrigin,
+  type LayerVertices,
+} from './layers/layer-geometry.js';
 export type { ModelHandle, ModelOptions, ModelPose, ModelRenderer } from './layers/models.js';

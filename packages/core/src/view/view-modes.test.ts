@@ -244,6 +244,28 @@ describe('temporary tilt clamps (F165, F166)', () => {
     view.applyTilt(camera, 2, mountain);
     expect(camera.pose.tiltRad / DEG).toBeCloseTo(55, 9);
   });
+
+  it('holds the tilt a limit lowered when even a vertical view stops clearing, instead of jumping back up (KB-153)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.chooseTilt(55 * DEG);
+    const camera = new Camera();
+    camera.widthPx = 320;
+    camera.heightPx = 240;
+    camera.pose.rangeMeters = 2000;
+    camera.update();
+    // A slope whose ground rises under the eye as the view tilts: the limit holds the tilt below the wanted 55°.
+    const slope = {
+      probeGround: (c: Camera): void =>
+        void (c.groundHeightMeters = c.eyeGeodetic.heightMeters - 1000 + 1500 * Math.sin(c.pose.tiltRad)),
+    };
+    view.applyTilt(camera, 2, slope);
+    const limited = camera.pose.tiltRad / DEG;
+    expect(limited).toBeLessThan(54);
+    // Then the ground rises above even a vertical view's eye.
+    const above = { probeGround: (c: Camera): void => void (c.groundHeightMeters = c.eyeGeodetic.heightMeters + 50) };
+    view.applyTilt(camera, 2, above);
+    expect(camera.pose.tiltRad / DEG).toBeCloseTo(limited, 6);
+  });
 });
 
 describe('view regressions of the M5 review', () => {

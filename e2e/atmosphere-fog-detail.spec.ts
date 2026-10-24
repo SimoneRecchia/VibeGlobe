@@ -56,7 +56,9 @@ for (const backend of ['webgpu', 'webgl2'] as const)
   test(`fog-aware detail requests at least 25% fewer tiles in a tilted flight, with no visible difference in the fogged band, on ${backend} (F395)`, async ({
     page,
   }) => {
-    test.setTimeout(180_000);
+    // Two full flights at four times the haze: about 80 s each here, over 90 s each in CI's software GPU, where 180 s
+    // timed out (a timeout is not the failure `test.fail` expects).
+    test.setTimeout(420_000);
     // KB-163: 7–13% fewer requests so far, at the default haze and at four times it.
     test.fail(true, 'KB-163');
     const aware = await fly(page, backend, true, HAZE);

@@ -118,7 +118,13 @@ function compileProperty(
     : Array.isArray(value) && !isExpression(value)
       ? ['literal', value]
       : value;
-  const compiled = createPropertyExpression(input, name, spec);
+  let compiled: ReturnType<typeof createPropertyExpression>;
+  try {
+    compiled = createPropertyExpression(input, name, spec);
+  } catch (error) {
+    // The style-spec throws for some malformed input (an operator named "__proto__", TG-03): a problem, never a throw.
+    return { problem: `invalid expression: ${error instanceof Error ? error.message : String(error)}` };
+  }
   if (compiled.result === 'error') return { problem: compiled.value.map((e) => `${e.key} ${e.message}`).join('; ') };
   return { expression: compiled.value as unknown as Compiled };
 }

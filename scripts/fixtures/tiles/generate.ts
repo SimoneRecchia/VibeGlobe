@@ -13,6 +13,7 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * `tiles` alternating colors per tile parity, contrasting at every tile edge (F106); `stripes` one-texel dark and
  * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
  * `holes` the `world` colors with every other `checker` cell transparent (F242); `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
+ * `toned` the `smooth` field darker and warmer, scaled by {@link TONE_SCALE}, a source of another tone (F249);
  * `red`, `green`, `blue` and `shade` one color everywhere ({@link SOLID_COLORS}).
  */
 export type FixturePattern =
@@ -20,6 +21,7 @@ export type FixturePattern =
   | 'levels'
   | 'border'
   | 'smooth'
+  | 'toned'
   | 'tiles'
   | 'stripes'
   | 'patches'
@@ -37,6 +39,18 @@ export const SOLID_COLORS: Readonly<Record<string, readonly [number, number, num
   blue: [60, 60, 220],
   shade: [128, 128, 128],
 };
+
+/** The per-channel scale of the `toned` pattern over `smooth`: another brightness and color balance (F249). */
+export const TONE_SCALE: readonly [number, number, number] = [0.7, 0.85, 1.05];
+
+/** A color of the `smooth` field in the `toned` pattern's tone. */
+function toned(color: readonly [number, number, number]): [number, number, number] {
+  return [
+    Math.max(MIN_CHANNEL, Math.round(color[0] * TONE_SCALE[0])),
+    Math.max(MIN_CHANNEL, Math.round(color[1] * TONE_SCALE[1])),
+    Math.max(MIN_CHANNEL, Math.round(color[2] * TONE_SCALE[2])),
+  ];
+}
 
 /** A tile request. */
 export interface FixtureTile {
@@ -137,9 +151,10 @@ export function renderTile(tile: FixtureTile): Uint8Array {
         } else color = dark ? [60, 70, 90] : [230, 220, 200];
       } else if (tile.pattern === 'patches') {
         color = [...(PATCH_COLORS[(tile.x + 3 * tile.y) % PATCH_COLORS.length] ?? [128, 128, 128])];
-      } else if (tile.pattern === 'smooth') {
+      } else if (tile.pattern === 'smooth' || tile.pattern === 'toned') {
         const { lonRad, latRad } = fixturePosition(tile, u, v);
         color = worldColor(lonRad, latRad);
+        if (tile.pattern === 'toned') color = toned(color);
       } else {
         const { lonRad, latRad } = fixturePosition(tile, u, v);
         color = worldColor(lonRad, latRad);

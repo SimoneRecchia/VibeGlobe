@@ -89,6 +89,13 @@ export class Constraints {
     view?.setMaxTilt(this.maxTiltRad);
   }
 
+  /** Whether a minimum or maximum zoom is set. */
+  get zoomLimited(): boolean {
+    const min = this.values[MIN_ZOOM] ?? Number.NaN;
+    const max = this.values[MAX_ZOOM] ?? Number.NaN;
+    return min === min || max === max;
+  }
+
   /** The maximum tilt in radians, NaN when unconstrained: the view state caps applied and chosen tilts with it. */
   get maxTiltRad(): number {
     return this.values[MAX_TILT] ?? Number.NaN;

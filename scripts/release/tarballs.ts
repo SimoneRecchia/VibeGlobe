@@ -13,6 +13,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { ALLOWED_LICENSES, FONT_LICENSES } from '../licenses.ts';
 import { ROOT_DIR, importSpecifiers, readWorkspace } from '../workspace.ts';
 
 /** Where the release scripts write tarballs and consumer projects (ignored by git). */
@@ -174,4 +175,52 @@ export function installedEnginePackages(projectDir: string): string[] {
         .map((name) => `@vibeglobe/${name}`)
         .sort()
     : [];
+}
+
+/** A non-code file shipped in a package (scripts/release/assets.json, F519). */
+export interface BundledAsset {
+  package: string;
+  /** Path inside the package; `*` matches within one path segment. */
+  path: string;
+  source: string;
+  license: string;
+  /** The text THIRD_PARTY_NOTICES.md carries for a third-party asset. */
+  notice?: string;
+}
+
+/** Licenses a shipped asset may have: the code licenses, OFL for fonts, public-domain data and the project's own. */
+const ASSET_LICENSES = [
+  ...ALLOWED_LICENSES,
+  'Public domain',
+  'CC0-1.0',
+  'PolyForm-Noncommercial-1.0.0',
+  'License text',
+];
+const CODE_FILE = /\.(js|mjs|d\.ts|d\.mts|map|ts|vue)$|(^|\/)(package\.json|LICENSE\.md|README\.md)$/;
+
+function matches(pattern: string, path: string): boolean {
+  const regex = new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`);
+  return regex.test(path);
+}
+
+/** Problems of the non-code files of one extracted package against the asset records and the notices (F519). */
+export function assetProblems(name: string, root: string, assets: readonly BundledAsset[], notices: string): string[] {
+  const problems: string[] = [];
+  for (const file of listFiles(root).map((path) => relative(root, path).split(sep).join('/'))) {
+    if (CODE_FILE.test(file)) continue;
+    const asset = assets.find((candidate) => candidate.package === name && matches(candidate.path, file));
+    if (!asset) {
+      problems.push(`${file}: a shipped asset with no record in scripts/release/assets.json`);
+      continue;
+    }
+    const font = /\.(woff2?|ttf|otf|pbf)$/.test(file);
+    const permitted = asset.license
+      .split(' AND ')
+      .every((license) => ASSET_LICENSES.includes(license) || (font && FONT_LICENSES.includes(license)));
+    if (!permitted) problems.push(`${file}: license ${asset.license} is not permitted`);
+    const thirdParty = asset.source !== 'VibeGlobe' && asset.license !== 'License text';
+    if (thirdParty && (asset.notice === undefined || !notices.includes(asset.notice)))
+      problems.push(`${file}: missing from THIRD_PARTY_NOTICES.md`);
+  }
+  return problems;
 }

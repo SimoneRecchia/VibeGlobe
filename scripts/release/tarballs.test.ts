@@ -2,7 +2,7 @@ import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
-import { freshDir, inspectPackage } from './tarballs.ts';
+import { assetProblems, freshDir, inspectPackage } from './tarballs.ts';
 
 function fakePackage(files: Record<string, string>): string {
   const root = freshDir('inspect');
@@ -48,6 +48,58 @@ describe('inspectPackage (F530)', () => {
       'dist/index.js: CommonJS, not ESM',
       'dist/index.js: imports ../../core/src/x.js, outside the package',
       'dist/index.js.map: source ../src/index.ts is not in the tarball',
+    ]);
+  });
+});
+
+describe('assetProblems (F519)', () => {
+  const assets = [
+    {
+      package: '@vibeglobe/tools',
+      path: 'configs/*.json',
+      source: 'VibeGlobe',
+      license: 'PolyForm-Noncommercial-1.0.0',
+    },
+    {
+      package: '@vibeglobe/tools',
+      path: 'data/outline.geojson',
+      source: 'Natural Earth',
+      license: 'Public domain',
+      notice: 'Made with Natural Earth.',
+    },
+    {
+      package: '@vibeglobe/tools',
+      path: 'fonts/*.woff2',
+      source: 'A foundry',
+      license: 'OFL-1.1',
+      notice: 'Font notice',
+    },
+    {
+      package: '@vibeglobe/tools',
+      path: 'data/tiles.pmtiles',
+      source: 'Someone',
+      license: 'CC-BY-NC-4.0',
+      notice: 'x',
+    },
+  ];
+
+  it('accepts recorded, permissively licensed assets that are in the notices, and ignores code', () => {
+    const root = fakePackage({
+      'dist/index.js': '',
+      'configs/world.json': '{}',
+      'data/outline.geojson': '{}',
+      'fonts/sans.woff2': '',
+    });
+    expect(assetProblems('@vibeglobe/tools', root, assets, 'Made with Natural Earth.\nFont notice')).toEqual([]);
+  });
+
+  it('reports unrecorded assets, licenses that are not permitted and assets missing from the notices', () => {
+    const root = fakePackage({ 'data/outline.geojson': '{}', 'data/tiles.pmtiles': '', 'icons/pin.svg': '' });
+    expect(assetProblems('@vibeglobe/tools', root, assets, '').sort()).toEqual([
+      'data/outline.geojson: missing from THIRD_PARTY_NOTICES.md',
+      'data/tiles.pmtiles: license CC-BY-NC-4.0 is not permitted',
+      'data/tiles.pmtiles: missing from THIRD_PARTY_NOTICES.md',
+      'icons/pin.svg: a shipped asset with no record in scripts/release/assets.json',
     ]);
   });
 });

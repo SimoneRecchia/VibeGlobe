@@ -68,6 +68,12 @@ function buildExample(
   return project;
 }
 
+/** Removes a built project, unless VIBEGLOBE_RELEASE_KEEP=1 asks to keep it for debugging. */
+function removeProject(project: string): void {
+  if (process.env['VIBEGLOBE_RELEASE_KEEP'] === '1') console.log(`kept ${project}`);
+  else rmSync(project, { recursive: true, force: true });
+}
+
 async function launch(): Promise<Browser> {
   const executablePath = process.env['VIBEGLOBE_CHROMIUM_PATH'];
   return chromium.launch({ args: gpuArgs(), ...(executablePath ? { executablePath } : { channel: 'chromium' }) });
@@ -349,7 +355,7 @@ try {
       await checkCustomAssetUrls(browser, project, `F531 ${label}`);
       checkNoEval(join(project, 'dist'), `F531 ${label}`);
     }
-    rmSync(project, { recursive: true, force: true });
+    removeProject(project);
   }
   if (entries.has('F531') && registryVersion === undefined) {
     const project = buildExample('nuxt-globe', ['@vibeglobe/vue', '@vibeglobe/sources'], { packed });
@@ -369,7 +375,7 @@ try {
     await page.close();
     await site.close();
     checkNoEval(join(project, '.output/public'), 'F531 nuxt');
-    rmSync(project, { recursive: true, force: true });
+    removeProject(project);
   }
   if (entries.has('F503')) {
     const engine = ['core', 'renderer', 'sources', 'worker', 'layers', 'ui', 'offline'].map(
@@ -379,7 +385,7 @@ try {
     const site = await serveSite(join(project, 'dist'));
     await checkLazyModules(browser, project, site);
     await site.close();
-    rmSync(project, { recursive: true, force: true });
+    removeProject(project);
   }
 } finally {
   await browser.close();

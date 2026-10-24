@@ -1,0 +1,47 @@
+[
+  {
+    "package": "@vibeglobe/tools",
+    "path": "configs/regions/italy.geojson",
+    "description": "Italy's outline for the italy-high build area",
+    "source": "Natural Earth 1:50m admin-0 countries, https://www.naturalearthdata.com/",
+    "license": "Public domain",
+    "notice": "Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com."
+  },
+  {
+    "package": "@vibeglobe/tools",
+    "path": "configs/*.json",
+    "description": "The pipeline's dataset configurations and their pinned source lists, written for this project",
+    "source": "VibeGlobe",
+    "license": "PolyForm-Noncommercial-1.0.0"
+  },
+  {
+    "package": "@vibeglobe/worker",
+    "path": "wasm/vibeglobe-basis.wasm",
+    "description": "KTX2 transcoder compiled to WebAssembly",
+    "source": "packages/worker/wasm/third-party.json (Basis Universal transcoder, Zstandard decoder)",
+    "license": "Apache-2.0 AND BSD-3-Clause",
+    "notice": "Compiled into `@vibeglobe/worker`'s `vibeglobe-basis.wasm`"
+  },
+  {
+    "package": "@vibeglobe/worker",
+    "path": "wasm/meshopt-decoder.wasm",
+    "description": "meshoptimizer's decoder, extracted from its npm package",
+    "source": "packages/worker/wasm/third-party.json (meshoptimizer decoder)",
+    "license": "MIT",
+    "notice": "Compiled into `@vibeglobe/worker`'s `meshopt-decoder.wasm`"
+  },
+  {
+    "package": "@vibeglobe/worker",
+    "path": "wasm/licenses/*.txt",
+    "description": "The license texts of the compiled components",
+    "source": "the components' repositories",
+    "license": "License text"
+  },
+  {
+    "package": "@vibeglobe/worker",
+    "path": "wasm/third-party.json",
+    "description": "The record of the compiled components",
+    "source": "VibeGlobe",
+    "license": "PolyForm-Noncommercial-1.0.0"
+  }
+]

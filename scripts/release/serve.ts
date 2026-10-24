@@ -64,11 +64,14 @@ function sendFile(root: string, pathname: string, res: ServerResponse, pagePolic
 }
 
 function forward(target: string, path: string, req: IncomingMessage, res: ServerResponse): void {
-  const upstream = request(new URL(path, target), { method: req.method, headers: req.headers }, (answer) => {
+  // A fresh connection per request: a kept-alive socket the other server closes as idle would reset a request sent on
+  // it in the same moment, and the browser would see the response aborted.
+  const options = { method: req.method, headers: { ...req.headers, connection: 'close' }, agent: false };
+  const upstream = request(new URL(path, target), options, (answer) => {
     res.writeHead(answer.statusCode ?? 502, answer.headers);
     answer.pipe(res);
   });
-  upstream.on('error', () => res.writeHead(502).end());
+  upstream.on('error', () => (res.headersSent ? res.destroy() : res.writeHead(502).end()));
   req.pipe(upstream);
 }
 

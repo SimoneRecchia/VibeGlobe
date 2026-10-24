@@ -24,6 +24,8 @@
     "!dist/tsconfig.tsbuildinfo",
     "!src/**/*.test.ts",
     "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
     "wasm/vibeglobe-basis.wasm",
     "wasm/meshopt-decoder.wasm",
     "wasm/licenses",

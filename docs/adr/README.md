@@ -60,3 +60,4 @@ Conventions:
 | [0133](0133-raster-like-vector-layers.md)            | Raster, hillshade and heatmap layers as textured tile squares; fill and line extras                         | Accepted (decided by agent; owner may revisit)                    |
 | [0141](0141-3d-tiles-render-extension.md)            | 3D Tiles drawn by a render extension: per-tile rigid placement, a relative depth pull and Google sessions   | Accepted (decided by agent; owner may revisit)                    |
 | [0151](0151-network-simulation-suite.md)             | Network simulation suite: links as fault rules plus browser interception, frames checked in the page        | Accepted (decided by agent; owner may revisit)                    |
+| [0171](0171-packaging-and-release.md)                | Packaging and release: checked tarballs, consumer projects, a dry-run release and an approved CI publish    | Accepted (decided by agent; owner may revisit)                    |

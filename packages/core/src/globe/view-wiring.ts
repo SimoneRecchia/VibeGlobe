@@ -37,6 +37,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     requestRender: () => globe.requestRender(),
     userInput: (cause) => movements.userInput(cause),
     timeMs: () => globe.clock.timeMs,
+    timeInto: (out) => globe.clock.timeInto(out),
     limitZoom: (deltaZoom) => globe.constraints.limitZoomDelta(globe.cam, deltaZoom),
     interruptMovement: () => movements.interrupt(),
   });

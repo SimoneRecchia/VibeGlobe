@@ -23,6 +23,8 @@ export interface ViewHost {
   userInput(cause: 'user' | 'inertia'): void;
   /** The engine clock's time, milliseconds. */
   timeMs(): number;
+  /** Writes the engine clock's time to `out[0]` (F064). */
+  timeInto(out: Float64Array): void;
   /** The part of a zoom step the zoom limits allow (KB-126). */
   limitZoom(deltaZoom: number): number;
   /** Stops a running API movement (KB-127). */
@@ -80,6 +82,7 @@ export class ViewControl {
       get timeMs() {
         return host.timeMs();
       },
+      timeInto: (out) => host.timeInto(out),
       get headingDeg() {
         return host.cam.pose.headingRad / RAD;
       },

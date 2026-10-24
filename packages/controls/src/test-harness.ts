@@ -107,6 +107,9 @@ export class FlatCamera {
       get timeMs() {
         return camera.timeMs;
       },
+      timeInto: (out: Float64Array) => {
+        out[0] = camera.timeMs;
+      },
       get coasting() {
         return camera.coasting;
       },

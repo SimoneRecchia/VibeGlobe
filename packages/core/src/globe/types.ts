@@ -274,6 +274,8 @@ export interface NavigationApi {
   coasting: boolean;
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
   readonly timeMs: number;
+  /** Writes {@link NavigationApi.timeMs} to `out[0]`: per-frame code reads it without a returned double (F064). */
+  timeInto(out: Float64Array): void;
   /** The applied heading and tilt, degrees. */
   readonly headingDeg: number;
   readonly tiltDeg: number;

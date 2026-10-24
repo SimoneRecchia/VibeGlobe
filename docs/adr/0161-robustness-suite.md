@@ -20,6 +20,8 @@ Option 2. Specs of open engine bugs are separate files named `*.bug.ts` under `e
 
 Two engine limits shape the scenarios: the recovery limit of ADR 0010 §8 (at most 3 recoveries within 60 s) spaces F512's 50 losses at 3 a minute, and the page-wide worker pool, which never shrinks while an engine holds it (ADR 0011), makes "workers back to baseline" mean none left once every engine on the page is destroyed.
 
+Headless Chromium cannot produce three conditions the entries name, so the specs simulate them as the browser drives them, at the engine's own inputs: a hidden tab (another tab in front leaves the page visible; `document.visibilityState` is overridden and the page's clock, which the engine reads through `performance.now`, jumps by the hidden minutes), the page lifecycle (CDP `Page.setWebLifecycleState` has no effect; the spec dispatches hidden, `freeze`, `resume`, visible, with the network down and up through `context.setOffline`), and a pixel-ratio change (CDP emulation updates `devicePixelRatio` and the media queries' results but dispatches no `change` event; the spec dispatches it on the page's media query lists). The real-device steps stay in `docs/hardening-backlog.md`.
+
 ## Consequences
 
 Full-length runs are long (F517's 1000 cycles, F512's 17 minutes of losses per backend): they run in CI's end-to-end jobs, and development runs use a scale of 0.1. Steps that need real devices or hours of runtime stay `failing` and are listed in `docs/hardening-backlog.md`.

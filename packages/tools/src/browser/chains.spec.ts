@@ -8,9 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import { PNG } from 'pngjs';
-import type { createManifest as CreateManifest } from '@vibeglobe/offline';
 import { runBuild } from '../pipeline/build.js';
-import { openHarness, servePackages, startHarness, viewAt } from '../../../../e2e/support/offline.ts';
 
 const CONFIGS = join(import.meta.dirname, '../../configs');
 const SAMPLES =
@@ -190,49 +188,58 @@ for (const backend of ['webgpu', 'webgl2'] as const)
 /** Globe to street over the Italian sample (F554): the views, from the whole globe down to the Italy sample's z14. */
 const GLOBE_TO_STREET = [2, 5, 8, 11, 14] as const;
 
-/** Installs the three sample packages for one source in the offline harness, offline only, and restarts its globe. */
+/** The offline harness page (e2e/support/offline.html), served by the playground's dev server. */
+const REPO = `/@fs${join(import.meta.dirname, '../../../..')}`;
+const HARNESS = `${REPO}/e2e/support/offline.html`;
+
+/** The harness's global, as far as these tests use it. */
+interface OfflineHarness {
+  start(config: object): Promise<void>;
+  restartGlobe(): Promise<void>;
+  manager?: { install(request: object): Promise<{ id: string } | undefined> };
+  served: { tier: string; coord: { level: number } }[];
+}
+
+/**
+ * Installs the three sample packages for one source in the offline harness, offline only (every tile from the
+ * packages, the pinned base image elsewhere), and restarts its globe.
+ */
 async function installSamplePackages(page: Page, backend: 'webgpu' | 'webgl2'): Promise<void> {
   const packages = [
-    {
-      id: 'fallback',
-      file: join(SAMPLES, 'world-low-sample', 'output', 'fallback.pmtiles'),
-      dataset: output('world-low', 'fallback'),
-    },
-    {
-      id: 'world',
-      file: join(SAMPLES, 'world-low-sample', 'output', 'imagery.pmtiles'),
-      dataset: output('world-low', 'imagery'),
-    },
-    {
-      id: 'italy',
-      file: join(SAMPLES, 'italy-high-sample', 'output', 'imagery.pmtiles'),
-      dataset: output('italy-high', 'imagery'),
-    },
-  ].map((p) => {
-    const metadata = JSON.parse(readFileSync(join(p.dataset, 'metadata.json'), 'utf8')) as {
+    ['fallback', 'world-low', 'fallback'],
+    ['world', 'world-low', 'imagery'],
+    ['italy', 'italy-high', 'imagery'],
+  ].map(([id = '', config = '', dataset = '']) => ({
+    id,
+    file: join(SAMPLES, `${config}-sample`, 'output', `${dataset}.pmtiles`),
+    metadata: JSON.parse(readFileSync(join(output(config, dataset), 'metadata.json'), 'utf8')) as {
       minzoom: number;
       maxzoom: number;
       bounds: [number, number, number, number];
       license: string;
       attribution: string;
-    };
-    return { id: p.id, bytes: readFileSync(p.file), metadata };
+    },
+  }));
+  await page.route('**/offline-fixtures/samples/*.pmtiles', async (route) => {
+    const id = /samples\/(\w+)\.pmtiles$/.exec(route.request().url())?.[1];
+    const p = packages.find((candidate) => candidate.id === id);
+    if (!p) return route.fulfill({ status: 404 });
+    return route.fulfill({ status: 200, contentType: 'application/octet-stream', body: readFileSync(p.file) });
   });
-  const server = await servePackages(page);
-  for (const p of packages) server.files.set(`samples/${p.id}.pmtiles`, p.bytes);
-  await openHarness(page);
-  await startHarness(page, {
+  await page.goto(HARNESS);
+  await page.waitForFunction(() => (globalThis as { offlineHarness?: unknown }).offlineHarness !== undefined);
+  const config = {
     network: 'offline',
     backend,
-    // Offline only: every tile comes from the packages, the pinned base image elsewhere.
     sources: [{ id: 'imagery', url: 'https://tiles.example.test/{z}/{x}/{y}.jpg', maxLevel: 14 }],
     view: { longitudeDeg: EDGE_DEG + 0.02, latitudeDeg: LAT_DEG, zoom: 2 },
-  });
+  };
   const installed = await page.evaluate(
-    async (list) => {
-      const repo = location.pathname.replace(/\/e2e\/support\/[^/]*$/, '');
+    async ([c, list, repo]) => {
+      const harness = (globalThis as unknown as { offlineHarness: OfflineHarness }).offlineHarness;
+      await harness.start(c);
       const { createManifest } = (await import(/* @vite-ignore */ `${repo}/packages/offline/src/index.ts`)) as {
-        createManifest: typeof CreateManifest;
+        createManifest(options: object): Promise<object>;
       };
       const ids: (string | undefined)[] = [];
       for (const p of list) {
@@ -255,14 +262,27 @@ async function installSamplePackages(page: Page, backend: 'webgpu' | 'webgl2'): 
           ],
           files: [{ path, format: 'pmtiles', data }],
         });
-        ids.push((await window.offlineHarness?.manager?.install({ manifest, files: { [path]: data } }))?.id);
+        ids.push((await harness.manager?.install({ manifest, files: { [path]: data } }))?.id);
       }
+      await harness.restartGlobe();
       return ids;
     },
-    packages.map((p) => ({ id: p.id, metadata: p.metadata })),
+    [config, packages.map((p) => ({ id: p.id, metadata: p.metadata })), REPO] as const,
   );
   expect(installed).toEqual(['fallback', 'world', 'italy']);
-  await page.evaluate(() => window.offlineHarness?.restartGlobe());
+}
+
+/** Moves the harness's camera and returns the frame once its tiles are in. */
+async function harnessViewAt(page: Page, zoom: number): Promise<PNG> {
+  await page.evaluate(
+    (view) =>
+      (
+        globalThis as unknown as { vibeglobePlayground: { globe: { jumpTo(view: object): void } } }
+      ).vibeglobePlayground.globe.jumpTo(view),
+    { longitudeDeg: EDGE_DEG + 0.02, latitudeDeg: LAT_DEG, zoom },
+  );
+  await settle(page);
+  return frame(page);
 }
 
 for (const backend of ['webgpu', 'webgl2'] as const)
@@ -286,9 +306,12 @@ for (const backend of ['webgpu', 'webgl2'] as const)
     await page.unrouteAll();
     await installSamplePackages(page, backend);
     for (const zoom of GLOBE_TO_STREET)
-      expect(await viewAt(page, EDGE_DEG + 0.02, LAT_DEG, zoom), `packages, zoom ${String(zoom)}`).toBe(0);
+      expect(holes(await harnessViewAt(page, zoom)), `packages, zoom ${String(zoom)}`).toBe(0);
     const fromPackages = await page.evaluate(
-      () => (window.offlineHarness?.served ?? []).filter((e) => e.tier === 'package' && e.coord.level === 14).length,
+      () =>
+        (globalThis as unknown as { offlineHarness: OfflineHarness }).offlineHarness.served.filter(
+          (e) => e.tier === 'package' && e.coord.level === 14,
+        ).length,
     );
     expect(fromPackages, 'z14 tiles from the Italy package').toBeGreaterThan(0);
   });

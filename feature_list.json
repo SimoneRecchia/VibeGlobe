@@ -5977,7 +5977,7 @@
         "Assert bridges draw above the roads they cross and tunnels draw below or dashed as styled",
         "Assert road-name labels appear along the roads at street zoom"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F454",

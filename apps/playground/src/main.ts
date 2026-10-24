@@ -314,6 +314,8 @@ function startGlobe(
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
+    // `?logLevel=debug` logs every tile request the engine starts (F574's request record).
+    ...(params.get('logLevel') === 'debug' ? { logLevel: 'debug' as const } : {}),
     // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
     ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
     // `?curves=` sets the Auto mode's zoom curves as JSON (F150).

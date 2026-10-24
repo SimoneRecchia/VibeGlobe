@@ -40,6 +40,7 @@ interface Manifest {
   private?: boolean;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 /** Sets `version` on a published package and pins its engine dependencies to the same version. */
@@ -49,11 +50,14 @@ export function bumpManifest(manifest: Manifest, version: string): Manifest {
     Object.fromEntries(Object.entries(deps).map(([name, range]) => [name, name.startsWith(SCOPE) ? version : range]));
   const dependencies = pin(manifest.dependencies);
   const peerDependencies = pin(manifest.peerDependencies);
+  // Development dependencies on engine packages too, or npm would look for the old version in the registry.
+  const devDependencies = pin(manifest.devDependencies);
   return {
     ...manifest,
     version,
     ...(dependencies ? { dependencies } : {}),
     ...(peerDependencies ? { peerDependencies } : {}),
+    ...(devDependencies ? { devDependencies } : {}),
   };
 }
 

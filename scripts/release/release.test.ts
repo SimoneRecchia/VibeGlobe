@@ -72,10 +72,12 @@ describe('release (F558)', () => {
 
   it('gives every package the version, pins engine dependencies, and orders dependencies first', () => {
     const renderer = {
+      devDependencies: { '@vibeglobe/sources': '0.0.0' },
       name: '@vibeglobe/renderer',
       version: '0.0.0',
       dependencies: { '@vibeglobe/core': '0.0.0', three: '0.186.1' },
     };
+    expect(bumpManifest(renderer, '1.0.0-rc.1').devDependencies).toEqual({ '@vibeglobe/sources': '1.0.0-rc.1' });
     expect(bumpManifest(renderer, '1.0.0-rc.1').dependencies).toEqual({
       '@vibeglobe/core': '1.0.0-rc.1',
       three: '0.186.1',

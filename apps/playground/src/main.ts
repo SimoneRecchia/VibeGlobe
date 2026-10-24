@@ -206,7 +206,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
   const chain = chainSources(params, base, session, imageryTiling, ITALY);
-  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
+  // `?harmonize=0` shows the chain's sources in their own colors (F249).
+  const harmonize = params.get('harmonize') !== '0';
+  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain], harmonize } : source;
   // `?utm=32632,32633` adds fixture rasters served in those UTM zones, reprojected on the client (F226).
   const utm = reprojected?.utmLayers(params, base, session) ?? [];
   return { imagery: [layer, ...utm, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };

@@ -16,9 +16,11 @@
     "@vibeglobe/custom-layer-example": "*",
     "@vibeglobe/gis": "*",
     "@vibeglobe/layers": "*",
+    "@vibeglobe/models": "*",
     "@vibeglobe/renderer": "*",
     "@vibeglobe/sources": "*",
     "@vibeglobe/ui": "*",
-    "@vibeglobe/worker": "*"
+    "@vibeglobe/worker": "*",
+    "draco3d": "1.5.9"
   }
 }

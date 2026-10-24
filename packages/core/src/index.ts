@@ -22,6 +22,7 @@ export { createGlobe } from './globe/create-globe.js';
 export { surfaceVisibility } from './surface/fog.js';
 export type { FogRay } from './surface/fog.js';
 export { GlobeError } from './globe/errors.js';
+export { refuseDisplayOnly } from './globe/display-only.js';
 export type { GlobeErrorCode } from './globe/errors.js';
 export type {
   AntialiasMode,

@@ -26,7 +26,6 @@
     {
       "path": "../../packages/layers"
     },
-
     {
       "path": "../../packages/gis"
     },
@@ -35,6 +34,9 @@
     },
     {
       "path": "../../packages/worker"
+    },
+    {
+      "path": "../../packages/models"
     }
   ]
 }

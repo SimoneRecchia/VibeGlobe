@@ -158,7 +158,8 @@ export class SymbolFader {
     for (const id of placed) if (!this.opacity.has(id)) this.opacity.set(id, 0);
     for (const [id, value] of this.opacity) {
       const target = placed.has(id) ? 1 : 0;
-      const next = value < target ? Math.min(1, value + step) : Math.max(0, value - step);
+      // A label at its target stays there (TD-01: a shown label was faded down every other frame).
+      const next = value < target ? Math.min(target, value + step) : Math.max(target, value - step);
       if (next === 0 && target === 0) this.opacity.delete(id);
       else this.opacity.set(id, next);
     }

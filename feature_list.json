@@ -5821,7 +5821,7 @@
         "Assert by frame differencing that vector features do not jump or slide during the morph",
         "Capture the same area in the globe, 2D and 3D phases and assert colors, line widths and feature presence match within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F442",
@@ -5834,7 +5834,7 @@
         "Assert no frame shows an empty area where vector content exists at a coarser level",
         "Assert out-of-coverage vector tiles are never requested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F443",
@@ -5847,7 +5847,7 @@
         "Assert main-thread CPU time per frame stays within the per-frame budget documented in docs/plan",
         "Assert no long task (over 50 ms) occurs on the main thread while tiles load"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F444",
@@ -5886,7 +5886,7 @@
         "Record frames during a continuous zoom and assert interpolated paint properties change smoothly",
         "Set feature-state on a feature at runtime and assert its style changes on the next frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F447",
@@ -5899,7 +5899,7 @@
         "Record frames while zooming across each minzoom and maxzoom and assert frame differences show a fade, not a single-frame pop",
         "Toggle visibility at runtime and assert the layer hides and shows without reloading tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F448",
@@ -5912,7 +5912,7 @@
         "Assert text from 10 to 32 px is crisp and glyph ranges are requested only for characters in use",
         "Render labels with Latin, Cyrillic, Greek and CJK characters and assert each renders or falls back to a configured font without missing boxes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F449",
@@ -5925,7 +5925,7 @@
         "Assert road labels follow curved lines and are not duplicated where a road crosses a tile boundary",
         "Record frames during slow pan, zoom, rotate and tilt and assert labels fade in and out with no flicker (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F450",
@@ -5938,7 +5938,7 @@
         "Assert from the request log that no tile is downloaded again",
         "Assert no recorded frame during the changes contains black or empty pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F451",
@@ -5990,7 +5990,7 @@
         "Switch the label language between English and Italian and assert names use name:en or name:it with a fallback to name",
         "Assert place labels do not flicker during the zoom (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F455",
@@ -6017,7 +6017,7 @@
         "Reload and pan so the buildings come from different tiles and assert the heights are identical",
         "Check the defaults table is documented in the data layers guide"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F457",
@@ -6030,7 +6030,7 @@
         "Assert buildings fade or grow in rather than pop (frame differencing below the popping threshold)",
         "Assert walls facing different directions receive different shading in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F458",
@@ -6042,7 +6042,7 @@
         "Assert the rendered height relative to the rendered ground scale matches the projection scale factor at each latitude",
         "Measure a building's height through the engine API and assert it equals the source height in meters"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F459",
@@ -6055,7 +6055,7 @@
         "Assert the selection highlight appears on the picked feature in a screenshot",
         "Repeat on both backends and with touch emulation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F460",

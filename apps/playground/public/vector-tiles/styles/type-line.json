@@ -1,0 +1,85 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: line layers",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    },
+    "route": {
+      "type": "geojson",
+      "lineMetrics": true,
+      "data": {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [9.165, 45.462],
+            [9.175, 45.472],
+            [9.19, 45.466],
+            [9.205, 45.474]
+          ]
+        }
+      }
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "path",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["path", "service", "minor", "tertiary"]]],
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "bevel"
+      },
+      "paint": {
+        "line-color": "#606060",
+        "line-width": 2,
+        "line-dasharray": [2, 1.5]
+      }
+    },
+    {
+      "id": "road",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["secondary"]]],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#3050c0",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2, 16, 10]
+      }
+    },
+    {
+      "id": "gradient",
+      "type": "line",
+      "source": "route",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "miter"
+      },
+      "paint": {
+        "line-width": 8,
+        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, "#0000ff", 1, "#ff0000"]
+      }
+    }
+  ]
+}

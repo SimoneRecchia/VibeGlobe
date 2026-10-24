@@ -1,19 +1,24 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-23 evening)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 night)
 
-Taken over from the previous account at about 21:00 UTC. Pull request SimoneRecchia/VibeGlobe#26 (the previous branch plus KB-133) is squash-merged into `main`; SimoneRecchia/VibeGlobe#25 is closed, its branch retired. Open: SimoneRecchia/VibeGlobe#27 (this branch). Tracks D (vector tiles), E (3D Tiles) and F (network simulation) start from `main` (owner, 2026-10-23): their folders are theirs; answer their "Hook requests".
+Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main`: SimoneRecchia/VibeGlobe#26 and SimoneRecchia/VibeGlobe#27 (squash; the repository allows no merge commits, so `main` is merged back into the branch after each). SimoneRecchia/VibeGlobe#25 is closed, its branch retired. Tracks D (vector tiles), E (3D Tiles, SimoneRecchia/VibeGlobe#29 merged) and F (network simulation, SimoneRecchia/VibeGlobe#28 merged) work in their own folders; their "Hook requests" are answered in `docs/parallel-tracks.md`.
 
-Done since the takeover: KB-133 (elevation queries boxed doubles on a loaded machine; the failing allocation test then broke two more terrain tests), the F322 flake (the offline harness retries a reset fetch once), F416 (`Globe.captureView`, hook A (4)), hook C (3) (`Globe.setQualitySettings`, `Globe.setAtmosphere`, the atmosphere wired into the renderer, off by default; fog-aware detail in the selection), hook C (1) (`parse-model` in the worker program with meshoptimizer's WebAssembly alone, for track E). Core's main entry moved its terrain decoding helpers to `@vibeglobe/core/decoders` to stay within 60 KB (59.1 KB now).
+Done since the takeover:
 
-Still open from the previous session's last full CI run (40021954210 on bbf4758; notes of the retired branch, commits 4f6e358, 7e3bee0, 6aa92b9):
+- Bugs: KB-133 (boxed doubles in elevation queries), KB-134 (label fades), KB-135 (an endless microtask loop in `globe-layers.ts` froze the page when labels and a model were added together; found with a browser trace, F385 passing again), KB-136 and KB-137 (frame allocations: returned doubles, `Number.isNaN`, a Set iterator, the morph getters; F064 green locally), F488 (Nuxt CSP check waited too little).
+- Features: F416 (`Globe.captureView`), F401 and F402 (adaptive quality on the playground's quality page and the harness), F399 pending its reference-desktop step.
+- Hooks: A (4), C (1) (`parse-model` with meshoptimizer's WebAssembly), C (3) (`setQualitySettings`, `setAtmosphere`, fog-aware detail), C (4) (playground `?quality=`, `?gpuLoad=`, `?atmosphere=`…), E (1), E (2), E (6) (render extensions' credits, display-only checks).
+- Full-CI test fixes with reasons in `docs/test-changes.md`: F132 (the `decoders` entry point), F297 (the served log after a restart), F322 (prefetch on a measured slow link, KB-138 open).
 
-1. **F064 allocation regression** (`e2e/globe-allocation.spec.ts:202`, failed on retry too): 83 bytes per frame against 12, at `motion-detail.ts` `update`, `view-control.ts` `get timeMs`, `controls/src/camera-port.ts` `beginFrame` and `renderer/src/extensions.ts` `frame`. Fix without allocations (packages/core/CLAUDE.md: no new fields on per-frame classes, no doubles passed as arguments; KB-133 and the `FrameEvents` attempt of this session showed both effects).
-2. **F359** (`e2e/data-label-collision.spec.ts:99`, fails at `waitForIdle`) and **F385** (`e2e/data-layer-removal.spec.ts:184`, 240 s timeout in `vibeglobeCycle`), both backends, on retry too; the probe `deterministic-mode` reported "first frame: nothing within 60000 ms". Hypothesis to check first: the engine no longer goes idle since KB-131 (frames keep running while the motion factor is above 1, or the motion hold keeps it above 1).
-3. **F488 flaky** (`e2e/nuxt-features.spec.ts:55`, webgpu: "security: CSP-safe styles" failed once, passed on retry): needs a root cause.
-4. **F287** (path requests drawn 70–85% of the required 95%): in docs/hardening-backlog.md, but its test fails the full suite, which the goal's final check needs green.
+Open:
 
-Next after these: the atmosphere entries end to end (F391–F396: playground switches, specs on the engine's views), C (4) the playground's quality page (F399–F402), F397 anti-aliasing modes, F398 anisotropy, M10 renderer items (F358, F374, F375, F378), KB-132.
+1. **F287** (path requests drawn 70–85% of 95%; in `docs/hardening-backlog.md`, but its test fails the full suite). A first attempt, holding visible requests while a flight climbs or descends, requested nothing along the path; the patch is not committed. Next: choose the levels from the range about a second ahead.
+2. **KB-138**: the bandwidth estimate reads 0.3–0.9 Mbps from the local fixture server on a busy page; F303 on `main` may share the cause.
+3. **KB-132**: the Node allocation test (`frame-allocation.test.ts`) fails about one run in five under load.
+4. The full CI run on the branch head (workflow_dispatch) decides what else is red.
+
+Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
 ## Current state
 

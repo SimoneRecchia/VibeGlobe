@@ -4257,7 +4257,7 @@
         "Call each data-access API (tile data access, pixel readback, elevation sampling, package export) on a Google fixture source",
         "Assert each call is refused with an error naming the Google profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F324",

@@ -316,12 +316,11 @@ test.describe('the measured link (F300–F303)', () => {
       const start = Date.now();
       while (Date.now() - start < 19_500) expect(blackPixels(await canvasImage(page))).toBe(0);
       await flight;
-      // Requests of the flight itself, not the destination preloaded at its start nor the arrival.
-      // Requests the flight asked for, not the start view's tiles (retried on the slow link after a timeout).
+      // Requests the flight made (before it ended), its destination preload included (F286: selected at the flight's
+      // detail), not the start view's tiles (retried on the slow link after a timeout).
       const log = await requestLog(page, session);
       const startView = withAncestors(new Set([...startTiles, ...log.slice(0, before).map(keyOf)]));
-      const during = log.slice(before).filter((r) => r.startMs !== undefined && !startView.has(keyOf(r)));
-      const path = during.filter((r) => Math.abs(r.x / 2 ** r.level - (139.7 + 180) / 360) > 0.03);
+      const path = log.slice(before).filter((r) => r.startMs !== undefined && !startView.has(keyOf(r)));
       finest.push(Math.max(...path.map((r) => r.level)));
       await waitForStreaming(page);
       const full = await page.evaluate(() =>

@@ -88,7 +88,9 @@ export class VectorTileLoader {
     this.layers = layers;
     if (version === this.version) return;
     this.version = version;
-    for (const entry of this.entries.values()) if (entry.state === 'ready') this.layout(entry);
+    // The tiles the last frame used now; the others when a frame wants them again (`update`).
+    for (const entry of this.entries.values())
+      if (entry.state === 'ready' && entry.usedAtFrame >= this.frame) this.layout(entry);
   }
 
   /** The tile when laid out (possibly for an older version while the new layout runs). */
@@ -139,9 +141,21 @@ export class VectorTileLoader {
     for (const entry of this.entries.values()) {
       if (entry.usedAtFrame !== this.frame && (entry.state === 'fetching' || entry.state === 'queued'))
         this.cancel(entry);
+      else if (this.stale(entry)) this.layout(entry);
     }
     this.pump();
     this.evict();
+  }
+
+  /** A kept tile this frame uses, laid out for an older style version and not being laid out again. */
+  private stale(entry: Entry): boolean {
+    return (
+      entry.usedAtFrame === this.frame &&
+      entry.state === 'ready' &&
+      entry.task === undefined &&
+      entry.loaded !== undefined &&
+      entry.loaded.version !== this.version
+    );
   }
 
   /** Tiles requested or being laid out, not ready yet (tests wait for 0). */

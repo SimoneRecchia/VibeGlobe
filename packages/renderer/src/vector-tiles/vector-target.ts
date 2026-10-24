@@ -4,13 +4,14 @@
  * the label quads of the frame. It implements the renderer-neutral `VectorTileTarget` of
  * `@vibeglobe/layers/vector-tiles`, which decides what to draw; it decides nothing itself.
  */
-import type { FrameView } from '@vibeglobe/core';
-import { BufferAttribute, BufferGeometry, Group, Mesh, type MeshBasicNodeMaterial } from 'three/webgpu';
+import type { DepthPath, FrameView } from '@vibeglobe/core';
+import { BufferAttribute, BufferGeometry, Group, Mesh, type MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import { placeTile } from '../eye-relative.js';
 import type { ThreeExtensionContext } from '../extensions.js';
 import { rasterizeSdfGlyphs } from './local-glyphs.js';
 import { SdfAtlas } from './sdf-atlas.js';
 import { updateVectorGeometry, vectorGeometry } from './vector-geometry.js';
+import { createRasterMaterial, rasterTexture } from './raster-material.js';
 import { createTextMaterial, setTextViewport } from './text-material.js';
 import {
   createVectorMaterial,
@@ -50,6 +51,8 @@ export interface VectorMeshData {
   /** Circles: corner (2) and stroke color (4) per vertex. */
   readonly corners?: Float32Array;
   readonly stroke?: Float32Array;
+  /** Rasters: the tile's image (straight sRGB RGBA, top row first). */
+  readonly image?: { readonly width: number; readonly height: number; readonly data: Uint8Array | Uint8ClampedArray };
 }
 
 /** Attributes a mesh may replace in place (same lengths): paint and draping. */
@@ -104,11 +107,26 @@ class ThreeVectorMesh implements VectorMesh {
   used = 0;
   disposed = false;
 
+  /** Rasters: the mesh's own material over its image (F445). */
+  readonly rasterMaterial: MeshBasicNodeMaterial | undefined;
+  private readonly texture: Texture | undefined;
+
   constructor(
     readonly data: VectorMeshData,
     private readonly owner: ThreeVectorTarget,
+    depthPath: DepthPath,
   ) {
     this.geometry = vectorGeometry(data);
+    if (data.image !== undefined) {
+      this.texture = rasterTexture(data.image);
+      this.rasterMaterial = createRasterMaterial(this.texture, depthPath);
+    }
+  }
+
+  /** Frees the raster material and texture. */
+  disposeRaster(): void {
+    this.rasterMaterial?.dispose();
+    this.texture?.dispose();
   }
 
   update(attributes: VectorMeshUpdate): void {
@@ -147,7 +165,7 @@ export class ThreeVectorTarget {
 
   /** Uploads one tile's mesh of one style layer; it is drawn when a frame's draws list it. */
   createMesh(data: VectorMeshData): VectorMesh {
-    const mesh = new ThreeVectorMesh(data, this);
+    const mesh = new ThreeVectorMesh(data, this, this.context.depthPath());
     this.meshes.add(mesh);
     return mesh;
   }
@@ -164,13 +182,15 @@ export class ThreeVectorTarget {
       this.root.children.push(group);
     }
     if (this.labelMesh !== undefined) this.root.children.push(this.labelMesh);
-    for (const layer of layers) this.material(layer);
+    for (const layer of layers) if (layer.kind !== 'raster') this.material(layer);
     for (const material of this.materials.values()) setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
     for (const layer of layers) {
-      const material = this.material(layer);
+      const shared = layer.kind === 'raster' ? undefined : this.material(layer);
       for (const draw of layer.draws) {
         const mesh = draw.mesh as ThreeVectorMesh;
-        if (mesh.disposed) continue;
+        const material = shared ?? mesh.rasterMaterial;
+        if (mesh.disposed || material === undefined) continue;
+        if (shared === undefined) setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
         const object = this.object(mesh, material, this.group(layer.layerId));
         const uniforms = object.userData['vectorDraw'] as VectorDrawUniforms;
         setVectorLayer(uniforms, layer.opacity, layer.zoomT, layer.dash, layer.heightScale);
@@ -216,6 +236,7 @@ export class ThreeVectorTarget {
     for (const object of mesh.objects) object.removeFromParent();
     mesh.objects.length = 0;
     mesh.geometry.dispose();
+    mesh.disposeRaster();
   }
 
   private material(layer: VectorLayerDraws): MeshBasicNodeMaterial {
@@ -223,7 +244,12 @@ export class ThreeVectorTarget {
     const key = `${layer.kind}\u0000${layer.solid === false ? 't' : 's'}`;
     let material = this.materials.get(key);
     if (material === undefined) {
-      material = createVectorMaterial(layer.kind, this.context.depthPath(), { solid: layer.solid !== false });
+      // Rasters have a material per mesh (their image); this is never asked for one.
+      const kind = layer.kind === 'raster' ? 'fill' : layer.kind;
+      material = createVectorMaterial(kind, this.context.depthPath(), {
+        solid: layer.solid !== false,
+        atlas: this.atlas,
+      });
       this.materials.set(key, material);
     }
     return material;

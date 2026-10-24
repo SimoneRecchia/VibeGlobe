@@ -10,6 +10,7 @@ import { PNG } from 'pngjs';
 import ts from 'typescript';
 import { ProtoWriter } from './proto.ts';
 import { demotilesFeatures } from './demotiles.ts';
+import { demTile, demTiles, RASTER_MAX_ZOOM, rasterTile } from './rasters.ts';
 import { encodeTile, tileList } from './tiles.ts';
 
 const ROOT = new URL('../../../', import.meta.url).pathname;
@@ -46,6 +47,20 @@ function writeDemotiles(): number {
   // As Prettier formats it.
   const tilejson = `{\n  "tilejson": "3.0.0",\n  "tiles": ["{z}/{x}/{y}.pbf"],\n  "minzoom": 0,\n  "maxzoom": ${DEMOTILES_MAX_ZOOM}\n}\n`;
   write(join(OUT, 'demotiles', 'tiles.json'), tilejson);
+  return count;
+}
+
+/** The raster and DEM fixture tiles (F445). */
+function writeRasters(): number {
+  let count = 0;
+  for (let z = 0; z <= RASTER_MAX_ZOOM; z++)
+    for (let x = 0; x < 2 ** z; x++)
+      for (let y = 0; y < 2 ** z; y++, count++)
+        write(join(OUT, 'raster', String(z), String(x), `${y}.png`), rasterTile(z, x, y));
+  for (const { z, x, y } of demTiles()) {
+    write(join(OUT, 'dem', String(z), String(x), `${y}.png`), demTile(z, x, y));
+    count++;
+  }
   return count;
 }
 
@@ -123,6 +138,8 @@ const ICONS: readonly (readonly [string, (x: number, y: number) => boolean, [num
   ['dot', (x, y) => x * x + y * y <= 1, [220, 40, 40]],
   ['square', (x, y) => Math.abs(x) <= 0.8 && Math.abs(y) <= 0.8, [40, 90, 220]],
   ['triangle', (x, y) => y <= 0.8 && y >= -0.9 + 1.7 * Math.abs(x), [30, 150, 60]],
+  // A fill pattern (F445), drawn opaque by `pattern` below.
+  ['hatch', () => false, [40, 110, 200]],
 ];
 
 function writeSprites(): void {
@@ -137,6 +154,12 @@ function writeSprites(): void {
           const x = ((px + 0.5) / size) * 2 - 1;
           const y = 1 - ((py + 0.5) / size) * 2;
           const at = (py * png.width + i * size + px) * 4;
+          if (name === 'hatch') {
+            // Diagonal stripes 8 CSS pixels apart: opaque, and seamless when repeated.
+            const stripe = (((Math.floor(px / ratio) - Math.floor(py / ratio)) % 8) + 8) % 8 < 4;
+            png.data.set([...(stripe ? rgb : [255, 255, 255]), 255], at);
+            continue;
+          }
           const fill = inside(x / 0.8, y / 0.8);
           const edge = !fill && inside(x / 0.95, y / 0.95);
           const color = fill ? rgb : [255, 255, 255];
@@ -153,7 +176,9 @@ function writeSprites(): void {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   rmSync(join(OUT, 'tiles'), { recursive: true, force: true });
   rmSync(join(OUT, 'demotiles'), { recursive: true, force: true });
-  console.log(`tiles: ${writeTiles()}, demotiles: ${writeDemotiles()}`);
+  rmSync(join(OUT, 'raster'), { recursive: true, force: true });
+  rmSync(join(OUT, 'dem'), { recursive: true, force: true });
+  console.log(`tiles: ${writeTiles()}, demotiles: ${writeDemotiles()}, rasters: ${writeRasters()}`);
   // `--tiles` writes only the tiles (the glyphs and sprites do not depend on the geography).
   if (!process.argv.includes('--tiles')) {
     rmSync(join(OUT, 'glyphs'), { recursive: true, force: true });

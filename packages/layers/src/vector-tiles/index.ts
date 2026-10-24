@@ -80,7 +80,7 @@ export {
   tileToLonLat,
 } from './globe-vertices.js';
 export type { GlobeVertices } from './globe-vertices.js';
-export { addVectorTiles } from './vector-tile-layer.js';
+export { addVectorTiles } from './add-vector-tiles.js';
 export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
 export { pickVectorFeatures } from './vector-picking.js';
 export type { DrawnTile, PickContext, PickedVectorFeature } from './vector-picking.js';

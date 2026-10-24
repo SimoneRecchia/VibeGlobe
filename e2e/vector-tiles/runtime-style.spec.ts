@@ -36,7 +36,8 @@ async function until(page: Page, done: () => Promise<boolean>): Promise<number> 
 }
 
 test('paint, layout, filter and layer changes at runtime (F450)', async ({ page }) => {
-  await openVector(page, 'scenario=mvt-labels&backend=webgl2&zoom=14&lon=9.18&lat=45.468');
+  // Tiles laid out in the engine's workers, which it shares with extensions on a globe with tiled imagery (D (4)).
+  await openVector(page, 'scenario=mvt-labels&backend=webgl2&zoom=14&lon=9.18&lat=45.468&imagery=world');
   const requested = await page.evaluate(() => window.vibeglobeVectorTiles?.layer?.requestLog().length);
   const style = 'window.vibeglobeVectorTiles.layer.style';
 

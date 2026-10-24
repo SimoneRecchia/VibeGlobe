@@ -13,11 +13,14 @@ import {
   cameraNear,
   cameraProjectionMatrix,
   cameraViewMatrix,
+  clamp,
   float,
   length,
   max,
   min,
   mod,
+  fract,
+  texture,
   normalize,
   positionGeometry,
   smoothstep,
@@ -36,11 +39,12 @@ import {
   Vector4,
   type Node,
   type Object3D,
+  type Texture,
 } from 'three/webgpu';
 import { morphedEyeRelative } from '../eye-relative.js';
 
 /** What a vector tile mesh draws. */
-export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle';
+export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle' | 'raster';
 
 /** Per-draw values, kept in `object.userData.vectorDraw` and read per object by the materials. */
 export interface VectorDrawUniforms {
@@ -70,7 +74,7 @@ export function createDrawUniforms(): VectorDrawUniforms {
  * left seams where the surface's tile edges come nearer than the fills, at grazing views (0.2% was the least that
  * closed them on the fixture views; 0.3% keeps a margin).
  */
-const DEPTH_PULL = 3e-3;
+export const DEPTH_PULL = 3e-3;
 /** Pull of circles, which span pixels around their anchor where the curved surface may lie nearer. */
 const CIRCLE_DEPTH_PULL = 3e-3;
 
@@ -78,7 +82,8 @@ function drawOf(object: Object3D | null | undefined): VectorDrawUniforms | undef
   return object?.userData['vectorDraw'] as VectorDrawUniforms | undefined;
 }
 
-interface Uniforms {
+/** The uniforms of a vector material: per frame (morph, viewport), per object (layer, dash, clip, tile). */
+export interface Uniforms {
   readonly morphParams: Node<'vec4'>;
   readonly morphAxes: Node<'mat3'>;
   readonly viewport: Node<'vec2'>;
@@ -91,7 +96,8 @@ interface Uniforms {
   readonly tile: Node<'vec4'>;
 }
 
-function createUniforms(): Uniforms {
+/** A material's uniforms, the per-object ones reading `object.userData.vectorDraw`. */
+export function createUniforms(): Uniforms {
   return {
     morphParams: uniform(new Vector4(0, 1, 1, 0)),
     morphAxes: uniform(new Matrix3()),
@@ -109,7 +115,7 @@ function createUniforms(): Uniforms {
  * endpoint from its Mercator offsets. Ground heights scale with the relief factor (as the terrain does); heights above
  * the ground (buildings) do not, and scale by k(φ) on the plane (F458).
  */
-function placed(
+export function placed(
   offset: Node<'vec3'>,
   normal: Node<'vec3'>,
   plane: Node<'vec4'>,
@@ -125,7 +131,8 @@ function placed(
   return morphedEyeRelative(globe, u.morphAxes.mul(planeLocal), u.morphParams.x).mul(1 - pull);
 }
 
-function mixAB(name: 'vtColor' | 'vtParams', u: Uniforms): Node<'vec4'> {
+/** A paint attribute mixed between its values at zooms A and B by the layer's zoom factor. */
+export function mixAB(name: 'vtColor' | 'vtParams', u: Uniforms): Node<'vec4'> {
   const a = attribute(`${name}A`, 'vec4');
   const b = attribute(`${name}B`, 'vec4');
   return a.add(b.sub(a).mul(u.layer.y));
@@ -135,14 +142,14 @@ function mixAB(name: 'vtColor' | 'vtParams', u: Uniforms): Node<'vec4'> {
  * Straight sRGB RGBA to linear light (the output is encoded back to sRGB): paint is mixed in sRGB, as the style
  * specification interpolates colors, and converted after mixing.
  */
-function linearRgba(srgb: Node<'vec4'>): Node<'vec4'> {
+export function linearRgba(srgb: Node<'vec4'>): Node<'vec4'> {
   // A cubic fit of the sRGB curve (within 0.5% of it; exact at 0 and 1), without a branch.
   const c = srgb.xyz;
   return vec4(c.mul(c.mul(c.mul(0.305306011).add(0.682171111)).add(0.012522878)), srgb.w);
 }
 
 /** 1 inside the draw's target square, else 0, from the vertex's interpolated tile position. */
-function insideClip(u: Uniforms): Node<'float'> {
+export function insideClip(u: Uniforms): Node<'float'> {
   const p = varying(attribute('vtTile', 'vec2'));
   const inside = p.x
     .greaterThanEqual(u.clip.x)
@@ -152,7 +159,8 @@ function insideClip(u: Uniforms): Node<'float'> {
   return inside.select(float(1), float(0));
 }
 
-function finish(
+/** Sets a material's depth path, blending and sides. */
+export function finish(
   material: MeshBasicNodeMaterial,
   viewPosition: Node<'vec4'>,
   depthPath: DepthPath,
@@ -169,11 +177,35 @@ function finish(
   return material;
 }
 
-function ground(): Node<'float'> {
+/** The terrain height under the vertex (draping). */
+export function ground(): Node<'float'> {
   return attribute('vtGround', 'float');
 }
 
-function fillMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial {
+/** The sprite atlas fills read their patterns from (F445): the texture and its size in texels. */
+export interface PatternAtlas {
+  readonly texture: Texture;
+  readonly size: number;
+}
+
+/**
+ * A fill's pattern color where the paint asks for one (`vtColor.y` = −1, no color has it): the sprite image whose atlas texels are in
+ * `vtParams` and pixel ratio in `vtColor.x`, repeated every image size in CSS pixels at the tile's own zoom (512 per
+ * tile), anchored to the tile, so neighboring tiles of a zoom continue it. Premultiplied sRGB to straight linear.
+ */
+function patternColor(u: Uniforms, atlas: PatternAtlas): Node<'vec4'> {
+  const params = varying(mixAB('vtParams', u));
+  const ratio = varying(mixAB('vtColor', u)).x;
+  const sizePx = params.zw.div(max(ratio, 1));
+  const cssPx = varying(attribute('vtTile', 'vec2')).div(8);
+  // Kept half a texel in from the image's border: filtering never reaches its atlas neighbors.
+  const local = clamp(fract(cssPx.div(max(sizePx, vec2(1, 1)))).mul(params.zw), vec2(0.5, 0.5), params.zw.sub(0.5));
+  const sample = texture(atlas.texture, params.xy.add(local).div(atlas.size));
+  const straight = sample.xyz.div(max(sample.w, 1e-4));
+  return linearRgba(vec4(straight, sample.w));
+}
+
+function fillMaterial(u: Uniforms, depthPath: DepthPath, atlas?: PatternAtlas): MeshBasicNodeMaterial {
   const here = placed(
     positionGeometry,
     attribute('tileNormal', 'vec3'),
@@ -186,7 +218,12 @@ function fillMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial 
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const material = new MeshBasicNodeMaterial();
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
-  const color = linearRgba(varying(mixAB('vtColor', u)));
+  const paint = varying(mixAB('vtColor', u));
+  let color = linearRgba(paint);
+  if (atlas !== undefined) {
+    const pattern = patternColor(u, atlas);
+    color = paint.y.lessThan(-0.5).select(vec4(pattern.xyz, pattern.w.mul(paint.w)), color);
+  }
   material.colorNode = vec4(color.xyz, color.w.mul(u.layer.x).mul(insideClip(u)));
   return finish(material, viewPosition, depthPath, false);
 }
@@ -314,14 +351,14 @@ function circleMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMateria
  * `userData.vectorUniforms`, set with {@link setVectorFrame}; layer and draw values are read per object. Solid extrusions write depth; everything else blends without.
  */
 export function createVectorMaterial(
-  kind: VectorMeshKind,
+  kind: Exclude<VectorMeshKind, 'raster'>,
   depthPath: DepthPath,
-  options: { readonly solid?: boolean } = {},
+  options: { readonly solid?: boolean; readonly atlas?: PatternAtlas } = {},
 ): MeshBasicNodeMaterial {
   const u = createUniforms();
   const material =
     kind === 'fill'
-      ? fillMaterial(u, depthPath)
+      ? fillMaterial(u, depthPath, options.atlas)
       : kind === 'line'
         ? lineMaterial(u, depthPath)
         : kind === 'extrusion'

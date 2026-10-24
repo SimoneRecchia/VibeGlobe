@@ -5,8 +5,15 @@
  */
 import type { FrameView } from '@vibeglobe/core';
 
-/** What a mesh draws. */
-export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle';
+/** What a mesh draws: `raster` is a textured tile square (raster, hillshade and heatmap layers, F445). */
+export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle' | 'raster';
+
+/** The image of a raster mesh: straight sRGB RGBA rows, top row first, covering the tile square. */
+export interface RasterImage {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array | Uint8ClampedArray;
+}
 
 /** One tile's mesh of one style layer. */
 export interface VectorMeshData {
@@ -37,6 +44,8 @@ export interface VectorMeshData {
   /** Circles: corner (2) and stroke color (4). */
   readonly corners?: Float32Array;
   readonly stroke?: Float32Array;
+  /** Rasters: the tile's image; paint `colorA.w` is the opacity, `paramsA` brightness min and max, saturation, contrast. */
+  readonly image?: RasterImage;
 }
 
 /** Attributes replaced in place (same lengths). */

@@ -67,7 +67,7 @@ export interface StyleLayerJson {
 
 interface Compiled {
   readonly kind: 'constant' | 'source' | 'camera' | 'composite';
-  evaluate(globals: { zoom: number }, feature?: unknown, featureState?: unknown): unknown;
+  evaluate(globals: { zoom: number } & ExpressionGlobals, feature?: unknown, featureState?: unknown): unknown;
 }
 
 /** A property or filter that failed to compile, with its JSON path inside the layer. */
@@ -119,6 +119,12 @@ function compileProperty(
   const compiled = createPropertyExpression(input, name, spec);
   if (compiled.result === 'error') return { problem: compiled.value.map((e) => `${e.key} ${e.message}`).join('; ') };
   return { expression: compiled.value as unknown as Compiled };
+}
+
+/** Values some paint expressions read besides the zoom: `heatmap-density` and `line-progress` (0–1). */
+export interface ExpressionGlobals {
+  readonly heatmapDensity?: number;
+  readonly lineProgress?: number;
 }
 
 /** A compiled style layer. Runtime changes go through `VectorStyle`, which reports them to the renderer. */
@@ -198,9 +204,18 @@ export class StyleLayer {
     return this.filterFn === undefined ? true : this.filterFn(zoom, feature);
   }
 
-  /** Evaluates a paint property (the specification's default when unset), as a plain value. */
-  paint(name: string, zoom: number, feature?: StyleFeatureInput, state?: FeatureStateMap): unknown {
-    return this.evaluate('paint', name, zoom, feature, state);
+  /**
+   * Evaluates a paint property (the specification's default when unset), as a plain value. `globals` gives
+   * `['heatmap-density']` and `['line-progress']` to the properties that read them (F445).
+   */
+  paint(
+    name: string,
+    zoom: number,
+    feature?: StyleFeatureInput,
+    state?: FeatureStateMap,
+    globals?: ExpressionGlobals,
+  ): unknown {
+    return this.evaluate('paint', name, zoom, feature, state, globals);
   }
 
   /** Evaluates a layout property (the specification's default when unset), as a plain value. */
@@ -231,9 +246,10 @@ export class StyleLayer {
     zoom: number,
     feature?: StyleFeatureInput,
     state?: FeatureStateMap,
+    globals?: ExpressionGlobals,
   ): unknown {
     const compiled = this.expression(group, name);
     if (compiled === undefined) return undefined;
-    return plainValue(compiled.evaluate({ zoom }, feature, state));
+    return plainValue(compiled.evaluate({ zoom, ...globals }, feature, state));
   }
 }

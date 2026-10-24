@@ -19,5 +19,12 @@
     "width": 32,
     "height": 32,
     "pixelRatio": 2
+  },
+  "hatch": {
+    "x": 96,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 2
   }
 }

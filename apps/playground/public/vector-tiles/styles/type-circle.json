@@ -1,0 +1,37 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: circle layers",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "heat",
+      "type": "circle",
+      "source": "openmaptiles",
+      "source-layer": "heat",
+      "paint": {
+        "circle-radius": ["*", 2, ["get", "mag"]],
+        "circle-color": ["interpolate", ["linear"], ["get", "mag"], 1, "#2060ff", 5, "#ff3020"],
+        "circle-opacity": 0.8,
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "#000000"
+      }
+    }
+  ]
+}

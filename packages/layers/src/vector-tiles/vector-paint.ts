@@ -17,9 +17,30 @@ export interface MeshPaint {
   readonly stroke?: Float32Array;
 }
 
-/** The mesh kind that draws a style layer type, if any. */
+/** A second mesh of a style layer: a fill's outline (`fill-outline-color`, F445). */
+export type PaintPart = 'outline';
+
+/** A sprite image packed in the target's atlas, for `fill-pattern`: texels, and its pixel ratio. */
+export interface PatternRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly pixelRatio: number;
+}
+
+/** What paint needs besides the layer: the mesh's part, sprite patterns, and per-vertex line progress. */
+export interface PaintOptions {
+  readonly part?: PaintPart | undefined;
+  readonly pattern?: ((name: string) => PatternRect | undefined) | undefined;
+  /** `line-progress` (0–1) per vertex, for `line-gradient`. */
+  readonly progress?: Float32Array | undefined;
+}
+
+/** The mesh kind that draws a style layer type (or a bucket type: `fill-outline`), if any. */
 export function meshKindOf(type: string): VectorMeshKind | undefined {
   if (type === 'fill' || type === 'line' || type === 'circle') return type;
+  if (type === 'fill-outline') return 'line';
   if (type === 'background') return 'fill';
   if (type === 'fill-extrusion') return 'extrusion';
   return undefined;
@@ -52,11 +73,25 @@ function featurePaint(
   zoom: number,
   feature: BucketFeature,
   state: FeatureStateMap | undefined,
+  options: PaintOptions,
 ): { color: number[]; params: number[]; stroke?: number[] } {
   const p = (name: string) => layer.paint(name, zoom, feature, state);
   switch (layer.type) {
-    case 'fill':
-      return { color: srgbColor(p('fill-color'), num(p('fill-opacity'), 1)), params: [0, 0, 0, 0] };
+    case 'fill': {
+      const opacity = num(p('fill-opacity'), 1);
+      // The outline: about one pixel (two wide, so it always covers a row of pixels), in the outline color.
+      if (options.part === 'outline')
+        return { color: srgbColor(p('fill-outline-color') ?? p('fill-color'), opacity), params: [1, 0, 0, 0] };
+      const name = p('fill-pattern');
+      const pattern = typeof name === 'string' && name !== '' ? options.pattern?.(name) : undefined;
+      // A pattern: its atlas texels in the parameters; its pixel ratio and a flag (green −1) in the color (F445).
+      if (pattern !== undefined)
+        return {
+          color: [pattern.pixelRatio, -1, 0, opacity],
+          params: [pattern.x, pattern.y, pattern.width, pattern.height],
+        };
+      return { color: srgbColor(p('fill-color'), opacity), params: [0, 0, 0, 0] };
+    }
     case 'line': {
       const width = num(p('line-width'), 1);
       const gap = num(p('line-gap-width'));
@@ -92,6 +127,7 @@ export function meshPaint(
   zoomA: number,
   state: FeatureState,
   into?: MeshPaint,
+  options: PaintOptions = {},
 ): MeshPaint {
   const n = featureIndex.length;
   const out: MeshPaint = into ?? {
@@ -103,7 +139,10 @@ export function meshPaint(
   };
   const perFeature = bucket.features.map((feature) => {
     const s = state(feature);
-    return [featurePaint(layer, zoomA, feature, s), featurePaint(layer, zoomA + 1, feature, s)] as const;
+    return [
+      featurePaint(layer, zoomA, feature, s, options),
+      featurePaint(layer, zoomA + 1, feature, s, options),
+    ] as const;
   });
   for (let v = 0; v < n; v++) {
     const pair = perFeature[featureIndex[v] ?? 0];
@@ -115,7 +154,23 @@ export function meshPaint(
     out.paramsB.set(b.params, v * 4);
     if (out.stroke !== undefined && a.stroke !== undefined) out.stroke.set(a.stroke, v * 4);
   }
+  if (layer.type === 'line' && options.progress !== undefined && layer.json.paint?.['line-gradient'] !== undefined)
+    lineGradient(layer, zoomA, options.progress, out);
   return out;
+}
+
+/** Colors of a `line-gradient` at each vertex's `line-progress` (both zooms; the line's opacity kept). */
+function lineGradient(layer: StyleLayer, zoomA: number, progress: Float32Array, out: MeshPaint): void {
+  const ramp = Array.from({ length: 256 }, (_, i) =>
+    srgbColor(layer.paint('line-gradient', zoomA, undefined, undefined, { lineProgress: i / 255 })),
+  );
+  for (let v = 0; v < progress.length; v++) {
+    const c = ramp[Math.round(Math.min(1, Math.max(0, progress[v] ?? 0)) * 255)] ?? [0, 0, 0, 0];
+    for (const colors of [out.colorA, out.colorB]) {
+      const opacity = colors[v * 4 + 3] ?? 1;
+      colors.set([c[0], c[1], c[2], c[3] * opacity], v * 4);
+    }
+  }
 }
 
 /** The zoom pair and mixing factor of a camera zoom: A = ⌊zoom⌋, t = zoom − A. */

@@ -4,16 +4,21 @@
  */
 import type { TileTransport } from '@vibeglobe/core';
 import { GEOJSON_SCHEME } from './geojson-tiles.js';
+import type { DemEncoding } from './raster-images.js';
 import type { SourceCoverage, TileId } from './tile-pyramid.js';
 import type { StyleSourceJson } from './vector-style.js';
 
-/** A vector or GeoJSON source, resolved. */
+/** A vector, GeoJSON, raster or raster-dem source, resolved. */
 export interface SourceInfo {
   readonly templates: readonly string[];
   readonly scheme: 'xyz' | 'tms';
   readonly coverage: SourceCoverage;
   /** A GeoJSON source's data, cut into tiles locally (`geojson://` URLs, F444). */
   readonly geojson?: unknown;
+  /** GeoJSON sources with `lineMetrics`: lines carry their progress (`line-gradient`, F445). */
+  readonly lineMetrics?: boolean;
+  /** Raster and raster-dem sources: image tiles of `tileSize` pixels, DEM tiles with their encoding (F445). */
+  readonly raster?: { readonly tileSize: number; readonly encoding?: DemEncoding };
 }
 
 /** Fetches and parses a JSON document; throws on HTTP errors. */
@@ -23,7 +28,7 @@ export async function json(url: string, fetchImpl: typeof fetch): Promise<unknow
   return response.json();
 }
 
-/** A source with its TileJSON or GeoJSON data read; undefined for sources other than vector and GeoJSON ones. */
+/** A source with its TileJSON or GeoJSON data read; undefined for video, image and unknown source types. */
 export async function resolveSource(
   source: StyleSourceJson,
   base: string | undefined,
@@ -37,6 +42,7 @@ export async function resolveSource(
       scheme: 'xyz',
       coverage: { minzoom: 0, maxzoom: source.maxzoom ?? 18 },
       geojson: typeof data === 'string' ? await json(new URL(data, base).href, fetchImpl) : data,
+      lineMetrics: source['lineMetrics'] === true,
     };
   }
   let doc: StyleSourceJson = source;
@@ -45,7 +51,8 @@ export async function resolveSource(
     doc = { ...((await json(url, fetchImpl)) as StyleSourceJson), ...source };
     doc = { ...doc, tiles: (doc.tiles ?? []).map((t) => new URL(t, url).href) };
   }
-  if (source.type !== 'vector' || doc.tiles === undefined || doc.tiles.length === 0) return undefined;
+  const raster = source.type === 'raster' || source.type === 'raster-dem';
+  if ((source.type !== 'vector' && !raster) || doc.tiles === undefined || doc.tiles.length === 0) return undefined;
   const bounds =
     Array.isArray(doc.bounds) && doc.bounds.length === 4 ? (doc.bounds as [number, number, number, number]) : undefined;
   return {
@@ -54,6 +61,16 @@ export async function resolveSource(
     ),
     coverage: { minzoom: doc.minzoom ?? 0, maxzoom: doc.maxzoom ?? 22, ...(bounds ? { bounds } : {}) },
     scheme: doc.scheme ?? 'xyz',
+    ...(raster
+      ? {
+          raster: {
+            tileSize: Number(doc['tileSize'] ?? 512),
+            ...(source.type === 'raster-dem'
+              ? { encoding: doc['encoding'] === 'terrarium' ? ('terrarium' as const) : ('mapbox' as const) }
+              : {}),
+          },
+        }
+      : {}),
   };
 }
 

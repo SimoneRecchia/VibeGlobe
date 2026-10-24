@@ -4,7 +4,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
-import { capture, near, openVector, settle } from './support.ts';
+import { expectMatchesBaseline } from '../support/visual.ts';
+import { BACKENDS, capture, near, openVector, settle } from './support.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
@@ -199,5 +200,12 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     const final = counts.at(-1) ?? 0;
     expect(final).toBeGreaterThan(0);
     expect(counts.filter((n) => n > 0 && n < final * 0.9).length, counts.join()).toBeGreaterThanOrEqual(1);
+  });
+}
+
+for (const backend of BACKENDS) {
+  test(`a Milan view with extrusions matches its baseline (${backend}, F455) @baseline`, async ({ page }, testInfo) => {
+    await openVector(page, `scenario=mvt-city&backend=${backend}`);
+    await expectMatchesBaseline(page, testInfo, `mvt-city-${backend}.png`, await capture(page));
   });
 }

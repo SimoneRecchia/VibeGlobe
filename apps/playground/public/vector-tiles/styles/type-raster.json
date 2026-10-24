@@ -1,0 +1,35 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: raster layers",
+  "sources": {
+    "raster": {
+      "type": "raster",
+      "tiles": ["/vector-tiles/raster/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "minzoom": 0,
+      "maxzoom": 3,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#000000"
+      }
+    },
+    {
+      "id": "raster",
+      "type": "raster",
+      "source": "raster",
+      "paint": {
+        "raster-opacity": 1,
+        "raster-saturation": 0,
+        "raster-contrast": 0
+      }
+    }
+  ]
+}

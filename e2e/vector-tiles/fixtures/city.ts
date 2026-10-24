@@ -228,3 +228,21 @@ export function pois(): GeoFeature[] {
     id: 9000 + i,
   }));
 }
+
+/** Points for heatmaps (F445): a dense cluster at the city center thinning outward, with a magnitude 1–5. */
+export function heatPoints(): GeoFeature[] {
+  let seed = 7;
+  const next = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  return Array.from({ length: 300 }, (_, i): GeoFeature => {
+    const r = 0.02 * Math.sqrt(-Math.log(1 - next() * 0.95));
+    const a = next() * 2 * Math.PI;
+    return {
+      layer: 'heat',
+      minzoom: 8,
+      type: 'Point',
+      coordinates: [[[9.19 + r * Math.cos(a) * 1.4, 45.465 + r * Math.sin(a)]]],
+      properties: { mag: 1 + Math.floor(next() * 5) },
+      id: 20000 + i,
+    };
+  });
+}

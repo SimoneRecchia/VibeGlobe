@@ -16,20 +16,31 @@ import { GlyphSource } from './glyph-source.js';
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
 import { localizedTextField } from './osm.js';
-import { tileOrigin } from './globe-vertices.js';
 import { VectorTileLoader } from './tile-loader.js';
-import { backgroundBucket, meshGeometry } from './tile-meshes.js';
-import { ancestorAt, retainedTiles, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
-import { meshKindOf, meshPaint, zoomBracket, type MeshPaint } from './vector-paint.js';
+import {
+  ancestorAt,
+  clipOf,
+  retainedTiles,
+  tileKey,
+  tilesToDraw,
+  tilesToRequest,
+  type TileId,
+} from './tile-pyramid.js';
+import { meshKindOf, zoomBracket, type PaintPart } from './vector-paint.js';
+import { TileMeshCache } from './tile-mesh-cache.js';
 import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
-import { json, resolveSource, tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
+import { tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
 import { geojsonTransport } from './geojson-tiles.js';
+import { RasterLayers } from './raster-layers.js';
 import type { StyleLayer } from './style-layer.js';
-import type { VectorLayerDraws, VectorMesh, VectorTileTarget } from './vector-target.js';
+import type { VectorLayerDraws, VectorTileTarget } from './vector-target.js';
+import { sampledTiles, viewTargets } from './view-tiles.js';
+import { BUCKET_EXTENT } from './layout-tile.js';
 
 export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
-import { sampledTiles, viewTargets } from './view-tiles.js';
-import { BUCKET_EXTENT, type Bucket } from './layout-tile.js';
+
+/** Style layer types drawn as textured tile squares (F445). */
+const RASTER_TYPES = new Set(['raster', 'hillshade', 'heatmap']);
 
 /** A source of the style, resolved (TileJSON read). */
 interface ResolvedSource extends SourceInfo {
@@ -42,52 +53,20 @@ interface SourceDraw {
   readonly clip: [number, number, number, number];
 }
 
-interface TileMesh {
-  readonly mesh: VectorMesh;
-  readonly featureIndex: Uint32Array;
-  readonly bucket: Bucket;
-  paint: MeshPaint;
-  paintKey: string;
-  /** Tile units of the vertices and their draped heights, with the terrain grid version they were draped from. */
-  readonly tileXY: Float32Array;
-  readonly ground: Float32Array;
-  groundVersion: number;
-}
-
-/** Logs a problem the way the engine's log does (until extensions can use it: hook request D (1)). */
-function warn(text: string): void {
-  (globalThis as { console?: { warn(text: string): void } }).console?.warn(`[vibeglobe] vector tiles: ${text}`);
-}
-
-/** Loads a style and draws it on the globe; resolves once the style and its sources are read. Call after `ready`. */
-export async function addVectorTiles(globe: Globe, options: VectorTilesOptions): Promise<VectorTileLayer> {
-  const baseFetch = options.fetch ?? ((input, init) => fetch(input, init));
-  const base =
-    typeof options.style === 'string'
-      ? new URL(options.style, globalThis.location?.href).href
-      : globalThis.location?.href;
-  const styleJson = typeof options.style === 'string' ? await json(base ?? options.style, baseFetch) : options.style;
-  const transform = options.transformUrl;
-  const fetchImpl: typeof fetch =
-    transform === undefined ? baseFetch : (input, init) => baseFetch(transform(String(input)), init);
-  const style = VectorStyle.load(styleJson);
-  for (const problem of style.problems) warn(`style ${problem.path}: ${problem.message}`);
-  const resolved = new Map<string, SourceInfo | undefined>();
-  for (const [id, source] of Object.entries(style.sources)) {
-    try {
-      resolved.set(id, await resolveSource(source, base, fetchImpl, id));
-    } catch (error) {
-      style.problems.push({ path: `sources.${id}`, message: String(error) });
-      warn(`style source ${id}: ${String(error)}`);
-    }
-  }
-  return new Runtime(globe, { ...options, fetch: fetchImpl }, style, resolved).start();
+/** Starts the runtime of a loaded style on a globe: its render extension, and pointer events with `element`. */
+export function startVectorTileLayer(
+  globe: Globe,
+  options: VectorTilesOptions,
+  style: VectorStyle,
+  resolved: ReadonlyMap<string, SourceInfo | undefined>,
+): VectorTileLayer {
+  return new Runtime(globe, options, style, resolved).start();
 }
 
 /** One layer's runtime. */
 class Runtime implements VectorTileLayer {
   private readonly sources = new Map<string, ResolvedSource>();
-  private readonly meshes = new Map<string, TileMesh>();
+  private meshes: TileMeshCache | undefined;
   private readonly fader = new LayerFader();
   private readonly featureStates = new Map<string, Record<string, unknown>>();
   private target: VectorTileTarget | undefined;
@@ -99,7 +78,7 @@ class Runtime implements VectorTileLayer {
   private unsubscribe: (() => void) | undefined;
   private placer: LabelPlacer | undefined;
   private readonly grounds: TileGrounds;
-  private drapePending = false;
+  private rasters: RasterLayers | undefined;
   private msLastFrame = 0;
   private drawnTilesWithBuckets: DrawnTile[] = [];
   private readonly interaction = new VectorInteraction(
@@ -169,7 +148,7 @@ class Runtime implements VectorTileLayer {
   loadingTiles(): number {
     let n = 0;
     for (const source of this.sources.values()) n += source.loader.loading;
-    return n;
+    return n + (this.rasters?.loading() ?? 0);
   }
 
   requestLog(source?: string): readonly string[] {
@@ -209,22 +188,43 @@ class Runtime implements VectorTileLayer {
       this.featureStates.get(`${source}|${id}`),
     );
     for (const [id, source] of this.resolved) {
-      if (source === undefined) continue;
+      if (source === undefined || source.raster !== undefined) continue;
       const loader = new VectorTileLoader({
         // GeoJSON tiles are cut locally: no request pool.
-        transport: source.geojson === undefined ? transport : geojsonTransport(source.geojson),
+        transport: source.geojson === undefined ? transport : geojsonTransport(source.geojson, source.lineMetrics),
         network: source.geojson === undefined ? context.network : undefined,
         workers: context.workers,
         onReady: () => context.requestRender(),
       });
       this.sources.set(id, { id, ...source, loader });
     }
+    this.meshes = new TileMeshCache(
+      () => this.target,
+      this.grounds,
+      (source, f) => this.stateOf(source, f.id),
+      (name) => {
+        const image = glyphs.icon(name);
+        const key = `icon|${name}|${image?.icon.pixelRatio ?? 1}`;
+        const rect =
+          image && (target.atlas.get(key) ?? target.atlas.addRgba(key, image.pixels, image.width, image.height));
+        return rect && image ? { ...rect, pixelRatio: image.icon.pixelRatio } : undefined;
+      },
+    );
+    this.rasters = new RasterLayers({
+      target,
+      transport,
+      sources: this.resolved,
+      grounds: this.grounds,
+      onReady: () => context.requestRender(),
+      buckets: (id, tile) => this.sources.get(id)?.loader.get(tile)?.buckets,
+    });
     return {
       frame: (view: FrameView) => this.frame(view, context),
       dispose: () => {
+        this.rasters?.dispose();
         for (const source of this.sources.values()) source.loader.dispose();
         this.sources.clear();
-        this.meshes.clear();
+        this.meshes?.clear();
         target.dispose();
         this.target = undefined;
       },
@@ -251,21 +251,29 @@ class Runtime implements VectorTileLayer {
     const zoom = this.globe.camera.zoom;
     const draws = this.sourceDraws(view);
     this.grounds.frame();
-    this.drapePending = false;
+    this.rasters?.beginFrame();
+    if (this.meshes) this.meshes.drapePending = false;
     const fades = this.fader.update(this.globe.timeMs, zoom, this.style.layers);
     let animating = false;
     const layerDraws: VectorLayerDraws[] = [];
     for (const layer of this.style.layers) {
       const opacity = fades.get(layer.id) ?? 0;
       if (opacity > 0 && opacity < 1) animating = true;
-      const drawn = opacity > 0 ? this.layerDraws(layer, opacity, zoom, draws) : undefined;
+      if (opacity <= 0) continue;
+      const drawn = this.layerDraws(layer, opacity, zoom, draws);
       if (drawn !== undefined) layerDraws.push(drawn);
+      // A fill's outline draws right over it (F445).
+      if (layer.type === 'fill' && layer.json.paint?.['fill-outline-color'] !== undefined) {
+        const outline = this.layerDraws(layer, opacity, zoom, draws, 'outline');
+        if (outline !== undefined) layerDraws.push(outline);
+      }
     }
-    this.evictMeshes();
+    this.meshes?.evict(this.globe.frameNumber);
+    this.rasters?.evict();
     const labels = this.placer?.frame(this.labelSources(fades, draws), view, zoom, this.globe.timeMs);
     target.setLabels(labels?.quads);
     target.draw(layerDraws, view);
-    if (animating || this.drapePending || labels?.animating === true) context.requestRender();
+    if (animating || this.meshes?.drapePending === true || labels?.animating === true) context.requestRender();
   }
 
   /** The symbol buckets of the drawn tiles, with their layer's fade. */
@@ -322,8 +330,18 @@ class Runtime implements VectorTileLayer {
     opacity: number,
     zoom: number,
     draws: ReadonlyMap<string, readonly SourceDraw[]>,
+    part?: PaintPart,
   ): VectorLayerDraws | undefined {
-    const kind = meshKindOf(layer.type);
+    if (RASTER_TYPES.has(layer.type))
+      return this.rasters?.draws(
+        layer,
+        opacity,
+        zoom,
+        this.paintVersion,
+        this.targets,
+        draws.get(layer.source ?? '') ?? [],
+      );
+    const kind = meshKindOf(part === 'outline' ? 'fill-outline' : layer.type);
     const source = layer.source === undefined ? undefined : this.sources.get(layer.source);
     if (kind === undefined || (source === undefined && layer.type !== 'background')) return undefined;
     const { zoomA, t } = zoomBracket(zoom);
@@ -331,15 +349,18 @@ class Runtime implements VectorTileLayer {
     const sourceDraws =
       source === undefined ? this.targets.map((tile) => ({ tile, clip: clipOf(tile, tile) })) : draws.get(source.id);
     for (const d of sourceDraws ?? []) {
-      const mesh = this.meshFor(source, d.tile, layer, zoomA);
+      const from = { sourceId: source?.id ?? '', loaded: source?.loader.get(d.tile), tile: d.tile };
+      if (source !== undefined && from.loaded === undefined) continue;
+      const mesh = this.meshes?.get(from, layer, zoomA, this.paintVersion, this.globe.frameNumber, part);
       if (mesh === undefined) continue;
-      list.push({ mesh: mesh.mesh, clip: d.clip, pxPerUnit: (512 * 2 ** (zoom - d.tile.z)) / BUCKET_EXTENT });
+      list.push({ mesh, clip: d.clip, pxPerUnit: (512 * 2 ** (zoom - d.tile.z)) / BUCKET_EXTENT });
     }
     const dash = layer.type === 'line' ? layer.paint('line-dasharray', zoom) : undefined;
     const extrusionOpacity =
       layer.type === 'fill-extrusion' ? Number(layer.paint('fill-extrusion-opacity', zoom) ?? 1) : 1;
     return {
-      layerId: layer.id,
+      // The outline draws in a group of its own, right after its fill's.
+      layerId: part === undefined ? layer.id : `${layer.id}\u0000${part}`,
       kind,
       opacity: opacity * extrusionOpacity,
       zoomT: t,
@@ -349,77 +370,8 @@ class Runtime implements VectorTileLayer {
     };
   }
 
-  /** The mesh of a tile's bucket for a layer, built on first use and repainted when paint or the zoom pair changed. */
-  private meshFor(
-    source: ResolvedSource | undefined,
-    tile: TileId,
-    layer: StyleLayer,
-    zoomA: number,
-  ): TileMesh | undefined {
-    const loaded = source?.loader.get(tile);
-    const target = this.target;
-    if ((source !== undefined && loaded === undefined) || target === undefined) return undefined;
-    const key = `${source?.id ?? ''}|${loaded?.key ?? tileKey(tile)}|${layer.id}|${loaded?.version ?? 0}`;
-    const paintKey = `${zoomA}|${this.paintVersion}`;
-    let entry = this.meshes.get(key);
-    if (entry === undefined) {
-      const bucket =
-        loaded === undefined ? backgroundBucket(tile, layer.id) : loaded.buckets.find((b) => b.layerId === layer.id);
-      const kind = meshKindOf(layer.type);
-      if (bucket === undefined || kind === undefined) return undefined;
-      const geometry = meshGeometry(kind, bucket, tileOrigin(tile));
-      if (geometry === undefined) return undefined;
-      const paint = meshPaint(layer, bucket, geometry.featureIndex, zoomA, (f) => this.stateOf(source?.id ?? '', f.id));
-      const groundVersion = this.grounds.version;
-      const ground = this.grounds.heights(tile, geometry.data.tile, geometry.data.ground);
-      const mesh = target.createMesh({ ...geometry.data, ...paint, ground });
-      entry = {
-        mesh,
-        featureIndex: geometry.featureIndex,
-        bucket,
-        paint,
-        paintKey,
-        tileXY: geometry.data.tile,
-        ground,
-        groundVersion,
-      };
-      this.meshes.set(key, entry);
-    } else if (entry.paintKey !== paintKey) {
-      meshPaint(
-        layer,
-        entry.bucket,
-        entry.featureIndex,
-        zoomA,
-        (f) => this.stateOf(source?.id ?? '', f.id),
-        entry.paint,
-      );
-      entry.mesh.update(entry.paint);
-      entry.paintKey = paintKey;
-    }
-    if (entry.groundVersion !== this.grounds.version && this.grounds.active) {
-      if (this.grounds.canDrape) {
-        entry.groundVersion = this.grounds.version;
-        entry.mesh.update({ ground: this.grounds.heights(tile, entry.tileXY, entry.ground) });
-      } else this.drapePending = true;
-    }
-    (entry as { usedAt?: number }).usedAt = this.globe.frameNumber;
-    return entry;
-  }
-
   private stateOf(source: string, id: number | undefined): Record<string, unknown> | undefined {
     return id === undefined ? undefined : this.featureStates.get(`${source}|${id}`);
-  }
-
-  /** Frees meshes not drawn for a while (their tile left the cache, or an older layout version). */
-  private evictMeshes(): void {
-    const now = this.globe.frameNumber;
-    for (const [key, entry] of this.meshes) {
-      const usedAt = (entry as { usedAt?: number }).usedAt ?? now;
-      if (now - usedAt > 120) {
-        entry.mesh.dispose();
-        this.meshes.delete(key);
-      }
-    }
   }
 }
 
@@ -436,13 +388,4 @@ function wantedTiles(source: ResolvedSource, targets: readonly TileId[]): TileId
     if (t !== undefined) out.set(tileKey(t), t);
   }
   return [...out.values()];
-}
-
-/** The square of `target` in the units of `tile` (its ancestor or itself). */
-function clipOf(tile: TileId, target: TileId): [number, number, number, number] {
-  const scale = 2 ** (target.z - tile.z);
-  const size = BUCKET_EXTENT / scale;
-  const x = (target.x - tile.x * scale) * size;
-  const y = (target.y - tile.y * scale) * size;
-  return [x, y, x + size, y + size];
 }

@@ -57,3 +57,4 @@ Conventions:
 | [0122](0122-quality-presets-and-adaptive-quality.md) | Quality presets, start-up choice and adaptive quality                                                       | Accepted (decided by agent; owner may revisit)                    |
 | [0131](0131-vector-tile-rendering.md)                | Vector tile rendering: a render extension over renderer-neutral buckets                                     | Accepted (decided by agent; owner may revisit)                    |
 | [0132](0132-vector-tile-labels.md)                   | Vector tile labels: CPU placement, one SDF atlas, a screen-space text material                              | Accepted (decided by agent; owner may revisit)                    |
+| [0133](0133-raster-like-vector-layers.md)            | Raster, hillshade and heatmap layers as textured tile squares; fill and line extras                         | Accepted (decided by agent; owner may revisit)                    |

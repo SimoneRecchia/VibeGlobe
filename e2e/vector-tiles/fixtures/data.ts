@@ -26,7 +26,7 @@ export const DETAIL_AREAS: readonly (readonly [number, number, number, number])[
   [9.99, 59.99, 10.01, 60.01],
 ];
 
-import { cityBuildings, cityRoads, mountainRoads, pois, towers, waterAndParks } from './city.ts';
+import { cityBuildings, cityRoads, heatPoints, mountainRoads, pois, towers, waterAndParks } from './city.ts';
 import { CONTINENTS, graticule, places } from './world.ts';
 
 /** Every fixture feature. */
@@ -47,6 +47,7 @@ export function allFeatures(): GeoFeature[] {
     ...waterAndParks(),
     ...mountainRoads(),
     ...pois(),
+    ...heatPoints(),
     ...towers(),
   ];
 }

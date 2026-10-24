@@ -52,6 +52,10 @@ per-host limits, coalescing and cancellation), laid out in the engine's workers,
   edges. Glyph ranges are requested only for the characters in use; characters the style's glyphs lack are drawn
   locally in `localFontFamily` when given, else left out.
 
+- Every layer type of the specification draws (ADR 0133): `raster` and `hillshade` (raster and raster-dem sources,
+  Terrarium or Mapbox encoding) and `heatmap` as images per tile; `line-gradient` on GeoJSON sources with
+  `lineMetrics`; `fill-pattern` from the sprite; `fill-outline-color`.
+
 ## Picking
 
 `layer.queryRenderedFeatures({ xPx, yPx })` returns the features under a point, topmost first (labels, then layers

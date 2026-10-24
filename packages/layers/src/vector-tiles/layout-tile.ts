@@ -40,6 +40,8 @@ export interface BucketGeometry {
   readonly extrusions?: Float32Array;
   readonly distances?: Float32Array;
   readonly normals?: Float32Array;
+  /** Lines with a `line-gradient`: `line-progress` (0–1) of each vertex along its whole line (F445). */
+  readonly progress?: Float32Array;
   /** With `LayoutInput.tile`: each vertex placed on the globe and the flat map, relative to the tile's origin. */
   readonly globe?: GlobeVertices;
   /** Lines with `LayoutInput.tile`: the point a short step along each vertex's extrusion, for its screen direction. */
@@ -109,6 +111,7 @@ class GeometryWriter {
   readonly extrusions: number[] = [];
   readonly distances: number[] = [];
   readonly normals: number[] = [];
+  readonly progress: number[] = [];
 
   append(
     feature: number,
@@ -119,6 +122,7 @@ class GeometryWriter {
       extrusions?: Float32Array;
       distances?: Float32Array;
       normals?: Float32Array;
+      progress?: Float32Array;
     },
   ): void {
     const base = this.featureIndex.length;
@@ -129,6 +133,7 @@ class GeometryWriter {
     if (g.extrusions !== undefined) this.extrusions.push(...g.extrusions);
     if (g.distances !== undefined) this.distances.push(...g.distances);
     if (g.normals !== undefined) this.normals.push(...g.normals);
+    if (g.progress !== undefined) this.progress.push(...g.progress);
   }
 
   build(): BucketGeometry {
@@ -136,6 +141,7 @@ class GeometryWriter {
     const extrusions = optional(this.extrusions);
     const distances = optional(this.distances);
     const normals = optional(this.normals);
+    const progress = optional(this.progress);
     return {
       positions: new Float32Array(this.positions),
       indices: new Uint32Array(this.indices),
@@ -143,6 +149,7 @@ class GeometryWriter {
       ...(extrusions === undefined ? {} : { extrusions }),
       ...(distances === undefined ? {} : { distances }),
       ...(normals === undefined ? {} : { normals }),
+      ...(progress === undefined ? {} : { progress }),
     };
   }
 }
@@ -181,6 +188,25 @@ function layoutFill(
   return writer.build();
 }
 
+/** Edge length of lines with a gradient, in bucket units: their colors are per vertex (F445). */
+const GRADIENT_EDGE_UNITS = 64;
+
+/**
+ * `line-progress` of a tessellated piece's vertices: its distance along the piece, mapped onto the share of the whole
+ * line the piece covers (`mapbox_clip_start` and `mapbox_clip_end` of GeoJSON tiles with line metrics; else all).
+ */
+function lineProgress(feature: MvtFeature, piece: readonly TilePoint[], distances: Float32Array): Float32Array {
+  let length = 0;
+  for (let i = 1; i < piece.length; i++)
+    length += Math.hypot(
+      (piece[i]?.[0] ?? 0) - (piece[i - 1]?.[0] ?? 0),
+      (piece[i]?.[1] ?? 0) - (piece[i - 1]?.[1] ?? 0),
+    );
+  const start = Number(feature.properties['mapbox_clip_start'] ?? 0);
+  const end = Number(feature.properties['mapbox_clip_end'] ?? 1);
+  return distances.map((d) => start + (d / (length || 1)) * (end - start));
+}
+
 function layoutLine(
   layer: StyleLayer,
   zoom: number,
@@ -188,18 +214,31 @@ function layoutLine(
   geometry: (f: MvtFeature) => Geometry,
   clip: ClipRect,
   maxEdge: number,
+  outline = false,
 ): BucketGeometry {
   const writer = new GeometryWriter();
+  const gradient = !outline && layer.json.paint?.['line-gradient'] !== undefined;
+  const edge = gradient ? Math.min(maxEdge, GRADIENT_EDGE_UNITS) : maxEdge;
   features.forEach((feature, index) => {
-    if (feature.type === 'Point') return;
-    const options = {
-      join: layer.layout('line-join', zoom, feature) as LineJoin,
-      cap: layer.layout('line-cap', zoom, feature) as LineCap,
-      miterLimit: Number(layer.layout('line-miter-limit', zoom, feature)),
-    };
+    if (feature.type === 'Point' || (outline && feature.type !== 'Polygon')) return;
+    const options = outline
+      ? { join: 'miter' as LineJoin, cap: 'butt' as LineCap, miterLimit: 2 }
+      : {
+          join: layer.layout('line-join', zoom, feature) as LineJoin,
+          cap: layer.layout('line-cap', zoom, feature) as LineCap,
+          miterLimit: Number(layer.layout('line-miter-limit', zoom, feature)),
+        };
     for (const part of geometry(feature)) {
-      for (const clipped of clipLine(densifyLine(part, maxEdge), clip))
-        writer.append(index, 2, tessellateLine(clipped, options, clip));
+      // A fill's outline follows each ring around, closed.
+      const path = outline && part[0] !== undefined ? [...part, part[0]] : part;
+      for (const clipped of clipLine(densifyLine(path, edge), clip)) {
+        const g = tessellateLine(clipped, options, clip);
+        writer.append(
+          index,
+          2,
+          gradient && g.distances ? { ...g, progress: lineProgress(feature, clipped, g.distances) } : g,
+        );
+      }
     }
   });
   return writer.build();
@@ -282,17 +321,28 @@ function layoutSymbols(
   return { labels, glyphRanges: glyphRangesOut };
 }
 
-function layoutLayer(layer: StyleLayer, source: MvtLayer, input: LayoutInput, clip: ClipRect): Bucket {
+function layoutLayer(
+  layer: StyleLayer,
+  source: MvtLayer,
+  input: LayoutInput,
+  clip: ClipRect,
+  type: string = layer.type,
+): Bucket {
   const features = selectFeatures(layer, source, input.zoom);
   const geometry = (f: MvtFeature) => scaled(f, source.extent, input.overzoom);
   const kept = features.map((f) => ({ id: f.id, type: f.type, properties: f.properties }));
-  const base = { layerId: layer.id, type: layer.type, features: kept };
+  const base = { layerId: layer.id, type, features: kept };
   const maxEdge = input.tile === undefined ? Infinity : maxEdgeUnits(input.tile.z, BUCKET_EXTENT);
   // Draped on terrain, lines and fills also need vertices often enough to follow the relief (F452).
   const draped = input.tile === undefined ? Infinity : DRAPE_EDGE_UNITS;
-  switch (layer.type) {
+  switch (type) {
     case 'fill':
       return { ...base, geometry: layoutFill(features, geometry, clip, Math.min(maxEdge, 2 * draped)) };
+    case 'fill-outline':
+      return {
+        ...base,
+        geometry: layoutLine(layer, input.zoom, features, geometry, clip, Math.min(maxEdge, draped), true),
+      };
     case 'line':
       return { ...base, geometry: layoutLine(layer, input.zoom, features, geometry, clip, Math.min(maxEdge, draped)) };
     case 'fill-extrusion':
@@ -318,8 +368,15 @@ export function layoutVectorTile(input: LayoutInput): Bucket[] {
     // Hidden layers are laid out too, so showing them again needs no new layout (F447, F450).
     const source = tile.layers.find((l) => l.name === (layer.sourceLayer ?? GEOJSON_LAYER));
     if (source === undefined) continue;
-    const bucket = layoutLayer(layer, source, input, clip);
-    buckets.push(input.tile === undefined ? bucket : placed(bucket, input.tile));
+    // A fill with an outline color also gets its outline (F445).
+    const types =
+      layer.type === 'fill' && layer.json.paint?.['fill-outline-color'] !== undefined
+        ? ['fill', 'fill-outline']
+        : [layer.type];
+    for (const type of types) {
+      const bucket = layoutLayer(layer, source, input, clip, type);
+      buckets.push(input.tile === undefined ? bucket : placed(bucket, input.tile));
+    }
   }
   return buckets;
 }
@@ -330,7 +387,7 @@ function placed(bucket: Bucket, tile: TileId): Bucket {
   if (g === undefined || g.featureIndex.length === 0) return bucket;
   const stride = bucket.type === 'fill-extrusion' ? 3 : 2;
   const globe = globeVertices(tile, BUCKET_EXTENT, g.positions, stride);
-  if (bucket.type !== 'line' || g.extrusions === undefined) return { ...bucket, geometry: { ...g, globe } };
+  if (g.extrusions === undefined) return { ...bucket, geometry: { ...g, globe } };
   const sides = new Float32Array(g.positions.length);
   for (let i = 0; i < sides.length; i += 2) {
     const ex = g.extrusions[i] ?? 0;
@@ -353,6 +410,7 @@ function transfers(buckets: readonly Bucket[]): ArrayBuffer[] {
       geometry.extrusions,
       geometry.distances,
       geometry.normals,
+      geometry.progress,
       ...[geometry.globe, geometry.side].flatMap((v) => (v === undefined ? [] : [v.positions, v.normals, v.planes])),
     ]) {
       if (array !== undefined) out.push(array.buffer as ArrayBuffer);

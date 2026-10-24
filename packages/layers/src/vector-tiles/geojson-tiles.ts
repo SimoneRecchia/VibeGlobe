@@ -127,6 +127,60 @@ function clipped(shape: Shape, z: number, x: number, y: number): TilePoint[][] {
   return rings;
 }
 
+/** The distance along `path` (with cumulative lengths `cum`) of its point nearest `p`. */
+function distanceAlong(path: readonly TilePoint[], cum: readonly number[], p: TilePoint): number {
+  let best = Infinity;
+  let at = 0;
+  for (let i = 0; i + 1 < path.length; i++) {
+    const [ax, ay] = path[i] ?? [0, 0];
+    const [bx, by] = path[i + 1] ?? [0, 0];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1)));
+    const d = (ax + t * dx - p[0]) ** 2 + (ay + t * dy - p[1]) ** 2;
+    if (d < best) {
+      best = d;
+      at = (cum[i] ?? 0) + t * Math.hypot(dx, dy);
+    }
+  }
+  return at;
+}
+
+const lengthOf = (path: readonly TilePoint[]) =>
+  path.reduce(
+    (sum, p, i) => (i === 0 ? 0 : sum + Math.hypot(p[0] - (path[i - 1]?.[0] ?? 0), p[1] - (path[i - 1]?.[1] ?? 0))),
+    0,
+  );
+
+/**
+ * The pieces of a line inside the tile, each a feature of its own with the share of its whole line it covers
+ * (`mapbox_clip_start`, `mapbox_clip_end`), for `line-progress` (sources with `lineMetrics`, F445).
+ */
+function metricPieces(
+  shape: Shape,
+  z: number,
+  x: number,
+  y: number,
+): { parts: TilePoint[][]; properties: Record<string, unknown> }[] {
+  const out: { parts: TilePoint[][]; properties: Record<string, unknown> }[] = [];
+  for (const part of shape.parts) {
+    const path = part.map((p) => toTile(z, x, y, p));
+    const cum = path.map((_, i) => lengthOf(path.slice(0, i + 1)));
+    const total = cum.at(-1) || 1;
+    for (const piece of clipLine(path, RECT)) {
+      if (piece.length < 2 || piece[0] === undefined) continue;
+      const start = distanceAlong(path, cum, piece[0]);
+      const properties = {
+        ...shape.properties,
+        mapbox_clip_start: start / total,
+        mapbox_clip_end: (start + lengthOf(piece)) / total,
+      };
+      out.push({ parts: [piece], properties });
+    }
+  }
+  return out;
+}
+
 const zigzag = (n: number) => (n << 1) ^ (n >> 31);
 
 function commands(type: 1 | 2 | 3, parts: readonly TilePoint[][]): number[] {
@@ -155,27 +209,19 @@ function commands(type: 1 | 2 | 3, parts: readonly TilePoint[][]): number[] {
   return out;
 }
 
-/** The tile of a GeoJSON source as MVT bytes (one layer, {@link GEOJSON_LAYER}), or undefined when no feature reaches it. */
-export function encodeGeoJsonTile(shapes: readonly Shape[], z: number, x: number, y: number): ArrayBuffer | undefined {
-  const keys: string[] = [];
-  const values: unknown[] = [];
-  const index = <T>(list: T[], value: T) => {
-    const i = list.indexOf(value);
-    return i >= 0 ? i : list.push(value) - 1;
-  };
-  const features: { id: number | undefined; type: number; tags: number[]; geometry: number[] }[] = [];
-  for (const shape of shapes) {
-    const parts = clipped(shape, z, x, y);
-    if (parts.length === 0) continue;
-    const tags: number[] = [];
-    for (const [k, v] of Object.entries(shape.properties)) {
-      if (v === null || v === undefined) continue;
-      const value = typeof v === 'object' ? JSON.stringify(v) : v;
-      tags.push(index(keys, k), index(values, value));
-    }
-    features.push({ id: shape.id, type: shape.type, tags, geometry: commands(shape.type, parts) });
-  }
-  if (features.length === 0) return undefined;
+interface EncodedFeature {
+  readonly id: number | undefined;
+  readonly type: number;
+  readonly tags: number[];
+  readonly geometry: number[];
+}
+
+/** The MVT bytes of one layer ({@link GEOJSON_LAYER}) of encoded features with their keys and values. */
+function writeMvt(
+  features: readonly EncodedFeature[],
+  keys: readonly string[],
+  values: readonly unknown[],
+): ArrayBuffer {
   const pbf = new PbfWriter();
   pbf.writeMessage(
     3,
@@ -213,8 +259,43 @@ export function encodeGeoJsonTile(shapes: readonly Shape[], z: number, x: number
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+/** The tile of a GeoJSON source as MVT bytes (one layer, {@link GEOJSON_LAYER}), or undefined when no feature reaches it. */
+export function encodeGeoJsonTile(
+  shapes: readonly Shape[],
+  z: number,
+  x: number,
+  y: number,
+  lineMetrics = false,
+): ArrayBuffer | undefined {
+  const keys: string[] = [];
+  const values: unknown[] = [];
+  const index = <T>(list: T[], value: T) => {
+    const i = list.indexOf(value);
+    return i >= 0 ? i : list.push(value) - 1;
+  };
+  const features: EncodedFeature[] = [];
+  for (const shape of shapes) {
+    const pieces =
+      lineMetrics && shape.type === 2
+        ? metricPieces(shape, z, x, y)
+        : [{ parts: clipped(shape, z, x, y), properties: shape.properties }];
+    for (const { parts, properties } of pieces) {
+      if (parts.length === 0) continue;
+      const tags: number[] = [];
+      for (const [k, v] of Object.entries(properties)) {
+        if (v === null || v === undefined) continue;
+        const value = typeof v === 'object' ? JSON.stringify(v) : v;
+        tags.push(index(keys, k), index(values, value));
+      }
+      features.push({ id: shape.id, type: shape.type, tags, geometry: commands(shape.type, parts) });
+    }
+  }
+  if (features.length === 0) return undefined;
+  return writeMvt(features, keys, values);
+}
+
 /** A transport that answers `geojson://<source>/{z}/{x}/{y}` requests from the source's data. */
-export function geojsonTransport(data: unknown): TileTransport {
+export function geojsonTransport(data: unknown, lineMetrics = false): TileTransport {
   const shapes = geojsonShapes(data);
   return {
     start(request: TileRequest, _timeouts: unknown, done: (result: TransportResult) => void): AbortHandle {
@@ -224,7 +305,7 @@ export function geojsonTransport(data: unknown): TileTransport {
         if (ended) return;
         ended = true;
         const [z = 0, x = 0, y = 0] = request.url.split('/').slice(-3).map(Number);
-        const bytes = encodeGeoJsonTile(shapes, z, x, y);
+        const bytes = encodeGeoJsonTile(shapes, z, x, y, lineMetrics);
         done(
           bytes === undefined
             ? { kind: 'status', status: 204, retryAfterMs: undefined }

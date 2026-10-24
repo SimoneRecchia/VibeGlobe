@@ -71,6 +71,9 @@ function identifiedTransport(options: OpenStreetMapImageryOptions): TileTranspor
   );
 }
 
+/** The link the OSMF recommends next to the attribution of its public servers (ADR 0032). */
+const OSM_REPORT_ISSUE = { text: 'Report a map issue', url: 'https://www.openstreetmap.org/fixthemap' };
+
 /**
  * Raster tiles from the OpenStreetMap Foundation's public servers (F264–F267) under their usage policy (ADR 0032):
  * light use only, at most two requests in flight, the application identified on every request, attribution to
@@ -79,6 +82,12 @@ function identifiedTransport(options: OpenStreetMapImageryOptions): TileTranspor
  */
 export function openStreetMapImagery(options: OpenStreetMapImageryOptions): DescribedImagerySource {
   checkIdentity(options);
+  // The policy names exactly one host: no `{s}` subdomains, nor the retired a/b/c hosts (ADR 0032, 2026-10-24).
+  if (options.url !== undefined && /\{s\}|\/\/[abc]\.tile\.openstreetmap\.org/.test(options.url))
+    throw new SourceConfigError(
+      'osm-subdomains',
+      'OpenStreetMap public servers: request https://tile.openstreetmap.org/{z}/{x}/{y}.png, without subdomains (tile usage policy, ADR 0032)',
+    );
   (options.warn ?? ((message: string) => console.warn(message)))(
     '[vibeglobe] The OpenStreetMap public tile servers are for light use only and unsuitable for production products; ' +
       'serve tiles built by the data pipeline instead (docs/guides/sources.md).',
@@ -92,7 +101,8 @@ export function openStreetMapImagery(options: OpenStreetMapImageryOptions): Desc
   });
   return {
     ...source,
-    attribution: [OSM_PUBLIC_PROFILE.requiredAttribution ?? { text: '' }],
+    // The policy recommends a way to report map errors next to the attribution.
+    attribution: [OSM_PUBLIC_PROFILE.requiredAttribution ?? { text: '' }, OSM_REPORT_ISSUE],
     profile: OSM_PUBLIC_PROFILE,
     transportRequired: true,
   };

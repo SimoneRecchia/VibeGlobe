@@ -68,10 +68,16 @@ describe('google3dTiles (F468–F470)', () => {
   });
 
   it('applies the Google profile: display only, no persistent cache, prefetch or offline packaging', () => {
-    const { profile } = google3dTiles({ apiKey: 'K', billingRegion: 'eea', fetch: api().fetchImpl });
+    const { profile } = google3dTiles({ apiKey: 'K', billingRegion: 'other', fetch: api().fetchImpl });
     expect(profile.displayOnly).toBe(true);
     expect([...profile.forbids].sort()).toEqual(['offlinePackaging', 'persistentCache', 'prefetch']);
-    expect(profile.requiredAttribution?.text).toBe('Google');
+    expect(profile.requiredAttribution?.text).toBe('Google Maps');
+  });
+
+  it('refuses an EEA billing account, which the Map Tiles API answers 403 (ADR 0031)', () => {
+    expect(() => google3dTiles({ apiKey: 'K', billingRegion: 'eea', fetch: api().fetchImpl })).toThrow(
+      /Photorealistic 3D Tiles are not available to billing accounts in the European Economic Area/,
+    );
   });
 
   it('refuses a missing key with a configuration error', () => {

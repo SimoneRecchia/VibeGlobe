@@ -12,7 +12,12 @@
 import type { AbortHandle, TileTransport, TimeoutsMs, TransportResult } from '@vibeglobe/core';
 import { retryAfterMs } from '../fetch-transport.js';
 import { SourceConfigError } from '../metadata.js';
-import { googleProfile, type GoogleProfile, type GoogleSourceOptions } from './google-provider.js';
+import {
+  assertAvailableInRegion,
+  googleProfile,
+  type GoogleProfile,
+  type GoogleSourceOptions,
+} from './google-provider.js';
 
 /** Options of {@link google3dTiles}. */
 export interface Google3DTilesOptions extends Omit<GoogleSourceOptions, 'language' | 'region'> {
@@ -124,6 +129,7 @@ async function result(response: Response): Promise<TransportResult> {
 export function google3dTiles(options: Google3DTilesOptions): Google3DTiles {
   if (!options.apiKey) throw new SourceConfigError('missing-api-key', 'Google 3D Tiles: apiKey is required');
   const profile = googleProfile(options.billingRegion, options.logoUrl);
+  assertAvailableInRegion(profile.billingRegion, 'photorealistic-3d-tiles');
   const base = (options.baseUrl ?? 'https://tile.googleapis.com/').replace(/\/?$/, '/');
   const url = `${base}v1/3dtiles/root.json`;
   const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));

@@ -6169,7 +6169,7 @@
         "In CI, run the same flow against a mock Map Tiles server",
         "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F469",
@@ -6182,7 +6182,7 @@
         "Record frames across the renewal and assert no holes or blank frames",
         "Manually keep a real session open beyond three hours on the reference desktop and record the renewal in the test log"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F470",
@@ -7237,6 +7237,31 @@
         "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F572",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "Google Photorealistic 3D Tiles follow the billing region's terms: an EEA billing account is refused with a configuration error naming the Map Tiles API EEA terms, while the engine keeps working; for other accounts the tiles load through the Map Tiles API session with the customer's own key and render a city in the 3D view, tested against the Map Tiles stand-in.",
+      "steps": [
+        "Create the 3D Tiles adapter with billingRegion 'eea' and assert the configuration error names the EEA terms, and that satellite tiles, the Street View layer and Street View are refused the same way while roadmap and terrain load",
+        "Open the 3dtiles-google scenario with googleRegion=eea and assert the playground shows the error, sends no request to the Map Tiles API and keeps rendering",
+        "Run the non-EEA flow against the Map Tiles stand-in: a session is created and photorealistic tiles stream and render over Rome",
+        "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F573",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "Google 3D Tiles sessions are renewed when their token expires without a visible interruption or a reload, tested against the Map Tiles stand-in.",
+      "steps": [
+        "Run against the stand-in, whose session token expires after 60 seconds, while navigating continuously",
+        "Assert a new session is requested before or at expiry and no tile request fails because of the expired token",
+        "Record frames across the renewal and assert no holes or blank frames"
+      ],
+      "status": "passing"
     }
   ]
 }

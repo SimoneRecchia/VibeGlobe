@@ -56,12 +56,19 @@ export function googleScenario(
     );
     return { options: undefined, showCredits: credits };
   }
-  const google = google3dTiles({
-    apiKey,
-    billingRegion: params.get('googleRegion') === 'eea' ? 'eea' : 'other',
-    ...(params.has('googleBase') ? { baseUrl: params.get('googleBase') ?? '' } : {}),
-    ...(params.has('googleSessionMs') ? { sessionLifetimeMs: Number(params.get('googleSessionMs')) } : {}),
-  });
+  let google: ReturnType<typeof google3dTiles>;
+  try {
+    google = google3dTiles({
+      apiKey,
+      billingRegion: params.get('googleRegion') === 'eea' ? 'eea' : 'other',
+      ...(params.has('googleBase') ? { baseUrl: params.get('googleBase') ?? '' } : {}),
+      ...(params.has('googleSessionMs') ? { sessionLifetimeMs: Number(params.get('googleSessionMs')) } : {}),
+    });
+  } catch (error) {
+    // An EEA billing account does not get Photorealistic 3D Tiles (ADR 0031): say so, and keep the engine running.
+    configurationMessage(app, error instanceof Error ? error.message : String(error));
+    return { options: undefined, showCredits: credits };
+  }
   return {
     options: {
       url: google.url,

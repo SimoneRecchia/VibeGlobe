@@ -35,3 +35,16 @@ The container's network policy blocks `operations.osmfoundation.org`, so the [Ti
 - The profile is for demos and development; products use the pipeline's self-hosted tiles (ADR 0024).
 - The concurrency limit is enforced by the engine's per-host request slots (F089), which honor `maxRequestsPerHost`.
 - `User-Agent` cannot be set from browsers; in Node the adapter's transport sets it from `appName` and `appUrl`.
+
+## Amendment 2026-10-24: the owner's reading
+
+The owner read the tile and vector tile usage policies from an unrestricted network on 2026-10-24 (open question 24). They confirm the rules above, and add:
+
+| Rule                                                                                                                                                             | Setting                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Raster tiles only from exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, no subdomains                                                                   | `openStreetMapImagery` refuses a `{s}` URL or the retired `a`/`b`/`c` hosts with the configuration error `osm-subdomains`; the default URL is the one named |
+| Attribution never hidden behind toggles or other UI                                                                                                              | `requiredAttribution` is a required credit: the engine's credits and the UI's attribution control keep required credits visible when collapsed (F424, F259) |
+| Honor `Cache-Control`, `Expires` and `ETag`, with conditional requests                                                                                           | Unchanged: `cache: 'default'` (the browser's HTTP cache sends `If-None-Match` and `If-Modified-Since`) and `respectCacheHeaders: true`                      |
+| A "Report a map issue" link to <https://www.openstreetmap.org/fixthemap> is recommended                                                                          | The public raster source's attribution adds it, after the required credit                                                                                   |
+| Vector tiles from `https://vector.openstreetmap.org/$VERSION/{z}/{x}/{y}.mvt` or its TileJSON (Shortbread schema; old versions retired after about three months) | Applications pass that URL, with a current `$VERSION`, to the vector tile source; no default ships, so a retired version never stays in the code            |
+| Keep 2 connections and no prefetch                                                                                                                               | Unchanged: `maxConcurrentRequests: 2`, `forbids: prefetch`                                                                                                  |

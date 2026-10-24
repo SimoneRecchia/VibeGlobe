@@ -8,7 +8,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import { PNG } from 'pngjs';
+import type { createManifest as CreateManifest } from '@vibeglobe/offline';
 import { runBuild } from '../pipeline/build.js';
+import { openHarness, servePackages, startHarness, viewAt } from '../../../../e2e/support/offline.ts';
 
 const CONFIGS = join(import.meta.dirname, '../../configs');
 const SAMPLES =
@@ -183,4 +185,110 @@ for (const backend of ['webgpu', 'webgl2'] as const)
     }
     expect(served.get('italy') ?? 0, 'high-detail tiles').toBeGreaterThan(0);
     expect(served.get('world') ?? 0, 'low-detail tiles').toBeGreaterThan(0);
+  });
+
+/** Globe to street over the Italian sample (F554): the views, from the whole globe down to the Italy sample's z14. */
+const GLOBE_TO_STREET = [2, 5, 8, 11, 14] as const;
+
+/** Installs the three sample packages for one source in the offline harness, offline only, and restarts its globe. */
+async function installSamplePackages(page: Page, backend: 'webgpu' | 'webgl2'): Promise<void> {
+  const packages = [
+    {
+      id: 'fallback',
+      file: join(SAMPLES, 'world-low-sample', 'output', 'fallback.pmtiles'),
+      dataset: output('world-low', 'fallback'),
+    },
+    {
+      id: 'world',
+      file: join(SAMPLES, 'world-low-sample', 'output', 'imagery.pmtiles'),
+      dataset: output('world-low', 'imagery'),
+    },
+    {
+      id: 'italy',
+      file: join(SAMPLES, 'italy-high-sample', 'output', 'imagery.pmtiles'),
+      dataset: output('italy-high', 'imagery'),
+    },
+  ].map((p) => {
+    const metadata = JSON.parse(readFileSync(join(p.dataset, 'metadata.json'), 'utf8')) as {
+      minzoom: number;
+      maxzoom: number;
+      bounds: [number, number, number, number];
+      license: string;
+      attribution: string;
+    };
+    return { id: p.id, bytes: readFileSync(p.file), metadata };
+  });
+  const server = await servePackages(page);
+  for (const p of packages) server.files.set(`samples/${p.id}.pmtiles`, p.bytes);
+  await openHarness(page);
+  await startHarness(page, {
+    network: 'offline',
+    backend,
+    // Offline only: every tile comes from the packages, the pinned base image elsewhere.
+    sources: [{ id: 'imagery', url: 'https://tiles.example.test/{z}/{x}/{y}.jpg', maxLevel: 14 }],
+    view: { longitudeDeg: EDGE_DEG + 0.02, latitudeDeg: LAT_DEG, zoom: 2 },
+  });
+  const installed = await page.evaluate(
+    async (list) => {
+      const repo = location.pathname.replace(/\/e2e\/support\/[^/]*$/, '');
+      const { createManifest } = (await import(/* @vite-ignore */ `${repo}/packages/offline/src/index.ts`)) as {
+        createManifest: typeof CreateManifest;
+      };
+      const ids: (string | undefined)[] = [];
+      for (const p of list) {
+        const data = await (await fetch(`/offline-fixtures/samples/${p.id}.pmtiles`)).blob();
+        const path = `${p.id}.pmtiles`;
+        const [westDeg, southDeg, eastDeg, northDeg] = p.metadata.bounds;
+        const manifest = await createManifest({
+          id: p.id,
+          version: '1',
+          area: { westDeg, southDeg, eastDeg, northDeg },
+          sources: [
+            {
+              sourceId: 'imagery',
+              file: path,
+              minLevel: p.metadata.minzoom,
+              maxLevel: p.metadata.maxzoom,
+              license: p.metadata.license,
+              attribution: { text: p.metadata.attribution },
+            },
+          ],
+          files: [{ path, format: 'pmtiles', data }],
+        });
+        ids.push((await window.offlineHarness?.manager?.install({ manifest, files: { [path]: data } }))?.id);
+      }
+      return ids;
+    },
+    packages.map((p) => ({ id: p.id, metadata: p.metadata })),
+  );
+  expect(installed).toEqual(['fallback', 'world', 'italy']);
+  await page.evaluate(() => window.offlineHarness?.restartGlobe());
+}
+
+for (const backend of ['webgpu', 'webgl2'] as const)
+  test(`the sample outputs, as static folders and as packages, run globe to street over Italy with no black pixel on ${backend} (F554)`, async ({
+    page,
+  }) => {
+    test.setTimeout(600_000);
+    await page.setViewportSize({ width: 480, height: 320 });
+    // Static folders: the playground's source chain over the three folders.
+    const served = await serveChain(page);
+    for (const zoom of GLOBE_TO_STREET) {
+      await page.goto(
+        `/?backend=${backend}&session=samples-f554&lon=${EDGE_DEG + 0.02}&lat=${LAT_DEG}&zoom=${zoom}&` +
+          'imagery=italy&imageryMin=10&imageryMax=14&chain=world:8,fallback:5',
+      );
+      await settle(page);
+      expect(holes(await frame(page)), `static folders, zoom ${String(zoom)}`).toBe(0);
+    }
+    expect(served.get('italy') ?? 0).toBeGreaterThan(0);
+    // Packages: the same outputs' PMTiles installed in an offline-only engine.
+    await page.unrouteAll();
+    await installSamplePackages(page, backend);
+    for (const zoom of GLOBE_TO_STREET)
+      expect(await viewAt(page, EDGE_DEG + 0.02, LAT_DEG, zoom), `packages, zoom ${String(zoom)}`).toBe(0);
+    const fromPackages = await page.evaluate(
+      () => (window.offlineHarness?.served ?? []).filter((e) => e.tier === 'package' && e.coord.level === 14).length,
+    );
+    expect(fromPackages, 'z14 tiles from the Italy package').toBeGreaterThan(0);
   });

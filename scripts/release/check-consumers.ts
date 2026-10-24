@@ -74,13 +74,18 @@ async function launch(): Promise<Browser> {
 }
 
 /** Opens `url` and records page errors, Content Security Policy violations and script and WebAssembly requests. */
-async function open(browser: Browser, url: string): Promise<{ page: Page; errors: string[]; fetched: string[] }> {
+async function open(
+  browser: Browser,
+  url: string,
+): Promise<{ page: Page; errors: string[]; warnings: string[]; fetched: string[] }> {
   const page = await browser.newPage({ viewport: { width: 480, height: 360 } });
   const errors: string[] = [];
+  const warnings: string[] = [];
   const fetched: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
+    else if (message.type() === 'warning') warnings.push(message.text());
   });
   page.on('request', (request) => fetched.push(new URL(request.url()).pathname));
   await page.addInitScript(() => {
@@ -89,7 +94,7 @@ async function open(browser: Browser, url: string): Promise<{ page: Page; errors
     );
   });
   await page.goto(url);
-  return { page, errors, fetched };
+  return { page, errors, warnings, fetched };
 }
 
 /** Waits until the globe has drawn every imagery tile it asked for and stopped drawing. */
@@ -186,9 +191,17 @@ async function checkCustomAssetUrls(browser: Browser, project: string, label: st
   const site = await serveSite(join(project, 'dist'), {
     forward: { prefix: '/vendor/vibeglobe/', target: assetServer.url },
   });
-  const { page, errors, fetched } = await open(browser, `${site.url}?backend=webgl2&assets=/vendor/vibeglobe/`);
+  const { page, errors, warnings, fetched } = await open(
+    browser,
+    `${site.url}?backend=webgl2&assets=/vendor/vibeglobe/`,
+  );
   const stats = await waitForImagery(page, 'minimalGlobe');
-  check(stats.ready > 0 && stats.failed === 0, `${label}: imagery drawn with assets from the separate server`);
+  check(
+    stats.ready > 0 && stats.failed === 0,
+    `${label}: imagery drawn with assets from the separate server (${stats.ready} ready, ${stats.failed} failed)${
+      stats.ready === 0 ? `; warnings: ${warnings.join('; ')}` : ''
+    }`,
+  );
   check(
     assetServer.requests.includes('/vibeglobe-worker.js') &&
       assetServer.requests.some((path) => path.endsWith('.wasm')),

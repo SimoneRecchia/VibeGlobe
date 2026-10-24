@@ -304,7 +304,7 @@ Recorded in [ADR 0011](../adr/0011-workers.md). In short:
 3. **Buffer recycling:** should typed arrays be returned to workers after upload? Add it only if heap profiling shows garbage-collection pauses above 1 ms from tile buffers.
 4. **Pixel-exact DEM decoding:** OffscreenCanvas readback with a distortion probe, `VideoFrame.copyTo`, or a JS PNG decoder over `DecompressionStream`? Decided in the terrain survey (M4).
 5. **Shared memory:** should `SharedArrayBuffer` be an optional fast path when `crossOriginIsolated` is true (for example for terrain height queries)? Not before a measured need.
-6. **Cross-origin worker hosting:** a CDN would need a blob shim, which the CSP rule forbids. Confirm that consumers such as Cube can serve assets from the page origin.
+6. **Cross-origin worker hosting:** a CDN would need a blob shim, which the CSP rule forbids. Confirm that consuming applications can serve assets from the page origin.
 
 [ml]: https://github.com/maplibre/maplibre-gl-js/tree/95c703172ab9d745eb809672006f68775cef7400
 [ml-pool]: https://github.com/maplibre/maplibre-gl-js/blob/95c703172ab9d745eb809672006f68775cef7400/src/util/worker_pool.ts

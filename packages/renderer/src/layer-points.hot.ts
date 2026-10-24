@@ -94,7 +94,9 @@ export function writePointQuad(
     arrays.corners[v * 4 + 1] = shown > 0 ? dy + x * sin + y * cos : 0;
     arrays.corners[v * 4 + 2] = shown > 0 ? sx : 2;
     arrays.corners[v * 4 + 3] = shown > 0 ? sy : 2;
-    arrays.uvs[v * 2] = -1;
-    arrays.uvs[v * 2 + 1] = -1;
+    arrays.uvs[v * 4] = -1;
+    arrays.uvs[v * 4 + 1] = -1;
+    arrays.uvs[v * 4 + 2] = 0;
+    arrays.uvs[v * 4 + 3] = 0;
   }
 }

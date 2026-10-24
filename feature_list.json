@@ -4777,7 +4777,7 @@
         "Zoom continuously while recording frames and verify text shows no blur steps or shimmer by frame differencing",
         "Verify glyphs are generated or loaded off the main thread and cached in an atlas"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F359",

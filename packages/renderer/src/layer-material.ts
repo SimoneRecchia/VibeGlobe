@@ -7,7 +7,9 @@ import {
   cameraProjectionMatrix,
   cameraViewMatrix,
   float,
+  floor,
   length,
+  max,
   normalize,
   positionGeometry,
   smoothstep,
@@ -69,10 +71,16 @@ function endpoint(
  * vertices offset across the projected segment by half the width. Colors are straight RGBA, blended over the surface,
  * depth-tested and never written. `setSurfaceMorph` and {@link setLayerViewport} update its uniforms each frame.
  */
-export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atlas?: Texture): MeshBasicNodeMaterial {
+export function createLayerMaterial(
+  shape: LayerShape,
+  depthPath: DepthPath,
+  atlas?: Texture,
+  labels?: Texture,
+): MeshBasicNodeMaterial {
   const morphParams = uniform(new Vector4(0, 1, 1, 0));
   const morphAxes = uniform(new Matrix3());
   const viewport = uniform(new Vector2(1, 1));
+  const pixelRatio = uniform(1);
   const normal = attribute('tileNormal', 'vec3');
   const plane = attribute('tilePlane', 'vec4');
   const height = attribute('layerHeight', 'float');
@@ -107,7 +115,7 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atl
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
   }
-  const { rgb, alpha } = layerColor(shape, color, corner, normal, morphParams, atlas);
+  const { rgb, alpha } = layerColor(shape, color, corner, normal, morphParams, atlas, labels, pixelRatio);
   // Screen-sized quads are not depth-tested: the curved surface around their anchor would cut them (see layerColor).
   if (shape === 'quad') material.depthTest = false;
   material.colorNode = vec4(rgb, alpha);
@@ -120,13 +128,14 @@ export function createLayerMaterial(shape: LayerShape, depthPath: DepthPath, atl
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;
   material.userData['viewport'] = viewport;
+  material.userData['pixelRatio'] = pixelRatio;
   return material;
 }
 
 /**
- * The color of a layer fragment: straight RGBA, and for quads the atlas (labels, marker images) tinted by it, round
- * points faded at their circle's edge, and anything behind the globe's horizon hidden, where the normal at the anchor
- * faces away from the eye (from m = ½ on nothing is behind a horizon, ADR 0008).
+ * The color of a layer fragment: straight RGBA, and for quads marker images tinted by it, labels drawn from their
+ * distance fields (F358), round points faded at their circle's edge, and anything behind the globe's horizon hidden,
+ * where the normal at the anchor faces away from the eye (from m = ½ on nothing is behind a horizon, ADR 0008).
  */
 function layerColor(
   shape: LayerShape,
@@ -135,6 +144,8 @@ function layerColor(
   normal: Node<'vec3'>,
   morphParams: Node<'vec4'>,
   atlas: Texture | undefined,
+  labels: Texture | undefined,
+  pixelRatio: Node<'float'>,
 ): { rgb: Node<'vec3'>; alpha: Node<'float'> } {
   // A world copy of a ring around a pole (corner.w = 1) shows only on the flat map's half of the morph (F368).
   if (shape !== 'quad')
@@ -144,13 +155,19 @@ function layerColor(
     };
   let rgb: Node<'vec3'> = color.xyz;
   let alpha: Node<'float'> = color.w;
+  const uv = attribute('layerUv', 'vec4');
   if (atlas) {
-    // White text with a dark halo takes the color, the halo stays dark; solid shapes (u < 0) use the color alone.
-    const uv = attribute('layerUv', 'vec2');
+    // Marker images take the color's alpha; solid shapes (u < 0) use the color alone.
     const textured = uv.x.greaterThanEqual(0);
-    const sample = texture(atlas, uv.max(vec2(0, 0)));
+    const sample = texture(atlas, uv.xy.max(vec2(0, 0)));
     rgb = color.xyz.mul(textured.select(sample.xyz, vec3(1, 1, 1)));
     alpha = color.w.mul(textured.select(sample.w, float(1)));
+  }
+  if (labels) {
+    const label = labelColor(labels, uv, color, corner, pixelRatio);
+    const isLabel = corner.z.greaterThan(2.5);
+    rgb = isLabel.select(label.rgb, rgb);
+    alpha = isLabel.select(label.alpha, alpha);
   }
   // corner.zw is the unit square of round points, 2 for every other quad.
   const edge = float(1).sub(smoothstep(0.85, 1, length(vec2(corner.z, corner.w))));
@@ -159,7 +176,50 @@ function layerColor(
   return { rgb, alpha: alpha.mul(corner.z.greaterThan(1.5).select(1, edge)).mul(shown) };
 }
 
-/** Sets the CSS-pixel viewport a layer material offsets its screen-sized parts in. */
-export function setLayerViewport(material: MeshBasicNodeMaterial, widthPx: number, heightPx: number): void {
+/** The field value at a label's outline (`sdfFromCoverage`). */
+const OUTLINE = 0.75;
+
+/**
+ * A label's text from its distance field (F358, ADR 0045): the fill where the field passes the outline and the halo
+ * out to its width (`corner.z` − 3, field units), each anti-aliased over about one device pixel (from the field units
+ * per CSS pixel, `corner.w`, and the pixel ratio: a screen-space derivative of the 8-bit field is too noisy, and moves
+ * text in pixel steps), so the edge stays crisp and moves smoothly at any size and pixel ratio. The fill is the color; the halo's sRGB bytes are packed in `uv.zw` (red × 256 + green,
+ * blue × 256 + alpha, `labelShading`).
+ */
+function labelColor(
+  labels: Texture,
+  uv: Node<'vec4'>,
+  color: Node<'vec4'>,
+  corner: Node<'vec4'>,
+  pixelRatio: Node<'float'>,
+): { rgb: Node<'vec3'>; alpha: Node<'float'> } {
+  const d = texture(labels, uv.xy.max(vec2(0, 0))).x;
+  const gamma = max(corner.w.div(pixelRatio).mul(0.7), 1e-4);
+  const fillA = smoothstep(float(OUTLINE).sub(gamma), float(OUTLINE).add(gamma), d);
+  const haloEdge = float(OUTLINE).sub(corner.z.sub(3));
+  const haloA = corner.z.greaterThan(3.0001).select(smoothstep(haloEdge.sub(gamma), haloEdge.add(gamma), d), float(0));
+  const rg = uv.z.round();
+  const ba = uv.w.round();
+  const red = floor(rg.div(256));
+  const blue = floor(ba.div(256));
+  const srgb = vec3(red, rg.sub(red.mul(256)), blue).div(255);
+  const haloAlpha = ba.sub(blue.mul(256)).div(255);
+  // sRGB to linear light: a cubic fit of the curve, as the vector-tile text material does.
+  const halo = srgb.mul(srgb.mul(srgb.mul(0.305306011).add(0.682171111)).add(0.012522878));
+  const fa = fillA.mul(color.w);
+  const ha = haloA.mul(haloAlpha).mul(float(1).sub(fa));
+  const alpha = fa.add(ha);
+  return { rgb: color.xyz.mul(fa).add(halo.mul(ha)).div(max(alpha, 1e-4)), alpha };
+}
+
+/** Sets the CSS-pixel viewport a layer material offsets its screen-sized parts in, and its device pixel ratio. */
+export function setLayerViewport(
+  material: MeshBasicNodeMaterial,
+  widthPx: number,
+  heightPx: number,
+  pixelRatio = 1,
+): void {
   (material.userData['viewport'] as { value: Vector2 } | undefined)?.value.set(widthPx, heightPx);
+  const ratio = material.userData['pixelRatio'] as { value: number } | undefined;
+  if (ratio) ratio.value = pixelRatio;
 }

@@ -139,3 +139,31 @@ export function labelsLayer(): DataLayer {
     },
   });
 }
+
+/** The text sizes of `?scenario=data-label-sizes` (F358), CSS pixels. */
+const LABEL_SIZES = [8, 12, 16, 24, 32, 48, 64];
+
+/**
+ * `?scenario=data-label-sizes` (F358): "Sharp" at each of {@link LABEL_SIZES} over the Atlantic, one above the other
+ * at longitude −30 from latitude 40 southward (1° plus 1° per 10 px of text apart), white with a black halo; and "Zoom" at
+ * (−50, 20), 20 px, for a continuous zoom around it.
+ */
+export function labelSizesLayer(): DataLayer {
+  let latDeg = 40;
+  const sized = LABEL_SIZES.map((sizePx) => {
+    const at = feature(`size-${String(sizePx)}`, point(-30, latDeg), { t: 'Sharp', s: sizePx });
+    latDeg -= 1 + sizePx / 10;
+    return at;
+  });
+  return new DataLayer('label', {
+    id: 'label-sizes',
+    data: [...sized, feature('zoom', point(-50, 20), { t: 'Zoom', s: 20 })],
+    style: {
+      'text-field': ['get', 't'],
+      'text-size': ['get', 's'],
+      'text-color': '#ffffff',
+      'text-halo-color': '#000000',
+      'text-halo-width': 2,
+    },
+  });
+}

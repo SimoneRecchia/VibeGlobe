@@ -157,6 +157,11 @@ export interface LayerRenderTarget {
   stats?(): { readonly rebuilds: number; readonly rangeUploads: number; readonly uploadedVertices: number };
   /** Optional, set by the engine: where clamped and draped features take their heights from (ADR 0037). */
   setGround?(ground: LayerGround): void;
+  /**
+   * Optional, set by the engine: called when content the target prepares off the frame (label glyphs generated in a
+   * worker, F358) is ready to draw, so the engine draws a frame.
+   */
+  onContentReady?(listener: () => void): void;
 }
 
 /**

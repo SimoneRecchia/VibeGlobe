@@ -6,7 +6,7 @@
  * RGBA sprite icons packed on shelves in one RGBA texture. Glyph texels go to every channel, so one sampler serves both
  * kinds. When the atlas is full it starts over with a new `generation`: callers add their entries again.
  */
-import { DataTexture, LinearFilter, RGBAFormat, UnsignedByteType } from 'three/webgpu';
+import { DataTexture, LinearFilter, RedFormat, RGBAFormat, UnsignedByteType } from 'three/webgpu';
 
 /** A packed entry, in texels. */
 export interface AtlasRect {
@@ -30,9 +30,16 @@ export class SdfAtlas {
   private shelfHeight = 0;
   private cursorX = 0;
 
-  constructor(readonly size = 1024) {
-    this.data = new Uint8Array(size * size * 4);
-    this.texture = new DataTexture(this.data, size, size, RGBAFormat, UnsignedByteType);
+  /**
+   * `channels` 1 makes a one-channel atlas of glyphs only (data-layer labels, F358): a quarter of the memory, no
+   * icons.
+   */
+  constructor(
+    readonly size = 1024,
+    private readonly channels: 1 | 4 = 4,
+  ) {
+    this.data = new Uint8Array(size * size * channels);
+    this.texture = new DataTexture(this.data, size, size, channels === 1 ? RedFormat : RGBAFormat, UnsignedByteType);
     this.texture.magFilter = LinearFilter;
     this.texture.minFilter = LinearFilter;
     this.texture.generateMipmaps = false;
@@ -89,11 +96,13 @@ export class SdfAtlas {
       if (place === undefined) return undefined;
     }
     const rect = { x: place.x + PADDING, y: place.y + PADDING, width, height };
+    const channels = this.channels;
     for (let row = 0; row < height; row++) {
       for (let col = 0; col < width; col++) {
         const [r, g, b, a] = texel(row * width + col);
-        const at = ((rect.y + row) * this.size + rect.x + col) * 4;
+        const at = ((rect.y + row) * this.size + rect.x + col) * channels;
         this.data[at] = r;
+        if (channels === 1) continue;
         this.data[at + 1] = g;
         this.data[at + 2] = b;
         this.data[at + 3] = a;

@@ -125,7 +125,8 @@ for (const backend of BACKENDS) {
     browser,
   }) => {
     const cycles = scaled(100);
-    test.setTimeout(600_000);
+    // Up to about 12 s per full cycle on the container's software GPU (a WebGPU start), with room to spare.
+    test.setTimeout(600_000 + cycles * 15_000);
     await expectNoGrowth(page, browser, backend, cycles, async () => {
       // Each engine starts the pool's workers and terminates them on unmount: sampled while the cycles run.
       let running = true;

@@ -1,0 +1,1 @@
+{"version":8,"sources":{"s":{"type":"vector","tiles":["x/{z}/{x}/{y}"]}},"layers":[{"id":"a","type":"line","source":"s","source-layer":"x","paint":{"line-width":["__proto__",1]}}]}

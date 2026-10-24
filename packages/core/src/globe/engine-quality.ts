@@ -93,7 +93,8 @@ export class EngineQuality {
 
   /** Applies everything to a renderer that just started. */
   attach(renderer: RendererBackend): void {
-    renderer.setQuality?.(this.rendererQuality(renderer));
+    const globe = this.parts.globe;
+    void renderer.setQuality?.(this.rendererQuality(renderer))?.then(() => globe.requestRender());
     renderer.setAtmosphere?.(this.sky);
   }
 
@@ -105,8 +106,10 @@ export class EngineQuality {
     if (resolutionScale !== undefined) this.parts.globe.setResolutionScale(resolutionScale);
     this.applyFog();
     const renderer = this.parts.renderer();
-    if (renderer) renderer.setQuality?.(this.rendererQuality(renderer));
-    this.parts.globe.requestRender();
+    const applied = renderer?.setQuality?.(this.rendererQuality(renderer));
+    const globe = this.parts.globe;
+    globe.requestRender();
+    void applied?.then(() => globe.requestRender());
   }
 
   /** Validates and applies atmosphere settings; fields not given keep their value. */

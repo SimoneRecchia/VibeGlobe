@@ -473,6 +473,9 @@ if (params.get('experiment') === 'gpu-probes') {
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
+  // Quality presets, adaptive quality, an artificial GPU load and the atmosphere (M11), loaded only when asked for.
+  if (['quality', 'gpuLoad', 'atmosphere', 'sun', 'haze', 'fog'].some((name) => params.has(name)))
+    void globe.ready.then(async () => (await import('./quality-demo.js')).startQuality(globe, params, canvas));
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;

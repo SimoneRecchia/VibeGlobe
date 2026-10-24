@@ -237,8 +237,11 @@ export interface RendererBackend {
   simulateDeviceLoss(): void;
   /** Test hook: the pixels of the frame just drawn, read in the same task (ADR 0012, Capture). */
   capture(): Promise<FrameCapture>;
-  /** Optional: applies the effects of the quality settings (F397–F399), between frames. */
-  setQuality?(quality: RendererQuality): void;
+  /**
+   * Optional: applies the effects of the quality settings (F397–F399), between frames. A promise resolves when an
+   * effect that needed compiling is drawn from the next frame, which the engine then requests.
+   */
+  setQuality?(quality: RendererQuality): Promise<void> | undefined;
   /** Optional: the atmosphere's sun lighting, time and haze (F394, F396). */
   setAtmosphere?(settings: Required<AtmosphereSettings>): void;
   destroy(): void;

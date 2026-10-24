@@ -85,7 +85,11 @@ export function drawImagery(
       const entry = layers[layer];
       if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
       const chosen = wantChain(entry.chain, tile, distance);
-      if (based || chosen < 0) continue;
+      if (based) continue;
+      if (chosen < 0) {
+        overlays = keepSlot(entry, overlays);
+        continue;
+      }
       const drawn = entry.chain[chosen];
       const handle = mapped(MAPPING_HANDLE);
       drawn?.loader.markDrawn(handle);
@@ -103,17 +107,7 @@ export function drawImagery(
         list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
       } else if (overlays < MAX_OVERLAYS) {
         visible?.mark(drawn?.index ?? 0);
-        const at = overlays * 9;
-        found[at] = handle;
-        found[at + 1] = geographic;
-        found[at + 2] = entry.entry.opacity;
-        found[at + 3] = BLEND_CODES[entry.entry.blend];
-        found[at + 4] = mapped(MAPPING_SCALE_U);
-        found[at + 5] = mapped(MAPPING_SCALE_V);
-        found[at + 6] = mapped(MAPPING_OFFSET_U);
-        found[at + 7] = mapped(MAPPING_OFFSET_V);
-        found[at + 8] = mapped(MAPPING_LEVEL);
-        overlays++;
+        overlays = addOverlay(entry, overlays, handle, geographic);
       }
     }
     writeOverlays(list, index, overlays);
@@ -133,6 +127,33 @@ function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distan
     const chosen = chain[source];
     if (chosen && chosen.loader.prefetching !== false) prefetchChildren(chosen, tile, distance);
   }
+}
+
+/** Adds a layer's tile in `mapping` to the overlays found for a draw; returns their count. */
+function addOverlay(layer: StackLayer, overlays: number, handle: number, geographic: number): number {
+  const at = overlays * 9;
+  found[at] = handle;
+  found[at + 1] = geographic;
+  found[at + 2] = layer.entry.opacity;
+  found[at + 3] = BLEND_CODES[layer.entry.blend];
+  found[at + 4] = mapped(MAPPING_SCALE_U);
+  found[at + 5] = mapped(MAPPING_SCALE_V);
+  found[at + 6] = mapped(MAPPING_OFFSET_U);
+  found[at + 7] = mapped(MAPPING_OFFSET_V);
+  found[at + 8] = mapped(MAPPING_LEVEL);
+  return overlays + 1;
+}
+
+/**
+ * A translucent layer still loading keeps its overlay slot, empty: the layers' slots do not shift when its tile arrives,
+ * so each slot's cross-fade stays within one layer (KB-155). Returns the overlays found so far.
+ */
+function keepSlot(layer: StackLayer, overlays: number): number {
+  if (isOpaque(layer.entry) || overlays >= MAX_OVERLAYS) return overlays;
+  found[overlays * 9] = -1;
+  found[overlays * 9 + 2] = 0;
+  found[overlays * 9 + 8] = -1;
+  return overlays + 1;
 }
 
 /** Writes the overlays found for draw `index` into the list's slots, bottom first; the slots left empty show nothing. */

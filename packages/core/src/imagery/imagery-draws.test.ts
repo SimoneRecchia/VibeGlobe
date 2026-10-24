@@ -187,6 +187,23 @@ describe('drawImagery', () => {
     expect(covered.wanted).toEqual([]);
   });
 
+  it('keeps each translucent layer in its overlay slot while a layer below it loads (KB-155)', () => {
+    const base = fakeLayer({ 9: 10 });
+    const loading = fakeLayer({});
+    const labels = fakeLayer({ 9: 12 });
+    const list = drawStack(
+      [
+        stacked([base.layer]),
+        stacked([loading.layer], { id: 'utm', transparent: true }),
+        stacked([labels.layer], { id: 'labels', transparent: true }),
+      ],
+      tile(9, 300, 170),
+    );
+    // The loading layer holds slot 0 empty; the labels stay in slot 1, where they will be once it arrives.
+    expect([list.overlays[0]?.textures[0], list.overlays[0]?.opacities[0]]).toEqual([-1, 0]);
+    expect(list.overlays[1]?.textures[0]).toBe(12);
+  });
+
   it('composes a layer with transparent tiles over the ones below instead of covering them (F242)', () => {
     const base = fakeLayer({ 9: 10 });
     const transparent = fakeLayer({ 9: 11 });

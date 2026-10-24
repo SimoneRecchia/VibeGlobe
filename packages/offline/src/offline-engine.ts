@@ -150,7 +150,8 @@ class OfflineEngine implements Offline {
   private readonly handlers = new Map<keyof OfflineEvents, Set<(payload: never) => void>>();
   private readonly counters = new Map<string, TierCounters>();
   private readonly warned = new Set<string>();
-  private waiters: (() => void)[] = [];
+  /** Waits for a change, each for any change or for a check of its endpoint. */
+  private waiters: { readonly endpoint: string | undefined; readonly wake: () => void }[] = [];
   private packageReader: PackageReader | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly onServe: OfflineOptions['onServe'];
@@ -178,11 +179,12 @@ class OfflineEngine implements Offline {
       fetch: this.fetchImpl,
       enabled: () => this.currentMode !== 'offline',
       onChange: (connectivity, unreachable) => {
-        this.wake();
+        // A wait for one endpoint's check ends with that check (KB-161), not with another endpoint's change.
+        this.wake(null);
         this.emit('connectivity-change', { connectivity, unreachable });
       },
-      // A failed download waits for its check, which may find the endpoint as it was.
-      onCheck: () => this.wake(),
+      // A failed download waits for its endpoint's check, which may find it as it was.
+      onCheck: (endpoint) => this.wake(endpoint),
     });
     // Only the built-in store outlives the page; a memory or custom store is not checked.
     if (options.store === undefined || options.store === 'main-thread') void this.checkCacheEviction();
@@ -337,12 +339,15 @@ class OfflineEngine implements Offline {
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
-      checkTimeoutMs: this.monitor.timeoutMs,
-      waitForChange: (maxMs) =>
+      longestCheckMs: this.monitor.longestCheckMs,
+      waitForChange: (maxMs, endpoint) =>
         new Promise<void>((resolve) => {
-          const waiter = (): void => {
-            clearTimeout(timer);
-            resolve();
+          const waiter = {
+            endpoint,
+            wake: (): void => {
+              clearTimeout(timer);
+              resolve();
+            },
           };
           // A wait that times out leaves the list, which would otherwise grow for the whole outage.
           const timer = setTimeout(() => {
@@ -416,10 +421,13 @@ class OfflineEngine implements Offline {
     this.emit('warning', { code, message });
   }
 
-  private wake(): void {
+  /** Ends every wait; with `endpoint`, only those for a check of it; with null, only those for any change. */
+  private wake(endpoint?: string | null): void {
     const waiters = this.waiters;
-    this.waiters = [];
-    for (const wake of waiters) wake();
+    const ends = (w: { readonly endpoint: string | undefined }): boolean =>
+      endpoint === undefined || w.endpoint === (endpoint ?? undefined);
+    this.waiters = waiters.filter((w) => !ends(w));
+    for (const waiter of waiters) if (ends(waiter)) waiter.wake();
   }
 
   private emit<E extends keyof OfflineEvents>(event: E, payload: OfflineEvents[E]): void {

@@ -36,6 +36,7 @@ import type {
   SurfaceTileInfo,
   TerrainStats,
   TileDrawList,
+  ReloadOptions,
 } from './types.js';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -420,8 +421,8 @@ export class SurfaceFrame {
   }
 
   /** See `Globe.reloadSource`. */
-  reloadSource(sourceId: string): boolean {
-    return this.imagery?.reloadSource(sourceId) ?? false;
+  reloadSource(sourceId: string, options?: ReloadOptions): boolean {
+    return this.imagery?.reloadSource(sourceId, options?.missingOnly) ?? false;
   }
 
   /** The terrain counters, if there is terrain. */

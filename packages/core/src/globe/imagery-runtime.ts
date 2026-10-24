@@ -438,15 +438,15 @@ export class ImageryRuntime {
   }
 
   /** Reloads the loaders of every layer, and the terrain, whose source has this id (`Globe.reloadSource`). */
-  reloadSource(sourceId: string): boolean {
+  reloadSource(sourceId: string, missingOnly?: boolean): boolean {
     let found = false;
     for (const layer of this.layers)
       if (layer.source.id === sourceId) {
-        layer.loader.reload();
+        layer.loader.reload(missingOnly);
         found = true;
       }
     if (this.terrain?.source.id === sourceId) {
-      this.terrain.loader.reload();
+      this.terrain.loader.reload(missingOnly);
       found = true;
     }
     return found;

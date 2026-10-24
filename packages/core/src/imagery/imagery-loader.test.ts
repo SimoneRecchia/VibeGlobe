@@ -493,6 +493,49 @@ describe('ImageryLoader', () => {
     expect(errors).toEqual(['failed 4/2/2']);
   });
 
+  it('requests a tile whose retries ran out during an outage again after five minutes in a still view (KB-162)', () => {
+    const { transport, timers, runFrame } = setUp();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), { kind: 'network-error' });
+      timers.advance(40_000);
+    }
+    expect(transport.started).toHaveLength(5);
+    timers.advance(300_000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started).toHaveLength(6);
+  });
+
+  it('gives a tile that keeps failing one more round after an outage at most, never endless retries (KB-162, F091)', () => {
+    const { transport, timers, runFrame, ok } = setUp();
+    for (let round = 0; round < 4; round++) {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        runFrame([[4, 2, 2]]);
+        transport.answer(url(4, 2, 2), { kind: 'status', status: 503, retryAfterMs: undefined });
+        timers.advance(40_000);
+      }
+      // Its neighbors load, and the view stays.
+      runFrame([[4, 2, 3 + round]]);
+      transport.answer(url(4, 2, 3 + round), ok);
+      timers.advance(300_000);
+    }
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(10);
+  });
+
+  it('never revives a tile that failed for good on a permanent error after a transient one (KB-162)', () => {
+    const { transport, timers, runFrame, ok } = setUp();
+    runFrame([[4, 2, 2]]);
+    transport.answer(url(4, 2, 2), { kind: 'status', status: 503, retryAfterMs: undefined });
+    timers.advance(40_000);
+    runFrame([[4, 2, 2]]);
+    transport.answer(url(4, 2, 2), { kind: 'status', status: 403, retryAfterMs: undefined });
+    runFrame([[4, 2, 3]]);
+    transport.answer(url(4, 2, 3), ok);
+    timers.advance(300_000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(2);
+  });
+
   it('never requests a corrupt tile again, even once the source answers others (F112, KB-162)', () => {
     const { transport, timers, runFrame, loader, ok } = setUp();
     runFrame([[4, 2, 2]]);
@@ -502,6 +545,29 @@ describe('ImageryLoader', () => {
     transport.answer(url(4, 2, 3), ok);
     timers.advance(5000);
     runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(1);
+  });
+
+  it('forgets only the tiles found missing on a reload of the missing ones, keeping every tile drawn (KB-158)', () => {
+    const { transport, runFrame, released, loader, ok } = setUp();
+    runFrame([
+      [4, 2, 2],
+      [4, 2, 3],
+    ]);
+    transport.answer(url(4, 2, 2), ok);
+    transport.answer(url(4, 2, 3), { kind: 'status', status: 404, retryAfterMs: undefined });
+    runFrame([
+      [4, 2, 2],
+      [4, 2, 3],
+    ]);
+    loader.reload(true);
+    const handles = runFrame([
+      [4, 2, 2],
+      [4, 2, 3],
+    ]);
+    expect(handles[0]).toBeGreaterThanOrEqual(0);
+    expect(released).toEqual([]);
+    expect(transport.started.filter((u) => u === url(4, 2, 3))).toHaveLength(2);
     expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(1);
   });
 

@@ -409,7 +409,7 @@ class GlobeEngine implements Globe {
   readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
   readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
-  readonly reloadSource = (sourceId: string): boolean => this.surfaceFrame.reloadSource(sourceId);
+  readonly reloadSource: Globe['reloadSource'] = (id, options) => this.surfaceFrame.reloadSource(id, options);
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
   readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });

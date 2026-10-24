@@ -18,8 +18,8 @@ export interface ConnectivityOptions extends HealthCheckTiming {
   readonly enabled: () => boolean;
   /** Called when the overall connectivity changes. */
   readonly onChange: (connectivity: Connectivity, unreachable: readonly string[]) => void;
-  /** Called after every check, whether or not it changed the state. */
-  readonly onCheck?: () => void;
+  /** Called after every check of an endpoint, whether or not it changed the state. */
+  readonly onCheck?: (endpoint: string) => void;
 }
 
 /** The reachability of one endpoint. */
@@ -129,6 +129,11 @@ export class ConnectivityMonitor {
     return this.options.timeoutMs ?? 5000;
   }
 
+  /** The longest a check takes from its request to its end: the least interval between checks, then its limit. */
+  get longestCheckMs(): number {
+    return this.minIntervalMs + this.timeoutMs;
+  }
+
   private schedule(name: string, entry: Endpoint, delayMs: number): void {
     if (this.destroyed || entry.checking || !this.options.enabled()) return;
     const earliest = entry.lastCheckMs + this.minIntervalMs - Date.now();
@@ -151,7 +156,7 @@ export class ConnectivityMonitor {
     entry.checking = false;
     if (this.destroyed) return;
     this.mark(name, entry, reachable ? 'reachable' : 'unreachable');
-    this.options.onCheck?.();
+    this.options.onCheck?.(name);
     if (!reachable) {
       // Back off while the endpoint stays down: 2 s, 4 s, … up to the maximum.
       this.schedule(name, entry, entry.waitMs);

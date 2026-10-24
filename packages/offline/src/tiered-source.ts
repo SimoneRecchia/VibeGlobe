@@ -28,10 +28,10 @@ export interface TierContext {
   reachable(endpoint: string): boolean;
   reportSuccess(endpoint: string): void;
   reportFailure(endpoint: string): void;
-  /** Resolves when connectivity or the mode changes, or after `maxMs`. */
-  waitForChange(maxMs: number): Promise<void>;
-  /** How long a health check can take: a failed download waits this long for the check it triggered. */
-  readonly checkTimeoutMs: number;
+  /** Resolves when connectivity or the mode changes, after a check of `endpoint` when given, or after `maxMs`. */
+  waitForChange(maxMs: number, endpoint?: string): Promise<void>;
+  /** The longest a triggered health check takes to finish, its wait for the least interval between checks included. */
+  readonly longestCheckMs: number;
   /** True in offline-only mode. */
   offlineOnly(): boolean;
   count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
@@ -184,7 +184,7 @@ class TileLoader {
       // failure (which would make it probe the host one request at a time, slowing cached and packaged tiles too);
       // a failure on a reachable endpoint does, and the engine backs off (F298, F315).
       if (!stored) {
-        await this.context.waitForChange(this.context.checkTimeoutMs + CHECK_MARGIN_MS);
+        await this.context.waitForChange(this.context.longestCheckMs + CHECK_MARGIN_MS, endpoint);
         if (this.context.reachable(endpoint) && !signal.aborted) return result;
       }
     }

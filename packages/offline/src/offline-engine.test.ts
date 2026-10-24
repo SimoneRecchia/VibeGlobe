@@ -231,6 +231,20 @@ describe('the offline engine', () => {
     expect(offline.connectivity).toBe('offline');
   }, 10_000);
 
+  it("a failed download waits for its own endpoint's check, not another endpoint's (KB-161)", async () => {
+    // dead.test is down and checked every few milliseconds; the check of the fixture host fails only after 3.5 s.
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('https://dead.test') || !url.endsWith('/0/0/0.png')) throw new TypeError('Failed to fetch');
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      throw new TypeError('Failed to fetch');
+    }) as typeof fetch;
+    const offline = engine({ fetch: fetchImpl });
+    const dead = offline.source(xyzImagery({ id: 'dead', url: 'https://dead.test/{z}/{x}/{y}.png' }));
+    void load(dead, tile(2, 0, 0));
+    expect((await load(offline.source(fixture()), tile(4, 1, 1))).kind).toBe('aborted');
+  }, 10_000);
+
   it('marks only the dead endpoint unreachable and backs its checks off (F297)', async () => {
     const net = fakeNetwork((url) => (url.startsWith('https://dead.test') ? 'down' : {}));
     const offline = engine({ fetch: net.fetchImpl, healthChecks: { minIntervalMs: 20, maxIntervalMs: 200 } });

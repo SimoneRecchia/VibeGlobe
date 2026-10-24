@@ -305,7 +305,7 @@ const harness: OfflineHarness = {
       offline.on(type, (payload) => harness.events.push({ type, payload }));
     // Back from offline-only mode, the misses read as no data load again (KB-158).
     offline.on('mode-change', ({ sourceIds }) => {
-      for (const id of sourceIds) harness.globe?.reloadSource(id);
+      for (const id of sourceIds) harness.globe?.reloadSource(id, { missingOnly: true });
     });
     const manager = createPackageManager(offline, {
       adapters,

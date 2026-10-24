@@ -79,7 +79,6 @@ export type {
   CameraConstraints,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
-export { buildTileMesh } from './surface/surface-mesh.js';
 export { MorphFrame, morphPointInto } from './view/morph.js';
 export { AUTO_TILT_RANGE_DEG, DEFAULT_VIEW_CURVES, validateViewCurves } from './view/curves.js';
 export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.js';
@@ -143,7 +142,7 @@ export { heightmapGeometricErrorMeters } from './terrain/terrain-source.js';
 export type { TerrainDecoder, TerrainSource } from './terrain/terrain-source.js';
 export type { ElevationSample } from './terrain/terrain-heights.js';
 export type { AbortSignalLike } from './globe/imagery-runtime.js';
-export { geoidModel, toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
+export { toEllipsoidal, undulationMeters } from './terrain/vertical-datum.js';
 export type { GeoidModel, VerticalDatum } from './terrain/vertical-datum.js';
 export { FRAME_PHASES } from './diagnostics/observability.js';
 export type {

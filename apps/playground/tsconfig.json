@@ -3,13 +3,15 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
-  "include": ["src"],
+  "include": ["src", "../../scripts/fixtures/custom-adapters/*.ts"],
+  "exclude": ["../../scripts/fixtures/custom-adapters/*.test.ts"],
   "references": [
     {
       "path": "../../packages/core"

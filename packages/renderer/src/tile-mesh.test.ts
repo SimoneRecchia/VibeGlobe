@@ -1,4 +1,4 @@
-import { buildTileMesh } from '@vibeglobe/core';
+import { buildTileMesh } from '@vibeglobe/core/decoders';
 import { describe, expect, it } from 'vitest';
 import { createTileMesh } from './tile-mesh.js';
 

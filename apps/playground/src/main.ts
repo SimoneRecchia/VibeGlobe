@@ -21,6 +21,7 @@ import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
+import { customAdapters } from './custom-adapters.js';
 import { exposeTestHooks } from './test-hooks.js';
 
 const OVERLAY_REFRESH_MS = 250;
@@ -268,7 +269,7 @@ const quantizedMesh =
 function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
   const imagery = fixtureImagery();
   const terrain = fixtureTerrain();
-  return { ...terrain, ...imagery };
+  return { ...terrain, ...imagery, ...customAdapters(params) };
 }
 
 /** Creates one engine instance in a container with its own canvas. */
@@ -288,6 +289,7 @@ function startGlobe(
       depth,
       canvas: target,
       gpuTiming: params.has('gpuTiming'),
+      antialias: params.get('antialias') !== '0',
       // Models (F361) load the glTF loader on the first model only.
       gltf: async () => (await import('@vibeglobe/renderer/gltf')).gltfLoader(),
       // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
@@ -473,7 +475,7 @@ if (params.get('experiment') === 'gpu-probes') {
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.
   if (scenario?.startsWith('3dtiles-'))
-    void globe.ready.then(async () => (await import('./tiles3d-demo.js')).showTiles3DScenario(globe, app, params));
+    void globe.ready.then(async () => (await import('./tiles3d-tour.js')).showTiles3D(globe, app, params));
   if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
   // Quality presets, adaptive quality, an artificial GPU load and the atmosphere (M11), loaded only when asked for.

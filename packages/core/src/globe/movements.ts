@@ -26,6 +26,7 @@ import type {
 } from './types.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import { validateBounds, viewForBounds } from './fit-bounds.js';
+import { FlightLookahead } from './flight-preload.js';
 import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
@@ -64,6 +65,8 @@ export interface MovementHost {
    * more (undefined).
    */
   preloadView?(end: Float64Array | undefined, flight?: boolean): void;
+  /** Each frame of a flight: the pose it will have in about a second, whose tiles load instead of the view's (F287). */
+  preloadAhead?(end: Float64Array): void;
   /** The camera jumped (`jumpTo`): motion-aware detail does not count it as motion (F085). */
   cameraJumped?(): void;
 }
@@ -91,6 +94,7 @@ export class Movements {
   private running: Running | undefined;
   /** A movement started this frame: it begins at the frame's clock time, not before. */
   private readonly stepIo = new Float64Array(2);
+  private readonly lookahead = new FlightLookahead();
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
   /** What the running user movement is: input, or the controls' inertia after it (F200). */
@@ -144,6 +148,8 @@ export class Movements {
       kind === 'fly' && this.reducedMotion
         ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
         : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs, options ?? {});
+    if (animator instanceof CameraAnimator && kind === 'fly')
+      this.lookahead.plan(animator, camera, this.host.timeMs(), animator.durationMs);
     return this.begin(animator, options?.signal);
   }
 
@@ -338,6 +344,9 @@ export class Movements {
       const opacity = running.animator.opacity;
       if (opacity !== undefined) this.host.setOpacity(opacity);
       this.host.cam.update();
+      const animator = running.animator;
+      if (!done && animator instanceof CameraAnimator && animator.kind === 'fly')
+        this.host.preloadAhead?.(this.lookahead.poseAhead(animator, this.host.cam, this.stepIo[0] ?? 0));
       this.moveEvent.cause = 'api';
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
       if (done) this.finish(running, 'completed');

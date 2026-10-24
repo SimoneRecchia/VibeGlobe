@@ -10,8 +10,8 @@
  *     undulationMeters` per line) and exits 1 if any differs by more than the tolerance (default 1 m).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { geoidModel, undulationMeters, type GeoidModel } from '@vibeglobe/core';
-import { readGeoidFile, writeGeoidFile } from '@vibeglobe/core/decoders';
+import { undulationMeters, type GeoidModel } from '@vibeglobe/core';
+import { geoidModel, readGeoidFile, writeGeoidFile } from '@vibeglobe/core/decoders';
 
 /** `latitudeDeg longitudeDeg value` triples of a text file; blank lines and `#` comments are skipped. */
 export function readTriples(text: string): [number, number, number][] {

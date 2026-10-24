@@ -1,0 +1,113 @@
+name: Release
+
+# ADR 0171. A release is started by hand (workflow_dispatch) with the version to release. The dry-run job always runs:
+# it sets the version, generates the changelog entry, builds, checks the tarballs and the consumer projects, creates
+# the version tag in its own checkout and runs `npm publish --dry-run` for every package. Only when `publish` is
+# chosen, on main, does the publish job run: it waits in the `npm-release` environment until the owner approves it
+# (required reviewers), then publishes to the public npm registry under @vibeglobe with the NPM_TOKEN secret of that
+# environment and pushes the release commit and tag. Pull requests that change the release tooling run the dry run.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (semantic version; a pre-release such as 1.0.0-rc.1 goes to the "next" dist-tag)'
+        required: true
+        type: string
+      publish:
+        description: 'Publish to npm after the dry run passes and the owner approves (main only)'
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - 'scripts/release/**'
+      - 'examples/**'
+      - '.github/workflows/release.yml'
+      - 'packages/*/package.json'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    name: Release dry run
+    runs-on: ubuntu-latest
+    # Playwright's image for the pinned Playwright version runs the consumer projects' browser checks (ADR 0035).
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    env:
+      CI: true
+      HOME: /root
+      VERSION: ${{ inputs.version || '0.0.0-dryrun.0' }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - name: Release dry run (version, changelog, build, tarballs, tag, npm publish --dry-run)
+        run: node scripts/release/release.ts "$VERSION"
+      - name: Consumer projects from the tarballs (F503, F531, F532)
+        run: |
+          npx tsc -b && npm run build:browser -w @vibeglobe/web-component
+          node scripts/release/check-consumers.ts F503 F531 F532
+      - name: No reference to the first consumer (F559)
+        run: node scripts/release/check-cube.ts
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-dry-run
+          path: .release/
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish to npm
+    needs: dry-run
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # The owner's approval: the environment's required reviewers hold this job until the owner approves it, and its
+    # NPM_TOKEN secret exists only there.
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      CI: true
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm, registry-url: 'https://registry.npmjs.org' }
+      - run: npm ci
+      - name: Publish (version, changelog, build, tarballs, tag, npm publish, push)
+        run: node scripts/release/release.ts "$VERSION" --publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  post-release:
+    name: Post-release checks
+    needs: publish
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    env:
+      CI: true
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      # F559: a fresh project installs the published packages from npm with no registry configuration or credentials.
+      - name: Install from npm and render the globe
+        run: |
+          npx tsc -b && npm run build:browser -w @vibeglobe/web-component
+          node scripts/release/check-consumers.ts --registry "${{ inputs.version }}"

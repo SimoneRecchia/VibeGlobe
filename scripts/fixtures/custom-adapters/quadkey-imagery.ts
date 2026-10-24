@@ -10,8 +10,14 @@ export function quadkey(coord: TileCoord): string {
   return key;
 }
 
-/** Imagery from `https://quadkeys.test/<quadkey>.png`, levels 1 to 15. */
-export function quadkeyImagery(transport: TileTransport = fetchTransport()): DescribedImagerySource {
+/** The fixture service's address. */
+export const QUADKEY_SERVICE = 'https://quadkeys.test/';
+
+/** Imagery from `<service><quadkey>.png`, levels 1 to 15. */
+export function quadkeyImagery(
+  transport: TileTransport = fetchTransport(),
+  service = QUADKEY_SERVICE,
+): DescribedImagerySource {
   return {
     id: 'quadkey',
     tiling: WEB_MERCATOR_TILING,
@@ -25,7 +31,7 @@ export function quadkeyImagery(transport: TileTransport = fetchTransport()): Des
     profile: CUSTOM_PROFILE,
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < 1 || coord.level > 15) return 'noData';
-      out.url = `https://quadkeys.test/${quadkey(coord)}.png`;
+      out.url = `${service}${quadkey(coord)}.png`;
       out.hostIndex = 0;
       return out;
     },

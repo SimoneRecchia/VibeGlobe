@@ -33,6 +33,8 @@ const SCENARIOS: Record<string, string> = {
   'startup-imagery': '?scenario=frame-loop&imagery=world',
   // F564: streaming along the Milan–Tokyo path from the local fixture server.
   'stream-path': '?scenario=path-milan-tokyo&imagery=world',
+  // F471: the fixture city's 3D Tiles (Draco) during an endless tour of pans, zooms, rotations and tilts.
+  '3dtiles-city': '?scenario=3dtiles-city&tiles3d=draco&tour=1',
   ...Object.fromEntries(
     (['webgl2', 'webgpu'] as const).flatMap((backend) =>
       [

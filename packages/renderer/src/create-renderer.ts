@@ -29,6 +29,11 @@ export interface RendererOptions {
    */
   readonly gpuTiming?: boolean;
   /**
+   * Multisampled anti-aliasing of the canvas (default true, F397). False draws without, for comparisons and devices too
+   * slow for it.
+   */
+  readonly antialias?: boolean;
+  /**
    * Limits the compressed texture families KTX2 imagery may use to these ('bc', 'etc2', 'astc'), among those the device
    * decodes (default: all of them; [] forces RGBA8). For tests, and for drivers that emulate a family (ADR 0020).
    */
@@ -47,6 +52,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     choice: options.backend ?? 'auto',
     depth: options.depth ?? 'auto',
     gpuTiming: options.gpuTiming ?? false,
+    antialias: options.antialias ?? true,
     compressedTextures: options.compressedTextures,
   } as const;
   return async (container, events) => {

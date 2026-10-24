@@ -18,6 +18,10 @@ Open:
 3. **KB-132**: the Node allocation test (`frame-allocation.test.ts`) fails about one run in five under load.
 4. The full CI run on the branch head (workflow_dispatch) decides what else is red.
 
+5. **F395**: in the playground's tilted view (zoom 9, tilt 80) fog saves about 22% of the requests beyond the pinned base (153 vs 196; denser `?haze=2` does not change it), short of the entry's 25%: only the distant levels 5–8 are spared. Next: check that `haze` reaches the selection's `fogHaze`, then whether the visibility at a tile's closest point is too generous.
+
+6. **F358** (time box spent 2026-10-24): labels drawn as one signed distance field per text (track D's `sdfFromCoverage`, shaded with fill, halo and `fwidth` anti-aliasing) at a 24 px base, or at the step above the label's device size (12–96 px in √2 steps), make the F360 stability check fail: the text's centroid moves up to 1.0–1.4 px beyond its anchor (the bitmap labels: 0.3 px panning, 0.7 px zooming), because the distance field loses the hinted stems and the ground shows through thin strokes as it scrolls. Also found: at a 32 px base the 2048 atlas started over every frame (about 2,300 labels in view). Options: per-glyph fields at the step's size with one quad per glyph (track D's layout), or bitmaps below 16 device pixels and fields above. The patch is not committed.
+
 Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
 
 ## Track G, robustness (2026-10-24)
@@ -40,6 +44,26 @@ and `scripts/robustness/` (ADR 0161, ADR 0162; numbers 0161–0169).
 - Hook requests: none. Headless Chromium cannot hide a page, freeze it or dispatch DPR media events: the specs simulate
   them (ADR 0161).
 - About 7 hours of agent time.
+
+## Track H, packaging and release (2026-10-24)
+
+Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns
+`scripts/release/`, `examples/`, `.github/workflows/release.yml`, `.claude/skills/release/` and the build fields of the
+packages' `package.json` (ADR 0171; numbers 0171–0179).
+
+- Passing: F532 (core, renderer, sources and `@vibeglobe/worker/basic` install no layers, UI, offline, Vue or Web
+  Component package; the globe renders and navigates; ADR 0172, made by this track with the owner's go-ahead),
+  F503 (321.7 KB gzip before the first frame, budget 351 KB; six optional modules fetched only when enabled),
+  F519 (`scripts/release/assets.json`, notices of data files), F526 (changelog from the history), F530 (tarballs and a
+  strict consumer), F531 (Vite and Nuxt builds, assets from a separate static server, no `'unsafe-eval'`), F535 (the
+  release skill, dry run followed to the end).
+- Pending owner steps: F558 (the approved publish from CI), F559 (install from npm once published); question 17.
+- Hook requests: H (1) done by this track (ADR 0172); H (2) `@types/three` as a dependency of `@vibeglobe/renderer` (consumers install it
+  meanwhile). Known bug TH-01 (a failed transcoder load is cached for the session) is the worker package's.
+- Commands: `node scripts/release/check-tarballs.ts`, `node scripts/release/check-consumers.ts [F503] [F531] [F532]`
+  (`VIBEGLOBE_CHROMIUM_PATH` in cloud containers, `VIBEGLOBE_RELEASE_KEEP=1` keeps the built projects),
+  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-cube.ts`.
+- About 3 hours of agent time.
 
 ## Track F, network simulation suite (2026-10-23)
 

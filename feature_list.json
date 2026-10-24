@@ -6575,7 +6575,7 @@
         "Measure JS heap after forced garbage collection, GPU resource counters, worker count and listener count before and after",
         "Assert no growth beyond the documented tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F500",

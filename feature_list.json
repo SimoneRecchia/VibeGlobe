@@ -3532,7 +3532,7 @@
         "Assert the profile honors the servers' cache headers and never sends no-cache request headers",
         "Run the opt-in live test at low volume, as the policy allows"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F265",

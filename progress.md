@@ -1,28 +1,34 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 night)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 morning)
 
-Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main`: SimoneRecchia/VibeGlobe#26 and SimoneRecchia/VibeGlobe#27 (squash; the repository allows no merge commits, so `main` is merged back into the branch after each). SimoneRecchia/VibeGlobe#25 is closed, its branch retired. Tracks D (vector tiles), E (3D Tiles, SimoneRecchia/VibeGlobe#29 merged) and F (network simulation, SimoneRecchia/VibeGlobe#28 merged) work in their own folders; their "Hook requests" are answered in `docs/parallel-tracks.md`.
+Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
+after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32. Open: SimoneRecchia/VibeGlobe#35. Tracks D, E, F and H are
+merged; tracks G (robustness) and H's follow-ups work in their own folders.
 
-Done since the takeover:
+Since the takeover:
 
-- Bugs: KB-133 (boxed doubles in elevation queries), KB-134 (label fades), KB-135 (an endless microtask loop in `globe-layers.ts` froze the page when labels and a model were added together; found with a browser trace, F385 passing again), KB-136 and KB-137 (frame allocations: returned doubles, `Number.isNaN`, a Set iterator, the morph getters; F064 green locally), F488 (Nuxt CSP check waited too little).
-- Features: F416 (`Globe.captureView`), F401 and F402 (adaptive quality on the playground's quality page and the harness), F399 pending its reference-desktop step.
-- Hooks: A (4), C (1) (`parse-model` with meshoptimizer's WebAssembly), C (3) (`setQualitySettings`, `setAtmosphere`, fog-aware detail), C (4) (playground `?quality=`, `?gpuLoad=`, `?atmosphere=`…), E (1), E (2), E (6) (render extensions' credits, display-only checks).
-- Full-CI test fixes with reasons in `docs/test-changes.md`: F132 (the `decoders` entry point), F297 (the served log after a restart), F322 (prefetch on a measured slow link, KB-138 open).
+- Passing: F416, F401, F402, F474, F385, F398, F219 (custom adapters of four kinds outside `packages/`), F323, F154,
+  F396 (sun lighting: terminator and slopes), F393 (sky through the zoom), F339 (real Copernicus DEM in the playground),
+  F264 (the live OpenStreetMap run), F488 (Nuxt example: atmosphere and an offline package added), F551 (sample builds
+  as source chains).
+- Bugs fixed: KB-133 to KB-137, KB-139, KB-141 (sun lighting without fog), KB-142 (chains magnifying a source that
+  answered 404). Open: KB-110 (CI-only pops, F137 in the hardening backlog), KB-132 (watch), KB-138, KB-140.
+- Hardening backlog additions: F137, F287, F397.
+- Data builds in this container (ignored by git): `packages/tools/node_modules/.vibeglobe-data/` holds the
+  test-mont-blanc terrain and both configurations' samples; Docker starts with `sudo dockerd` for `vibeglobe-data
+verify`.
 
-Open:
+Open, breadth first:
 
-1. **F287** (path requests drawn 70–85% of 95%; in `docs/hardening-backlog.md`, but its test fails the full suite). A first attempt, holding visible requests while a flight climbs or descends, requested nothing along the path; the patch is not committed. Next: choose the levels from the range about a second ahead.
-2. **KB-138**: the bandwidth estimate reads 0.3–0.9 Mbps from the local fixture server on a busy page; F303 on `main` may share the cause.
-3. **KB-132**: the Node allocation test (`frame-allocation.test.ts`) fails about one run in five under load.
-4. The full CI run on the branch head (workflow_dispatch) decides what else is red.
-
-5. **F395**: in the playground's tilted view (zoom 9, tilt 80) fog saves about 22% of the requests beyond the pinned base (153 vs 196; denser `?haze=2` does not change it), short of the entry's 25%: only the distant levels 5–8 are spared. Next: check that `haze` reaches the selection's `fogHaze`, then whether the visibility at a tile's closest point is too generous.
-
-6. **F358** (time box spent 2026-10-24): labels drawn as one signed distance field per text (track D's `sdfFromCoverage`, shaded with fill, halo and `fwidth` anti-aliasing) at a 24 px base, or at the step above the label's device size (12–96 px in √2 steps), make the F360 stability check fail: the text's centroid moves up to 1.0–1.4 px beyond its anchor (the bitmap labels: 0.3 px panning, 0.7 px zooming), because the distance field loses the hinted stems and the ground shows through thin strokes as it scrolls. Also found: at a 32 px base the 2048 atlas started over every frame (about 2,300 labels in view). Options: per-glyph fields at the step's size with one quad per glyph (track D's layout), or bitmaps below 16 device pixels and fields above. The patch is not committed.
-
-Next: F397 anti-aliasing modes, F398 anisotropy, F474 (the Vue `qualityPreset` prop), the M10 renderer items (F358, F374, F375, F378), track E hooks (3)–(5).
+1. **F395**: over an 8 s tilted flight across the Alps fog saves 15% of all requests (19% beyond the pinned base levels
+   0–3), short of 25%; only the distant levels 5–8 are spared. The "no visible difference" step also needs a way to draw
+   fog with full detail, which the public API does not have.
+2. **F358** (time box spent): one signed distance field per label fails F360's stability check (centroid 1.0–1.4 px).
+   Options: per-glyph fields at the step's size, or bitmaps below 16 device pixels and fields above.
+3. **F249** tone harmonization (ADR 0039 option 1: feathered boundary plus per-source color adjustments).
+4. **F374** marker level of detail, **F378** live feed (the p95 step needs the reference desktop).
+5. The acceptances: F148, F167, F217, F269, F329, F389, F403, F438, F472, F490, F554 (each with a fresh-context review).
 
 ## Track H, packaging and release (2026-10-24)
 

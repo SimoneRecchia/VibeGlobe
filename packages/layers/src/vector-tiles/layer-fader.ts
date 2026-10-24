@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Cross-fades style layers in and out as the zoom crosses their minzoom and maxzoom or their visibility changes
  * (F447), so a layer never pops in a single frame. The fade runs on the engine clock, like label fades (ADR 0029).

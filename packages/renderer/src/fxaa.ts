@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The scene drawn into a texture without multisampling (KB-140), shown as it is, or through fast approximate
  * anti-aliasing: each pixel blended along the edge through it, found from the luminance of its four diagonal

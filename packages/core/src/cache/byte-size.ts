@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Exact GPU byte sizes of tile textures (ADR 0007 §Memory, ADR 0020 §6). The budgets are hard caps, so sizes are summed
  * level by level rather than estimated with the ×4/3 rule: the rule undercounts the smallest levels of RGBA8 chains

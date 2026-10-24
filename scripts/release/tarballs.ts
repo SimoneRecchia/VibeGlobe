@@ -106,7 +106,7 @@ export function inspectPackage(root: string): string[] {
     license?: string;
   };
   if (manifest.type !== 'module') problems.push('package.json: "type" is not "module"');
-  if (manifest.license !== 'PolyForm-Noncommercial-1.0.0') problems.push('package.json: license is not PolyForm');
+  if (manifest.license !== 'MPL-2.0') problems.push('package.json: license is not MPL-2.0');
   const license = join(root, 'LICENSE.md');
   if (!existsSync(license)) problems.push('LICENSE.md missing');
   else if (readFileSync(license, 'utf8') !== readFileSync(join(ROOT_DIR, 'LICENSE.md'), 'utf8'))
@@ -189,13 +189,7 @@ export interface BundledAsset {
 }
 
 /** Licenses a shipped asset may have: the code licenses, OFL for fonts, public-domain data and the project's own. */
-const ASSET_LICENSES = [
-  ...ALLOWED_LICENSES,
-  'Public domain',
-  'CC0-1.0',
-  'PolyForm-Noncommercial-1.0.0',
-  'License text',
-];
+const ASSET_LICENSES = [...ALLOWED_LICENSES, 'Public domain', 'CC0-1.0', 'MPL-2.0', 'License text'];
 const CODE_FILE = /\.(js|mjs|d\.ts|d\.mts|map|ts|vue)$|(^|\/)(package\.json|LICENSE\.md|README\.md)$/;
 
 function matches(pattern: string, path: string): boolean {

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * 3D Tiles 1.1 metadata (F460, F466; ADR 0041): schema classes and enums, metadata entities in JSON (tileset, group,
  * tile, content) resolved with defaults, `noData`, normalization, offset and scale, and binary property tables of

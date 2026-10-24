@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * OGC 3D Tiles (M13; ADR 0041): tileset and content parsing, implicit tiling, traversal by screen-space error with
  * REPLACE and ADD refinement, request priorities and cancellation, the content memory budget, and the render

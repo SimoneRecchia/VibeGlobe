@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Marker level of detail (F374): a marker layer whose distant or dense markers draw as simplified symbols, a dot of a
  * point layer under it, and switch to the full marker by a cross-fade when they stand apart on screen. Density is

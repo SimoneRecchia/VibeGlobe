@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A label layer (F357, F359, F360): text at coordinates, styled with MapLibre `text-*` properties, decluttered by
  * {@link LabelPlacer} with fades. Glyph rendering (SDF atlases) is the renderer's; this layer decides what shows.

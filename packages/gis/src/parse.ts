@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Coordinate parsing: reads what {@link formatCoordinate} writes, and the common hand-typed variants (signed decimal
  * degrees, ASCII marks, space-separated degrees minutes seconds, hemisphere letters before or after, decimal commas).

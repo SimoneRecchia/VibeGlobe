@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The worker-side half of the protocol (ADR 0011 rules 2 and 6): announces the handshake, runs each `run` message's
  * task from the task table, answers every one with exactly one reply, and lets a `cancel` message flag the running

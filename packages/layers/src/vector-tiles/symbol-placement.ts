@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Symbol placement for vector-tile labels (F449, F454), original code (ADR 0041): collision of screen-space boxes in
  * an rbush index with priorities (the topmost style layer first, then `symbol-sort-key`, then importance), a

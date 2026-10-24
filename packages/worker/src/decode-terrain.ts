@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The `decode-terrain` task (F134, ADR 0006 §5): a terrain tile's bytes in, a height grid out, with its heights in a
  * transferred `Float32Array`. Heightmaps are decoded by the browser's image decoder without color conversion, so the

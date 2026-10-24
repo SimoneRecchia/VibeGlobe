@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A GeoTIFF reader for single images (F234), from the data pipeline's reader (`@vibeglobe/tools`, ADR 0024) with
  * DEFLATE through `fflate` so it runs in browsers: classic TIFF, tiled or stripped, chunky samples, no/LZW/DEFLATE

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The `layer.json` of a quantized-mesh terrain source (F128): its tiling scheme, zoom range, tile URL templates,
  * declared extensions and availability, whether listed in full or spread over child tiles (`metadataAvailability`).

@@ -2,7 +2,7 @@
   "name": "@vibeglobe/offline",
   "version": "0.0.0",
   "description": "VibeGlobe offline: persistent cache, network modes, offline packages, connectivity and bandwidth logic.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

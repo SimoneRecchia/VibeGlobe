@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The layer switcher (F425): a button that opens a panel with the base maps (radio buttons: one imagery layer shown)
  * and the overlays (check boxes: imagery overlays and the data layers of a stack the application passes). Visibility changes go

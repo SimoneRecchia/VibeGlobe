@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The message protocol between the worker pool (`@vibeglobe/core`, `scheduler/worker-protocol.ts`) and this worker
  * program, and the task contract (ADR 0011 rules 3, 5 and 6). Core owns the shapes; an incompatible change bumps

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { installStyles, styleRootOf, uninstallStyles } from '../theme/install.js';
 
 /** Values shown by the debug overlay; `undefined` renders as a dash. */

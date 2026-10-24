@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Minimal Protocol Buffers wire-format reading and writing, for OSM PBF and Mapbox Vector Tiles. */
 
 /** Reads fields from a protobuf message. */

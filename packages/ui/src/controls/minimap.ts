@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The overview minimap (F417): a small equirectangular world image with the main view's footprint, the ground shown
  * along the canvas's edges (`Globe.screenToGeo` at points of each edge, so a tilted view draws its trapezoid). It

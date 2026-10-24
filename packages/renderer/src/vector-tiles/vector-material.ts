@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Materials of vector tile meshes (ADR 0131): fills, lines extruded across their screen direction with dashes,
  * building extrusions with flat-shaded walls, and circles. Every vertex follows the surface's precision and morph path

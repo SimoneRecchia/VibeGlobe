@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath The features a layer changed since the last frame, marked as the layers write them and drained into upload
  * runs once per frame by `LayerBatches` (F376–F378): flags in a typed array, so a live feed's changes allocate nothing.

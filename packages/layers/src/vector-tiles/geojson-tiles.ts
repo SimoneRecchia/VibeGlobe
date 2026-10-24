@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * GeoJSON sources of a style (F444; ADR 0131): the data cut into the tiles a frame asks for and encoded as Mapbox
  * Vector Tiles (one layer, {@link GEOJSON_LAYER}, which style layers of a GeoJSON source read: they have no `source-layer`), so they take the same

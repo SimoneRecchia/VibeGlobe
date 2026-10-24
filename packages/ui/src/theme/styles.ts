@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The ui package's stylesheet. Every color, font and size comes from a documented CSS variable ({@link THEME_VARIABLES}),
  * so an application restyles every control by setting variables on the `.vg-ui` element, in a rule of its own

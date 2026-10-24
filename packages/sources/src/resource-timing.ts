@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Network timings of the transport's own responses, from the Resource Timing API (F300): when the response's headers
  * arrived and its last byte, as the browser's network stack saw them. The main thread may notice a response's end a

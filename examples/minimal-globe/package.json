@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "A consumer application with only the core, the renderer, one imagery source and the worker program (F531, F532, F559).",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "build": "vite build"

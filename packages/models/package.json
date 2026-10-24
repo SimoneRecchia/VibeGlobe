@@ -2,7 +2,7 @@
   "name": "@vibeglobe/models",
   "version": "0.0.0",
   "description": "VibeGlobe models: glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding in workers, node transforms and a renderer-neutral model description.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

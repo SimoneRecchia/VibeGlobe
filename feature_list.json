@@ -573,7 +573,7 @@
         "Open the README licensing section and confirm it states that noncommercial use is free, that any commercial use including resale needs a commercial license from the owner, and how to request one",
         "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0015 explains why each allowlisted license permits distribution inside a PolyForm Noncommercial project"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F544",
@@ -587,7 +587,7 @@
         "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature, question and commercial-license templates, a security link instead of blank issues, and the CLA acceptance line",
         "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F545",
@@ -6854,7 +6854,7 @@
         "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
         "Assert every link in the README resolves"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F522",
@@ -6938,7 +6938,7 @@
         "Assert the licensing section, contributing guide, contributor license agreement, security policy and code of conduct are reachable from the navigation",
         "Run a link checker over the built site and assert zero broken links"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F528",
@@ -7122,7 +7122,7 @@
         "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the PolyForm-Noncommercial-1.0.0 license",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F540",
@@ -7146,7 +7146,7 @@
         "Query the repository through the GitHub API and confirm it is public",
         "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F541",
@@ -7159,6 +7159,82 @@
         "Assert all 15 milestone acceptance entries pass",
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F566",
+      "milestone": 1,
+      "section": "Fixed constraints",
+      "description": "VibeGlobe is open source under the Mozilla Public License 2.0: LICENSE.md holds the official MPL-2.0 text, every package.json declares MPL-2.0, every distributed source file opens with the MPL notice, the README explains the license, and every shipped dependency's license allows distribution inside an MPL-2.0 project.",
+      "steps": [
+        "Compare LICENSE.md, and every package's LICENSE.md, with the official MPL-2.0 text from Mozilla and confirm they are identical",
+        "Run npm run check and confirm it requires the SPDX identifier MPL-2.0 in the root, library and app package.json files and the MPL notice at the top of every distributed source file under packages/*/src; confirm its unit tests cover a missing field and a missing notice",
+        "Open the README licensing section and confirm it states MPL-2.0, that any use including commercial use is allowed, that modified VibeGlobe files stay under the MPL, and that there is no separate commercial license",
+        "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0043 explains why each allowlisted license permits distribution inside an MPL-2.0 project"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F567",
+      "milestone": 1,
+      "section": "Documentation and distribution",
+      "description": "The repository has a contributing guide that requires a Developer Certificate of Origin sign-off on every commit, the DCO text, a security policy and a code of conduct with the reporting contact, issue templates and a pull request template that asks for the sign-off.",
+      "steps": [
+        "Open CONTRIBUTING.md and confirm it requires a DCO sign-off (git commit -s) on every commit and states the repository rules (feature list, tests, bugs, licenses, ADRs) and how to submit",
+        "Open DCO.md and confirm it holds the Developer Certificate of Origin 1.1 and the sign-off format",
+        "Open SECURITY.md and CODE_OF_CONDUCT.md and confirm supported versions, a private reporting channel with the owner's contact address, a response time and the enforcement contact",
+        "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature and question templates, a security link instead of blank issues, no commercial-license template, and the sign-off item",
+        "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F568",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The README explains what VibeGlobe is, how to install it from the public npm registry (@vibeglobe), the licensing (MPL-2.0, no separate commercial license), a minimal usage example, and links to every guide.",
+      "steps": [
+        "Open README.md and confirm the npm installation and licensing sections",
+        "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
+        "Assert every link in the README resolves"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F569",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The documentation site also contains the licensing section (MPL-2.0), the contributing guide with the Developer Certificate of Origin, the security policy and the code of conduct with the reporting contact, with no broken links.",
+      "steps": [
+        "Build the documentation site",
+        "Assert the licensing section, contributing guide, Developer Certificate of Origin, security policy and code of conduct are reachable from the navigation",
+        "Run a link checker over the built site and assert zero broken links"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F570",
+      "milestone": 15,
+      "section": "Milestones (all must be completed)",
+      "description": "Version 1.0.0 of every package is published to npm under @vibeglobe with the MPL-2.0 license.",
+      "steps": [
+        "Obtain the owner's approval to publish 1.0.0, as PLAN.md requires for externally visible actions",
+        "Run the release workflow for 1.0.0",
+        "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the MPL-2.0 license",
+        "Install 1.0.0 into a fresh consumer project and assert the globe renders"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F571",
+      "milestone": 15,
+      "section": "Fixed constraints",
+      "description": "By the first release the repository is public, as an open-source project under the Mozilla Public License 2.0.",
+      "steps": [
+        "Obtain the owner's approval to make the repository public, as PLAN.md requires for repository settings",
+        "Query the repository through the GitHub API and confirm it is public and its detected license is MPL-2.0",
+        "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
       "status": "failing"
     }

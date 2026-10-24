@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Lays out one vector tile for the style layers that read its source (F443): decodes the MVT, filters features,
  * clips and tessellates fills, lines and extrusions, and prepares labels (text, glyph ranges, anchors). It runs as a

@@ -15,7 +15,7 @@ function fakePackage(files: Record<string, string>): string {
 
 const manifest = JSON.stringify({
   type: 'module',
-  license: 'PolyForm-Noncommercial-1.0.0',
+  license: 'MPL-2.0',
   types: './dist/index.d.ts',
   exports: { '.': { types: './dist/index.d.ts', source: './src/index.ts', default: './dist/index.js' } },
 });
@@ -58,7 +58,7 @@ describe('assetProblems (F519)', () => {
       package: '@vibeglobe/tools',
       path: 'configs/*.json',
       source: 'VibeGlobe',
-      license: 'PolyForm-Noncommercial-1.0.0',
+      license: 'MPL-2.0',
     },
     {
       package: '@vibeglobe/tools',

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Web Mercator (EPSG:3857) XYZ tile math: the grid every pipeline output and offline package uses. */
 
 /** Latitude limit of the square Web Mercator world, in degrees. */

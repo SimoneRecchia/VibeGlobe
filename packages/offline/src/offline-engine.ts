@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Attribution, TileCoord, TileSource } from '@vibeglobe/core';
 import { ConnectivityMonitor, endpointOf, type HealthCheckTiming } from './connectivity.js';
 import { DEFAULT_CACHE_BYTES, indexedDbStore } from './idb-store.js';

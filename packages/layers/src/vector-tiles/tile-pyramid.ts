@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Which vector tiles to request and draw (F442; ADR 0041). Beyond a source's `maxzoom` the deepest tile is overzoomed:
  * the target tile reads a sub-square of it, scaled up, and no deeper tile is requested. Tiles outside the source's

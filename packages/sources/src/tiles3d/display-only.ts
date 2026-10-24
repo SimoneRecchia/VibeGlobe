@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The display-only refusal of 3D Tiles data access (F323, ADR 0031) through core's `refuseDisplayOnly`, the one the
  * globe's own data-access APIs use: a render extension's source is passed as the only data source in view, so the

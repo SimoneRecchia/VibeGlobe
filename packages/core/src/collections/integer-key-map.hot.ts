@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Looked up for every drawn tile every frame. A Map boxes number keys beyond 31 bits on every call, and surface
  * tile keys pass that from level 16 on (ADR 0018).

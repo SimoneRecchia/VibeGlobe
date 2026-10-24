@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The tile step of vector datasets (F341): an OpenStreetMap PBF extract read in three streaming passes (ways to find
  * the nodes they need, nodes, then ways again), cut into Mapbox Vector Tiles with roads, places and buildings.

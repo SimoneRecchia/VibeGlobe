@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition, Globe, ScreenPoint } from '@vibeglobe/core';
 
 /** A click on the globe: where it landed on the element and on the ellipsoid (undefined in space). */

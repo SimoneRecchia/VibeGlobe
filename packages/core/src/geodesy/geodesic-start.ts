@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Starting azimuth of the inverse geodesic problem (Karney 2013), in the canonical configuration of
  * {@link solveInverse}: β1 ≤ 0, |β2| ≤ |β1|, 0 ≤ λ12 ≤ π.

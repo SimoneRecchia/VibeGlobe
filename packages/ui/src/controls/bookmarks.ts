@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Saved views (F415): bookmarks of the camera (`@vibeglobe/gis` view states, F414) created, listed, opened (a flight,
  * F195) and removed through the API and a panel, exported and imported as JSON. With `storageKey` they persist in the

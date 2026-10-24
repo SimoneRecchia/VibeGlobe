@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Contracts between the tile scheduler, the network transport, the worker pool and the caches (ADR 0007, ADR 0011,
  * docs/plan/m3-imagery-streaming.md §2.2). Core stays DOM-free: sources implement the transport with `fetch` and

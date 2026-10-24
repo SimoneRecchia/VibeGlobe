@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Signed distance field glyphs drawn locally with the canvas 2D API (F448, ADR 0132), original code: the fallback for
  * characters the style's glyph server lacks (CJK with a configured font family), and the generator of the fixture

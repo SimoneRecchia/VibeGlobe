@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Factory functions of the built-in layer kinds (docs/plan/api.md: `globe.layers.add(pointLayer({ ... }))`). */
 import { ClusterLayer, type ClusterLayerOptions } from './cluster-layer.js';
 import { DataLayer, type DataLayerOptions } from './data-layer.js';

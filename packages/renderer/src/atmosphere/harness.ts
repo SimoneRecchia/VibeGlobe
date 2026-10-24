@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The atmosphere harness (e2e/support/atmosphere.html installs it as `window.atmosphereHarness`), driven by the
 // atmosphere track's end-to-end tests. Test code, not exported by the package: it sits here because the end-to-end
 // TypeScript project cannot import the renderer's sources. Until the main session wires the atmosphere into the engine's frame loop

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Geolocation (F413): a toggle button that watches the device's position, shows it as a point with its accuracy as a
  * geodesic circle (data layers, F351, F356) and flies there once (`Globe.flyTo`, which keeps the view mode, F201). The

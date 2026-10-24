@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Anti-aliasing modes (F397): none, a post-process pass (FXAA), or four samples per pixel (MSAA). */
 export type AntialiasMode = 'none' | 'fxaa' | 'msaa4';
 

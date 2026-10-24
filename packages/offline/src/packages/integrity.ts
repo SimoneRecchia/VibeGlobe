@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Integrity checks of package files (F309): SHA-256 of the whole file and of each chunk, and the PMTiles v3 header's
  * layout, so a corruption is reported with the part of the file it hit (header, directories, metadata, tile data).

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Entry of the worker program (ADR 0011 rule 5): one module worker that runs every built-in task for the page-wide
  * pool. It installs the message handler and posts the `ready` handshake as soon as the module has evaluated.

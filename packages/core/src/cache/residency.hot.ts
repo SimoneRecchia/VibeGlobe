@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Touched for every selected and every drawn tile each frame, and trimmed each frame; doubles stay in typed
  * arrays and tile keys are read from arrays the caller holds, so the frame path allocates nothing (ADR 0018).

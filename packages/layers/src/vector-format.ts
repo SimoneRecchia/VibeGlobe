@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vector format adapters as the data layers use them (F371): GeoJSON, KML and KMZ, and GPX through the M7 parsers of
  * `@vibeglobe/sources/vector` (ADR 0030). The parsers never throw: they keep the valid features and report the others

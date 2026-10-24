@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The 2D / 3D / Auto toggle (F421): 2D keeps the tilt at 0°, 3D chooses the default tilt, Auto restores the zoom-driven
  * curves, each through the engine's `setViewMode` (F163), which eases to the new tilt. A Back to Auto button next to it

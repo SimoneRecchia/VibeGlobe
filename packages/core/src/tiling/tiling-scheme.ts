@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import type { TileCoord } from './tile-key.js';
 

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The atmosphere's shader nodes (ADR 0040): the steps of `atmosphere-model.ts` in TSL, for WebGPU and WebGL2 alike.
 // Every function here emits nodes into the shader being built, so it is called inside an `Fn`.
 import {

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Public types of the 3D Tiles render extension (ADR 0141). */
 import type { CreditProfile, RenderExtension, RenderExtensionContext, TaskTable, TileTransport } from '@vibeglobe/core';
 import type { RequestEvent } from './fetcher.js';

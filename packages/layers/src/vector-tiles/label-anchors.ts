@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Label anchors of one tile's symbol bucket (F449, ADR 0132): point labels at their feature's point, line labels every
  * `symbol-spacing` along their line, both fixed at the tile's own zoom (512-pixel tiles), so anchors do not move

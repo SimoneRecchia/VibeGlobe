@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Terrain collision (F146, F147, ADR 0028): how high the camera's target is raised along its normal so the eye keeps
  * its clearance above the terrain. Pure arithmetic, per frame; allocates nothing.

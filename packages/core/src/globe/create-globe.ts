@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { requestingTarget } from '../layers/layer-geometry.js';
 import { extendGlobe, releaseExtensionPools, type ExtensionParts } from './render-extensions.js';
 import { addModel } from '../layers/models.js';

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Reading OpenStreetMap PBF extracts (https://wiki.openstreetmap.org/wiki/PBF_Format): blobs of zlib-compressed
  * primitive blocks with dense nodes, nodes and ways. Relations are not read (multipolygon buildings are a follow-up).

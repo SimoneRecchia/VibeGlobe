@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Places laid-out vector tile geometry on the globe and the flat map (ADR 0131): every vertex in tile units gets the
  * attributes a surface tile vertex carries (offsets from the tile's origin, ellipsoid normal, Web Mercator plane

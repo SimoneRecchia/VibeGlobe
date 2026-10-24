@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { MERCATOR_HALF_WORLD_M, METERS_PER_DEGREE, STANDARD_PIXEL_M, tilingOfCrs } from './crs.js';
 import type { WmtsTileMatrix, WmtsTileMatrixSet } from './wmts-capabilities.js';
 

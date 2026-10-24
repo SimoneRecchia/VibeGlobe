@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { CameraMovement, CameraState, GeoPosition, NavigationApi, ScreenPoint, ViewInit } from '@vibeglobe/core';
 import { createControls, type NavigationControls } from './create-controls.js';
 import type { ControlsOptions } from './options.js';

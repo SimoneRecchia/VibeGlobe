@@ -12,7 +12,7 @@
     "path": "configs/*.json",
     "description": "The pipeline's dataset configurations and their pinned source lists, written for this project",
     "source": "VibeGlobe",
-    "license": "PolyForm-Noncommercial-1.0.0"
+    "license": "MPL-2.0"
   },
   {
     "package": "@vibeglobe/worker",
@@ -42,6 +42,6 @@
     "path": "wasm/third-party.json",
     "description": "The record of the compiled components",
     "source": "VibeGlobe",
-    "license": "PolyForm-Noncommercial-1.0.0"
+    "license": "MPL-2.0"
   }
 ]

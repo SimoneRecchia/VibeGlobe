@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Fixture host application that loads the engine with a dynamic import after a user action (F547).",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "build": "vite build",

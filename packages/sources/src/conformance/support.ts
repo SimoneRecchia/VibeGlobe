@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** One check of a conformance suite and its outcome. */
 export interface CheckResult {
   /** The adapter or fixture the check ran against. */

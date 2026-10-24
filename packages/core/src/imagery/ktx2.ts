@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The KTX2 container reader and target choice of ADR 0020 (rules 2, 3 and 6): validates a file and predicts the bytes
  * of every level before any WebAssembly runs, and picks the GPU format a tile is transcoded to. Pure functions, run in

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Applied to the camera once per frame after input and movements (F209–F211): doubles stay in arrays.
  * @benchmark packages/core/src/globe/frame-allocation.test.ts

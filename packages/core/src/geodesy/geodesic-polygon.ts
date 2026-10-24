@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Lengths of geodesic polylines and areas of geodesic polygons on the WGS84 ellipsoid, after C. F. F. Karney,
  * "Algorithms for geodesics", J. Geodesy 87 (2013): a polygon's area is the sum of the areas S12 between

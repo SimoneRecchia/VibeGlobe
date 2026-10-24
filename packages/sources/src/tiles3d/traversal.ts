@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * 3D Tiles traversal (F461, F462; ADR 0041): selects the tiles to draw by screen-space error and the requests to make,
  * once per frame. A tile refines when its screen-space error, `geometricError × viewportHeight / (2 × distance ×

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The coordinates readout (F406): the position and elevation under the pointer, or at the view center while the map
  * is navigated with the keyboard, in the chosen format. Formatting comes from `@vibeglobe/gis` (F405).

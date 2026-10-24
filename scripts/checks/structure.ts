@@ -1,4 +1,4 @@
-import type { WorkspacePackage } from '../workspace.ts';
+import type { SourceFile, WorkspacePackage } from '../workspace.ts';
 
 /** Library packages required by PLAN.md "Architecture guidance", published as `@vibeglobe/<dir>`. */
 export const LIBRARY_PACKAGES = [
@@ -16,8 +16,20 @@ export const LIBRARY_PACKAGES = [
 ];
 const REQUIRED_APPS = ['playground'];
 
-/** SPDX identifier that every package.json declares, the root included (ADR 0015). */
-export const PROJECT_LICENSE = 'PolyForm-Noncommercial-1.0.0';
+/** SPDX identifier that every package.json declares, the root included (ADR 0043). */
+export const PROJECT_LICENSE = 'MPL-2.0';
+
+/** The MPL 2.0 Exhibit A notice every distributed source file opens with (after a shebang line), ADR 0043. */
+const LICENSE_NOTICE =
+  /^(#![^\n]*\n)?(\/\/|<!--) This Source Code Form is subject to the terms of the Mozilla Public License, v\. 2\.0\./;
+
+/** Reports distributed sources (not tests, declarations or fixtures) that do not open with the MPL notice. */
+export function findLicenseHeaderViolations(sources: readonly SourceFile[]): string[] {
+  return sources
+    .filter((source) => !/\.(test|spec)\.ts$|\.d\.ts$|\/__fixtures__\//.test(source.path))
+    .filter((source) => !LICENSE_NOTICE.test(source.content))
+    .map((source) => `${source.path}: must open with the MPL 2.0 notice (Exhibit A)`);
+}
 
 /** Reports a manifest at `dir` whose license is not the project license. */
 export function findLicenseViolation(dir: string, license: string | undefined): string[] {

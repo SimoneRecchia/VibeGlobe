@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * OGC 3D Tiles 1.0 and 1.1 tileset JSON (F460; ADR 0041): the tile tree with world transforms, bounding volumes,
  * geometric errors, inherited refinement, single and multiple contents, external tilesets, implicit tiling roots

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "A consumer application that starts with the core and the renderer and loads each optional module only when it is enabled (F503).",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "build": "vite build"

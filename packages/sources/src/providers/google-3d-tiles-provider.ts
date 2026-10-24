@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Google Photorealistic 3D Tiles (F468–F470, F323; ADR 0031, ADR 0141) through the Map Tiles API with the customer's
  * own key: the root tileset (`v1/3dtiles/root.json`) starts a session, whose token Google writes into the tileset's

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The material of raster meshes (F445, ADR 0133): a tile square that follows the globe, the morph and the terrain like
  * a fill, textured with the tile's image (raster tiles, hillshade shading, heatmap colors). Raster paint is applied in

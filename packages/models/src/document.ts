@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The parts of a glTF 2.0 document this package reads, as {@link validateGltf} returns them: every index checked
  * against its array, every number checked for its range. Fields the package ignores (animations, skins, cameras)

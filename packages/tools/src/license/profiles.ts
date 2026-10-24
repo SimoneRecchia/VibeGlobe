@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Built-in provider profiles: the license and attribution of every source the pipeline and the package builder know,
  * as re-verified in ADR 0025 (docs/adr/0025-default-data-licenses.md). The attribution strings here are the ones the
@@ -167,12 +169,12 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
   {
     id: 'fixture',
     name: 'VibeGlobe test fixture',
-    license: 'PolyForm-Noncommercial-1.0.0',
-    licenseUrl: 'https://polyformproject.org/licenses/noncommercial/1.0.0/',
+    license: 'MPL-2.0',
+    licenseUrl: 'https://mozilla.org/MPL/2.0/',
     termsReadDate: '2026-10-21',
     attribution: 'VibeGlobe test fixture',
     sourceUrl: 'https://github.com/SimoneRecchia/VibeGlobe',
-    commercialUse: false,
+    commercialUse: true,
     redistribution: true,
     offlinePackaging: true,
   },

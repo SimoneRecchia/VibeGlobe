@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Synthetic source data for sample builds without real downloads: the documented fixture stub of Sentinel-2 cloudless
  * originals (when the owner's requester-pays access is unavailable) and a small OpenStreetMap extract. Content is a

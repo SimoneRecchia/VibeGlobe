@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A local HTTP server for sample builds and tests (`vibeglobe-data fixtures serve`): the synthetic Sentinel-2 cloudless
  * stub, a synthetic OpenStreetMap extract, synthetic XYZ tiles and, optionally, a static folder served like any plain

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Runs every frame for every drawn surface tile and imagery layer; results go into typed arrays, no doubles
  * cross a call boundary (ADR 0018).

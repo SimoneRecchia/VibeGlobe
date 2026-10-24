@@ -1,6 +1,6 @@
 # 0015. Owner decisions of 2026-10-20 (open questions 1–12)
 
-- Status: Accepted
+- Status: Accepted (license part, item 7, superseded by 0043)
 - Date: 2026-10-20
 - Milestone: M1 (applies to every milestone)
 

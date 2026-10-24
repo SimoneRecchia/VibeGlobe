@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A minimal typed event emitter; handler errors are isolated so one subscriber cannot break the frame loop. Handlers
  * live in arrays replaced on change (copy on write), so emitting allocates nothing.

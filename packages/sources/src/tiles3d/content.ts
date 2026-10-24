@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * 3D Tiles tile content (F460; ADR 0041): the 1.0 binary formats (Batched 3D Model `b3dm`, Instanced 3D Model `i3dm`,
  * Point Cloud `pnts`, Composite `cmpt`) and 1.1 glTF content (`glb`, or glTF JSON). Headers, feature tables and batch

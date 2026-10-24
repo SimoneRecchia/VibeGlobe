@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Places the labels of the drawn tiles each frame (F448, F449, F454; ADR 0132): projects their anchors to the screen,
  * hides those behind the globe, lays point labels out around their anchor and line labels glyph by glyph along their

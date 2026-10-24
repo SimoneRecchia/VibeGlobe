@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The built-in data layer: one batch of points, markers, labels, lines, polygons or circles, styled by MapLibre
  * expressions and updated feature by feature (F369, F370, F372, F376, F377).

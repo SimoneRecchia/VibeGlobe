@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { DebugMeshData, DepthPath, TileMeshData } from '@vibeglobe/core';
 import { positionLocal, sin, vec3 } from 'three/tsl';
 import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial, type Scene } from 'three/webgpu';

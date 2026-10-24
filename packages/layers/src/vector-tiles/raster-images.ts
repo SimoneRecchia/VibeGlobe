@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Images of raster-like style layers (F445, ADR 0133), made on the CPU and drawn as textured tile squares: hillshade
  * shading from a raster-dem tile, and heatmap densities of a tile's points colored by `heatmap-color`. Both are straight

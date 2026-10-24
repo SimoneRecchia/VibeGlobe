@@ -3,7 +3,13 @@ import type { WorkspacePackage } from '../workspace.ts';
 import { importSpecifiers, packageNameOf } from '../workspace.ts';
 import { findDependencyViolations } from './dependencies.ts';
 import { findHotPathViolations } from './hot-paths.ts';
-import { LIBRARY_PACKAGES, PROJECT_LICENSE, findLicenseViolation, findStructureViolations } from './structure.ts';
+import {
+  LIBRARY_PACKAGES,
+  PROJECT_LICENSE,
+  findLicenseHeaderViolations,
+  findLicenseViolation,
+  findStructureViolations,
+} from './structure.ts';
 
 function pkg(
   dir: string,
@@ -86,12 +92,10 @@ describe('findStructureViolations', () => {
     delete find(workspace, 'packages/core').manifest.license;
     find(workspace, 'apps/playground').manifest.license = 'MIT';
     expect(findStructureViolations(workspace)).toEqual([
-      'packages/core: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
-      'apps/playground: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
+      'packages/core: package.json must declare "license": "MPL-2.0"',
+      'apps/playground: package.json must declare "license": "MPL-2.0"',
     ]);
-    expect(findLicenseViolation('.', undefined)).toEqual([
-      '.: package.json must declare "license": "PolyForm-Noncommercial-1.0.0"',
-    ]);
+    expect(findLicenseViolation('.', undefined)).toEqual(['.: package.json must declare "license": "MPL-2.0"']);
     expect(findLicenseViolation('.', PROJECT_LICENSE)).toEqual([]);
   });
 
@@ -149,12 +153,39 @@ describe('findDependencyViolations', () => {
   });
 });
 
+const NOTICE =
+  '// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not\n' +
+  '// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.\n';
+
+describe('findLicenseHeaderViolations (ADR 0043)', () => {
+  it('requires the MPL notice in distributed sources, after a shebang, and not in tests', () => {
+    const sources = [
+      { path: 'packages/core/src/a.ts', content: `${NOTICE}export const a = 1;` },
+      { path: 'packages/tools/src/bin.ts', content: `#!/usr/bin/env node\n${NOTICE}run();` },
+      {
+        path: 'packages/vue/src/A.vue',
+        content: '<!-- This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. -->',
+      },
+      { path: 'packages/core/src/b.ts', content: 'export const b = 2;' },
+      { path: 'packages/core/src/b.test.ts', content: 'test();' },
+    ];
+    expect(findLicenseHeaderViolations(sources)).toEqual([
+      'packages/core/src/b.ts: must open with the MPL 2.0 notice (Exhibit A)',
+    ]);
+  });
+});
+
 describe('findHotPathViolations', () => {
   const exists = (path: string): boolean => path === 'benchmarks/frame-loop.bench.ts';
 
   it('accepts a documented hot-path module', () => {
     const content =
       '/**\n * @hotpath Runs every frame for every tile.\n * @benchmark benchmarks/frame-loop.bench.ts\n */\nexport const x = 1;';
+    expect(findHotPathViolations([{ path: 'packages/core/src/a.hot.ts', content }], exists)).toEqual([]);
+  });
+
+  it('reads the header after the license notice', () => {
+    const content = `${NOTICE}/**\n * @hotpath Runs every frame.\n * @benchmark benchmarks/frame-loop.bench.ts\n */\nexport const x = 1;`;
     expect(findHotPathViolations([{ path: 'packages/core/src/a.hot.ts', content }], exists)).toEqual([]);
   });
 

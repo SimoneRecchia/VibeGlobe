@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The page-wide network pool of ADR 0007: it owns host slots, so per-host and overall limits hold across engine
  * instances and sources (F089); coalesces concurrent needs for one tile into one transport request (F095); aborts a

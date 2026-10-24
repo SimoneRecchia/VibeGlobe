@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The optimal zoom-and-pan path of van Wijk and Nuij ("Smooth and efficient zooming and panning", 2003) for flights
  * (F195): the view's width w and its center's travelled distance u along a path parameter s, so that the camera

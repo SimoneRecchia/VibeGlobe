@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The 3D Tiles loader's requests (F462; ADR 0141): its own priority queue in front of the page's request pool
  * (`context.network`: per-host limits, coalescing, cancellation, the measured link). The pool grants a slot on a host

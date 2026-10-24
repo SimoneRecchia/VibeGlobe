@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The engine's observability (M3 plan, increment 8): phase timing with User Timing measures (F118, F119), leveled
  * logging with a pluggable sink (F120) and event traces (F121). Everything is off or quiet by default and then costs

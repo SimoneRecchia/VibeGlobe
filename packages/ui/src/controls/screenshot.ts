@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The screenshot control (F416): a PNG of the current view, taken once the view has loaded (the engine's `idle`), from
  * the engine's own frame (`Globe.captureFrame`), with the credits of the visible sources (`Globe.credits()`: text and

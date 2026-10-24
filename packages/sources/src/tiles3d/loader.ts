@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The 3D Tiles render extension (F461–F467; ADR 0141): `Globe.addRenderExtension(tiles3d({ url, meshes }))`. Each
  * frame it selects tiles by screen-space error (`selectTiles`, REPLACE and ADD, no holes), queues the content and

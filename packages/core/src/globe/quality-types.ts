@@ -15,6 +15,7 @@ export interface QualitySettings {
   readonly maxScreenErrorPx?: number;
   /** Anisotropic filtering of imagery, at most the device's (F398; default its maximum). */
   readonly anisotropy?: number;
+  /** Multisampling (`msaa4`, the default, where the renderer allows it), an FXAA pass, or none (F397, KB-140). */
   readonly antialias?: AntialiasMode;
   /** The atmosphere (F391–F396; default 'off'). */
   readonly atmosphere?: AtmosphereLevel;

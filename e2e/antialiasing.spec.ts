@@ -143,3 +143,33 @@ for (const backend of ['webgpu', 'webgl2'] as const)
       }
     }
   });
+
+for (const backend of ['webgpu', 'webgl2'] as const)
+  test(`the antialias quality setting changes the edges at run time: none aliased, msaa4 and fxaa smoothed, on ${backend} (KB-140, F398)`, async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const [, query, measure] = SCENES[1];
+    await openGlobe(page, `backend=${backend}&${query}`);
+    const shares: Record<string, number> = {};
+    for (const antialias of ['none', 'msaa4', 'fxaa', 'none'] as const) {
+      await page.evaluate(
+        (mode) => window.vibeglobePlayground?.globe.setQualitySettings({ antialias: mode }),
+        antialias,
+      );
+      // The change rebuilds the renderer or its passes: wait until the frames show it.
+      await expect
+        .poll(
+          async () => (await page.evaluate(() => window.vibeglobePlayground?.globe.qualitySettings.antialias)) ?? '',
+        )
+        .toBe(antialias);
+      const { steps, share } = measure(await frame(page));
+      shares[antialias] = share;
+      console.log(
+        `[antialiasing] ${backend} ${antialias}: ${steps} slanted steps, ${(share * 100).toFixed(0)}% smoothed`,
+      );
+      expect(steps, `${antialias}: slanted edges in view`).toBeGreaterThan(20);
+      if (antialias === 'none') expect(share, 'none: aliased').toBeLessThan(ALIASED_SHARE);
+      else expect(share, `${antialias}: smoothed`).toBeGreaterThanOrEqual(SMOOTH_SHARE);
+    }
+  });

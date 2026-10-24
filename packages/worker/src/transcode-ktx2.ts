@@ -153,6 +153,8 @@ export function createTranscodeKtx2(load: TranscoderLoader) {
         return wasm;
       })
       .catch((error: unknown) => {
+        // A failed load (a reset connection) is not kept: the next KTX2 task loads it again (TH-01).
+        instance = undefined;
         const reason = error instanceof Error ? error.message : String(error);
         throw new TaskError('format-unsupported', `the KTX2 transcoder could not be loaded: ${reason}`);
       }));

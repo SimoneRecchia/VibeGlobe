@@ -27,7 +27,7 @@ import { LayerBatches } from './layer-batches.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import { chooseWebGPU, decodeBitmap } from './environment.js';
+import { chooseWebGPU, decodeBitmap, surfaceScope } from './environment.js';
 import * as surface from './surface-material.js';
 import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
@@ -38,6 +38,7 @@ import { BackendCounters } from './backend-counters.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import { releaseMesh } from './release-mesh.js';
 import { SceneAtmosphere } from './atmosphere/scene-atmosphere.js';
+import { Antialiasing } from './antialiasing.js';
 import type { BackendSettings } from './backend-settings.js';
 
 export type { BackendSettings } from './backend-settings.js';
@@ -125,6 +126,8 @@ export class ThreeBackend implements RendererBackend {
   private lossWatch: LossWatch = { held: () => false, stop: () => undefined };
   /** The active depth path (ADR 0005 §4). */
   private depthPath: DepthPath = 'reversed-z';
+  /** Multisampling or the FXAA pass (KB-140). */
+  private readonly antialiasing = new Antialiasing();
 
   private constructor(
     private readonly surface: DrawingSurface,
@@ -154,15 +157,8 @@ export class ThreeBackend implements RendererBackend {
     return this.canvases.inputElement;
   }
 
-  /** The global scope the canvas lives in: the page's window, or the worker's global scope. */
-  private scope(): typeof globalThis {
-    return this.surface.kind === 'element'
-      ? ((this.surface.container.ownerDocument.defaultView ?? globalThis) as typeof globalThis)
-      : globalThis;
-  }
-
   private async initRenderer(): Promise<void> {
-    const scope = this.scope();
+    const scope = surfaceScope(this.surface);
     const choice = this.webgpuFailure === undefined ? this.settings.choice : 'webgl2';
     const webgpu = await chooseWebGPU(scope, this.surface, choice);
     const forceWebGL = !webgpu;
@@ -341,7 +337,7 @@ export class ThreeBackend implements RendererBackend {
     this.atmosphere.update(view);
     this.beginFrame();
     this.counters.beforeRender();
-    this.renderer.render(this.scene, this.camera);
+    this.antialiasing.render(this.renderer, this.scene, this.camera);
     this.counters.afterRender(this.renderer, this.settings.gpuTiming);
     return true;
   }
@@ -370,14 +366,21 @@ export class ThreeBackend implements RendererBackend {
   /** The frame just drawn, read from the canvas in the calling task (ADR 0012, Capture). */
   readonly capture = (): Promise<FrameCapture> => captureCanvas(this.canvases.drawingCanvas);
 
-  /** Applies the effects of the engine's quality settings (F398, F399): anisotropy and the atmosphere level. */
+  /**
+   * Applies the effects of the engine's quality settings (F398, F399, KB-140): anisotropy, the atmosphere level and the
+   * anti-aliasing.
+   */
   setQuality(quality: RendererQuality): Promise<void> | undefined {
     this.anisotropy = quality.anisotropy;
     if (!this.destroyed) this.tileTextures.refilter(this.renderer, this.imageryTexture);
-    // The atmosphere appearing or going away rebuilds the surface material that it shades.
-    if (!this.atmosphere.setQuality(quality, this.depthPath) || this.destroyed || !this.imageryTexture)
-      return undefined;
-    return this.swapMaterial(this.imageryTexture);
+    const atmosphereChanged = this.atmosphere.setQuality(quality, this.depthPath);
+    if (this.destroyed || this.failed) return undefined;
+    this.antialiasing.set(quality.antialias);
+    // A recovering backend loads the pass with its new renderer; the atmosphere appearing or going away rebuilds the
+    // surface material that it shades.
+    const pass = this.recovering ? undefined : this.antialiasing.prepare(this.renderer, this.scene, this.camera);
+    const material = atmosphereChanged && this.imageryTexture ? this.swapMaterial(this.imageryTexture) : undefined;
+    return pass || material ? Promise.all([pass, material]).then(() => undefined) : undefined;
   }
 
   /**
@@ -422,6 +425,7 @@ export class ThreeBackend implements RendererBackend {
 
   private async recover(delayMs: number): Promise<void> {
     try {
+      this.antialiasing.release();
       this.renderer.dispose();
       this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
       this.tileTextures.disposeTextures();
@@ -440,6 +444,7 @@ export class ThreeBackend implements RendererBackend {
         return;
       }
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
+      await this.antialiasing.prepare(this.renderer, this.scene, this.camera);
       this.canvases.attach();
       this.recovering = false;
       this.events.deviceRestored();

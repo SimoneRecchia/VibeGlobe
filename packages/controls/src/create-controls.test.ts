@@ -147,6 +147,35 @@ describe('wheel and trackpad zoom (F168, F169)', () => {
     expect(h.prevented()).toBe(4);
   });
 
+  it('forgets a held Ctrl when the window loses focus, so a later pinch stays a pinch (KB-151)', () => {
+    const h = controlsHarness();
+    // Ctrl+L: the keyup lands in the address bar.
+    h.key('keydown', 'Control');
+    h.fireWindow('blur');
+    h.fire('wheel', { clientX: 210, clientY: 170, deltaY: -2, deltaMode: 0, ctrlKey: true });
+    h.frame();
+    expect(h.camera.zoom).toBeCloseTo(2 / 100, 12);
+  });
+
+  it('learns a Ctrl held before the page had focus from the mouse moving over the map (KB-151)', () => {
+    const h = controlsHarness();
+    // No keydown reached the page; the mouse reports the key.
+    h.pointer('pointermove', { x: 210, y: 170, t: 0, ctrlKey: true });
+    h.fire('wheel', { clientX: 220, clientY: 190, deltaY: -3, deltaMode: 0, ctrlKey: true });
+    h.frame();
+    expect(h.camera.zoom).toBeCloseTo(3 / 300, 12);
+  });
+
+  it('ignores Safari gesture events during a two-finger touch, which iPadOS sends for it too (KB-152)', () => {
+    const h = controlsHarness();
+    h.pointer('pointerdown', { x: 100, y: 100, t: 0, id: 1, pointerType: 'touch' });
+    h.pointer('pointerdown', { x: 200, y: 100, t: 0, id: 2, pointerType: 'touch' });
+    h.fire('gesturestart', {});
+    h.fire('gesturechange', { scale: 2, rotation: 10, clientX: 160, clientY: 120 });
+    h.frame();
+    expect([h.camera.zooms, h.camera.headingDeg]).toEqual([0, 0]);
+  });
+
   it('applies a notch in one step once two animation frames in a row came three time constants late (slow displays)', async () => {
     let host = 0;
     const h = controlsHarness({}, { hostNow: () => host });

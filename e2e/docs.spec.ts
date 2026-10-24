@@ -21,7 +21,8 @@ test('documentation site serves the guides and the API reference of every packag
     await expect(page.getByRole('link', { name: `@vibeglobe/${name}`, exact: true }).first()).toBeVisible();
   }
 
-  await page.goto(`${DOCS_URL}/classes/_vibeglobe_core.FrameStats.html`);
+  // FrameStats is documented under its entry point, `@vibeglobe/core/diagnostics`.
+  await page.goto(`${DOCS_URL}/classes/_vibeglobe_core_diagnostics.FrameStats.html`);
   await expect(page.getByRole('heading', { name: /FrameStats/ }).first()).toBeVisible();
   await expect(page.getByText('Rolling frame-time statistics over the most recent frames.').first()).toBeVisible();
 

@@ -1,4 +1,5 @@
-import { FrameStats, type GeoPosition, type Globe } from '@vibeglobe/core';
+import type { GeoPosition, Globe } from '@vibeglobe/core';
+import { FrameStats } from '@vibeglobe/core/diagnostics';
 
 /** Called once per frame with the frame statistics after the frame was recorded. */
 export type FrameListener = (stats: FrameStats, timestampMs: number) => void;

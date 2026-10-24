@@ -3,7 +3,6 @@
  * Framework-agnostic core of VibeGlobe: math, WGS84 geodesy, camera, tiling, scheduling, cache and events.
  * @module @vibeglobe/core
  */
-export { FrameStats } from './diagnostics/frame-stats.js';
 export { WGS84 } from './geodesy/wgs84.js';
 export type { Ellipsoid } from './geodesy/wgs84.js';
 export { ecefToGeodetic, geodeticToEcef } from './geodesy/ecef.js';
@@ -209,11 +208,5 @@ export {
   type LayerRenderTarget,
   type Placement,
 } from './layers/layer-target.js';
-export {
-  layerOrigin,
-  projectLayerPoint,
-  writeLayerVertex,
-  type LayerOrigin,
-  type LayerVertices,
-} from './layers/layer-geometry.js';
+export { layerOrigin, writeLayerVertex, type LayerOrigin, type LayerVertices } from './layers/layer-geometry.js';
 export type { ModelHandle, ModelOptions, ModelPose, ModelRenderer } from './layers/models.js';

@@ -68,7 +68,7 @@ export class EngineQuality {
     this.quality = {
       maxScreenErrorPx: initial.maxScreenErrorPx ?? 1,
       anisotropy: quality.anisotropy ?? 64,
-      antialias: quality.antialias ?? 'none',
+      antialias: quality.antialias ?? 'msaa4',
       atmosphere: quality.atmosphere ?? 'off',
       fog: quality.fog ?? true,
     };

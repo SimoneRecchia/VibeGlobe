@@ -1,5 +1,6 @@
 // A strict consumer of the built packages: it must type-check against their published declarations.
-import { FrameStats, WGS84, type Ellipsoid } from '@vibeglobe/core';
+import { WGS84, type Ellipsoid } from '@vibeglobe/core';
+import { FrameStats } from '@vibeglobe/core/diagnostics';
 import type {} from '@vibeglobe/controls';
 import type {} from '@vibeglobe/layers';
 import type {} from '@vibeglobe/offline';

@@ -1,11 +1,5 @@
-import {
-  enuFrame,
-  morphPointInto,
-  projectLayerPoint,
-  type FrameView,
-  type ModelPose,
-  type ModelRenderer,
-} from '@vibeglobe/core';
+import { enuFrame, morphPointInto, type FrameView, type ModelPose, type ModelRenderer } from '@vibeglobe/core';
+import { projectLayerPoint } from '@vibeglobe/core/layers';
 import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
 import {
   Box3,

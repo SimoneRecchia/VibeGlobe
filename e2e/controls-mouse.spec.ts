@@ -45,6 +45,8 @@ for (const backend of BACKENDS) {
   test(`dragging keeps the grabbed point under the pointer on the globe, tilted, across the antimeridian and near the pole on ${backend} (F178)`, async ({
     page,
   }) => {
+    // Five views, each opened and settled: 26–28 s alone on SwiftShader, past the 30 s default beside other tests.
+    test.setTimeout(60_000);
     await openControls(page, `backend=${backend}&lon=10&lat=45&zoom=3`);
     await dragKeepsAnchor(page, { xPx: 400, yPx: 300 }, { xPx: 520, yPx: 360 });
     await openControls(page, `backend=${backend}&lon=179.5&lat=0&zoom=6`);

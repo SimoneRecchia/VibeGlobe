@@ -25,7 +25,7 @@ import {
   GreaterEqualDepth,
   Matrix3,
   MeshBasicNodeMaterial,
-  Vector2,
+  Vector3,
   Vector4,
   type Node,
   type Texture,
@@ -79,8 +79,9 @@ export function createLayerMaterial(
 ): MeshBasicNodeMaterial {
   const morphParams = uniform(new Vector4(0, 1, 1, 0));
   const morphAxes = uniform(new Matrix3());
-  const viewport = uniform(new Vector2(1, 1));
-  const pixelRatio = uniform(1);
+  // CSS pixels wide and high, and the device pixel ratio.
+  const viewport = uniform(new Vector3(1, 1, 1));
+  const pixelRatio = viewport.z;
   const normal = attribute('tileNormal', 'vec3');
   const plane = attribute('tilePlane', 'vec4');
   const height = attribute('layerHeight', 'float');
@@ -102,7 +103,7 @@ export function createLayerMaterial(
       pull,
     );
     const otherClip = cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(other, 1)));
-    const direction = normalize(otherClip.xy.div(otherClip.w).sub(clip.xy.div(clip.w)).mul(viewport));
+    const direction = normalize(otherClip.xy.div(otherClip.w).sub(clip.xy.div(clip.w)).mul(viewport.xy));
     // corner.x: the side (±1), corner.y: half the width in pixels.
     offsetPx = vec2(direction.y.negate(), direction.x).mul(corner.x).mul(corner.y);
   }
@@ -110,7 +111,7 @@ export function createLayerMaterial(
   material.vertexNode =
     shape === 'flat' || shape === 'solid'
       ? clip
-      : vec4(clip.xy.add(offsetPx.mul(2).div(viewport).mul(clip.w)), clip.z, clip.w);
+      : vec4(clip.xy.add(offsetPx.mul(2).div(viewport.xy).mul(clip.w)), clip.z, clip.w);
   if (depthPath === 'fragment') {
     material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
     material.depthFunc = GreaterEqualDepth;
@@ -128,7 +129,6 @@ export function createLayerMaterial(
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;
   material.userData['viewport'] = viewport;
-  material.userData['pixelRatio'] = pixelRatio;
   return material;
 }
 
@@ -212,14 +212,17 @@ function labelColor(
   return { rgb: color.xyz.mul(fa).add(halo.mul(ha)).div(max(alpha, 1e-4)), alpha };
 }
 
-/** Sets the CSS-pixel viewport a layer material offsets its screen-sized parts in, and its device pixel ratio. */
+/**
+ * Sets the CSS-pixel viewport a layer material offsets its screen-sized parts in, and its device pixel ratio, from the
+ * frame's view: the view itself is passed, as a double argument to a call V8 does not inline is boxed (F064).
+ */
 export function setLayerViewport(
   material: MeshBasicNodeMaterial,
-  widthPx: number,
-  heightPx: number,
-  pixelRatio = 1,
+  view: { readonly widthPx: number; readonly heightPx: number; readonly pixelRatio: number },
 ): void {
-  (material.userData['viewport'] as { value: Vector2 } | undefined)?.value.set(widthPx, heightPx);
-  const ratio = material.userData['pixelRatio'] as { value: number } | undefined;
-  if (ratio) ratio.value = pixelRatio;
+  (material.userData['viewport'] as { value: Vector3 } | undefined)?.value.set(
+    view.widthPx,
+    view.heightPx,
+    view.pixelRatio,
+  );
 }

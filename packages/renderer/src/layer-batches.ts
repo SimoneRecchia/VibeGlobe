@@ -329,7 +329,7 @@ export class LayerBatches implements LayerRenderTarget {
       const material = this.materialList[i];
       if (!material) continue;
       setSurfaceMorph(material, view.morph);
-      setLayerViewport(material, view.widthPx, view.heightPx, view.pixelRatio);
+      setLayerViewport(material, view);
     }
   }
 

@@ -15,6 +15,7 @@ import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imag
 import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
+import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
@@ -97,31 +98,6 @@ function terrainDecodeTask(
   };
 }
 
-/** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
-let pagePool: { pool: NetworkPool; users: number } | undefined;
-
-/** Takes a share of the page's network pool (also for render extensions on a globe without imagery, track D hook 4). */
-export function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
-  pagePool ??= {
-    pool: new NetworkPool({
-      now: () => host.now(),
-      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
-      clearTimer: (handle) => host.clearTimer(handle),
-      adaptive: true,
-    }),
-    users: 0,
-  };
-  pagePool.users++;
-  return pagePool.pool;
-}
-
-/** Releases a share taken with {@link acquireNetworkPool}. */
-export function releaseNetworkPool(pool: NetworkPool): void {
-  if (pagePool?.pool !== pool || --pagePool.users > 0) return;
-  pool.dispose();
-  pagePool = undefined;
-}
-
 /**
  * The imagery of one engine instance (M3 plan §2.3): a loader per layer over a network pool, a lease on the shared
  * worker pool, and the memory they share (GPU residency and RAM tier, ADR 0007). Each frame wants tiles between the
@@ -140,6 +116,8 @@ export class ImageryRuntime {
   nextIndex: number;
   /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
   readonly preload = new FlightPreload();
+  /** The tiles of the view a flight will show in about a second, loaded instead of the current view's (F287). */
+  readonly ahead = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
   private readonly byIndex = new Map<number, ImageryLoader>();
@@ -391,6 +369,7 @@ export class ImageryRuntime {
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
+    if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
     if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
     const terrain = this.terrain;

@@ -3,7 +3,7 @@ import type { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
-import { acquireNetworkPool, releaseNetworkPool } from './imagery-runtime.js';
+import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
 import type { CreditedSource } from '../imagery/credits.js';
 import { extensionCredits, type RuntimeCredits } from './runtime-credits.js';
 import type { FrameView, RendererBackend } from './types.js';

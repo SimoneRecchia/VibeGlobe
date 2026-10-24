@@ -51,8 +51,8 @@ coincides with the engine's terrain avoids z-fighting (F467), and how Google's 3
 Requests go through the page's request pool with the loader's own priority queue (`TileFetcher`, a `NetworkPool`
 client), and are cancelled when traversal no longer uses their tile (a loading tile is not re-requested, so "not in
 this frame's requests" alone would cancel every request each frame). Models decode with `parse-model` on the engine's
-workers; until the worker program registers it (hook request E (1)), the loader uses a worker of the application's
-own (`modelWorker`, the playground's `tiles3d-model-worker.ts`), else the task table it gives (`modelTasks`) on the
+workers, with the Draco decoder's URL in each task (`dracoWasmUrl`); on an engine whose worker program lacks the task,
+the loader uses a worker of the application's own (`modelWorker`), else the task table it gives (`modelTasks`) on the
 main thread. KTX2 textures transcode with the worker program's `transcode-ktx2` task.
 
 ## Consequences
@@ -63,8 +63,7 @@ main thread. KTX2 textures transcode with the worker program's `transcode-ktx2` 
 - Render extensions need a globe with tiled imagery to receive `network` and `workers`; without them the loader
   falls back to six requests at once and the fallback task table.
 - The fallback model worker bundles meshoptimizer's decoder, whose Blob-worker code built bundles refuse (F100): the
-  playground starts it only on its development server, so its production build decodes 3D Tiles content once the
-  worker program registers `parse-model` (hook request E (1)); applications that pass `modelTasks` meet the same
-  check in their own bundles.
+  playground starts it only on its development server; applications that pass `modelTasks` meet the same check in
+  their own bundles.
 - Credits of render extensions cannot reach the engine's attribution yet (hook request E (2)); the playground's
   Google scenario shows the logo and copyrights in its own pinned element meanwhile.

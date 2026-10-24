@@ -639,23 +639,23 @@ models, C hook 2), the Google Photorealistic 3D Tiles adapter (`google3dTiles`),
 `3dtiles-city` and `3dtiles-google`, and a generated fixture city (`e2e/fixtures/tiles3d/`, variants plain, Draco,
 meshopt, KTX2 and on terrain). Hook requests E (1)–(5) above.
 
-| Entry | Status  | Checked by                                                                                       | Blocker of the remaining steps                                                                |
-| ----- | ------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| F461  | passing | `e2e/tiles3d-streaming.spec.ts` (both backends, normal and slow link), `tiles3d.test.ts`         | —                                                                                             |
-| F462  | passing | `e2e/tiles3d-scheduling.spec.ts` (the 10-minute navigation ran once: 648 stops, 1,003 evictions) | —                                                                                             |
-| F463  | failing | `e2e/tiles3d-decoders.spec.ts`: Draco, meshopt, KTX2; lazy decoders; models decode in workers    | The main thread's frame budget on a real GPU; hook E (1) (docs/hardening-backlog.md)          |
-| F464  | passing | `e2e/tiles3d-precision.spec.ts` (both backends)                                                  | —                                                                                             |
-| F465  | passing | `e2e/tiles3d-phases.spec.ts`, `view-frame.test.ts`                                               | —                                                                                             |
-| F466  | passing | `e2e/tiles3d-picking.spec.ts`, `tiles3d.test.ts`                                                 | —                                                                                             |
-| F467  | passing | `e2e/tiles3d-terrain.spec.ts` (both backends)                                                    | —                                                                                             |
-| F468  | pending | `e2e/tiles3d-google.spec.ts` against the stand-in; the no-key message                            | The run with the owner's key (docs/open-questions.md)                                         |
-| F469  | pending | `e2e/tiles3d-google.spec.ts` (60 s sessions), `google-3d-tiles-provider.test.ts`                 | The three-hour real session on the reference desktop (docs/open-questions.md)                 |
-| F470  | failing | `e2e/tiles3d-google.spec.ts`: copyrights by area, uncovered logo, display only, nothing stored   | Hook E (2): extension credits in the engine's attribution (the scenario shows them meanwhile) |
-| F471  | failing | `e2e/tiles3d-performance.spec.ts`: no hole, no black pixel; frame time gated on real GPUs only   | Reference desktop and tablet (question 2); hook E (5): the benchmark scenario and history     |
+| Entry | Status  | Checked by                                                                                            | Blocker of the remaining steps                                                                |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| F461  | passing | `e2e/tiles3d-streaming.spec.ts` (both backends, normal and slow link), `tiles3d.test.ts`              | —                                                                                             |
+| F462  | passing | `e2e/tiles3d-scheduling.spec.ts` (the 10-minute navigation ran once: 648 stops, 1,003 evictions)      | —                                                                                             |
+| F463  | failing | `e2e/tiles3d-decoders.spec.ts`: Draco, meshopt, KTX2; lazy decoders; decoding on the engine's workers | The main thread's frame budget on a real GPU (docs/hardening-backlog.md)                      |
+| F464  | passing | `e2e/tiles3d-precision.spec.ts` (both backends)                                                       | —                                                                                             |
+| F465  | passing | `e2e/tiles3d-phases.spec.ts`, `view-frame.test.ts`                                                    | —                                                                                             |
+| F466  | passing | `e2e/tiles3d-picking.spec.ts`, `tiles3d.test.ts`                                                      | —                                                                                             |
+| F467  | passing | `e2e/tiles3d-terrain.spec.ts` (both backends)                                                         | —                                                                                             |
+| F468  | pending | `e2e/tiles3d-google.spec.ts` against the stand-in; the no-key message                                 | The run with the owner's key (docs/open-questions.md)                                         |
+| F469  | pending | `e2e/tiles3d-google.spec.ts` (60 s sessions), `google-3d-tiles-provider.test.ts`                      | The three-hour real session on the reference desktop (docs/open-questions.md)                 |
+| F470  | failing | `e2e/tiles3d-google.spec.ts`: copyrights by area, uncovered logo, display only, nothing stored        | Hook E (2): extension credits in the engine's attribution (the scenario shows them meanwhile) |
+| F471  | failing | `e2e/tiles3d-performance.spec.ts`: no hole, no black pixel; frame time gated on real GPUs only        | Reference desktop and tablet (question 2); hook E (5): the benchmark scenario and history     |
 
-Until hook E (1) lands, the playground decodes 3D Tiles content in a module worker of its own
-(`apps/playground/src/tiles3d-model-worker.ts`), on its development server only (the worker bundles meshoptimizer's
-Blob-worker code, which production bundles refuse, F100).
+Models decode with the engine's `parse-model` (C (1), E (1)), the Draco decoder's URL passed in each task
+(`Tiles3DOptions.dracoWasmUrl`); on an engine without the task the loader falls back to a worker of the application's
+own (`modelWorker`; the playground's, on its development server only) or to `modelTasks` on the main thread.
 
 F323: the 3D Tiles part is done (picking and `tileset()` of a display-only source throw `GlobeError` 'display-only'
 naming the profile; `tiles3d.test.ts`, `e2e/tiles3d-google.spec.ts`).

@@ -44,6 +44,11 @@ export interface Tiles3DOptions {
    * engine's worker program does not register the task yet (hook request E (1)); without it such tiles fail.
    */
   readonly modelTasks?: TaskTable;
+  /**
+   * The absolute URL where the application hosts Draco's `draco_decoder.wasm` (ADR 0015), loaded by the workers only
+   * once a tileset with Draco content needs it (F463).
+   */
+  readonly dracoWasmUrl?: string;
   /** A worker of the application's own running `parse-model`, used before `modelTasks` (hook request E (1)). */
   readonly modelWorker?: ModelWorker;
   /** The provider profile: `displayOnly` refuses picking and every data access (F323, ADR 0031). */

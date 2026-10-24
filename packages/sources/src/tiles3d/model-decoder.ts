@@ -30,6 +30,8 @@ export class ModelDecoder {
     private readonly workers: WorkerPool | undefined,
     private readonly fallback: TaskTable | undefined,
     private readonly ownWorker: ModelWorker | undefined = undefined,
+    /** Where the consumer hosts `draco_decoder.wasm`, for the engine's `parse-model` (ADR 0015). */
+    private readonly dracoWasmUrl: string | undefined = undefined,
   ) {}
 
   /** Decodes a GLB; `inWorker` tells where it ran. */
@@ -63,7 +65,13 @@ export class ModelDecoder {
     return new Promise((resolve) => {
       let id = -1;
       id = workers.run(
-        { task: 'parse-model', input: { bytes: buffer }, transfer: [buffer], priority, timeoutMs: 30_000 },
+        {
+          task: 'parse-model',
+          input: { bytes: buffer, ...(this.dracoWasmUrl === undefined ? {} : { dracoWasmUrl: this.dracoWasmUrl }) },
+          transfer: [buffer],
+          priority,
+          timeoutMs: 30_000,
+        },
         (outcome) => {
           job.tasks.delete(id);
           resolve(outcome);

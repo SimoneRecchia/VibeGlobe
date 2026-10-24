@@ -63,8 +63,7 @@ test('the Draco decoder loads from the URL the page configures (F463)', async ({
 });
 
 test('models decode in workers, never on the main thread (F463)', async ({ page }) => {
-  // On the scenario's own model worker until the engine's worker program registers parse-model (hook request E (1));
-  // KTX2 textures transcode on the engine's workers.
+  // The engine's worker program runs parse-model (glTF, Draco, meshopt) and transcode-ktx2.
   await openCity(page, `backend=webgl2&tiles3d=draco&${VIEW}`);
   await settleTiles(page);
   const stats = await page.evaluate(() => window.vibeglobeTiles3d?.extension.stats());

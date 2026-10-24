@@ -84,15 +84,15 @@ export function tilesetOptions(params: URLSearchParams, base: string): Tiles3DOp
 }
 
 /**
- * The model worker the loader uses while the worker program lacks `parse-model` (hook request E (1)), its Draco
- * decoder from `decoders=` (F463) or the bundled file. Development server only: the worker bundles meshoptimizer's
+ * The model worker the loader falls back to on an engine whose worker program lacks `parse-model`; the engine's own
+ * workers decode first, with the Draco decoder from `decoders=` (F463) or the bundled file. Development server only: the worker bundles meshoptimizer's
  * decoder, whose Blob-worker code production bundles refuse (F100), so a production playground decodes 3D Tiles
  * content once the worker program registers the task.
  */
-async function devDecoding(params: URLSearchParams): Promise<Pick<Tiles3DOptions, 'modelWorker'>> {
+async function devDecoding(dracoWasm: string): Promise<Pick<Tiles3DOptions, 'modelWorker'>> {
   if (!import.meta.env.DEV) return {};
   const { devModelWorker } = await import('./tiles3d-dev-decoding.js');
-  return { modelWorker: devModelWorker(new URL(params.get('decoders') ?? dracoWasmUrl, location.href).href) };
+  return { modelWorker: devModelWorker(dracoWasm) };
 }
 
 /**
@@ -114,7 +114,8 @@ export async function showTiles3DScenario(
       : undefined;
   const chosen = google ? google.options : tilesetOptions(params, import.meta.env.BASE_URL);
   if (!chosen) return undefined;
-  const options = { ...chosen, ...(await devDecoding(params)) };
+  const dracoWasm = new URL(params.get('decoders') ?? dracoWasmUrl, location.href).href;
+  const options = { ...chosen, dracoWasmUrl: dracoWasm, ...(await devDecoding(dracoWasm)) };
   globe.addRenderExtension(
     tiles3d(
       {

@@ -110,7 +110,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   ) {
     this.meshes = options.meshes(context);
     this.workers = context.workers;
-    this.decoder = new ModelDecoder(context.workers, options.modelTasks, options.modelWorker);
+    this.decoder = new ModelDecoder(context.workers, options.modelTasks, options.modelWorker, options.dracoWasmUrl);
     this.fetcher = new TileFetcher(options.transport ?? fetchTransport(), context.network, options.onRequest);
     this.cache = new TileContentCache(options.memoryBudgetBytes ?? DEFAULT_BUDGET_BYTES, (tile) => this.release(tile));
     this.loaded = this.loadRoot();

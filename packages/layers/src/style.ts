@@ -154,7 +154,14 @@ export function compileStyle(kind: BatchKind, style: LayerStyle = {}): CompiledS
     if (value === undefined) continue;
     // A constant array (`[0, 1]` for an offset, a font stack) is a literal, not an expression (MapLibre semantics).
     const input = Array.isArray(value) && !isExpression(value) ? ['literal', value] : value;
-    const compiled = createPropertyExpression(input, name, spec);
+    let compiled: ReturnType<typeof createPropertyExpression>;
+    try {
+      compiled = createPropertyExpression(input, name, spec);
+    } catch (error) {
+      // Malformed input the style-spec throws on (an operator named "__proto__", TG-03) is a style problem.
+      problems.push(`${name}: invalid expression (${error instanceof Error ? error.message : String(error)})`);
+      continue;
+    }
     if (compiled.result === 'error') {
       for (const error of compiled.value) problems.push(`${name}${error.key}: ${error.message}`);
       continue;

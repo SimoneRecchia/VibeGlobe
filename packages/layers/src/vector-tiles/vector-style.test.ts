@@ -155,6 +155,17 @@ describe('layer order, zoom ranges and visibility (F447)', () => {
   });
 });
 
+describe('malformed expressions (F451, TG-03)', () => {
+  it('loads a style whose expression operator is "__proto__" without throwing, reporting the property', () => {
+    const style = VectorStyle.load({
+      version: 8,
+      sources: { s: { type: 'vector', tiles: ['x/{z}/{x}/{y}'] } },
+      layers: [{ id: 'a', type: 'line', source: 's', 'source-layer': 'x', paint: { 'line-width': ['__proto__', 1] } }],
+    });
+    expect(style.problems.length).toBeGreaterThan(0);
+  });
+});
+
 describe('runtime style changes (F450)', () => {
   it('reports each change with its cost and never asks for a tile download', () => {
     const style = VectorStyle.load(STYLE);

@@ -84,12 +84,15 @@ export function validateManifest(value: unknown): PackageManifest {
   if (!Array.isArray(m.files) || m.files.length === 0) fail(`package '${String(m.id)}' lists no files`);
   if (!Array.isArray(m.sources) || m.sources.length === 0) fail(`package '${String(m.id)}' lists no sources`);
   for (const file of m.files ?? []) {
+    // A null or non-object entry is a bad manifest, reported as one (TG-02).
+    if (typeof file !== 'object' || file === null) fail(`a file entry of '${String(m.id)}' is not an object`);
     if (!isString(file.path) || file.path.includes('..')) fail(`a file path of '${String(m.id)}' is invalid`);
     if (file.format !== 'pmtiles' && file.format !== 'mbtiles') fail(`file '${file.path}' has an unknown format`);
     if (!Number.isInteger(file.bytes) || file.bytes <= 0) fail(`file '${file.path}' has no size`);
     if (!/^[0-9a-f]{64}$/.test(file.sha256)) fail(`file '${file.path}' has no SHA-256`);
   }
   for (const source of m.sources ?? []) {
+    if (typeof source !== 'object' || source === null) fail(`a source entry of '${String(m.id)}' is not an object`);
     if (!isString(source.sourceId) || !m.files?.some((f) => f.path === source.file))
       fail(`a source of '${String(m.id)}' names no listed file`);
     if (!isString(source.license) || !isString(source.attribution?.text))

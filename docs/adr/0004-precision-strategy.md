@@ -136,3 +136,9 @@ The GPU readback test and the reassociation canary are built (`runGpuProbes` in 
 ## Update 2026-10-21 (offset benchmark)
 
 The benchmark of the verification list exists: `packages/renderer/src/eye-relative.test.ts` updates the split offsets of 5,000 draws per frame and requires zero allocations (a deliberately allocating change fails it), and `npm run bench:micro` times it against `quality/budgets.json` (`micro`, 0.1 ms median). On the cloud container's idle vCPU the median is 0.108 ms (p95 0.23–0.27 ms over three runs); the budget is for the reference desktop and is checked there by the hardware run (F075). Real frames update only the drawn tiles (about 20–800 in the M2 scenarios).
+
+## Update 2026-10-25 (reassociation on Apple GPUs, KB-175)
+
+The owner's reference desktop (MacBook Pro, Apple M5, Chrome 155; `benchmarks/results/macbook-apple-m5-macos-26-6-2/`) failed the probes on both backends: `maxErrorPx` 0.152 against 0.01, equal to `maxErrorWithoutLowPx`, and the canary read 0.5. The shader compiler reassociates (offset + T_hi) + T_lo into offset + (T_hi + T_lo), which rounds T_lo away, as the Context's WGSL rule allows. Computing T on the CPU and uploading it once in float32 would not help: that is exactly the "without T_lo" case.
+
+Decision: each split sum holds its first addition apart from the second through a uniform equal to 1 (`ORDER` in `eye-relative.ts`): ((offset + T_hi) × one) + T_lo, for the globe offset and the plane offset of the morph alike. The uniform's value is unknown when the shader compiles, so no algebraic rewrite can merge T_hi and T_lo; the extra multiply costs one instruction per vertex. The canary runs through the same node, so it now reports whether the barrier holds. On SwiftShader (CI) the probes are unchanged (0.0004 px, canary in order). The owner re-runs `e2e/globe-gpu-probes.spec.ts` on the reference desktop to confirm on the Apple GPU.

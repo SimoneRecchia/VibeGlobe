@@ -185,6 +185,11 @@ export interface TileDrawList extends TileDrawLayer {
   readonly count: number;
   readonly meshKeys: Float64Array;
   /**
+   * The source each draw's imagery comes from, for tone matching (F249, ADR 0044): `layer × 8 + index in its chain`,
+   * -1 where the draw's layer does not match tones (a single source, or `harmonize: false`).
+   */
+  readonly toneSources: Int16Array;
+  /**
    * Terrain heights (M4, ADR 0006 §5): height-grid textures by handle, {@link NO_TERRAIN} where a draw shows the
    * ellipsoid (no terrain source, or none resident yet).
    */

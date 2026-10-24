@@ -3328,7 +3328,7 @@
         "Assert frame-difference analysis shows no visible jump when the active source switches",
         "Disable harmonization for the layer and assert the raw source colors are shown"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F250",

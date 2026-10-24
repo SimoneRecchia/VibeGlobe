@@ -35,7 +35,7 @@ Then the consumer projects, from the same tarballs:
 ```sh
 node scripts/release/check-consumers.ts F503 F531        # lazy modules, asset loading (Vite, Nuxt)
 node scripts/release/check-consumers.ts F532             # minimal install: fails until hook request H (1) lands
-node scripts/release/check-cube.ts                         # nothing refers to Cube (F559)
+node scripts/release/check-cube.ts                         # nothing refers to the first consumer (F559)
 ```
 
 `check-consumers.ts` builds `examples/*` outside the repository, installs the packed tarballs (third-party dependencies from the public registry, no credentials), and checks them in Chromium under a strict Content Security Policy. Set `VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium` in cloud containers.

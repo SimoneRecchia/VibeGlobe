@@ -56,7 +56,7 @@ jobs:
         run: |
           npx tsc -b && npm run build:browser -w @vibeglobe/web-component
           node scripts/release/check-consumers.ts F503 F531
-      - name: No reference to Cube (F559)
+      - name: No reference to the first consumer (F559)
         run: node scripts/release/check-cube.ts
       - uses: actions/upload-artifact@v7
         if: always()

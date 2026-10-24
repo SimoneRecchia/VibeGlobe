@@ -12,6 +12,7 @@ const ALLOWED = [
   // States PLAN.md's rule that nothing depends on Cube.
   'docs/plan/architecture.md',
   'scripts/release/check-cube.ts',
+  'scripts/release/release.test.ts',
   'scripts/checks/dependencies.ts',
   'scripts/checks/checks.test.ts',
 ];

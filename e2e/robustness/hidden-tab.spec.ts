@@ -1,7 +1,7 @@
 // Hidden and visible tab transitions (F515): the tab is hidden during a flight and while idle, and shown again after
 // 1 and 10 minutes. The hidden time is simulated (`support/page-clock.ts`): the page's clock jumps by the hidden time
-// while the page is hidden for a short real interval. While hidden no frame is drawn and no tile request starts beyond
-// those already queued; once shown the camera is where the movement ends, the flight has completed without replaying
+// while the page is hidden for a short real interval. While hidden no frame is drawn and no tile request starts; once
+// shown the camera is where the movement ends, the flight has completed without replaying
 // its frames, and the view's tiles refresh to full detail.
 import { expect, test, type Page } from '@playwright/test';
 import { openGlobe, waitForIdle } from '../support/globe.ts';
@@ -16,26 +16,41 @@ const DESTINATION = { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 7, headingDe
 const HIDDEN_REAL_MS = 2000;
 
 /**
- * Hides the page for `HIDDEN_REAL_MS`, moving its clock on by `simulatedMs`; returns what happened meanwhile and the
- * tile requests that were queued when it was hidden (the engine draws nothing and selects no new tiles while hidden,
- * so its request pool can only drain that backlog: the throttle F515 asks for is no request beyond it).
+ * Hides the page for `HIDDEN_REAL_MS`, moving its clock on by `simulatedMs`; returns the frames drawn and the tile
+ * requests started meanwhile. Start times come from the page's Resource Timing on the real clock, compared with the
+ * real moment of hiding: Playwright's request events can arrive late on a loaded machine.
  */
 async function hideFor(page: Page, simulatedMs: number) {
-  const requests: string[] = [];
-  const record = (request: { url: () => string }): void => void requests.push(request.url());
-  const { before, camera, queued } = await page.evaluate((ms) => {
-    (window as unknown as { setHidden: (h: boolean, j: number) => void }).setHidden(true, ms);
+  const { before, camera, hiddenAt } = await page.evaluate((ms) => {
+    const w = window as unknown as { setHidden: (h: boolean, j: number) => void; realNow: () => number };
     const globe = window.vibeglobePlayground?.globe;
-    return { before: globe?.frameNumber ?? 0, camera: globe?.camera, queued: globe?.imageryStats()?.queued ?? 0 };
+    const at = w.realNow();
+    w.setHidden(true, ms);
+    return { before: globe?.frameNumber ?? 0, camera: globe?.camera, hiddenAt: at };
   }, simulatedMs);
-  // Requests already started before hiding may still be reported: only those starting after a short grace count.
-  await page.waitForTimeout(100);
-  page.on('request', record);
   await page.waitForTimeout(HIDDEN_REAL_MS);
-  page.off('request', record);
-  const frames = (await page.evaluate(() => window.vibeglobePlayground?.globe.frameNumber ?? 0)) - before;
-  const tiles = requests.filter((url) => url.includes('/fixture-tiles/'));
-  return { frames, beyondBacklog: Math.max(0, tiles.length - queued), tiles, camera };
+  const { frames, tiles } = await page.evaluate(
+    ([start, frame]) => ({
+      frames: (window.vibeglobePlayground?.globe.frameNumber ?? 0) - frame,
+      tiles: performance
+        .getEntriesByType('resource')
+        .filter((entry) => entry.name.includes('/fixture-tiles/') && entry.startTime > start)
+        .map((entry) => entry.name),
+    }),
+    [hiddenAt, before] as const,
+  );
+  return { frames, tiles, camera, hiddenAtMs: hiddenAt };
+}
+
+/** Tile requests started since `sinceMs` (real clock): the control that Resource Timing records them at all. */
+async function tilesSince(page: Page, sinceMs: number): Promise<number> {
+  return page.evaluate(
+    (start) =>
+      performance
+        .getEntriesByType('resource')
+        .filter((entry) => entry.name.includes('/fixture-tiles/') && entry.startTime > start).length,
+    sinceMs,
+  );
 }
 
 /**
@@ -86,8 +101,8 @@ for (const backend of BACKENDS) {
       // Halfway through the flight.
       await page.waitForTimeout(1500);
       expect(await page.evaluate(() => (window as unknown as { outcome?: string }).outcome)).toBeUndefined();
-      const { camera: hiddenAt, frames: hiddenFrames, beyondBacklog, tiles } = await hideFor(page, minutes * 60_000);
-      expect({ hiddenFrames, beyondBacklog }, JSON.stringify(tiles)).toEqual({ hiddenFrames: 0, beyondBacklog: 0 });
+      const { camera: hiddenAt, frames: hiddenFrames, tiles, hiddenAtMs } = await hideFor(page, minutes * 60_000);
+      expect({ hiddenFrames, tiles }).toEqual({ hiddenFrames: 0, tiles: [] });
       const { firstCamera, frames } = await show(page);
       // On return the flight either ends at once or resumes where it stopped: no jump and no replay of its frames.
       const atEnd = Math.abs((firstCamera?.longitudeDeg ?? NaN) - DESTINATION.longitudeDeg) < 1e-6;
@@ -105,6 +120,8 @@ for (const backend of BACKENDS) {
       expect(camera?.zoom).toBeCloseTo(DESTINATION.zoom, 6);
       console.log(`[robustness] F515 flight ${minutes} min ${backend}: ${frames} frames until idle after showing`);
       await expectFreshTiles(page);
+      // The control: the destination's tiles, requested after the return, are in the same record.
+      expect(await tilesSince(page, hiddenAtMs)).toBeGreaterThan(0);
       expect(unexpected(errors)).toEqual([]);
     });
 
@@ -118,8 +135,8 @@ for (const backend of BACKENDS) {
       await expectFreshTiles(page);
       await waitForIdle(page);
       const before = await page.evaluate(() => window.vibeglobePlayground?.globe.camera);
-      const { frames: hiddenFrames, beyondBacklog, tiles } = await hideFor(page, minutes * 60_000);
-      expect({ hiddenFrames, beyondBacklog }, JSON.stringify(tiles)).toEqual({ hiddenFrames: 0, beyondBacklog: 0 });
+      const { frames: hiddenFrames, tiles } = await hideFor(page, minutes * 60_000);
+      expect({ hiddenFrames, tiles }).toEqual({ hiddenFrames: 0, tiles: [] });
       const { frames } = await show(page);
       // Drawn again on return, without an animation burst.
       expect(frames).toBeGreaterThan(0);

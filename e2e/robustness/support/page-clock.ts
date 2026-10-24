@@ -14,11 +14,15 @@ export function lifecycleControls(): void {
   performance.now = () => now() + offsetMs;
   Date.now = () => dateNow() + offsetMs;
   const w = window as unknown as {
+    realNow: () => number;
     setHidden: (hidden: boolean, jumpMs?: number) => void;
     freeze: () => void;
     resume: (sleptMs: number) => void;
     lifecycle: string[];
   };
+  // The real clock, which Resource Timing entries use, and room for every request of a run in their buffer.
+  w.realNow = now;
+  performance.setResourceTimingBufferSize(100_000);
   w.lifecycle = [];
   for (const type of ['freeze', 'resume', 'visibilitychange'])
     document.addEventListener(type, () => w.lifecycle.push(type));

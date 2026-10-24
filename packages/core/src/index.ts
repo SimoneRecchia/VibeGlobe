@@ -20,6 +20,7 @@ export {
 } from './camera/zoom.js';
 export { createGlobe } from './globe/create-globe.js';
 export { GlobeError } from './globe/errors.js';
+export { refuseDisplayOnly } from './globe/display-only.js';
 export type { GlobeErrorCode } from './globe/errors.js';
 export type {
   BackendName,

@@ -44,7 +44,7 @@ coincides with the engine's terrain avoids z-fighting (F467), and how Google's 3
    a session is used for `sessionLifetimeMs` (default 2 h 45 min, Google's last about three hours), then a new one
    starts from the root tileset; a 400, 401 or 403 starts one new session for the whole burst of refused requests and
    retries them, so no tile fails because its token expired (F469). The Google profile applies as for the 2D tiles:
-   display only (picking and tile data refused with `GlobeError` `display-only`, F323), no persistent cache, prefetch
+   display only (picking and tile data refused through core's `refuseDisplayOnly`, `GlobeError` `display-only`, F323), no persistent cache, prefetch
    or offline packaging, Google's logo and the copyrights of the drawn tiles (their glTF `asset.copyright`, most
    frequent first).
 

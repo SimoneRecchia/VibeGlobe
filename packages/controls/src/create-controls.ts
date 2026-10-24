@@ -1,6 +1,6 @@
 import type { Controls, ControlsFactory, NavigationApi } from '@vibeglobe/core';
 import { HeadingTarget, Inertia, type InertiaTaus, KeyMotion, ZoomTarget } from './animators.js';
-import { CameraPort, type ConnectedGlobe } from './camera-port.js';
+import { CameraPort, FRAME_MS, type ConnectedGlobe } from './camera-port.js';
 import type { GestureContext } from './gesture-context.js';
 import { KeyboardInput } from './keyboard.js';
 import { MouseGestures } from './mouse-gestures.js';
@@ -145,8 +145,9 @@ function attach(
       // The wheel's zoom goes first, so a drag started during it keeps its grabbed point under the pointer.
       wheel.apply();
       const zooming = zoom.pending !== 0;
-      // Every frame reads the engine clock (`NavigationApi.timeMs`, no allocation), so animations start where it was.
-      const now = port.beginFrame();
+      // Every frame reads the engine clock (`NavigationApi.timeInto`, no allocation), so animations start where it was.
+      port.beginFrame();
+      const now = port.times[FRAME_MS] ?? 0;
       let moving = zooming && zoom.step(now, port);
       mouse.apply();
       touch.apply();

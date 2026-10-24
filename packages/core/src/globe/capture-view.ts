@@ -1,4 +1,5 @@
 import type { Camera } from '../camera/camera.js';
+import { refuseExtensionReadback } from './display-only.js';
 import { GlobeError } from './errors.js';
 import { captureWhenDrawn, type FrameWaits } from './frame-waits.js';
 import type { FrameCapture } from './renderer-stats.js';
@@ -104,6 +105,7 @@ export class ViewCaptures {
   async frame(): Promise<FrameCapture> {
     const parts = this.parts;
     parts.check('captureFrame');
+    refuseExtensionReadback('captureFrame', parts.renderer());
     return captureWhenDrawn({
       ready: parts.globe.ready,
       waits: parts.waits(),
@@ -116,6 +118,7 @@ export class ViewCaptures {
   async view(size: CaptureSize): Promise<FrameCapture> {
     const parts = this.parts;
     parts.check('captureView');
+    refuseExtensionReadback('captureView', parts.renderer());
     const checked = validateCaptureSize(size);
     await parts.globe.ready;
     return captureViewAt(this.host(), checked);

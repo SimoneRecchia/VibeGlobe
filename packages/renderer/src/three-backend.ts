@@ -303,9 +303,9 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Compiles the surface pipelines before the first frame (ADR 0010 §4); `pipelineCompiles` counts from here. */
-  private async warmUpPipelines(): Promise<void> {
+  private async warmUpPipelines(material = this.material): Promise<void> {
     const sky = this.atmosphere.skyMaterial;
-    if (this.material) await warmUpPipelines(this.renderer, sky ? [this.material, sky] : [this.material]);
+    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material]);
     this.counters.resetCompiles();
   }
 
@@ -378,13 +378,25 @@ export class ThreeBackend implements RendererBackend {
   readonly capture = (): Promise<FrameCapture> => captureCanvas(this.canvases.drawingCanvas);
 
   /** Applies the effects of the engine's quality settings (F398, F399): anisotropy and the atmosphere level. */
-  setQuality(quality: RendererQuality): void {
+  setQuality(quality: RendererQuality): Promise<void> | undefined {
     this.anisotropy = quality.anisotropy;
     // The atmosphere appearing or going away rebuilds the surface material that it shades.
-    if (this.atmosphere.setQuality(quality, this.depthPath) && !this.destroyed) {
-      this.createImageryResources();
-      void this.warmUpPipelines();
-    }
+    if (!this.atmosphere.setQuality(quality, this.depthPath) || this.destroyed || !this.imageryTexture)
+      return undefined;
+    return this.swapMaterial(this.imageryTexture);
+  }
+
+  /**
+   * Replaces the surface material once the new one is compiled: until then the frames keep the old one, since a
+   * material whose pipeline is still compiling is skipped and the globe would vanish for a frame (F399).
+   */
+  private async swapMaterial(texture: Texture): Promise<void> {
+    const material = surface.createSurfaceMaterial(texture, this.depthPath, this.atmosphere.current);
+    await this.warmUpPipelines(material);
+    if (this.destroyed || this.imageryTexture !== texture) return material.dispose();
+    this.material?.dispose();
+    this.material = material;
+    this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
 
   /** The atmosphere's sun lighting, time and haze (F394, F396): uniforms only. */

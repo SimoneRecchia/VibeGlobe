@@ -5114,7 +5114,7 @@
         "Verify GPU and RAM memory return to their baseline within tolerance after each cycle",
         "Verify no listeners, workers or timers remain from removed layers"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F386",
@@ -5291,7 +5291,7 @@
         "Record every frame and verify switching never shows black areas, flicker or a frozen frame",
         "Verify frame time decreases from ultra to low on the reference desktop"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F400",
@@ -5315,7 +5315,7 @@
         "Verify adaptive quality lowers detail or resolution within the documented reaction time and frame time returns within the target",
         "Record frames and verify the reduction causes no visible pop or flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F402",
@@ -5327,7 +5327,7 @@
         "Verify quality rises back step by step to the preset level once frame time has been stable for the documented interval",
         "Run a load that hovers around the threshold for 5 minutes and verify quality changes no more often than the documented minimum interval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F403",
@@ -6249,7 +6249,7 @@
         "Assert the engine instance and canvas are the same object before and after (no remount)",
         "Assert from the request log that unchanged sources are not downloaded again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F475",

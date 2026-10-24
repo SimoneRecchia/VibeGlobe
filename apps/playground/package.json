@@ -16,6 +16,7 @@
     "@vibeglobe/custom-layer-example": "*",
     "@vibeglobe/gis": "*",
     "@vibeglobe/layers": "*",
+    "@vibeglobe/quality": "*",
     "@vibeglobe/models": "*",
     "@vibeglobe/renderer": "*",
     "@vibeglobe/sources": "*",

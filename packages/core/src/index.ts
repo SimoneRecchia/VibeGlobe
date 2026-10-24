@@ -19,6 +19,7 @@ export {
   rangeForGroundZoom,
 } from './camera/zoom.js';
 export { createGlobe } from './globe/create-globe.js';
+export { refuseDisplayOnlySource } from './globe/display-only.js';
 export { surfaceVisibility } from './surface/fog.js';
 export type { FogRay } from './surface/fog.js';
 export { GlobeError } from './globe/errors.js';

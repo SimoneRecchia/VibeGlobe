@@ -150,6 +150,8 @@ for (const backend of BACKENDS) {
     });
 
     test(`F393: sky and haze stay continuous through the tilt and the morph to flat (${backend})`, async ({ page }) => {
+      // 69 frames: about 21 s locally, more than the default 30 s on CI's runner (docs/test-changes.md).
+      test.setTimeout(60_000);
       // The tilt into the 3D view at 20 km, by 2° steps.
       const tilts: HarnessPose[] = [];
       for (let tilt = 0; tilt <= 84; tilt += 2) tilts.push({ lonDeg: 8, latDeg: 46, rangeM: 20_000, tiltDeg: tilt });

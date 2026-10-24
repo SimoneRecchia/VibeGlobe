@@ -388,6 +388,8 @@ function applyOverlays(
 export function setSurfaceMorph(material: Material, morph: MorphFrame): void {
   const params = material.userData['morphParams'] as { value: Vector4 } | undefined;
   const axes = material.userData['morphAxes'] as { value: Matrix3 } | undefined;
-  params?.value.set(morph.morph, morph.relief, morph.sigma, 0);
+  // From the factors array, not the getters: a double returned by a call that is not inlined is boxed (F064).
+  const factors = morph.factors;
+  params?.value.set(factors[0] ?? 0, factors[1] ?? 1, factors[2] ?? 1, 0);
   axes?.value.fromArray(morph.axes);
 }

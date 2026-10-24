@@ -47,9 +47,13 @@ const overlaps = (a: Bounds, b: Bounds): boolean =>
 async function recordDrawn(page: Page): Promise<void> {
   await page.evaluate(() => {
     const seen = new Map<string, [number, number, number, number]>();
-    (window as unknown as { drawn: typeof seen }).drawn = seen;
+    const page = window as unknown as { drawn: typeof seen; slowestLinkBps: number };
+    page.drawn = seen;
+    page.slowestLinkBps = Number.POSITIVE_INFINITY;
     const globe = window.offlineHarness?.globe;
     globe?.on('frame', () => {
+      const link = globe.imageryStats()?.bandwidthBitsPerSecond ?? Number.NaN;
+      if (link < page.slowestLinkBps) page.slowestLinkBps = link;
       for (const t of globe.surfaceTiles())
         seen.set(`${t.level}/${t.x}/${t.y}`, [t.westDeg, t.southDeg, t.eastDeg, t.northDeg]);
     });
@@ -95,6 +99,10 @@ async function serveGoogle(page: Page): Promise<string[]> {
   });
   return tiles;
 }
+
+/** True when some frame since `recordDrawn` measured a slow link, on which no source prefetches (F302, KB-138). */
+const linkWasSlow = (page: Page): Promise<boolean> =>
+  page.evaluate(() => (window as unknown as { slowestLinkBps: number }).slowestLinkBps < 1.5e6);
 
 const effective = (page: Page, sourceId: string) =>
   page.evaluate((id) => window.offlineHarness?.offline?.effectiveSwitches(id), sourceId);
@@ -236,12 +244,17 @@ test('Google tiles are never prefetched or preloaded, while other sources in the
   const seen = await drawn(page);
   expect(google.length).toBeGreaterThan(0);
   expect(beyondView(google, seen), 'Google tiles requested outside every drawn view').toEqual([]);
-  expect(
-    beyondView(
-      requests.filter((p) => p.includes('/f322-world/')),
-      seen,
-    ).length,
-  ).toBeGreaterThan(0);
+  // The other source keeps prefetch; it prefetches unless some frame judged the link slow (F302: under 1.5 Mbps
+  // no source prefetches, and a busy page on a software GPU measures that even from the local server; KB-138).
+  expect((await effective(page, 'world'))?.prefetch).toBe(true);
+  expect((await effective(page, 'google'))?.prefetch).toBe(false);
+  if (!(await linkWasSlow(page)))
+    expect(
+      beyondView(
+        requests.filter((p) => p.includes('/f322-world/')),
+        seen,
+      ).length,
+    ).toBeGreaterThan(0);
 });
 
 test('the OpenStreetMap public servers are neither prefetched in bulk nor packaged (F324)', async ({ page }) => {

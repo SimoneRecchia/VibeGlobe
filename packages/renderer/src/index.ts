@@ -8,4 +8,5 @@ export type { RendererOptions } from './create-renderer.js';
 export type { BackendChoice, DepthChoice } from './three-backend.js';
 export type { ThreeExtensionContext } from './extensions.js';
 export { runGpuProbes } from './run-gpu-probes.js';
+export { gpuLoad } from './gpu-load.js';
 export type { GpuProbeOptions, GpuProbeResult } from './gpu-probes.js';

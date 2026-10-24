@@ -29,6 +29,8 @@ export interface ViewHost {
   timeInto(out: Float64Array): void;
   /** The part of a zoom step the zoom limits allow (KB-126). */
   limitZoom(deltaZoom: number): number;
+  /** Whether zoom limits are set: without them a step goes through untouched, with no call (KB-132). */
+  zoomLimited(): boolean;
   /** Stops a running API movement (KB-127). */
   interruptMovement(): void;
 }
@@ -63,7 +65,9 @@ export class ViewControl {
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
         const allowed =
-          typeof deltaZoom === 'number' && Number.isFinite(deltaZoom) ? host.limitZoom(deltaZoom) : deltaZoom;
+          host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
+            ? host.limitZoom(deltaZoom)
+            : deltaZoom;
         if (zoomCamera(host.cam, host.view, point, allowed)) host.requestRender();
       },
       requestUpdate: () => {

@@ -450,8 +450,8 @@ for (const backend of BACKENDS) {
       page,
     }) => {
       test.setTimeout(240_000);
-      // KB-153: in manual tilt at about zoom 12.4 the terrain limit lowers the tilt 7° for one frame (docs/known-bugs.md).
-      test.fail(mode === 'manual-tilt', 'KB-153');
+      // KB-170: in manual tilt the terrain limit lowers the tilt up to 6.9° in one frame of this 0.1-zoom-a-frame descent.
+      test.fail(mode === 'manual-tilt', 'KB-170');
       // With the fixture terrain: the zoom ends on the fixture peak's flank, the target on its relief (F167 step 1).
       await openGlobe(page, `${CLOCK}&backend=${backend}&terrain=terrarium${query}`);
       await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());

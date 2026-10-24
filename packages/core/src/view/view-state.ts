@@ -63,6 +63,8 @@ const LAST_TIME = 10;
 const KEPT = 11;
 /** The maximum tilt of the camera constraints (F210), radians; NaN without one. */
 const TILT_CAP = 12;
+/** The tilt the previous frame applied, radians: where a limit that no tilt satisfies holds the tilt (KB-153). */
+const PREVIOUS_TILT = 13;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -73,7 +75,7 @@ const TILT_CAP = 12;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -202,6 +204,7 @@ export class ViewState {
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
     if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
     if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
+    values[PREVIOUS_TILT] = values[APPLIED_TILT] ?? 0;
     values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
     if (clearanceMeters > 0 && ground) this.probeTerrainLimit(camera, ground);
     else if (clearanceMeters > 0) {
@@ -224,23 +227,26 @@ export class ViewState {
    */
   private probeTerrainLimit(camera: Camera, ground: GroundProbe): void {
     const values = this.values;
-    if (clears(camera, values, WANTED_TILT, ground)) return;
+    if (clears(this, camera, values, WANTED_TILT, ground)) return;
     values[LOW_TILT] = 0;
     // Under the terrain even looking straight down: the target is below the surface (after a jump, before the frame
-    // lifts it), which no tilt mends, so the wanted tilt stands (KB-104).
-    if (!clears(camera, values, LOW_TILT, ground)) {
-      values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
-      clears(camera, values, WANTED_TILT, ground);
+    // lifts it), which no tilt mends, so the tilt stands (KB-104): the wanted one, or, while a limit held the previous
+    // frame lower, no higher than that frame's, so a zoom that reaches this point does not jump up (KB-153).
+    if (!clears(this, camera, values, LOW_TILT, ground)) {
+      const wanted = values[WANTED_TILT] ?? 0;
+      const previous = values[PREVIOUS_TILT] ?? 0;
+      values[APPLIED_TILT] = this.clamped && previous < wanted ? previous : wanted;
+      clears(this, camera, values, APPLIED_TILT, ground);
       return;
     }
     values[HIGH_TILT] = values[WANTED_TILT] ?? 0;
     for (let step = 0; step < PROBE_STEPS; step++) {
       values[APPLIED_TILT] = ((values[LOW_TILT] ?? 0) + (values[HIGH_TILT] ?? 0)) / 2;
-      if (clears(camera, values, APPLIED_TILT, ground)) values[LOW_TILT] = values[APPLIED_TILT] ?? 0;
+      if (clears(this, camera, values, APPLIED_TILT, ground)) values[LOW_TILT] = values[APPLIED_TILT] ?? 0;
       else values[HIGH_TILT] = values[APPLIED_TILT] ?? 0;
     }
     values[APPLIED_TILT] = values[LOW_TILT] ?? 0;
-    clears(camera, values, APPLIED_TILT, ground);
+    clears(this, camera, values, APPLIED_TILT, ground);
   }
 
   /**
@@ -316,9 +322,11 @@ export class ViewState {
  * True when, at the tilt in `values[slot]` (radians), the eye stands at least the clearance (`limits[5]`) above the
  * surface probed under it; leaves the camera at that tilt with its ground probed. Doubles stay in arrays (ADR 0018).
  */
-function clears(camera: Camera, values: Float64Array, slot: number, ground: GroundProbe): boolean {
+function clears(state: ViewState, camera: Camera, values: Float64Array, slot: number, ground: GroundProbe): boolean {
   camera.pose.tiltRad = values[slot] ?? 0;
   camera.update();
+  // The relief follows the tilt: each candidate is probed with its own, not the last frame's (KB-153).
+  state.update(camera);
   ground.probeGround(camera);
   return camera.eyeGeodetic.heightMeters - camera.groundHeightMeters >= (limits[5] ?? 0);
 }

@@ -54,17 +54,17 @@ function meanColor(image: unknown): Float32Array | undefined {
 
 /** The tone gains of a renderer's imagery: tile means by texture handle, and a gain per chain source. */
 export class ToneMatcher {
-  readonly #means = new Map<number, Float32Array>();
+  /** Tile means by texture handle; null for a tile that cannot be measured (compressed). */
+  readonly #means = new Map<number, Float32Array | null>();
   /** The source a texture was last drawn as, for the gain of a fade that starts from it. */
   readonly #sources = new Map<number, number>();
   /** Per key: summed means and count of this frame's draws. */
   readonly #sums = new Float64Array(KEYS * 4);
   readonly #gains = new Float32Array(KEYS * 3).fill(1);
 
-  /** Records a tile's mean color (0–1 per channel, sRGB) when its texture is uploaded. */
+  /** Records a tile's mean color (0–1 per channel, sRGB), measured from its image unless given. */
   measure(handle: number, image: unknown, mean = meanColor(image)): void {
-    if (mean) this.#means.set(handle, mean);
-    else this.#means.delete(handle);
+    this.#means.set(handle, mean ?? null);
   }
 
   /** Forgets a released texture. */
@@ -73,8 +73,11 @@ export class ToneMatcher {
     this.#sources.delete(handle);
   }
 
-  /** Sets each later source's gain to the first source's mean over its own, from this frame's draws. */
-  frame(draws: TileDrawList): void {
+  /**
+   * Sets each later source's gain to the first source's mean over its own, from this frame's draws. A tile is measured
+   * the first time a matched layer draws it (`imageOf` gives its image): layers without a chain measure nothing.
+   */
+  frame(draws: TileDrawList, imageOf?: (handle: number) => unknown): void {
     const sums = this.#sums;
     sums.fill(0);
     for (let i = 0; i < draws.count; i++) {
@@ -82,6 +85,7 @@ export class ToneMatcher {
       if (key < 0 || key >= KEYS) continue;
       const handle = draws.textures[i] ?? -1;
       if (this.#sources.get(handle) !== key) this.#sources.set(handle, key);
+      if (imageOf && !this.#means.has(handle)) this.measure(handle, imageOf(handle));
       const mean = this.#means.get(handle);
       if (!mean) continue;
       for (let c = 0; c < 3; c++) sums[key * 4 + c] = (sums[key * 4 + c] ?? 0) + (mean[c] ?? 0);

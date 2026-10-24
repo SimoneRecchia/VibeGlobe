@@ -121,6 +121,9 @@ export class TileTextures {
     return this.bytes;
   }
 
+  /** The decoded image under a handle, if any (tone matching measures it on first use, F249). */
+  readonly imageOf = (handle: number): unknown => this.entries[handle]?.tile.image;
+
   /** The texture under a handle, if any. */
   get(handle: number): Texture | undefined {
     return this.entries[handle]?.texture;
@@ -135,7 +138,6 @@ export class TileTextures {
     this.bytes += tile.gpuBytes;
     if (isCompressed(tile.image)) this.compressed++;
     renderer.initTexture(entry.texture);
-    this.tones.measure(handle, tile.image);
   }
 
   /** Disposes the texture under `handle`; `closeImage` also frees the decoded image (an `ImageBitmap`'s memory). */

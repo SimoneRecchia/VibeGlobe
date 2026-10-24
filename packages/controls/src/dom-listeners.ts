@@ -64,6 +64,9 @@ function pointerListeners(element: HTMLElement, port: CameraPort, r: Recognizers
     event.preventDefault();
   };
   const onMove = (event: PointerEvent): void => {
+    // A mouse over the map reports Ctrl even when the key went down before the page had focus (KB-151); a trackpad
+    // pinch sets ctrlKey on its wheel events only.
+    if (event.pointerType === 'mouse') r.wheel.ctrlHeld = event.ctrlKey;
     const { xPx, yPx } = localPoint(element, event);
     if (event.pointerType === 'touch') request(r.touch.move(event.pointerId, xPx, yPx, event.timeStamp));
     else if (event.pointerId === r.mouse.pointerId) request(r.mouse.move(xPx, yPx, event.timeStamp, event.ctrlKey));

@@ -157,6 +157,15 @@ describe('wheel and trackpad zoom (F168, F169)', () => {
     expect(h.camera.zoom).toBeCloseTo(2 / 100, 12);
   });
 
+  it('learns a Ctrl held before the page had focus from the mouse moving over the map (KB-151)', () => {
+    const h = controlsHarness();
+    // No keydown reached the page; the mouse reports the key.
+    h.pointer('pointermove', { x: 210, y: 170, t: 0, ctrlKey: true });
+    h.fire('wheel', { clientX: 220, clientY: 190, deltaY: -3, deltaMode: 0, ctrlKey: true });
+    h.frame();
+    expect(h.camera.zoom).toBeCloseTo(3 / 300, 12);
+  });
+
   it('ignores Safari gesture events during a two-finger touch, which iPadOS sends for it too (KB-152)', () => {
     const h = controlsHarness();
     h.pointer('pointerdown', { x: 100, y: 100, t: 0, id: 1, pointerType: 'touch' });

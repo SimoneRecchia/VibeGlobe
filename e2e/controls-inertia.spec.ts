@@ -19,12 +19,17 @@ test('a released drag coasts with time-based inertia, and a release after holdin
   await record(page, []);
   await page.mouse.move(100, 120);
   await page.mouse.down();
-  // Moves 16 ms apart, as a mouse reports them, and the release right after the last.
-  for (let i = 1; i <= 12; i++) {
+  // Moves 16 ms apart, as a mouse reports them, and the release right after the last. The release does not wait for
+  // the page to handle the last move: on a busy software GPU that took up to 160 ms, and the release's timestamp then
+  // read as a hold before it (KB-205).
+  for (let i = 1; i < 12; i++) {
     await page.mouse.move(100 + 8 * i, 120);
     await page.waitForTimeout(16);
   }
+  const last = page.mouse.move(100 + 8 * 12, 120);
+  await page.waitForTimeout(16);
   await page.mouse.up();
+  await last;
   await settle(page);
   const all = await frames(page);
   const releasedAt = all.findIndex((frame) => frame.pointer === null);

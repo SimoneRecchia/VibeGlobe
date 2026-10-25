@@ -27,7 +27,7 @@ interface Eye {
 interface Run {
   requested: number;
   /** Each request's tile and the eye of the frame that started it. */
-  requests: { level: number; x: number; y: number; eye: Eye }[];
+  requests: { level: number; x: number; y: number; priority: number; eye: Eye }[];
   gpuBytes: number;
   holes: number;
   dark: number;
@@ -144,10 +144,17 @@ async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: n
   // A request logged while a frame is drawn belongs to the first eye recorded after it.
   const requests: Run['requests'] = [];
   for (const entry of entries) {
-    const match = / request (\d+)\/(\d+)\/(\d+)$/.exec(entry.message);
+    const match = / request (\d+)\/(\d+)\/(\d+) at priority (-?[\d.e+-]+)$/.exec(entry.message);
     // One started after the last frame (a slot freed while the engine idles) belongs to the last frame's view.
     const eye = eyes.find((e) => e.timeMs >= entry.timeMs) ?? eyes.at(-1);
-    if (match && eye) requests.push({ level: Number(match[1]), x: Number(match[2]), y: Number(match[3]), eye });
+    if (match && eye)
+      requests.push({
+        level: Number(match[1]),
+        x: Number(match[2]),
+        y: Number(match[3]),
+        priority: Number(match[4]),
+        eye,
+      });
   }
   const image = await canvasImage(page);
   const pixels: number[] = [];
@@ -169,8 +176,6 @@ for (const backend of ['webgpu', 'webgl2'] as const)
   }) => {
     // Two full flights at four times the haze: about 80 s each here, over 90 s each in CI's software GPU.
     test.setTimeout(420_000);
-    // KB-174: one level-7 tile under a parent in full fog is still requested on WebGL2 now and then.
-    test.fail(backend === 'webgl2', 'KB-174');
     const aware = await fly(page, backend, true, HAZE);
     const full = await fly(page, backend, false, HAZE);
     const saved = 1 - aware.requested / full.requested;
@@ -191,7 +196,7 @@ for (const backend of ['webgpu', 'webgl2'] as const)
         }
     console.log(
       `[fog-detail] ${backend}: ${aware.requested} vs ${full.requested} tiles requested (${(saved * 100).toFixed(1)}% fewer), ` +
-        `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (${inFog.map((r) => `${r.level}/${r.x}/${r.y}`).join(' ')}; full detail ${fullInFog.length}), ` +
+        `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (${inFog.map((r) => `${r.level}/${r.x}/${r.y} p${r.priority}`).join(' ')}; full detail ${fullInFog.length}), ` +
         `GPU ${aware.gpuBytes} vs ${full.gpuBytes} bytes, fogged band mean difference ${(difference / count).toFixed(2)}`,
     );
     // The record covers the run's requests, and the full-detail run shows the check finds fogged requests.

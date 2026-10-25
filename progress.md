@@ -6,10 +6,9 @@ The owner uses the engine in the first consumer on Monday and Tuesday and restar
 two weeks of hardening. Branch `claude/wizardly-archimedes-up4ww2`; everything is merged into `main` (pull requests
 #26 to #47, squash merges; #41 is superseded by #43 for the owner to close).
 
-**State.** `npm run status`: 448 passing, 81 failing, 33 pending (owner steps), 22 superseded, 79.7% of the active
-entries. M1, M2, M3 and M9 are complete. In M4–M14 every failing entry is in `docs/hardening-backlog.md` except F329
-(the M8 acceptance), which is marked once one full CI run shows the M8 network specs green: the last full runs failed
-only on flaky timing specs, each fixed since (F300, F303, F459); dispatch `ci.yml` on `main` and check. M15 (hardening
+**State.** `npm run status`: 449 passing, 80 failing, 33 pending (owner steps), 22 superseded, 79.9% of the active
+entries. M1, M2, M3 and M9 are complete. In M4–M14 every failing entry is in `docs/hardening-backlog.md`; F329 (the
+M8 acceptance) is passing since the full CI runs of 2026-10-25 showed every M8 network spec green. M15 (hardening
 and release) is 10 of 53.
 
 **Done on 2026-10-25.** KB-202, the owner's trackpad feedback (a flick on a zoomed-out globe stopped dead, a drag off
@@ -51,8 +50,7 @@ OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle
 (`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment for publishing). The 33
 pending entries wait for owner steps listed there (reference tablet, the owner's Mac runs, the Milan sample, keys).
 
-**Start on Wednesday.** Read this, run `./init.sh`, check the last full CI run on `main` (mark F329 if the M8 specs are
-green), ask the owner for the first consumer's findings, then follow the backlog order above.
+**Start on Wednesday.** Read this, run `./init.sh`, check the last full CI run on `main`, ask the owner for the first consumer's findings, then follow the backlog order above.
 
 ## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
 

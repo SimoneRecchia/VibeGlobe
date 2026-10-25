@@ -15,7 +15,7 @@ export const REAL_DATA: Readonly<Record<string, Readonly<Record<string, string>>
 };
 
 /** The two builds the scenario needs, as the page names them when they are missing. */
-export const MONT_BLANC_BUILDS = [
+const MONT_BLANC_BUILDS = [
   'node packages/tools/dist/bin.js build packages/tools/configs/test-mont-blanc.json --sample --yes',
   'node packages/tools/dist/bin.js build italy-high.json --sample --yes --dataset imagery',
 ] as const;
@@ -38,7 +38,7 @@ interface Dataset {
 }
 
 /** The scenario's layers; each source's credits come from its dataset's `metadata.json`. */
-export interface MontBlancData {
+interface MontBlancData {
   readonly terrain: TerrainSource;
   /** Bottom first: the coarser context imagery (when built), then the sample's. */
   readonly imagery: readonly ImagerySource[];
@@ -123,7 +123,7 @@ function imageryOf(data: Dataset, id: string): ImagerySource[] {
  * Loads the scenario's datasets. When the two builds it needs have not been run, it shows the commands that make them
  * over the globe instead and returns undefined: the globe then shows the Natural Earth base alone.
  */
-export async function montBlancData(params: URLSearchParams): Promise<MontBlancData | undefined> {
+async function montBlancData(params: URLSearchParams): Promise<MontBlancData | undefined> {
   // `&terrainBuild=<folder>` reads the terrain from another build folder of the pipeline (one made with `--out`).
   const terrainBuild = params.get('terrainBuild') ?? 'test-mont-blanc-sample';
   // `&context=0` leaves out the world-low context around the samples.

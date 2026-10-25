@@ -40,9 +40,7 @@
         "testIgnore": [
           "/globe-allocation\\.spec\\.ts|controls-inertia\\.spec\\.ts|imagery-timing\\.spec\\.ts|globe-leaks\\.spec\\.ts|adapter-leaks\\.spec\\.ts|hud-overhead\\.spec\\.ts/"
         ],
-        "testMatch": [
-          "**/*.spec.ts"
-        ],
+        "testMatch": ["**/*.spec.ts"],
         "timeout": 30000
       },
       {
@@ -75,9 +73,7 @@
         "name": "chromium",
         "testDir": "/Users/s1imone/WebstormProjects/VibeGlobe/e2e",
         "snapshotDir": "/Users/s1imone/WebstormProjects/VibeGlobe/e2e",
-        "testIgnore": [
-          {}
-        ],
+        "testIgnore": [{}],
         "testMatch": "**/*.spec.ts",
         "timeout": 30000,
         "use": {
@@ -153,22 +149,13 @@
           "defaultBrowserType": "chromium",
           "channel": "chromium"
         },
-        "dependencies": [
-          "chromium"
-        ],
+        "dependencies": ["chromium"],
         "ignoreSnapshots": false,
         "__projectId": "measurements"
       }
     ],
     "quiet": false,
-    "reporter": [
-      [
-        "line"
-      ],
-      [
-        "json"
-      ]
-    ],
+    "reporter": [["line"], ["json"]],
     "reportSlowTests": {
       "max": 5,
       "threshold": 300000

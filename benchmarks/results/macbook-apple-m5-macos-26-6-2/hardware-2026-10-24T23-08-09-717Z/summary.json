@@ -6,12 +6,7 @@
   "cpu": "Apple M5",
   "memoryGiB": 32,
   "gpu": "see the benchmark reports",
-  "browsers": [
-    "chromium",
-    "chrome",
-    "firefox",
-    "webkit"
-  ],
+  "browsers": ["chromium", "chrome", "firefox", "webkit"],
   "reports": [
     "micro-2026-10-24T23-18-23-473Z.json",
     "offscreen-2026-10-24T23-21-27-415Z.json",

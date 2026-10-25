@@ -28,14 +28,25 @@ export interface GestureSwitches {
 
 /** Inertia time constants (ADR 0009 §6): the remaining motion decays as e^(−t/τ). */
 export interface InertiaSettings {
+  /** Pan glide after a drag; 650 ms keeps a fifth of the release speed after 1 s (KB-177). */
   readonly panTauMs: number;
+  /** Rotation glide after a rotate drag (Ctrl or right button); 650 ms by default, like the pan (KB-177). */
   readonly rotateTauMs: number;
+  /** Heading glide after a two-finger twist: short, so a twist ends close to where the fingers left it (KB-177). */
+  readonly twistTauMs: number;
   readonly tiltTauMs: number;
   readonly zoomTauMs: number;
   /** The fastest pan a release carries on, in CSS pixels per second. */
   readonly maxPanSpeedPxPerS: number;
-  /** Velocity is measured over this much time before the release. */
+  /**
+   * Velocity is the least-squares slope of the motion over this much time before the latest move (stretched when
+   * events come slower), however long before the release that move came (KB-177).
+   */
   readonly velocityWindowMs: number;
+  /** A release after the pointer stayed within {@link stillPx} for at least this long does not glide (KB-177). */
+  readonly stillMs: number;
+  /** Motion within this distance, in CSS pixels, counts as holding still (sensor jitter). */
+  readonly stillPx: number;
 }
 
 /** Wheel and trackpad zoom (ADR 0009 §4). */
@@ -131,12 +142,15 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
     inertia: true,
   },
   inertia: {
-    panTauMs: 200,
-    rotateTauMs: 200,
+    panTauMs: 650,
+    rotateTauMs: 650,
+    twistTauMs: 200,
     tiltTauMs: 150,
     zoomTauMs: 150,
     maxPanSpeedPxPerS: 2500,
-    velocityWindowMs: 80,
+    velocityWindowMs: 120,
+    stillMs: 150,
+    stillPx: 2,
   },
   wheel: { pixelsPerLevel: 300, pinchPixelsPerLevel: 100, notchSmoothingMs: 100, maxLeadLevels: 2 },
   keyboard: { panViewportsPerS: 0.8, rotateDegPerS: 90, tiltDegPerS: 45, smoothingMs: 150, zoomLevelsPerPress: 1 },
@@ -206,7 +220,13 @@ export function resolveControlsOptions(options: ControlsOptions = {}): ResolvedC
   }
   return {
     gestures: switches(options.gestures),
-    inertia: numbers('inertia', d.inertia, options.inertia, ['panTauMs', 'rotateTauMs', 'tiltTauMs', 'zoomTauMs']),
+    inertia: numbers('inertia', d.inertia, options.inertia, [
+      'panTauMs',
+      'rotateTauMs',
+      'twistTauMs',
+      'tiltTauMs',
+      'zoomTauMs',
+    ]),
     wheel: numbers('wheel', d.wheel, options.wheel, ['pixelsPerLevel', 'pinchPixelsPerLevel', 'maxLeadLevels']),
     keyboard: numbers('keyboard', d.keyboard, options.keyboard, ['smoothingMs', 'zoomLevelsPerPress']),
     touch: numbers('touch', d.touch, options.touch, ['tapMaxMs', 'doubleTapMs', 'tiltDecisionMs']),

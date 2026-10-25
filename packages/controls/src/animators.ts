@@ -58,6 +58,8 @@ export interface ReleaseVelocity {
 export interface InertiaTaus {
   readonly panTauMs: number;
   readonly rotateTauMs: number;
+  /** A twist's heading glide; the touch gestures pass it as `rotateTauMs` of their run. */
+  readonly twistTauMs: number;
   readonly tiltTauMs: number;
   readonly zoomTauMs: number;
 }
@@ -71,7 +73,7 @@ export class Inertia {
   active = false;
   private readonly timeline = new Timeline();
   private readonly v: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
-  private taus: InertiaTaus = { panTauMs: 1, rotateTauMs: 1, tiltTauMs: 1, zoomTauMs: 1 };
+  private taus: InertiaTaus = { panTauMs: 1, rotateTauMs: 1, twistTauMs: 1, tiltTauMs: 1, zoomTauMs: 1 };
   private anchor: GeoPosition | undefined;
   private readonly origin: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly pixel: MutablePoint = { xPx: 0, yPx: 0 };

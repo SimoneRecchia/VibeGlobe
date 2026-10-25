@@ -63,7 +63,17 @@ Every option is optional; invalid values throw a `GlobeError` with code `invalid
 ```ts
 createControls({
   gestures: { boxZoom: false, inertia: true }, // switch single gestures off
-  inertia: { panTauMs: 200, rotateTauMs: 200, tiltTauMs: 150, zoomTauMs: 150, maxPanSpeedPxPerS: 2500 },
+  inertia: {
+    panTauMs: 650,
+    rotateTauMs: 650,
+    twistTauMs: 200,
+    tiltTauMs: 150,
+    zoomTauMs: 150,
+    velocityWindowMs: 120,
+    stillMs: 150,
+    stillPx: 2,
+    maxPanSpeedPxPerS: 2500,
+  },
   wheel: { pixelsPerLevel: 300, pinchPixelsPerLevel: 100, notchSmoothingMs: 100, maxLeadLevels: 2 },
   keyboard: { panViewportsPerS: 0.8, rotateDegPerS: 90, tiltDegPerS: 45, smoothingMs: 150, zoomLevelsPerPress: 1 },
   touch: { tapMaxMovePx: 10, tapMaxMs: 250, doubleTapMs: 300, tiltDecisionMs: 100, rotateThresholdPx: 25 },

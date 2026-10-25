@@ -69,6 +69,8 @@ export class TouchGestures {
   private readonly carriedPixel: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly velocity = new Float64Array(4);
   private readonly release: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
+  /** The time constants of a touch release: a twist's heading glides with `twistTauMs` (KB-177). */
+  private readonly taus = { panTauMs: 1, rotateTauMs: 1, twistTauMs: 1, tiltTauMs: 1, zoomTauMs: 1 };
 
   constructor(private readonly context: GestureContext) {
     this.taps = new TapDetector(context.options);
@@ -327,7 +329,8 @@ export class TouchGestures {
 
   private measureRelease(out: ReleaseVelocity, releaseMs: number): void {
     const { options } = this.context;
-    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity, releaseMs);
+    const { velocityWindowMs, stillMs, stillPx } = options.inertia;
+    this.samples.velocity(velocityWindowMs, this.velocity, releaseMs, stillMs, stillPx);
     const vx = this.velocity[0] ?? 0;
     const vy = this.velocity[1] ?? 0;
     out.panXPx = out.panYPx = out.headingDeg = out.tiltDeg = out.zoomLevels = 0;
@@ -369,7 +372,9 @@ export class TouchGestures {
     if (!options.gestures.inertia) return false;
     if (carried) Object.assign(this.release, this.carried);
     else this.measureRelease(this.release, timeMs);
-    inertia.start(this.release, this.context.inertiaTaus(), anchor, pixel, options.maxTiltDeg);
+    Object.assign(this.taus, this.context.inertiaTaus());
+    this.taus.rotateTauMs = this.taus.twistTauMs;
+    inertia.start(this.release, this.taus, anchor, pixel, options.maxTiltDeg);
     if (inertia.active) port.requestNextFrame();
     return inertia.active;
   }

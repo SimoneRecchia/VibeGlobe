@@ -1,9 +1,9 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 05:20 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 04:45 UTC)
 
 Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
-#32, #35–#40, #42 (04:55 UTC; merge it again by about 09:00 UTC). GitHub deletes the branch on merge: the next push
+#32, #35–#40, #42 (04:35 UTC; merge it again by about 08:30 UTC). GitHub deletes the branch on merge: the next push
 recreates it. Tracks D, E, F, G and H are merged; the space-background track (F600–F609,
 `packages/renderer/src/starfield/`) is SimoneRecchia/VibeGlobe#41, which the owner merges. A full manual CI run on
 9a31bbe (run 40160663439) was in progress at the handoff; its failures are the next work.

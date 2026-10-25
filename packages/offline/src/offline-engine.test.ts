@@ -265,12 +265,16 @@ describe('the offline engine', () => {
     offline.source(xyzImagery({ id: 'lan', url: 'https://lan.test/{z}/{x}/{y}.png' }), { layerId: 'airgapped' });
     offline.setMode('offline', { layerId: 'airgapped' });
     offline.setMode('online');
-    await expect.poll(() => net.requests.filter((r) => r.url.startsWith('https://tiles.test/')).length).toBeGreaterThan(0);
+    await expect
+      .poll(() => net.requests.filter((r) => r.url.startsWith('https://tiles.test/')).length)
+      .toBeGreaterThan(0);
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(net.requests.filter((r) => r.url.startsWith('https://lan.test/'))).toHaveLength(0);
     // Back from offline-only: its host is checked again.
     offline.setMode('inherit', { layerId: 'airgapped' });
-    await expect.poll(() => net.requests.filter((r) => r.url.startsWith('https://lan.test/')).length).toBeGreaterThan(0);
+    await expect
+      .poll(() => net.requests.filter((r) => r.url.startsWith('https://lan.test/')).length)
+      .toBeGreaterThan(0);
   });
 
   it('hands back the held tiles of an endpoint that returns while another stays down (KB-194)', async () => {

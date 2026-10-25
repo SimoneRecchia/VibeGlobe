@@ -39,11 +39,7 @@ export class RuntimeCredits {
    * Ends a frame of `count` draws: marks the terrain when a draw shows it, with the credits of the terrain tiles drawn
    * (by their handle in the terrain `loader`: an offline package's, KB-193), and reports a change of credits.
    */
-  afterFrame(
-    list: DrawList,
-    count: number,
-    loader?: { attributionOf(handle: number): Attribution | undefined },
-  ): void {
+  afterFrame(list: DrawList, count: number, loader?: { attributionOf(handle: number): Attribution | undefined }): void {
     if (this.terrainIndex >= 0) {
       const textures = list.terrain.textures;
       for (let i = 0; i < count; i++) {

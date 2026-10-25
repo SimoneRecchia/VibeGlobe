@@ -30,8 +30,15 @@ to handle the last move and read as a hold; F180's two-finger lift the same), F2
 pops once in CI's software GPU); KB-097 and KB-170 (M5 relief and tilt in the descent onto a flank); TG-01 (a device
 loss after the camera moved keeps the old view), TG-04 (a whole vector view can stay missing after chaos, partly
 fixed), TG-06 (WebGPU engines destroyed during a fast start-up stay alive in a 1000-cycle run); KB-PT-07 (the
-OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-206 (F474 once counted a tile requested twice; not reproduced), KB-207 (two steps of F438's input-only walk-through flaky on CI). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
+OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-206 (F474 once counted a tile requested twice; not reproduced), KB-207 (two steps of F438's input-only walk-through flaky on CI), KB-208 (F081 on WebGPU once past its 120 s timeout). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
 (ADR 0046).
+
+**The full suite on CI.** Not yet green in one run: each full run on 2026-10-25 surfaced one to five different tests that
+fail their first attempt on CI's software GPU and pass on retry (CI fails a job on any flaky test, ADR 0012). Fixed
+today: F091 (KB-204, an engine bug), F179 and F180 (KB-205), F273, F106, F150, F448, F078 (known-bug status format).
+Still flaky and recorded: KB-206 (F474), KB-207 (F438), KB-208 (F081), and F510's raster chaos once on `main` before
+KB-204 (10 of 10 since in CI's image). The last full run on `main` (40224392533, commit `c1b92f4`) passed every job except shard 7, where F081 (KB-208) timed out once and passed on retry; the isolated measurements, F510 included, passed. First job on Wednesday: dispatch
+`ci.yml` on `main`, fix what it reports the same way (reproduce in CI's image, `CLAUDE.md`), until one run is green.
 
 **Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):
 

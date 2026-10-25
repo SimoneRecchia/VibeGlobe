@@ -191,7 +191,7 @@ for (const backend of ['webgpu', 'webgl2'] as const)
         }
     console.log(
       `[fog-detail] ${backend}: ${aware.requested} vs ${full.requested} tiles requested (${(saved * 100).toFixed(1)}% fewer), ` +
-        `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (full detail ${fullInFog.length}), ` +
+        `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (${inFog.map((r) => `${r.level}/${r.x}/${r.y}`).join(' ')}; full detail ${fullInFog.length}), ` +
         `GPU ${aware.gpuBytes} vs ${full.gpuBytes} bytes, fogged band mean difference ${(difference / count).toFixed(2)}`,
     );
     // The record covers the run's requests, and the full-detail run shows the check finds fogged requests.

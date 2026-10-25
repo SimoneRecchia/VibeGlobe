@@ -1,13 +1,19 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MIN_SIGMA_DEVICE_PX, decodeStarCatalog, starColor, starSprite } from './star-catalog.js';
+import { MIN_SIGMA_DEVICE_PX, decodeStarCatalog, loadStarCatalog, starColor, starSprite } from './star-catalog.js';
+
+const bytes = (): ArrayBuffer => {
+  const file = readFileSync(new URL('./bsc5-stars.bin', import.meta.url));
+  return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+};
 
 const DEG = Math.PI / 180;
 
 describe('star catalog (F601)', () => {
   it('decodes the Yale Bright Star Catalog brightest first, Sirius at its J2000 position', () => {
-    const catalog = decodeStarCatalog();
+    const catalog = decodeStarCatalog(bytes());
     expect(catalog.count).toBe(9096);
     expect(catalog.magnitudes[0]).toBeCloseTo(-1.46, 1);
     const [x, y, z] = catalog.directions;
@@ -16,6 +22,21 @@ describe('star catalog (F601)', () => {
     expect(Math.asin(z ?? 0) / DEG).toBeCloseTo(-16.716, 2);
     for (let i = 1; i < catalog.count; i++)
       expect(catalog.magnitudes[i]).toBeGreaterThanOrEqual(catalog.magnitudes[i - 1] ?? 0);
+  });
+
+  it('fetches a catalog URL once, and again after a failure (F600)', async () => {
+    let calls = 0;
+    const fetchBytes = async (): Promise<ArrayBuffer> => (calls++, bytes());
+    const [a, b] = await Promise.all([
+      loadStarCatalog('https://assets.test/a.bin', fetchBytes),
+      loadStarCatalog('https://assets.test/a.bin', fetchBytes),
+    ]);
+    expect(a).toBe(b);
+    expect(calls).toBe(1);
+    const failing = (): Promise<ArrayBuffer> => (calls++, Promise.reject(new Error('404')));
+    await expect(loadStarCatalog('https://assets.test/b.bin', failing)).rejects.toThrow('404');
+    await loadStarCatalog('https://assets.test/b.bin', fetchBytes);
+    expect(calls).toBe(3);
   });
 
   it('colors hot stars blue-white and cool stars orange', () => {

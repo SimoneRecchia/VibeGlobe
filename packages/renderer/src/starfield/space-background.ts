@@ -11,7 +11,7 @@ import { sunDirectionEcef } from '../atmosphere/sun-position.js';
 import type { ThreeExtensionContext } from '../extensions.js';
 import { celestialToClip, celestialToEcef, ecefToGalactic } from './sky-orientation.js';
 import { skyVisibility } from './sky-visibility.js';
-import { decodeStarCatalog } from './star-catalog.js';
+import { DEFAULT_CATALOG_URL, loadStarCatalog } from './star-catalog.js';
 import type { StarfieldMeshes } from './starfield-meshes.js';
 
 /** Options of {@link addSpaceBackground}; every one can change later through {@link SpaceBackground.setOptions}. */
@@ -31,6 +31,16 @@ export interface SpaceBackgroundOptions {
   readonly timeMs?: number;
   /** Fades the background out under the atmosphere's daytime sky near the ground (default true). */
   readonly fade?: boolean;
+}
+
+/** What {@link addSpaceBackground} takes: the options, and where the star catalog is hosted. */
+export interface SpaceBackgroundInit extends SpaceBackgroundOptions {
+  /**
+   * The URL of the star catalog `bsc5-stars.bin` (54 KB), an engine asset the application hosts (ADR 0015). By default
+   * the file next to the module in the published package, which bundlers copy to the application's assets. It is
+   * requested once the background is first drawn, never before.
+   */
+  readonly catalogUrl?: string;
 }
 
 /** The space background added to a globe. */
@@ -151,16 +161,35 @@ class SkyState {
 }
 
 /** The render extension: its meshes are built once three.js and the catalog are loaded, then updated every frame. */
-function spaceExtension(state: SkyState, context: RenderExtensionContext): RenderExtension {
+/** Fetches a URL's bytes, failing on an HTTP error. */
+async function fetchBytes(url: string): Promise<ArrayBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.arrayBuffer();
+}
+
+/**
+ * The render extension: its meshes are built once three.js and the catalog are loaded (both on first use), then
+ * updated every frame.
+ */
+function spaceExtension(state: SkyState, catalogUrl: string, context: RenderExtensionContext): RenderExtension {
   const three = context.renderer as ThreeExtensionContext;
   let meshes: StarfieldMeshes | undefined;
   let disposed = false;
-  void import('./starfield-meshes.js').then(({ createStarfieldMeshes }) => {
-    if (disposed) return;
-    meshes = createStarfieldMeshes(decodeStarCatalog(), three.depthPath());
-    three.scene.add(meshes.milkyWay, meshes.stars);
-    context.requestRender();
-  });
+  Promise.all([import('./starfield-meshes.js'), loadStarCatalog(catalogUrl, fetchBytes)]).then(
+    ([{ createStarfieldMeshes }, catalog]) => {
+      if (disposed) return;
+      meshes = createStarfieldMeshes(catalog, three.depthPath());
+      three.scene.add(meshes.milkyWay, meshes.stars);
+      context.requestRender();
+    },
+    (error: unknown) =>
+      context.report(
+        new GlobeError('resource-failed', `The space background's star catalog failed to load from ${catalogUrl}`, {
+          cause: error,
+        }),
+      ),
+  );
   return {
     frame(view) {
       if (meshes) state.update(view, meshes);
@@ -180,9 +209,10 @@ function spaceExtension(state: SkyState, context: RenderExtensionContext): Rende
  * ratio and do not shimmer; the background fades out under the atmosphere's daytime sky near the ground and shows
  * again at night or from space. Off unless added; call once the globe is ready (`Globe.addRenderExtension`).
  */
-export function addSpaceBackground(globe: SpaceBackgroundGlobe, options: SpaceBackgroundOptions = {}): SpaceBackground {
+export function addSpaceBackground(globe: SpaceBackgroundGlobe, init: SpaceBackgroundInit = {}): SpaceBackground {
+  const { catalogUrl = DEFAULT_CATALOG_URL(), ...options } = init;
   const state = new SkyState(globe, options);
-  const remove = globe.addRenderExtension((context) => spaceExtension(state, context));
+  const remove = globe.addRenderExtension((context) => spaceExtension(state, catalogUrl, context));
   return {
     get options() {
       return { ...state.settings };

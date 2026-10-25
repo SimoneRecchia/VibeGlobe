@@ -47,9 +47,12 @@ with a floor, look sharp on every display, while a texture's stars are tied to i
 
 ## Decision
 
-1. **Stars: BSC5 rendered procedurally.** The 9,096 catalog stars with a visual magnitude are encoded in
-   `star-catalog-data.ts` (6 bytes a star, brightest first: right ascension as u16 of a turn, declination as i16 of
-   90°, (V + 2) × 25 as u8, log temperature from 2,000 K to 50,000 K as u8; 72 KB of base64), decoded once.
+1. **Stars: BSC5 rendered procedurally.** The 9,096 catalog stars with a visual magnitude are encoded in an engine
+   asset, `src/starfield/bsc5-stars.bin` (54 KB; 6 bytes a star, brightest first: right ascension as u16 of a turn,
+   declination as i16 of 90°, (V + 2) × 25 as u8, log temperature from 2,000 K to 50,000 K as u8), fetched once when
+   the background is first drawn, never before (F600, F605). By default it is the file next to the module in the
+   published package (`new URL(…, import.meta.url)`, which bundlers copy); applications host it elsewhere with
+   `catalogUrl` (ADR 0015).
    - Source: the JSON conversion `bsc5-short.json` of github.com/brettonw/YaleBrightStarCatalog (MIT, © 2016 Bretton
      Wade; file SHA-256 `94b0581379ef9ea49f1ce664734a06d2fbbff2d7487f926acad3e9ef0960e0d8`), which carries BSC5's J2000
      positions, V magnitudes and a color temperature derived from B−V. The catalog itself is public domain (scientific
@@ -58,7 +61,7 @@ with a floor, look sharp on every display, while a texture's stars are tied to i
      build container (its proxy refuses them); the license reading is from the catalog's documentation as mirrored in
      the conversion's README.
    - Regenerating: parse each entry's `RA` (`hh mm ss.s`), `Dec` (`±dd° mm′ ss″`), `V` and `K` (5,800 K when missing),
-     sort by V, pack as above, and write the base64 string as `STAR_CATALOG_BASE64`.
+     sort by V, pack as above, and write the bytes to `bsc5-stars.bin`.
    - Each star is a sprite of four vertices: a Gaussian whose radius is 0.5 CSS px (more for stars brighter than
      magnitude 3) and never under 0.75 device px, and whose peak keeps the star's light in CSS pixels the same at every
      pixel ratio (`starSprite`). At 0.75 px the sum of a Gaussian's pixels varies by under 10⁻⁴ as it moves by a fraction
@@ -90,7 +93,12 @@ with a floor, look sharp on every display, while a texture's stars are tied to i
 
 ## Consequences
 
-- No image asset and no attribution on screen; the only third-party data is the 72 KB catalog, recorded in the notices.
+- No image asset and no attribution on screen; the only third-party data is the 54 KB catalog, recorded in the notices.
+- F603 (the main session's wording) asks for the Milky Way "drawn from a permissively licensed panorama". The panorama
+  here is an analytic all-sky function of the galactic direction, MPL-2.0 like the rest of the code: it needs no
+  download and has no texture seam or pole pinch by construction. F603's checks (no seam at the anticenter, where the
+  galactic longitude wraps, no pinch at the galactic poles, no banding) run against it (`e2e/starfield-motion.spec.ts`).
+  An image panorama remains possible later (a follow-up) if the owner prefers one, after a license check.
 - The faintest stars are those of BSC5 (about magnitude 6.5–8): denser star fields would need a larger catalog
   (Tycho-2 is public too, about 2.5 million stars) and a level-of-detail scheme — a follow-up, not needed now.
 - Reading `Globe.atmosphere` and `Globe.qualitySettings` each frame allocates two small objects; a non-allocating read

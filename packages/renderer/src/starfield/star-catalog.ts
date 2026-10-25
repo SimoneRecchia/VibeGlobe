@@ -2,7 +2,9 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The star catalog (ADR 0181) and how a star looks: its direction, magnitude and color, and the size and peak of its
 // sprite at a pixel ratio, so a star keeps its brightness on every display and never shimmers when the sky moves.
-import { STAR_CATALOG_BASE64 } from './star-catalog-data.js';
+// The catalog is an engine asset (ADR 0015): `bsc5-stars.bin`, the 9,096 stars of the Yale Bright Star Catalog, 5th
+// revised edition (Hoffleit and Warren 1991; public domain), from the JSON conversion of
+// github.com/brettonw/YaleBrightStarCatalog (MIT). ADR 0181 gives its encoding: brightest first, 6 bytes a star.
 
 const DEG = Math.PI / 180;
 const BYTES_PER_STAR = 6;
@@ -19,27 +21,6 @@ export interface StarCatalog {
   readonly magnitudes: Float32Array;
   /** Linear RGB colors, each channel at most 1, 3 per star. */
   readonly colors: Float32Array;
-}
-
-/** Decodes base64 without the DOM (`atob` is not in every runtime's types for core-style code). */
-function decodeBase64(text: string): Uint8Array {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const values = new Uint8Array(128);
-  for (let i = 0; i < alphabet.length; i++) values[alphabet.charCodeAt(i)] = i;
-  const length = text.replace(/=+$/, '').length;
-  const out = new Uint8Array(Math.floor((length * 3) / 4));
-  let bits = 0;
-  let count = 0;
-  let o = 0;
-  for (let i = 0; i < length; i++) {
-    bits = (bits << 6) | (values[text.charCodeAt(i)] ?? 0);
-    count += 6;
-    if (count >= 8) {
-      count -= 8;
-      out[o++] = (bits >> count) & 0xff;
-    }
-  }
-  return out;
 }
 
 /** Planck's law up to a constant, for a wavelength in nanometers and a temperature in kelvin. */
@@ -62,13 +43,17 @@ export function starColor(kelvin: number, out: Float32Array, offset = 0): void {
   out[offset + 2] = 0.5 + (0.5 * b) / max;
 }
 
-let decoded: StarCatalog | undefined;
+/**
+ * The catalog's default location: next to this module, in the published package (`src/starfield/bsc5-stars.bin`, from
+ * both `src` and `dist`), which bundlers copy to the application's assets. Applications may host it elsewhere
+ * (`SpaceBackgroundOptions.catalogUrl`).
+ */
+export const DEFAULT_CATALOG_URL = (): string => new URL('../../src/starfield/bsc5-stars.bin', import.meta.url).href;
 
-/** The catalog, decoded once. */
-export function decodeStarCatalog(): StarCatalog {
-  if (decoded) return decoded;
-  const bytes = decodeBase64(STAR_CATALOG_BASE64);
-  const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+/** Decodes the catalog's bytes. */
+export function decodeStarCatalog(buffer: ArrayBuffer): StarCatalog {
+  const bytes = new Uint8Array(buffer);
+  const data = new DataView(buffer);
   const count = Math.floor(bytes.length / BYTES_PER_STAR);
   const directions = new Float32Array(count * 3);
   const magnitudes = new Float32Array(count);
@@ -84,8 +69,21 @@ export function decodeStarCatalog(): StarCatalog {
     const kelvin = Math.exp(LOG_KELVIN_MIN + ((bytes[at + 5] ?? 0) / 255) * (LOG_KELVIN_MAX - LOG_KELVIN_MIN));
     starColor(kelvin, colors, i * 3);
   }
-  decoded = { count, directions, magnitudes, colors };
-  return decoded;
+  return { count, directions, magnitudes, colors };
+}
+
+/** Catalogs being loaded or loaded, by URL: each is fetched once per page. */
+const loaded = new Map<string, Promise<StarCatalog>>();
+
+/** Fetches and decodes the catalog at a URL, once; a failed load is forgotten so a later one retries. */
+export function loadStarCatalog(url: string, fetchBytes: (url: string) => Promise<ArrayBuffer>): Promise<StarCatalog> {
+  let catalog = loaded.get(url);
+  if (!catalog) {
+    catalog = fetchBytes(url).then(decodeStarCatalog);
+    loaded.set(url, catalog);
+    catalog.catch(() => loaded.delete(url));
+  }
+  return catalog;
 }
 
 /** The smallest Gaussian radius of a sprite, device pixels: below it a moving star's pixel sum would flicker. */

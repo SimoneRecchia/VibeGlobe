@@ -2088,10 +2088,10 @@ License: Public domain
 
 Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
 
-## src/starfield/star-catalog-data.ts in @vibeglobe/renderer
+## src/starfield/bsc5-stars.bin in @vibeglobe/renderer
 
 The 9,096 stars of the Yale Bright Star Catalog, 5th revised edition (Hoffleit and Warren 1991), encoded for the space background (ADR 0181); source: Yale Bright Star Catalog (BSC5, NASA Astronomical Data Center and CDS catalog V/50) through the JSON conversion of https://github.com/brettonw/YaleBrightStarCatalog
 
-License: Public domain (catalog data) AND MIT (JSON conversion)
+License: Public domain AND MIT
 
 The star catalog data is the Yale Bright Star Catalog, 5th revised edition (Hoffleit, D. and Warren, W. H. Jr., 1991), in the public domain. Converted to JSON by Bretton Wade: MIT License, Copyright (c) 2016 Bretton Wade. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

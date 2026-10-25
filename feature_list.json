@@ -7286,7 +7286,7 @@
         "Turn the space background on and off at runtime and confirm stars and the Milky Way appear and disappear in the next frame",
         "Confirm it is a render extension that the renderer package ships and the core does not depend on"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F601",
@@ -7298,7 +7298,7 @@
         "Assert each star stays within 0.5 px of its expected position for the camera of that frame",
         "Assert the stars' motion has no lag or jump relative to the globe between frames"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F602",
@@ -7310,7 +7310,7 @@
         "Record frames of a slow orbit and assert no star's brightness changes by more than the flicker threshold between frames",
         "Compare a still view with its reviewed baseline on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F603",
@@ -7322,7 +7322,7 @@
         "Assert no banding in the gradient regions (no step above the threshold between neighboring pixels)",
         "Compare with reviewed baselines on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F604",
@@ -7334,7 +7334,7 @@
         "Zoom from space to street level and into the flat map and assert the background fades out smoothly, with no pop",
         "Assert zero black or empty pixels in every recorded frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F605",
@@ -7346,7 +7346,7 @@
         "Confirm the catalog and panorama are requested only when the background is first switched on, from the configured asset base URL (ADR 0015)",
         "Measure its GPU time on the reference desktop and assert at most 0.3 ms per frame"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F606",
@@ -7357,7 +7357,7 @@
         "Open the playground with the space background switch and confirm it draws",
         "Open the guide and confirm it documents enabling it, its options and where its assets are hosted"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F607",
@@ -7368,7 +7368,7 @@
         "Unit-test sidereal time and precession against Meeus's worked examples, the celestial pole and a sidereal day",
         "Change the engine's time by six hours and assert the rendered stars move to their newly predicted screen positions, on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F608",
@@ -7379,7 +7379,7 @@
         "Capture the space background view on both backends and compare it with its baseline at ADR 0012's tolerances",
         "Assert the two backends' skies agree within the cross-backend tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F609",
@@ -7390,7 +7390,7 @@
         "Alternate windows with and without the background during a continuous drag and assert the median main-thread overhead is under 0.5 ms",
         "Assert the median frame-rate ratio is at least 0.8"
       ],
-      "status": "failing"
+      "status": "passing"
     }
   ]
 }

@@ -33,6 +33,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test(`every drawn tile's texels stay within 1.5 px, and a tilted view is finer near the camera (F081)`, async ({
       page,
     }) => {
+      // On WebGPU over SwiftShader the views take 1.9 min on CI, at the file's 2-minute limit (KB-208).
+      test.setTimeout(240_000);
       const session = await fixtureSession(page);
       await openGlobe(
         page,

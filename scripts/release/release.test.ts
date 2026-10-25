@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
-import { CHANGELOG_HEADER, addEntry, changelogEntry, type Commit } from './changelog.ts';
+import { CHANGELOG_HEADER, addEntry, changelogEntry, writeChangelog, type Commit } from './changelog.ts';
 import { cubeReferences } from './check-cube.ts';
 import { bumpManifest, distTag, publishOrder, publishRefusal } from './release.ts';
 
@@ -40,6 +42,21 @@ describe('changelog (F526)', () => {
         '- **Breaking:** Renderer: new sampler (abc1234)\n',
       ].join('\n'),
     );
+  });
+
+  it('reads a history of more than 1 MB of commit messages before the first release (KB-191)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'vibeglobe-changelog-'));
+    try {
+      const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+      git('init', '-q');
+      const message = join(repo, '.message');
+      writeFileSync(message, `feat: a long one\n\n${'x'.repeat(1_200_000)}\n`);
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-F', message);
+      const entry = writeChangelog('0.0.1', '2026-10-25', repo);
+      expect(entry).toContain('a long one');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('keeps one entry per released version, newest first, and refuses a version twice', () => {

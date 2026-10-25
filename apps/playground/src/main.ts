@@ -22,6 +22,7 @@ import { instrumentMainThread, startWorkerRendering } from './render-experiment/
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
+import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
 import { exposeTestHooks } from './test-hooks.js';
 import { cacheLine, surfaceLine } from './overlay-lines.js';
 
@@ -122,7 +123,7 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     tilt: '70',
   },
 };
-for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
+for (const [name, value] of Object.entries({ ...TERRAIN_SCENARIOS, ...REAL_DATA }[params.get('scenario') ?? ''] ?? {}))
   if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
@@ -275,10 +276,9 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
   // 3D Tiles decode their glTF content with the engine's workers (`parse-model`): a globe without tiled sources needs
   // them too, or a production build has nothing to decode with (F463).
   const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
-  return { ...tiles3dWorkers, ...terrain, ...imagery, ...customAdapters(params) };
+  return { ...tiles3dWorkers, ...terrain, ...imagery, ...customAdapters(params), ...montBlancLayers };
 }
 
-/** Creates one engine instance in a container with its own canvas. */
 /** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
 function startGlobe(
   container: HTMLElement,

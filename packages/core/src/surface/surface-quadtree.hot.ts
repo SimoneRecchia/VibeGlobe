@@ -40,6 +40,8 @@ export interface QuadtreeTile {
   southRad: number;
   eastRad: number;
   northRad: number;
+  /** The selection found the tile's closest point in full fog (F574): nothing finer than it is wanted there. */
+  fogged?: boolean;
 }
 
 /** Selection settings. */
@@ -330,6 +332,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
     southRad: 0,
     eastRad: 0,
     northRad: 0,
+    fogged: false,
   });
   quadtreeTileBounds(root, level, x, y, span, tile);
   measureTile(tile, camera.eyeEcef);
@@ -378,6 +381,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
             state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
+    tile.fogged = fogged;
     state.count++;
     return;
   }

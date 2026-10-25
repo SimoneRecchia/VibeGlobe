@@ -141,11 +141,12 @@ async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: n
       .fogEyes,
   }));
   if (!stats) throw new Error('no stats');
-  // A request is logged while its frame is drawn: the first eye recorded after it is that frame's.
+  // A request logged while a frame is drawn belongs to the first eye recorded after it.
   const requests: Run['requests'] = [];
   for (const entry of entries) {
     const match = / request (\d+)\/(\d+)\/(\d+)$/.exec(entry.message);
-    const eye = eyes.find((e) => e.timeMs >= entry.timeMs);
+    // One started after the last frame (a slot freed while the engine idles) belongs to the last frame's view.
+    const eye = eyes.find((e) => e.timeMs >= entry.timeMs) ?? eyes.at(-1);
     if (match && eye) requests.push({ level: Number(match[1]), x: Number(match[2]), y: Number(match[3]), eye });
   }
   const image = await canvasImage(page);

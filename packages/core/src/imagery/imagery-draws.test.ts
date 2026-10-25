@@ -95,6 +95,12 @@ describe('drawImagery', () => {
     expect(gap.wanted.slice(0, 3)).toEqual([12, 11, 10]);
   });
 
+  it('prefetches no children under a center tile in full fog (F574, KB-174)', () => {
+    const { layer, wanted } = fakeLayer({ 9: 42 });
+    draw(layer, { ...tile(9, 300, 170), fogged: true });
+    expect(wanted).toEqual([9]);
+  });
+
   it('requests no ancestor while the tile itself is arriving from the RAM tier (F097)', () => {
     const { layer, wanted } = fakeLayer({ 9: ARRIVING, 4: 42 });
     const list = draw(layer, tile(9, 300, 170));

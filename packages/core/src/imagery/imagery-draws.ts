@@ -116,7 +116,8 @@ export function drawImagery(
     }
     writeOverlays(list, index, overlays);
   }
-  if (center) prefetchStack(layers, center, centerDistance);
+  // Nothing finer shows under a center in full fog (F574, KB-174).
+  if (center && center.fogged !== true) prefetchStack(layers, center, centerDistance);
 }
 
 /** Prefetches the children of the center tile from each visible layer, from the first source of its chain that has it. */

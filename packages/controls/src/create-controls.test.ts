@@ -151,8 +151,11 @@ describe('inertia (F179, ADR 0009 §6)', () => {
   it('glides after a trackpad flick that slows down and lifts 90–120 ms after the last move (KB-177)', () => {
     for (const gapMs of [90, 120]) {
       const { distancePx } = glide(trackpadFlick(), 200 + gapMs);
-      // The content keeps moving right, the way the flick went: a real glide, not a dead stop.
-      expect(distancePx).toBeGreaterThan(100);
+      // The content keeps moving right, the way the flick went: a real glide, not a dead stop, and no faster than the
+      // finger over its last 25 ms (about 0.3 px/ms, so at most 0.3 · 650 px): no jerk forward to the speed it had
+      // before slowing down (KB-202).
+      expect(distancePx).toBeGreaterThan(5);
+      expect(distancePx).toBeLessThan(0.3 * 650);
     }
   });
 

@@ -5,6 +5,9 @@ const CAPACITY = 16;
 /** The longest window the event cadence may stretch the velocity window to: slower events are not a drag. */
 const MAX_WINDOW_MS = 300;
 
+/** The motion at the lift is measured over at least this much of the latest samples (KB-202). */
+const RECENT_MS = 20;
+
 /** Change of a scale or angle channel (log2 of a finger distance, radians) below which a hold counts as still. */
 const STILL_CHANNEL_EPSILON = 1e-3;
 
@@ -91,7 +94,57 @@ export class SampleRing {
       }
       out[c] = sTV / sTT;
     }
+    this.endSlope(Math.max(RECENT_MS, 2 * cadenceMs), lastTime, out);
   }
+
+  /**
+   * Narrows the slopes in `out` to the motion at the latest sample (KB-202): the least-squares slope over the last
+   * `recentMs` only, so a finger slowing down before it lifts glides at about its speed at the lift, not at the
+   * window's mean speed, which jerked the glide forward. Kept along each slope's direction and never above it: a
+   * slowdown is never read as a reversal or a speed-up. Position channels a and b are narrowed together, as one
+   * direction. A straight line over a few samples, not a curve, so jitter in event times does not read as a slowdown.
+   */
+  private endSlope(recentMs: number, lastTime: number, out: Float64Array): void {
+    let n = 1;
+    while (n < this.count && lastTime - (this.times[this.index(n)] ?? 0) <= recentMs) n++;
+    if (n < 2 || lastTime - (this.times[this.index(n - 1)] ?? 0) < 4) return;
+    let meanT = 0;
+    for (let k = 0; k < n; k++) meanT += (this.times[this.index(k)] ?? 0) - lastTime;
+    meanT /= n;
+    let sTT = 0;
+    for (let k = 0; k < n; k++) {
+      const dt = (this.times[this.index(k)] ?? 0) - lastTime - meanT;
+      sTT += dt * dt;
+    }
+    const end = this.end;
+    for (let c = 0; c < 4; c++) {
+      let meanV = 0;
+      for (let k = 0; k < n; k++) meanV += this.values[this.index(k) * 4 + c] ?? 0;
+      meanV /= n;
+      let sTV = 0;
+      for (let k = 0; k < n; k++) {
+        const i = this.index(k);
+        sTV += ((this.times[i] ?? 0) - lastTime - meanT) * ((this.values[i * 4 + c] ?? 0) - meanV);
+      }
+      end[c] = sTV / sTT;
+    }
+    const lx = out[0] ?? 0;
+    const ly = out[1] ?? 0;
+    const length = Math.hypot(lx, ly);
+    if (length > 0) {
+      const along = Math.min(Math.max(((end[0] ?? 0) * lx + (end[1] ?? 0) * ly) / length, 0), length);
+      out[0] = (lx / length) * along;
+      out[1] = (ly / length) * along;
+    }
+    for (let c = 2; c < 4; c++) {
+      const linear = out[c] ?? 0;
+      const slope = end[c] ?? 0;
+      out[c] = slope * linear <= 0 ? 0 : Math.sign(linear) * Math.min(Math.abs(slope), Math.abs(linear));
+    }
+  }
+
+  /** Scratch of {@link SampleRing.endSlope}. */
+  private readonly end = new Float64Array(4);
 
   /** The ring slot of the sample `back` samples before the latest. */
   private index(back: number): number {

@@ -1,6 +1,5 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { GeoPosition } from '@vibeglobe/core';
 import type { CameraPort } from './camera-port.js';
 import { approachShare, inertiaOffset, inertiaRemaining, SmoothedVelocity } from './motion.js';
 
@@ -66,35 +65,46 @@ export interface InertiaTaus {
 
 /**
  * Inertia after a release (ADR 0009 §6): each channel follows x(t) = v0·τ·(1 − e^(−t/τ)) in engine time since the
- * release, continuous in velocity at the release. Pan moves the grabbed anchor along the release direction (a great
- * circle on the globe); zoom stays anchored at the pan pixel.
+ * release, continuous in velocity at the release. Pan turns the globe about the screen center ({@link
+ * CameraPort.pivotPan}), the release velocity given at the center (KB-202): moving the grabbed point itself ran it off
+ * the globe's disc, where the camera stopped dead, and sped the turn up near the edge. Zoom stays anchored at the
+ * pixel the pan would carry the release point to.
  */
 export class Inertia {
   active = false;
   private readonly timeline = new Timeline();
   private readonly v: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
   private taus: InertiaTaus = { panTauMs: 1, rotateTauMs: 1, twistTauMs: 1, tiltTauMs: 1, zoomTauMs: 1 };
-  private anchor: GeoPosition | undefined;
+  private pan = false;
+  private widthPx = 0;
+  private heightPx = 0;
   private readonly origin: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly pixel: MutablePoint = { xPx: 0, yPx: 0 };
   private elapsedMs = 0;
   private maxTiltDeg = 89;
 
-  /** Starts from a release at `pixel` with the drag's anchor (or none for rotation and zoom only). */
+  /**
+   * Starts from a release at `pixel`; `pan` false for rotation and zoom only. The pan velocity is the one at the screen
+   * center of a `widthPx` × `heightPx` view ({@link CameraPort.pivotScale}).
+   */
   start(
     velocity: ReleaseVelocity,
     taus: InertiaTaus,
-    anchor: GeoPosition | undefined,
+    pan: boolean,
     pixel: MutablePoint,
     maxTiltDeg: number,
+    widthPx: number,
+    heightPx: number,
   ): void {
     Object.assign(this.v, velocity);
-    if (!anchor) {
+    if (!pan) {
       this.v.panXPx = 0;
       this.v.panYPx = 0;
     }
     this.taus = taus;
-    this.anchor = anchor;
+    this.pan = pan;
+    this.widthPx = widthPx;
+    this.heightPx = heightPx;
     this.origin.xPx = pixel.xPx;
     this.origin.yPx = pixel.yPx;
     this.maxTiltDeg = maxTiltDeg;
@@ -106,7 +116,7 @@ export class Inertia {
   /** Stops at once. */
   stop(): void {
     this.active = false;
-    this.anchor = undefined;
+    this.pan = false;
   }
 
   private resting(t: number): boolean {
@@ -134,10 +144,12 @@ export class Inertia {
     const dTilt = inertiaOffset(v.tiltDeg, taus.tiltTauMs, t) - inertiaOffset(v.tiltDeg, taus.tiltTauMs, before);
     port.rotate(dHeading, dTilt, this.maxTiltDeg);
     const dZoom = inertiaOffset(v.zoomLevels, taus.zoomTauMs, t) - inertiaOffset(v.zoomLevels, taus.zoomTauMs, before);
+    const dx = inertiaOffset(v.panXPx, taus.panTauMs, t) - inertiaOffset(v.panXPx, taus.panTauMs, before);
+    const dy = inertiaOffset(v.panYPx, taus.panTauMs, t) - inertiaOffset(v.panYPx, taus.panTauMs, before);
     this.pixel.xPx = this.origin.xPx + inertiaOffset(v.panXPx, taus.panTauMs, t);
     this.pixel.yPx = this.origin.yPx + inertiaOffset(v.panYPx, taus.panTauMs, t);
     port.zoomAt(this.pixel, dZoom);
-    if (this.anchor) port.dragTo(this.anchor, this.pixel);
+    if (this.pan && (dx !== 0 || dy !== 0)) port.pivotPan(dx, dy, this.widthPx, this.heightPx);
     port.setCoasting(false);
     if (this.resting(t)) this.stop();
     return this.active;

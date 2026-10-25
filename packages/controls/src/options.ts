@@ -148,7 +148,7 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
     tiltTauMs: 150,
     zoomTauMs: 150,
     maxPanSpeedPxPerS: 2500,
-    velocityWindowMs: 120,
+    velocityWindowMs: 50,
     stillMs: 150,
     stillPx: 2,
   },

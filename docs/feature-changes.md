@@ -30,3 +30,4 @@ Entries that an owner decision made impossible to pass are never deleted or rewo
 ## Added entries
 
 - 2026-10-25, owner: an optional space background (stars and the Milky Way) that moves consistently with the globe like Google Earth's, off by default, built by a parallel session as a render extension (`packages/renderer/src/starfield/`). Entries F600–F606 (M11); F607–F609 stay reserved for it.
+- 2026-10-25, track I (space background): F607–F609 added from the reserved numbers for the sky's orientation by sidereal time, the screenshot baselines and the frame-time check (ADR 0181).

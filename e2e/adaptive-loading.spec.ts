@@ -360,7 +360,8 @@ test.describe('the measured link (F300–F303)', () => {
     page,
   }) => {
     test.setTimeout(900_000);
-    const ROUNDS = 6;
+    const ROUNDS = 3;
+    const SAMPLES = 3;
     const SETTINGS = ['adaptive', '2', '6'];
     const links: { name: string; rules: unknown[] }[] = [
       { name: '400 kbps', rules: [{ linkBytesPerS: SLOW }] },
@@ -370,7 +371,8 @@ test.describe('the measured link (F300–F303)', () => {
     for (const link of links) {
       const samples: Record<string, number[]> = { adaptive: [], '2': [], '6': [] };
       let mostAdaptive = 0;
-      // Six rounds, each setting timed by its best run: a view completes in a few hundred milliseconds on a fast
+      // Three rounds of three views per page (each over new tiles, after the page's start-up), each setting timed by its
+      // best run: a view completes in a few hundred milliseconds on a fast
       // link, where single runs on CI's runner vary by more than the 10% compared, and the first view of a round is the
       // slowest (measured 2026-10-24), so the order rotates and each setting runs once in each place.
       for (let round = 0; round < ROUNDS; round++)
@@ -379,8 +381,19 @@ test.describe('the measured link (F300–F303)', () => {
           const fixed = perHost === 'adaptive' ? '' : `&perHost=${perHost}&adaptive=0`;
           await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=6${fixed}`);
           await waitForStreaming(page);
-          samples[perHost]?.push(await timeToCompleteView(page));
-          await waitForStreaming(page);
+          // Views of seconds on the high-latency link vary little: one per page keeps the test within its time.
+          const views = link.name === '500 ms' ? 1 : SAMPLES;
+          for (let view = 0; view < views; view++) {
+            if (view > 0) {
+              await page.evaluate(
+                (lon) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: lon, latitudeDeg: 45, zoom: 6 }),
+                10 + 5 * view,
+              );
+              await waitForStreaming(page);
+            }
+            samples[perHost]?.push(await timeToCompleteView(page));
+            await waitForStreaming(page);
+          }
           if (perHost !== 'adaptive') continue;
           const log = (await requestLog(page, session)).filter((r) => r.endMs !== undefined);
           // Most requests in flight at once, after the link was measured (the first six responses).

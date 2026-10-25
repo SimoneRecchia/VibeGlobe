@@ -2,7 +2,8 @@
 // only, offline only, hybrid) and the four switches (persistent cache, memory reuse, prefetch and flight preloading,
 // offline packaging), each with an unrestricted source and a source whose profile forbids the persistent cache,
 // prefetch and packaging; the combinations that read packages run with packages in browser storage and on a LAN
-// server. A short zoom, pan and flight per combination, with request interception and storage inspection.
+// server. A short zoom, pan and flight per combination, with request interception and storage inspection, on WebGPU and
+// on forced WebGL2 (F329 step 3, KB-188).
 import { expect, test, type Page } from '@playwright/test';
 import { nextFrame } from './support/globe.ts';
 import {
@@ -116,7 +117,12 @@ async function scenario(page: Page): Promise<number> {
 }
 
 /** Runs the 16 switch combinations in one mode and package setup, checking each against the specification. */
-async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none'): Promise<void> {
+async function runMatrix(
+  page: Page,
+  mode: Mode,
+  setup: 'stored' | 'lan' | 'none',
+  backend: 'webgpu' | 'webgl2',
+): Promise<void> {
   await openHarness(page);
   await tileHeaders(page, () => ({ 'Cache-Control': 'max-age=86400' }));
   const lan = setup === 'lan' ? await servePackages(page) : undefined;
@@ -137,10 +143,11 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
     await page.waitForTimeout(500);
     await clearTiles(page);
     const sessions = {
-      open: `f314-${mode}-${setup}-${String(index)}`,
-      strict: `f314s-${mode}-${setup}-${String(index)}`,
+      open: `f314-${backend}-${mode}-${setup}-${String(index)}`,
+      strict: `f314s-${backend}-${mode}-${setup}-${String(index)}`,
     };
     const config: HarnessConfig = {
+      backend,
       network: mode,
       switches,
       sources: [
@@ -272,16 +279,17 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
   expect(failures).toEqual([]);
 }
 
-for (const [mode, setup] of [
-  ['online', 'none'],
-  ['offline', 'stored'],
-  ['offline', 'lan'],
-  ['hybrid', 'stored'],
-  ['hybrid', 'lan'],
-] as const)
-  test(`every switch combination behaves as specified in ${mode} mode${setup === 'none' ? '' : ` with packages ${setup === 'lan' ? 'on a LAN server' : 'in browser storage'}`} (F314)`, async ({
-    page,
-  }) => {
-    test.setTimeout(900_000);
-    await runMatrix(page, mode, setup);
-  });
+for (const backend of ['webgpu', 'webgl2'] as const)
+  for (const [mode, setup] of [
+    ['online', 'none'],
+    ['offline', 'stored'],
+    ['offline', 'lan'],
+    ['hybrid', 'stored'],
+    ['hybrid', 'lan'],
+  ] as const)
+    test(`every switch combination behaves as specified in ${mode} mode${setup === 'none' ? '' : ` with packages ${setup === 'lan' ? 'on a LAN server' : 'in browser storage'}`} on ${backend} (F314, F329)`, async ({
+      page,
+    }) => {
+      test.setTimeout(900_000);
+      await runMatrix(page, mode, setup, backend);
+    });

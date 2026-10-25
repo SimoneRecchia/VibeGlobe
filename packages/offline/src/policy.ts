@@ -5,7 +5,8 @@ import type { NetworkMode, NetworkPolicy, PolicyDecision, PolicyRequest, Provide
 
 /** What the default policy reads: the mode, the switches and each source's provider rules. */
 export interface PolicyInputs {
-  mode(): NetworkMode;
+  /** The mode in effect for a source in a layer (KB-184). */
+  mode(sourceId: string, layerId: string): NetworkMode;
   readonly switches: SwitchBoard;
   rules(sourceId: string): ProviderRules | undefined;
 }
@@ -18,7 +19,7 @@ export interface PolicyInputs {
 export function defaultNetworkPolicy(inputs: PolicyInputs): NetworkPolicy {
   return {
     resolve(request: PolicyRequest): PolicyDecision {
-      const mode = inputs.mode();
+      const mode = inputs.mode(request.sourceId, request.layerId);
       const switches = inputs.switches.effective(request.sourceId, request.layerId, inputs.rules(request.sourceId));
       const purposeAllowed =
         request.purpose === 'visible' ||

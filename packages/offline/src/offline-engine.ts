@@ -84,9 +84,16 @@ export interface OfflineSettings {
 
 /** An offline engine: network modes, loading switches, the persistent cache and connectivity for wrapped sources. */
 export interface Offline {
+  /** The global network mode. */
   readonly mode: NetworkMode;
-  /** Changes the network mode at runtime; new requests follow it at once (F290). */
-  setMode(mode: NetworkMode): void;
+  /**
+   * Changes the network mode at runtime, globally or for one source or layer, as the switches (F290, KB-184): a layer's
+   * mode beats its source's, which beats the global one; `'inherit'` drops a source's or layer's own. New requests
+   * follow it at once.
+   */
+  setMode(mode: NetworkMode | 'inherit', scope?: SwitchScope): void;
+  /** The network mode in effect for a source (in a layer). */
+  modeOf(sourceId: string, layerId?: string): NetworkMode;
   /** Sets loading switches globally, or for one source or layer (F290). */
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void;
   /** The mode and the global switches. */
@@ -146,6 +153,10 @@ class OfflineEngine implements Offline {
   private readonly rules = new Map<string, ProviderRules>();
   /** The ids of the sources wrapped by {@link source}, in order. */
   private readonly wrapped = new Set<string>();
+  /** The layer of each wrapped source (`TieredSourceOptions.layerId`, default the source's id). */
+  private readonly layerOf = new Map<string, string>();
+  /** Network modes set for one source (`source:<id>`) or layer (`layer:<id>`), KB-184. */
+  private readonly modeOverrides = new Map<string, NetworkMode>();
   private readonly policy: NetworkPolicy;
   private readonly store: CacheStore;
   private readonly monitor: ConnectivityMonitor;
@@ -162,7 +173,6 @@ class OfflineEngine implements Offline {
   private cacheMarked = false;
   /** Switches the application set on globally: a source registered later whose profile forbids one is warned about. */
   private readonly enabledGlobally = new Set<LoadingSwitch>();
-  /** The packages each source's tiles were read from: their credits join the source's (F306). */
   /** Each package's credit for a source, by `packageId\u0000sourceId`: one object, so frames compare it by identity. */
   private readonly packageCredits = new Map<string, Attribution | undefined>();
 
@@ -174,7 +184,7 @@ class OfflineEngine implements Offline {
     this.policy =
       options.policy ??
       defaultNetworkPolicy({
-        mode: () => this.currentMode,
+        mode: (sourceId, layerId) => this.modeOf(sourceId, layerId),
         switches: this.switches,
         rules: (id) => this.rules.get(id),
       });
@@ -182,7 +192,8 @@ class OfflineEngine implements Offline {
     this.monitor = new ConnectivityMonitor({
       ...options.healthChecks,
       fetch: this.fetchImpl,
-      enabled: () => this.currentMode !== 'offline',
+      // Health checks run while any source may use the network.
+      enabled: () => this.currentMode !== 'offline' || [...this.modeOverrides.values()].some((m) => m !== 'offline'),
       onChange: (connectivity, unreachable) => {
         // A wait for one endpoint's check ends with that check (KB-161), not with another endpoint's change.
         this.wake(null);
@@ -204,13 +215,29 @@ class OfflineEngine implements Offline {
     return this.monitor.connectivity;
   }
 
-  setMode(mode: NetworkMode): void {
-    if (mode === this.currentMode) return;
-    const wasOffline = this.currentMode === 'offline';
-    this.currentMode = mode;
+  setMode(mode: NetworkMode | 'inherit', scope?: SwitchScope): void {
+    const before = new Map([...this.wrapped].map((id) => [id, this.modeOf(id, this.layerOf.get(id))]));
+    if (scope?.layerId === undefined && scope?.sourceId === undefined) {
+      if (mode === 'inherit' || mode === this.currentMode) return;
+      this.currentMode = mode;
+    } else {
+      const key = scope.layerId !== undefined ? `layer:${scope.layerId}` : `source:${scope.sourceId ?? ''}`;
+      if (mode === 'inherit') this.modeOverrides.delete(key);
+      else this.modeOverrides.set(key, mode);
+    }
+    // The sources that left offline-only mode: their unavailable tiles may load now.
+    const leftOffline = [...before].filter(
+      ([id, was]) => was === 'offline' && this.modeOf(id, this.layerOf.get(id)) !== 'offline',
+    );
     this.wake();
     if (mode !== 'offline') this.monitor.checkAll();
-    this.emit('mode-change', { mode, sourceIds: wasOffline ? [...this.wrapped] : [] });
+    this.emit('mode-change', { mode: this.currentMode, sourceIds: leftOffline.map(([id]) => id) });
+  }
+
+  modeOf(sourceId: string, layerId = sourceId): NetworkMode {
+    return (
+      this.modeOverrides.get(`layer:${layerId}`) ?? this.modeOverrides.get(`source:${sourceId}`) ?? this.currentMode
+    );
   }
 
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void {
@@ -240,6 +267,7 @@ class OfflineEngine implements Offline {
     }
     this.registerEndpoint(source);
     this.wrapped.add(source.id);
+    this.layerOf.set(source.id, options.layerId ?? source.id);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
     // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258). A package's
     // credit travels with the tiles it served and is listed while they are drawn (F306, KB-189).
@@ -358,7 +386,7 @@ class OfflineEngine implements Offline {
           }, maxMs);
           this.waiters.push(waiter);
         }),
-      offlineOnly: () => this.currentMode === 'offline',
+      offlineOnly: (sourceId, layerId) => this.modeOf(sourceId, layerId) === 'offline',
       changes: () => this.changeCount,
       count: (sourceId, tier, coord, packageId) => {
         let counters = this.counters.get(sourceId);

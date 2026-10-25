@@ -42,8 +42,8 @@ export interface TierContext {
   waitForChange(maxMs: number, endpoint?: string): Promise<void>;
   /** The longest a triggered health check takes to finish, its wait for the least interval between checks included. */
   readonly longestCheckMs: number;
-  /** True in offline-only mode. */
-  offlineOnly(): boolean;
+  /** True where offline-only mode is in effect for the source in its layer. */
+  offlineOnly(sourceId: string, layerId: string): boolean;
   /** Counts changes of connectivity, mode or switches: a miss is worth retrying only after one (KB-190). */
   changes(): number;
   count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
@@ -342,7 +342,7 @@ class TileLoader {
    * once connectivity returns without spending the engine's retries (F298, F299).
    */
   private async miss(decision: PolicyDecision, key: string): Promise<TransportResult> {
-    if (this.context.offlineOnly() || !decision.useNetwork) return NOT_FOUND;
+    if (this.context.offlineOnly(this.source.id, this.layerId) || !decision.useNetwork) return NOT_FOUND;
     this.context.count(this.source.id, 'offlineMisses');
     // Asked again with nothing changed since its last miss: wait for a change instead (KB-190).
     const changes = this.context.changes();

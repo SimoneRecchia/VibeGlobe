@@ -228,6 +228,33 @@ describe('the offline engine', () => {
     // The 1.5 s hold check and the health checks' backoff take longer than the default 5 s.
   }, 15_000);
 
+  it('overrides the network mode for one layer or source while the others keep the global one (F290, KB-184)', async () => {
+    const net = fakeNetwork(() => ({}));
+    const offline = engine({ fetch: net.fetchImpl });
+    const base = offline.source(fixture('base'), { layerId: 'base' });
+    const labels = offline.source(fixture('labels'), { layerId: 'labels' });
+    const changes: (readonly string[])[] = [];
+    offline.on('mode-change', (event) => changes.push(event.sourceIds));
+    offline.setMode('offline', { layerId: 'labels' });
+    expect([offline.mode, offline.modeOf('base', 'base'), offline.modeOf('labels', 'labels')]).toEqual([
+      'hybrid',
+      'hybrid',
+      'offline',
+    ]);
+    // The offline-only layer never asks the network; the other keeps loading from it.
+    expect((await load(labels, tile(2, 1, 1))).kind).toBe('status');
+    expect(text(await load(base, tile(2, 1, 1)))).toBe('tile');
+    expect(net.requests.map((r) => r.url).filter((url) => url.endsWith('/2/1/1.png'))).toHaveLength(1);
+    // A source's mode applies to every layer that has none of its own; the layer's own wins.
+    offline.setMode('online', { sourceId: 'labels' });
+    expect(offline.modeOf('labels', 'labels')).toBe('offline');
+    offline.setMode('inherit', { layerId: 'labels' });
+    expect(offline.modeOf('labels', 'labels')).toBe('online');
+    // Leaving offline-only mode names the sources whose tiles may load now.
+    expect(changes).toEqual([[], [], ['labels']]);
+    expect(text(await load(labels, tile(2, 1, 1)))).toBe('tile');
+  });
+
   it('a failure on an endpoint the health check finds reachable goes to the engine, which backs off (F315)', async () => {
     let first = true;
     const net = fakeNetwork((url) => {

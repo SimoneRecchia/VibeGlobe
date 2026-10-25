@@ -26,7 +26,7 @@ interface Box {
 interface DenseLayer {
   collisionBoxes: Box[];
   setVisible?: (visible: boolean) => void;
-  placer: { pending: boolean; frameMs: number[] };
+  placer: { pending: boolean; frameMs: number[]; frameStallMs: number[] };
 }
 
 const overlaps = (a: Box, b: Box): boolean => a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
@@ -104,7 +104,9 @@ for (const backend of BACKENDS) {
     expect(strayPixels(shown, hidden, before, 1), 'text outside the shown boxes').toBe(0);
     // Zooming in: labels hidden before appear, the collision work sliced within its budget.
     await page.evaluate(() => {
-      (window.vibeglobeLayers?.layers['dense'] as unknown as DenseLayer).placer.frameMs.length = 0;
+      const placer = (window.vibeglobeLayers?.layers['dense'] as unknown as DenseLayer).placer;
+      placer.frameMs.length = 0;
+      placer.frameStallMs.length = 0;
     });
     let previous = before;
     for (const zoom of [9, 10]) {
@@ -114,9 +116,12 @@ for (const backend of BACKENDS) {
       expect(after.filter((b) => !wasShown.has(b.id)).length, `labels shown at zoom ${zoom}`).toBeGreaterThan(100);
       previous = after;
     }
-    const times = await page.evaluate(() =>
-      [...(window.vibeglobeLayers?.layers['dense'] as unknown as DenseLayer).placer.frameMs].sort((a, b) => a - b),
-    );
+    // The work of each slice: its time without the stalls in it, when the thread did not run (KB-171: on CI's busy
+    // CPU, with a software GPU, the main thread waits whole scheduler ticks of 4 ms in the middle of a slice).
+    const times = await page.evaluate(() => {
+      const placer = (window.vibeglobeLayers?.layers['dense'] as unknown as DenseLayer).placer;
+      return placer.frameMs.map((ms, i) => ms - (placer.frameStallMs[i] ?? 0)).sort((a, b) => a - b);
+    });
     expect(times.length, 'placement sliced across frames').toBeGreaterThan(2);
     const p95 = times[Math.min(times.length - 1, Math.floor(times.length * 0.95))] ?? Infinity;
     expect(p95, `collision work per frame: ${times.map((t) => t.toFixed(1)).join(' ')}`).toBeLessThanOrEqual(

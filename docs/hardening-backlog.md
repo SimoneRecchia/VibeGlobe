@@ -6,7 +6,7 @@ only remaining steps are hardening stay `failing` in `feature_list.json` and are
 entry is marked `passing` only when all of its steps pass.
 
 Owner (2026-10-24, ADR 0046): acceptance entries blocked only by known hardening bugs (F148, F167, F389) are listed here and their
-milestones close; their bugs (KB-097, KB-110, KB-170, KB-171) may stay open until the hardening weeks.
+milestones close; their bugs (KB-097, KB-110, KB-170; KB-171 fixed 2026-10-25) may stay open until the hardening weeks.
 
 Hardening means: performance budgets on real GPUs, soak, chaos and fuzzing runs, the cross-browser matrix, and visual
 perfection in edge cases.

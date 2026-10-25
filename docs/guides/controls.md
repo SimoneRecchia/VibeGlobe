@@ -69,7 +69,7 @@ createControls({
     twistTauMs: 200,
     tiltTauMs: 150,
     zoomTauMs: 150,
-    velocityWindowMs: 120,
+    velocityWindowMs: 50,
     stillMs: 150,
     stillPx: 2,
     maxPanSpeedPxPerS: 2500,

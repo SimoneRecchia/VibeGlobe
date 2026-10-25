@@ -2,7 +2,7 @@
 // frame, so it runs in the measurements project with the machine to itself (KB-150).
 import { expect, test } from '@playwright/test';
 import { DEFAULT_CONTROLS_OPTIONS } from '@vibeglobe/controls';
-import { camera, frames, openControls, record, settle } from './support/controls.ts';
+import { camera, frames, openControls, positionAt, record, settle } from './support/controls.ts';
 
 test('a released drag coasts with time-based inertia, and a release after holding still does not (F179)', async ({
   page,
@@ -73,4 +73,129 @@ test('a released drag coasts with time-based inertia, and a release after holdin
   await page.mouse.up();
   await settle(page);
   expect((await camera(page)).longitudeDeg).toBeCloseTo(before.longitudeDeg, 9);
+});
+
+/**
+ * Plays a flick in the page with real timing (KB-202): pointer events every `eventMs` from `fromX` along the canvas's
+ * middle row, at `speed(t)` px/ms, then the lift `liftAfterMs` after the last move.
+ */
+async function flick(
+  page: import('@playwright/test').Page,
+  fromX: number,
+  y: number,
+  durationMs: number,
+  eventMs: number,
+  speed: string,
+  liftAfterMs: number,
+): Promise<void> {
+  await page.evaluate(
+    async ([fromXPx, yPx, duration, interval, speedSource, lift]) => {
+      const canvas = document.querySelector('#globe')?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      const target = document.elementFromPoint(canvas.left + fromXPx, canvas.top + yPx);
+      const speedAt = new Function('t', `return ${speedSource};`) as (t: number) => number;
+      const fire = (type: string, x: number): void =>
+        void target?.dispatchEvent(
+          new PointerEvent(type, {
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            button: 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX: canvas.left + x,
+            clientY: canvas.top + yPx,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      const wait = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
+      fire('pointerdown', fromXPx);
+      const start = performance.now();
+      let x = fromXPx;
+      let last = start;
+      while (performance.now() - start < duration) {
+        await wait(interval);
+        const now = performance.now();
+        x += speedAt(now - start) * (now - last);
+        last = now;
+        fire('pointermove', x);
+      }
+      await wait(lift);
+      fire('pointerup', x);
+    },
+    [fromX, y, durationMs, eventMs, speed, liftAfterMs] as const,
+  );
+}
+
+for (const [eventMs, label] of [
+  [1000 / 120, '120 Hz'],
+  [1000 / 60, '60 Hz'],
+] as const) {
+  test(`flicks on a zoomed-out globe glide on past its edge and slow down smoothly to rest, never reversing, at ${label} (KB-202)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    // The whole globe in a 480 × 360 canvas, surrounded by space; its radius is under 150 px.
+    await openControls(page, 'lon=0&lat=0&zoom=0.3&size=480x360');
+    for (const [name, fromX, durationMs, speed, liftMs] of [
+      ['fast flick', 200, 120, '1.5 * Math.min(1, t / 40)', 2],
+      [
+        'flick slowing before the lift',
+        190,
+        140,
+        't < 90 ? 1.5 * Math.min(1, t / 40) : 1.5 - (1.1 * (t - 90)) / 50',
+        10,
+      ],
+      ['gentle flick', 230, 200, '0.3 * Math.min(1, t / 40)', 4],
+    ] as const) {
+      await settle(page);
+      await record(page, []);
+      await flick(page, fromX, 180, durationMs, eventMs, speed, liftMs);
+      await settle(page);
+      const all = await frames(page);
+      const releasedAt = all.findIndex((frame, i) => i > 0 && frame.pointer === null);
+      const lon = all.map((frame) => frame.camera.longitudeDeg);
+      const step = (i: number): number => (((lon[i] ?? 0) - (lon[i - 1] ?? 0) + 540) % 360) - 180;
+      const rate = (i: number): number => step(i) / ((all[i]?.timeMs ?? 0) - (all[i - 1]?.timeMs ?? 1));
+      const trace = `${name}: ${JSON.stringify(all.map((f) => [f.timeMs.toFixed(1), f.camera.longitudeDeg.toFixed(4), f.pointer ? 1 : 0]))}`;
+      // At least one drag frame (a software GPU draws a few frames a second at most).
+      expect(releasedAt, trace).toBeGreaterThan(0);
+      // The content moves east, the camera west: every frame from the release on, the same way.
+      const glide = all.length - releasedAt;
+      for (let i = releasedAt; i < all.length; i++) expect(step(i), trace).toBeLessThanOrEqual(0);
+      // A glide, not a dead stop: at least half a second of frames that move.
+      const moving = all.slice(releasedAt).filter((_, k) => step(releasedAt + k) < -1e-6);
+      expect(glide, trace).toBeGreaterThan(5);
+      expect((moving.at(-1)?.timeMs ?? 0) - (all[releasedAt]?.timeMs ?? 0), trace).toBeGreaterThan(500);
+      // Slowing down: each frame's rate no faster than the one before (10% for the software GPU's uneven steps).
+      for (let i = releasedAt + 2; i < all.length; i++)
+        expect(Math.abs(rate(i)), `${trace} frame ${i}`).toBeLessThanOrEqual(Math.abs(rate(i - 1)) * 1.1 + 1e-6);
+    }
+  });
+}
+
+test('a drag that leaves the globe keeps turning it, and its release glides (KB-202)', async ({ page }) => {
+  test.setTimeout(60_000);
+  await openControls(page, 'lon=0&lat=0&zoom=0.3&size=480x360');
+  await settle(page);
+  // The globe's radius along the middle row: the last pixel right of the center that still shows it.
+  let radiusPx = 0;
+  while (radiusPx < 240 && (await positionAt(page, { xPx: 240 + radiusPx + 1, yPx: 180 }))) radiusPx++;
+  expect(radiusPx).toBeLessThan(200);
+  await record(page, []);
+  // From the center to 230 px right, past the edge, at 0.33 px/ms.
+  await flick(page, 240, 180, 700, 1000 / 120, '0.33', 2);
+  await settle(page);
+  const all = await frames(page);
+  const releasedAt = all.findIndex((frame, i) => i > 0 && frame.pointer === null);
+  const lon = all.map((frame) => frame.camera.longitudeDeg);
+  const trace = JSON.stringify(
+    all.map((f) => [f.timeMs.toFixed(1), f.camera.longitudeDeg.toFixed(4), f.pointer?.xPx.toFixed(0)]),
+  );
+  // While the pointer is beyond the edge, the globe keeps turning (westward camera, eastward content).
+  const offDisc = all.flatMap((f, i) => ((f.pointer?.xPx ?? 0) > 240 + radiusPx + 2 ? [i] : []));
+  expect(offDisc.length, `${radiusPx} px: ${trace}`).toBeGreaterThan(1);
+  const step = (a: number, b: number): number => ((b - a + 540) % 360) - 180;
+  expect(step(lon[offDisc[0] ?? 0] ?? 0, lon[offDisc.at(-1) ?? 0] ?? 0), trace).toBeLessThan(-1);
+  // And the release glides on.
+  expect(step(lon[releasedAt - 1] ?? 0, lon.at(-1) ?? 0), trace).toBeLessThan(-1);
 });

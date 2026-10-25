@@ -33,6 +33,8 @@ export class MouseGestures {
   /** Started with Ctrl: releasing Ctrl ends the rotation. */
   private ctrlRotate = false;
   private anchor: GeoPosition | undefined;
+  /** The pan turns the globe about the screen center: the pointer left the globe's disc (KB-202). */
+  private trackball = false;
   private grabPending = false;
   private movePending = false;
   private releasePending = false;
@@ -75,6 +77,7 @@ export class MouseGestures {
     this.downMs = press.timeMs;
     this.moved = false;
     this.grabPending = mode === 'pan' && gestures.dragPan;
+    this.trackball = false;
     this.movePending = false;
     this.releasePending = false;
     this.samples.clear();
@@ -137,6 +140,7 @@ export class MouseGestures {
     this.mode = 'none';
     this.pointerId = undefined;
     this.anchor = undefined;
+    this.trackball = false;
     this.grabPending = false;
     this.movePending = false;
     this.releasePending = false;
@@ -153,14 +157,30 @@ export class MouseGestures {
     return false;
   }
 
+  /**
+   * Keeps the grabbed point under the pointer while the pointer is over the globe. Off the globe's disc (a zoomed-out
+   * globe surrounded by space) the pointer's motion turns the globe about the screen center instead, like a virtual
+   * trackball, and the next point the pointer reaches on the globe is grabbed again (KB-202).
+   */
   private applyPan(): void {
-    const { port } = this.context;
+    const { port, options } = this.context;
+    // A press that only waits for a double click.
+    if (!options.gestures.dragPan) return;
     if (this.grabPending) {
       this.grabPending = false;
       this.anchor = port.grab(this.down);
+      this.trackball = !this.anchor;
     }
-    if (!this.anchor) return;
-    port.dragTo(this.anchor, this.pointer);
+    if (this.anchor && port.grab(this.pointer)) {
+      port.dragTo(this.anchor, this.pointer);
+      this.trackball = false;
+    } else {
+      const dx = this.pointer.xPx - this.applied.xPx;
+      const dy = this.pointer.yPx - this.applied.yPx;
+      if (dx !== 0 || dy !== 0) port.pivotPan(dx, dy, this.context.widthPx(), this.context.heightPx());
+      this.anchor = port.grab(this.pointer);
+      this.trackball = true;
+    }
     this.applied.xPx = this.pointer.xPx;
     this.applied.yPx = this.pointer.yPx;
   }
@@ -186,25 +206,31 @@ export class MouseGestures {
   private finishRelease(): void {
     const { options, inertia, port } = this.context;
     const mode = this.mode;
-    const anchor = this.anchor;
+    const trackball = this.trackball;
+    const panned = mode === 'pan' && options.gestures.dragPan;
     this.end();
-    if (!options.gestures.inertia || (mode === 'pan' && !anchor) || mode === 'none') return;
+    if (!options.gestures.inertia || mode === 'none' || (mode === 'pan' && !panned)) return;
     const { velocityWindowMs, stillMs, stillPx } = options.inertia;
     this.samples.velocity(velocityWindowMs, this.velocity, this.upMs, stillMs, stillPx);
     const release = this.release;
     release.panXPx = release.panYPx = release.headingDeg = release.tiltDeg = release.zoomLevels = 0;
     const vx = this.velocity[0] ?? 0;
     const vy = this.velocity[1] ?? 0;
+    const widthPx = this.context.widthPx();
+    const heightPx = this.context.heightPx();
     if (mode === 'pan') {
-      const speed = Math.hypot(vx, vy);
-      const scale = speed > 0 ? Math.min(1, options.inertia.maxPanSpeedPxPerS / 1000 / speed) : 0;
+      // The glide turns the globe about the screen center as fast as the drag did at the release point (KB-202); a
+      // drag off the globe already turned it about the center.
+      const pivot = trackball ? 1 : port.pivotScale(this.applied, vx, vy, widthPx, heightPx);
+      const speed = Math.hypot(vx, vy) * pivot;
+      const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
       release.panXPx = vx * scale;
       release.panYPx = vy * scale;
     } else {
       release.headingDeg = vx * this.headingPerPx();
       release.tiltDeg = -vy * this.tiltPerPx();
     }
-    inertia.start(release, this.context.inertiaTaus(), anchor, this.applied, options.maxTiltDeg);
+    inertia.start(release, this.context.inertiaTaus(), panned, this.applied, options.maxTiltDeg, widthPx, heightPx);
     if (inertia.active) port.requestNextFrame();
   }
 }

@@ -403,7 +403,10 @@ test.describe('the measured link (F300–F303)', () => {
       // best run: a view completes in a few hundred milliseconds on a fast
       // link, where single runs on CI's runner vary by more than the 10% compared, and the first view of a round is the
       // slowest (measured 2026-10-24), so the order rotates and each setting runs once in each place.
-      for (let round = 0; round < ROUNDS; round++)
+      // On the fast link a view's network part takes 70–100 ms, where a few milliseconds of noise decide the 10% (run
+      // 40196202887: adaptive and fixed six, the same six in flight, 95 against 71 ms): twice the rounds, which are cheap.
+      const rounds = link.name === '50 Mbps' ? 2 * ROUNDS : ROUNDS;
+      for (let round = 0; round < rounds; round++)
         for (const perHost of SETTINGS.map((_, i) => SETTINGS[(i + round) % SETTINGS.length] ?? 'adaptive')) {
           const session = await fixtureSession(page, link.rules);
           const fixed = perHost === 'adaptive' ? '' : `&perHost=${perHost}&adaptive=0`;

@@ -533,6 +533,9 @@ describe('ImageryLoader', () => {
     const { transport, timers, runFrame, ok } = context;
     for (let round = 0; round < 5; round++) {
       failRound(context, [4, 2, 2], { kind: 'status', status: 503, retryAfterMs: undefined });
+      // The source keeps failing (another tile), so it is never stable enough to give rounds back (ADR 0046).
+      runFrame([[5, 0, round]]);
+      transport.answer(url(5, 0, round), { kind: 'network-error' });
       // Its neighbors load, and the view stays.
       runFrame([[4, 2, 3 + round]]);
       transport.answer(url(4, 2, 3 + round), ok);
@@ -541,6 +544,40 @@ describe('ImageryLoader', () => {
     timers.advance(600_000);
     runFrame([[4, 2, 2]]);
     expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(20);
+  });
+
+  it('gives a tile out of rounds its rounds back after 20 successes in a row, or a success 30 s after the last failure (ADR 0046)', () => {
+    for (const stable of ['streak', 'quiet'] as const) {
+      const context = setUp();
+      const { transport, timers, runFrame, uploaded, ok } = context;
+      for (let round = 0; round < 4; round++) {
+        failRound(context, [4, 2, 2], { kind: 'status', status: 503, retryAfterMs: undefined });
+        runFrame([[5, 0, round]]);
+        transport.answer(url(5, 0, round), { kind: 'network-error' });
+        runFrame([[4, 2, 3 + round]]);
+        transport.answer(url(4, 2, 3 + round), ok);
+      }
+      const exhausted = transport.started.filter((u) => u === url(4, 2, 2)).length;
+      // Fewer successes in a row (the last neighbor's and these), soon after the last failure: still out of rounds.
+      for (let i = 0; i < (stable === 'streak' ? 18 : 1); i++) {
+        runFrame([[6, i, 0]]);
+        transport.answer(url(6, i, 0), ok);
+      }
+      runFrame([[4, 2, 2]]);
+      expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(exhausted);
+      if (stable === 'quiet') timers.advance(30_000);
+      runFrame([[6, 30, 1]]);
+      transport.answer(url(6, 30, 1), ok);
+      runFrame([[4, 2, 2]]);
+      expect(
+        transport.started.filter((u) => u === url(4, 2, 2)),
+        stable,
+      ).toHaveLength(exhausted + 1);
+      transport.answer(url(4, 2, 2), ok);
+      const before = uploaded.length;
+      runFrame([[4, 2, 2]]);
+      expect(uploaded.length, stable).toBe(before + 1);
+    }
   });
 
   it('never revives a tile that failed for good on a permanent error after a transient one (KB-162)', () => {

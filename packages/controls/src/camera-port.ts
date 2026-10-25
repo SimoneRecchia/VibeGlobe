@@ -17,6 +17,21 @@ export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' 
 /** One frame at 60 Hz. */
 const NOMINAL_FRAME_MS = 1000 / 60;
 
+/** The longest step of a pivot pan: each step grabs again, so the pivot never runs off the globe (KB-202). */
+const PIVOT_STEP_PX = 16;
+/** The probe length that measures how fast the globe turns per pixel at a screen point (KB-202). */
+const PROBE_PX = 2;
+
+/** The great-circle angle between two positions, radians. */
+function angleRad(a: GeoPosition, b: GeoPosition): number {
+  const RAD = Math.PI / 180;
+  const φ1 = a.latitudeDeg * RAD;
+  const φ2 = b.latitudeDeg * RAD;
+  const s1 = Math.sin((φ2 - φ1) / 2);
+  const s2 = Math.sin(((b.longitudeDeg - a.longitudeDeg) * RAD) / 2);
+  return 2 * Math.asin(Math.min(1, Math.sqrt(s1 * s1 + Math.cos(φ1) * Math.cos(φ2) * s2 * s2)));
+}
+
 /** How long a measurement of slow frames holds before animations are tried again. */
 const SLOW_VERDICT_MS = 5000;
 
@@ -129,6 +144,63 @@ export class CameraPort {
   dragTo(anchor: GeoPosition, point: ScreenPoint): void {
     this.navigation.dragTo(anchor, point);
   }
+
+  /**
+   * Moves the globe like a drag of (dx, dy) pixels at the screen center, whatever lies under the pointer (KB-202): the
+   * point under the center is grabbed again at every step of at most {@link PIVOT_STEP_PX}, so the motion turns the
+   * globe about its center (a virtual trackball, as Google Earth does when a drag leaves the globe) and never runs off
+   * its disc. Returns false when the center shows no globe.
+   */
+  pivotPan(dxPx: number, dyPx: number, widthPx: number, heightPx: number): boolean {
+    const steps = Math.max(1, Math.ceil(Math.hypot(dxPx, dyPx) / PIVOT_STEP_PX));
+    const center = this.pivot;
+    for (let i = 0; i < steps; i++) {
+      center.xPx = widthPx / 2;
+      center.yPx = heightPx / 2;
+      const anchor = this.navigation.grab(center);
+      if (!anchor) return i > 0;
+      center.xPx += dxPx / steps;
+      center.yPx += dyPx / steps;
+      this.navigation.dragTo(anchor, center);
+    }
+    return true;
+  }
+
+  /**
+   * The factor that turns a pan velocity at `point`, along (dx, dy), into the velocity at the screen center that turns
+   * the globe as fast (KB-202): near the globe's edge a pixel is a larger turn than at the center. 1 when either point
+   * shows no globe.
+   */
+  pivotScale(point: ScreenPoint, dxPx: number, dyPx: number, widthPx: number, heightPx: number): number {
+    const length = Math.hypot(dxPx, dyPx);
+    if (length === 0) return 1;
+    const ux = (PROBE_PX * dxPx) / length;
+    const uy = (PROBE_PX * dyPx) / length;
+    const at = this.turnPerPx(point.xPx, point.yPx, ux, uy);
+    const center = this.turnPerPx(widthPx / 2, heightPx / 2, ux, uy);
+    return at > 0 && center > 0 ? at / center : 1;
+  }
+
+  /** Radians the globe turns for a pixel of drag at (x, y) along (ux, uy) of {@link PROBE_PX}; 0 off the globe. */
+  private turnPerPx(xPx: number, yPx: number, ux: number, uy: number): number {
+    const probe = this.pivot;
+    probe.xPx = xPx;
+    probe.yPx = yPx;
+    const a = this.navigation.grab(probe);
+    probe.xPx = xPx + ux;
+    probe.yPx = yPx + uy;
+    let b = this.navigation.grab(probe);
+    if (!b) {
+      // At the very edge, the probe the other way.
+      probe.xPx = xPx - ux;
+      probe.yPx = yPx - uy;
+      b = this.navigation.grab(probe);
+    }
+    return a && b ? angleRad(a, b) / PROBE_PX : 0;
+  }
+
+  /** Scratch point of the pivot pan and the probes. */
+  private readonly pivot = { xPx: 0, yPx: 0 };
 
   /** Stops a running API movement: a press on the map (`NavigationApi.interruptMovement`, F202). */
   interruptMovement(): void {

@@ -38,6 +38,8 @@ export class TouchGestures {
   private rebaseline = false;
   // Gesture since the last re-baseline.
   private anchor: GeoPosition | undefined;
+  /** The pan turns the globe about the screen center: the fingers left the globe's disc (KB-202). */
+  private trackball = false;
   private readonly mid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly applied: MutablePoint = { xPx: 0, yPx: 0 };
   /** The midpoint when the fingers last changed, where the next frame grabs the anchor. */
@@ -68,7 +70,7 @@ export class TouchGestures {
   // Velocity of a two-finger gesture whose fingers lift one after the other.
   private readonly carried: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
   private carriedMs = -Infinity;
-  private carriedAnchor: GeoPosition | undefined;
+  private carriedTrackball = false;
   private readonly carriedPixel: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly velocity = new Float64Array(4);
   private readonly release: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
@@ -162,6 +164,7 @@ export class TouchGestures {
 
   private reset(): void {
     this.anchor = undefined;
+    this.trackball = false;
     this.dirty = false;
     this.rebaseline = false;
     this.carriedMs = -Infinity;
@@ -214,6 +217,7 @@ export class TouchGestures {
   private start(): void {
     this.rebaseline = false;
     this.anchor = this.context.options.gestures.dragPan ? this.context.port.grab(this.startMid) : undefined;
+    this.trackball = this.context.options.gestures.dragPan && !this.anchor;
     this.applied.xPx = this.startMid.xPx;
     this.applied.yPx = this.startMid.yPx;
     this.measure();
@@ -254,8 +258,24 @@ export class TouchGestures {
     return true;
   }
 
+  /**
+   * Keeps the grabbed point under the fingers while they are over the globe; off its disc their motion turns the
+   * globe about the screen center like a virtual trackball, and the globe is grabbed again where they return (KB-202).
+   */
   private applyPan(): void {
-    if (this.anchor) this.context.port.dragTo(this.anchor, this.mid);
+    const { port, options } = this.context;
+    if (options.gestures.dragPan) {
+      if (this.anchor && port.grab(this.mid)) {
+        port.dragTo(this.anchor, this.mid);
+        this.trackball = false;
+      } else {
+        const dx = this.mid.xPx - this.applied.xPx;
+        const dy = this.mid.yPx - this.applied.yPx;
+        if (dx !== 0 || dy !== 0) port.pivotPan(dx, dy, this.context.widthPx(), this.context.heightPx());
+        this.anchor = port.grab(this.mid);
+        this.trackball = true;
+      }
+    }
     this.applied.xPx = this.mid.xPx;
     this.applied.yPx = this.mid.yPx;
   }
@@ -331,7 +351,7 @@ export class TouchGestures {
     this.measureRelease(this.carried, timeMs);
     this.carriedMs = timeMs;
     // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
-    this.carriedAnchor = this.anchor;
+    this.carriedTrackball = this.trackball;
     this.carriedPixel.xPx = this.applied.xPx;
     this.carriedPixel.yPx = this.applied.yPx;
   }
@@ -361,7 +381,7 @@ export class TouchGestures {
     const { tapMaxMs } = options.touch;
     const quick = timeMs - this.sessionStartMs <= tapMaxMs && !this.sessionMoved;
     const carried = timeMs - this.carriedMs <= LIFT_TOGETHER_MS;
-    const anchor = carried ? this.carriedAnchor : this.anchor;
+    const trackball = carried ? this.carriedTrackball : this.trackball;
     const pixel = carried ? this.carriedPixel : this.applied;
     this.reset();
     if (quick && this.sessionFingers === 2) {
@@ -383,7 +403,16 @@ export class TouchGestures {
     else this.measureRelease(this.release, timeMs);
     Object.assign(this.taus, this.context.inertiaTaus());
     this.taus.rotateTauMs = this.taus.twistTauMs;
-    inertia.start(this.release, this.taus, anchor, pixel, options.maxTiltDeg);
+    const widthPx = this.context.widthPx();
+    const heightPx = this.context.heightPx();
+    // The glide turns the globe about the screen center as fast as the fingers did where they lifted (KB-202).
+    const release = this.release;
+    const pivot = trackball ? 1 : port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx);
+    const speed = Math.hypot(release.panXPx, release.panYPx) * pivot;
+    const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
+    release.panXPx *= scale;
+    release.panYPx *= scale;
+    inertia.start(release, this.taus, options.gestures.dragPan, pixel, options.maxTiltDeg, widthPx, heightPx);
     if (inertia.active) port.requestNextFrame();
     return inertia.active;
   }

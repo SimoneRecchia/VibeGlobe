@@ -59,6 +59,9 @@ async function targets(page: Page) {
 
 for (const backend of BACKENDS) {
   test(`hover and click events carry the feature and highlight it (${backend}, F459)`, async ({ page }) => {
+    // The vector scene, three pointer rounds and two captures took 25 s on CI's software GPU, where a pointer move
+    // waits for the page to acknowledge it after its long frames: close to the default 30 s, which it crossed once.
+    test.setTimeout(60_000);
     await openVector(page, `scenario=mvt-labels&backend=${backend}`);
     await record(page);
     const t = await targets(page);

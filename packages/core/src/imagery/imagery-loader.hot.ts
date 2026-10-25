@@ -74,6 +74,16 @@ const MAX_DECODE_RETRIES = 3;
  */
 const MAX_ROUNDS = 3;
 /**
+ * A source stable again gives every tile its rounds back (ADR 0046, open question 33): this many network successes in
+ * a row, or a success this long after its last failure, so long flapping faults never leave a tile on its ancestor.
+ */
+const STABLE_SUCCESSES = 20;
+const STABLE_MS = 30_000;
+/** `retries` of a dead tile with rounds left, waiting for its source to answer again. */
+const AWAITING_SOURCE = -1;
+/** `retries` of a tile out of rounds after transient failures: it waits for the source to be stable again. */
+const OUT_OF_ROUNDS = -2;
+/**
  * The source's health check while such tiles wait and nothing else answers: one of them is requested once, without
  * retries and without using one of its rounds, after this long, the wait doubling up to {@link PROBE_MAX_MS}; its
  * answer gives every waiting tile its round (ADR 0046).
@@ -192,6 +202,10 @@ export class ImageryLoader implements NetworkPoolClient {
    * the source's next network success, which a health check of one of them asks for when nothing else loads (ADR 0046).
    */
   private outageDead = 0;
+  /** The source's network successes since its last transient failure, that failure's time, and whether rounds were given back since. */
+  private successStreak = 0;
+  private lastFailureMs = Number.NEGATIVE_INFINITY;
+  private roundsRestored = true;
   /** The wait of the next health check, and the token that cancels the previous one. */
   private probeMs = PROBE_MS;
   private probeToken = 0;
@@ -495,6 +509,9 @@ export class ImageryLoader implements NetworkPoolClient {
     this.outageDead = 0;
     this.probeToken++;
     this.probeArmed = false;
+    this.successStreak = 0;
+    this.lastFailureMs = Number.NEGATIVE_INFINITY;
+    this.roundsRestored = true;
     this.options.requestFrame();
   }
 
@@ -680,6 +697,7 @@ export class ImageryLoader implements NetworkPoolClient {
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
+      if (result.cached !== true) this.succeeded();
       if (this.outageDead > 0 && result.cached !== true) this.reviveOutageDead();
       record.attribution = result.attribution;
       record.freshUntilMs =
@@ -701,6 +719,7 @@ export class ImageryLoader implements NetworkPoolClient {
     } else if (decision.failureClass === FAILURE_NO_DATA) {
       record.state = NO_DATA;
     } else if (decision.retry) {
+      if (decision.failureClass === FAILURE_TRANSIENT) this.failedTransiently();
       record.state = FAILED;
       record.retries++;
       this.table.eligibleAt[record.slot] = decision.nextEligibleMs;
@@ -710,7 +729,10 @@ export class ImageryLoader implements NetworkPoolClient {
       const probing = record.retries === PROBING;
       record.state = DEAD;
       // Out of retries on transient failures: maybe an outage, so a fresh round once the source is back (ADR 0046).
-      if (decision.failureClass === FAILURE_TRANSIENT) this.awaitSource(record);
+      if (decision.failureClass === FAILURE_TRANSIENT) {
+        this.failedTransiently();
+        this.awaitSource(record);
+      }
       // A failed health check is not reported again.
       if (!probing)
         this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
@@ -721,8 +743,11 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** A dead tile with rounds left waits for its source to answer again; the first one starts the health checks. */
   private awaitSource(record: TileRecord): void {
-    if (record.rounds >= MAX_ROUNDS) return;
-    record.retries = -1;
+    if (record.rounds >= MAX_ROUNDS) {
+      record.retries = OUT_OF_ROUNDS;
+      return;
+    }
+    record.retries = AWAITING_SOURCE;
     this.outageDead++;
     // A failed health check leaves the checks running, their wait doubling.
     if (this.probeArmed) return;
@@ -741,7 +766,11 @@ export class ImageryLoader implements NetworkPoolClient {
       }
       let probe: TileRecord | undefined;
       for (const record of this.table.bySlot)
-        if (record.state === DEAD && record.retries < 0 && (!probe || record.wantedFrame > probe.wantedFrame))
+        if (
+          record.state === DEAD &&
+          record.retries === AWAITING_SOURCE &&
+          (!probe || record.wantedFrame > probe.wantedFrame)
+        )
           probe = record;
       if (probe) {
         this.outageDead--;
@@ -760,7 +789,28 @@ export class ImageryLoader implements NetworkPoolClient {
     this.outageDead = 0;
     this.probeToken++;
     this.probeArmed = false;
-    for (const record of this.table.bySlot) if (record.state === DEAD && record.retries < 0) this.revive(record);
+    for (const record of this.table.bySlot)
+      if (record.state === DEAD && record.retries === AWAITING_SOURCE) this.revive(record);
+    this.options.requestFrame();
+  }
+
+  /** A transient network failure: the source is not stable. */
+  private failedTransiently(): void {
+    this.successStreak = 0;
+    this.lastFailureMs = this.options.now();
+    this.roundsRestored = false;
+  }
+
+  /** A network success: once the source is stable again, every tile gets its rounds back (ADR 0046). */
+  private succeeded(): void {
+    this.successStreak++;
+    if (this.roundsRestored) return;
+    if (this.successStreak < STABLE_SUCCESSES && this.options.now() - this.lastFailureMs < STABLE_MS) return;
+    this.roundsRestored = true;
+    for (const record of this.table.bySlot) {
+      record.rounds = 0;
+      if (record.state === DEAD && record.retries === OUT_OF_ROUNDS) this.revive(record);
+    }
     this.options.requestFrame();
   }
 
@@ -835,6 +885,7 @@ export class ImageryLoader implements NetworkPoolClient {
         record.state = DEAD;
         this.options.memory.ram.delete(this.options.handleBase + record.slot);
         if (!probing) this.reportError(record, 'corrupt');
+        // Not a sign of an unstable source: a really corrupt tile then gets its rounds back only after network faults.
         this.awaitSource(record);
       } else {
         // The worker crashed, timed out or is unavailable: retried with backoff from the RAM copy, at most

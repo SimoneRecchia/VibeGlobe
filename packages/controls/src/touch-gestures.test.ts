@@ -64,7 +64,7 @@ describe('touch gestures (ADR 0009 §4)', () => {
 
   it('waits one frame for the partner finger of a touch event, however late that frame runs, and no longer (KB-183)', () => {
     let hostMs = 0;
-    const h = controlsHarness({ hostNow: () => hostMs });
+    const h = controlsHarness({}, { hostNow: () => hostMs });
     press(h, [300, 300, 500, 300]);
     twoFingers(h, [300, 300, 500, 300], [250, 300, 550, 300], 0, 5);
     const mid = h.camera.worldAt({ xPx: 400, yPx: 300 });

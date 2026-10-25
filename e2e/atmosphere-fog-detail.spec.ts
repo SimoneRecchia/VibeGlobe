@@ -169,8 +169,6 @@ for (const backend of ['webgpu', 'webgl2'] as const)
   }) => {
     // Two full flights at four times the haze: about 80 s each here, over 90 s each in CI's software GPU.
     test.setTimeout(420_000);
-    // KB-174: level-7 tiles requested under a parent in full fog, and no reduction on WebGL2 yet.
-    test.fail(true, 'KB-174');
     const aware = await fly(page, backend, true, HAZE);
     const full = await fly(page, backend, false, HAZE);
     const saved = 1 - aware.requested / full.requested;

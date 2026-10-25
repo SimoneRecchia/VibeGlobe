@@ -275,8 +275,9 @@ export class ImageryLoader implements NetworkPoolClient {
   /**
    * Wants a tile this frame with a priority key (lower first). Returns the texture handle when the tile is on the GPU,
    * {@link ARRIVING} when its bytes are being decoded or uploaded, else -1. A tile with no data or a permanent failure returns -1 forever and is never requested again.
+   * `ringNeighbors` false leaves a visible tile's neighbors out of the prefetch ring (a tile in full fog, F574).
    */
-  want(level: number, x: number, y: number, priority: number): number {
+  want(level: number, x: number, y: number, priority: number, ringNeighbors = true): number {
     const record = this.table.recordFor(level, x, y);
     // The pinned base keeps its class-0 key (its level) when visible tiles also want it, and a tile wanted twice in a
     // frame keeps the lower key: otherwise a visible tile could sit above a pinned one that has to load first (KB-067).
@@ -285,7 +286,12 @@ export class ImageryLoader implements NetworkPoolClient {
     else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
     if (record.wantedFrame < this.frame - 1) this.table.wantedSince[record.slot] = this.options.now();
     record.wantedFrame = this.frame;
-    if (priority >= VISIBLE_CLASS && priority < VISIBLE_CLASS + 1024 && this.ringCount < RING_CAPACITY) {
+    if (
+      ringNeighbors &&
+      priority >= VISIBLE_CLASS &&
+      priority < VISIBLE_CLASS + 1024 &&
+      this.ringCount < RING_CAPACITY
+    ) {
       const at = 4 * this.ringCount++;
       this.ring[at] = level;
       this.ring[at + 1] = x;

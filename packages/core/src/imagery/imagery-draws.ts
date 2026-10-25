@@ -305,7 +305,7 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
     // requested; the others are only looked up.
     const handle =
       !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
+        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, tile.fogged !== true)
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;

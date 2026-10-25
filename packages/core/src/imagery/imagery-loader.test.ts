@@ -751,6 +751,18 @@ describe('ImageryLoader', () => {
     }
   });
 
+  it('prefetches no ring around a visible tile in full fog (F574, KB-174)', () => {
+    const { transport, loader, residency } = setUp(32, {
+      prefetchRing: true,
+      source: { loadingFlags: () => LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH, maxRequestsPerHost: 16 },
+    });
+    residency.startFrame(1);
+    loader.beginFrame();
+    loader.want(5, 10, 10, 1024 + 5, false);
+    loader.endFrame();
+    expect(transport.started).toEqual([url(5, 10, 10)]);
+  });
+
   it('during a flight requests a visible tile only once it stays wanted, never one the view shows for a moment (F287)', () => {
     const { timers, transport, loader } = setUp();
     loader.settleMs = 400;

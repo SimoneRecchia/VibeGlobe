@@ -5,11 +5,15 @@
 // (plan §4.2). No frame crosses into the test.
 import type { FrameCapture, Globe, ViewInit } from '@vibeglobe/core';
 
-/** One step of a path: a jump, a pan or zoom in frame-sized moves, a flight, or frames with the camera still. */
+/**
+ * One step of a path: a jump, a pan or zoom in frame-sized moves, a flight (drawn to its end, or for `frames` frames
+ * with the flight left running), frames of a flight still running (`follow`), or frames with the camera still.
+ */
 export type PathStep =
   | { readonly jump: ViewInit }
   | { readonly move: ViewInit; readonly frames: number }
-  | { readonly fly: ViewInit; readonly durationMs: number }
+  | { readonly fly: ViewInit; readonly durationMs: number; readonly frames?: number }
+  | { readonly follow: number }
   | { readonly hold: number };
 
 /** What the recorder found: counts, and the first frame and place of each defect (-1 and undefined when none). */
@@ -152,8 +156,12 @@ export async function recordPath(globe: Globe, steps: readonly PathStep[], darkB
         let arrived = false;
         void globe.flyTo(step.fly, { durationMs: step.durationMs }).finally(() => (arrived = true));
         // The flight advances with the engine clock, one step per drawn frame; bounded in case it never ends.
-        for (let k = 0; !arrived && k < step.durationMs / 8; k++) await draw(true);
-        await draw(true);
+        const frames = step.frames ?? step.durationMs / 8;
+        for (let k = 0; !arrived && k < frames; k++) await draw(true);
+        if (step.frames === undefined) await draw(true);
+      } else if ('follow' in step) {
+        // A flight started by an earlier step goes on: its frames move.
+        for (let k = 0; k < step.follow; k++) await draw(true);
       } else {
         for (let k = 0; k < step.hold; k++) await draw(false);
       }

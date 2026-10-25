@@ -153,8 +153,10 @@ class OfflineEngine implements Offline {
   private readonly rules = new Map<string, ProviderRules>();
   /** The ids of the sources wrapped by {@link source}, in order. */
   private readonly wrapped = new Set<string>();
-  /** The layer of each wrapped source (`TieredSourceOptions.layerId`, default the source's id). */
-  private readonly layerOf = new Map<string, string>();
+  /** The layers of each wrapped source (`TieredSourceOptions.layerId`, default the source's id). */
+  private readonly layersOf = new Map<string, Set<string>>();
+  /** The wrapped sources that load from each endpoint. */
+  private readonly sourcesOf = new Map<string, Set<string>>();
   /** Network modes set for one source (`source:<id>`) or layer (`layer:<id>`), KB-184. */
   private readonly modeOverrides = new Map<string, NetworkMode>();
   private readonly policy: NetworkPolicy;
@@ -192,8 +194,10 @@ class OfflineEngine implements Offline {
     this.monitor = new ConnectivityMonitor({
       ...options.healthChecks,
       fetch: this.fetchImpl,
-      // Health checks run while any source may use the network.
-      enabled: () => this.currentMode !== 'offline' || [...this.modeOverrides.values()].some((m) => m !== 'offline'),
+      // An endpoint is checked while a source loading from it may use the network (KB-192).
+      enabled: (endpoint) => [...(this.sourcesOf.get(endpoint) ?? [])].some((id) => this.usesNetwork(id)),
+      // One endpoint coming back while another stays down changes what a held miss waits for (KB-194).
+      onEndpointChange: () => this.wake(null),
       onChange: (connectivity, unreachable) => {
         // A wait for one endpoint's check ends with that check (KB-161), not with another endpoint's change.
         this.wake(null);
@@ -216,7 +220,7 @@ class OfflineEngine implements Offline {
   }
 
   setMode(mode: NetworkMode | 'inherit', scope?: SwitchScope): void {
-    const before = new Map([...this.wrapped].map((id) => [id, this.modeOf(id, this.layerOf.get(id))]));
+    const before = new Map([...this.wrapped].map((id) => [id, this.usesNetwork(id)]));
     if (scope?.layerId === undefined && scope?.sourceId === undefined) {
       if (mode === 'inherit' || mode === this.currentMode) return;
       this.currentMode = mode;
@@ -226,9 +230,7 @@ class OfflineEngine implements Offline {
       else this.modeOverrides.set(key, mode);
     }
     // The sources that left offline-only mode: their unavailable tiles may load now.
-    const leftOffline = [...before].filter(
-      ([id, was]) => was === 'offline' && this.modeOf(id, this.layerOf.get(id)) !== 'offline',
-    );
+    const leftOffline = [...before].filter(([id, used]) => !used && this.usesNetwork(id));
     this.wake();
     if (mode !== 'offline') this.monitor.checkAll();
     this.emit('mode-change', { mode: this.currentMode, sourceIds: leftOffline.map(([id]) => id) });
@@ -267,7 +269,9 @@ class OfflineEngine implements Offline {
     }
     this.registerEndpoint(source);
     this.wrapped.add(source.id);
-    this.layerOf.set(source.id, options.layerId ?? source.id);
+    const layers = this.layersOf.get(source.id) ?? new Set<string>();
+    layers.add(options.layerId ?? source.id);
+    this.layersOf.set(source.id, layers);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
     // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258). A package's
     // credit travels with the tiles it served and is listed while they are drawn (F306, KB-189).
@@ -349,8 +353,24 @@ class OfflineEngine implements Offline {
   private registerEndpoint(source: TileSource): void {
     const probe = { url: '', hostIndex: 0 };
     const root = { root: 0 as const, level: source.minLevel, x: 0, y: 0 };
-    if (source.request(root, probe) === 'noData' || !/^https?:/.test(probe.url)) return;
-    this.monitor.addEndpoint(endpointOf(probe.url), probe.url);
+    if (source.request(root, probe) !== 'noData') this.addEndpoint(source.id, endpointOf(probe.url), probe.url);
+  }
+
+  /** Health-checks the endpoint while a source loading from it may use the network (KB-192). */
+  private addEndpoint(sourceId: string, endpoint: string, probeUrl: string): void {
+    if (!/^https?:/.test(probeUrl)) return;
+    const sources = this.sourcesOf.get(endpoint) ?? new Set<string>();
+    sources.add(sourceId);
+    this.sourcesOf.set(endpoint, sources);
+    this.monitor.addEndpoint(endpoint, probeUrl);
+  }
+
+  /** True while any layer of the wrapped source may use the network. */
+  private usesNetwork(sourceId: string): boolean {
+    for (const layerId of this.layersOf.get(sourceId) ?? [sourceId]) {
+      if (this.modeOf(sourceId, layerId) !== 'offline') return true;
+    }
+    return false;
   }
 
   private context(): Parameters<typeof tieredSource>[1] {
@@ -363,9 +383,7 @@ class OfflineEngine implements Offline {
       },
       readPackage: (sourceId, coord, signal) =>
         this.packageReader ? this.packageReader.read(sourceId, coord, signal) : Promise.resolve(undefined),
-      addEndpoint: (endpoint, probeUrl) => {
-        if (/^https?:/.test(probeUrl)) this.monitor.addEndpoint(endpoint, probeUrl);
-      },
+      addEndpoint: (sourceId, endpoint, probeUrl) => this.addEndpoint(sourceId, endpoint, probeUrl),
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),

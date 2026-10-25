@@ -33,7 +33,7 @@ export interface TierContext {
   };
   readPackage(sourceId: string, coord: TileCoord, signal: AbortSignal): Promise<PackageTile | undefined>;
   /** Makes an endpoint known to the health checks, with a tile URL it serves (a source may spread tiles over hosts). */
-  addEndpoint(endpoint: string, probeUrl: string): void;
+  addEndpoint(sourceId: string, endpoint: string, probeUrl: string): void;
   /** False while the endpoint is known to be unreachable. */
   reachable(endpoint: string): boolean;
   reportSuccess(endpoint: string): void;
@@ -120,6 +120,7 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
     // F290): 1 keeps tiles in memory, 2 prefetches (`LOAD_KEEP_IN_MEMORY`, `LOAD_PREFETCH` of `@vibeglobe/core`).
     loadingFlags: () =>
       (context.decide(source.id, layerId).keepInMemory ? 1 : 0) | (context.prefetch(source.id, layerId) ? 2 : 0),
+    heldRequests: () => loader.held,
     transport: {
       start(request: TileRequest, timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
         const coord = coordOf(request.url);
@@ -144,6 +145,8 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
 }
 
 class TileLoader {
+  /** Requests held until a change of connectivity, mode or switches (KB-194). */
+  held = 0;
   /** The change count at each tile's last miss, by tile key (KB-190). */
   private readonly misses = new Map<string, number>();
 
@@ -205,7 +208,7 @@ class TileLoader {
       }
     }
     const endpoint = endpointOf(url);
-    if (decision.useNetwork) this.context.addEndpoint(endpoint, url);
+    if (decision.useNetwork) this.context.addEndpoint(this.source.id, endpoint, url);
     if (decision.useNetwork && this.context.reachable(endpoint)) {
       const outcome = this.ownTransport(url)
         ? await this.viaTransport(url, timeouts, signal)
@@ -226,7 +229,7 @@ class TileLoader {
       this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
-    return this.miss(decision, key);
+    return this.miss(decision, key, signal);
   }
 
   /**
@@ -341,7 +344,7 @@ class TileLoader {
    * for now: hold the request briefly, then tell the engine to ask again (an abort, not a failure), so the tile loads
    * once connectivity returns without spending the engine's retries (F298, F299).
    */
-  private async miss(decision: PolicyDecision, key: string): Promise<TransportResult> {
+  private async miss(decision: PolicyDecision, key: string, signal: AbortSignal): Promise<TransportResult> {
     if (this.context.offlineOnly(this.source.id, this.layerId) || !decision.useNetwork) return NOT_FOUND;
     this.context.count(this.source.id, 'offlineMisses');
     // Asked again with nothing changed since its last miss: wait for a change instead (KB-190).
@@ -349,7 +352,20 @@ class TileLoader {
     const repeated = this.misses.get(key) === changes;
     if (this.misses.size >= MAX_REMEMBERED_MISSES) this.misses.clear();
     this.misses.set(key, changes);
-    await this.context.waitForChange(repeated ? REPEATED_MISS_HOLD_MS : OFFLINE_HOLD_MS);
+    if (!repeated) await this.context.waitForChange(OFFLINE_HOLD_MS);
+    else {
+      // Waiting for connectivity: not loading, so the engine may go idle meanwhile (KB-194). An abort ends the hold.
+      this.held++;
+      let holding = true;
+      const release = (): void => {
+        if (holding) this.held--;
+        holding = false;
+      };
+      signal.addEventListener('abort', release, { once: true });
+      await this.context.waitForChange(REPEATED_MISS_HOLD_MS);
+      signal.removeEventListener('abort', release);
+      release();
+    }
     // Not a failure: a transient error would make the engine probe the host with one request at a time, which would
     // also slow the tiles the cache and the packages hold.
     return { kind: 'aborted' };

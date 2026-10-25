@@ -255,9 +255,13 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.pinnedSettled >= this.pinnedTotal;
   }
 
-  /** True while any wanted tile is queued, in flight, decoding or waiting for its upload. */
+  /**
+   * True while any wanted tile is queued, in flight, decoding or waiting for its upload; requests the source holds
+   * until connectivity returns do not count (KB-194).
+   */
   get busy(): boolean {
-    return this.heap.size > 0 || this.active.length > 0 || this.uploads.size > 0;
+    const held = this.options.source.heldRequests?.() ?? 0;
+    return this.heap.size > 0 || this.active.length > held || this.uploads.size > 0;
   }
 
   /** Starts a frame: tiles not wanted again from now on leave the queue at {@link ImageryLoader.endFrame}. */

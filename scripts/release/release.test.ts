@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
 import { CHANGELOG_HEADER, addEntry, changelogEntry, writeChangelog, type Commit } from './changelog.ts';
-import { cubeReferences } from './check-cube.ts';
+import { candidateFiles, cubeReferences } from './check-cube.ts';
 import { bumpManifest, distTag, publishOrder, publishRefusal } from './release.ts';
 
 const commit = (subject: string, body = ''): Commit => ({ hash: 'abc1234def', subject, body });
@@ -122,6 +122,18 @@ describe('release (F558)', () => {
 });
 
 describe('Cube search (F559)', () => {
+  it('reads tracked files larger than 1 MB that may name the consumer (KB-197)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'vibeglobe-cube-'));
+    try {
+      writeFileSync(join(repo, 'results.json'), `${'x'.repeat(2_000_000)}\n"title": "Cube"\n`);
+      execFileSync('git', ['init', '-q'], { cwd: repo });
+      execFileSync('git', ['add', 'results.json'], { cwd: repo });
+      expect(cubeReferences(candidateFiles(repo))).toEqual(['results.json:2: "title": "Cube"']);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it('finds the consumer named in code or documentation, but not cube maps or test models', () => {
     const files = new Map([
       ['docs/guides/x.md', 'Consumers such as Cube serve assets.\ncube maps and MeshoptCubeTest.glb'],

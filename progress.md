@@ -46,6 +46,7 @@ F600–F609 added, `docs/feature-changes.md`).
   `sky-visibility.test.ts`; `e2e/starfield.spec.ts` (star positions predicted independently through a pinhole camera
   fitted to `screenToGeo`, both backends; pixel ratios and sub-pixel motion; Milky Way; day and night; toggle;
   baselines), `e2e/starfield-cost.spec.ts` (frame time).
+- F600–F609 passing; F608 against the baselines recorded by the Visual baselines workflow, compared in manual CI run 40150818551 (shard 11: all nine star-field tests green).
 - Hook requests I (1)–(5) in `docs/parallel-tracks.md`: (1)–(3) are proposed in the track's pull request (subpath
   export, baseline workflow step, notices row); (4) and (5) are optional.
 - Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the

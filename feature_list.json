@@ -7365,7 +7365,7 @@
         "Capture the space background view on both backends and compare it with its baseline at ADR 0012's tolerances",
         "Assert the two backends agree within the cross-backend tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F609",

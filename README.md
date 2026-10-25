@@ -14,6 +14,18 @@ npm run dev        # playground at http://localhost:5173
 npm run status     # feature-list progress
 ```
 
+## The playground
+
+`npm run dev` opens the showcase at http://localhost:5173: every control of `@vibeglobe/ui` (search with typed
+coordinates and a demo place list, compass, zoom, tilt, 2D / 3D / Auto, reset to globe and home, fullscreen,
+coordinate and elevation readout, scale bar, measurement, drawing, layer switcher, saved views, screenshot,
+geolocation, minimap, attribution), a settings panel (theme, language, quality, atmosphere, fog, sun time, space
+background, network mode, backend), demo data layers (clustered markers, a polygon, a line, labels), the best data
+built locally by the dataset pipeline (otherwise Natural Earth) and a help overlay of the gestures. `?ui=0` hides the
+controls; the test scenarios keep their own parameters ([apps/playground/CLAUDE.md](apps/playground/CLAUDE.md)).
+
+![The playground's showcase: the globe over the space background with every control and the settings panel open](docs/images/playground-showcase.png)
+
 ## Documentation
 
 - [PLAN.md](PLAN.md): the owner's master brief.

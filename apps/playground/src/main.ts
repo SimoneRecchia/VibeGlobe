@@ -23,6 +23,7 @@ import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
 import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
 import { exposeTestHooks } from './test-hooks.js';
+import { PAGE_UI, SHOWCASE } from './page-mode.js';
 
 /** Engine log messages collected with `?logSink=1` (F120). */
 const logEntries: LogEntry[] = [];
@@ -144,6 +145,8 @@ function viewFromUrl(): ViewInit {
     const value = params.get(param);
     if (value !== null) view[field] = Number(value);
   }
+  // The showcase opens on Europe, the whole globe in view (owner, 2026-10-25).
+  if (SHOWCASE && Object.keys(view).length === 0) return { longitudeDeg: 10, latitudeDeg: 44, zoom: 2.2 };
   return view;
 }
 
@@ -409,9 +412,14 @@ if (params.get('experiment') === 'gpu-probes') {
   );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
-  showViewModeControls(globe, app, params.get('viewMode'));
-  showCameraControls(globe, app, navigation);
+  // The page's own buttons, which tests drive, unless the UI controls take their place (`page-mode.ts`).
+  if (!PAGE_UI) {
+    showViewModeControls(globe, app, params.get('viewMode'));
+    showCameraControls(globe, app, navigation);
+  }
   runScenario(globe, scenario);
+  if (PAGE_UI || SHOWCASE)
+    void import('./showcase.js').then((m) => m.showPageUi(globe, app, params, { showcase: SHOWCASE, ui: PAGE_UI }));
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));

@@ -8,6 +8,7 @@
 import type { GlobeOptions, ImagerySource, TerrainSource, TileCoord, TileRequest } from '@vibeglobe/core';
 import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
+import { SHOWCASE } from './page-mode.js';
 
 /** The scenario's view as URL parameters the URL may override: the summit (45.8326° N, 6.8652° E) from the north. */
 export const REAL_DATA: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -47,10 +48,10 @@ interface MontBlancData {
 /** Reads one dataset's index from the dev server; undefined when that build has not been run. */
 async function dataset(build: string, id: string): Promise<Dataset | undefined> {
   const base = `${import.meta.env.BASE_URL}real-data/${build}/${id}/`;
-  const body = (await (await fetch(`${base}index.json`)).json()) as {
-    metadata?: DatasetMetadata;
-    tiles?: string[];
-  };
+  // The production build has no `/real-data/` route: its answer is not this index.
+  const body = (await fetch(`${base}index.json`)
+    .then((response) => response.json())
+    .catch(() => ({}))) as { metadata?: DatasetMetadata; tiles?: string[] };
   return body.metadata ? { base, metadata: body.metadata, tiles: new Set(body.tiles ?? []) } : undefined;
 }
 
@@ -123,7 +124,7 @@ function imageryOf(data: Dataset, id: string): ImagerySource[] {
  * Loads the scenario's datasets. When the two builds it needs have not been run, it shows the commands that make them
  * over the globe instead and returns undefined: the globe then shows the Natural Earth base alone.
  */
-async function montBlancData(params: URLSearchParams): Promise<MontBlancData | undefined> {
+async function montBlancData(params: URLSearchParams, report = true): Promise<MontBlancData | undefined> {
   // `&terrainBuild=<folder>` reads the terrain from another build folder of the pipeline (one made with `--out`).
   const terrainBuild = params.get('terrainBuild') ?? 'test-mont-blanc-sample';
   // `&context=0` leaves out the world-low context around the samples.
@@ -135,7 +136,7 @@ async function montBlancData(params: URLSearchParams): Promise<MontBlancData | u
     dataset(context, 'imagery'),
   ]);
   if (!terrain || !imagery) {
-    showMissingBuilds(MONT_BLANC_BUILDS.filter((_, index) => (index === 0 ? !terrain : !imagery)));
+    if (report) showMissingBuilds(MONT_BLANC_BUILDS.filter((_, index) => (index === 0 ? !terrain : !imagery)));
     return undefined;
   }
   const layers = [
@@ -169,7 +170,13 @@ function showMissingBuilds(missing: readonly string[]): void {
 
 /** The scenario's layers for `createGlobe` with `?scenario=mont-blanc` (read before the globe starts); none otherwise. */
 const params = new URLSearchParams(location.search);
-const data = params.get('scenario') === 'mont-blanc' ? await montBlancData(params) : undefined;
+// The showcase uses the same builds when they exist, and Natural Earth alone, silently, when they do not.
+const data =
+  params.get('scenario') === 'mont-blanc'
+    ? await montBlancData(params)
+    : SHOWCASE
+      ? await montBlancData(params, false)
+      : undefined;
 export const montBlancLayers: Pick<GlobeOptions, 'terrain' | 'imagery' | 'workers'> = data
   ? { terrain: data.terrain, imagery: data.imagery, workers: createWorkers() }
   : {};

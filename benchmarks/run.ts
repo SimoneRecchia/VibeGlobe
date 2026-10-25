@@ -57,11 +57,54 @@ interface PlaygroundHooks {
     rendererStats(): { drawCalls: number };
     imageryStats():
       { ready: number; requested: number; failed: number; gpuBytes: number; ramBytes: number } | undefined;
+    diagnostics: {
+      setPhaseTiming(enabled: boolean, userTiming?: boolean): void;
+      phaseTimesMs(): Record<string, number>;
+    };
+    on(type: 'frame', listener: () => void): () => void;
   };
   cpuFrameTimesMs(): number[];
   gpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
   firstFrameMs: number | undefined;
+}
+
+/**
+ * Runs in the page: samples `durationMs` of animation frames with the CPU and GPU times the playground records and the
+ * median of the engine's phase times per frame (without User Timing marks), which show where a frame's CPU time goes.
+ */
+async function samplePage(durationMs: number) {
+  const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
+  hooks.resetCpuSamples();
+  const diagnostics = hooks.globe.diagnostics;
+  diagnostics.setPhaseTiming(true, false);
+  const phases: Record<string, number>[] = [];
+  const stopPhases = hooks.globe.on('frame', () => phases.push({ ...diagnostics.phaseTimesMs() }));
+  const timestamps: number[] = [];
+  await new Promise<void>((done) => {
+    const start = performance.now();
+    const tick = (time: number): void => {
+      timestamps.push(time);
+      if (time - start < durationMs) requestAnimationFrame(tick);
+      else done();
+    };
+    requestAnimationFrame(tick);
+  });
+  stopPhases();
+  diagnostics.setPhaseTiming(false);
+  const median = (values: number[]): number => [...values].sort((a, b) => a - b)[values.length >> 1] ?? 0;
+  const phaseMedianMs = Object.fromEntries(
+    Object.keys(phases[0] ?? {}).map((phase) => [phase, median(phases.map((frame) => frame[phase] ?? 0))]),
+  );
+  const frameTimesMs = timestamps.slice(1).map((time, index) => time - (timestamps[index] as number));
+  return {
+    frameTimesMs,
+    cpuFrameMs: hooks.cpuFrameTimesMs(),
+    gpuFrameMs: hooks.gpuFrameTimesMs(),
+    drawCalls: hooks.globe.rendererStats().drawCalls,
+    imagery: hooks.globe.imageryStats() ?? null,
+    phaseMedianMs,
+  };
 }
 
 async function measureRun(browser: Browser, url: string): Promise<RunResult> {
@@ -78,32 +121,11 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
       () => (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground.firstFrameMs ?? null,
     );
     await page.waitForTimeout(DISCARD_MS);
-    const sample = await page.evaluate(async (durationMs) => {
-      const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
-      hooks.resetCpuSamples();
-      const timestamps: number[] = [];
-      await new Promise<void>((done) => {
-        const start = performance.now();
-        const tick = (time: number): void => {
-          timestamps.push(time);
-          if (time - start < durationMs) requestAnimationFrame(tick);
-          else done();
-        };
-        requestAnimationFrame(tick);
-      });
-      const frameTimesMs = timestamps.slice(1).map((time, index) => time - (timestamps[index] as number));
-      return {
-        frameTimesMs,
-        cpuFrameMs: hooks.cpuFrameTimesMs(),
-        gpuFrameMs: hooks.gpuFrameTimesMs(),
-        drawCalls: hooks.globe.rendererStats().drawCalls,
-        imagery: hooks.globe.imageryStats() ?? null,
-      };
-    }, SAMPLE_MS);
+    const sample = await page.evaluate(samplePage, SAMPLE_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.collectGarbage');
     const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
-    return summarizeRun(
+    const run = summarizeRun(
       sample.frameTimesMs,
       sample.cpuFrameMs,
       usedSize,
@@ -118,6 +140,7 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
         ramMB: sample.imagery.ramBytes / 1048576,
       },
     );
+    return { ...run, phaseMedianMs: sample.phaseMedianMs };
   } finally {
     await page.close();
   }

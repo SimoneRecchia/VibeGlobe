@@ -84,6 +84,12 @@ const AWAITING_SOURCE = -1;
 /** `retries` of a tile out of rounds after transient failures: it waits for the source to be stable again. */
 const OUT_OF_ROUNDS = -2;
 /**
+ * `roundSuccesses` of a waiting tile whose source answered other tiles during its round (KB-204): no outage hid it, so
+ * the source's next answer does not give it a fresh round, only the source being stable again; health checks still
+ * request it, so a view where nothing else loads still finds the source stable.
+ */
+const NEEDS_STABLE = -1;
+/**
  * The source's health check while such tiles wait and nothing else answers: one of them is requested once, without
  * retries and without using one of its rounds, after this long, the wait doubling up to {@link PROBE_MAX_MS}; its
  * answer gives every waiting tile its round (ADR 0046).
@@ -204,6 +210,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private outageDead = 0;
   /** The source's network successes since its last transient failure, that failure's time, and whether rounds were given back since. */
   private successStreak = 0;
+  /** Every network success of the source, to tell whether it answered during a tile's round (KB-204). */
+  private networkSuccesses = 0;
   private lastFailureMs = Number.NEGATIVE_INFINITY;
   private roundsRestored = true;
   /** The wait of the next health check, and the token that cancels the previous one. */
@@ -640,6 +648,7 @@ export class ImageryLoader implements NetworkPoolClient {
         break;
       }
       record.availabilityUnknown = false;
+      if (record.retries === 0) record.roundSuccesses = this.networkSuccesses;
       // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
       const consumer = this.options.network.request(
         request.url,
@@ -729,8 +738,11 @@ export class ImageryLoader implements NetworkPoolClient {
       const probing = record.retries === PROBING;
       record.state = DEAD;
       // Out of retries on transient failures: maybe an outage, so a fresh round once the source is back (ADR 0046).
+      // When the source answered other tiles during the round, no outage hid the tile: it waits for the source to be
+      // stable instead, so a success that merely arrives after it is not taken for the end of an outage (KB-204).
       if (decision.failureClass === FAILURE_TRANSIENT) {
         this.failedTransiently();
+        if (!probing && this.networkSuccesses !== record.roundSuccesses) record.roundSuccesses = NEEDS_STABLE;
         this.awaitSource(record);
       }
       // A failed health check is not reported again.
@@ -786,11 +798,18 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** The source answered again: its waiting tiles get a fresh round (ADR 0046). */
   private reviveOutageDead(): void {
-    this.outageDead = 0;
-    this.probeToken++;
-    this.probeArmed = false;
+    let waiting = 0;
     for (const record of this.table.bySlot)
-      if (record.state === DEAD && record.retries === AWAITING_SOURCE) this.revive(record);
+      if (record.state === DEAD && record.retries === AWAITING_SOURCE) {
+        if (record.roundSuccesses === NEEDS_STABLE) waiting++;
+        else this.revive(record);
+      }
+    // Tiles that wait for stability keep the health checks running (KB-204).
+    this.outageDead = waiting;
+    if (waiting === 0) {
+      this.probeToken++;
+      this.probeArmed = false;
+    }
     this.options.requestFrame();
   }
 
@@ -803,13 +822,19 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** A network success: once the source is stable again, every tile gets its rounds back (ADR 0046). */
   private succeeded(): void {
+    this.networkSuccesses++;
     this.successStreak++;
     if (this.roundsRestored) return;
     if (this.successStreak < STABLE_SUCCESSES && this.options.now() - this.lastFailureMs < STABLE_MS) return;
     this.roundsRestored = true;
     for (const record of this.table.bySlot) {
       record.rounds = 0;
-      if (record.state === DEAD && record.retries === OUT_OF_ROUNDS) this.revive(record);
+      if (record.state !== DEAD) continue;
+      if (record.retries === OUT_OF_ROUNDS) this.revive(record);
+      else if (record.retries === AWAITING_SOURCE && record.roundSuccesses === NEEDS_STABLE) {
+        this.outageDead--;
+        this.revive(record);
+      }
     }
     this.options.requestFrame();
   }

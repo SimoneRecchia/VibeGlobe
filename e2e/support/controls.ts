@@ -104,13 +104,22 @@ export class Touch {
     await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: this.points(points) });
   }
 
-  async move(points: readonly TouchPoint[]): Promise<void> {
-    await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: this.points(points) });
+  /** `timestampS`: the event's time in seconds since 1970, as CDP takes it; by default the time the browser gets it. */
+  async move(points: readonly TouchPoint[], timestampS?: number): Promise<void> {
+    await this.cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: this.points(points),
+      ...(timestampS === undefined ? {} : { timestamp: timestampS }),
+    });
   }
 
   /** Lifts every point not in `remaining`. */
-  async end(remaining: readonly TouchPoint[] = []): Promise<void> {
-    await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: this.points(remaining) });
+  async end(remaining: readonly TouchPoint[] = [], timestampS?: number): Promise<void> {
+    await this.cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: this.points(remaining),
+      ...(timestampS === undefined ? {} : { timestamp: timestampS }),
+    });
   }
 }
 

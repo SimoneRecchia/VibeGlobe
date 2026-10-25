@@ -134,9 +134,6 @@ hydration, so no `<ClientOnly>` is needed. Load it only on the page that shows t
     </VibeGlobe>
   </div>
 </template>
-    <SitesLayer />
-  </VibeGlobe>
-</template>
 ```
 
 Mouse, trackpad, touch and keyboard navigation are on by default (`:controls="false"` turns them off). Quantized-mesh

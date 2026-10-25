@@ -580,6 +580,39 @@ describe('ImageryLoader', () => {
     }
   });
 
+  it('gives no fresh round to a tile whose source answered other tiles during its round (KB-204)', () => {
+    const { transport, timers, runFrame, uploaded, ok } = setUp();
+    // The tile fails its whole round while a neighbor loads: the source was up, so no outage ended.
+    runFrame([
+      [4, 2, 2],
+      [4, 2, 3],
+    ]);
+    transport.answer(url(4, 2, 3), ok);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) {
+        timers.advance(40_000);
+        runFrame([[4, 2, 2]]);
+      }
+      transport.answer(url(4, 2, 2), { kind: 'status', status: 500, retryAfterMs: undefined });
+    }
+    // Another tile answers right after: not the end of an outage, so the failed tile is not requested again.
+    runFrame([
+      [4, 2, 2],
+      [4, 3, 3],
+    ]);
+    transport.answer(url(4, 3, 3), ok);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(5);
+    // In a still view where nothing else loads, the health checks still ask for it, and it loads once it answers.
+    timers.advance(10_000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(6);
+    transport.answer(url(4, 2, 2), ok);
+    const before = uploaded.length;
+    runFrame([[4, 2, 2]]);
+    expect(uploaded.length).toBe(before + 1);
+  });
+
   it('never revives a tile that failed for good on a permanent error after a transient one (KB-162)', () => {
     const { transport, timers, runFrame, ok } = setUp();
     runFrame([[4, 2, 2]]);

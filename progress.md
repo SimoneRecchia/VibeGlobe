@@ -21,14 +21,17 @@ settings panel, demo data, the local sample builds and a help overlay; every pag
 owner's to push (this session can push only its branch: `git tag -a v0.1.0 04f9286 -m "Release v0.1.0" && git push
 origin v0.1.0`); `npm run release:pack` rebuilds the tarballs (`release-0.1.0/README.md`), and
 `docs/guides/cube-quickstart.md` installs them in a Nuxt 3 or Vue 3 application. Also: ADR 0046 decision 5 (retry
-rounds back once a source is stable, question 33), KB-171 fixed (label placement slices), KB-199/KB-200/KB-201.
+rounds back once a source is stable, question 33), KB-171 fixed (label placement slices), KB-199/KB-200/KB-201. From
+the last full CI run on `main`: KB-204 (a tile failing for good with HTTP 500 got a second round when another tile's
+retry succeeded just after it; it now waits for the source to be stable), KB-205 (F179's release waited for the page
+to handle the last move and read as a hold; F180's two-finger lift the same), F273 measures warm pans, F106 gets 10 minutes on software GPUs.
 
 **Open bugs** (`docs/known-bugs.md`): KB-180 (black wedges near the poles on the owner's Mac, partly fixed) and KB-181
 (a short crack at level 14 in `terrain-alps`), both waiting for the owner's exact views; KB-110 (F137's crack sweep
 pops once in CI's software GPU); KB-097 and KB-170 (M5 relief and tilt in the descent onto a flank); TG-01 (a device
 loss after the camera moved keeps the old view), TG-04 (a whole vector view can stay missing after chaos, partly
 fixed), TG-06 (WebGPU engines destroyed during a fast start-up stay alive in a 1000-cycle run); KB-PT-07 (the
-OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
+OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-206 (F474 once counted a tile requested twice; not reproduced). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
 (ADR 0046).
 
 **Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):

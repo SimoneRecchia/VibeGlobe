@@ -86,6 +86,14 @@ test('cached tiles are not requested again after a reload, and cache I/O stays o
   const config: HarnessConfig = { sources: [{ id: 'world', pattern: 'world', session: 'f273' }], view: ROME };
   await openHarness(page);
   await tileHeaders(page, () => ({ 'Cache-Control': 'max-age=86400' }));
+  // An unmeasured warm-up pan with the cache off and tiles of its own: otherwise the measured pan with writes is the
+  // page's first, with its one-off compilation, and only the baseline after it runs warm.
+  await startHarness(page, {
+    sources: [{ id: 'world', pattern: 'world', session: 'f273-warmup' }],
+    view: ROME,
+    switches: { persistentCache: false },
+  });
+  await pan(page);
   const first = recordTileRequests(page);
   await startHarness(page, config);
   // The engine's main-thread CPU per frame while the pan writes every tile to the cache, against the same pan with the

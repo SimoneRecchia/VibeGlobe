@@ -1,34 +1,54 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 13:05 UTC)
+## Handoff for Wednesday 28 October (written 2026-10-25, before the 22:00 Europe/Rome stop)
 
-Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
-#32, #35–#40, #42, #43 and #44 (10:48 UTC; #41 is superseded by #43 and stays for the owner to close); #45 is open with
-everything since, to merge by about 14:45 UTC. GitHub deletes the branch on merge: the next push recreates it. The full
-run on ee8bf1e (40189053419) failed four shards, all fixed since: F359 (KB-171 fixed: placement slices allocate almost
-nothing, and the budget gates each slice's work without the stalls of a descheduled thread), F060 (holds still before
-each release, so KB-177's glide no longer takes its time), the data-labels WebGPU baseline (the 01:57 one, which the code
-renders exactly) and F300 (the fixture server encodes the route's tiles before the measured passes). The next full run
-goes on the head once shard 10 of that run (soak, robustness) ends. Still flaky on CI without a fix: F222 and F510's
-raster recovery (ADR 0046). F329 is marked once a full run shows the M8 network specs green (no M8 bug is open).
+The owner uses the engine in the first consumer on Monday and Tuesday and restarts the main session on Wednesday for
+two weeks of hardening. Branch `claude/wizardly-archimedes-up4ww2`; everything is merged into `main` (pull requests
+#26 to #47, squash merges; #41 is superseded by #43 for the owner to close).
 
-Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
-F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170 (KB-171 fixed 2026-10-25); F403, F472, F453 pending; the
-reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan/quality.md`).
+**State.** `npm run status`: 448 passing, 81 failing, 33 pending (owner steps), 22 superseded, 79.7% of the active
+entries. M1, M2, M3 and M9 are complete. In M4–M14 every failing entry is in `docs/hardening-backlog.md` except F329
+(the M8 acceptance), which is marked once one full CI run shows the M8 network specs green: the last full runs failed
+only on flaky timing specs, each fixed since (F300, F303, F459); dispatch `ci.yml` on `main` and check. M15 (hardening
+and release) is 10 of 53.
 
-Since the last handoff (2026-10-25 04:45):
+**Done on 2026-10-25.** KB-202, the owner's trackpad feedback (a flick on a zoomed-out globe stopped dead, a drag off
+the disc froze): glides now turn the globe about the screen center like a virtual trackball, drags off the disc keep
+turning it, the release velocity follows the finger at the lift; trackpad sequences at 120 and 60 Hz are unit and
+browser tests. The playground's showcase (owner request): the default page shows every `@vibeglobe/ui` control, a
+settings panel, demo data, the local sample builds and a help overlay; every page shows the default controls
+(`?ui=0` hides them); tests see the bare engine (`apps/playground/CLAUDE.md`). Pre-release 0.1.0: tag `v0.1.0` on
+`main`, not published; `npm run release:pack` rebuilds the tarballs (`release-0.1.0/README.md`), and
+`docs/guides/cube-quickstart.md` installs them in a Nuxt 3 or Vue 3 application. Also: ADR 0046 decision 5 (retry
+rounds back once a source is stable, question 33), KB-171 fixed (label placement slices), KB-199/KB-200/KB-201.
 
-- Fixed: KB-138 (the bandwidth estimate fits each transfer's time against its bytes and leaves out a fixed
-  per-response delay), the M8 fix-check's gaps KB-192 (offline-only scopes are never health-checked), KB-193 (terrain
-  package credits), KB-194 (held misses no longer keep the engine busy; one endpoint returning wakes its tiles),
-  KB-195 (F298 step 3 checked), KB-196 (the playground installs a world package), and KB-197 (release dry run: the first-consumer
-  check reads large files), KB-198 (package areas reaching 180° covered one column only).
-- F052 expects the stitch binding's start-up height grid (9 uploads). The network-mode matrix checks popping in still
-  frames on a stepped clock (F329 step 3).
-- Remaining M4–M14 outside the backlog: F329 only. Its steps are covered (the review and its fix-check are done, no M8
-  bug is open); it is marked once the full CI run passes its network suites and matrix.
-- Open elsewhere: KB-180's wedges and KB-181 (the owner's exact views are asked for), TG-04 (vector recovery), the WebGL2
-  CPU budget (the next hardware run's `phaseMedianMs` shows where the fixed 4.9 ms per frame goes).
+**Open bugs** (`docs/known-bugs.md`): KB-180 (black wedges near the poles on the owner's Mac, partly fixed) and KB-181
+(a short crack at level 14 in `terrain-alps`), both waiting for the owner's exact views; KB-110 (F137's crack sweep
+pops once in CI's software GPU); KB-097 and KB-170 (M5 relief and tilt in the descent onto a flank); TG-01 (a device
+loss after the camera moved keeps the old view), TG-04 (a whole vector view can stay missing after chaos, partly
+fixed), TG-06 (WebGPU engines destroyed during a fast start-up stay alive in a 1000-cycle run); KB-PT-07 (the
+OpenStreetMap warning per source, core side fixed). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
+(ADR 0046).
+
+**Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):
+
+1. What the first consumer will hit first: any issue the owner brings back from Monday and Tuesday, then KB-180 and
+   KB-181 (terrain near the poles and cracks on real GPUs), F137 and F148 (crack sweep, KB-110).
+2. The globe-to-street zoom: F167 and F157 (KB-097, KB-170).
+3. Data layers on real GPUs and terrain: F363 to F366 (clamping, draping, morph), F351 to F354, F361, F371 to F375
+   and F389 (formats, streaming, clustering, 100,000 points at the target frame rate), F379.
+4. Vector tiles and 3D Tiles: F440, F444, F445, F451, F452, F455 (visual baselines and performance), F463, F470.
+5. Atmosphere and anti-aliasing on real GPUs: F391, F392, F394, F397.
+6. Adaptive loading and network modes: F286 to F288, F293 to F295, F300, F301, F315, then F329 (acceptance).
+7. M15: TG-01, TG-04, TG-06 and the remaining M15 entries (cross-browser F504, soak, chaos, fuzzing, the WebGL2 CPU
+   p95 of `drag-200/400/800` on the owner's Mac, the release).
+
+**Open owner questions** (`docs/open-questions.md`): 13 (legal review of the README licensing text), 16
+(`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment for publishing). The 33
+pending entries wait for owner steps listed there (reference tablet, the owner's Mac runs, the Milan sample, keys).
+
+**Start on Wednesday.** Read this, run `./init.sh`, check the last full CI run on `main` (mark F329 if the M8 specs are
+green), ask the owner for the first consumer's findings, then follow the backlog order above.
 
 ## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
 

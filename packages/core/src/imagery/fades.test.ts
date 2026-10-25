@@ -71,6 +71,21 @@ describe('ImageryFades (F105)', () => {
     expect([list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([10, [0.125, 0.125, 0.5, 0.125]]);
   });
 
+  it('a tile that appears by refinement during the fade of its parent to the same imagery goes on with that fade (KB-199)', () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(4);
+    const now = new Float64Array([0]);
+    const parent = quadtreeTileKey(0, 3, 2, 5);
+    fades.apply(frame(list, 10, 3, parent), list.imageryLayer, now, 250, () => undefined);
+    now[0] = 100;
+    fades.apply(frame(list, 11, 3, parent), list.imageryLayer, now, 250, () => undefined);
+    // Its child shows the parent's new imagery too: the fade from 10 goes on, not cut off.
+    now[0] = 200;
+    fades.apply(frame(list, 11, 3, quadtreeTileKey(0, 4, 4, 10)), list.imageryLayer, now, 250, () => undefined);
+    expect(list.fades[0]).toBeCloseTo(0.4, 6);
+    expect(list.fromTextures[0]).toBe(10);
+  });
+
   it('a tile that appears by coarsening fades from the stand-in its children all showed (KB-199)', () => {
     const fades = new ImageryFades();
     const list = new DrawList(8);
@@ -95,6 +110,33 @@ describe('ImageryFades (F105)', () => {
       10,
       [0.25, 0.25, 0.5, 0.25],
     ]);
+  });
+
+  it('a tile that appears by coarsening during the fade of its children goes on with that fade (KB-199)', () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(8);
+    const now = new Float64Array([0]);
+    const children = (texture: number): DrawList => {
+      list.count = 4;
+      for (let k = 0; k < 4; k++) {
+        const x = 4 + (k & 1);
+        const y = 10 + (k >> 1);
+        list.meshKeys[k] = quadtreeTileKey(0, 4, x, y);
+        list.textures[k] = texture;
+        list.imageryLevels[k] = 1;
+        list.geographic[k] = 0;
+        list.uvTransforms.set([0.125, 0.125, (x % 8) / 8, (y % 8) / 8], k * 4);
+      }
+      return list;
+    };
+    fades.apply(children(10), list.imageryLayer, now, 250, () => undefined);
+    now[0] = 100;
+    fades.apply(children(11), list.imageryLayer, now, 250, () => undefined);
+    // Their parent shows the imagery they fade to: the fade from the stand-in goes on.
+    now[0] = 200;
+    fades.apply(frame(list, 11, 3, quadtreeTileKey(0, 3, 2, 5)), list.imageryLayer, now, 250, () => undefined);
+    expect(list.fades[0]).toBeCloseTo(0.4, 6);
+    expect([list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([10, [0.25, 0.25, 0.5, 0.25]]);
   });
 
   it('switches at once with no duration, and a tile drawn again after a gap starts without a fade', () => {

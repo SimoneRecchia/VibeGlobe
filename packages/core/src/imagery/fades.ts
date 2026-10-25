@@ -118,7 +118,7 @@ export class ImageryFades {
       for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
       this.startMs[slot] = nowMs;
     } else if (refineMs > 0 && (layer.geographic[i] ?? 1) === 0 && key % 3 === 0) {
-      if (!this.seedFromParent(slot, key, nowMs, refineMs)) this.seedFromChildren(slot, key, nowMs);
+      if (!this.seedFromParent(slot, key, nowMs, refineMs)) this.seedFromChildren(slot, key, nowMs, refineMs);
     }
     return slot;
   }
@@ -134,9 +134,11 @@ export class ImageryFades {
     const row = tile[2];
     if (level === 0) return false;
     const parent = this.drawnLastFrame(meshKey(level - 1, column >> 1, row >> 1));
-    if (parent < 0 || this.toTexture[parent] === this.toTexture[slot]) return false;
-    // A fade of the parent under way goes on from where it started, with its timing.
+    if (parent < 0) return false;
+    // A fade of the parent under way goes on from where it started, with its timing, also when the child shows the
+    // imagery the parent fades to: cutting it off would jump.
     const fading = nowMs - (this.startMs[parent] ?? -Infinity) < fadeMs && this.fromGeographic[parent] === 0;
+    if (!fading && this.toTexture[parent] === this.toTexture[slot]) return false;
     const source = fading ? this.fromTransform : this.toTransform;
     this.fromTexture[slot] = (fading ? this.fromTexture[parent] : this.toTexture[parent]) ?? 0;
     this.fromGeographic[slot] = 0;
@@ -153,35 +155,41 @@ export class ImageryFades {
 
   /**
    * A Web Mercator tile appearing by coarsening, where every child drawn last frame showed the same imagery (a stand-in
-   * magnified over all of them): fades from that imagery over the whole tile.
+   * magnified over all of them), or was fading from the same imagery: fades from that imagery over the whole tile, or
+   * goes on with the children's fade.
    */
-  private seedFromChildren(slot: number, key: number, nowMs: number): void {
+  private seedFromChildren(slot: number, key: number, nowMs: number, fadeMs: number): void {
     const tile = tileOfKey(key);
     const level = tile[0];
     const column = tile[1];
     const row = tile[2];
     let first = -1;
     let firstChild = 0;
+    let fading = false;
     for (let k = 0; k < 4; k++) {
       const child = this.drawnLastFrame(meshKey(level + 1, 2 * column + (k & 1), 2 * row + (k >> 1)));
       if (child < 0) continue;
-      if (first >= 0 && this.toTexture[child] !== this.toTexture[first]) return;
+      // A fade of the children under way goes on, from what they all fade from.
+      const childFading = nowMs - (this.startMs[child] ?? -Infinity) < fadeMs && this.fromGeographic[child] === 0;
+      const shown = (childFading ? this.fromTexture[child] : this.toTexture[child]) ?? 0;
       if (first < 0) {
         first = child;
         firstChild = k;
-      }
+        fading = childFading;
+      } else if (childFading !== fading || shown !== (fading ? this.fromTexture[first] : this.toTexture[first])) return;
     }
-    if (first < 0 || this.toTexture[first] === this.toTexture[slot]) return;
-    this.fromTexture[slot] = this.toTexture[first] ?? 0;
+    if (first < 0 || (!fading && this.toTexture[first] === this.toTexture[slot])) return;
+    const source = fading ? this.fromTransform : this.toTransform;
+    this.fromTexture[slot] = (fading ? this.fromTexture[first] : this.toTexture[first]) ?? 0;
     this.fromGeographic[slot] = 0;
     // The child showed its quarter of this tile's part: twice its scale, back by its column and row within this tile.
-    const su = this.toTransform[first * 4] ?? 1;
-    const sv = this.toTransform[first * 4 + 1] ?? 1;
+    const su = source[first * 4] ?? 1;
+    const sv = source[first * 4 + 1] ?? 1;
     this.fromTransform[slot * 4] = 2 * su;
     this.fromTransform[slot * 4 + 1] = 2 * sv;
-    this.fromTransform[slot * 4 + 2] = (this.toTransform[first * 4 + 2] ?? 0) - (firstChild & 1) * su;
-    this.fromTransform[slot * 4 + 3] = (this.toTransform[first * 4 + 3] ?? 0) - (firstChild >> 1) * sv;
-    this.startMs[slot] = nowMs;
+    this.fromTransform[slot * 4 + 2] = (source[first * 4 + 2] ?? 0) - (firstChild & 1) * su;
+    this.fromTransform[slot * 4 + 3] = (source[first * 4 + 3] ?? 0) - (firstChild >> 1) * sv;
+    this.startMs[slot] = fading ? (this.startMs[first] ?? nowMs) : nowMs;
   }
 
   /** The slot of a Web Mercator tile drawn last frame with Web Mercator imagery, −1 for none. */

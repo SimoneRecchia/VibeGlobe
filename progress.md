@@ -3,11 +3,14 @@
 ## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 06:30 UTC)
 
 Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
-#32, #35–#40, #42, #43 (07:15 UTC, with track I's space background F600–F609: #41 is superseded by it and stays for the
-owner to close); merge again by about 11:15 UTC. GitHub deletes the branch on merge: the next push recreates it. Full
-run 40168874917 (29727ec) failed F180, F448, F450, F488, F303, F269, F297, F222 (flaky), F510 raster (flaky) and the new
-playground package test: fixed since except F269 (KB-199, partly), F222, F510 and F297, which passes locally and in the CI
-image. A new full run on 7561762 was dispatched at about 09:40 UTC; its failures are the next work.
+#32, #35–#40, #42, #43 and #44 (10:48 UTC; #41 is superseded by #43 and stays for the owner to close); merge again by
+about 14:45 UTC. GitHub deletes the branch on merge: the next push recreates it. A full manual CI run on the latest head
+was dispatched at about 11:55 UTC; its failures are the next work. Fixed since the 06:30 handoff: KB-199 (fades across
+quadtree splits and merges, F269), KB-200 (F303 compares the network part of a view), F180 (KB-183's wait), F297, F448,
+F450, F488, F574 (denser haze), TG-04 partly. Still flaky on CI without a fix: F222 (a rate-limited source got 11
+requests in one server-side second once: browser queueing beyond the limiter's 150 ms margin) and F510's raster recovery
+(a tile out of retry rounds under heavy faults, ADR 0046). F329 is marked once a full run shows the M8 network specs
+green (no M8 bug is open).
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
 F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the

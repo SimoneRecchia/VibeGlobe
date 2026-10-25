@@ -71,6 +71,32 @@ describe('ImageryFades (F105)', () => {
     expect([list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([10, [0.125, 0.125, 0.5, 0.125]]);
   });
 
+  it('a tile that appears by coarsening fades from the stand-in its children all showed (KB-199)', () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(8);
+    const now = new Float64Array([0]);
+    // Four children at level 4 all magnify the same level-1 stand-in (texture 10), each its own sixteenth of it.
+    list.count = 4;
+    for (let k = 0; k < 4; k++) {
+      const x = 4 + (k & 1);
+      const y = 10 + (k >> 1);
+      list.meshKeys[k] = quadtreeTileKey(0, 4, x, y);
+      list.textures[k] = 10;
+      list.imageryLevels[k] = 1;
+      list.geographic[k] = 0;
+      list.uvTransforms.set([0.125, 0.125, (x % 8) / 8, (y % 8) / 8], k * 4);
+    }
+    fades.apply(list, list.imageryLayer, now, 250, () => undefined);
+    now[0] = 16;
+    // Their parent replaces them with its own level-3 imagery: it fades in from its quarter of the stand-in.
+    fades.apply(frame(list, 11, 3, quadtreeTileKey(0, 3, 2, 5)), list.imageryLayer, now, 250, () => undefined);
+    expect([list.fades[0], list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([
+      0,
+      10,
+      [0.25, 0.25, 0.5, 0.25],
+    ]);
+  });
+
   it('switches at once with no duration, and a tile drawn again after a gap starts without a fade', () => {
     const fades = new ImageryFades();
     const list = new DrawList(4);

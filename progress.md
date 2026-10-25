@@ -28,7 +28,7 @@ rounds back once a source is stable, question 33), KB-171 fixed (label placement
 pops once in CI's software GPU); KB-097 and KB-170 (M5 relief and tilt in the descent onto a flank); TG-01 (a device
 loss after the camera moved keeps the old view), TG-04 (a whole vector view can stay missing after chaos, partly
 fixed), TG-06 (WebGPU engines destroyed during a fast start-up stay alive in a 1000-cycle run); KB-PT-07 (the
-OpenStreetMap warning per source, core side fixed). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
+OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
 (ADR 0046).
 
 **Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):

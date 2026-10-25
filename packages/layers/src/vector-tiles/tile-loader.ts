@@ -297,8 +297,9 @@ export class VectorTileLoader {
       entry.state = 'ready';
       this.options.onReady();
     };
-    // Bytes that do not decode (truncated or corrupted on the way) are fetched again later, like a failed download.
-    const undecodable = (): void => {
+    // Bytes that do not decode or lay out (truncated or corrupted on the way) are fetched again later, like a failed
+    // download.
+    const retryLater = (): void => {
       entry.task = undefined;
       if (this.disposed || this.entries.get(entry.key) !== entry || entry.state === 'ready') return;
       delete entry.bytes;
@@ -307,7 +308,7 @@ export class VectorTileLoader {
     const workers = this.options.workers;
     if (workers === undefined) {
       const buckets = layoutDecodable(input);
-      if (buckets === undefined) undecodable();
+      if (buckets === undefined) retryLater();
       else finish(buckets);
       return;
     }
@@ -315,11 +316,8 @@ export class VectorTileLoader {
       { task: 'layout-vector-tile', input, transfer: [input.bytes], priority: entry.priority },
       (outcome) => {
         if (outcome.ok) finish(outcome.output as Bucket[]);
-        else if (outcome.error.taskCode === 'undecodable') undecodable();
-        else if (outcome.error.code !== 'cancelled' && outcome.error.code !== 'aborted') {
-          entry.task = undefined;
-          if (entry.state !== 'ready') entry.state = 'missing';
-        }
+        // Any other failure (a worker crash, bytes that break the layout) is retried the same way (TG-04).
+        else if (outcome.error.code !== 'cancelled' && outcome.error.code !== 'aborted') retryLater();
       },
     );
   }

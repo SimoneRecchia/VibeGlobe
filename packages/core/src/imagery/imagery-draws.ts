@@ -116,7 +116,8 @@ export function drawImagery(
     }
     writeOverlays(list, index, overlays);
   }
-  if (center) prefetchStack(layers, center, centerDistance);
+  // Nothing finer shows under a center the fog nearly hides (F574, KB-174).
+  if (center && !hazed(center)) prefetchStack(layers, center, centerDistance);
 }
 
 /** Prefetches the children of the center tile from each visible layer, from the first source of its chain that has it. */
@@ -284,6 +285,14 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 }
 
 /**
+ * Below this fog visibility at a tile's closest point nothing is prefetched around or under it: its neighbors and
+ * children, deeper in the haze, would show at most half their detail (F574, KB-174).
+ */
+const PREFETCH_MIN_VISIBILITY = 0.5;
+
+const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
+
+/**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
  * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
  * source of the chain) are neither requested nor looked up.
@@ -295,19 +304,23 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
   const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
+  // The level below was found missing: its parent is the finest this source can show there (KB-179).
+  let belowMissing = false;
   for (let current = wanted; current >= lowest; current--) {
     const x = mapped(MAPPING_X);
     const y = mapped(MAPPING_Y);
-    // The wanted tile and every second ancestor are requested; the others are only looked up.
+    // The wanted tile, every second ancestor, the source's coarsest level and the parent of a missing tile are
+    // requested; the others are only looked up.
     const handle =
-      !arriving && (wanted - current) % 2 === 0
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
+      !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
+        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, !hazed(tile))
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;
       return handle;
     }
     if (handle === ARRIVING) arriving = true;
+    belowMissing = layer.loader.unavailable(current, x, y);
     if (current > lowest) mapAncestor(mapping, 0, 1);
   }
   return -1;

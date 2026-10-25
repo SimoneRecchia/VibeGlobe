@@ -2,16 +2,14 @@
 
 `PLAN.md` sets the targets; this document defines the reference devices, the initial budgets and how each is measured. Budget values are starting points: they are refined with measurements (recorded in ADRs) but the zero-artifact targets are never weakened.
 
-## Reference devices (proposed; the owner's device details are pending)
+## Reference devices (owner, 2026-10-24, ADR 0046)
 
-| Role                       | Proposed device                                                                                                            | Why                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Reference desktop          | Windows 11 laptop, Intel Core i5 12th gen with Iris Xe integrated GPU, 16 GB RAM, 1920×1080 at 1×, current Chrome and Edge | A mainstream integrated GPU: if it holds 60 fps, discrete GPUs do too |
-| Reference desktop (Apple)  | MacBook Air M1, 8 GB, Retina display at 2×, current Safari and Chrome                                                      | Apple GPU, high-DPI, Safari WebGPU                                    |
-| Reference tablet (iPadOS)  | iPad 10th generation (A14), current Safari                                                                                 | Most common iPad class in the field                                   |
-| Reference tablet (Android) | Mid-range Android tablet with a Mali or Adreno GPU (for example Samsung Galaxy Tab S9 FE), current Chrome                  | ARM GPU coverage                                                      |
+| Role              | Device                                                                                                             | Results                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| Reference desktop | MacBook Pro, Apple M5 (10-core CPU, 10-core GPU, Metal 4), 32 GB, macOS 26.6.2, Chrome 155 and Safari              | `benchmarks/results/macbook-apple-m5-macos-26-6-2/` |
+| Reference tablet  | None yet: every tablet step stays `pending` until one is available (`docs/open-questions.md`, pending owner steps) | —                                                   |
 
-The owner declined a paid cloud device service for now and will be asked again before M15 ([ADR 0015](../adr/0015-owner-decisions-2026-10-20.md)); the details of the owner's desktop and tablet are tracked in [open questions](../open-questions.md). Until then, automated measurements run in CI (WebGL2 and WebGPU through SwiftShader, timings recorded but not gated, ADR 0012) and on whatever hardware the session has, recorded with the device name.
+Chrome stands in for Edge (the same engine) and Playwright's WebKit for Safari (owner, 2026-10-24, ADR 0019). The owner runs the hardware procedure (`docs/guides/hardware-testing.md`) on the reference desktop; CI keeps the automated measurements (WebGL2 and WebGPU through SwiftShader, timings recorded but not gated, ADR 0012). The devices proposed earlier (a Windows laptop with Iris Xe, a MacBook Air M1, an iPad 10th generation, a mid-range Android tablet) are not used.
 
 ## Performance targets and initial budgets
 

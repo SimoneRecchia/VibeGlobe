@@ -926,7 +926,7 @@
         "Confirm it records frame-time and input-latency measurements for main-thread and worker rendering in the supported browsers",
         "Confirm it states the decision and, if adopted, which browsers use it and how the fallback works"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F066",
@@ -1051,7 +1051,7 @@
         "Follow it on a machine with a GPU and confirm the WebGPU visual tests and the benchmarks run",
         "Confirm results are saved in the documented location with the device, OS, browser and GPU recorded"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F076",
@@ -1574,7 +1574,7 @@
         "Run the start-up benchmark on the reference desktop and record time from engine creation to the first frame with complete imagery",
         "Confirm it is at most 1 s and record the result"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F116",
@@ -5239,7 +5239,7 @@
         "Verify the fog-enabled run requests at least 25% fewer tiles over the scenario (the measured reduction is recorded in the ADR) with no visible difference in the fogged region",
         "Verify no black or empty pixels appear near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F396",
@@ -5341,7 +5341,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F404",
@@ -5977,7 +5977,7 @@
         "Assert bridges draw above the roads they cross and tunnels draw below or dashed as styled",
         "Assert road-name labels appear along the roads at street zoom"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F454",
@@ -6223,7 +6223,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F473",
@@ -7264,97 +7264,111 @@
       "status": "passing"
     },
     {
+      "id": "F574",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Fog-aware detail: a tile entirely inside full fog is never requested at a fine level, and the tilted fog scenario requests measurably fewer tiles than the same run at full detail.",
+      "steps": [
+        "Unit-test the level selection with fog: a tile whose nearest point lies beyond the full-fog distance is not refined below the fog's coarse level, while a tile partly inside the visible range is",
+        "Run the same tilted flight scenario with fog-aware detail on and off and record every tile request with its level and position",
+        "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
+        "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
+      ],
+      "status": "failing"
+    },
+    {
       "id": "F600",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The optional space background is surveyed and decided before it is built: how virtual globes draw stars and the Milky Way, a public-domain star catalog rendered procedurally, and any Milky Way image only with a verified license compatible with MPL-2.0, recorded in an ADR and in THIRD_PARTY_NOTICES.md.",
+      "description": "An optional space background draws stars and the Milky Way behind the globe, off by default and switched on per instance through a render extension.",
       "steps": [
-        "Write the ADR: prior art, the catalog chosen and its license, the Milky Way source and its license, the rendering approach and its options",
-        "Record the catalog in THIRD_PARTY_NOTICES.md through the notices generator and assert `npm run notices -- --check` passes",
-        "Assert no image asset without a recorded license ships with the background"
+        "Start a globe with default options and confirm no space background draws and none of its assets are requested",
+        "Turn the space background on and off at runtime and confirm stars and the Milky Way appear and disappear in the next frame",
+        "Confirm it is a render extension that the renderer package ships and the core does not depend on"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F601",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "An optional space background like Google Earth's, off by default, is added as a render extension through an exported helper addSpaceBackground(globe, options): the stars of a public-domain catalog and the Milky Way behind the globe, with options to show either, change brightness, set or follow the sky time and turn the daytime fade off, and removable with its GPU resources freed.",
+      "description": "The space background moves consistently with the globe, as in Google Earth: stars keep fixed directions in the sky's frame, so orbiting, tilting and zooming turn them together with the globe without drift or parallax.",
       "steps": [
-        "Decode the catalog in a unit test and assert its size, order and the position of Sirius",
-        "Open the playground without the background and assert no space background is drawn",
-        "Add the background, assert stars and the Milky Way appear behind the globe, then remove it and assert the frame equals the one without it",
-        "Assert invalid options throw invalid-option"
+        "Orbit, tilt and zoom with the space background on and track several stars' screen positions against their catalog directions in every frame",
+        "Assert each star stays within 0.5 px of its expected position for the camera of that frame",
+        "Assert the stars' motion has no lag or jump relative to the globe between frames"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F602",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The sky is fixed in the celestial frame: it is rotated by Greenwich sidereal time from the engine's date and time (the atmosphere's time, a fixed epoch when none is set) with precession from J2000, tested against published values.",
+      "description": "Stars come from a permissively licensed catalog with sizes and brightness by magnitude, and do not shimmer, alias or pop while the camera moves.",
       "steps": [
-        "Unit-test sidereal time and precession against Meeus's worked examples, the pole and a sidereal day",
-        "Change the engine's time by six hours and assert the rendered stars move to their newly predicted screen positions"
+        "Load the catalog and confirm its license is recorded in THIRD_PARTY_NOTICES.md",
+        "Record frames of a slow orbit and assert no star's brightness changes by more than the flicker threshold between frames",
+        "Compare a still view with its reviewed baseline on both backends"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F603",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "Every camera move, globe spin or tilt moves the sky consistently: the stars drawn stand where their celestial directions project for several camera poses, on WebGPU and WebGL2.",
+      "description": "The Milky Way is drawn from a permissively licensed panorama with no seam, pole pinch or banding.",
       "steps": [
-        "Unit-test the celestial-to-clip matrix against the product of projection, view rotation and sky orientation",
-        "For three camera poses (position, heading, tilt) on both backends, predict the bright stars' screen positions independently and assert each is drawn within 2 px of its prediction"
+        "Look toward the panorama's seam and both poles and confirm no visible seam or pinch",
+        "Assert no banding in the gradient regions (no step above the threshold between neighboring pixels)",
+        "Compare with reviewed baselines on both backends"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F604",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "Stars are crisp at any pixel ratio and do not shimmer: a star's light is the same at pixel ratios 1 and 2, its sprite never falls below a minimum radius, and the star field's total light stays constant while the camera moves by fractions of a pixel.",
+      "description": "The space background stays behind the globe and its atmosphere: never drawn over the globe's disc or the day sky, and it fades out near the ground and on the flat map.",
       "steps": [
-        "Unit-test the sprite rule: equal light at pixel ratios 1 to 3 and a constant pixel sum under sub-pixel motion",
-        "Capture the background at pixel ratios 1 and 2 and assert the stars' light per CSS pixel agrees within 25 %",
-        "Turn the camera by sub-pixel steps and assert the stars' total light varies by under 3 % between frames"
+        "Assert no star pixel inside the globe's disc or where the atmosphere's sky is brighter than the stars",
+        "Zoom from space to street level and into the flat map and assert the background fades out smoothly, with no pop",
+        "Assert zero black or empty pixels in every recorded frame"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F605",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The Milky Way is drawn procedurally along the galactic plane, wider and brighter toward the galactic center, with a dark dust lane, without an image asset.",
+      "description": "The space background renders the same on WebGPU and WebGL2, loads its assets lazily from the consumer's asset host, and costs at most 0.3 ms GPU per frame on the reference desktop.",
       "steps": [
-        "Unit-test the galactic frame: the galactic center and the north galactic pole",
-        "With the stars off, assert the frame is brighter along the projected galactic plane than 25° away from it"
+        "Compare the same views on WebGPU and forced WebGL2 within the baseline tolerance",
+        "Confirm the catalog and panorama are requested only when the background is first switched on, from the configured asset base URL (ADR 0015)",
+        "Measure its GPU time on the reference desktop and assert at most 0.3 ms per frame"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F606",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The space background fades out under the atmosphere's daytime sky near the ground and shows again at night or from space.",
+      "description": "The playground switches the space background on and the guides document it, with its options and asset hosting.",
       "steps": [
-        "Unit-test the visibility: day near the ground, night, twilight, space, the atmosphere off and the flat map",
-        "Near the ground at noon with the atmosphere, assert the frame equals the one without the background",
-        "At night at the same place, and from space at noon, assert the stars show"
+        "Open the playground with the space background switch and confirm it draws",
+        "Open the guide and confirm it documents enabling it, its options and where its assets are hosted"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F607",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The playground shows the space background with ?stars=1 and not without it.",
+      "description": "The space background's sky is fixed in the celestial frame by the engine's date and time: it is rotated by Greenwich sidereal time from the atmosphere's time (a fixed epoch when the application sets none), with precession from J2000, tested against published values.",
       "steps": [
-        "Open the playground without the parameter and assert no space background exists",
-        "Open it with ?stars=1 and assert the background is drawn and its handle exposed for tests"
+        "Unit-test sidereal time and precession against Meeus's worked examples, the celestial pole and a sidereal day",
+        "Change the engine's time by six hours and assert the rendered stars move to their newly predicted screen positions, on both backends"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F608",
@@ -7363,20 +7377,20 @@
       "description": "Screenshot comparison of the space background against baselines recorded in the pinned CI environment, on WebGPU and WebGL2.",
       "steps": [
         "Capture the space background view on both backends and compare it with its baseline at ADR 0012's tolerances",
-        "Assert the two backends agree within the cross-backend tolerance"
+        "Assert the two backends' skies agree within the cross-backend tolerance"
       ],
-      "status": "passing"
+      "status": "failing"
     },
     {
       "id": "F609",
       "milestone": 11,
       "section": "Rendering and visual quality",
-      "description": "The space background's cost is bounded: the frame time with it differs from the frame time without it by under the budget of its ADR.",
+      "description": "The space background's frame-time cost is checked: with it on, the main-thread time per frame grows by under 0.5 ms and the frame rate stays at least 80 % of the rate without it on CI's software GPU.",
       "steps": [
         "Alternate windows with and without the background during a continuous drag and assert the median main-thread overhead is under 0.5 ms",
-        "Assert the frame rate with the background is at least 80 % of the rate without it"
+        "Assert the median frame-rate ratio is at least 0.8"
       ],
-      "status": "passing"
+      "status": "failing"
     }
   ]
 }

@@ -83,6 +83,24 @@ describe('drawImagery', () => {
     expect(list.imageryLevels[0]).toBe(4);
   });
 
+  it("requests a source's coarsest level and the level above one found missing, so a clipped pyramid draws (KB-179)", () => {
+    // A pyramid from level 10 whose level 11 tile is missing (a region clipped at 11): its level 10 tile is wanted.
+    const clipped = fakeLayer({}, [11]);
+    const source = { ...clipped.layer.source, minLevel: 10 } as ImagerySource;
+    draw({ ...clipped.layer, source }, tile(11, 1080, 730));
+    expect(clipped.wanted.slice(0, 2)).toEqual([11, 10]);
+    // A level 12 tile missing at 12: level 11, between the every-second ancestors, is wanted too.
+    const gap = fakeLayer({}, [12]);
+    draw(gap.layer, tile(12, 2160, 1460));
+    expect(gap.wanted.slice(0, 3)).toEqual([12, 11, 10]);
+  });
+
+  it('prefetches no children under a center tile in full fog (F574, KB-174)', () => {
+    const { layer, wanted } = fakeLayer({ 9: 42 });
+    draw(layer, { ...tile(9, 300, 170), fogVisibility: 0.05 });
+    expect(wanted).toEqual([9]);
+  });
+
   it('requests no ancestor while the tile itself is arriving from the RAM tier (F097)', () => {
     const { layer, wanted } = fakeLayer({ 9: ARRIVING, 4: 42 });
     const list = draw(layer, tile(9, 300, 170));

@@ -189,7 +189,8 @@ export class MouseGestures {
     const anchor = this.anchor;
     this.end();
     if (!options.gestures.inertia || (mode === 'pan' && !anchor) || mode === 'none') return;
-    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity, this.upMs);
+    const { velocityWindowMs, stillMs, stillPx } = options.inertia;
+    this.samples.velocity(velocityWindowMs, this.velocity, this.upMs, stillMs, stillPx);
     const release = this.release;
     release.panXPx = release.panYPx = release.headingDeg = release.tiltDeg = release.zoomLevels = 0;
     const vx = this.velocity[0] ?? 0;

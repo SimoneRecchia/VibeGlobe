@@ -96,3 +96,27 @@ test.describe('in a small window, so the software GPU draws many frames', () => 
     expect(counts.added).toBe(0);
   });
 });
+
+test('the corner readouts overlap nothing: the tile-view switch, the status line, the coordinates and the credits (KB-182)', async ({
+  page,
+}) => {
+  // The fixture imagery brings a credit line into the bottom right corner.
+  await page.goto('/?debug=1&imagery=world&session=playground');
+  await expect(page.locator('.tile-view-toggle')).toBeVisible();
+  await expect(page.locator('.vg-credits')).toBeVisible();
+  const canvas = await page.locator('#globe').boundingBox();
+  await page.mouse.move((canvas?.x ?? 0) + (canvas?.width ?? 0) / 2, (canvas?.y ?? 0) + (canvas?.height ?? 0) / 2);
+  await expect(page.locator('#cursor')).toHaveText(/°, /);
+  const boxes = await page.evaluate(() =>
+    ['.tile-view-toggle', '#status', '#cursor', '.vg-credits'].map((selector) => {
+      const box = document.querySelector(selector)?.getBoundingClientRect();
+      return { selector, left: box?.left ?? 0, right: box?.right ?? 0, top: box?.top ?? 0, bottom: box?.bottom ?? 0 };
+    }),
+  );
+  const overlaps: string[] = [];
+  for (const [i, a] of boxes.entries())
+    for (const b of boxes.slice(i + 1))
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+        overlaps.push(`${a.selector} × ${b.selector}`);
+  expect(overlaps).toEqual([]);
+});

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_CONTROLS_OPTIONS } from './options.js';
 import { controlsHarness, type PointerInit } from './test-harness.js';
 
 type Harness = ReturnType<typeof controlsHarness>;
@@ -101,6 +102,33 @@ describe('touch gestures (ADR 0009 §4)', () => {
     expect(turned).toBeGreaterThan(25);
     expect(turned).toBeLessThan(45 - 14);
     expect(h.camera.zoom).toBe(0);
+  });
+
+  it('ends a twist with a short spin of its own time constant, not the long drag-rotate glide (KB-177)', () => {
+    const h = controlsHarness();
+    press(h, [300, 300, 500, 300]);
+    // 40° in 100 ms past the unlock: 0.4°/ms at release.
+    const ring = (deg: number) => {
+      const a = (deg * Math.PI) / 180;
+      return [
+        400 - 100 * Math.cos(a),
+        300 - 100 * Math.sin(a),
+        400 + 100 * Math.cos(a),
+        300 + 100 * Math.sin(a),
+      ] as const;
+    };
+    twoFingers(h, ring(0), ring(20), 0);
+    const end = twoFingers(h, ring(20), ring(60), 100);
+    const released = h.camera.headingDeg;
+    touch(h, 'pointerup', 1, ring(60)[0], ring(60)[1], end + 5);
+    touch(h, 'pointerup', 2, ring(60)[2], ring(60)[3], end + 5);
+    h.run(h.globe.timeMs + 5000);
+    const { twistTauMs, rotateTauMs } = DEFAULT_CONTROLS_OPTIONS.inertia;
+    expect(twistTauMs).toBeLessThan(rotateTauMs);
+    // About 0.4°/ms × τ more, clockwise: the twist's τ, not the drag-rotate one.
+    const coast = (released - h.camera.headingDeg + 360) % 360;
+    expect(coast).toBeGreaterThan(0.4 * twistTauMs * 0.7);
+    expect(coast).toBeLessThan(0.4 * twistTauMs * 1.3);
   });
 
   it('tilts with a two-finger vertical drag, exclusively (F185)', () => {
@@ -213,7 +241,7 @@ describe('touch gestures (ADR 0009 §4)', () => {
     touch(h, 'pointerup', 1, 400, 300, end + 5);
     touch(h, 'pointerup', 2, 600, 300, end + 10);
     h.run(h.globe.timeMs + 2000);
-    // 1 px/ms for τ = 200 ms: about 200 px more.
+    // 1 px/ms for the default τ: at least 150 px more.
     expect(released - h.camera.centerX).toBeGreaterThan(150);
   });
 

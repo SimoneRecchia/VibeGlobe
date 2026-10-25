@@ -10,7 +10,7 @@ import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
 import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
-import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
+import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imagery-loader.hot.js';
@@ -219,6 +219,7 @@ export class ImageryRuntime {
       decodeTask: imageryDecodeTask(source, formats),
     });
     this.byIndex.set(index, loader);
+    warnOfProfile(this.renderer, source, this.loaderContext.observability);
     return { source, loader, index };
   }
 

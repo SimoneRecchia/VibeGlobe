@@ -84,6 +84,7 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
   const quarter: InertiaTaus = {
     panTauMs: full.panTauMs / 4,
     rotateTauMs: full.rotateTauMs / 4,
+    twistTauMs: full.twistTauMs / 4,
     tiltTauMs: full.tiltTauMs / 4,
     zoomTauMs: full.zoomTauMs / 4,
   };

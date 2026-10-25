@@ -67,8 +67,20 @@ export const ARRIVING = -2;
 const UNWANTED_FRAMES = 2;
 /** Decodes that fail for a reason other than the bytes (worker crash, timeout) are retried this often, backing off. */
 const MAX_DECODE_RETRIES = 3;
-/** How long after its retries ran out a tile that may have failed in an outage waits for its last round (KB-162). */
-const OUTAGE_RETRY_MS = 300_000;
+/**
+ * Rounds of attempts a tile that failed for a transient reason or with corrupt bytes gets again, each once its source
+ * answers, per session (ADR 0046, amending KB-162's one round and F112's quarantine).
+ */
+const MAX_ROUNDS = 3;
+/**
+ * The source's health check while such tiles wait and nothing else answers: one of them is requested once, without
+ * retries and without using one of its rounds, after this long, the wait doubling up to {@link PROBE_MAX_MS}; its
+ * answer gives every waiting tile its round (ADR 0046).
+ */
+const PROBE_MS = 10_000;
+const PROBE_MAX_MS = 300_000;
+/** `retries` of a health-check request: beyond every policy's maximum, so it is never retried. */
+const PROBING = Number.POSITIVE_INFINITY;
 const DECODE_RETRY_MS = 500;
 /** A tile the GPU budget refused waits this long before it is tried again (no re-decoding every frame). */
 const REFUSED_RETRY_MS = 1000;
@@ -175,10 +187,14 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly rateIndex: number;
   private pinnedSettled = 0;
   /**
-   * Tiles whose retries ran out on transient failures (`retries` -1): once each, they get one more round of retries
-   * after the source's next network success, or after {@link OUTAGE_RETRY_MS} in a view that asks it nothing (KB-162).
+   * Tiles dead from transient failures or corrupt bytes with rounds left (`retries` -1): they get a fresh round after
+   * the source's next network success, which a health check of one of them asks for when nothing else loads (ADR 0046).
    */
   private outageDead = 0;
+  /** The wait of the next health check, and the token that cancels the previous one. */
+  private probeMs = PROBE_MS;
+  private probeToken = 0;
+  private probeArmed = false;
   /** The source's loading features this frame (`LOAD_*`). */
   private flags = LOAD_ALL;
   /** Visible tiles wanted this frame (level, x, y, key), whose neighbors are prefetched (F284). */
@@ -259,8 +275,9 @@ export class ImageryLoader implements NetworkPoolClient {
   /**
    * Wants a tile this frame with a priority key (lower first). Returns the texture handle when the tile is on the GPU,
    * {@link ARRIVING} when its bytes are being decoded or uploaded, else -1. A tile with no data or a permanent failure returns -1 forever and is never requested again.
+   * `ringNeighbors` false leaves a visible tile's neighbors out of the prefetch ring (a tile in full fog, F574).
    */
-  want(level: number, x: number, y: number, priority: number): number {
+  want(level: number, x: number, y: number, priority: number, ringNeighbors = true): number {
     const record = this.table.recordFor(level, x, y);
     // The pinned base keeps its class-0 key (its level) when visible tiles also want it, and a tile wanted twice in a
     // frame keeps the lower key: otherwise a visible tile could sit above a pinned one that has to load first (KB-067).
@@ -269,7 +286,12 @@ export class ImageryLoader implements NetworkPoolClient {
     else if (record.wantedFrame === this.frame && previous < priority) priority = previous;
     if (record.wantedFrame < this.frame - 1) this.table.wantedSince[record.slot] = this.options.now();
     record.wantedFrame = this.frame;
-    if (priority >= VISIBLE_CLASS && priority < VISIBLE_CLASS + 1024 && this.ringCount < RING_CAPACITY) {
+    if (
+      ringNeighbors &&
+      priority >= VISIBLE_CLASS &&
+      priority < VISIBLE_CLASS + 1024 &&
+      this.ringCount < RING_CAPACITY
+    ) {
       const at = 4 * this.ringCount++;
       this.ring[at] = level;
       this.ring[at + 1] = x;
@@ -455,12 +477,14 @@ export class ImageryLoader implements NetworkPoolClient {
       ram.delete(handle);
       record.state = UNLOADED;
       record.retries = 0;
-      record.revived = false;
+      record.rounds = 0;
       record.availabilityUnknown = false;
     }
     this.active.length = 0;
     this.pinnedSettled = 0;
     this.outageDead = 0;
+    this.probeToken++;
+    this.probeArmed = false;
     this.options.requestFrame();
   }
 
@@ -672,31 +696,67 @@ export class ImageryLoader implements NetworkPoolClient {
       // Wake a frame when the retry becomes eligible: nothing else would.
       this.options.setTimer(() => this.options.requestFrame(), decision.nextEligibleMs - this.options.now());
     } else {
+      const probing = record.retries === PROBING;
       record.state = DEAD;
-      // Out of retries on transient failures: maybe an outage, so one more round once the source is back (KB-162).
-      if (decision.failureClass === FAILURE_TRANSIENT && !record.revived) {
-        record.retries = -1;
-        if (this.outageDead++ === 0)
-          this.options.setTimer(() => {
-            if (!this.destroyed && this.outageDead > 0) this.reviveOutageDead();
-          }, OUTAGE_RETRY_MS);
-      }
-      this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
+      // Out of retries on transient failures: maybe an outage, so a fresh round once the source is back (ADR 0046).
+      if (decision.failureClass === FAILURE_TRANSIENT) this.awaitSource(record);
+      // A failed health check is not reported again.
+      if (!probing)
+        this.reportError(record, result.kind === 'network-error' && result.cause === 'cors' ? 'cors' : 'failed');
     }
     this.settlePinned(record);
     this.options.requestFrame();
   }
 
-  /** The source answered again: its tiles dead from network failures may load now (KB-162). */
+  /** A dead tile with rounds left waits for its source to answer again; the first one starts the health checks. */
+  private awaitSource(record: TileRecord): void {
+    if (record.rounds >= MAX_ROUNDS) return;
+    record.retries = -1;
+    this.outageDead++;
+    // A failed health check leaves the checks running, their wait doubling.
+    if (this.probeArmed) return;
+    this.probeMs = PROBE_MS;
+    this.armProbe(++this.probeToken);
+  }
+
+  /** The next health check: the waiting tile wanted most recently gets its round, and its answer tells for the rest. */
+  private armProbe(token: number): void {
+    this.probeArmed = true;
+    this.options.setTimer(() => {
+      if (this.destroyed || token !== this.probeToken) return;
+      if (this.outageDead === 0) {
+        this.probeArmed = false;
+        return;
+      }
+      let probe: TileRecord | undefined;
+      for (const record of this.table.bySlot)
+        if (record.state === DEAD && record.retries < 0 && (!probe || record.wantedFrame > probe.wantedFrame))
+          probe = record;
+      if (probe) {
+        this.outageDead--;
+        probe.state = UNLOADED;
+        // One request: no retry, and a failure leaves the tile waiting with its rounds (ADR 0046).
+        probe.retries = PROBING;
+        this.options.requestFrame();
+      }
+      this.probeMs = Math.min(2 * this.probeMs, PROBE_MAX_MS);
+      this.armProbe(token);
+    }, this.probeMs);
+  }
+
+  /** The source answered again: its waiting tiles get a fresh round (ADR 0046). */
   private reviveOutageDead(): void {
     this.outageDead = 0;
-    for (const record of this.table.bySlot)
-      if (record.state === DEAD && record.retries < 0) {
-        record.state = UNLOADED;
-        record.retries = 0;
-        record.revived = true;
-      }
+    this.probeToken++;
+    this.probeArmed = false;
+    for (const record of this.table.bySlot) if (record.state === DEAD && record.retries < 0) this.revive(record);
     this.options.requestFrame();
+  }
+
+  private revive(record: TileRecord): void {
+    record.state = UNLOADED;
+    record.retries = 0;
+    record.rounds++;
   }
 
   /** Backs a tile off after a decode that failed for a reason other than its bytes, or reports it for good. */
@@ -758,10 +818,13 @@ export class ImageryLoader implements NetworkPoolClient {
         this.options.memory.ram.delete(this.options.handleBase + record.slot);
         this.reportError(record, 'unsupported');
       } else if (code === 'task-failed') {
-        // Bytes of a declared format that do not decode: quarantined, reported once, never retried (M3 plan risk 9).
+        // Bytes of a declared format that do not decode: quarantined and reported, then requested again once the
+        // source answers, at most MAX_ROUNDS times: the bytes may have been damaged in transit (ADR 0046).
+        const probing = record.retries === PROBING;
         record.state = DEAD;
         this.options.memory.ram.delete(this.options.handleBase + record.slot);
-        this.reportError(record, 'corrupt');
+        if (!probing) this.reportError(record, 'corrupt');
+        this.awaitSource(record);
       } else {
         // The worker crashed, timed out or is unavailable: retried with backoff from the RAM copy, at most
         // MAX_DECODE_RETRIES times, then reported (F091).
@@ -804,7 +867,6 @@ export class ImageryLoader implements NetworkPoolClient {
     if (record.pinned) residency.setPinned(handle, true);
     record.state = READY;
     record.retries = 0;
-    record.revived = false;
     this.observe(record, 'tile', 'ready');
     this.settlePinned(record);
   }

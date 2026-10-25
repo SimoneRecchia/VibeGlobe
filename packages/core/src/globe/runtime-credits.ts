@@ -120,3 +120,21 @@ export function runtimeCredits(
     () => [...(extensionCredits.get(renderer)?.values() ?? [])].flat(),
   );
 }
+
+/** The provider warnings each engine instance (by its renderer) has logged (F267, KB-PT-07). */
+const warnedBy = new WeakMap<RendererBackend, Set<string>>();
+
+/** Logs the warning of `source`'s profile, once per engine instance however many of its sources draw (F267). */
+export function warnOfProfile(
+  renderer: RendererBackend,
+  source: CreditedSource,
+  observability: Observability | undefined,
+): void {
+  const warning = source.profile?.warning;
+  if (warning === undefined) return;
+  const warned = warnedBy.get(renderer) ?? new Set<string>();
+  warnedBy.set(renderer, warned);
+  if (warned.has(warning)) return;
+  warned.add(warning);
+  observability?.logger.log('warn', warning);
+}

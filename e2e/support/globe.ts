@@ -49,6 +49,7 @@ declare global {
       checkFrame(darkBelow?: number): Promise<ScenarioReport>;
       showHud(on: boolean): void;
       loggedLevels(): string[];
+      loggedEntries(): { level: string; message: string; timeMs: number }[];
       clearLog(): void;
       geodesicDistanceMeters(
         from: { longitudeDeg: number; latitudeDeg: number },

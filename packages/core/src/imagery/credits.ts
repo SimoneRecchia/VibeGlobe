@@ -16,6 +16,8 @@ export interface CreditProfile {
   readonly id?: string;
   /** The terms allow drawing only: pixel readback, tile data and elevation sampling are refused (F323, ADR 0031). */
   readonly displayOnly?: boolean;
+  /** A warning about the provider's terms, logged once per engine instance however many of its sources draw (F267). */
+  readonly warning?: string;
 }
 
 /** The credit metadata a tiled source may carry (`DescribedImagerySource` in `@vibeglobe/sources`). */

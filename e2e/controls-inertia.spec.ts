@@ -1,6 +1,7 @@
 // Inertia of a released drag (F179), moved out of controls-mouse.spec.ts: it measures the camera's speed frame by
 // frame, so it runs in the measurements project with the machine to itself (KB-150).
 import { expect, test } from '@playwright/test';
+import { DEFAULT_CONTROLS_OPTIONS } from '@vibeglobe/controls';
 import { camera, frames, openControls, record, settle } from './support/controls.ts';
 
 test('a released drag coasts with time-based inertia, and a release after holding still does not (F179)', async ({
@@ -47,7 +48,11 @@ test('a released drag coasts with time-based inertia, and a release after holdin
   for (let i = first + 1; i < lon.length; i++) {
     expect(Math.abs(rate(i)), trace).toBeLessThanOrEqual(Math.abs(rate(i - 1)) + 1e-9);
   }
-  expect((all.at(-1)?.timeMs ?? 0) - (all[releasedAt]?.timeMs ?? 0)).toBeLessThan(2500);
+  // Inertia rests once under 0.1 px of motion remains (ADR 0009 §6): v0·τ·e^(−t/τ) < 0.1 px. The drag moves at most
+  // 8 px per 16 ms (0.5 px/ms), so the glide ends within τ·ln(0.5 τ / 0.1) of the release, plus two engine steps.
+  const tauMs = DEFAULT_CONTROLS_OPTIONS.inertia.panTauMs;
+  const restMs = tauMs * Math.log((0.5 * tauMs) / 0.1) + 200;
+  expect((all.at(-1)?.timeMs ?? 0) - (all[releasedAt]?.timeMs ?? 0)).toBeLessThan(restMs);
   // Along the drag's direction: an east-west drag on the equator keeps the latitude.
   expect(Math.abs((all.at(-1)?.camera.latitudeDeg ?? 0) - (all[releasedAt]?.camera.latitudeDeg ?? 0))).toBeLessThan(
     0.5,

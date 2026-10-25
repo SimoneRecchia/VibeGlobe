@@ -1,0 +1,18 @@
+
+> vibeglobe@0.0.0 bench:offscreen
+> node benchmarks/offscreen.ts --browser chromium --hardware
+
+{"backend":"webgpu","mode":"main","load":false,"frames":600,"frameIntervalP50Ms":16.6,"frameIntervalP95Ms":18.1,"inputs":603,"inputLatencyP50Ms":14.3,"inputLatencyP95Ms":16}
+{"backend":"webgpu","mode":"main","load":true,"frames":501,"frameIntervalP50Ms":16.7,"frameIntervalP95Ms":43.2,"inputs":504,"inputLatencyP50Ms":16.1,"inputLatencyP95Ms":42.5}
+{"backend":"webgpu","mode":"main","load":false,"screenshots":15,"misalignmentP50Px":0.5,"misalignmentMaxPx":0.63}
+{"backend":"webgpu","mode":"worker","load":false,"frames":600,"frameIntervalP50Ms":16.6,"frameIntervalP95Ms":18.2,"inputs":604,"inputLatencyP50Ms":31.9,"inputLatencyP95Ms":33.5}
+{"backend":"webgpu","mode":"worker","load":true,"frames":500,"frameIntervalP50Ms":16.7,"frameIntervalP95Ms":33.4,"inputs":504,"inputLatencyP50Ms":32.7,"inputLatencyP95Ms":49.3}
+{"backend":"webgpu","mode":"worker","load":false,"screenshots":15,"misalignmentP50Px":0.45,"misalignmentMaxPx":1.82}
+{"backend":"webgl2","mode":"main","load":false,"frames":600,"frameIntervalP50Ms":16.6,"frameIntervalP95Ms":18,"inputs":603,"inputLatencyP50Ms":14.4,"inputLatencyP95Ms":16.2}
+{"backend":"webgl2","mode":"main","load":true,"frames":500,"frameIntervalP50Ms":16.7,"frameIntervalP95Ms":42.2,"inputs":503,"inputLatencyP50Ms":16,"inputLatencyP95Ms":41.3}
+{"backend":"webgl2","mode":"main","load":false,"screenshots":15,"misalignmentP50Px":0.5,"misalignmentMaxPx":0.73}
+{"backend":"webgl2","mode":"worker","load":false,"frames":599,"frameIntervalP50Ms":16.6,"frameIntervalP95Ms":18.1,"inputs":603,"inputLatencyP50Ms":31.9,"inputLatencyP95Ms":33.4}
+{"backend":"webgl2","mode":"worker","load":true,"frames":501,"frameIntervalP50Ms":16.7,"frameIntervalP95Ms":33.4,"inputs":505,"inputLatencyP50Ms":32.8,"inputLatencyP95Ms":49.4}
+{"backend":"webgl2","mode":"worker","load":false,"screenshots":15,"misalignmentP50Px":0.45,"misalignmentMaxPx":1.72}
+Results: /Users/s1imone/WebstormProjects/VibeGlobe/benchmarks/results/macbook-apple-m5-macos-26-6-2/offscreen-2026-10-24T23-21-27-415Z.json
+

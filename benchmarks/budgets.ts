@@ -30,6 +30,8 @@ export interface Distribution {
 }
 
 export interface RunResult {
+  /** The median of the engine's phase times per frame (`Globe.diagnostics.phaseTimesMs`), where the run records them. */
+  readonly phaseMedianMs?: Readonly<Record<string, number>>;
   frames: number;
   /** `over16_7`: frames that missed at least one 60 Hz refresh; `over33_3`: at least two (ADR 0014). */
   frameTimeMs: Distribution & { over16_7: number; over33_3: number };

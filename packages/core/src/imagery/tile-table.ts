@@ -39,8 +39,8 @@ export interface TileRecord {
   readonly pinned: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
-  /** The tile already had its one more round of retries after an outage (KB-162). */
-  revived: boolean;
+  /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
+  rounds: number;
   /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
   freshUntilMs: number;
 }
@@ -105,7 +105,7 @@ export class TileTable {
       task: -1,
       pinned: level <= this.pinnedLevel,
       availabilityUnknown: false,
-      revived: false,
+      rounds: 0,
       freshUntilMs: Infinity,
     };
     this.bySlot.push(record);

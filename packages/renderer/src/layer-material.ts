@@ -177,7 +177,7 @@ function layerColor(
 }
 
 /** The field value at a label's outline (`sdfFromCoverage`). */
-const OUTLINE = 0.75;
+const OUTLINE = 0.72;
 
 /**
  * A label's text from its distance field (F358, ADR 0045): the fill where the field passes the outline and the halo

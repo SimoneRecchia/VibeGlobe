@@ -359,30 +359,38 @@ test.describe('the measured link (F300–F303)', () => {
   test('concurrency follows the link within the hosts limits, and completes a view as fast as the best fixed one (F303)', async ({
     page,
   }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(900_000);
+    const ROUNDS = 3;
+    const SETTINGS = ['adaptive', '2', '6'];
     const links: { name: string; rules: unknown[] }[] = [
       { name: '400 kbps', rules: [{ linkBytesPerS: SLOW }] },
       { name: '50 Mbps', rules: [{ linkBytesPerS: FAST }] },
       { name: '500 ms', rules: [{ latencyMs: 500, linkBytesPerS: FAST }] },
     ];
     for (const link of links) {
-      const times: Record<string, number> = {};
+      const samples: Record<string, number[]> = { adaptive: [], '2': [], '6': [] };
       let mostAdaptive = 0;
-      for (const perHost of ['adaptive', '2', '6']) {
-        const session = await fixtureSession(page, link.rules);
-        const fixed = perHost === 'adaptive' ? '' : `&perHost=${perHost}&adaptive=0`;
-        await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=6${fixed}`);
-        await waitForStreaming(page);
-        times[perHost] = await timeToCompleteView(page);
-        await waitForStreaming(page);
-        if (perHost !== 'adaptive') continue;
-        const log = (await requestLog(page, session)).filter((r) => r.endMs !== undefined);
-        // Most requests in flight at once, after the link was measured (the first six responses).
-        const measured = log.slice(6);
-        mostAdaptive = Math.max(
-          ...measured.map((r) => measured.filter((o) => o.startMs <= r.startMs && (o.endMs ?? 0) > r.startMs).length),
-        );
-      }
+      // Three rounds, each setting timed by its best run: a view completes in a few hundred milliseconds on a fast
+      // link, where single runs on CI's runner vary by more than the 10% compared, and the first view of a round is the
+      // slowest (measured 2026-10-24), so the order rotates and each setting runs once in each place.
+      for (let round = 0; round < ROUNDS; round++)
+        for (const perHost of SETTINGS.map((_, i) => SETTINGS[(i + round) % SETTINGS.length] ?? 'adaptive')) {
+          const session = await fixtureSession(page, link.rules);
+          const fixed = perHost === 'adaptive' ? '' : `&perHost=${perHost}&adaptive=0`;
+          await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=6${fixed}`);
+          await waitForStreaming(page);
+          samples[perHost]?.push(await timeToCompleteView(page));
+          await waitForStreaming(page);
+          if (perHost !== 'adaptive') continue;
+          const log = (await requestLog(page, session)).filter((r) => r.endMs !== undefined);
+          // Most requests in flight at once, after the link was measured (the first six responses).
+          const measured = log.slice(6);
+          mostAdaptive = Math.max(
+            mostAdaptive,
+            ...measured.map((r) => measured.filter((o) => o.startMs <= r.startMs && (o.endMs ?? 0) > r.startMs).length),
+          );
+        }
+      const times = Object.fromEntries(Object.entries(samples).map(([key, values]) => [key, Math.min(...values)]));
       console.log(`[adaptive] F303 ${link.name}: most in flight ${mostAdaptive}, times ${JSON.stringify(times)}`);
       expect(mostAdaptive).toBeLessThanOrEqual(6);
       if (link.name === '400 kbps') expect(mostAdaptive).toBeLessThanOrEqual(2);

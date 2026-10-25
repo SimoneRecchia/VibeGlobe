@@ -17,11 +17,12 @@ import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
-import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
+import { startDragLoop, startFrameLoop, startMeasuredLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
+import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
 import { exposeTestHooks } from './test-hooks.js';
 import { cacheLine, surfaceLine } from './overlay-lines.js';
 
@@ -122,7 +123,7 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     tilt: '70',
   },
 };
-for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
+for (const [name, value] of Object.entries({ ...TERRAIN_SCENARIOS, ...REAL_DATA }[params.get('scenario') ?? ''] ?? {}))
   if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
@@ -272,10 +273,12 @@ const quantizedMesh =
 function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
   const imagery = fixtureImagery();
   const terrain = fixtureTerrain();
-  return { ...terrain, ...imagery, ...customAdapters(params) };
+  // 3D Tiles decode their glTF content with the engine's workers (`parse-model`): a globe without tiled sources needs
+  // them too, or a production build has nothing to decode with (F463).
+  const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
+  return { ...tiles3dWorkers, ...terrain, ...imagery, ...customAdapters(params), ...montBlancLayers };
 }
 
-/** Creates one engine instance in a container with its own canvas. */
 /** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
 function startGlobe(
   container: HTMLElement,
@@ -314,6 +317,8 @@ function startGlobe(
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
+    // `?logLevel=debug` logs every tile request the engine starts (F574's request record).
+    ...(params.get('logLevel') === 'debug' ? { logLevel: 'debug' as const } : {}),
     // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
     ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
     // `?curves=` sets the Auto mode's zoom curves as JSON (F150).
@@ -466,8 +471,9 @@ if (params.get('experiment') === 'gpu-probes') {
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.
-  if (scenario?.startsWith('3dtiles-'))
-    void globe.ready.then(async () => (await import('./tiles3d-tour.js')).showTiles3D(globe, app, params));
+  const tiles3dShown = scenario?.startsWith('3dtiles-')
+    ? globe.ready.then(async () => (await import('./tiles3d-tour.js')).showTiles3D(globe, app, params))
+    : undefined;
   if (scenario?.startsWith('data-') || scenario?.startsWith('draped-') || scenario === 'live-feed')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
   // Quality presets, adaptive quality, an artificial GPU load and the atmosphere (M11), loaded only when asked for.
@@ -489,6 +495,9 @@ if (params.get('experiment') === 'gpu-probes') {
   if (params.has('debug')) loop = await startDebugOverlay(globe, app);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
   else if (scenario === 'drag') loop = startDragLoop(globe);
+  // `?scenario=3dtiles-city&tour=1`: the tour of the `3dtiles-city` benchmark, its frames measured like a drag.
+  else if (tiles3dShown && params.get('tour') === '1')
+    loop = startMeasuredLoop(globe, (await import('./tiles3d-tour.js')).cityTour(globe, tiles3dShown));
   // `?hud=1` shows the performance HUD (F119).
   const { createHud } = await import('./hud.js');
   const hud = createHud(globe, app);

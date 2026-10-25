@@ -190,6 +190,19 @@ function setUp(
 const url = (level: number, x: number, y: number): string => `https://tiles.test/${level}/${x}/${y}.png`;
 
 describe('ImageryLoader', () => {
+  /** Fails a tile's whole round of attempts (the first request and four retries), ending right after the last. */
+  const failRound = (
+    { transport, timers, runFrame }: ReturnType<typeof setUp>,
+    tile: [number, number, number],
+    result: TransportResult = { kind: 'network-error' },
+  ): void => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) timers.advance(40_000);
+      runFrame([tile]);
+      transport.answer(url(...tile), result);
+    }
+  };
+
   it('requests wanted tiles in priority order and draws them once decoded and uploaded (F088)', () => {
     const { transport, loader, uploaded, ok } = setUp(2);
     loader.beginFrame();
@@ -400,7 +413,7 @@ describe('ImageryLoader', () => {
     for (const handle of [100, 101, 102, 103, 104]) expect(residency.isPinned(handle)).toBe(true);
   });
 
-  it('reports a corrupt tile once and never requests it again; its ancestor stays drawn (F112)', () => {
+  it('reports a corrupt tile once and requests it again only as the source health check; its ancestor stays drawn (F112, ADR 0046)', () => {
     const { transport, errors, timers, runFrame } = setUp();
     runFrame([
       [4, 1, 1],
@@ -416,7 +429,8 @@ describe('ImageryLoader', () => {
       ]);
     }
     expect(errors).toEqual(['corrupt 4/1/1']);
-    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(1);
+    // Once: the health check 10 s after it, whose answer has not come.
+    expect(transport.started.filter((u) => u === url(4, 1, 1))).toHaveLength(2);
   });
 
   it('transcodes KTX2 sources for the device formats and reports data it cannot use once (F104)', () => {
@@ -442,13 +456,12 @@ describe('ImageryLoader', () => {
   });
 
   it('gives up after the last retry and reports the tile as failed (F091)', () => {
-    const { transport, errors, timers, runFrame } = setUp();
-    for (let attempt = 0; attempt < 8; attempt++) {
-      runFrame([[4, 2, 2]]);
-      transport.answer(url(4, 2, 2), { kind: 'status', status: 500, retryAfterMs: undefined });
-      timers.advance(40_000);
-    }
-    // The first request and four retries.
+    const context = setUp();
+    const { transport, errors, timers, runFrame } = context;
+    failRound(context, [4, 2, 2], { kind: 'status', status: 500, retryAfterMs: undefined });
+    // The first request and four retries, then nothing until the source's health check (ADR 0046).
+    timers.advance(9_999);
+    runFrame([[4, 2, 2]]);
     expect(transport.started).toHaveLength(5);
     expect(errors).toEqual(['failed 4/2/2']);
   });
@@ -466,23 +479,21 @@ describe('ImageryLoader', () => {
     runFrame([[4, 2, 2]]);
     expect(uploaded).toHaveLength(1);
     loader.evicted((uploaded[0] ?? 0) - 100);
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       runFrame([[4, 2, 2]]);
       transport.answer(url(4, 2, 2), fail);
-      timers.advance(40_000);
+      timers.advance(attempt < 4 ? 40_000 : 9_999);
     }
+    runFrame([[4, 2, 2]]);
     // Five requests before the success, then the first request and four retries again.
     expect(transport.started).toHaveLength(10);
     expect(errors).toEqual(['failed 4/2/2']);
   });
 
   it('requests a tile whose retries ran out during an outage again once the source answers another tile (KB-162)', () => {
-    const { transport, errors, timers, runFrame, loader, ok } = setUp();
-    for (let attempt = 0; attempt < 8; attempt++) {
-      runFrame([[4, 2, 2]]);
-      transport.answer(url(4, 2, 2), { kind: 'network-error' });
-      timers.advance(40_000);
-    }
+    const context = setUp();
+    const { transport, errors, runFrame, loader, ok } = context;
+    failRound(context, [4, 2, 2]);
     expect(loader.failed(4, 2, 2)).toBe(true);
     // The source is back: another tile loads, and the dead one is requested again.
     runFrame([[4, 2, 3]]);
@@ -493,33 +504,43 @@ describe('ImageryLoader', () => {
     expect(errors).toEqual(['failed 4/2/2']);
   });
 
-  it('requests a tile whose retries ran out during an outage again after five minutes in a still view (KB-162)', () => {
-    const { transport, timers, runFrame } = setUp();
-    for (let attempt = 0; attempt < 8; attempt++) {
-      runFrame([[4, 2, 2]]);
-      transport.answer(url(4, 2, 2), { kind: 'network-error' });
-      timers.advance(40_000);
-    }
+  it('checks the source with one request of a dead tile in a still view, the waits doubling, and loads it once the source answers (KB-162, ADR 0046)', () => {
+    const context = setUp();
+    const { transport, errors, timers, runFrame, uploaded, ok } = context;
+    failRound(context, [4, 2, 2]);
     expect(transport.started).toHaveLength(5);
-    timers.advance(300_000);
+    // The health checks: one request each, no retry, a failure not reported again.
+    for (const waitMs of [10_000, 20_000, 40_000]) {
+      timers.advance(waitMs - 1);
+      runFrame([[4, 2, 2]]);
+      const before = transport.started.length;
+      timers.advance(1);
+      runFrame([[4, 2, 2]]);
+      expect(transport.started).toHaveLength(before + 1);
+      transport.answer(url(4, 2, 2), { kind: 'network-error' });
+    }
+    expect(transport.started).toHaveLength(8);
+    expect(errors).toEqual(['failed 4/2/2']);
+    timers.advance(80_000);
     runFrame([[4, 2, 2]]);
-    expect(transport.started).toHaveLength(6);
+    transport.answer(url(4, 2, 2), ok);
+    runFrame([[4, 2, 2]]);
+    expect(uploaded).toHaveLength(1);
   });
 
-  it('gives a tile that keeps failing one more round after an outage at most, never endless retries (KB-162, F091)', () => {
-    const { transport, timers, runFrame, ok } = setUp();
-    for (let round = 0; round < 4; round++) {
-      for (let attempt = 0; attempt < 8; attempt++) {
-        runFrame([[4, 2, 2]]);
-        transport.answer(url(4, 2, 2), { kind: 'status', status: 503, retryAfterMs: undefined });
-        timers.advance(40_000);
-      }
+  it('gives a tile that keeps failing three more rounds when the source answers, at most, never endless retries (ADR 0046, F091)', () => {
+    const context = setUp();
+    const { transport, timers, runFrame, ok } = context;
+    for (let round = 0; round < 5; round++) {
+      failRound(context, [4, 2, 2], { kind: 'status', status: 503, retryAfterMs: undefined });
       // Its neighbors load, and the view stays.
       runFrame([[4, 2, 3 + round]]);
       transport.answer(url(4, 2, 3 + round), ok);
-      timers.advance(300_000);
     }
-    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(10);
+    // Its first round and three more; then no health check either.
+    timers.advance(600_000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(20);
   });
 
   it('never revives a tile that failed for good on a permanent error after a transient one (KB-162)', () => {
@@ -536,16 +557,21 @@ describe('ImageryLoader', () => {
     expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(2);
   });
 
-  it('never requests a corrupt tile again, even once the source answers others (F112, KB-162)', () => {
-    const { transport, timers, runFrame, loader, ok } = setUp();
+  it('requests a corrupt tile again once the source answers others, three times at most (F112, ADR 0046)', () => {
+    const { transport, runFrame, loader, ok } = setUp();
+    const corrupt = { kind: 'ok', bytes: new ArrayBuffer(1), contentType: 'image/png' } as const;
     runFrame([[4, 2, 2]]);
-    transport.answer(url(4, 2, 2), { kind: 'ok', bytes: new ArrayBuffer(1), contentType: 'image/png' });
+    transport.answer(url(4, 2, 2), corrupt);
     expect(loader.failed(4, 2, 2)).toBe(true);
-    runFrame([[4, 2, 3]]);
-    transport.answer(url(4, 2, 3), ok);
-    timers.advance(5000);
-    runFrame([[4, 2, 2]]);
-    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(1);
+    for (let round = 0; round < 4; round++) {
+      // Another tile loads: the corrupt one gets a round, and its bytes are corrupt again.
+      runFrame([[4, 3, 3 + round]]);
+      transport.answer(url(4, 3, 3 + round), ok);
+      runFrame([[4, 2, 2]]);
+      transport.answer(url(4, 2, 2), corrupt);
+    }
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(4);
+    expect(loader.failed(4, 2, 2)).toBe(true);
   });
 
   it('forgets only the tiles found missing on a reload of the missing ones, keeping every tile drawn (KB-158)', () => {
@@ -723,6 +749,18 @@ describe('ImageryLoader', () => {
         );
       } else expect(transport.started).toEqual([url(5, 10, 10)]);
     }
+  });
+
+  it('prefetches no ring around a visible tile in full fog (F574, KB-174)', () => {
+    const { transport, loader, residency } = setUp(32, {
+      prefetchRing: true,
+      source: { loadingFlags: () => LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH, maxRequestsPerHost: 16 },
+    });
+    residency.startFrame(1);
+    loader.beginFrame();
+    loader.want(5, 10, 10, 1024 + 5, false);
+    loader.endFrame();
+    expect(transport.started).toEqual([url(5, 10, 10)]);
   });
 
   it('during a flight requests a visible tile only once it stays wanted, never one the view shows for a moment (F287)', () => {

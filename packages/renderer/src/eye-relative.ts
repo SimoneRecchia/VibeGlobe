@@ -9,12 +9,20 @@ import {
   modelWorldMatrix,
   positionGeometry,
   transpose,
+  uniform,
   varying,
   vec3,
   vec4,
 } from 'three/tsl';
 import { GreaterEqualDepth, type Node, type NodeMaterial, type Object3D } from 'three/webgpu';
 import { splitEyeOffset } from './eye-offset.js';
+
+/**
+ * 1, as a uniform: the first sum of each split offset is multiplied by it before the second is added. Its value is
+ * unknown when the shader compiles, so a compiler that reassociates float additions (Apple's Metal compiler does,
+ * KB-175) cannot regroup (a + T_hi) + T_lo into a + (T_hi + T_lo), which rounds T_lo away (ADR 0004 §3).
+ */
+const ORDER = uniform(1);
 
 const high = new Float32Array(3);
 const low = new Float32Array(3);
@@ -115,7 +123,7 @@ export function morphedEyeRelative(
   const planeHigh = vec3(column0.y, column0.z, column1.x);
   const planeLow = vec3(column1.z, column2.x, column2.y);
   const globe = eyeRelativePosition(globeOffset);
-  const plane = planeOffset.add(planeHigh).add(planeLow);
+  const plane = planeOffset.add(planeHigh).mul(ORDER).add(planeLow);
   return globe.mul(float(1).sub(morph)).add(plane.mul(morph));
 }
 
@@ -142,12 +150,15 @@ export function makeEyeRelative(
   }
 }
 
-/** A vertex offset from the mesh's origin, relative to the eye: (offset + T_hi) + T_lo, each sum in float32. */
+/**
+ * A vertex offset from the mesh's origin, relative to the eye: (offset + T_hi) + T_lo, each sum in float32, the first
+ * held apart from the second by {@link ORDER}.
+ */
 export function eyeRelativePosition(offset: Node<'vec3'>): Node<'vec3'> {
   // The translation column, and the bottom row (the translation column of the transpose).
   const eyeHigh = modelWorldMatrix.mul(vec4(0, 0, 0, 1)).xyz;
   const eyeLow = transpose(modelWorldMatrix).mul(vec4(0, 0, 0, 1)).xyz;
-  return offset.add(eyeHigh).add(eyeLow);
+  return offset.add(eyeHigh).mul(ORDER).add(eyeLow);
 }
 
 /** The view-space position of a vertex offset from the mesh's origin: the rotation-only view of the eye-relative one. */

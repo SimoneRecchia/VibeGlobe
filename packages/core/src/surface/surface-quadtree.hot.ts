@@ -22,6 +22,9 @@ export const SOUTH_CAP = 2;
 /** Grid segments per tile edge, as M2's surface (ADR 0013): the mesh and its geometric error agree on it. */
 export const QUADTREE_SEGMENTS = 16;
 
+/** Visibility below which fog hides a surface entirely: under one 8-bit step of its color (F574). */
+export const FULL_FOG_VISIBILITY = 1 / 255;
+
 /**
  * A surface tile of the three-root quadtree. Mercator tiles are XYZ tiles (rows from the north); cap tiles are
  * geographic, rows from the cap's northern edge, and may cover `span` columns of their level near the pole.
@@ -37,6 +40,8 @@ export interface QuadtreeTile {
   southRad: number;
   eastRad: number;
   northRad: number;
+  /** The fog's visibility at the tile's closest point as the selection measured it (1 without fog, F574). */
+  fogVisibility?: number;
 }
 
 /** Selection settings. */
@@ -327,6 +332,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
     southRad: 0,
     eastRad: 0,
     northRad: 0,
+    fogVisibility: 1,
   });
   quadtreeTileBounds(root, level, x, y, span, tile);
   measureTile(tile, camera.eyeEcef);
@@ -349,18 +355,23 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   }
   // Errors divided by the distance, the distance divided by the fog's visibility: hazed tiles count as farther (F395).
   let errorDistance = distance;
+  // A tile whose closest point is in full fog is never refined: nothing of its detail would show (F574).
+  let fogged = false;
+  let visibility = 1;
   if (options.fogHaze !== undefined) {
     fog[0] = closest;
     fog[1] = options.fogHaze;
     fogVisibilityInto(camera.eyeEcef, offset, fog);
-    const visibility = fog[2] ?? 1;
+    visibility = fog[2] ?? 1;
     errorDistance = distance / (visibility > 1e-3 ? visibility : 1e-3);
+    fogged = visibility < FULL_FOG_VISIBILITY;
   }
   const screenError = ((measure[SAG] ?? 0) / errorDistance) * state.pixelsPerRadian;
   const maxLevel = options.maxLevel < MAX_TILE_LEVEL ? options.maxLevel : MAX_TILE_LEVEL;
   const refine =
     level < (options.minLevel ?? MIN_LEVEL) ||
     (level < maxLevel &&
+      !fogged &&
       (screenError > options.maxScreenErrorPx ||
         radius > RADIUS_TO_DISTANCE * distance ||
         (level < (options.imageryMaxLevel ?? 0) &&
@@ -371,6 +382,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
             state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
+    tile.fogVisibility = visibility;
     state.count++;
     return;
   }

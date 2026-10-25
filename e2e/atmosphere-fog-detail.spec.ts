@@ -1,16 +1,33 @@
-// Fog-aware detail (F395): the same tilted flight with the fog drawn, once loading coarser tiles where the fog hides the
-// ground and once at full detail (`QualitySettings.fogAwareDetail`). The fog-aware run requests at least 25% fewer
-// tiles, the fogged band near the horizon looks the same, and neither run has a black or empty pixel.
+// Fog-aware detail (F574, which replaced F395 by the owner's decision of 2026-10-24, ADR 0046): the same tilted flight
+// with the fog drawn, once loading coarser tiles where the fog hides the ground and once at full detail
+// (`QualitySettings.fogAwareDetail`). Every tile request of the fog-aware run is recorded with the eye of its frame: none
+// is a tile whose parent lies entirely inside full fog (the selection never refines such a tile). The fog-aware run
+// requests fewer tiles, the fogged band near the horizon looks the same, and neither run has a black or empty pixel.
 import { expect, test, type Page } from '@playwright/test';
+import { surfaceVisibility } from '@vibeglobe/core';
 import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
 /** A hazy day: four times a clear day's aerosols. */
 const HAZE = 4;
+/** `FULL_FOG_VISIBILITY` of `packages/core/src/surface/surface-quadtree.hot.ts`: under one 8-bit step of color. */
+const FULL_FOG = 1 / 255;
+const A = 6378137;
+const E2 = 6.69437999014e-3;
+const POLAR_SCALE = 6378.137 / 6356.752314245;
+const DEG = Math.PI / 180;
+
+interface Eye {
+  lon: number;
+  lat: number;
+  altitudeMeters: number;
+}
 
 interface Run {
   requested: number;
+  /** Each request's tile and the eye of the frame that started it. */
+  requests: { level: number; x: number; y: number; eye: Eye }[];
   gpuBytes: number;
   holes: number;
   dark: number;
@@ -18,10 +35,73 @@ interface Run {
   pixels: number[];
 }
 
+function ecef(lonRad: number, latRad: number, heightMeters: number): [number, number, number] {
+  const n = A / Math.sqrt(1 - E2 * Math.sin(latRad) ** 2);
+  return [
+    (n + heightMeters) * Math.cos(latRad) * Math.cos(lonRad),
+    (n + heightMeters) * Math.cos(latRad) * Math.sin(lonRad),
+    (n * (1 - E2) + heightMeters) * Math.sin(latRad),
+  ];
+}
+
+/** The fraction of light from a ground point that reaches the eye, as the engine's selection computes it. */
+function visibility(eye: [number, number, number], point: [number, number, number]): number {
+  const [ex, ey, ez] = [eye[0], eye[1], eye[2] * POLAR_SCALE];
+  const [dx, dy, dz] = [point[0] - eye[0], point[1] - eye[1], (point[2] - eye[2]) * POLAR_SCALE];
+  const eyeDistance = Math.hypot(ex, ey, ez);
+  const length = Math.hypot(dx, dy, dz);
+  if (length === 0) return 1;
+  return surfaceVisibility(
+    {
+      eyeAltitudeKm: eyeDistance / 1000 - 6378.137,
+      radiusKm: 6378.137,
+      viewMu: (dx * ex + dy * ey + dz * ez) / (length * eyeDistance),
+      maxDistanceKm: Math.hypot(point[0] - eye[0], point[1] - eye[1], point[2] - eye[2]) / 1000,
+    },
+    HAZE,
+  );
+}
+
+/** The bounds of a Web Mercator tile, radians. */
+function bounds(level: number, x: number, y: number) {
+  const n = 2 ** level;
+  const lat = (row: number) => Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / n)));
+  return {
+    west: (x / n) * 2 * Math.PI - Math.PI,
+    east: ((x + 1) / n) * 2 * Math.PI - Math.PI,
+    north: lat(y),
+    south: lat(y + 1),
+  };
+}
+
+/**
+ * Whether a tile lies entirely inside full fog seen from `eye`, judged only for tiles smaller than their distance from
+ * the eye (the selection measures from a bounding volume, which a continent-sized tile spans near and far): the most
+ * light from a 5 × 5 grid and from its point nearest the eye stays under a quarter of full fog's threshold.
+ */
+function entirelyFogged(level: number, x: number, y: number, eye: Eye): boolean {
+  const b = bounds(level, x, y);
+  const eyeEcef = ecef(eye.lon * DEG, eye.lat * DEG, eye.altitudeMeters);
+  const clamp = (v: number, low: number, high: number) => Math.min(high, Math.max(low, v));
+  const nearest = ecef(clamp(eye.lon * DEG, b.west, b.east), clamp(eye.lat * DEG, b.south, b.north), 0);
+  const sw = ecef(b.west, b.south, 0);
+  const ne = ecef(b.east, b.north, 0);
+  const distance = Math.hypot(nearest[0] - eyeEcef[0], nearest[1] - eyeEcef[1], nearest[2] - eyeEcef[2]);
+  if (distance <= Math.hypot(sw[0] - ne[0], sw[1] - ne[1], sw[2] - ne[2])) return false;
+  let most = visibility(eyeEcef, nearest);
+  for (let i = 0; i <= 4; i++)
+    for (let j = 0; j <= 4; j++)
+      most = Math.max(
+        most,
+        visibility(eyeEcef, ecef(b.west + ((b.east - b.west) * i) / 4, b.south + ((b.north - b.south) * j) / 4, 0)),
+      );
+  return most < FULL_FOG / 4;
+}
+
 async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: number): Promise<Run> {
   await openGlobe(
     page,
-    `backend=${backend}&imagery=world&atmosphere=medium&clockStepMs=16.666666666666668` +
+    `backend=${backend}&imagery=world&atmosphere=medium&clockStepMs=16.666666666666668&logSink=1&logLevel=debug` +
       '&lon=8&lat=45&zoom=12&tilt=85&heading=60',
   );
   await page.evaluate(
@@ -33,18 +113,49 @@ async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: n
     [fogAwareDetail, haze] as const,
   );
   await waitForIdle(page);
-  const before = await page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats()?.requested ?? 0);
+  const before = await page.evaluate(() => {
+    const hooks = window.vibeglobePlayground;
+    const globe = hooks?.globe;
+    hooks?.clearLog();
+    // The eye at the end of every frame, with the page clock the log entries carry.
+    const eyes: { timeMs: number; lon: number; lat: number; altitudeMeters: number }[] = [];
+    (window as unknown as { fogEyes: typeof eyes }).fogEyes = eyes;
+    globe?.on('frame', () => {
+      const camera = globe.camera;
+      eyes.push({
+        timeMs: performance.now(),
+        lon: camera.eyeLongitudeDeg,
+        lat: camera.eyeLatitudeDeg,
+        altitudeMeters: camera.altitudeMeters,
+      });
+    });
+    return globe?.imageryStats()?.requested ?? 0;
+  });
   const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('tilted-flight', 0));
   if (!report) throw new Error('no report');
   await waitForIdle(page);
-  const stats = await page.evaluate(() => window.vibeglobePlayground?.globe.imageryStats());
+  const { stats, entries, eyes } = await page.evaluate(() => ({
+    stats: window.vibeglobePlayground?.globe.imageryStats(),
+    entries: window.vibeglobePlayground?.loggedEntries() ?? [],
+    eyes: (window as unknown as { fogEyes: { timeMs: number; lon: number; lat: number; altitudeMeters: number }[] })
+      .fogEyes,
+  }));
   if (!stats) throw new Error('no stats');
+  // A request logged while a frame is drawn belongs to the first eye recorded after it.
+  const requests: Run['requests'] = [];
+  for (const entry of entries) {
+    const match = / request (\d+)\/(\d+)\/(\d+)$/.exec(entry.message);
+    // One started after the last frame (a slot freed while the engine idles) belongs to the last frame's view.
+    const eye = eyes.find((e) => e.timeMs >= entry.timeMs) ?? eyes.at(-1);
+    if (match && eye) requests.push({ level: Number(match[1]), x: Number(match[2]), y: Number(match[3]), eye });
+  }
   const image = await canvasImage(page);
   const pixels: number[] = [];
   for (let i = 0; i < image.data.length; i += 4)
     pixels.push(image.data[i] ?? 0, image.data[i + 1] ?? 0, image.data[i + 2] ?? 0);
   return {
     requested: stats.requested - before,
+    requests,
     gpuBytes: stats.gpuBytes,
     holes: report.holes,
     dark: report.dark,
@@ -53,17 +164,21 @@ async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: n
 }
 
 for (const backend of ['webgpu', 'webgl2'] as const)
-  test(`fog-aware detail requests at least 25% fewer tiles in a tilted flight, with no visible difference in the fogged band, on ${backend} (F395)`, async ({
+  test(`fog-aware detail requests no fine tile inside full fog and fewer tiles in a tilted flight, with no visible difference in the fogged band, on ${backend} (F574)`, async ({
     page,
   }) => {
-    // Two full flights at four times the haze: about 80 s each here, over 90 s each in CI's software GPU, where 180 s
-    // timed out (a timeout is not the failure `test.fail` expects).
+    // Two full flights at four times the haze: about 80 s each here, over 90 s each in CI's software GPU.
     test.setTimeout(420_000);
-    // KB-163: 7–13% fewer requests so far, at the default haze and at four times it.
-    test.fail(true, 'KB-163');
+    // KB-174: one level-7 tile under a parent in full fog is still requested on WebGL2 now and then.
+    test.fail(backend === 'webgl2', 'KB-174');
     const aware = await fly(page, backend, true, HAZE);
     const full = await fly(page, backend, false, HAZE);
     const saved = 1 - aware.requested / full.requested;
+    // Requests of tiles whose parent lies entirely inside full fog: the selection would have refined a fogged tile.
+    const inFog = aware.requests.filter((r) => r.level > 0 && entirelyFogged(r.level - 1, r.x >> 1, r.y >> 1, r.eye));
+    const fullInFog = full.requests.filter(
+      (r) => r.level > 0 && entirelyFogged(r.level - 1, r.x >> 1, r.y >> 1, r.eye),
+    );
     // The fogged band: the rows between the horizon's sky and the near ground, the upper third of the frame.
     let difference = 0;
     let count = 0;
@@ -76,9 +191,14 @@ for (const backend of ['webgpu', 'webgl2'] as const)
         }
     console.log(
       `[fog-detail] ${backend}: ${aware.requested} vs ${full.requested} tiles requested (${(saved * 100).toFixed(1)}% fewer), ` +
+        `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (${inFog.map((r) => `${r.level}/${r.x}/${r.y}`).join(' ')}; full detail ${fullInFog.length}), ` +
         `GPU ${aware.gpuBytes} vs ${full.gpuBytes} bytes, fogged band mean difference ${(difference / count).toFixed(2)}`,
     );
-    expect(saved).toBeGreaterThanOrEqual(0.25);
+    // The record covers the run's requests, and the full-detail run shows the check finds fogged requests.
+    expect(aware.requests.length).toBeGreaterThan(aware.requested * 0.9);
+    expect(fullInFog.length).toBeGreaterThan(0);
+    expect(inFog.map((r) => `${r.level}/${r.x}/${r.y}`)).toEqual([]);
+    expect(saved).toBeGreaterThan(0);
     expect(difference / count).toBeLessThan(2);
     expect([aware.holes, aware.dark, full.holes, full.dark]).toEqual([0, 0, 0, 0]);
   });

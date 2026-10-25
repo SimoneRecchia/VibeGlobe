@@ -48,6 +48,22 @@ Against the criteria:
 | Added input latency ≤ 4 ms p95     | fails: +9.9 ms (p50 +9.8) | fails: +37.8 ms (p50 +9.5) |
 | Overlay misalignment 0 px          | fails: about 2 px, max 4  | fails: about 2 px, max 2.6 |
 
+### On the reference desktop (2026-10-24)
+
+The owner's MacBook Pro, Apple M5 (10-core CPU, 10-core GPU, Metal 4), 32 GB, macOS 26.6.2, with the same method (`npm run bench:offscreen -- --hardware`; results in `benchmarks/results/macbook-apple-m5-macos-26-6-2/offscreen-*.json`). The owner accepts Chrome as Edge's stand-in (the same engine) and Playwright's WebKit as Safari's. p95 in ms, offset in px:
+
+| Browser      | Backend | Frame interval under load, main → worker | Input latency p95, main → worker (no load) | Worker overlay offset p50 / max |
+| ------------ | ------- | ---------------------------------------- | ------------------------------------------ | ------------------------------- |
+| Chrome 155   | WebGPU  | 34.5 → 34.4                              | 16.4 → 32.8                                | 0.34 / 0.91                     |
+| Chrome 155   | WebGL2  | 40.8 → 33.4                              | 15.3 → 32.7                                | 1.73 / 2.29                     |
+| Chromium 156 | WebGPU  | 43.2 → 33.4                              | 16.0 → 33.5                                | 0.45 / 1.82                     |
+| Chromium 156 | WebGL2  | 42.2 → 33.4                              | 16.2 → 33.4                                | 0.45 / 1.72                     |
+| Firefox 157  | WebGL2  | 34 → 26                                  | 9 → 17                                     | 0.41 / 2.5                      |
+| WebKit 27.2  | WebGPU  | 42 → 29                                  | 16 → 14                                    | 0.35 / 0.71                     |
+| WebKit 27.2  | WebGL2  | 41 → 28                                  | 16 → 15                                    | 0.5 / 73.85                     |
+
+Without load every mode holds 60 fps (p95 16–18 ms; Firefox 8–10 ms at its higher rate). In the Chromium engines the worker adds about 17 ms of input latency (a second frame clock), and under load it improves the frame interval by 0–21%, below the 25% asked for; Firefox improves 24% and adds 8 ms; only WebKit improves by about 30% without added latency, and its WebGL2 overlay lagged by up to 74 px. The criteria hold in no Chromium browser, so the decision below stands on real hardware.
+
 ## Decision
 
 Worker rendering is **not adopted**. The engine renders on the main thread (ADR 0011, option 5a).
@@ -55,11 +71,7 @@ Worker rendering is **not adopted**. The engine renders on the main thread (ADR 
 - Two failures are structural, not artefacts of the software GPU, so they would hold on any hardware and in any browser:
   - **Latency:** forwarding input to a worker adds a message hop and a second frame clock.
   - **Overlay alignment:** a DOM overlay positioned from the worker's frames lags the canvas by up to a frame, because the worker's frames and the page's DOM updates reach the screen independently.
-- The criteria must hold in every browser, so measuring Edge, Firefox and Safari could not reverse the decision.
-- Those measurements still complete the record. The owner runs them on the reference devices with the procedure in `docs/guides/hardware-testing.md`:
-  - `npm run bench:offscreen -- --hardware` with `--channel chrome` or `--channel msedge`, `--browser firefox` and `--browser webkit`.
-  - Safari itself on macOS or iPadOS, following the guide.
-- This last step is an owner step (`docs/open-questions.md`, pending owner steps), so F065 is `pending` until then.
+- The criteria must hold in every browser. Measured on the reference desktop in Chrome (Edge's stand-in), Chromium, Firefox and WebKit (Safari's stand-in, owner 2026-10-24): the Chromium engines fail the latency and load criteria, which confirms the decision (Measurements, "On the reference desktop").
 - Kept:
   - The renderer's OffscreenCanvas path, which ADR 0011 requires anyway: the renderer touches no DOM in that path.
   - The playground mode and the benchmark, so the evaluation can be repeated.

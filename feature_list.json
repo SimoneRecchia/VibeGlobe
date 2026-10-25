@@ -926,7 +926,7 @@
         "Confirm it records frame-time and input-latency measurements for main-thread and worker rendering in the supported browsers",
         "Confirm it states the decision and, if adopted, which browsers use it and how the fallback works"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F066",
@@ -1051,7 +1051,7 @@
         "Follow it on a machine with a GPU and confirm the WebGPU visual tests and the benchmarks run",
         "Confirm results are saved in the documented location with the device, OS, browser and GPU recorded"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F076",
@@ -1574,7 +1574,7 @@
         "Run the start-up benchmark on the reference desktop and record time from engine creation to the first frame with complete imagery",
         "Confirm it is at most 1 s and record the result"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F116",
@@ -5239,7 +5239,7 @@
         "Verify the fog-enabled run requests at least 25% fewer tiles over the scenario (the measured reduction is recorded in the ADR) with no visible difference in the fogged region",
         "Verify no black or empty pixels appear near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F396",
@@ -5341,7 +5341,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F404",
@@ -5977,7 +5977,7 @@
         "Assert bridges draw above the roads they cross and tunnels draw below or dashed as styled",
         "Assert road-name labels appear along the roads at street zoom"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F454",
@@ -6223,7 +6223,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F473",
@@ -7262,6 +7262,102 @@
         "Record frames across the renewal and assert no holes or blank frames"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F574",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Fog-aware detail: a tile entirely inside full fog is never requested at a fine level, and the tilted fog scenario requests measurably fewer tiles than the same run at full detail.",
+      "steps": [
+        "Unit-test the level selection with fog: a tile whose nearest point lies beyond the full-fog distance is not refined below the fog's coarse level, while a tile partly inside the visible range is",
+        "Run the same tilted flight scenario with fog-aware detail on and off and record every tile request with its level and position",
+        "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
+        "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F600",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "An optional space background draws stars and the Milky Way behind the globe, off by default and switched on per instance through a render extension.",
+      "steps": [
+        "Start a globe with default options and confirm no space background draws and none of its assets are requested",
+        "Turn the space background on and off at runtime and confirm stars and the Milky Way appear and disappear in the next frame",
+        "Confirm it is a render extension that the renderer package ships and the core does not depend on"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F601",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background moves consistently with the globe, as in Google Earth: stars keep fixed directions in the sky's frame, so orbiting, tilting and zooming turn them together with the globe without drift or parallax.",
+      "steps": [
+        "Orbit, tilt and zoom with the space background on and track several stars' screen positions against their catalog directions in every frame",
+        "Assert each star stays within 0.5 px of its expected position for the camera of that frame",
+        "Assert the stars' motion has no lag or jump relative to the globe between frames"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F602",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Stars come from a permissively licensed catalog with sizes and brightness by magnitude, and do not shimmer, alias or pop while the camera moves.",
+      "steps": [
+        "Load the catalog and confirm its license is recorded in THIRD_PARTY_NOTICES.md",
+        "Record frames of a slow orbit and assert no star's brightness changes by more than the flicker threshold between frames",
+        "Compare a still view with its reviewed baseline on both backends"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F603",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The Milky Way is drawn from a permissively licensed panorama with no seam, pole pinch or banding.",
+      "steps": [
+        "Look toward the panorama's seam and both poles and confirm no visible seam or pinch",
+        "Assert no banding in the gradient regions (no step above the threshold between neighboring pixels)",
+        "Compare with reviewed baselines on both backends"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F604",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background stays behind the globe and its atmosphere: never drawn over the globe's disc or the day sky, and it fades out near the ground and on the flat map.",
+      "steps": [
+        "Assert no star pixel inside the globe's disc or where the atmosphere's sky is brighter than the stars",
+        "Zoom from space to street level and into the flat map and assert the background fades out smoothly, with no pop",
+        "Assert zero black or empty pixels in every recorded frame"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F605",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background renders the same on WebGPU and WebGL2, loads its assets lazily from the consumer's asset host, and costs at most 0.3 ms GPU per frame on the reference desktop.",
+      "steps": [
+        "Compare the same views on WebGPU and forced WebGL2 within the baseline tolerance",
+        "Confirm the catalog and panorama are requested only when the background is first switched on, from the configured asset base URL (ADR 0015)",
+        "Measure its GPU time on the reference desktop and assert at most 0.3 ms per frame"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F606",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The playground switches the space background on and the guides document it, with its options and asset hosting.",
+      "steps": [
+        "Open the playground with the space background switch and confirm it draws",
+        "Open the guide and confirm it documents enabling it, its options and where its assets are hosted"
+      ],
+      "status": "failing"
     }
   ]
 }

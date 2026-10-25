@@ -40,8 +40,8 @@ export interface QuadtreeTile {
   southRad: number;
   eastRad: number;
   northRad: number;
-  /** The selection found the tile's closest point in full fog (F574): nothing finer than it is wanted there. */
-  fogged?: boolean;
+  /** The fog's visibility at the tile's closest point as the selection measured it (1 without fog, F574). */
+  fogVisibility?: number;
 }
 
 /** Selection settings. */
@@ -332,7 +332,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
     southRad: 0,
     eastRad: 0,
     northRad: 0,
-    fogged: false,
+    fogVisibility: 1,
   });
   quadtreeTileBounds(root, level, x, y, span, tile);
   measureTile(tile, camera.eyeEcef);
@@ -357,11 +357,12 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
   let errorDistance = distance;
   // A tile whose closest point is in full fog is never refined: nothing of its detail would show (F574).
   let fogged = false;
+  let visibility = 1;
   if (options.fogHaze !== undefined) {
     fog[0] = closest;
     fog[1] = options.fogHaze;
     fogVisibilityInto(camera.eyeEcef, offset, fog);
-    const visibility = fog[2] ?? 1;
+    visibility = fog[2] ?? 1;
     errorDistance = distance / (visibility > 1e-3 ? visibility : 1e-3);
     fogged = visibility < FULL_FOG_VISIBILITY;
   }
@@ -381,7 +382,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
             state.pixelsPerRadian >
             (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
-    tile.fogged = fogged;
+    tile.fogVisibility = visibility;
     state.count++;
     return;
   }

@@ -97,7 +97,7 @@ describe('drawImagery', () => {
 
   it('prefetches no children under a center tile in full fog (F574, KB-174)', () => {
     const { layer, wanted } = fakeLayer({ 9: 42 });
-    draw(layer, { ...tile(9, 300, 170), fogged: true });
+    draw(layer, { ...tile(9, 300, 170), fogVisibility: 0.05 });
     expect(wanted).toEqual([9]);
   });
 

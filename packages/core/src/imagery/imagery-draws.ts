@@ -116,8 +116,8 @@ export function drawImagery(
     }
     writeOverlays(list, index, overlays);
   }
-  // Nothing finer shows under a center in full fog (F574, KB-174).
-  if (center && center.fogged !== true) prefetchStack(layers, center, centerDistance);
+  // Nothing finer shows under a center the fog nearly hides (F574, KB-174).
+  if (center && !hazed(center)) prefetchStack(layers, center, centerDistance);
 }
 
 /** Prefetches the children of the center tile from each visible layer, from the first source of its chain that has it. */
@@ -285,6 +285,14 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 }
 
 /**
+ * Below this fog visibility at a tile's closest point nothing is prefetched around or under it: its neighbors and
+ * children would show at most a tenth of their detail (F574, KB-174).
+ */
+const PREFETCH_MIN_VISIBILITY = 0.1;
+
+const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
+
+/**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
  * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
  * source of the chain) are neither requested nor looked up.
@@ -305,7 +313,7 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
     // requested; the others are only looked up.
     const handle =
       !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, tile.fogged !== true)
+        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, !hazed(tile))
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;

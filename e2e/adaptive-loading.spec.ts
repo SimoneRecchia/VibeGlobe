@@ -360,7 +360,7 @@ test.describe('the measured link (F300–F303)', () => {
     page,
   }) => {
     test.setTimeout(900_000);
-    const ROUNDS = 5;
+    const ROUNDS = 6;
     const SETTINGS = ['adaptive', '2', '6'];
     const links: { name: string; rules: unknown[] }[] = [
       { name: '400 kbps', rules: [{ linkBytesPerS: SLOW }] },
@@ -370,7 +370,7 @@ test.describe('the measured link (F300–F303)', () => {
     for (const link of links) {
       const samples: Record<string, number[]> = { adaptive: [], '2': [], '6': [] };
       let mostAdaptive = 0;
-      // Five rounds, each setting timed by its best run: a view completes in a few hundred milliseconds on a fast
+      // Six rounds, each setting timed by its best run: a view completes in a few hundred milliseconds on a fast
       // link, where single runs on CI's runner vary by more than the 10% compared, and the first view of a round is the
       // slowest (measured 2026-10-24), so the order rotates and each setting runs once in each place.
       for (let round = 0; round < ROUNDS; round++)

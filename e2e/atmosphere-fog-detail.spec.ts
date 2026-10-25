@@ -9,8 +9,8 @@ import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
-/** A hazy day: four times a clear day's aerosols. */
-const HAZE = 4;
+/** A hazy day: eight times a clear day's aerosols, so the full-fog distance falls well inside the flight's view. */
+const HAZE = 8;
 /** `FULL_FOG_VISIBILITY` of `packages/core/src/surface/surface-quadtree.hot.ts`: under one 8-bit step of color. */
 const FULL_FOG = 1 / 255;
 const A = 6378137;

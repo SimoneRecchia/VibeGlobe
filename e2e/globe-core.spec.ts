@@ -407,8 +407,11 @@ for (const backend of BACKENDS) {
         expect(Math.hypot(next.xPx - companionShown.xPx, next.yPx - companionShown.yPx)).toBeLessThan(3 * stepPx);
         companionShown = next;
       }
+      // Held still before the release, the drag ends without a glide (KB-177: a 150 ms hold zeroes the release
+      // velocity), which on CI's software GPU took most of the test's time; F060 is the tracking during the drag.
+      await page.waitForTimeout(200);
       await page.mouse.up();
-      // The release may coast (F179): the next drag's points are picked once the globe holds still.
+      // The next drag's points are picked once the globe holds still.
       await waitForIdle(page);
     }
     await expectCompleteGlobe(page);

@@ -164,6 +164,35 @@ describe('label placement and collision', () => {
     expect(placer.pending).toBe(true);
   });
 
+  it('keeps no per-label objects of its own from pass to pass: the boxes of the pass before last are reused (KB-171)', () => {
+    // Objects a sliced pass keeps across frames are copied by every young-generation collection, inside the slices.
+    const placer = new LabelPlacer(estimatedTextMeasurer, { placementIntervalMs: 0 });
+    const labels = (): PlacementInput[] =>
+      Array.from({ length: 50 }, (_, i) => ({
+        id: i,
+        longitudeDeg: i * 3,
+        latitudeDeg: 0,
+        heightMeters: 0,
+        text: `L${i}`,
+        sizePx: 12,
+        anchor: 0,
+        offsetXEm: 0,
+        offsetYEm: 0,
+        sortKey: 0,
+        enabled: true,
+      }));
+    const pass = (zoom: number): readonly CollisionBox[] => {
+      const passes = placer.passes;
+      for (let t = 0; placer.passes === passes; t += 16) placer.update(t + zoom * 1000, flatProjector(zoom), labels);
+      return placer.collisionBoxes;
+    };
+    const first = [...pass(10)];
+    pass(11);
+    const third = pass(12);
+    expect(third.length).toBe(first.length);
+    expect(third.every((box, i) => box === first[i])).toBe(true);
+  });
+
   it('uploads label fade as the visibility factor', () => {
     const target = new RecordingRenderTarget();
     const stack = new LayerStack(target);

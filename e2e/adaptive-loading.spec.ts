@@ -90,21 +90,30 @@ async function pan(page: Page, degrees: number, durationMs: number): Promise<voi
   );
 }
 
-/** Jumps to zoom 9 and measures, frame by frame in the page, the milliseconds until every wanted tile is drawn. */
-function timeToCompleteView(page: Page): Promise<number> {
+/**
+ * Jumps to zoom 9 and measures, frame by frame in the page, the milliseconds until every wanted tile is drawn
+ * (`viewMs`), and until the last tile requested since the jump had arrived by then (`networkMs`, from Resource Timing).
+ */
+function timeToCompleteView(page: Page): Promise<{ viewMs: number; networkMs: number }> {
   return page.evaluate(
     () =>
-      new Promise<number>((resolve) => {
+      new Promise<{ viewMs: number; networkMs: number }>((resolve) => {
         const globe = window.vibeglobePlayground?.globe;
+        performance.setResourceTimingBufferSize(100_000);
         const start = performance.now();
         globe?.jumpTo({ zoom: 9 });
         const check = (): void => {
           const s = globe?.imageryStats();
           const idle = s !== undefined && s.queued + s.loading + s.decoding + s.uploadsPending === 0;
           // Complete: nothing loading and every tile at its own detail, not a coarser stand-in (motion detail, F288).
-          if (idle && globe?.surfaceTiles().every((t) => t.root !== 'mercator' || t.imageryLevel === t.level))
-            resolve(performance.now() - start);
-          else requestAnimationFrame(check);
+          if (idle && globe?.surfaceTiles().every((t) => t.root !== 'mercator' || t.imageryLevel === t.level)) {
+            const viewMs = performance.now() - start;
+            let lastEnd = start;
+            for (const entry of performance.getEntriesByType('resource') as PerformanceResourceTiming[])
+              if (entry.name.includes('/fixture-tiles/') && entry.startTime >= start)
+                lastEnd = Math.max(lastEnd, entry.responseEnd);
+            resolve({ viewMs, networkMs: lastEnd - start });
+          } else requestAnimationFrame(check);
         };
         requestAnimationFrame(check);
       }),
@@ -263,14 +272,31 @@ test.describe('the measured link (F300–F303)', () => {
   }) => {
     test.setTimeout(300_000);
     // Photo-sized tiles (512 px JPEG, about 40 kB, as real imagery): a 50 Mbps link moves a few-kilobyte tile in less
-    // time than a response takes to handle. A first pass without a link has the fixture server encode them all, so
-    // its encoding never stalls the measured link.
+    // time than a response takes to handle. The fixture server first encodes every tile of the route and around it,
+    // levels 0 to 7, and those a pass of the route in the page shows, so its encoding (about 80 ms a tile on its event
+    // loop) never stalls the measured link: the pass alone missed some, which a fresh server, as on CI, encoded during
+    // the 50 Mbps pass (18 Mbps measured).
     const tiles = 'imagery=world&imageryTileSize=512&imageryFormat=jpg';
     const route = async (step: number): Promise<void> =>
       page.evaluate((s) => {
         window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 10 + 3 * s, latitudeDeg: 45, zoom: 8 });
       }, step);
-    await openGlobe(page, `session=${await fixtureSession(page)}&${tiles}&lon=10&lat=45&zoom=8`);
+    const warmSession = await fixtureSession(page);
+    const mercatorRow = (latDeg: number, level: number): number => {
+      const φ = (latDeg * Math.PI) / 180;
+      return Math.floor(((1 - Math.log(Math.tan(φ) + 1 / Math.cos(φ)) / Math.PI) / 2) * 2 ** level);
+    };
+    const warm: string[] = [];
+    for (let level = 0; level <= 7; level++)
+      for (let x = Math.floor((180 / 360) * 2 ** level); x <= Math.floor((236 / 360) * 2 ** level); x++)
+        for (let y = mercatorRow(52, level); y <= mercatorRow(38, level); y++)
+          warm.push(`/fixture-tiles/${warmSession}/world/mercator/${level}/${x}/${y}@2x.jpg`);
+    for (let i = 0; i < warm.length; i += 4)
+      await Promise.all(
+        warm.slice(i, i + 4).map(async (url) => expect((await page.request.get(url)).status()).toBe(200)),
+      );
+    // Then the route in the page, for the finer tiles it shows at each step.
+    await openGlobe(page, `session=${warmSession}&${tiles}&lon=10&lat=45&zoom=8`);
     for (let step = 0; step < 10; step++) {
       await route(step);
       await waitForStreaming(page);
@@ -371,6 +397,7 @@ test.describe('the measured link (F300–F303)', () => {
     ];
     for (const link of links) {
       const samples: Record<string, number[]> = { adaptive: [], '2': [], '6': [] };
+      const views: Record<string, number[]> = { adaptive: [], '2': [], '6': [] };
       let mostAdaptive = 0;
       // Two rounds of three views per page (each over new tiles, after the page's start-up), each setting timed by its
       // best run: a view completes in a few hundred milliseconds on a fast
@@ -383,8 +410,8 @@ test.describe('the measured link (F300–F303)', () => {
           await openGlobe(page, `session=${session}&imagery=world&lon=10&lat=45&zoom=6${fixed}`);
           await waitForStreaming(page);
           // Views of seconds on the high-latency link vary little: one per page keeps the test within its time.
-          const views = link.name === '500 ms' ? 1 : SAMPLES;
-          for (let view = 0; view < views; view++) {
+          const viewCount = link.name === '500 ms' ? 1 : SAMPLES;
+          for (let view = 0; view < viewCount; view++) {
             if (view > 0) {
               await page.evaluate(
                 (lon) => window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: lon, latitudeDeg: 45, zoom: 6 }),
@@ -392,7 +419,9 @@ test.describe('the measured link (F300–F303)', () => {
               );
               await waitForStreaming(page);
             }
-            samples[perHost]?.push(await timeToCompleteView(page));
+            const timed = await timeToCompleteView(page);
+            samples[perHost]?.push(timed.networkMs);
+            views[perHost]?.push(timed.viewMs);
             await waitForStreaming(page);
           }
           if (perHost !== 'adaptive') continue;
@@ -405,7 +434,10 @@ test.describe('the measured link (F300–F303)', () => {
           );
         }
       const times = Object.fromEntries(Object.entries(samples).map(([key, values]) => [key, Math.min(...values)]));
-      console.log(`[adaptive] F303 ${link.name}: most in flight ${mostAdaptive}, times ${JSON.stringify(times)}`);
+      const drawn = Object.fromEntries(Object.entries(views).map(([key, values]) => [key, Math.min(...values)]));
+      console.log(
+        `[adaptive] F303 ${link.name}: most in flight ${mostAdaptive}, network ${JSON.stringify(times)}, drawn ${JSON.stringify(drawn)}`,
+      );
       expect(mostAdaptive).toBeLessThanOrEqual(6);
       if (link.name === '400 kbps') expect(mostAdaptive).toBeLessThanOrEqual(2);
       else expect(mostAdaptive).toBeGreaterThan(2);

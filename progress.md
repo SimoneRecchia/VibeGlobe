@@ -4,9 +4,10 @@
 
 Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
 #32, #35–#40, #42, #43 (07:15 UTC, with track I's space background F600–F609: #41 is superseded by it and stays for the
-owner to close); merge again by about 11:15 UTC. GitHub deletes the branch on merge: the next push recreates it. The
-full manual CI run on 29727ec (run 40168874917) found F180, F448 and F450 (fixed since) and more failures in shards 1, 8
-and 11 that are the next work; then a new full run on the latest head.
+owner to close); merge again by about 11:15 UTC. GitHub deletes the branch on merge: the next push recreates it. Full
+run 40168874917 (29727ec) failed F180, F448, F450, F488, F303, F269, F297, F222 (flaky), F510 raster (flaky) and the new
+playground package test: fixed since except F269 (KB-199, partly), F222, F510 and F297, which passes locally and in the CI
+image. A new full run on 7561762 was dispatched at about 09:40 UTC; its failures are the next work.
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
 F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the

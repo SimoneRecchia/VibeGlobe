@@ -403,16 +403,22 @@ test('custom curves drive the morph, relief and tilt, and changing them at runti
   await waitForIdle(page);
   // The image before the change, so that a jump in the first changed frame is compared too.
   let previous = await canvasImage(page);
-  await page.evaluate(() => window.vibeglobePlayground?.globe.setViewCurves({}));
-  const morphs: number[] = [];
+  // The morph of every engine frame, recorded in the page: a capture draws one frame, but another one (a tile
+  // arriving) can come between two captures, and a per-capture sample then spans two steps.
+  await page.evaluate(() => {
+    const globe = window.vibeglobePlayground?.globe;
+    const samples: number[] = [];
+    (window as unknown as { morphSamples: number[] }).morphSamples = samples;
+    globe?.on('frame', () => samples.push(globe.camera.morphFactor));
+    globe?.setViewCurves({});
+  });
   let largestShare = 0;
-  // Each capture draws exactly one frame: one sample per frame.
   for (let i = 0; i < 40; i++) {
     const image = await canvasImage(page);
-    morphs.push(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1));
     largestShare = Math.max(largestShare, changedShare(previous, image));
     previous = image;
   }
+  const morphs = await page.evaluate(() => (window as unknown as { morphSamples: number[] }).morphSamples);
   expect(morphs.at(-1)).toBe(0);
   expect(morphs.every((value, i) => i === 0 || Math.abs(value - (morphs[i - 1] ?? 0)) < 0.3)).toBe(true);
   expect(morphs.filter((value, i) => i > 0 && value !== morphs[i - 1]).length).toBeGreaterThan(4);

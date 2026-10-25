@@ -96,7 +96,8 @@ test('a captive portal counts as unreachable and is never used as tiles; package
   await startHarness(page, {
     network: 'hybrid',
     sources: [{ id: 'world', pattern: 'world', session: 'f297' }],
-    view: { longitudeDeg: 40, latitudeDeg: 41.9, zoom: 4 },
+    // Finer than the world base package's levels 0–3, so the view keeps asking the network (the portal) for tiles.
+    view: { longitudeDeg: 40, latitudeDeg: 41.9, zoom: 6 },
     healthChecks: HEALTH,
     awaitReady: false,
   });

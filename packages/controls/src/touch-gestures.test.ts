@@ -62,7 +62,7 @@ describe('touch gestures (ADR 0009 §4)', () => {
     expect(h.camera.tiltDeg).toBe(0);
   });
 
-  it('waits one frame for the partner finger of a touch event, however late that frame runs, and no longer (KB-183)', () => {
+  it('waits at least one frame and 100 ms for the partner finger of a touch event, however late the frames run (KB-183)', () => {
     let hostMs = 0;
     const h = controlsHarness({}, { hostNow: () => hostMs });
     press(h, [300, 300, 500, 300]);
@@ -77,9 +77,22 @@ describe('touch gestures (ADR 0009 §4)', () => {
     touch(h, 'pointermove', 2, 560, 300, 60);
     h.frame(10);
     expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
-    // A finger that really stopped: the other's move alone is applied one frame later.
+    // A busy page runs two frames before the partner's report (F180 on CI): neither shows half the motion.
     touch(h, 'pointermove', 1, 230, 300, 70);
+    hostMs = 156;
     h.frame(10);
+    hostMs = 172;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    touch(h, 'pointermove', 2, 570, 300, 70);
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    // A finger that really stopped: the other's move alone is applied once the wait is over.
+    touch(h, 'pointermove', 1, 220, 300, 80);
+    hostMs = 200;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    hostMs = 300;
     h.frame(10);
     expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(395, 6);
   });

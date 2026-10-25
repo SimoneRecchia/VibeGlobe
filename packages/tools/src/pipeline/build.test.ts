@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { BuildConfig, DatasetConfig } from '../config/schema.js';
 import { syntheticOsmExtract } from '../fixtures/osm-sample.js';
+import { decodePng } from '../encode/png.js';
 import { PmtilesReader } from '../output/pmtiles.js';
 import { decodeTile } from '../vector/mvt.js';
 import { type BuildOptions, runBuild } from './build.js';
@@ -178,6 +179,29 @@ describe('runBuild', { timeout: 30_000 }, () => {
       attribution: expect.stringMatching(/^produced using Copernicus WorldDEM-30/),
     });
     pmtiles.close();
+  });
+
+  it("writes terrain tiles with a one-pixel ring of their neighbors' own pixels, so shared edges match (KB-178)", async () => {
+    const options = setup([terrain]);
+    await runBuild(options);
+    const folder = join(options.outDir, 'output', 'terrain', '14');
+    const columns = readdirSync(folder)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const x = columns[0] ?? 0;
+    const y = Number(readdirSync(join(folder, String(x)))[0]?.split('.')[0]);
+    const read = (column: number) => decodePng(new Uint8Array(readFileSync(join(folder, String(column), `${y}.png`))));
+    const west = read(x);
+    const east = read(x + 1);
+    expect([west.width, west.height]).toEqual([258, 258]);
+    const pixel = (png: typeof west, px: number, py: number) => [
+      ...png.pixels.subarray((py * 258 + px) * 3, (py * 258 + px) * 3 + 3),
+    ];
+    for (const py of [0, 1, 128, 257]) {
+      // The west tile's border column is the east tile's first own column, and the reverse.
+      expect(pixel(west, 257, py)).toEqual(pixel(east, 1, py));
+      expect(pixel(east, 0, py)).toEqual(pixel(west, 256, py));
+    }
   });
 
   it('names every download the lock file does not pin, with its checksum (DP-006)', async () => {

@@ -39,9 +39,14 @@ export function byteMapping(dataset: DatasetConfig): (sample: number) => number 
   return (sample) => table[Math.max(0, Math.min(stretch.maxReflectance, Math.round(sample)))] ?? 255;
 }
 
+/** The pixels of neighbor samples around each tile of a dataset: 1 for terrain (KB-178), else 0. */
+function terrainBorderPx(dataset: DatasetConfig): number {
+  return dataset.encoding === 'terrarium' ? 1 : 0;
+}
+
 /** The tile encoder of a raster dataset. */
 function rasterEncoder(dataset: DatasetConfig): TileEncoder {
-  if (dataset.encoding === 'terrarium') return (samples) => encodeTerrariumTile(samples, TILE_PX);
+  if (dataset.encoding === 'terrarium') return (samples, sizePx) => encodeTerrariumTile(samples, sizePx);
   const quality = dataset.quality ?? 85;
   const toByte = byteMapping(dataset);
   return (samples) => {
@@ -176,6 +181,8 @@ export function tileRasterDataset(
     tileFolder: folders.tiles,
     extension: tileExtension(dataset),
     encode: rasterEncoder(dataset),
+    // Terrain tiles carry a ring of their neighbors' heights, so neighbors' shared edges match (KB-178).
+    borderPx: terrainBorderPx(dataset),
     log: folders.log,
     report: folders.report,
   });

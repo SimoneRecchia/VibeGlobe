@@ -18,8 +18,11 @@ Since the last handoff (2026-10-24 22:00):
 - Fixed: KB-173 (SDF strokes in CI's fonts), KB-175 (Apple reassociation, to confirm on the Mac), KB-176 (3D Tiles in
   production builds), KB-177 (inertia: robust release velocity, 650 ms glide), KB-179 (clipped pyramids), KB-182
   (playground overlaps), KB-PT-07 core side. Playground `?scenario=mont-blanc` (real Copernicus DEM and WorldCover).
-- Open: KB-174 (one fogged request on WebGL2, time box spent), KB-178 and KB-180 (skirt walls between terrain levels
-  and polar caps: edge stitching planned), KB-181 (owner's views asked for), KB-183 (two-finger frame race), TG-05
+- Terrain walls fixed (KB-178): edges next to coarser terrain take its heights (third height texture), the pipeline
+  writes 258-px terrain tiles with a ring of the neighbors' pixels (rebuild older builds), and skirts deepened by
+  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps fade Mercator
+  heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
+- Open: KB-174 (one fogged request on WebGL2, time box spent), KB-180's wedges and sheet (owner's views), KB-181 (owner's views asked for), KB-183 (two-finger frame race), TG-05
   (132 → 31 dead tiles; decoded uploads stuck), and the WebGL2 CPU budget (ADR 0010 rule 7 triggered; benchmarks now
   record phase times; texture pages via multi-draw planned).
 - Remaining M4–M14 outside the backlog: F329 (fresh-context M8 review running), F574 (KB-174), F600–F606 (parallel

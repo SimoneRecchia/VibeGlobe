@@ -24,6 +24,10 @@ export const FINEST_FAILED = -2;
  * slot, u and v across the tile (v from the north) and the height sampled there.
  */
 const located = new Float64Array(8);
+/** 85.0511287798° in radians: the Web Mercator tiling's edge. */
+const MERCATOR_EDGE_RAD = 1.4844222297453324;
+/** From that edge to the pole. */
+const CAP_SPAN_RAD = Math.PI / 2 - MERCATOR_EDGE_RAD;
 /** 2^level by level: rows of a tiling at each level. */
 const ROWS = Float64Array.from({ length: 32 }, (_, level) => 2 ** level);
 /** A position in radians for {@link TerrainHeights.sample} and {@link TerrainHeights.wantFinest}. */
@@ -37,7 +41,7 @@ function project(mercator: boolean, at: Float64Array): void {
   const lonRad = at[0] ?? 0;
   const latRad = at[1] ?? 0;
   if (mercator) {
-    const limit = 1.4844222297453324; // 85.0511287798° in radians: Mercator-only terrain continues its edge heights.
+    const limit = MERCATOR_EDGE_RAD; // Mercator-only terrain continues its edge heights.
     const lat = latRad > limit ? limit : latRad < -limit ? -limit : latRad;
     located[0] = (lonRad + Math.PI) / (2 * Math.PI);
     located[1] = (1 - Math.log(Math.tan(Math.PI / 4 + lat / 2)) / Math.PI) / 2;
@@ -185,7 +189,10 @@ export class TerrainHeights {
       const grid = handle >= 0 ? this.grids.get(handle) : undefined;
       if (!grid) continue;
       sampleHeightInto(grid, located, 5);
-      out.heightMeters = located[7] ?? 0;
+      // Polar caps fade the edge row's heights to the ellipsoid at the pole, as drawn (KB-180, `terrain-stitch.hot.ts`).
+      const latRad = Math.abs(at[1] ?? 0);
+      const capShare = mercator && latRad > MERCATOR_EDGE_RAD ? (Math.PI / 2 - latRad) / CAP_SPAN_RAD : 1;
+      out.heightMeters = (located[7] ?? 0) * (capShare < 0 ? 0 : capShare);
       out.level = level;
       out.noData = false;
       return out;

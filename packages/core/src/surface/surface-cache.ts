@@ -60,8 +60,11 @@ export class SurfaceCache {
     const terrainDepth = errors
       ? 2 * ((errors[tile.level] ?? 0) + (errors[tile.level > 0 ? tile.level - 1 : 0] ?? 0))
       : 0;
-    const skirtDepthMeters = Math.max(1, 6378137 * size * size * 0.1, terrainDepth);
-    return buildQuadtreeTileMesh(tile, skirtDepthMeters);
+    const flatDepth = Math.max(1, 6378137 * size * size * 0.1);
+    // They reach out four times the flat depth, which closes the corners between levels (KB-069), and no further: a
+    // reach of four times the terrain's depth made nearly flat sheets that stood above every slope falling away from
+    // an edge more steeply than 14° (KB-178).
+    return buildQuadtreeTileMesh(tile, Math.max(flatDepth, terrainDepth), 4 * flatDepth);
   }
 
   private evict(): void {

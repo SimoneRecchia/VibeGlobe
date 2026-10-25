@@ -23,6 +23,14 @@ export class DrawLayer implements TileDrawLayer {
   skirtMeters: Float32Array;
   /** The source of each draw's imagery for tone matching, `layer × 8 + chain index`, or -1 (F249). */
   toneSources: Int16Array;
+  /** Terrain only: 1 on each edge (north, east, south, west) that samples the stitch texture (KB-178). */
+  stitchEdges: Uint8Array;
+  /** Terrain only: the coarser terrain tile a draw's stitched edges sample, or -1 (KB-178). */
+  stitchTextures: Int32Array;
+  /** Terrain only: the UV transforms into the stitch textures, four per draw. */
+  stitchTransforms: Float32Array;
+  /** Terrain only: the share of its heights a draw keeps on its north and south edges (polar caps, KB-180). */
+  heightScales: Float32Array;
 
   constructor(capacity: number) {
     this.textures = new Int32Array(capacity);
@@ -36,6 +44,10 @@ export class DrawLayer implements TileDrawLayer {
     this.seeded = new Uint8Array(capacity);
     this.skirtMeters = new Float32Array(capacity);
     this.toneSources = new Int16Array(capacity).fill(-1);
+    this.stitchEdges = new Uint8Array(capacity * 4);
+    this.stitchTextures = new Int32Array(capacity).fill(-1);
+    this.stitchTransforms = new Float32Array(capacity * 4);
+    this.heightScales = new Float32Array(capacity * 2).fill(1);
   }
 
   /** Draw `index` shows `texture` (with no fade yet) through the transform in `transform[0..3]`. */

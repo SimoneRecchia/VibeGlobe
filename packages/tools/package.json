@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/tools",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe tools: command-line tools: data pipeline and offline package builder.",
   "license": "MPL-2.0",
   "type": "module",

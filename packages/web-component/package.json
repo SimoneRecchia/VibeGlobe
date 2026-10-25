@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/web-component",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe web-component: framework-neutral <vibe-globe> custom element.",
   "license": "MPL-2.0",
   "type": "module",
@@ -26,12 +26,12 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/controls": "0.0.0",
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/renderer": "0.0.0",
-    "@vibeglobe/sources": "0.0.0",
-    "@vibeglobe/ui": "0.0.0",
-    "@vibeglobe/worker": "0.0.0"
+    "@vibeglobe/controls": "0.1.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/renderer": "0.1.0",
+    "@vibeglobe/sources": "0.1.0",
+    "@vibeglobe/ui": "0.1.0",
+    "@vibeglobe/worker": "0.1.0"
   },
   "scripts": {
     "build:browser": "vite build"

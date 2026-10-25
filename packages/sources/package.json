@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/sources",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe sources: source adapters for imagery, terrain, vector and 3D data, with provider profiles.",
   "license": "MPL-2.0",
   "type": "module",
@@ -50,7 +50,7 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/core": "0.1.0",
     "fflate": "0.8.3",
     "pbf": "5.1.2",
     "pmtiles": "4.5.0",
@@ -60,6 +60,6 @@
   "devDependencies": {
     "@mapbox/vector-tile": "3.0.0",
     "@types/sql.js": "1.4.11",
-    "@vibeglobe/gis": "0.0.0"
+    "@vibeglobe/gis": "0.1.0"
   }
 }

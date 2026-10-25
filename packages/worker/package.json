@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/worker",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe worker program: the single module worker that runs decoding tasks for the shared worker pool.",
   "license": "MPL-2.0",
   "type": "module",
@@ -42,12 +42,12 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/sources": "0.0.0"
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/sources": "0.1.0"
   },
   "peerDependencies": {
-    "@vibeglobe/layers": "0.0.0",
-    "@vibeglobe/models": "0.0.0"
+    "@vibeglobe/layers": "0.1.0",
+    "@vibeglobe/models": "0.1.0"
   },
   "peerDependenciesMeta": {
     "@vibeglobe/layers": {
@@ -58,7 +58,7 @@
     }
   },
   "devDependencies": {
-    "@vibeglobe/layers": "0.0.0",
-    "@vibeglobe/models": "0.0.0"
+    "@vibeglobe/layers": "0.1.0",
+    "@vibeglobe/models": "0.1.0"
   }
 }

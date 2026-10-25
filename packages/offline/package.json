@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/offline",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe offline: persistent cache, network modes, offline packages, connectivity and bandwidth logic.",
   "license": "MPL-2.0",
   "type": "module",
@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@noble/hashes": "2.3.0",
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/sources": "0.0.0"
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/sources": "0.1.0"
   }
 }

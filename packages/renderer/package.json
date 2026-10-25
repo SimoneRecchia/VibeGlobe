@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/renderer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe renderer: renderer backend: WebGPU with automatic WebGL2 fallback, shaders, GPU resource management.",
   "license": "MPL-2.0",
   "type": "module",
@@ -46,12 +46,12 @@
   ],
   "dependencies": {
     "@types/three": "0.186.0",
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/models": "0.0.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/models": "0.1.0",
     "earcut": "3.2.4",
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@vibeglobe/sources": "0.0.0"
+    "@vibeglobe/sources": "0.1.0"
   }
 }

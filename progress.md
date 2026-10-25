@@ -1,34 +1,30 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 04:45 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 06:30 UTC)
 
 Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
-#32, #35–#40, #42 (04:35 UTC; merge it again by about 08:30 UTC). GitHub deletes the branch on merge: the next push
-recreates it. Tracks D, E, F, G and H are merged; the space-background track (F600–F609,
-`packages/renderer/src/starfield/`) is SimoneRecchia/VibeGlobe#41, which the owner merges. A full manual CI run on
-9a31bbe (run 40160663439) was in progress at the handoff; its failures are the next work.
+#32, #35–#40, #42 (04:35 UTC). SimoneRecchia/VibeGlobe#43 carries everything since (track I's space background, F600–F609,
+included: #41 is superseded by it and stays for the owner to close); merge it by about 08:30 UTC. GitHub deletes the
+branch on merge: the next push recreates it. A full manual CI run on 29727ec (run 40168874917) was in progress at the
+handoff; its failures are the next work.
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
 F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the
 reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan/quality.md`).
 
-Since the last handoff (2026-10-24 22:00):
+Since the last handoff (2026-10-25 04:45):
 
-- Passing: F065 (ADR 0019 on the reference desktop), F075, F115 (224 ms), F574 (fog-aware detail). Added: F574,
-  F600–F606 (the parallel track's).
-- Fixed: KB-173, KB-174 (no request inside full fog on either backend), KB-175 (to confirm on the Mac), KB-176,
-  KB-177 (inertia), KB-179, KB-182, KB-183 (two-finger race: wait one frame for the partner), KB-PT-07 core side,
-  TG-05 (the recording harnesses dropped the engine's frame requests, so it stopped drawing after a recording).
-- Terrain walls fixed (KB-178): edges next to coarser terrain take its heights (third height texture), the pipeline
-  writes 258-px terrain tiles with a ring of the neighbors' pixels (rebuild older builds), and skirts deepened by
-  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps
-  fade Mercator heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
-- F179's drag reference speed is measured over the whole drag (CI's frame-locked moves doubled the old one).
-- Open: KB-180's wedges and KB-181 (the owner's exact views are asked for), KB-138 (M8), TG-04 (vector recovery), the
-  WebGL2 CPU budget (ADR 0010 rule 7: on the Mac a fixed 4.9 ms per frame dominates, 1.3 µs per draw; the next
-  hardware run's `phaseMedianMs` shows where; texture pages remove only the per-draw part).
-- Remaining M4–M14 outside the backlog: F329 (waits for track B's hook requests KB-184, KB-188–KB-190) and F600–F606
-  (#41).
+- Fixed: KB-138 (the bandwidth estimate fits each transfer's time against its bytes and leaves out a fixed
+  per-response delay), the M8 fix-check's gaps KB-192 (offline-only scopes are never health-checked), KB-193 (terrain
+  package credits), KB-194 (held misses no longer keep the engine busy; one endpoint returning wakes its tiles),
+  KB-195 (F298 step 3 checked), KB-196 (the playground installs a world package), and KB-197 (release dry run: the Cube
+  check reads large files), KB-198 (package areas reaching 180° covered one column only).
+- F052 expects the stitch binding's start-up height grid (9 uploads). The network-mode matrix checks popping in still
+  frames on a stepped clock (F329 step 3).
+- Remaining M4–M14 outside the backlog: F329 only. Its steps are covered (the review and its fix-check are done, no M8
+  bug is open); it is marked once the full CI run passes its network suites and matrix.
+- Open elsewhere: KB-180's wedges and KB-181 (the owner's exact views are asked for), TG-04 (vector recovery), the WebGL2
+  CPU budget (the next hardware run's `phaseMedianMs` shows where the fixed 4.9 ms per frame goes).
 
 ## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
 

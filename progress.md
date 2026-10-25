@@ -1,11 +1,12 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 01:40 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 05:20 UTC)
 
-Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`; SimoneRecchia/VibeGlobe#40 into `main` is open
-(merge it with a merge commit or squash once its fast checks pass, then merge `main` back and run `npx tsc -b --force`).
-Merged into `main` so far: #26, #27, #30, #32, #35–#39. Tracks D, E, F, G and H are merged; a space-background track
-(F600–F606, `packages/renderer/src/starfield/`) runs in a parallel session (`docs/parallel-tracks.md`).
+Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
+#32, #35–#40, #42 (04:55 UTC; merge it again by about 09:00 UTC). GitHub deletes the branch on merge: the next push
+recreates it. Tracks D, E, F, G and H are merged; the space-background track (F600–F609,
+`packages/renderer/src/starfield/`) is SimoneRecchia/VibeGlobe#41, which the owner merges. A full manual CI run on
+9a31bbe (run 40160663439) was in progress at the handoff; its failures are the next work.
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
 F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the
@@ -13,20 +14,21 @@ reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan
 
 Since the last handoff (2026-10-24 22:00):
 
-- Passing: F065 (ADR 0019 on the reference desktop), F075, F115 (224 ms). Added: F574 (failing, KB-174), F600–F606
-  (the parallel track's).
-- Fixed: KB-173 (SDF strokes in CI's fonts), KB-175 (Apple reassociation, to confirm on the Mac), KB-176 (3D Tiles in
-  production builds), KB-177 (inertia: robust release velocity, 650 ms glide), KB-179 (clipped pyramids), KB-182
-  (playground overlaps), KB-PT-07 core side. Playground `?scenario=mont-blanc` (real Copernicus DEM and WorldCover).
+- Passing: F065 (ADR 0019 on the reference desktop), F075, F115 (224 ms), F574 (fog-aware detail). Added: F574,
+  F600–F606 (the parallel track's).
+- Fixed: KB-173, KB-174 (no request inside full fog on either backend), KB-175 (to confirm on the Mac), KB-176,
+  KB-177 (inertia), KB-179, KB-182, KB-183 (two-finger race: wait one frame for the partner), KB-PT-07 core side,
+  TG-05 (the recording harnesses dropped the engine's frame requests, so it stopped drawing after a recording).
 - Terrain walls fixed (KB-178): edges next to coarser terrain take its heights (third height texture), the pipeline
   writes 258-px terrain tiles with a ring of the neighbors' pixels (rebuild older builds), and skirts deepened by
-  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps fade Mercator
-  heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
-- Open: KB-174 (one fogged request on WebGL2, time box spent), KB-180's wedges and sheet (owner's views), KB-181 (owner's views asked for), KB-183 (two-finger frame race), TG-05
-  (132 → 31 dead tiles; decoded uploads stuck), and the WebGL2 CPU budget (ADR 0010 rule 7 triggered; benchmarks now
-  record phase times; texture pages via multi-draw planned).
-- Remaining M4–M14 outside the backlog: F329 (fresh-context M8 review running), F574 (KB-174), F600–F606 (parallel
-  track).
+  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps
+  fade Mercator heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
+- F179's drag reference speed is measured over the whole drag (CI's frame-locked moves doubled the old one).
+- Open: KB-180's wedges and KB-181 (the owner's exact views are asked for), KB-138 (M8), TG-04 (vector recovery), the
+  WebGL2 CPU budget (ADR 0010 rule 7: on the Mac a fixed 4.9 ms per frame dominates, 1.3 µs per draw; the next
+  hardware run's `phaseMedianMs` shows where; texture pages remove only the per-draw part).
+- Remaining M4–M14 outside the backlog: F329 (waits for track B's hook requests KB-184, KB-188–KB-190) and F600–F606
+  (#41).
 
 ## Track H, packaging and release (2026-10-24)
 

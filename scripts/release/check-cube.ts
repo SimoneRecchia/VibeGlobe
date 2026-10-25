@@ -17,7 +17,8 @@ const ALLOWED = [
   'scripts/checks/checks.test.ts',
 ];
 /** Integration examples that name Cube as a consumer of the engine. */
-const INTEGRATION_EXAMPLES = /^docs\/guides\/integration\.md$/;
+// The quickstart for the first consumer (owner, 2026-10-25) is one of them.
+const INTEGRATION_EXAMPLES = /^docs\/guides\/(?:integration|cube-quickstart)\.md$/;
 /** The product name, a package scope or repository of its owner (not "cube map" or "MeshoptCubeTest"). */
 const CUBE = /\b(?:Vireox|vireox|@vireox\/|Cube(?! ?maps?\b)(?=[\s.,;:)'"`]|$))/;
 

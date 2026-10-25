@@ -150,7 +150,16 @@ for (const backend of BACKENDS) {
       stages('imagery');
       await waitForIdle(page);
       stages('idle');
-      const capture = await captureCanvas(page);
+      // A settled view: a second capture after the next idle shows the same pixels (KB-203: on CI the engine has gone
+      // idle before data-layer labels were drawn, about one first attempt in two for data-labels and data-markers).
+      let capture = await captureCanvas(page);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await page.waitForTimeout(300);
+        await waitForIdle(page);
+        const again = await captureCanvas(page);
+        if (compareImages(capture, again, 0).differing === 0) break;
+        capture = again;
+      }
       stages('captured');
       await expectMatchesBaseline(page, testInfo, viewName(backend, view.name), capture);
     });

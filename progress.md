@@ -32,6 +32,26 @@ Since the takeover:
   Open, breadth first: F148, F167, F329 (CI run), F389, F395 (question 32), F403, F453, F472; M15 and track G's
   bugs.
 
+## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
+
+Owner requirement of 2026-10-24: an optional space background like Google Earth's, off by default (ADR 0181, entries
+F600–F609 added, `docs/feature-changes.md`).
+
+- `packages/renderer/src/starfield/`: `addSpaceBackground(globe, options)` (`@vibeglobe/renderer/starfield`), a render
+  extension: the 9,096 stars of the Yale Bright Star Catalog (public domain; MIT JSON conversion; recorded in
+  `THIRD_PARTY_NOTICES.md`) as Gaussian sprites with a 0.75 device-pixel floor and pixel-ratio-independent light, and a
+  procedural Milky Way in galactic axes (no image). Sky orientation by precession and Greenwich mean sidereal time from
+  `Globe.atmosphere.timeMs`; fades under the daytime sky near the ground; hidden around a high flat map.
+- Playground `?stars=1` (handle in `window.vibeglobeStars`). Tests: `sky-orientation.test.ts`, `star-catalog.test.ts`,
+  `sky-visibility.test.ts`; `e2e/starfield.spec.ts` (star positions predicted independently through a pinhole camera
+  fitted to `screenToGeo`, both backends; pixel ratios and sub-pixel motion; Milky Way; day and night; toggle;
+  baselines), `e2e/starfield-cost.spec.ts` (frame time).
+- Hook requests I (1)–(5) in `docs/parallel-tracks.md`: (1)–(3) are proposed in the track's pull request (subpath
+  export, baseline workflow step, notices row); (4) and (5) are optional.
+- Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the
+  e2e predictions fit the camera from ground points instead. On CI's software GPU the background costs about 15 % of
+  the frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
+
 ## Track H, packaging and release (2026-10-24)
 
 Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns

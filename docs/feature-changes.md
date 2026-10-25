@@ -25,3 +25,11 @@ Entries that an owner decision made impossible to pass are never deleted or rewo
 | F561  | F571        | 2026-10-24: license change (ADR 0043)                                                                          | It describes a source-available repository under the PolyForm Noncommercial License                                                                                                                                 |
 | F468  | F572        | 2026-10-24: open question 24, the Map Tiles API EEA guide ([ADR 0031](adr/0031-google-maps-platform-terms.md)) | It needs a real Photorealistic 3D Tiles session with the owner's key; the owner's billing account is in the EEA, where Google answers 403, so it can never run                                                      |
 | F469  | F573        | 2026-10-24: open question 24 (ADR 0031)                                                                        | Its last step keeps a real 3D Tiles session open for three hours on the owner's account, which the EEA terms refuse                                                                                                 |
+
+## Entries added after the initial list
+
+New owner requirements become new entries at the end of `feature_list.json`; existing entries are untouched (ADR 0003).
+
+| Date       | Entries   | Owner requirement                                                                                                                                                                 | Record                                   |
+| ---------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 2026-10-25 | F600–F609 | An optional space background like Google Earth's, off by default: stars and the Milky Way fixed in the celestial frame, crisp, not shimmering, fading under the daytime sky (M11) | [ADR 0181](adr/0181-space-background.md) |

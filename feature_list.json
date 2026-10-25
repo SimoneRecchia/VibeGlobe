@@ -7275,6 +7275,89 @@
         "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F600",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "An optional space background draws stars and the Milky Way behind the globe, off by default and switched on per instance through a render extension.",
+      "steps": [
+        "Start a globe with default options and confirm no space background draws and none of its assets are requested",
+        "Turn the space background on and off at runtime and confirm stars and the Milky Way appear and disappear in the next frame",
+        "Confirm it is a render extension that the renderer package ships and the core does not depend on"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F601",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background moves consistently with the globe, as in Google Earth: stars keep fixed directions in the sky's frame, so orbiting, tilting and zooming turn them together with the globe without drift or parallax.",
+      "steps": [
+        "Orbit, tilt and zoom with the space background on and track several stars' screen positions against their catalog directions in every frame",
+        "Assert each star stays within 0.5 px of its expected position for the camera of that frame",
+        "Assert the stars' motion has no lag or jump relative to the globe between frames"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F602",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Stars come from a permissively licensed catalog with sizes and brightness by magnitude, and do not shimmer, alias or pop while the camera moves.",
+      "steps": [
+        "Load the catalog and confirm its license is recorded in THIRD_PARTY_NOTICES.md",
+        "Record frames of a slow orbit and assert no star's brightness changes by more than the flicker threshold between frames",
+        "Compare a still view with its reviewed baseline on both backends"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F603",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The Milky Way is drawn from a permissively licensed panorama with no seam, pole pinch or banding.",
+      "steps": [
+        "Look toward the panorama's seam and both poles and confirm no visible seam or pinch",
+        "Assert no banding in the gradient regions (no step above the threshold between neighboring pixels)",
+        "Compare with reviewed baselines on both backends"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F604",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background stays behind the globe and its atmosphere: never drawn over the globe's disc or the day sky, and it fades out near the ground and on the flat map.",
+      "steps": [
+        "Assert no star pixel inside the globe's disc or where the atmosphere's sky is brighter than the stars",
+        "Zoom from space to street level and into the flat map and assert the background fades out smoothly, with no pop",
+        "Assert zero black or empty pixels in every recorded frame"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F605",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background renders the same on WebGPU and WebGL2, loads its assets lazily from the consumer's asset host, and costs at most 0.3 ms GPU per frame on the reference desktop.",
+      "steps": [
+        "Compare the same views on WebGPU and forced WebGL2 within the baseline tolerance",
+        "Confirm the catalog and panorama are requested only when the background is first switched on, from the configured asset base URL (ADR 0015)",
+        "Measure its GPU time on the reference desktop and assert at most 0.3 ms per frame"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F606",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The playground switches the space background on and the guides document it, with its options and asset hosting.",
+      "steps": [
+        "Open the playground with the space background switch and confirm it draws",
+        "Open the guide and confirm it documents enabling it, its options and where its assets are hosted"
+      ],
+      "status": "failing"
     }
   ]
 }

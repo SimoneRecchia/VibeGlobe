@@ -666,3 +666,7 @@ own (`modelWorker`; the playground's, on its development server only) or to `mod
 
 F323: the 3D Tiles part is done (picking and `tileset()` of a display-only source throw `GlobeError` 'display-only'
 naming the profile; `tiles3d.test.ts`, `e2e/tiles3d-google.spec.ts`).
+
+## Space background track: status
+
+Started by the owner on 2026-10-25 in a parallel session: an optional space background (stars and the Milky Way) as a render extension in `packages/renderer/src/starfield/`, entries F600–F606 (M11; F607–F609 reserved). The main session does not edit that directory; the track's hook requests go to the table above.

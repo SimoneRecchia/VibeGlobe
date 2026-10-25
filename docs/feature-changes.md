@@ -26,3 +26,7 @@ Entries that an owner decision made impossible to pass are never deleted or rewo
 | F468  | F572        | 2026-10-24: open question 24, the Map Tiles API EEA guide ([ADR 0031](adr/0031-google-maps-platform-terms.md)) | It needs a real Photorealistic 3D Tiles session with the owner's key; the owner's billing account is in the EEA, where Google answers 403, so it can never run                                                                                        |
 | F469  | F573        | 2026-10-24: open question 24 (ADR 0031)                                                                        | Its last step keeps a real 3D Tiles session open for three hours on the owner's account, which the EEA terms refuse                                                                                                                                   |
 | F395  | F574        | 2026-10-24: open question 32 ([ADR 0046](adr/0046-owner-decisions-2026-10-24.md))                              | It requires 25% fewer tile requests in the tilted flight; most requests there are near tiles the fog does not hide (5–13% measured, KB-163), and the owner replaced the target with no fine-level request inside full fog plus a measurable reduction |
+
+## Added entries
+
+- 2026-10-25, owner: an optional space background (stars and the Milky Way) that moves consistently with the globe like Google Earth's, off by default, built by a parallel session as a render extension (`packages/renderer/src/starfield/`). Entries F600–F606 (M11); F607–F609 stay reserved for it.

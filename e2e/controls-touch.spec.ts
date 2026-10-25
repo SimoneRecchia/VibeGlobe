@@ -27,6 +27,7 @@ async function glide(
   to: readonly TouchPoint[],
   steps: number,
   page: { waitForTimeout(ms: number): Promise<void> },
+  release = false,
 ): Promise<TouchPoint[]> {
   let at: TouchPoint[] = [...from];
   for (let i = 1; i <= steps; i++) {
@@ -36,6 +37,14 @@ async function glide(
       x: p.x + ((to[k]?.x ?? p.x) - p.x) * s,
       y: p.y + ((to[k]?.y ?? p.y) - p.y) * s,
     }));
+    if (release && i === steps) {
+      // The lift 16 ms after the last move by the events' own times, however long the page took to handle that move:
+      // on a busy software GPU a lift timed when sent read as a hold (KB-205).
+      const sentS = Date.now() / 1000;
+      await touch.move(at, sentS);
+      await touch.end([], sentS + 0.016);
+      return at;
+    }
     await touch.move(at);
     await page.waitForTimeout(16);
   }
@@ -128,8 +137,8 @@ for (const backend of BACKENDS) {
       ],
       12,
       page,
+      true,
     );
-    await touch.end();
     await settle(page);
     const recorded = await frames(page);
     expect(

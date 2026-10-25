@@ -17,7 +17,7 @@ Since the last handoff (2026-10-25 04:45):
 - Fixed: KB-138 (the bandwidth estimate fits each transfer's time against its bytes and leaves out a fixed
   per-response delay), the M8 fix-check's gaps KB-192 (offline-only scopes are never health-checked), KB-193 (terrain
   package credits), KB-194 (held misses no longer keep the engine busy; one endpoint returning wakes its tiles),
-  KB-195 (F298 step 3 checked), KB-196 (the playground installs a world package), and KB-197 (release dry run: the Cube
+  KB-195 (F298 step 3 checked), KB-196 (the playground installs a world package), and KB-197 (release dry run: the first-consumer
   check reads large files), KB-198 (package areas reaching 180° covered one column only).
 - F052 expects the stitch binding's start-up height grid (9 uploads). The network-mode matrix checks popping in still
   frames on a stepped clock (F329 step 3).

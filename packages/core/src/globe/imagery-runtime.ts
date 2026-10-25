@@ -399,7 +399,7 @@ export class ImageryRuntime {
       this.terrainMs = host.now() - terrainStart + this.chargedMs;
       this.chargedMs = 0;
     }
-    this.credits.afterFrame(list, count);
+    this.credits.afterFrame(list, count, this.terrain?.loader);
     for (const layer of this.layers) layer.loader.scheduleRequests();
     terrainStart = terrain ? host.now() : 0;
     terrain?.loader.scheduleRequests();

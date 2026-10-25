@@ -62,6 +62,41 @@ describe('touch gestures (ADR 0009 §4)', () => {
     expect(h.camera.tiltDeg).toBe(0);
   });
 
+  it('waits at least one frame and 100 ms for the partner finger of a touch event, however late the frames run (KB-183)', () => {
+    let hostMs = 0;
+    const h = controlsHarness({}, { hostNow: () => hostMs });
+    press(h, [300, 300, 500, 300]);
+    twoFingers(h, [300, 300, 500, 300], [250, 300, 550, 300], 0, 5);
+    const mid = h.camera.worldAt({ xPx: 400, yPx: 300 });
+    // One touch event moves both fingers apart; a busy main thread runs the frame 80 ms after the first finger's move
+    // and before the second's: applying it then would put the midpoint at 395 px.
+    touch(h, 'pointermove', 1, 240, 300, 60);
+    hostMs = 140;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    touch(h, 'pointermove', 2, 560, 300, 60);
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    // A busy page runs two frames before the partner's report (F180 on CI): neither shows half the motion.
+    touch(h, 'pointermove', 1, 230, 300, 70);
+    hostMs = 156;
+    h.frame(10);
+    hostMs = 172;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    touch(h, 'pointermove', 2, 570, 300, 70);
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    // A finger that really stopped: the other's move alone is applied once the wait is over.
+    touch(h, 'pointermove', 1, 220, 300, 80);
+    hostMs = 200;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(400, 6);
+    hostMs = 300;
+    h.frame(10);
+    expect(h.camera.pixelOf(mid).xPx).toBeCloseTo(395, 6);
+  });
+
   it('twists the heading about the midpoint, and ignores small twists below the threshold (F184)', () => {
     const h = controlsHarness();
     press(h, [300, 300, 500, 300]);

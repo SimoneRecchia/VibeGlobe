@@ -8,8 +8,8 @@ import { SampleRing } from './samples.js';
 const DEG = 180 / Math.PI;
 /** A last finger lifted within this time of the one before it ends a two-finger gesture (its velocity carries on). */
 const LIFT_TOGETHER_MS = 50;
-/** How long a frame waits for the other finger's report of the same touch event. */
-const PARTNER_WAIT_MS = 40;
+/** How long a frame waits at least for the partner of a finger that moved alone, when they moved in step so far (KB-183). */
+const PARTNER_WAIT_MS = 100;
 
 /** Wraps an angle difference into (−π, π]. */
 function wrapRad(a: number): number {
@@ -60,6 +60,9 @@ export class TouchGestures {
   private sessionStartMs = 0;
   private sessionFingers = 0;
   private sessionMoved = false;
+  /** The report frames wait for the partner of (KB-183), NaN for none, and the host time the wait began. */
+  private waitedForMs = Number.NaN;
+  private waitStartMs = 0;
   private readonly tapMid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly taps: TapDetector;
   // Velocity of a two-finger gesture whose fingers lift one after the other.
@@ -228,9 +231,11 @@ export class TouchGestures {
   }
 
   /**
-   * True while the fingers moved in step so far, only one has reported the latest touch event, and that report is less
-   * than 40 ms old: the browser dispatches each finger's move separately, and a frame between them would show half the
-   * motion. A finger that really stopped is applied once its partner's report is older.
+   * True while the fingers moved in step so far and only one has reported the latest touch event: the browser
+   * dispatches each finger's move separately, and a frame between them would show half the motion. The wait lasts at
+   * least one frame, however late it runs (KB-183: a 40 ms wait on the clock alone let a late frame through), and at
+   * least {@link PARTNER_WAIT_MS}, since a busy page can run more than one frame between the two reports (F180 on CI);
+   * a finger whose partner has not reported by then really stopped, and is applied.
    */
   private halfReported(): boolean {
     const a0 = this.moveMs[0] ?? 0;
@@ -238,10 +243,14 @@ export class TouchGestures {
     const p0 = this.previousMoveMs[0] ?? 0;
     const p1 = this.previousMoveMs[1] ?? 0;
     const half = (a0 > a1 && p0 === a1) || (a1 > a0 && p1 === a0);
-    const ageMs = half ? this.context.port.hostMs() - Math.max(a0, a1) : 0;
-    // A negative age means clocks that do not compare: never wait then.
-    if (!half || ageMs < 0 || ageMs >= PARTNER_WAIT_MS) return false;
-    this.context.port.requestNextFrame();
+    if (!half) return false;
+    const latest = a0 > a1 ? a0 : a1;
+    const port = this.context.port;
+    if (this.waitedForMs !== latest) {
+      this.waitedForMs = latest;
+      this.waitStartMs = port.hostMs();
+    } else if (port.hostMs() - this.waitStartMs >= PARTNER_WAIT_MS) return false;
+    port.requestNextFrame();
     return true;
   }
 

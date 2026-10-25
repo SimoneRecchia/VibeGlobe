@@ -46,6 +46,11 @@ export interface TileSource {
    * `@vibeglobe/offline` resolves it from the network mode, the switches and the provider's profile (F271, F281–F285).
    */
   loadingFlags?(): number;
+  /**
+   * Optional: how many of the source's requests in flight wait for connectivity to return (`@vibeglobe/offline`
+   * during an outage). They do not keep the engine busy, so it goes idle with the view as complete as it can be (KB-194).
+   */
+  heldRequests?(): number;
 }
 
 /** Tiles stay in RAM and GPU memory after they leave the screen, within the budgets (F281); off: only the working set. */

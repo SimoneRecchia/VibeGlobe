@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { NO_TERRAIN } from './types.js';
-import { creditsOf, VisibleSources, type Credit, type CreditedSource } from '../imagery/credits.js';
+import { creditsOf, VisibleSources, type Attribution, type Credit, type CreditedSource } from '../imagery/credits.js';
 import type { DrawList } from '../imagery/draw-list.js';
 import type { ImagerySource } from '../imagery/imagery-source.js';
 import type { Observability } from '../diagnostics/observability.js';
@@ -35,15 +35,20 @@ export class RuntimeCredits {
     this.visible = new VisibleSources(sources.length);
   }
 
-  /** Ends a frame of `count` draws: marks the terrain when a draw shows it, and reports a change of credits. */
-  afterFrame(list: DrawList, count: number): void {
+  /**
+   * Ends a frame of `count` draws: marks the terrain when a draw shows it, with the credits of the terrain tiles drawn
+   * (by their handle in the terrain `loader`: an offline package's, KB-193), and reports a change of credits.
+   */
+  afterFrame(list: DrawList, count: number, loader?: { attributionOf(handle: number): Attribution | undefined }): void {
     if (this.terrainIndex >= 0) {
       const textures = list.terrain.textures;
       for (let i = 0; i < count; i++) {
-        if (textures[i] !== NO_TERRAIN) {
-          this.visible.mark(this.terrainIndex);
-          break;
-        }
+        const handle = textures[i] ?? NO_TERRAIN;
+        if (handle === NO_TERRAIN) continue;
+        this.visible.mark(this.terrainIndex);
+        if (!loader) break;
+        const credit = loader.attributionOf(handle);
+        if (credit) this.visible.markCredit(credit, this.terrainIndex);
       }
     }
     if (this.visible.settle()) this.report(this.list());
@@ -66,6 +71,9 @@ export class RuntimeCredits {
       (source, index): source is CreditedSource => source !== undefined && this.visible.visible(index),
     );
     shown.push(...this.extra());
+    // Credits of single tiles drawn (an offline package's, KB-189), under the source that drew them.
+    for (const [credit, index] of this.visible.tileCredits())
+      shown.push({ id: this.sources[index]?.id ?? 'tile', attribution: [credit] });
     return creditsOf(shown, this.hidden, (sourceId) => {
       if (this.warned.has(sourceId)) return;
       this.warned.add(sourceId);

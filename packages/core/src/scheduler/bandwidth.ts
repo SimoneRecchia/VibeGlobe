@@ -94,13 +94,15 @@ export class BandwidthEstimator {
       }
       order[j] = i;
     }
+    const delayMs = this.fixedDelayMs(order, n);
     let unionMs = 0;
     let bytes = 0;
     let end = Number.NEGATIVE_INFINITY;
     for (let k = 0; k < n; k++) {
       const i = order[k] ?? 0;
-      const start = this.from[i] ?? 0;
-      const stop = this.to[i] ?? 0;
+      const stopAt = this.to[i] ?? 0;
+      const start = Math.min(stopAt, (this.from[i] ?? 0) + delayMs);
+      const stop = stopAt;
       bytes += this.sizes[i] ?? 0;
       if (stop <= end) continue;
       unionMs += stop - Math.max(start, end);
@@ -108,5 +110,46 @@ export class BandwidthEstimator {
     }
     // 10 ms of transfers: a fast link moves small tiles in about a millisecond each (F300).
     return unionMs >= 10 ? (bytes * 8000) / unionMs : Number.NaN;
+  }
+
+  /**
+   * The part of each transfer that does not grow with its bytes (KB-138): the intercept of the transfers' times fitted
+   * against their sizes, time = delay + bytes ÷ throughput, at most what leaves every transfer its fitted size term. A server that
+   * spends a fixed time on every response, or a busy page that notices each end a little late, then no longer reads as
+   * a slow link; on a link that is the bottleneck the intercept is close to zero and nothing changes. Sizes too alike
+   * to fit leave it at zero.
+   */
+  private fixedDelayMs(order: Float64Array, n: number): number {
+    let meanBytes = 0;
+    let meanMs = 0;
+    for (let k = 0; k < n; k++) {
+      const i = order[k] ?? 0;
+      const ms = (this.to[i] ?? 0) - (this.from[i] ?? 0);
+      meanBytes += this.sizes[i] ?? 0;
+      meanMs += ms;
+    }
+    meanBytes /= n;
+    meanMs /= n;
+    let covariance = 0;
+    let variance = 0;
+    for (let k = 0; k < n; k++) {
+      const i = order[k] ?? 0;
+      const dx = (this.sizes[i] ?? 0) - meanBytes;
+      covariance += dx * ((this.to[i] ?? 0) - (this.from[i] ?? 0) - meanMs);
+      variance += dx * dx;
+    }
+    // Sizes within a few percent of each other: the delay cannot be told from the bandwidth.
+    if (variance <= (0.05 * meanBytes) ** 2 * n || covariance <= 0) return 0;
+    const msPerByte = covariance / variance;
+    const intercept = meanMs - msPerByte * meanBytes;
+    if (intercept <= 0) return 0;
+    // No transfer may keep less than its fitted size term.
+    let delayMs = intercept;
+    for (let k = 0; k < n; k++) {
+      const i = order[k] ?? 0;
+      const ms = (this.to[i] ?? 0) - (this.from[i] ?? 0);
+      delayMs = Math.min(delayMs, ms - msPerByte * (this.sizes[i] ?? 0));
+    }
+    return Math.max(0, delayMs);
   }
 }

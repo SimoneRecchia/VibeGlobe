@@ -361,8 +361,16 @@ function layoutLayer(
 
 /** Lays out a tile; a tile that does not decode yields no buckets. Problems in a layer's style skip that layer. */
 export function layoutVectorTile(input: LayoutInput): Bucket[] {
+  return layoutDecodable(input) ?? [];
+}
+
+/**
+ * Lays out a tile, or returns undefined when its bytes do not decode: a truncated or corrupted download, which the
+ * loader requests again (TG-04).
+ */
+export function layoutDecodable(input: LayoutInput): Bucket[] | undefined {
   const tile = decodeMvt(input.bytes);
-  if (tile === undefined) return [];
+  if (tile === undefined) return undefined;
   const clip = tileClipRect(BUCKET_EXTENT, BUCKET_BUFFER);
   const buckets: Bucket[] = [];
   for (const json of input.layers) {
@@ -433,7 +441,9 @@ export const VECTOR_TILE_TASKS: TaskTable = Object.freeze({
       throw Object.assign(new Error('layout-vector-tile needs bytes, layers and zoom'), { code: 'invalid-input' });
     }
     const start = performance.now();
-    const buckets = layoutVectorTile(value as LayoutInput);
+    const buckets = layoutDecodable(value as LayoutInput);
+    if (buckets === undefined)
+      throw Object.assign(new Error('the tile does not decode as a vector tile'), { code: 'undecodable' });
     performance.measure('vibeglobe:layout-vector-tile', { start, end: performance.now() });
     return { output: buckets, transfer: transfers(buckets) };
   },

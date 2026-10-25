@@ -203,6 +203,102 @@ describe('the offline engine', () => {
     expect(changes).toEqual(['offline', 'online']);
   });
 
+  it('holds a tile asked for again with nothing changed since its miss until connectivity changes (KB-190)', async () => {
+    let portal = true;
+    const net = fakeNetwork(() =>
+      portal ? { redirected: true, headers: { 'Content-Type': 'text/html' }, body: '<html>login</html>' } : {},
+    );
+    const offline = engine({ fetch: net.fetchImpl });
+    const source = offline.source(fixture());
+    expect((await load(source, tile(3, 1, 1))).kind).toBe('aborted');
+    await expect.poll(() => offline.connectivity).toBe('offline');
+    // The first miss is handed back after a short hold, as before.
+    expect((await load(source, tile(3, 2, 2))).kind).toBe('aborted');
+    // Asked again with nothing changed: held, not handed back every half second for the whole outage.
+    let held: string | undefined;
+    void load(source, tile(3, 2, 2)).then((result) => (held = result.kind));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(held).toBeUndefined();
+    // Waiting for connectivity, not loading: the engine may go idle meanwhile (KB-194).
+    expect(source.heldRequests?.()).toBe(1);
+    portal = false;
+    await expect.poll(() => offline.connectivity, { timeout: 3000 }).toBe('online');
+    // Connectivity changed: the held request is handed back at once, and asked again the tile loads.
+    await expect.poll(() => held, { timeout: 1000 }).toBe('aborted');
+    expect(source.heldRequests?.()).toBe(0);
+    expect(text(await load(source, tile(3, 2, 2)))).toBe('tile');
+    expect(net.requests.filter((r) => r.url.endsWith('/3/2/2.png'))).toHaveLength(1);
+    // The 1.5 s hold check and the health checks' backoff take longer than the default 5 s.
+  }, 15_000);
+
+  it('overrides the network mode for one layer or source while the others keep the global one (F290, KB-184)', async () => {
+    const net = fakeNetwork(() => ({}));
+    const offline = engine({ fetch: net.fetchImpl });
+    const base = offline.source(fixture('base'), { layerId: 'base' });
+    const labels = offline.source(fixture('labels'), { layerId: 'labels' });
+    const changes: (readonly string[])[] = [];
+    offline.on('mode-change', (event) => changes.push(event.sourceIds));
+    offline.setMode('offline', { layerId: 'labels' });
+    expect([offline.mode, offline.modeOf('base', 'base'), offline.modeOf('labels', 'labels')]).toEqual([
+      'hybrid',
+      'hybrid',
+      'offline',
+    ]);
+    // The offline-only layer never asks the network; the other keeps loading from it.
+    expect((await load(labels, tile(2, 1, 1))).kind).toBe('status');
+    expect(text(await load(base, tile(2, 1, 1)))).toBe('tile');
+    expect(net.requests.map((r) => r.url).filter((url) => url.endsWith('/2/1/1.png'))).toHaveLength(1);
+    // A source's mode applies to every layer that has none of its own; the layer's own wins.
+    offline.setMode('online', { sourceId: 'labels' });
+    expect(offline.modeOf('labels', 'labels')).toBe('offline');
+    offline.setMode('inherit', { layerId: 'labels' });
+    expect(offline.modeOf('labels', 'labels')).toBe('online');
+    // Leaving offline-only mode names the sources whose tiles may load now.
+    expect(changes).toEqual([[], [], ['labels']]);
+    expect(text(await load(labels, tile(2, 1, 1)))).toBe('tile');
+  });
+
+  it('never health-checks the host of a layer or source in offline-only mode (F292, KB-192)', async () => {
+    const net = fakeNetwork(() => ({}));
+    const offline = engine({ fetch: net.fetchImpl });
+    offline.source(fixture('base'), { layerId: 'base' });
+    offline.source(xyzImagery({ id: 'lan', url: 'https://lan.test/{z}/{x}/{y}.png' }), { layerId: 'airgapped' });
+    offline.setMode('offline', { layerId: 'airgapped' });
+    offline.setMode('online');
+    await expect
+      .poll(() => net.requests.filter((r) => r.url.startsWith('https://tiles.test/')).length)
+      .toBeGreaterThan(0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(net.requests.filter((r) => r.url.startsWith('https://lan.test/'))).toHaveLength(0);
+    // Back from offline-only: its host is checked again.
+    offline.setMode('inherit', { layerId: 'airgapped' });
+    await expect
+      .poll(() => net.requests.filter((r) => r.url.startsWith('https://lan.test/')).length)
+      .toBeGreaterThan(0);
+  });
+
+  it('hands back the held tiles of an endpoint that returns while another stays down (KB-194)', async () => {
+    const down = new Set(['a.test', 'b.test']);
+    const net = fakeNetwork((url) => (down.has(new URL(url).host) ? 'down' : {}));
+    const offline = engine({ fetch: net.fetchImpl });
+    const host = (name: string) => xyzImagery({ id: name, url: `https://${name}.test/{z}/{x}/{y}.png` });
+    const a = offline.source(host('a'));
+    const b = offline.source(host('b'));
+    offline.source(host('c'));
+    await load(b, tile(3, 1, 1));
+    expect((await load(a, tile(3, 1, 1))).kind).toBe('aborted');
+    await expect.poll(() => offline.connectivity).toBe('degraded');
+    expect((await load(a, tile(3, 2, 2))).kind).toBe('aborted');
+    let held: string | undefined;
+    void load(a, tile(3, 2, 2)).then((result) => (held = result.kind));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(held).toBeUndefined();
+    // a returns, b stays down: connectivity stays degraded, but a's held tile is handed back at once.
+    down.delete('a.test');
+    await expect.poll(() => held, { timeout: 3000 }).toBe('aborted');
+    expect(offline.connectivity).toBe('degraded');
+  }, 15_000);
+
   it('a failure on an endpoint the health check finds reachable goes to the engine, which backs off (F315)', async () => {
     let first = true;
     const net = fakeNetwork((url) => {

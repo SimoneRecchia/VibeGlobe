@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BandwidthEstimator } from './bandwidth.js';
+import { BandwidthEstimator, SLOW_LINK_BPS } from './bandwidth.js';
 import type { TransportResult } from './types.js';
 
 const response = (bytes: number, waitMs: number): Extract<TransportResult, { kind: 'ok' }> => ({
@@ -33,6 +33,21 @@ describe('bandwidth estimate (F300, F303)', () => {
       simulate(estimator, bitsPerSecond, 20_000, 4, 10_000);
       expect(Math.abs(estimator.bitsPerSecond / bitsPerSecond - 1)).toBeLessThan(0.2);
     }
+  });
+
+  it('does not read a fixed delay per response as a slow link: a fast server with 60 ms per tile (KB-138)', () => {
+    const estimator = new BandwidthEstimator();
+    // 50 Mbps, but every response's transfer lasts 60 ms longer whatever its size, one after another.
+    let t = 0;
+    for (let i = 0; i < 12; i++) {
+      const bytes = [6_000, 10_000, 20_000][i % 3] ?? 6_000;
+      const transferMs = 60 + (bytes * 8) / 50e3;
+      estimator.started(t);
+      estimator.ended(t + transferMs, t, { ...response(bytes, 0), transferMs, endAgoMs: 0 });
+      t += transferMs + 5;
+    }
+    expect(estimator.bitsPerSecond).toBeGreaterThan(SLOW_LINK_BPS);
+    expect(Math.abs(estimator.bitsPerSecond / 50e6 - 1)).toBeLessThan(0.2);
   });
 
   it('measures with the network times when the main thread notices responses late, and skips cache hits', () => {

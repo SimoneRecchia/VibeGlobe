@@ -433,6 +433,7 @@ if (params.get('experiment') === 'gpu-probes') {
   const showBackend = (): void =>
     setStatus(`${globe.backend ?? ''} · WGS84, a = ${WGS84.semiMajorAxisMeters} m · Made with Natural Earth`);
   globe.on('device-restored', showBackend);
+  offlineDemo?.attach(globe);
   globe.ready.then(showBackend, (error: unknown) =>
     setStatus(`The globe could not start: ${error instanceof Error ? error.message : String(error)}`),
   );

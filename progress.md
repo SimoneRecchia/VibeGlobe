@@ -1,16 +1,19 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 06:30 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 13:05 UTC)
 
 Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
-#32, #35–#40, #42, #43 (07:15 UTC, with track I's space background F600–F609: #41 is superseded by it and stays for the
-owner to close); merge again by about 11:15 UTC. GitHub deletes the branch on merge: the next push recreates it. Full
-run 40168874917 (29727ec) failed F180, F448, F450, F488, F303, F269, F297, F222 (flaky), F510 raster (flaky) and the new
-playground package test: fixed since except F269 (KB-199, partly), F222, F510 and F297, which passes locally and in the CI
-image. A new full run on 7561762 was dispatched at about 09:40 UTC; its failures are the next work.
+#32, #35–#40, #42, #43 and #44 (10:48 UTC; #41 is superseded by #43 and stays for the owner to close); #45 is open with
+everything since, to merge by about 14:45 UTC. GitHub deletes the branch on merge: the next push recreates it. The full
+run on ee8bf1e (40189053419) failed four shards, all fixed since: F359 (KB-171 fixed: placement slices allocate almost
+nothing, and the budget gates each slice's work without the stalls of a descheduled thread), F060 (holds still before
+each release, so KB-177's glide no longer takes its time), the data-labels WebGPU baseline (the 01:57 one, which the code
+renders exactly) and F300 (the fixture server encodes the route's tiles before the measured passes). The next full run
+goes on the head once shard 10 of that run (soak, robustness) ends. Still flaky on CI without a fix: F222 and F510's
+raster recovery (ADR 0046). F329 is marked once a full run shows the M8 network specs green (no M8 bug is open).
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
-F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the
+F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170 (KB-171 fixed 2026-10-25); F403, F472, F453 pending; the
 reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan/quality.md`).
 
 Since the last handoff (2026-10-25 04:45):

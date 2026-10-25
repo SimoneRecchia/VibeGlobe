@@ -272,14 +272,31 @@ test.describe('the measured link (F300–F303)', () => {
   }) => {
     test.setTimeout(300_000);
     // Photo-sized tiles (512 px JPEG, about 40 kB, as real imagery): a 50 Mbps link moves a few-kilobyte tile in less
-    // time than a response takes to handle. A first pass without a link has the fixture server encode them all, so
-    // its encoding never stalls the measured link.
+    // time than a response takes to handle. The fixture server first encodes every tile of the route and around it,
+    // levels 0 to 7, and those a pass of the route in the page shows, so its encoding (about 80 ms a tile on its event
+    // loop) never stalls the measured link: the pass alone missed some, which a fresh server, as on CI, encoded during
+    // the 50 Mbps pass (18 Mbps measured).
     const tiles = 'imagery=world&imageryTileSize=512&imageryFormat=jpg';
     const route = async (step: number): Promise<void> =>
       page.evaluate((s) => {
         window.vibeglobePlayground?.globe.jumpTo({ longitudeDeg: 10 + 3 * s, latitudeDeg: 45, zoom: 8 });
       }, step);
-    await openGlobe(page, `session=${await fixtureSession(page)}&${tiles}&lon=10&lat=45&zoom=8`);
+    const warmSession = await fixtureSession(page);
+    const mercatorRow = (latDeg: number, level: number): number => {
+      const φ = (latDeg * Math.PI) / 180;
+      return Math.floor(((1 - Math.log(Math.tan(φ) + 1 / Math.cos(φ)) / Math.PI) / 2) * 2 ** level);
+    };
+    const warm: string[] = [];
+    for (let level = 0; level <= 7; level++)
+      for (let x = Math.floor((180 / 360) * 2 ** level); x <= Math.floor((236 / 360) * 2 ** level); x++)
+        for (let y = mercatorRow(52, level); y <= mercatorRow(38, level); y++)
+          warm.push(`/fixture-tiles/${warmSession}/world/mercator/${level}/${x}/${y}@2x.jpg`);
+    for (let i = 0; i < warm.length; i += 4)
+      await Promise.all(
+        warm.slice(i, i + 4).map(async (url) => expect((await page.request.get(url)).status()).toBe(200)),
+      );
+    // Then the route in the page, for the finer tiles it shows at each step.
+    await openGlobe(page, `session=${warmSession}&${tiles}&lon=10&lat=45&zoom=8`);
     for (let step = 0; step < 10; step++) {
       await route(step);
       await waitForStreaming(page);

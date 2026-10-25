@@ -42,7 +42,10 @@ export interface TileRecord {
   availabilityUnknown: boolean;
   /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
   rounds: number;
-  /** The loader's count of network successes when the tile's current round of attempts started (KB-204). */
+  /**
+   * The loader's count of network successes when the tile's current round of attempts started, or `-1` while it waits
+   * for its source to be stable (KB-204).
+   */
   roundSuccesses: number;
   /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
   freshUntilMs: number;

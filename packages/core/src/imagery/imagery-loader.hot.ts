@@ -81,11 +81,14 @@ const STABLE_SUCCESSES = 20;
 const STABLE_MS = 30_000;
 /** `retries` of a dead tile with rounds left, waiting for its source to answer again. */
 const AWAITING_SOURCE = -1;
-/**
- * `retries` of a tile out of rounds after transient failures, or that failed while its source answered other tiles
- * (KB-204): it waits for the source to be stable again.
- */
+/** `retries` of a tile out of rounds after transient failures: it waits for the source to be stable again. */
 const OUT_OF_ROUNDS = -2;
+/**
+ * `roundSuccesses` of a waiting tile whose source answered other tiles during its round (KB-204): no outage hid it, so
+ * the source's next answer does not give it a fresh round, only the source being stable again; health checks still
+ * request it, so a view where nothing else loads still finds the source stable.
+ */
+const NEEDS_STABLE = -1;
 /**
  * The source's health check while such tiles wait and nothing else answers: one of them is requested once, without
  * retries and without using one of its rounds, after this long, the wait doubling up to {@link PROBE_MAX_MS}; its
@@ -739,8 +742,8 @@ export class ImageryLoader implements NetworkPoolClient {
       // stable instead, so a success that merely arrives after it is not taken for the end of an outage (KB-204).
       if (decision.failureClass === FAILURE_TRANSIENT) {
         this.failedTransiently();
-        if (!probing && this.networkSuccesses !== record.roundSuccesses) record.retries = OUT_OF_ROUNDS;
-        else this.awaitSource(record);
+        if (!probing && this.networkSuccesses !== record.roundSuccesses) record.roundSuccesses = NEEDS_STABLE;
+        this.awaitSource(record);
       }
       // A failed health check is not reported again.
       if (!probing)
@@ -795,11 +798,18 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** The source answered again: its waiting tiles get a fresh round (ADR 0046). */
   private reviveOutageDead(): void {
-    this.outageDead = 0;
-    this.probeToken++;
-    this.probeArmed = false;
+    let waiting = 0;
     for (const record of this.table.bySlot)
-      if (record.state === DEAD && record.retries === AWAITING_SOURCE) this.revive(record);
+      if (record.state === DEAD && record.retries === AWAITING_SOURCE) {
+        if (record.roundSuccesses === NEEDS_STABLE) waiting++;
+        else this.revive(record);
+      }
+    // Tiles that wait for stability keep the health checks running (KB-204).
+    this.outageDead = waiting;
+    if (waiting === 0) {
+      this.probeToken++;
+      this.probeArmed = false;
+    }
     this.options.requestFrame();
   }
 
@@ -819,7 +829,12 @@ export class ImageryLoader implements NetworkPoolClient {
     this.roundsRestored = true;
     for (const record of this.table.bySlot) {
       record.rounds = 0;
-      if (record.state === DEAD && record.retries === OUT_OF_ROUNDS) this.revive(record);
+      if (record.state !== DEAD) continue;
+      if (record.retries === OUT_OF_ROUNDS) this.revive(record);
+      else if (record.retries === AWAITING_SOURCE && record.roundSuccesses === NEEDS_STABLE) {
+        this.outageDead--;
+        this.revive(record);
+      }
     }
     this.options.requestFrame();
   }

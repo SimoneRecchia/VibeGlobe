@@ -581,7 +581,7 @@ describe('ImageryLoader', () => {
   });
 
   it('gives no fresh round to a tile whose source answered other tiles during its round (KB-204)', () => {
-    const { transport, timers, runFrame, ok } = setUp();
+    const { transport, timers, runFrame, uploaded, ok } = setUp();
     // The tile fails its whole round while a neighbor loads: the source was up, so no outage ended.
     runFrame([
       [4, 2, 2],
@@ -603,6 +603,14 @@ describe('ImageryLoader', () => {
     transport.answer(url(4, 3, 3), ok);
     runFrame([[4, 2, 2]]);
     expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(5);
+    // In a still view where nothing else loads, the health checks still ask for it, and it loads once it answers.
+    timers.advance(10_000);
+    runFrame([[4, 2, 2]]);
+    expect(transport.started.filter((u) => u === url(4, 2, 2))).toHaveLength(6);
+    transport.answer(url(4, 2, 2), ok);
+    const before = uploaded.length;
+    runFrame([[4, 2, 2]]);
+    expect(uploaded.length).toBe(before + 1);
   });
 
   it('never revives a tile that failed for good on a permanent error after a transient one (KB-162)', () => {

@@ -76,7 +76,9 @@ const GROUP_CHECKS: Record<string, (context: CheckContext) => Checks> = {
       const button = document.querySelector<HTMLButtonElement>('.vg-ui__button--zoom-in');
       const before = globe.camera.zoom;
       button?.click();
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // The step animates over frames: a slow frame on a software GPU outlasts idle's quiet time, so wait for its end.
+      for (let waitedMs = 0; waitedMs < 5000 && !near(globe.camera.zoom, before + 1, 1e-3); waitedMs += 50)
+        await new Promise((resolve) => setTimeout(resolve, 50));
       await idle(globe);
       return button !== null && near(globe.camera.zoom, before + 1, 1e-3);
     },

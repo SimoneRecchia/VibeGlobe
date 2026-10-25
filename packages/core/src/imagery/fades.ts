@@ -59,7 +59,7 @@ export class ImageryFades {
       const texture = layer.textures[i] ?? 0;
       const level = layer.levels[i] ?? -1;
       if (slot === undefined) {
-        slot = this.begin(key, layer, i, nowMs);
+        slot = this.begin(key, layer, i, nowMs, maxLevelGap === Infinity ? fadeMs : 0);
       } else if (this.toTexture[slot] !== texture || this.toLevel[slot] !== level) {
         const gap = (this.toLevel[slot] ?? -1) - level;
         if (gap > maxLevelGap || -gap > maxLevelGap) {
@@ -103,9 +103,12 @@ export class ImageryFades {
 
   /**
    * A slot for a tile drawn for the first time: it starts without a fade, or, when its draw names what was shown there
-   * before (`seeded`, terrain, F138), fading from that.
+   * before (`seeded`, terrain, F138), fading from that. With `refine` (imagery), a Web Mercator tile whose parent was
+   * drawn last frame with other imagery fades from the part of the parent's that covers it, or continues the parent's
+   * fade when one is under way: a refinement that brings finer imagery already loaded then shows no jump (F269).
+   * `refineMs` is the fade duration for such tiles, 0 for none.
    */
-  private begin(key: number, layer: DrawLayer, i: number, nowMs: number): number {
+  private begin(key: number, layer: DrawLayer, i: number, nowMs: number, refineMs: number): number {
     const slot = this.allocate(key);
     this.store(slot, layer, i);
     this.startMs[slot] = -Infinity;
@@ -114,6 +117,34 @@ export class ImageryFades {
       this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
       for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
       this.startMs[slot] = nowMs;
+    } else if (refineMs > 0 && (layer.geographic[i] ?? 1) === 0) {
+      const parentKey = mercatorParentKey(key);
+      const parent = parentKey < 0 ? undefined : this.slots.get(parentKey);
+      if (
+        parent !== undefined &&
+        this.stamps[parent] === this.frame - 1 &&
+        this.toGeographic[parent] === 0 &&
+        this.toTexture[parent] !== this.toTexture[slot]
+      ) {
+        // A fade of the parent under way goes on from where it started, with its timing.
+        const fading = nowMs - (this.startMs[parent] ?? -Infinity) < refineMs && this.fromGeographic[parent] === 0;
+        const source = fading ? this.fromTransform : this.toTransform;
+        this.fromTexture[slot] = (fading ? this.fromTexture[parent] : this.toTexture[parent]) ?? 0;
+        this.fromGeographic[slot] = 0;
+        // The child's quarter of what the parent showed: half its scale, offset by the child's column and row.
+        const tile = (key - (key % 3)) / 3;
+        const level = levelOfIndex(tile);
+        const within = tile - (4 ** level - 1) / 3;
+        const column = within % 2 ** level;
+        const row = (within - column) / 2 ** level;
+        const su = (source[parent * 4] ?? 1) / 2;
+        const sv = (source[parent * 4 + 1] ?? 1) / 2;
+        this.fromTransform[slot * 4] = su;
+        this.fromTransform[slot * 4 + 1] = sv;
+        this.fromTransform[slot * 4 + 2] = (source[parent * 4 + 2] ?? 0) + (column % 2) * su;
+        this.fromTransform[slot * 4 + 3] = (source[parent * 4 + 3] ?? 0) + (row % 2) * sv;
+        this.startMs[slot] = fading ? (this.startMs[parent] ?? nowMs) : nowMs;
+      }
     }
     return slot;
   }
@@ -175,4 +206,24 @@ export class ImageryFades {
     this.startMs = copy(this.startMs, capacity, (n) => new Float64Array(n));
     this.capacity = capacity;
   }
+}
+
+/** The quadtree level of a tile index (`quadtreeTileKey` without its root): levels start at (4^level − 1) / 3. */
+function levelOfIndex(index: number): number {
+  let level = 0;
+  while ((4 ** (level + 1) - 1) / 3 <= index) level++;
+  return level;
+}
+
+/** The key of a Web Mercator surface tile's parent (`quadtreeTileKey`), or −1 for a root or another root's tile. */
+function mercatorParentKey(key: number): number {
+  const root = key % 3;
+  if (root !== 0) return -1;
+  const index = key / 3;
+  const level = levelOfIndex(index);
+  if (level === 0) return -1;
+  const within = index - (4 ** level - 1) / 3;
+  const column = within % 2 ** level;
+  const row = (within - column) / 2 ** level;
+  return ((4 ** (level - 1) - 1) / 3 + Math.floor(row / 2) * 2 ** (level - 1) + Math.floor(column / 2)) * 3;
 }

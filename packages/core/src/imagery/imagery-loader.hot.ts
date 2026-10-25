@@ -81,7 +81,10 @@ const STABLE_SUCCESSES = 20;
 const STABLE_MS = 30_000;
 /** `retries` of a dead tile with rounds left, waiting for its source to answer again. */
 const AWAITING_SOURCE = -1;
-/** `retries` of a tile out of rounds after transient failures: it waits for the source to be stable again. */
+/**
+ * `retries` of a tile out of rounds after transient failures, or that failed while its source answered other tiles
+ * (KB-204): it waits for the source to be stable again.
+ */
 const OUT_OF_ROUNDS = -2;
 /**
  * The source's health check while such tiles wait and nothing else answers: one of them is requested once, without
@@ -204,6 +207,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private outageDead = 0;
   /** The source's network successes since its last transient failure, that failure's time, and whether rounds were given back since. */
   private successStreak = 0;
+  /** Every network success of the source, to tell whether it answered during a tile's round (KB-204). */
+  private networkSuccesses = 0;
   private lastFailureMs = Number.NEGATIVE_INFINITY;
   private roundsRestored = true;
   /** The wait of the next health check, and the token that cancels the previous one. */
@@ -640,6 +645,7 @@ export class ImageryLoader implements NetworkPoolClient {
         break;
       }
       record.availabilityUnknown = false;
+      if (record.retries === 0) record.roundSuccesses = this.networkSuccesses;
       // Keyed by URL: another layer or engine instance on the page wanting the same tile shares the request (F095).
       const consumer = this.options.network.request(
         request.url,
@@ -729,9 +735,12 @@ export class ImageryLoader implements NetworkPoolClient {
       const probing = record.retries === PROBING;
       record.state = DEAD;
       // Out of retries on transient failures: maybe an outage, so a fresh round once the source is back (ADR 0046).
+      // When the source answered other tiles during the round, no outage hid the tile: it waits for the source to be
+      // stable instead, so a success that merely arrives after it is not taken for the end of an outage (KB-204).
       if (decision.failureClass === FAILURE_TRANSIENT) {
         this.failedTransiently();
-        this.awaitSource(record);
+        if (!probing && this.networkSuccesses !== record.roundSuccesses) record.retries = OUT_OF_ROUNDS;
+        else this.awaitSource(record);
       }
       // A failed health check is not reported again.
       if (!probing)
@@ -803,6 +812,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** A network success: once the source is stable again, every tile gets its rounds back (ADR 0046). */
   private succeeded(): void {
+    this.networkSuccesses++;
     this.successStreak++;
     if (this.roundsRestored) return;
     if (this.successStreak < STABLE_SUCCESSES && this.options.now() - this.lastFailureMs < STABLE_MS) return;

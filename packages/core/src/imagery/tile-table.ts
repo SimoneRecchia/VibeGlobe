@@ -42,6 +42,8 @@ export interface TileRecord {
   availabilityUnknown: boolean;
   /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
   rounds: number;
+  /** The loader's count of network successes when the tile's current round of attempts started (KB-204). */
+  roundSuccesses: number;
   /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
   freshUntilMs: number;
   /** The credit of the tile alone, from its last response (`TransportResult.attribution`, KB-189). */
@@ -109,6 +111,7 @@ export class TileTable {
       pinned: level <= this.pinnedLevel,
       availabilityUnknown: false,
       rounds: 0,
+      roundSuccesses: 0,
       freshUntilMs: Infinity,
       attribution: undefined,
     };

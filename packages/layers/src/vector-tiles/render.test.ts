@@ -226,6 +226,26 @@ describe('tile loading (F442, F450)', () => {
     expect(loader.requestLog).toEqual(['a', 'b', 'html']);
   });
 
+  it('requests a tile again after a while when its bytes do not lay out, as after a failed download (TG-04)', async () => {
+    const corrupt = new Uint8Array([0x1a, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x08]).buffer;
+    const table: Record<string, ArrayBuffer> = { c: corrupt };
+    const transport = fakeTransport(table);
+    let nowMs = 0;
+    const loader = new VectorTileLoader({ transport, onReady: () => undefined, now: () => nowMs });
+    loader.setLayers(layers, 1);
+    const tile = { z: 1, x: 0, y: 0 };
+    const wanted = [{ url: 'c', tile, priority: 0 }];
+    loader.update(wanted, new Set());
+    await tick();
+    expect(loader.isMissing(tile)).toBe(false);
+    table['c'] = TILE;
+    nowMs = 6_000;
+    loader.update(wanted, new Set());
+    await tick();
+    expect(loader.get(tile)?.buckets[0]?.layerId).toBe('water');
+    expect(loader.requestLog).toEqual(['c', 'c']);
+  });
+
   it('cancels tiles no frame wants any more', () => {
     const aborted: string[] = [];
     const transport: TileTransport = {

@@ -8,7 +8,7 @@
  * keeps the most recently used ones within its size.
  */
 import type { AbortHandle, NetworkPool, TileTransport, TransportResult, WorkerPool } from '@vibeglobe/core';
-import { layoutVectorTile, type Bucket } from './layout-tile.js';
+import { layoutDecodable, type Bucket } from './layout-tile.js';
 import type { StyleLayerJson } from './style-layer.js';
 import { tileKey, type TileId } from './tile-pyramid.js';
 
@@ -74,6 +74,8 @@ export class VectorTileLoader {
   private readonly hosts = new Map<string, number>();
   private readonly removeClient: (() => void) | undefined;
   private disposed = false;
+  /** Draws a frame when a failed tile may be requested again: an idle globe draws none on its own (TG-04). */
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly options: TileLoaderOptions) {
     this.removeClient = options.network?.addClient({
@@ -160,17 +162,27 @@ export class VectorTileLoader {
     );
   }
 
-  /** Tiles requested or being laid out, not ready yet (tests wait for 0). */
+  /**
+   * Tiles requested or being laid out, not ready yet, and wanted tiles waiting to be requested again after a failure
+   * (TG-04; tests wait for 0).
+   */
   get loading(): number {
     let n = 0;
     for (const entry of this.entries.values())
-      if (entry.state === 'queued' || entry.state === 'fetching' || entry.state === 'layout') n++;
+      if (
+        entry.state === 'queued' ||
+        entry.state === 'fetching' ||
+        entry.state === 'layout' ||
+        (entry.state === 'failed' && entry.usedAtFrame === this.frame)
+      )
+        n++;
     return n;
   }
 
   /** Frees everything; nothing is called back afterwards. */
   dispose(): void {
     this.disposed = true;
+    clearTimeout(this.retryTimer);
     this.removeClient?.();
     for (const entry of this.entries.values()) this.cancel(entry);
     this.entries.clear();
@@ -256,11 +268,19 @@ export class VectorTileLoader {
     } else if (result.kind === 'ok' || (result.kind === 'status' && (result.status === 404 || result.status === 204))) {
       entry.state = 'missing';
       this.options.onReady();
-    } else if (result.kind !== 'aborted') {
-      entry.state = 'failed';
-      entry.retryAtMs = (this.options.now?.() ?? Date.now()) + RETRY_MS;
-    }
+    } else if (result.kind !== 'aborted') this.failed(entry);
     this.pump();
+  }
+
+  /** Marks a tile failed: requested again after {@link RETRY_MS}, in the first frame drawn from then on. */
+  private failed(entry: Entry): void {
+    entry.state = 'failed';
+    entry.retryAtMs = (this.options.now?.() ?? Date.now()) + RETRY_MS;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      if (!this.disposed) this.options.onReady();
+    }, RETRY_MS);
   }
 
   private layout(entry: Entry): void {
@@ -277,15 +297,25 @@ export class VectorTileLoader {
       entry.state = 'ready';
       this.options.onReady();
     };
+    // Bytes that do not decode (truncated or corrupted on the way) are fetched again later, like a failed download.
+    const undecodable = (): void => {
+      entry.task = undefined;
+      if (this.disposed || this.entries.get(entry.key) !== entry || entry.state === 'ready') return;
+      delete entry.bytes;
+      this.failed(entry);
+    };
     const workers = this.options.workers;
     if (workers === undefined) {
-      finish(layoutVectorTile(input));
+      const buckets = layoutDecodable(input);
+      if (buckets === undefined) undecodable();
+      else finish(buckets);
       return;
     }
     entry.task = workers.run(
       { task: 'layout-vector-tile', input, transfer: [input.bytes], priority: entry.priority },
       (outcome) => {
         if (outcome.ok) finish(outcome.output as Bucket[]);
+        else if (outcome.error.taskCode === 'undecodable') undecodable();
         else if (outcome.error.code !== 'cancelled' && outcome.error.code !== 'aborted') {
           entry.task = undefined;
           if (entry.state !== 'ready') entry.state = 'missing';

@@ -154,6 +154,8 @@ class OfflineEngine implements Offline {
   private readonly warned = new Set<string>();
   /** Waits for a change, each for any change or for a check of its endpoint. */
   private waiters: { readonly endpoint: string | undefined; readonly wake: () => void }[] = [];
+  /** Changes of connectivity, mode or switches so far (`TierContext.changes`, KB-190). */
+  private changeCount = 0;
   private packageReader: PackageReader | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly onServe: OfflineOptions['onServe'];
@@ -161,7 +163,8 @@ class OfflineEngine implements Offline {
   /** Switches the application set on globally: a source registered later whose profile forbids one is warned about. */
   private readonly enabledGlobally = new Set<LoadingSwitch>();
   /** The packages each source's tiles were read from: their credits join the source's (F306). */
-  private readonly servedPackages = new Map<string, Set<string>>();
+  /** Each package's credit for a source, by `packageId\u0000sourceId`: one object, so frames compare it by identity. */
+  private readonly packageCredits = new Map<string, Attribution | undefined>();
 
   constructor(options: OfflineOptions) {
     this.currentMode = options.mode ?? 'hybrid';
@@ -238,25 +241,21 @@ class OfflineEngine implements Offline {
     this.registerEndpoint(source);
     this.wrapped.add(source.id);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
-    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
-    // package its tiles came from (F306).
+    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258). A package's
+    // credit travels with the tiles it served and is listed while they are drawn (F306, KB-189).
     Object.defineProperty(wrapped, 'attribution', {
       enumerable: true,
-      get: () => this.creditsOf(source.id, (source as { attribution?: readonly Attribution[] }).attribution ?? []),
+      get: () => (source as { attribution?: readonly Attribution[] }).attribution ?? [],
     });
     return wrapped as S;
   }
 
-  /** A source's credits followed by those of the packages that served its tiles, each text once. */
-  private creditsOf(sourceId: string, own: readonly Attribution[]): readonly Attribution[] {
-    const packages = this.servedPackages.get(sourceId);
-    if (!packages || !this.packageReader?.attribution) return own;
-    const credits = [...own];
-    for (const packageId of packages) {
-      const credit = this.packageReader.attribution(packageId, sourceId);
-      if (credit && !credits.some((c) => c.text === credit.text)) credits.push(credit);
-    }
-    return credits;
+  /** The credit of a package's tiles of a source, made once (KB-189). */
+  private packageCredit(sourceId: string, packageId: string): Attribution | undefined {
+    const key = `${packageId}\u0000${sourceId}`;
+    if (!this.packageCredits.has(key))
+      this.packageCredits.set(key, this.packageReader?.attribution?.(packageId, sourceId));
+    return this.packageCredits.get(key);
   }
 
   stats(sourceId?: string): TierCounters {
@@ -284,6 +283,7 @@ class OfflineEngine implements Offline {
 
   setPackageReader(reader: PackageReader | undefined): void {
     this.packageReader = reader;
+    this.packageCredits.clear();
     this.wake();
   }
 
@@ -359,17 +359,14 @@ class OfflineEngine implements Offline {
           this.waiters.push(waiter);
         }),
       offlineOnly: () => this.currentMode === 'offline',
+      changes: () => this.changeCount,
       count: (sourceId, tier, coord, packageId) => {
         let counters = this.counters.get(sourceId);
         if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
         counters[tier]++;
-        if (packageId !== undefined) {
-          let packages = this.servedPackages.get(sourceId);
-          if (!packages) this.servedPackages.set(sourceId, (packages = new Set()));
-          packages.add(packageId);
-        }
         if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
       },
+      packageCredit: (sourceId, packageId) => this.packageCredit(sourceId, packageId),
       fetch: this.fetchImpl,
     };
   }
@@ -425,6 +422,8 @@ class OfflineEngine implements Offline {
 
   /** Ends every wait; with `endpoint`, only those for a check of it; with null, only those for any change. */
   private wake(endpoint?: string | null): void {
+    // A check of one endpoint that finds it as it was changes nothing a miss waits for.
+    if (endpoint === undefined || endpoint === null) this.changeCount++;
     const waiters = this.waiters;
     const ends = (w: { readonly endpoint: string | undefined }): boolean =>
       endpoint === undefined || w.endpoint === (endpoint ?? undefined);

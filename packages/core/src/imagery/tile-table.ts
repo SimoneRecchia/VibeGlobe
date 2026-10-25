@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
+import type { Attribution } from './credits.js';
 import { NO_SLOT } from '../scheduler/network-pool.js';
 import { MAX_TILE_LEVEL, packTileKey, type TileCoord } from '../tiling/tile-key.js';
 
@@ -43,6 +44,8 @@ export interface TileRecord {
   rounds: number;
   /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
   freshUntilMs: number;
+  /** The credit of the tile alone, from its last response (`TransportResult.attribution`, KB-189). */
+  attribution: Attribution | undefined;
 }
 
 /**
@@ -107,6 +110,7 @@ export class TileTable {
       availabilityUnknown: false,
       rounds: 0,
       freshUntilMs: Infinity,
+      attribution: undefined,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);

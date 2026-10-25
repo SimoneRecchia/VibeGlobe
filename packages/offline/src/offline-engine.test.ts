@@ -203,6 +203,31 @@ describe('the offline engine', () => {
     expect(changes).toEqual(['offline', 'online']);
   });
 
+  it('holds a tile asked for again with nothing changed since its miss until connectivity changes (KB-190)', async () => {
+    let portal = true;
+    const net = fakeNetwork(() =>
+      portal ? { redirected: true, headers: { 'Content-Type': 'text/html' }, body: '<html>login</html>' } : {},
+    );
+    const offline = engine({ fetch: net.fetchImpl });
+    const source = offline.source(fixture());
+    expect((await load(source, tile(3, 1, 1))).kind).toBe('aborted');
+    await expect.poll(() => offline.connectivity).toBe('offline');
+    // The first miss is handed back after a short hold, as before.
+    expect((await load(source, tile(3, 2, 2))).kind).toBe('aborted');
+    // Asked again with nothing changed: held, not handed back every half second for the whole outage.
+    let held: string | undefined;
+    void load(source, tile(3, 2, 2)).then((result) => (held = result.kind));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(held).toBeUndefined();
+    portal = false;
+    await expect.poll(() => offline.connectivity, { timeout: 3000 }).toBe('online');
+    // Connectivity changed: the held request is handed back at once, and asked again the tile loads.
+    await expect.poll(() => held, { timeout: 1000 }).toBe('aborted');
+    expect(text(await load(source, tile(3, 2, 2)))).toBe('tile');
+    expect(net.requests.filter((r) => r.url.endsWith('/3/2/2.png'))).toHaveLength(1);
+    // The 1.5 s hold check and the health checks' backoff take longer than the default 5 s.
+  }, 15_000);
+
   it('a failure on an endpoint the health check finds reachable goes to the engine, which backs off (F315)', async () => {
     let first = true;
     const net = fakeNetwork((url) => {

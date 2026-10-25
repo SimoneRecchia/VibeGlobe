@@ -1,6 +1,14 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { AbortHandle, TileSource, TileCoord, TileRequest, TimeoutsMs, TransportResult } from '@vibeglobe/core';
+import type {
+  AbortHandle,
+  Attribution,
+  TileSource,
+  TileCoord,
+  TileRequest,
+  TimeoutsMs,
+  TransportResult,
+} from '@vibeglobe/core';
 import { freshnessOf, type SourceCachePolicy } from './cache-policy.js';
 import { endpointOf } from './connectivity.js';
 import { fetchTile, type FetchOutcome } from './network-fetch.js';
@@ -36,7 +44,11 @@ export interface TierContext {
   readonly longestCheckMs: number;
   /** True in offline-only mode. */
   offlineOnly(): boolean;
+  /** Counts changes of connectivity, mode or switches: a miss is worth retrying only after one (KB-190). */
+  changes(): number;
   count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
+  /** The credit a package's tiles of a source carry (F306, KB-189): one object per package and source, or none. */
+  packageCredit(sourceId: string, packageId: string): Attribution | undefined;
   readonly fetch: typeof fetch;
 }
 
@@ -58,6 +70,14 @@ export interface TieredSourceOptions {
 
 /** How long a tile that cannot be loaded while offline is held before the engine is told to ask again. */
 const OFFLINE_HOLD_MS = 500;
+/**
+ * How long a tile asked for again with nothing changed since its last miss is held: a change of connectivity or mode
+ * hands it back at once, so this only bounds a request nothing wakes. Handing it back every 500 ms kept the engine
+ * asking for the whole outage (KB-190).
+ */
+const REPEATED_MISS_HOLD_MS = 60_000;
+/** Misses remembered per source; more are forgotten, at worst costing one more short hold each. */
+const MAX_REMEMBERED_MISSES = 4096;
 
 /** The cache key of a tile of a source. */
 export function tileKey(sourceId: string, coord: TileCoord): string {
@@ -124,6 +144,9 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
 }
 
 class TileLoader {
+  /** The change count at each tile's last miss, by tile key (KB-190). */
+  private readonly misses = new Map<string, number>();
+
   constructor(
     private readonly source: TileSource,
     private readonly context: TierContext,
@@ -170,7 +193,15 @@ class TileLoader {
       if (signal.aborted) return ABORTED;
       if (tile) {
         this.context.count(id, 'package', coord, tile.packageId);
-        return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType, cached: true };
+        // The package's credit is listed while this tile is drawn, and no longer (F306, KB-189).
+        const attribution = this.context.packageCredit(id, tile.packageId);
+        return {
+          kind: 'ok',
+          bytes: tile.bytes,
+          contentType: tile.contentType,
+          cached: true,
+          ...(attribution ? { attribution } : {}),
+        };
       }
     }
     const endpoint = endpointOf(url);
@@ -195,7 +226,7 @@ class TileLoader {
       this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
-    return this.miss(decision);
+    return this.miss(decision, key);
   }
 
   /**
@@ -310,10 +341,15 @@ class TileLoader {
    * for now: hold the request briefly, then tell the engine to ask again (an abort, not a failure), so the tile loads
    * once connectivity returns without spending the engine's retries (F298, F299).
    */
-  private async miss(decision: PolicyDecision): Promise<TransportResult> {
+  private async miss(decision: PolicyDecision, key: string): Promise<TransportResult> {
     if (this.context.offlineOnly() || !decision.useNetwork) return NOT_FOUND;
     this.context.count(this.source.id, 'offlineMisses');
-    await this.context.waitForChange(OFFLINE_HOLD_MS);
+    // Asked again with nothing changed since its last miss: wait for a change instead (KB-190).
+    const changes = this.context.changes();
+    const repeated = this.misses.get(key) === changes;
+    if (this.misses.size >= MAX_REMEMBERED_MISSES) this.misses.clear();
+    this.misses.set(key, changes);
+    await this.context.waitForChange(repeated ? REPEATED_MISS_HOLD_MS : OFFLINE_HOLD_MS);
     // Not a failure: a transient error would make the engine probe the host with one request at a time, which would
     // also slow the tiles the cache and the packages hold.
     return { kind: 'aborted' };

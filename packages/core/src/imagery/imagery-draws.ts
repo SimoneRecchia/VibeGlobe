@@ -99,6 +99,8 @@ export function drawImagery(
       if (isOpaque(entry.entry)) {
         based = true;
         visible?.mark(drawn?.index ?? 0);
+        const credit = drawn?.loader.attributionOf(handle);
+        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
         // Tone matching between the chain's sources (F249): which one this draw shows.
         list.toneSources[index] = entry.entry.harmonize && entry.chain.length > 1 ? layer * 8 + chosen : -1;
         list.textures[index] = handle;
@@ -111,6 +113,8 @@ export function drawImagery(
         list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
       } else if (overlays < MAX_OVERLAYS) {
         visible?.mark(drawn?.index ?? 0);
+        const credit = drawn?.loader.attributionOf(handle);
+        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
         overlays = addOverlay(entry, overlays, handle, geographic);
       }
     }

@@ -66,6 +66,9 @@ export class RuntimeCredits {
       (source, index): source is CreditedSource => source !== undefined && this.visible.visible(index),
     );
     shown.push(...this.extra());
+    // Credits of single tiles drawn (an offline package's, KB-189), under the source that drew them.
+    for (const [credit, index] of this.visible.tileCredits())
+      shown.push({ id: this.sources[index]?.id ?? 'tile', attribution: [credit] });
     return creditsOf(shown, this.hidden, (sourceId) => {
       if (this.warned.has(sourceId)) return;
       this.warned.add(sourceId);

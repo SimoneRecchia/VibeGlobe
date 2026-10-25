@@ -42,4 +42,21 @@ describe('credits (F254, F255)', () => {
     expect(visible.settle()).toBe(true);
     expect([visible.visible(0), visible.visible(1), visible.visible(2)]).toEqual([true, false, true]);
   });
+
+  it("lists a tile's own credit while the tile is drawn and drops it once no drawn tile carries it (KB-189)", () => {
+    const visible = new VisibleSources(1);
+    const rome = { text: 'Rome package' };
+    visible.mark(0);
+    visible.markCredit(rome, 0);
+    expect(visible.settle()).toBe(true);
+    expect([...visible.tileCredits()]).toEqual([[rome, 0]]);
+    // The same tiles again: no change to report.
+    visible.mark(0);
+    visible.markCredit(rome, 0);
+    expect(visible.settle()).toBe(false);
+    // Its tiles left the view; the source still draws others.
+    visible.mark(0);
+    expect(visible.settle()).toBe(true);
+    expect([...visible.tileCredits()]).toEqual([]);
+  });
 });

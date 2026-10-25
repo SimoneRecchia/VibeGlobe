@@ -6,6 +6,7 @@
  * @benchmark packages/core/src/globe/frame-allocation.test.ts
  */
 import type { RamTier } from '../cache/ram-tier.js';
+import type { Attribution } from './credits.js';
 import { SLOW_LINK_BPS } from '../scheduler/bandwidth.js';
 import type { Residency } from '../cache/residency.hot.js';
 import { UPLOAD_REFUSED, UploadQueue } from '../cache/upload-queue.hot.js';
@@ -347,6 +348,11 @@ export class ImageryLoader implements NetworkPoolClient {
     return record?.state === READY ? this.options.handleBase + record.slot : -1;
   }
 
+  /** The credit of the tile alone under a texture handle (an offline package's, KB-189), if its response gave one. */
+  attributionOf(handle: number): Attribution | undefined {
+    return this.table.bySlot[handle - this.options.handleBase]?.attribution;
+  }
+
   /** The tile uploaded under a texture handle of this loader. */
   coordOf(handle: number): TileCoord | undefined {
     return this.table.bySlot[handle - this.options.handleBase]?.coord;
@@ -671,6 +677,7 @@ export class ImageryLoader implements NetworkPoolClient {
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
       if (this.outageDead > 0 && result.cached !== true) this.reviveOutageDead();
+      record.attribution = result.attribution;
       record.freshUntilMs =
         result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
           ? this.options.now() + result.maxAgeMs

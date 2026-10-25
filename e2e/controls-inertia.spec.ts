@@ -38,7 +38,12 @@ test('a released drag coasts with time-based inertia, and a release after holdin
   expect(all.length - releasedAt, trace).toBeGreaterThan(3);
   // The release frame starts inertia part-way through its step; from the next frame on, inertia runs at the drag's
   // speed (the content moves east, the center west) and slows monotonically to rest within the time constant.
-  const dragRate = (rate(releasedAt - 1) + rate(releasedAt - 2)) / 2;
+  // The drag's speed over the whole drag: on a software GPU the moves arrive one per frame, so the camera's rate over
+  // one or two frame intervals swings with their length (a 33 ms frame showing a whole 100 ms step).
+  const dragStart = all.findIndex((frame) => frame.pointer !== null);
+  const dragRate =
+    ((lon[releasedAt - 1] ?? 0) - (lon[dragStart] ?? 0)) /
+    ((all[releasedAt - 1]?.timeMs ?? 0) - (all[dragStart]?.timeMs ?? 1));
   const first = releasedAt + 1;
   expect(rate(first), trace).toBeLessThan(0);
   // A sanity bound: that frame averages a stretch already decaying, over uneven engine steps on a software GPU; the

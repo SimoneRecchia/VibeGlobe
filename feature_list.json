@@ -7274,7 +7274,7 @@
         "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
         "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F600",

@@ -168,6 +168,20 @@ export interface TileDrawLayer {
    * terrain coarser than its level's may differ from its neighbors by that terrain's error.
    */
   readonly skirtMeters: Float32Array;
+  /**
+   * Terrain only, four per draw (north, east, south, west edge): 1 where the edge's heights come from the draw's stitch
+   * texture, the coarser terrain its neighbor across that edge shows, so the two meet (KB-178); 0 elsewhere.
+   */
+  readonly stitchEdges?: Uint8Array;
+  /** Terrain only: the texture handle of each draw's stitch heights, or -1 for none. */
+  readonly stitchTextures?: Int32Array;
+  /** Terrain only: the UV transforms into the stitch textures, four per draw, as `uvTransforms`. */
+  readonly stitchTransforms?: Float32Array;
+  /**
+   * Terrain only, two per draw: the share of its heights a draw keeps on its north and south edges, linear between
+   * (1 except on polar caps over a Web Mercator terrain, which fade to the ellipsoid at the pole, KB-180).
+   */
+  readonly heightScales?: Float32Array;
 }
 
 /**

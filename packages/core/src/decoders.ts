@@ -28,7 +28,7 @@ export {
 } from './imagery/ktx2.js';
 export { readLayerJson, readRanges, TerrainAvailability } from './terrain/layer-json.js';
 export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
-export { decodeHeightmap, heightGrid } from './terrain/heightmap.js';
+export { decodeHeightmap, heightGrid, heightmapBorderPx } from './terrain/heightmap.js';
 export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
 export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
 export type { MeasuredGrid } from './terrain/grid-size.js';

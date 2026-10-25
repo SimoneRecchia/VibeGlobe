@@ -11,7 +11,6 @@ import {
 } from '@vibeglobe/core';
 import { readGeoidFile } from '@vibeglobe/core/decoders';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { sourceLines } from './source-lines.js';
 import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
@@ -24,13 +23,15 @@ import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
 import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
 import { exposeTestHooks } from './test-hooks.js';
-import { cacheLine, surfaceLine } from './overlay-lines.js';
 
-const OVERLAY_REFRESH_MS = 250;
 /** Engine log messages collected with `?logSink=1` (F120). */
 const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
+// `?network=online|hybrid|offline` wraps the fixture imagery with the offline engine in that mode (KB-185).
+const offlineDemo = params.has('network')
+  ? (await import('./offline-demo.js')).playgroundOffline(params.get('network'))
+  : undefined;
 // `?utm=` layers need the gis package and proj4: loaded only then, so the engine alone loads neither (F418).
 const reprojected = params.has('utm') ? await import('./reprojected-layers.js') : undefined;
 
@@ -276,7 +277,8 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
   // 3D Tiles decode their glTF content with the engine's workers (`parse-model`): a globe without tiled sources needs
   // them too, or a production build has nothing to decode with (F463).
   const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
-  return { ...tiles3dWorkers, ...terrain, ...imagery, ...customAdapters(params), ...montBlancLayers };
+  const wrapped = offlineDemo && imagery.imagery ? { imagery: imagery.imagery.map(offlineDemo.wrap) } : {};
+  return { ...tiles3dWorkers, ...terrain, ...imagery, ...wrapped, ...customAdapters(params), ...montBlancLayers };
 }
 
 /** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
@@ -382,63 +384,6 @@ function startSecondGlobe(host: HTMLElement): Globe {
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
 }
 
-async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
-  // Loaded on demand so the overlay code is not part of the default page.
-  const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
-    import('@vibeglobe/ui'),
-    import('./tile-view.js'),
-  ]);
-  const overlay = createDebugOverlay(host);
-  addTileViewToggle(globe, host, params.has('imagery') ? `fixture-${params.get('imagery')}` : undefined);
-  let info: (readonly [string, string])[] = [];
-  let pipelineCompiles = -1;
-  let surfaceInfo = '';
-  // Read at start and again after a recovery, which may have switched the backend (KB-049).
-  const readInfo = (): void => {
-    const caps = globe.capabilities;
-    if (!caps) return;
-    pipelineCompiles = Number.NaN;
-    info = [
-      ['backend', `backend ${caps.backend}`],
-      ['max-texture-size', `max texture ${caps.maxTextureSize}`],
-      ['max-anisotropy', `anisotropy ${caps.maxAnisotropy}`],
-      ['compressed-formats', `compressed ${caps.compressedTextureFormats.join(', ') || 'none'}`],
-      ['device-memory', `memory ${caps.deviceMemoryGiB === undefined ? 'unknown' : `${caps.deviceMemoryGiB} GiB`}`],
-      ['adapter', `adapter ${caps.adapter}`],
-      ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
-      ...sourceLines(globe),
-    ];
-  };
-  void globe.ready.then(readInfo);
-  globe.on('device-restored', readInfo);
-  let lastRefreshMs = -Infinity;
-  return startFrameLoop((stats, timestampMs) => {
-    if (timestampMs - lastRefreshMs < OVERLAY_REFRESH_MS) return;
-    lastRefreshMs = timestampMs;
-    overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
-    // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
-    const rendererStats = globe.rendererStats();
-    const compiles = info.length > 0 ? rendererStats.pipelineCompiles : -1;
-    // Draw calls and pipeline changes of the last frame (F103).
-    const draws = `draw calls ${rendererStats.drawCalls} · pipeline switches ${rendererStats.pipelineSwitches}`;
-    const surface = surfaceLine(globe);
-    const imagery = globe.imageryStats();
-    const cache = imagery ? cacheLine(imagery) : '';
-    const extra = window.vibeglobeDebugRows?.() ?? []; // Rows of the running scenario (F374).
-    if (compiles === pipelineCompiles && surface + cache + draws + extra.join() === surfaceInfo) return;
-    pipelineCompiles = compiles;
-    surfaceInfo = surface + cache + draws + extra.join();
-    overlay.setInfo([
-      ...info,
-      ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
-      ['draws', draws],
-      ['surface', surface],
-      ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
-      ...extra,
-    ]);
-  });
-}
-
 const experiment = params.get('experiment') === 'offscreen' ? params.get('render') : null;
 
 if (params.get('experiment') === 'gpu-probes') {
@@ -492,7 +437,8 @@ if (params.get('experiment') === 'gpu-probes') {
     setStatus(`The globe could not start: ${error instanceof Error ? error.message : String(error)}`),
   );
   let loop: FrameLoop | undefined;
-  if (params.has('debug')) loop = await startDebugOverlay(globe, app);
+  if (params.has('debug'))
+    loop = await (await import('./debug-overlay.js')).startDebugOverlay(globe, app, params, offlineDemo);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
   else if (scenario === 'drag') loop = startDragLoop(globe);
   // `?scenario=3dtiles-city&tour=1`: the tour of the `3dtiles-city` benchmark, its frames measured like a drag.

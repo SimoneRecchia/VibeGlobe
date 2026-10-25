@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeHeightmap, heightGrid } from './heightmap.js';
+import { decodeHeightmap, heightGrid, heightmapBorderPx } from './heightmap.js';
 
 /** RGBA bytes of a square tile whose every pixel has the given red, green and blue. */
 function uniform(sizePx: number, r: number, g: number, b: number): Uint8Array {
@@ -42,6 +42,31 @@ describe('heightmap encodings', () => {
 });
 
 describe('height grid', () => {
+  it('gives two neighbors with a one-pixel border the same heights along their shared edge (KB-178)', () => {
+    // Rough relief sampled at pixel centers of 16-pixel tiles, each with a ring of its neighbor's pixels: 18 px.
+    const relief = (x: number, y: number): number =>
+      1000 * Math.sin(x * 1.7) * Math.cos(y * 2.3) + 300 * Math.sin(x * y);
+    const tile = (column: number): Float32Array => {
+      const pixels = new Float32Array(18 * 18);
+      for (let y = 0; y < 18; y++)
+        for (let x = 0; x < 18; x++) pixels[y * 18 + x] = relief(column * 16 + x - 1 + 0.5, y - 1 + 0.5);
+      return pixels;
+    };
+    expect([heightmapBorderPx(18), heightmapBorderPx(258), heightmapBorderPx(256), heightmapBorderPx(257)]).toEqual([
+      1, 1, 0, 0,
+    ]);
+    const west = heightGrid(tile(0), 18, 16);
+    const east = heightGrid(tile(1), 18, 16);
+    for (let row = 0; row <= 16; row++)
+      expect(west.heightsMeters[row * 17 + 16]).toBeCloseTo(east.heightsMeters[row * 17] ?? NaN, 3);
+    // The interior keeps its own pixels: a vertex between four pixel centers is their mean.
+    const pixels = tile(0);
+    const mean =
+      ((pixels[1 * 18 + 1] ?? 0) + (pixels[1 * 18 + 2] ?? 0) + (pixels[2 * 18 + 1] ?? 0) + (pixels[2 * 18 + 2] ?? 0)) /
+      4;
+    expect(west.heightsMeters[1 * 17 + 1]).toBeCloseTo(mean, 3);
+  });
+
   it('spans the tile edge to edge, interpolating between pixel centers and extrapolating to the border', () => {
     // A 4-pixel ramp west to east: 0, 10, 20, 30 m at the pixel centers (x = 0.5, 1.5, 2.5, 3.5).
     const pixels = new Float32Array(16);

@@ -1,5 +1,5 @@
 // Connectivity dropping and returning (F298, F329's scenario frames): the navigation scenario with the connection lost
-// mid-pan and back after the flight, on WebGPU and forced WebGL2; every frame drawn on the manual clock and checked
+// mid-pan and back mid-flight (KB-187), on WebGPU and forced WebGL2; every frame drawn on the manual clock and checked
 // for holes, black pixels and pops. The base package and the network's own detail cover the path while offline.
 import { expect, test } from '@playwright/test';
 import { openHarness, servedTiers, startHarness } from '../support/offline.ts';
@@ -18,7 +18,7 @@ test.use({ viewport: { width: 320, height: 240 } });
 test.describe.configure({ timeout: 240_000 });
 
 for (const backend of BACKENDS)
-  test(`connectivity drops mid-pan and returns after a flight on ${backend}: no hole, black pixel or pop, detail resumes (F298, F329)`, async ({
+  test(`connectivity drops mid-pan and returns mid-flight on ${backend}: no hole, black pixel or pop, detail resumes (F298, F329)`, async ({
     page,
     context,
   }) => {
@@ -32,29 +32,40 @@ for (const backend of BACKENDS)
 
     const online = await recordPath(
       page,
-      [{ jump: ROME }, { move: { ...ROME, zoom: 9.5 }, frames: 30 }, { hold: 60 }],
+      [
+        { jump: ROME },
+        { move: { ...ROME, zoom: 9.5 }, frames: 30 },
+        { hold: 60 },
+        { move: { ...ROME, longitudeDeg: 12.8, zoom: 9.5 }, frames: 15 },
+      ],
       BLACK_BELOW,
     );
+    // Mid-pan: the connection drops between two frames of the move, which goes on at the same pace.
     await context.setOffline(true);
     const dropped = await recordPath(
       page,
       [
-        { move: { ...ROME, longitudeDeg: 13.1, zoom: 9.5 }, frames: 30 },
+        { move: { ...ROME, longitudeDeg: 13.1, zoom: 9.5 }, frames: 15 },
         { hold: 40 },
-        { fly: { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 8 }, durationMs: 3000 },
-        { hold: 40 },
+        { fly: { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 8 }, durationMs: 3000, frames: 180 },
       ],
       BLACK_BELOW,
     );
     await expectConnectivity(page, 'offline');
     const fromNetwork = (await servedTiers(page))['network'] ?? 0;
+    // Mid-flight: the connection returns while the flight goes on.
     await context.setOffline(false);
-    await expectConnectivity(page, 'online');
     const returned = await recordPath(
       page,
-      [{ hold: 90 }, { move: { longitudeDeg: 2.6, latitudeDeg: 48.85, zoom: 8.5 }, frames: 30 }, { hold: 60 }],
+      [
+        { follow: 200 },
+        { hold: 90 },
+        { move: { longitudeDeg: 2.6, latitudeDeg: 48.85, zoom: 8.5 }, frames: 30 },
+        { hold: 60 },
+      ],
       BLACK_BELOW,
     );
+    await expectConnectivity(page, 'online');
     for (const [phase, report] of Object.entries({ online, dropped, returned })) {
       console.log(`[network] drop-return ${backend} ${phase}: ${JSON.stringify(report)}`);
       expectClean(report, 40);

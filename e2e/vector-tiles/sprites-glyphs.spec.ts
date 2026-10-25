@@ -65,6 +65,8 @@ for (const ratio of [1, 2]) {
 }
 
 test('text is crisp from 10 to 32 px (F448)', async ({ page }) => {
+  // Four text sizes, each laid out and drawn again on a software GPU: 27 s on CI, past the default 30 s on a slow runner.
+  test.setTimeout(60_000);
   await openVector(page, POIS);
   for (const size of [10, 14, 20, 32]) {
     await page.evaluate(

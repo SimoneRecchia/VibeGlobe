@@ -3,7 +3,9 @@
 The first pre-release of the `@vibeglobe` packages (owner, 2026-10-25), for installing from files while nothing is
 on the npm registry. The tag `v0.1.0` on `main` is the release commit (every package at 0.1.0, engine
 dependencies pinned to it, `CHANGELOG.md` with its entry). The tarballs themselves are not in git: build them from
-the tag, in a few minutes:
+the tag, in a few minutes. The tag is the owner's to push (this session's git access pushes only its branch): `git tag
+-a v0.1.0 04f9286 -m "Release v0.1.0" && git push origin v0.1.0`, or a GitHub release draft on that commit, which
+creates it. Until then, check out `04f9286` (the squash merge of #47 on `main`) instead:
 
 ```sh
 git checkout v0.1.0

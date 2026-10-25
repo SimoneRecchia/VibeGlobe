@@ -17,8 +17,9 @@ the disc froze): glides now turn the globe about the screen center like a virtua
 turning it, the release velocity follows the finger at the lift; trackpad sequences at 120 and 60 Hz are unit and
 browser tests. The playground's showcase (owner request): the default page shows every `@vibeglobe/ui` control, a
 settings panel, demo data, the local sample builds and a help overlay; every page shows the default controls
-(`?ui=0` hides them); tests see the bare engine (`apps/playground/CLAUDE.md`). Pre-release 0.1.0: tag `v0.1.0` on
-`main`, not published; `npm run release:pack` rebuilds the tarballs (`release-0.1.0/README.md`), and
+(`?ui=0` hides them); tests see the bare engine (`apps/playground/CLAUDE.md`). Pre-release 0.1.0: the release commit `04f9286` on `main` (#47), not published; the tag `v0.1.0` is the
+owner's to push (this session can push only its branch: `git tag -a v0.1.0 04f9286 -m "Release v0.1.0" && git push
+origin v0.1.0`); `npm run release:pack` rebuilds the tarballs (`release-0.1.0/README.md`), and
 `docs/guides/cube-quickstart.md` installs them in a Nuxt 3 or Vue 3 application. Also: ADR 0046 decision 5 (retry
 rounds back once a source is stable, question 33), KB-171 fixed (label placement slices), KB-199/KB-200/KB-201.
 
@@ -43,7 +44,7 @@ OpenStreetMap warning per source, core side fixed). KB-097, KB-110 and KB-170 ma
 7. M15: TG-01, TG-04, TG-06 and the remaining M15 entries (cross-browser F504, soak, chaos, fuzzing, the WebGL2 CPU
    p95 of `drag-200/400/800` on the owner's Mac, the release).
 
-**Open owner questions** (`docs/open-questions.md`): 13 (legal review of the README licensing text), 16
+**Open owner questions** (`docs/open-questions.md`): the `v0.1.0` tag above; 13 (legal review of the README licensing text), 16
 (`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment for publishing). The 33
 pending entries wait for owner steps listed there (reference tablet, the owner's Mac runs, the Milan sample, keys).
 

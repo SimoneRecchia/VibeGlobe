@@ -1,7 +1,7 @@
-// Both offline setups (F295, F296, F329's scenario frames) in offline-only mode, on WebGPU and forced WebGL2: packages
-// read from a LAN server without installing (mode 1), and packages installed in browser storage (mode 2). The
-// navigation scenario draws every frame on the manual clock, checked for holes, black pixels and pops; no request
-// reaches the tile source.
+// Both offline setups (F295, F296, F329's scenario frames) on WebGPU and forced WebGL2: packages read from a LAN server
+// without installing, in hybrid mode with no internet (mode 1: every request for the tile source fails), and packages
+// installed in browser storage in offline-only mode (mode 2: no request reaches the tile source). The navigation
+// scenario draws every frame on the manual clock, checked for holes, black pixels and pops.
 import { expect, test, type Page } from '@playwright/test';
 import { openHarness, publishFixture, servedTiers, servePackages, startHarness } from '../support/offline.ts';
 import { NAVIGATION, recordPath, ROME, sessionId } from './support/network.ts';
@@ -40,8 +40,11 @@ async function runSetup(page: Page, backend: Backend, setup: 'lan' | 'storage'):
     else await page.evaluate((s) => window.offlineHarness?.installFixture(s), spec);
   }
   const requests = recordSourceRequests(page, session);
+  // Mode 1 has no internet: the tile source cannot be reached, the LAN server can (KB-186).
+  if (setup === 'lan')
+    await page.route(`**/fixture-tiles/${session}/**`, (route) => route.abort('internetdisconnected'));
   await startHarness(page, {
-    network: 'offline',
+    network: setup === 'lan' ? 'hybrid' : 'offline',
     sources,
     ...(setup === 'lan' ? { served } : {}),
     view: ROME,
@@ -53,12 +56,13 @@ async function runSetup(page: Page, backend: Backend, setup: 'lan' | 'storage'):
   console.log(`[network] ${setup} ${backend}: ${JSON.stringify(report)}`);
   expectClean(report);
   expect((await servedTiers(page))['package'] ?? 0).toBeGreaterThan(0);
-  expect(requests).toEqual([]);
   if (setup === 'lan') expect(lan.requests.length).toBeGreaterThan(0);
+  // Offline-only mode never asks the network; hybrid mode does, and fails (mode 1).
+  else expect(requests).toEqual([]);
 }
 
 for (const backend of BACKENDS) {
-  test(`offline mode 1, packages on a LAN server: the navigation scenario with no hole, black pixel or pop on ${backend} (F295, F329)`, async ({
+  test(`offline mode 1, packages on a LAN server in hybrid mode with no internet: the navigation scenario with no hole, black pixel or pop on ${backend} (F295, F329)`, async ({
     page,
   }) => runSetup(page, backend, 'lan'));
 

@@ -21,6 +21,7 @@ import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { stitchTerrainEdges } from '../terrain/terrain-stitch.hot.js';
 import {
   drawTerrain,
   recordShownTerrain,
@@ -393,6 +394,7 @@ export class ImageryRuntime {
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       recordShownTerrain(list, tiles, count, terrain);
       if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);
+      stitchTerrainEdges(list, tiles, count, terrain);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart + this.chargedMs;
       this.chargedMs = 0;

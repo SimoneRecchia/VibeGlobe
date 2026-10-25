@@ -886,7 +886,10 @@ export class ImageryLoader implements NetworkPoolClient {
     if (!tracing && !logging) return;
     const subject = `${record.coord.level}/${record.coord.x}/${record.coord.y}`;
     if (tracing) observability.tracer.record(kind, event, subject);
-    if (logging) observability.logger.log('debug', `${this.options.source.id}: request ${subject}`);
+    // The priority names the path that wanted the tile: visible, preload, prefetch (KB-174).
+    const priority = this.table.priorities[record.slot] ?? 0;
+    if (logging)
+      observability.logger.log('debug', `${this.options.source.id}: request ${subject} at priority ${priority}`);
   }
 
   private leaveActive(record: TileRecord): void {

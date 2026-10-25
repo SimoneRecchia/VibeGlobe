@@ -43,6 +43,8 @@ export const TILE_SEGMENTS = QUADTREE_SEGMENTS;
 const GRID = TILE_SEGMENTS + 1;
 const SURFACE_VERTICES = GRID * GRID;
 const SKIRT_VERTICES = 4 * GRID;
+/** How far out a skirt reaches by default, per meter it hangs down (KB-069). */
+const SKIRT_OUTWARD = 4;
 
 let sharedIndices: Uint16Array | undefined;
 
@@ -199,10 +201,15 @@ export function buildTileMesh(
 
 /**
  * Builds the mesh of a surface-quadtree tile (ADR 0006 §1): rows at {@link quadtreeRowLatitudeRad}, so a Mercator
- * tile's rows are evenly spaced in Mercator y, with skirts of `skirtDepthMeters`. Texture coordinates still address the
- * equirectangular base imagery until imagery tiles arrive (M3 plan, increment 1).
+ * tile's rows are evenly spaced in Mercator y, with skirts of `skirtDepthMeters` reaching `skirtReachMeters` out from
+ * the edge (four times the depth by default). Texture coordinates still address the equirectangular base imagery until
+ * imagery tiles arrive (M3 plan, increment 1).
  */
-export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: number): TileMeshData {
+export function buildQuadtreeTileMesh(
+  tile: QuadtreeTile,
+  skirtDepthMeters: number,
+  skirtReachMeters = SKIRT_OUTWARD * skirtDepthMeters,
+): TileMeshData {
   const { westRad, eastRad } = tile;
   const originEcef = new Float64Array(3);
   geodeticToEcef((westRad + eastRad) / 2, quadtreeRowLatitudeRad(tile, TILE_SEGMENTS / 2), 0, originEcef);
@@ -214,10 +221,10 @@ export function buildQuadtreeTileMesh(tile: QuadtreeTile, skirtDepthMeters: numb
   const northRad = rowLatitudes[0] ?? 0;
   const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
   const planeCenter = planeCenterOf((westRad + eastRad) / 2, rowLatitudes[TILE_SEGMENTS / 2] ?? 0);
-  // Skirts slope outward four times as far as they hang down, so the skirts of neighbors overlap below the surface and
-  // close the corners and slivers where tiles of different levels meet (KB-069); a skirt hangs at most a fraction of
-  // a percent of the radius down, so even at this slope it stays inside the ellipsoid.
-  const outwardRad = (4 * skirtDepthMeters) / WGS84.semiMajorAxisMeters;
+  // Skirts reach outward, so the skirts of neighbors overlap below the surface and close the corners and slivers where
+  // tiles of different levels meet (KB-069); a skirt hangs at most a fraction of a percent of the radius down, so it
+  // stays inside the ellipsoid.
+  const outwardRad = skirtReachMeters / WGS84.semiMajorAxisMeters;
   const write = (index: number, row: number, col: number, heightMeters: number): void => {
     let lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
     let latRad = rowLatitudes[row] ?? 0;

@@ -54,6 +54,51 @@ describe('terrain attributes (M4)', () => {
   });
 });
 
+describe('skirts', () => {
+  it('reach out as far as asked, not four times their depth, so deep terrain skirts stay under ground falling away from the edge (KB-178)', () => {
+    const blank = {
+      key: 0,
+      root: 0,
+      level: 0,
+      x: 0,
+      y: 0,
+      span: 1,
+      westRad: 0,
+      southRad: 0,
+      eastRad: 0,
+      northRad: 0,
+    } as const;
+    const tile = quadtreeTileBounds(MERCATOR_ROOT, 12, 2125, 1460, 1, { ...blank });
+    const depthMeters = 400;
+    const mesh = buildQuadtreeTileMesh(tile, depthMeters, 100);
+    const grid = TILE_SEGMENTS + 1;
+    const edgeVertex = new Float64Array(3);
+    let widest = 0;
+    for (let i = grid * grid; i < mesh.positions.length / 3; i++) {
+      // A skirt vertex shares its edge vertex's texture coordinates: find that vertex, then the horizontal offset.
+      const u = mesh.uvs[i * 3] ?? 0;
+      const v = mesh.uvs[i * 3 + 1] ?? 0;
+      const edge = Math.round(v * TILE_SEGMENTS) * grid + Math.round(u * TILE_SEGMENTS);
+      for (let c = 0; c < 3; c++)
+        edgeVertex[c] = (mesh.positions[i * 3 + c] ?? 0) - (mesh.positions[edge * 3 + c] ?? 0);
+      const up = mesh.normals.subarray(edge * 3, edge * 3 + 3);
+      const down = -(
+        (edgeVertex[0] ?? 0) * (up[0] ?? 0) +
+        (edgeVertex[1] ?? 0) * (up[1] ?? 0) +
+        (edgeVertex[2] ?? 0) * (up[2] ?? 0)
+      );
+      const out = Math.sqrt(
+        Math.max(0, Math.hypot(edgeVertex[0] ?? 0, edgeVertex[1] ?? 0, edgeVertex[2] ?? 0) ** 2 - down ** 2),
+      );
+      expect(down).toBeCloseTo(depthMeters, 0);
+      widest = Math.max(widest, out);
+    }
+    // 100 m from each edge: a corner's skirt vertex, out from both, reaches √2 times as far.
+    expect(widest).toBeGreaterThan(99);
+    expect(widest).toBeLessThan(100 * Math.SQRT2 + 1);
+  });
+});
+
 describe('tile-local texture coordinates (M3 plan §2.4)', () => {
   const GRID = TILE_SEGMENTS + 1;
   const uvw = (mesh: TileMeshData, vertex: number): number[] =>

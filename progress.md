@@ -1,36 +1,32 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-24 22:00 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 01:40 UTC)
 
-Taken over from the previous account on 2026-10-23 at about 21:00 UTC. Merged into `main` (squash; `main` merged back
-after each): SimoneRecchia/VibeGlobe#26, #27, #30, #32, #35, #36, #37, #38; #39 open (F249, F358, full-CI fixes). Tracks
-D, E, F, G and H are merged.
+Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`; SimoneRecchia/VibeGlobe#40 into `main` is open
+(merge it with a merge commit or squash once its fast checks pass, then merge `main` back and run `npx tsc -b --force`).
+Merged into `main` so far: #26, #27, #30, #32, #35–#39. Tracks D, E, F, G and H are merged; a space-background track
+(F600–F606, `packages/renderer/src/starfield/`) runs in a parallel session (`docs/parallel-tracks.md`).
 
-Owner decisions of 2026-10-24, done:
+Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
+F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the
+reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan/quality.md`).
 
-- License: MPL-2.0 with a DCO sign-off (ADR 0043); the MPL notice in every distributed source file (`npm run check`);
-  contact recchia.sim@gmail.com (questions 14 and 15 closed).
-- Core budget 64 KB (ADR 0042). Provider readings (questions 23, 24): amendments to ADR 0025, 0031, 0032; Google EEA
-  refusals (`assertAvailableInRegion`), the "Google Maps" credit, 16 px logos with clear space, OSM single host and
-  "Report a map issue"; F468, F469 superseded by F572, F573 (passing).
+Since the last handoff (2026-10-24 22:00):
 
-Since the takeover:
-
-- Passing: F416, F401, F402, F474, F385, F398, F219, F323, F154, F396, F393, F339, F264, F488, F551, F374,
-  **F490 (M14)**, **F554 (M9)**, **F269 (M7)**, F566, F567, F572, F573, F249 (ADR 0044), F358 (ADR 0045), each milestone after a fresh-context review
-  and its fix check. F438 (M12) is pending its manual tablet and desktop step (review and fix check done).
-- Bugs fixed: KB-132 to KB-169 (except KB-163), KB-172, DP-002 to DP-006, TH-01, TG-02, TG-03. What remains of F167
-  manual tilt is KB-170 (the terrain limit's rate in a fast zoom). Open: KB-097 (F167), KB-110 (F137, hardening
-  backlog), KB-138 (M11), KB-144 (F378), KB-163 (F395: the 25% target is open question 32), KB-170 (F167), KB-171
-  (F359's budget gate flaky in this container, also on the committed code). Track G's TG-01, TG-04 to TG-06 (M15).
-- Full CI run 40119880914 (66fafeb) and 40130319391 (9d2a4fa): F052, F399, F429, F231, F248 specs updated to intended
-  changes (`docs/test-changes.md`); KB-172 fixed; F064's regression from F358 (a boxed pixel ratio, per-frame closures)
-  fixed; label fields keep the engine drawing until they show (F379); labels under 14 px drawn from a 12 px field
-  (F360 in other fonts); tile means measured lazily (F249). F101/F102 and F142 fail locally on 66fafeb too (not a
-  regression of these commits); full run 40135695755 started on 440634c. F378 pending (KB-144 fixed). Hook H (2)
-  done.
-  Open, breadth first: F148, F167, F329 (CI run), F389, F395 (question 32), F403, F453, F472; M15 and track G's
-  bugs.
+- Passing: F065 (ADR 0019 on the reference desktop), F075, F115 (224 ms). Added: F574 (failing, KB-174), F600–F606
+  (the parallel track's).
+- Fixed: KB-173 (SDF strokes in CI's fonts), KB-175 (Apple reassociation, to confirm on the Mac), KB-176 (3D Tiles in
+  production builds), KB-177 (inertia: robust release velocity, 650 ms glide), KB-179 (clipped pyramids), KB-182
+  (playground overlaps), KB-PT-07 core side. Playground `?scenario=mont-blanc` (real Copernicus DEM and WorldCover).
+- Terrain walls fixed (KB-178): edges next to coarser terrain take its heights (third height texture), the pipeline
+  writes 258-px terrain tiles with a ring of the neighbors' pixels (rebuild older builds), and skirts deepened by
+  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps fade Mercator
+  heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
+- Open: KB-174 (one fogged request on WebGL2, time box spent), KB-180's wedges and sheet (owner's views), KB-181 (owner's views asked for), KB-183 (two-finger frame race), TG-05
+  (132 → 31 dead tiles; decoded uploads stuck), and the WebGL2 CPU budget (ADR 0010 rule 7 triggered; benchmarks now
+  record phase times; texture pages via multi-draw planned).
+- Remaining M4–M14 outside the backlog: F329 (fresh-context M8 review running), F574 (KB-174), F600–F606 (parallel
+  track).
 
 ## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
 

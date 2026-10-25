@@ -286,9 +286,9 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 
 /**
  * Below this fog visibility at a tile's closest point nothing is prefetched around or under it: its neighbors and
- * children would show at most a tenth of their detail (F574, KB-174).
+ * children, deeper in the haze, would show at most half their detail (F574, KB-174).
  */
-const PREFETCH_MIN_VISIBILITY = 0.1;
+const PREFETCH_MIN_VISIBILITY = 0.5;
 
 const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
 

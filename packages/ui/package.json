@@ -1,6 +1,6 @@
 {
   "name": "@vibeglobe/ui",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe ui: optional ready-made UI controls, theming and translations.",
   "license": "MPL-2.0",
   "type": "module",
@@ -30,8 +30,8 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/gis": "0.0.0",
-    "@vibeglobe/layers": "0.0.0"
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/gis": "0.1.0",
+    "@vibeglobe/layers": "0.1.0"
   }
 }

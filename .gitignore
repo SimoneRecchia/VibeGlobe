@@ -12,3 +12,6 @@ benchmarks/results/ci-*/
 .output/
 .nuxt/
 .release/
+
+# Tarballs of a pre-release, rebuilt with npm run release:pack (release-0.1.0/README.md).
+release-*/*.tgz

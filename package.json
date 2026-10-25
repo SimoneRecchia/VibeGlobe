@@ -42,7 +42,8 @@
     "bench:micro": "node benchmarks/micro.ts",
     "bench:probes": "node benchmarks/probes.ts",
     "test:hardware": "node scripts/hardware-run.ts",
-    "test:live-sources": "node scripts/sources-live.ts"
+    "test:live-sources": "node scripts/sources-live.ts",
+    "release:pack": "node scripts/release/pack.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

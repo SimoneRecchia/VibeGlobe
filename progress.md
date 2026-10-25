@@ -50,6 +50,26 @@ carries the main session's entries F600–F606 for it; the track added F607–F6
   predictions fit the camera from ground points instead. On CI's software GPU the background costs about 10–15 % of the
   frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
 
+## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
+
+Owner requirement of 2026-10-24: an optional space background like Google Earth's, off by default (ADR 0181). `main`
+carries the main session's entries F600–F606 for it; the track added F607–F609 (`docs/feature-changes.md`).
+
+- `packages/renderer/src/starfield/`: `addSpaceBackground(globe, options)` (`@vibeglobe/renderer/starfield`), a render
+  extension: the 9,096 stars of the Yale Bright Star Catalog (public domain; MIT JSON conversion; recorded in
+  `THIRD_PARTY_NOTICES.md`), an engine asset `bsc5-stars.bin` fetched when first drawn (`catalogUrl`), drawn as Gaussian
+  sprites with a 0.75 device-pixel floor and pixel-ratio-independent light, and a procedural Milky Way in galactic axes
+  (no image). Sky orientation by precession and Greenwich mean sidereal time from `Globe.atmosphere.timeMs`; fades under
+  the daytime sky near the ground. Guide `docs/guides/space-background.md`.
+- Playground `?stars=1` (`&starCatalog=<url>`; handle in `window.vibeglobeStars`). Tests: three unit files in the folder;
+  `e2e/starfield.spec.ts`, `e2e/starfield-motion.spec.ts` (0.5 px per-frame tracking, flicker, seam and poles, fade,
+  lazy asset, guide), `e2e/starfield-cost.spec.ts`; helpers in `e2e/support/starfield.ts`.
+- Status: F600–F604, F606–F609 passing; F605 pending its GPU-time step on the reference desktop (`docs/open-questions.md`).
+- Hook requests I (1)–(6) in `docs/parallel-tracks.md`.
+- Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the e2e
+  predictions fit the camera from ground points instead. On CI's software GPU the background costs about 10–15 % of the
+  frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
+
 ## Track H, packaging and release (2026-10-24)
 
 Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns

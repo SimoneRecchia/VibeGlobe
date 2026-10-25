@@ -6,6 +6,7 @@
  * @benchmark packages/core/src/globe/frame-allocation.test.ts
  */
 import type { RamTier } from '../cache/ram-tier.js';
+import type { Attribution } from './credits.js';
 import { SLOW_LINK_BPS } from '../scheduler/bandwidth.js';
 import type { Residency } from '../cache/residency.hot.js';
 import { UPLOAD_REFUSED, UploadQueue } from '../cache/upload-queue.hot.js';
@@ -254,9 +255,13 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.pinnedSettled >= this.pinnedTotal;
   }
 
-  /** True while any wanted tile is queued, in flight, decoding or waiting for its upload. */
+  /**
+   * True while any wanted tile is queued, in flight, decoding or waiting for its upload; requests the source holds
+   * until connectivity returns do not count (KB-194).
+   */
   get busy(): boolean {
-    return this.heap.size > 0 || this.active.length > 0 || this.uploads.size > 0;
+    const held = this.options.source.heldRequests?.() ?? 0;
+    return this.heap.size > 0 || this.active.length > held || this.uploads.size > 0;
   }
 
   /** Starts a frame: tiles not wanted again from now on leave the queue at {@link ImageryLoader.endFrame}. */
@@ -345,6 +350,11 @@ export class ImageryLoader implements NetworkPoolClient {
   peekInside(level: number, x: number, y: number): number {
     const record = this.table.findInside(level, x, y);
     return record?.state === READY ? this.options.handleBase + record.slot : -1;
+  }
+
+  /** The credit of the tile alone under a texture handle (an offline package's, KB-189), if its response gave one. */
+  attributionOf(handle: number): Attribution | undefined {
+    return this.table.bySlot[handle - this.options.handleBase]?.attribution;
   }
 
   /** The tile uploaded under a texture handle of this loader. */
@@ -671,6 +681,7 @@ export class ImageryLoader implements NetworkPoolClient {
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
     if (result.kind === 'ok') {
       if (this.outageDead > 0 && result.cached !== true) this.reviveOutageDead();
+      record.attribution = result.attribution;
       record.freshUntilMs =
         result.maxAgeMs !== undefined && this.options.source.profile?.respectCacheHeaders === true
           ? this.options.now() + result.maxAgeMs

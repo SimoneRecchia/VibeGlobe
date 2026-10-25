@@ -681,6 +681,15 @@ describe('ImageryLoader', () => {
     expect(transport.aborted).toContain(url(5, 2, 2));
   });
 
+  it('requests the source holds until connectivity returns do not keep the loader busy (KB-194)', () => {
+    let held = 0;
+    const { loader, runFrame } = setUp(32, { source: { heldRequests: () => held } });
+    runFrame([[4, 1, 1]]);
+    expect(loader.busy).toBe(true);
+    held = 1;
+    expect(loader.busy).toBe(false);
+  });
+
   it('a tile of a full host steps aside for a tile of a free host (M3 review)', () => {
     const { transport, runFrame } = setUp(32, {
       source: {

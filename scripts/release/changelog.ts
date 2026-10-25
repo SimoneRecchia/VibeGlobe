@@ -91,7 +91,12 @@ function commitsSinceLastRelease(cwd: string = ROOT_DIR): Commit[] {
   } catch {
     // No release yet: the whole history.
   }
-  const log = execFileSync('git', ['log', '--format=%H%x1f%s%x1f%b%x1e', range], { cwd, encoding: 'utf8' });
+  // The whole history before the first release runs past Node's 1 MB default (KB-191).
+  const log = execFileSync('git', ['log', '--format=%H%x1f%s%x1f%b%x1e', range], {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024 * 1024,
+  });
   return log
     .split('\x1e')
     .map((record) => record.trim())

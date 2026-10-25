@@ -33,14 +33,22 @@ export function cubeReferences(files: ReadonlyMap<string, string>): string[] {
   return found;
 }
 
-if (import.meta.main) {
-  const listed = execFileSync('git', ['grep', '-I', '-l', '-E', 'Cube|[Vv]ireox'], { cwd: ROOT_DIR, encoding: 'utf8' })
+/**
+ * The tracked files of the repository at `root` that may name Cube, with their indexed contents. Some are large (the
+ * owner's benchmark results run to tens of MB, KB-197): git's output may be read up to 1 GB.
+ */
+export function candidateFiles(root: string = ROOT_DIR): Map<string, string> {
+  const options = { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 } as const;
+  const listed = execFileSync('git', ['grep', '-I', '-l', '-E', 'Cube|[Vv]ireox'], options)
     .trim()
     .split('\n')
     .filter((path) => path !== '');
-  const files = new Map(
-    listed.map((path) => [path, execFileSync('git', ['show', `:${path}`], { cwd: ROOT_DIR, encoding: 'utf8' })]),
-  );
+  return new Map(listed.map((path) => [path, execFileSync('git', ['show', `:${path}`], options)]));
+}
+
+if (import.meta.main) {
+  const files = candidateFiles();
+  const listed = [...files.keys()];
   const found = cubeReferences(files);
   for (const line of found) console.error(`FAIL  ${line}`);
   console.log(found.length === 0 ? `ok    no reference to Cube in ${listed.length} candidate files` : '');

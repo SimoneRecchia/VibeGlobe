@@ -25,14 +25,18 @@ async function settleFrames(page: Page): Promise<void> {
   for (let i = 0; i < 8; i++) await capture(page);
 }
 
-/** Captures frames until `done` holds; returns the time it took. */
+/**
+ * Captures frames until `done` holds; returns the time until the check that first saw the change began (a capture takes
+ * a few hundred milliseconds on CI's software GPU, which is the test's time, not the engine's).
+ */
 async function until(page: Page, done: () => Promise<boolean>): Promise<number> {
   const start = Date.now();
-  while (!(await done())) {
-    if (Date.now() - start > 10_000) throw new Error('change never showed');
+  for (;;) {
+    const checkedAt = Date.now();
+    if (await done()) return checkedAt - start;
+    if (checkedAt - start > 10_000) throw new Error('change never showed');
     await colorAt(page, ROAD);
   }
-  return Date.now() - start;
 }
 
 test('paint, layout, filter and layer changes at runtime (F450)', async ({ page }) => {

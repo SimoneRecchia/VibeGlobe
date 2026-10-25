@@ -1,32 +1,50 @@
 # Progress
 
-## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 01:40 UTC)
+## Session state (main session, branch `claude/wizardly-archimedes-up4ww2`, 2026-10-25 06:30 UTC)
 
-Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`; SimoneRecchia/VibeGlobe#40 into `main` is open
-(merge it with a merge commit or squash once its fast checks pass, then merge `main` back and run `npx tsc -b --force`).
-Merged into `main` so far: #26, #27, #30, #32, #35–#39. Tracks D, E, F, G and H are merged; a space-background track
-(F600–F606, `packages/renderer/src/starfield/`) runs in a parallel session (`docs/parallel-tracks.md`).
+Handoff: the main session's branch is `claude/wizardly-archimedes-up4ww2`. Merged into `main` so far: #26, #27, #30,
+#32, #35–#40, #42 (04:35 UTC). SimoneRecchia/VibeGlobe#43 carries everything since (track I's space background, F600–F609,
+included: #41 is superseded by it and stays for the owner to close); merge it by about 08:30 UTC. GitHub deletes the
+branch on merge: the next push recreates it. A full manual CI run on 29727ec (run 40168874917) was in progress at the
+handoff; its failures are the next work.
 
 Owner decisions of 2026-10-24 and 25 (ADR 0046): retry rounds after connectivity returns (TG-05); F395 superseded by
 F574; F148, F167, F389 in the hardening backlog with KB-097, KB-110, KB-170, KB-171; F403, F472, F453 pending; the
 reference desktop is the owner's MacBook Pro M5, no reference tablet (`docs/plan/quality.md`).
 
-Since the last handoff (2026-10-24 22:00):
+Since the last handoff (2026-10-25 04:45):
 
-- Passing: F065 (ADR 0019 on the reference desktop), F075, F115 (224 ms). Added: F574 (failing, KB-174), F600–F606
-  (the parallel track's).
-- Fixed: KB-173 (SDF strokes in CI's fonts), KB-175 (Apple reassociation, to confirm on the Mac), KB-176 (3D Tiles in
-  production builds), KB-177 (inertia: robust release velocity, 650 ms glide), KB-179 (clipped pyramids), KB-182
-  (playground overlaps), KB-PT-07 core side. Playground `?scenario=mont-blanc` (real Copernicus DEM and WorldCover).
-- Terrain walls fixed (KB-178): edges next to coarser terrain take its heights (third height texture), the pipeline
-  writes 258-px terrain tiles with a ring of the neighbors' pixels (rebuild older builds), and skirts deepened by
-  terrain keep the flat globe's reach (they reached out up to 1 km as sheets above every slope over 14°). Polar caps fade Mercator
-  heights to the ellipsoid (KB-180 blocks). ADR 0006 and ADR 0024 updates.
-- Open: KB-174 (one fogged request on WebGL2, time box spent), KB-180's wedges and sheet (owner's views), KB-181 (owner's views asked for), KB-183 (two-finger frame race), TG-05
-  (132 → 31 dead tiles; decoded uploads stuck), and the WebGL2 CPU budget (ADR 0010 rule 7 triggered; benchmarks now
-  record phase times; texture pages via multi-draw planned).
-- Remaining M4–M14 outside the backlog: F329 (fresh-context M8 review running), F574 (KB-174), F600–F606 (parallel
-  track).
+- Fixed: KB-138 (the bandwidth estimate fits each transfer's time against its bytes and leaves out a fixed
+  per-response delay), the M8 fix-check's gaps KB-192 (offline-only scopes are never health-checked), KB-193 (terrain
+  package credits), KB-194 (held misses no longer keep the engine busy; one endpoint returning wakes its tiles),
+  KB-195 (F298 step 3 checked), KB-196 (the playground installs a world package), and KB-197 (release dry run: the first-consumer
+  check reads large files), KB-198 (package areas reaching 180° covered one column only).
+- F052 expects the stitch binding's start-up height grid (9 uploads). The network-mode matrix checks popping in still
+  frames on a stepped clock (F329 step 3).
+- Remaining M4–M14 outside the backlog: F329 only. Its steps are covered (the review and its fix-check are done, no M8
+  bug is open); it is marked once the full CI run passes its network suites and matrix.
+- Open elsewhere: KB-180's wedges and KB-181 (the owner's exact views are asked for), TG-04 (vector recovery), the WebGL2
+  CPU budget (the next hardware run's `phaseMedianMs` shows where the fixed 4.9 ms per frame goes).
+
+## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
+
+Owner requirement of 2026-10-24: an optional space background like Google Earth's, off by default (ADR 0181). `main`
+carries the main session's entries F600–F606 for it; the track added F607–F609 (`docs/feature-changes.md`).
+
+- `packages/renderer/src/starfield/`: `addSpaceBackground(globe, options)` (`@vibeglobe/renderer/starfield`), a render
+  extension: the 9,096 stars of the Yale Bright Star Catalog (public domain; MIT JSON conversion; recorded in
+  `THIRD_PARTY_NOTICES.md`), an engine asset `bsc5-stars.bin` fetched when first drawn (`catalogUrl`), drawn as Gaussian
+  sprites with a 0.75 device-pixel floor and pixel-ratio-independent light, and a procedural Milky Way in galactic axes
+  (no image). Sky orientation by precession and Greenwich mean sidereal time from `Globe.atmosphere.timeMs`; fades under
+  the daytime sky near the ground. Guide `docs/guides/space-background.md`.
+- Playground `?stars=1` (`&starCatalog=<url>`; handle in `window.vibeglobeStars`). Tests: three unit files in the folder;
+  `e2e/starfield.spec.ts`, `e2e/starfield-motion.spec.ts` (0.5 px per-frame tracking, flicker, seam and poles, fade,
+  lazy asset, guide), `e2e/starfield-cost.spec.ts`; helpers in `e2e/support/starfield.ts`.
+- Status: F600–F604, F606–F609 passing; F605 pending its GPU-time step on the reference desktop (`docs/open-questions.md`).
+- Hook requests I (1)–(6) in `docs/parallel-tracks.md`.
+- Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the e2e
+  predictions fit the camera from ground points instead. On CI's software GPU the background costs about 10–15 % of the
+  frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
 
 ## Track H, packaging and release (2026-10-24)
 

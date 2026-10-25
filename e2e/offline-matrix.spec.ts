@@ -2,7 +2,8 @@
 // only, offline only, hybrid) and the four switches (persistent cache, memory reuse, prefetch and flight preloading,
 // offline packaging), each with an unrestricted source and a source whose profile forbids the persistent cache,
 // prefetch and packaging; the combinations that read packages run with packages in browser storage and on a LAN
-// server. A short zoom, pan and flight per combination, with request interception and storage inspection.
+// server. A short zoom, pan and flight per combination, with request interception and storage inspection, on WebGPU and
+// on forced WebGL2, with no pixel popping in the frames of a still camera (F329 step 3, KB-188).
 import { expect, test, type Page } from '@playwright/test';
 import { nextFrame } from './support/globe.ts';
 import {
@@ -16,6 +17,7 @@ import {
   tileHeaders,
   type HarnessConfig,
 } from './support/offline.ts';
+import { recordPath } from './network/support/network.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
 
@@ -96,13 +98,18 @@ async function recordDrawn(page: Page): Promise<void> {
   });
 }
 
-/** A short scenario: a zoom, a pan, a one-second flight and a settled view; the most empty pixels seen. */
-async function scenario(page: Page): Promise<number> {
+/**
+ * A short scenario: a zoom, a pan, a one-second flight and a settled view; the most empty pixels seen, and the pixels
+ * that popped in frames of a still camera while tiles arrived (F329 step 3).
+ */
+async function scenario(page: Page): Promise<{ worst: number; pops: number }> {
   let worst = 0;
+  let pops = 0;
   for (const view of [ROME, { ...ROME, zoom: 9 }, { ...ROME, longitudeDeg: 12.8, zoom: 9 }]) {
     await page.evaluate((v) => window.offlineHarness?.globe?.jumpTo(v), view);
     await nextFrame(page);
     worst = Math.max(worst, await emptyPixelsMoving(page));
+    pops += (await recordPath(page, [{ hold: 8 }], 0)).pops;
   }
   await page.evaluate((v) => {
     void window.offlineHarness?.globe?.flyTo(v, { durationMs: 1000 });
@@ -112,11 +119,17 @@ async function scenario(page: Page): Promise<number> {
     worst = Math.max(worst, await emptyPixelsMoving(page));
   }
   await page.waitForTimeout(2000);
-  return Math.max(worst, await emptyPixelsMoving(page));
+  pops += (await recordPath(page, [{ hold: 20 }], 0)).pops;
+  return { worst: Math.max(worst, await emptyPixelsMoving(page)), pops };
 }
 
 /** Runs the 16 switch combinations in one mode and package setup, checking each against the specification. */
-async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none'): Promise<void> {
+async function runMatrix(
+  page: Page,
+  mode: Mode,
+  setup: 'stored' | 'lan' | 'none',
+  backend: 'webgpu' | 'webgl2',
+): Promise<void> {
   await openHarness(page);
   await tileHeaders(page, () => ({ 'Cache-Control': 'max-age=86400' }));
   const lan = setup === 'lan' ? await servePackages(page) : undefined;
@@ -137,10 +150,11 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
     await page.waitForTimeout(500);
     await clearTiles(page);
     const sessions = {
-      open: `f314-${mode}-${setup}-${String(index)}`,
-      strict: `f314s-${mode}-${setup}-${String(index)}`,
+      open: `f314-${backend}-${mode}-${setup}-${String(index)}`,
+      strict: `f314s-${backend}-${mode}-${setup}-${String(index)}`,
     };
     const config: HarnessConfig = {
+      backend,
       network: mode,
       switches,
       sources: [
@@ -156,12 +170,14 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
       served,
       view: ROME,
       healthChecks: { minIntervalMs: 300, maxIntervalMs: 2000 },
+      // One engine step per drawn frame, so a cross-fade between two recorded frames is not read as a pop.
+      clockStepMs: 1000 / 60,
       awaitReady: mode !== 'offline',
     };
     const from = requests.length;
     await startHarness(page, config);
     await recordDrawn(page);
-    const worst = await scenario(page);
+    const { worst, pops } = await scenario(page);
     const drawn = await page.evaluate(() => [...(window as unknown as { drawn: Map<string, Bounds> }).drawn.values()]);
     // This combination's own sources only (the previous engine may still finish its last requests).
     const sent = requests
@@ -188,6 +204,7 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
       if (effective.strict[name] !== strict) fail(`strict ${name} is ${String(effective.strict[name])}`);
     }
     if (worst > 0) fail(`${String(worst)} empty pixels`);
+    if (pops > 0) fail(`${String(pops)} popped pixels`);
     // Network: none at all offline; online and hybrid fetch what they need.
     if (mode === 'offline' && sent.length > 0) fail(`${String(sent.length)} requests offline`);
     if (mode !== 'offline' && ofSource('strict').length === 0) fail('no request for the strict source');
@@ -272,16 +289,17 @@ async function runMatrix(page: Page, mode: Mode, setup: 'stored' | 'lan' | 'none
   expect(failures).toEqual([]);
 }
 
-for (const [mode, setup] of [
-  ['online', 'none'],
-  ['offline', 'stored'],
-  ['offline', 'lan'],
-  ['hybrid', 'stored'],
-  ['hybrid', 'lan'],
-] as const)
-  test(`every switch combination behaves as specified in ${mode} mode${setup === 'none' ? '' : ` with packages ${setup === 'lan' ? 'on a LAN server' : 'in browser storage'}`} (F314)`, async ({
-    page,
-  }) => {
-    test.setTimeout(900_000);
-    await runMatrix(page, mode, setup);
-  });
+for (const backend of ['webgpu', 'webgl2'] as const)
+  for (const [mode, setup] of [
+    ['online', 'none'],
+    ['offline', 'stored'],
+    ['offline', 'lan'],
+    ['hybrid', 'stored'],
+    ['hybrid', 'lan'],
+  ] as const)
+    test(`every switch combination behaves as specified in ${mode} mode${setup === 'none' ? '' : ` with packages ${setup === 'lan' ? 'on a LAN server' : 'in browser storage'}`} on ${backend} (F314, F329)`, async ({
+      page,
+    }) => {
+      test.setTimeout(900_000);
+      await runMatrix(page, mode, setup, backend);
+    });

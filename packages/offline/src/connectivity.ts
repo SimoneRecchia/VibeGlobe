@@ -16,8 +16,13 @@ export interface HealthCheckTiming {
 /** Options of {@link ConnectivityMonitor}. */
 export interface ConnectivityOptions extends HealthCheckTiming {
   readonly fetch?: typeof fetch;
-  /** False while health checks must not run (offline-only mode never touches the network, F292). */
-  readonly enabled: () => boolean;
+  /**
+   * False while health checks of the endpoint must not run: offline-only mode never touches the network (F292), and
+   * neither does a layer or source set to it (KB-192).
+   */
+  readonly enabled: (endpoint: string) => boolean;
+  /** Called when one endpoint's state changes, whether or not the overall connectivity does (KB-194). */
+  readonly onEndpointChange?: (endpoint: string) => void;
   /** Called when the overall connectivity changes. */
   readonly onChange: (connectivity: Connectivity, unreachable: readonly string[]) => void;
   /** Called after every check of an endpoint, whether or not it changed the state. */
@@ -137,7 +142,7 @@ export class ConnectivityMonitor {
   }
 
   private schedule(name: string, entry: Endpoint, delayMs: number): void {
-    if (this.destroyed || entry.checking || !this.options.enabled()) return;
+    if (this.destroyed || entry.checking || !this.options.enabled(name)) return;
     const earliest = entry.lastCheckMs + this.minIntervalMs - Date.now();
     const wait = Math.max(delayMs, earliest, 0);
     // A pending check stays unless this one is due sooner (KB-159: an online event brings a backed-off check forward).
@@ -151,7 +156,7 @@ export class ConnectivityMonitor {
   }
 
   private async check(name: string, entry: Endpoint): Promise<void> {
-    if (this.destroyed || !this.options.enabled()) return;
+    if (this.destroyed || !this.options.enabled(name)) return;
     entry.checking = true;
     entry.lastCheckMs = Date.now();
     const reachable = await this.probe(entry.probeUrl);
@@ -191,6 +196,7 @@ export class ConnectivityMonitor {
     if (entry.state === state) return;
     entry.state = state;
     if (state === 'unreachable') this.schedule(name, entry, entry.waitMs);
+    this.options.onEndpointChange?.(name);
     const down = this.unreachable();
     const next: Connectivity =
       down.length === 0 ? 'online' : down.length === this.endpoints.size ? 'offline' : 'degraded';

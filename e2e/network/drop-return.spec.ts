@@ -29,6 +29,13 @@ for (const backend of BACKENDS)
     await page.evaluate((s) => window.offlineHarness?.installFixture(s), worldBase(session));
     await page.request.post(`/_fixture/${session}/rules`, { data: JSON.stringify([{ latencyMs: 100 }]) });
     await startHarness(page, { sources, view: ROME, backend, healthChecks: HEALTH, clockStepMs: STEP_MS });
+    // Every request for the session's tiles, health checks (the root tile, `/0/0/0`) told apart (F298 step 3, KB-195).
+    const requests: { url: string; check: boolean }[] = [];
+    page.on('request', (request) => {
+      const url = request.url();
+      if (url.includes(`/${session}/`) && !url.includes('/_fixture/'))
+        requests.push({ url, check: /\/0\/0\/0\.\w+$/.test(url) });
+    });
 
     const online = await recordPath(
       page,
@@ -44,16 +51,21 @@ for (const backend of BACKENDS)
     await context.setOffline(true);
     const dropped = await recordPath(
       page,
-      [
-        { move: { ...ROME, longitudeDeg: 13.1, zoom: 9.5 }, frames: 15 },
-        { hold: 40 },
-        { fly: { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 8 }, durationMs: 3000, frames: 180 },
-      ],
+      [{ move: { ...ROME, longitudeDeg: 13.1, zoom: 9.5 }, frames: 15 }, { hold: 40 }],
       BLACK_BELOW,
     );
     await expectConnectivity(page, 'offline');
+    // Known offline, the engine asks for no tile (only health checks) until a health check succeeds (F298 step 3).
+    const atOffline = requests.length;
+    const flying = await recordPath(
+      page,
+      [{ fly: { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 8 }, durationMs: 3000, frames: 180 }],
+      BLACK_BELOW,
+    );
+    expect(requests.slice(atOffline).filter((r) => !r.check)).toEqual([]);
     const fromNetwork = (await servedTiers(page))['network'] ?? 0;
     // Mid-flight: the connection returns while the flight goes on.
+    const atReturn = requests.length;
     await context.setOffline(false);
     const returned = await recordPath(
       page,
@@ -66,9 +78,12 @@ for (const backend of BACKENDS)
       BLACK_BELOW,
     );
     await expectConnectivity(page, 'online');
-    for (const [phase, report] of Object.entries({ online, dropped, returned })) {
+    // The first request after the return is a health check: tiles are asked for again only once it succeeded.
+    expect(requests[atReturn]?.check).toBe(true);
+    for (const [phase, report] of Object.entries({ online, dropped, flying, returned })) {
       console.log(`[network] drop-return ${backend} ${phase}: ${JSON.stringify(report)}`);
-      expectClean(report, 40);
+      // The flight alone has no still frame; the pops of the others are judged on 40 still frames at least.
+      expectClean(report, phase === 'flying' ? 0 : 40);
     }
     // Back online, the detail around Paris comes from the network again.
     expect((await servedTiers(page))['network'] ?? 0).toBeGreaterThan(fromNetwork);

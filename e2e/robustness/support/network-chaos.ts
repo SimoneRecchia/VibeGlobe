@@ -201,8 +201,8 @@ async function vectorChaos(page: Page, context: BrowserContext, backend: string,
   expect(unexpected(errors, INJECTED)).toEqual([]);
 }
 
-/** Registers the raster and vector chaos scenarios on both backends; `recovery` adds the full-detail checks. */
-export function networkChaosTests(recovery: boolean): void {
+/** Registers the raster chaos scenario on both backends; with `recovery`, it also expects full detail after the faults. */
+export function rasterChaosTests(recovery: boolean): void {
   test.use({ viewport: { width: 320, height: 240 } });
   const after = recovery ? 'full detail after the faults stop' : 'the globe complete';
   for (const backend of BACKENDS) {
@@ -212,6 +212,14 @@ export function networkChaosTests(recovery: boolean): void {
       test.setTimeout(600_000);
       await rasterChaos(page, backend, recovery);
     });
+  }
+}
+
+/** Registers the vector chaos scenario on both backends; with `recovery`, it also expects full detail after the faults. */
+export function vectorChaosTests(recovery: boolean): void {
+  test.use({ viewport: { width: 320, height: 240 } });
+  const after = recovery ? 'full detail after the faults stop' : 'the globe complete';
+  for (const backend of BACKENDS) {
     test(`random faults on vector tiles and glyphs during navigation on ${backend}: no uncaught error, ${after} (F510)`, async ({
       page,
       context,

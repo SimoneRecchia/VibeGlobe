@@ -410,8 +410,7 @@ export async function recordScenario(
   const report = emptyReport(scenario.frames);
   // Only the harness draws while it records: each capture is exactly one drawn frame, one step of the engine clock,
   // so a pixel's change between captures is its change in one frame.
-  const requestAnimationFrame = window.requestAnimationFrame;
-  window.requestAnimationFrame = () => 0;
+  const restoreFrames = holdDisplayFrames();
   let previous: FrameCapture | undefined;
   let previousLevels = new Map<string, number>();
   const terrain = globe.terrainStats() !== undefined;
@@ -450,8 +449,32 @@ export async function recordScenario(
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   } finally {
-    window.requestAnimationFrame = requestAnimationFrame;
+    restoreFrames();
     globe.requestRender();
   }
   return report;
+}
+
+/**
+ * Holds the display's frames while a recording draws its own: the engine's frame requests meanwhile are kept, under
+ * ids far above the browser's, and handed to the real `requestAnimationFrame` when the returned function restores it.
+ * Dropping them (`() => 0`) left the engine waiting for a frame that never came after the recording (TG-05).
+ */
+function holdDisplayFrames(): () => void {
+  const request = window.requestAnimationFrame;
+  const cancel = window.cancelAnimationFrame;
+  const held = new Map<number, FrameRequestCallback>();
+  let nextId = 1_000_000_000;
+  window.requestAnimationFrame = (callback) => {
+    held.set(nextId, callback);
+    return nextId++;
+  };
+  window.cancelAnimationFrame = (id) => {
+    if (!held.delete(id)) cancel.call(window, id);
+  };
+  return () => {
+    window.requestAnimationFrame = request;
+    window.cancelAnimationFrame = cancel;
+    for (const callback of held.values()) request.call(window, callback);
+  };
 }

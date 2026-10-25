@@ -39,6 +39,8 @@ test('?network= runs the playground on the offline engine: hybrid tiers in ?debu
 test('a world package installed in the playground draws the whole globe offline-only, and online mode never reads it (F291, F292, KB-196)', async ({
   page,
 }) => {
+  // Three page loads, a 21-tile package build and a complete globe: over the default 30 s on CI's software GPU.
+  test.setTimeout(120_000);
   await openGlobe(page, 'imagery=world&session=playground-package&network=hybrid&zoom=1');
   const tiles = await page.evaluate(async () => {
     const demo = (

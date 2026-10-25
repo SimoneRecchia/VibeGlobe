@@ -295,12 +295,15 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
   const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
+  // The level below was found missing: its parent is the finest this source can show there (KB-179).
+  let belowMissing = false;
   for (let current = wanted; current >= lowest; current--) {
     const x = mapped(MAPPING_X);
     const y = mapped(MAPPING_Y);
-    // The wanted tile and every second ancestor are requested; the others are only looked up.
+    // The wanted tile, every second ancestor, the source's coarsest level and the parent of a missing tile are
+    // requested; the others are only looked up.
     const handle =
-      !arriving && (wanted - current) % 2 === 0
+      !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
         ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
@@ -308,6 +311,7 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
       return handle;
     }
     if (handle === ARRIVING) arriving = true;
+    belowMissing = layer.loader.unavailable(current, x, y);
     if (current > lowest) mapAncestor(mapping, 0, 1);
   }
   return -1;

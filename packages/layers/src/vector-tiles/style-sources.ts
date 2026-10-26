@@ -21,6 +21,24 @@ export interface SourceInfo {
   readonly lineMetrics?: boolean;
   /** Raster and raster-dem sources: image tiles of `tileSize` pixels, DEM tiles with their encoding (F445). */
   readonly raster?: { readonly tileSize: number; readonly encoding?: DemEncoding };
+  /** The source's credit, from the style or its TileJSON (often HTML with links). */
+  readonly attribution?: string;
+}
+
+/**
+ * The credits of a style source's attribution: its text without markup, linked to its first link. A style's credit
+ * lists several providers in one line ("OpenFreeMap © OpenMapTiles Data from OpenStreetMap"), shown as one credit.
+ */
+export function attributionCredits(attribution: string | undefined): { text: string; url?: string }[] {
+  if (!attribution) return [];
+  const url = /href\s*=\s*["']([^"']+)["']/i.exec(attribution)?.[1];
+  const text = attribution
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&copy;/g, '©')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text ? [{ text, ...(url ? { url } : {}) }] : [];
 }
 
 /** Fetches and parses a JSON document; throws on HTTP errors. */
@@ -45,6 +63,7 @@ export async function resolveSource(
       coverage: { minzoom: 0, maxzoom: source.maxzoom ?? 18 },
       geojson: typeof data === 'string' ? await json(new URL(data, base).href, fetchImpl) : data,
       lineMetrics: source['lineMetrics'] === true,
+      ...(typeof source.attribution === 'string' ? { attribution: source.attribution } : {}),
     };
   }
   let doc: StyleSourceJson = source;
@@ -63,6 +82,7 @@ export async function resolveSource(
     ),
     coverage: { minzoom: doc.minzoom ?? 0, maxzoom: doc.maxzoom ?? 22, ...(bounds ? { bounds } : {}) },
     scheme: doc.scheme ?? 'xyz',
+    ...(typeof doc.attribution === 'string' ? { attribution: doc.attribution } : {}),
     ...(raster
       ? {
           raster: {

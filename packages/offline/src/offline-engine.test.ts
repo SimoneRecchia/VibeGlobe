@@ -181,6 +181,32 @@ describe('the offline engine', () => {
     expect(packageReads).toBe(0);
   });
 
+  it('a package-only source never touches the network and a network-only one never reads packages, in every mode', async () => {
+    const net = fakeNetwork(() => ({}));
+    const offline = engine({ fetch: net.fetchImpl, mode: 'hybrid' });
+    offline.setPackageReader({
+      read: (id) =>
+        Promise.resolve(
+          id === 'worldcover'
+            ? { bytes: new TextEncoder().encode('pkg').buffer, contentType: 'image/jpeg', packageId: 'europe' }
+            : undefined,
+        ),
+    });
+    // The layer's offline stand-in (one provider, in the app's package) and its online detail (another provider).
+    const packaged = offline.source(fixture('worldcover'), { tiers: 'package' });
+    const online = offline.source(fixture('ortho'), { tiers: 'network' });
+    expect(text(await load(packaged, tile(2, 1, 1)))).toBe('pkg');
+    expect(text(await load(online, tile(2, 1, 1)))).toBe('tile');
+    expect(net.requests.map((r) => r.url)).toEqual(['https://tiles.test/2/1/1.png']);
+    // Online only: the package is not read, so its source draws nothing; offline only: the network source draws nothing.
+    offline.setMode('online');
+    expect((await load(packaged, tile(2, 2, 2))).kind).toBe('status');
+    offline.setMode('offline');
+    expect((await load(online, tile(2, 2, 2))).kind).toBe('status');
+    expect(text(await load(packaged, tile(2, 2, 2)))).toBe('pkg');
+    expect(net.requests).toHaveLength(1);
+  });
+
   it('detects a captive portal by health check, waits instead of retrying, and resumes when it clears (F297, F298, F299)', async () => {
     let portal = true;
     const net = fakeNetwork(() =>

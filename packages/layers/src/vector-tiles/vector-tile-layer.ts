@@ -31,7 +31,7 @@ import {
 import { meshKindOf, zoomBracket, type PaintPart } from './vector-paint.js';
 import { TileMeshCache } from './tile-mesh-cache.js';
 import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
-import { tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
+import { attributionCredits, tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
 import { geojsonTransport } from './geojson-tiles.js';
 import { RasterLayers } from './raster-layers.js';
 import type { StyleLayer } from './style-layer.js';
@@ -241,6 +241,32 @@ class Runtime implements VectorTileLayer {
     this.globe.requestRender();
   }
 
+  /** The sources with a visible layer at this zoom, by id, as last credited. */
+  private creditedSources = '';
+
+  /**
+   * Credits the style's sources that have a layer shown at this zoom (their style or TileJSON `attribution`), listed with
+   * the engine's other credits; updated only when that set changes.
+   */
+  private updateCredits(zoom: number, context: RenderExtensionContext): void {
+    let key = '';
+    for (const [id, source] of this.resolved) {
+      if (!source?.attribution) continue;
+      if (this.style.layers.some((l) => l.source === id && l.visible && l.inZoomRange(zoom))) key += `${id}\n`;
+    }
+    if (key === this.creditedSources) return;
+    this.creditedSources = key;
+    context.setCredits(
+      key
+        .split('\n')
+        .filter((id) => id !== '')
+        .map((id) => ({
+          id: `vector-tiles:${id}`,
+          attribution: attributionCredits(this.resolved.get(id)?.attribution),
+        })),
+    );
+  }
+
   private frame(view: FrameView, context: RenderExtensionContext): void {
     const start = performance.now();
     this.drawFrame(view, context);
@@ -251,6 +277,7 @@ class Runtime implements VectorTileLayer {
     const target = this.target;
     if (target === undefined) return;
     const zoom = this.globe.camera.zoom;
+    this.updateCredits(zoom, context);
     const draws = this.sourceDraws(view);
     this.grounds.frame();
     this.rasters?.beginFrame();

@@ -7391,6 +7391,92 @@
         "Assert the median frame-rate ratio is at least 0.8"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F610",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "An imagery or terrain source can declare its coverage as polygons (land, a country's borders) besides its levels: outside the polygons and beyond its maximum level it makes no request, and the next source of the layer, the layer below or its deepest level magnified is drawn instead.",
+      "steps": [
+        "Give a source a country polygon with a hole and assert which tiles it asks for, wholly inside by default and every touching tile with overlap",
+        "Assert a source with an area returns no data outside it and beyond its maximum level, and exposes the polygons' bounds as its coverage"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F611",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "A layer's offline package and its online detail can come from different providers: a source wrapped as package-only never touches the network and a network-only one never reads packages, so offline-only mode draws only the package and online-only mode only the network.",
+      "steps": [
+        "Wrap a packaged source as package-only and an online one as network-only and load tiles in hybrid, online-only and offline-only modes",
+        "Assert the package-only source makes no request in any mode, draws nothing online, and the network-only one draws nothing offline"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F612",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "The credits list together the attributions of every visible source, the vector tile style's sources (their style or TileJSON attribution) included, while one of their layers is shown.",
+      "steps": [
+        "Show a fixture imagery source and a vector style whose source declares an HTML attribution",
+        "Assert the credits list both, and that hiding every layer of the vector source removes its credit and keeps the imagery's"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F613",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`@vibeglobe/presets` exports `europeOpen(options)`: Google Earth-like map types for Europe (Satellite, Hybrid, Map, Relief bases; labels and borders, roads, 3D buildings and 3D terrain overlays) built only from free sources whose terms allow commercial use and redistribution, each with its coverage, levels, licence, exact attribution and the date its terms were read; options set the app's package manifest, each source's online maximum level, excluded and added sources.",
+      "steps": [
+        "Build the preset with default options and assert every base map and overlay, each source's coverage, levels, licence, attribution and reading date, and that online sources cover only land while the sea comes from the package",
+        "Assert the options: the package manifest URL, a lower online maximum level, an excluded source and an added source"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F614",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "The pipeline configuration `europe.json` builds the Europe preset's offline package from the same sources, with separate levels for land (a Natural Earth land mask) and sea, chosen by parameters.",
+      "steps": [
+        "Validate europe.json and assert its datasets, their profiles and attributions match the preset's packaged sources",
+        "Assert tiles above the sea's maximum level are counted and built only over land"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F615",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "`vibeglobe-data estimate <config>` counts the tiles of each level, land and sea separately, measures the real tile size on a sample of tiles where the source can be reached, and prints per level the tiles and cumulative gigabytes for imagery, vector and terrain, without downloading the whole region.",
+      "steps": [
+        "Run estimate on europe.json and assert the per-level table with land and sea counts and cumulative sizes for each dataset kind",
+        "Assert measured sizes replace the configured ones for the sampled levels, and that rows not measured say so"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F616",
+      "milestone": 7,
+      "section": "Documentation and distribution",
+      "description": "The guide `docs/guides/europe-preset.md` shows the Europe preset in hybrid, online-only and offline-only use, with the maximum online zoom per area and an example output of `estimate`.",
+      "steps": [
+        "Assert the guide has each section and its examples type-check against the package"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F617",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The playground has a selector of the Europe preset's map types and overlays.",
+      "steps": [
+        "Open the playground with the preset, switch base maps and overlays, and assert the imagery layers and vector styles follow with no console error"
+      ],
+      "status": "failing"
     }
   ]
 }

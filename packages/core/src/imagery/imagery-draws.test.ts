@@ -224,6 +224,25 @@ describe('drawImagery', () => {
     expect(list.overlays[1]?.textures[0]).toBe(12);
   });
 
+  it('gives no overlay slot to a translucent layer whose sources cover none of the tile (F618)', () => {
+    const base = fakeLayer({ 9: 10 });
+    const here = fakeLayer({ 9: 12 });
+    // Two clipped layers of other countries, far from this tile, above the one that has it.
+    const abroad = (id: string): StackLayer => {
+      const away = fakeLayer({});
+      const source = {
+        ...away.layer.source,
+        coverage: [{ westRad: -3, southRad: -1.4, eastRad: -2.9, northRad: -1.3 }],
+      };
+      return stacked([{ ...away.layer, source }], { id, transparent: true });
+    };
+    const list = drawStack(
+      [stacked([base.layer]), stacked([here.layer], { id: 'here', transparent: true }), abroad('a1'), abroad('a2')],
+      tile(9, 300, 170),
+    );
+    expect(list.overlays[0]?.textures[0]).toBe(12);
+  });
+
   it('composes a layer with transparent tiles over the ones below instead of covering them (F242)', () => {
     const base = fakeLayer({ 9: 10 });
     const transparent = fakeLayer({ 9: 11 });

@@ -89,7 +89,9 @@ export function drawImagery(
       const chosen = wantChain(entry.chain, tile, distance);
       if (based) continue;
       if (chosen < 0) {
-        overlays = keepSlot(entry, overlays);
+        // A layer whose sources cover none of this tile takes no slot, so several clipped layers (one per country)
+        // leave the slots to the ones that have data here (F618).
+        if (coversTile(entry.chain, tile)) overlays = keepSlot(entry, overlays);
         continue;
       }
       const drawn = entry.chain[chosen];
@@ -237,6 +239,12 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const level = shifted < 0 ? 0 : shifted < source.maxLevel ? shifted : source.maxLevel;
   if (source.tiling.crs === 'EPSG:3857') return tile.root === MERCATOR_ROOT && mapMercator(tile, level, mapping, 0);
   return mapGeographic(tile, level, mapping, 0);
+}
+
+/** True when some source of the chain covers the tile (overwrites `mapping`). */
+function coversTile(chain: readonly ImageryLayer[], tile: QuadtreeTile): boolean {
+  for (const layer of chain) if (mapInto(layer, tile)) return true;
+  return false;
 }
 
 /** True when a source after `k` in the chain can map the tile (overwrites `mapping`). */

@@ -2,7 +2,8 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The `decode-image` task (ADR 0011 rule 4, ADR 0010 §6): encoded image bytes in, a transferable `ImageBitmap` out,
- * decoded with fixed options so neither renderer backend converts anything at upload.
+ * decoded with fixed options so neither renderer backend converts anything at upload. A tile across its source's
+ * border is masked to the source's area, and a tile of the source's blank color is answered as no data (F618).
  */
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
@@ -11,6 +12,10 @@ export interface DecodeImageInput {
   readonly bytes: ArrayBuffer;
   /** MIME type from the response, for example `image/png`; may be empty when the server sent none. */
   readonly contentType: string;
+  /** The source's area over the tile, in tile units (core's `TileMask`): pixels outside it become transparent. */
+  readonly mask?: { readonly points: Float64Array; readonly ringEnds: Uint32Array };
+  /** A color that, filling the whole tile, means no data: the task then fails with `no-data`. */
+  readonly blank?: { readonly rgb: readonly number[]; readonly tolerance: number };
 }
 
 /** Output of `decode-image`; its shape is core's `DecodedTile`, with the bitmap transferred. */
@@ -52,11 +57,68 @@ export function rgba8MipChainBytes(widthPx: number, heightPx: number): number {
 
 function parseInput(input: unknown): DecodeImageInput {
   if (typeof input !== 'object' || input === null) throw new TaskError('invalid-input', 'decode-image needs an object');
-  const { bytes, contentType } = input as Partial<Record<keyof DecodeImageInput, unknown>>;
+  const { bytes, contentType, mask, blank } = input as Partial<Record<keyof DecodeImageInput, unknown>>;
   if (!(bytes instanceof ArrayBuffer)) throw new TaskError('invalid-input', 'decode-image needs `bytes` (ArrayBuffer)');
   if (typeof contentType !== 'string')
     throw new TaskError('invalid-input', 'decode-image needs `contentType` (string)');
-  return { bytes, contentType };
+  const m = mask as DecodeImageInput['mask'] | undefined;
+  if (m !== undefined && !(m.points instanceof Float64Array && m.ringEnds instanceof Uint32Array))
+    throw new TaskError('invalid-input', 'decode-image needs `mask.points` (Float64Array) and `mask.ringEnds`');
+  const b = blank as DecodeImageInput['blank'] | undefined;
+  if (b !== undefined && !(Array.isArray(b.rgb) && b.rgb.length === 3 && typeof b.tolerance === 'number'))
+    throw new TaskError('invalid-input', 'decode-image needs `blank.rgb` (three numbers) and `blank.tolerance`');
+  return { bytes, contentType, ...(m ? { mask: m } : {}), ...(b ? { blank: b } : {}) };
+}
+
+/** True when every pixel is opaque and within `tolerance` of the color in each channel. */
+export function isBlank(rgba: Uint8ClampedArray, blank: NonNullable<DecodeImageInput['blank']>): boolean {
+  const [r = 0, g = 0, b = 0] = blank.rgb;
+  const t = blank.tolerance;
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (
+      Math.abs((rgba[i] ?? 0) - r) > t ||
+      Math.abs((rgba[i + 1] ?? 0) - g) > t ||
+      Math.abs((rgba[i + 2] ?? 0) - b) > t ||
+      (rgba[i + 3] ?? 0) < 255
+    )
+      return false;
+  }
+  return true;
+}
+
+/**
+ * Applies the blank test and the area mask to a decoded tile on an `OffscreenCanvas`; returns the masked bitmap (the
+ * input is closed) or throws `no-data` for a blank tile.
+ */
+function maskTile(image: ImageBitmap, input: DecodeImageInput): ImageBitmap {
+  if (typeof OffscreenCanvas !== 'function') return image;
+  const canvas = new OffscreenCanvas(image.width, image.height);
+  const context = canvas.getContext('2d', { willReadFrequently: input.blank !== undefined });
+  if (!context) return image;
+  context.drawImage(image, 0, 0);
+  if (input.blank && isBlank(context.getImageData(0, 0, image.width, image.height).data, input.blank)) {
+    image.close();
+    throw new TaskError('no-data', 'the tile has only the source\'s blank color');
+  }
+  if (!input.mask) return image;
+  // Keep only what lies inside the area's rings (even-odd: holes and several polygons).
+  context.globalCompositeOperation = 'destination-in';
+  context.beginPath();
+  const { points, ringEnds } = input.mask;
+  let start = 0;
+  for (const end of ringEnds) {
+    for (let i = start; i < end; i++) {
+      const x = (points[i * 2] ?? 0) * image.width;
+      const y = (points[i * 2 + 1] ?? 0) * image.height;
+      if (i === start) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+    start = end;
+  }
+  context.fill('evenodd');
+  image.close();
+  return canvas.transferToImageBitmap();
 }
 
 function cancelledError(): TaskError {
@@ -69,7 +131,8 @@ function cancelledError(): TaskError {
  * cancelled before or right after decoding (the bitmap is then closed).
  */
 export async function decodeImage(input: unknown, context: TaskContext): Promise<TaskOutput> {
-  const { bytes, contentType } = parseInput(input);
+  const parsed = parseInput(input);
+  const { bytes, contentType } = parsed;
   if (typeof createImageBitmap !== 'function')
     throw new TaskError('unsupported', 'createImageBitmap is not available in this context');
   if (context.isCancelled()) throw cancelledError();
@@ -85,6 +148,7 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
     image.close();
     throw cancelledError();
   }
+  if (parsed.mask || parsed.blank) image = maskTile(image, parsed);
   const output: DecodedImage = {
     image,
     widthPx: image.width,

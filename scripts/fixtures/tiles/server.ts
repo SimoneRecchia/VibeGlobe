@@ -119,6 +119,7 @@ const PATTERNS: readonly string[] = [
   'green',
   'blue',
   'shade',
+  'white',
 ];
 // `mercator-tms`: the Web Mercator tiles with TMS rows, counted from the south (F229).
 const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms'];

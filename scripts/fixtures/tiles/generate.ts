@@ -14,7 +14,7 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
  * `holes` the `world` colors with every other `checker` cell transparent (F242); `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
  * `toned` the `smooth` field darker and warmer, scaled by {@link TONE_SCALE}, a source of another tone (F249);
- * `red`, `green`, `blue` and `shade` one color everywhere ({@link SOLID_COLORS}).
+ * `red`, `green`, `blue`, `shade` and `white` one color everywhere ({@link SOLID_COLORS}).
  */
 export type FixturePattern =
   | 'world'
@@ -38,6 +38,8 @@ export const SOLID_COLORS: Readonly<Record<string, readonly [number, number, num
   green: [60, 200, 60],
   blue: [60, 60, 220],
   shade: [128, 128, 128],
+  // A service's filler outside its area, such as basemap.at's white tiles around Austria (KB-209).
+  white: [255, 255, 255],
 };
 
 /** The per-channel scale of the `toned` pattern over `smooth`: another brightness and color balance (F249). */

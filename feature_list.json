@@ -7477,6 +7477,17 @@
         "Open the playground with the preset, switch base maps and overlays, and assert the imagery layers and vector styles follow with no console error"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F618",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "A source's coverage can be a GeoJSON (multi)polygon such as a country's borders: tiles wholly outside are never requested, tiles across the border are clipped per pixel when decoded so the layer below shows outside the area, a translucent layer that covers none of a tile takes no overlay slot there, and `blankTile` treats tiles of one color as no data for services without a known area; `@vibeglobe/presets/countries` has Natural Earth borders of Europe's countries and regions, loaded per country.",
+      "steps": [
+        "Unit-test the clip mask of a border tile, GeoJSON areas, blank-tile detection, the overlay slots and the country borders",
+        "In the browser, a white service limited to a polygon shows white inside it and the layer below outside it within one tile, and a blankTile source shows the layer below"
+      ],
+      "status": "passing"
     }
   ]
 }

@@ -220,6 +220,53 @@ globe.imageryLayers.set('labels', { visible: false }); // a hidden layer request
 globe.imageryLayers.move('labels', 0); // reorder at runtime
 ```
 
+A source limited to a country or a region gets its `area`: rectangles (`coverage`), polygons, or GeoJSON such as a
+country's borders. Tiles wholly outside the area are never requested. With GeoJSON (or `tiles: 'clip'`), tiles that
+cross the border are requested too, and their pixels outside the area become transparent when they are decoded, so the
+layer below shows there instead of the white or black filler many national services send beyond their country
+(F618, KB-209). Put such a source in its own layer above the fallback: a layer's chain draws each tile from one source.
+`@vibeglobe/presets/countries` has the borders of Europe's countries (`await countryBorders('AT')`, Natural Earth,
+public domain). `blankTile` is the fallback for services whose area is not known: their tiles of that color alone count
+as no data.
+
+```ts
+import { createGlobe } from '@vibeglobe/core';
+import { xyzImagery } from '@vibeglobe/sources';
+
+const world = xyzImagery({ id: 'world', url: 'https://world.example.com/{z}/{x}/{y}.jpg', maxLevel: 9 });
+const national = xyzImagery({
+  id: 'national-ortho',
+  url: 'https://ortho.example.com/{z}/{x}/{y}.jpg',
+  maxLevel: 19,
+  // The country's borders as GeoJSON: border tiles are clipped per pixel.
+  area: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [9.5, 46.4],
+        [17.2, 46.4],
+        [17.2, 49.0],
+        [9.5, 49.0],
+        [9.5, 46.4],
+      ],
+    ],
+  },
+});
+const legacy = xyzImagery({ id: 'legacy', url: 'https://legacy.example.com/{z}/{x}/{y}.png', blankTile: '#ffffff' });
+
+createGlobe({
+  container,
+  renderer,
+  baseImageryUrl,
+  workers,
+  imagery: [
+    { id: 'world', sources: [world] },
+    { id: 'national', sources: [national] },
+    { id: 'legacy', sources: [legacy] },
+  ],
+});
+```
+
 ## Vector formats
 
 The vector parsers run in workers: `@vibeglobe/sources/vector` exports them and `VECTOR_TASKS`, the worker task table the engine's worker program registers.

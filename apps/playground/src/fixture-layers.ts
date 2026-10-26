@@ -31,6 +31,19 @@ export function credits(
   };
 }
 
+/** A triangle over Italy, 0°–24° E and 35°–52° N, whose long side crosses 12° E at 43.5° N (KB-209). */
+const TRIANGLE = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [0, 35],
+      [24, 35],
+      [0, 52],
+      [0, 35],
+    ],
+  ],
+} as const;
+
 /**
  * `?overlays=<pattern>[:<opacity>[:<blend>]],…` adds fixture layers above `?imagery=`, bottom first, each with its
  * opacity and blend mode (F243–F246); their ids are `overlay-<pattern>`.
@@ -63,6 +76,10 @@ export function overlayLayers(
       maxLevel: 18,
       // `?overlayCoverage=italy` limits the overlays to a box around Italy (F254).
       ...(params.get('overlayCoverage') === 'italy' ? { coverage: [italy] } : {}),
+      // `?overlayArea=triangle` limits them to a triangle over Italy as GeoJSON, clipped per pixel (F618, KB-209).
+      ...(params.get('overlayArea') === 'triangle' ? { area: TRIANGLE } : {}),
+      // `?overlayBlank=rrggbb`: tiles of that color only count as no data (F618).
+      ...(params.get('overlayBlank') ? { blankTile: `#${params.get('overlayBlank') ?? ''}` } : {}),
       ...credits(params, `overlay-${pattern}`, pattern),
     });
     return { sources: [source], opacity: Number(opacity), blend: blend as ImageryBlend };

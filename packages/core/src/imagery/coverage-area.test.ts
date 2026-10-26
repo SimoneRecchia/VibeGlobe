@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TileRectangleRad } from '../tiling/tiling-scheme.js';
-import { coverageTest, type PolygonDeg } from './coverage-area.js';
+import { coverageArea, coverageTest, type PolygonDeg } from './coverage-area.js';
 
 const DEG = Math.PI / 180;
 const rect = (west: number, south: number, east: number, north: number): TileRectangleRad => ({
@@ -44,5 +44,22 @@ describe('coverage areas (polygon coverage of a source)', () => {
     // Around the lake's shore: touching both.
     expect(inside.covers(rect(11.5, 47.2, 12.5, 47.8))).toBe(false);
     expect(overlap.covers(rect(11.5, 47.2, 12.5, 47.8))).toBe(true);
+  });
+
+  it('clips: a border tile gets the outline in tile units, a tile wholly inside none; GeoJSON clips by default (F618)', () => {
+    const area = coverageArea({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: COUNTRY.map((r) => [...r]) },
+    });
+    expect(area.tiles).toBe('clip');
+    const clip = coverageTest(area);
+    // Across the east border (16° E) on geographic rows: the outer ring's x runs to 0.5 of the tile, its rows linear.
+    const mask = clip.mask(rect(15, 46, 17, 49), false);
+    expect(mask?.ringEnds.length).toBe(2);
+    expect([2, 3, 4, 5].map((k) => (mask?.points[k] ?? NaN) + 0)).toEqual([0.5, 1, 0.5, 0]);
+    expect(clip.covers(rect(15, 46, 17, 49))).toBe(true);
+    expect(clip.mask(rect(14, 47, 15, 48), true)).toBeUndefined();
+    // The other modes never mask.
+    expect(coverageTest({ polygons: [COUNTRY], tiles: 'overlap' }).mask(rect(15, 46, 17, 49), false)).toBeUndefined();
   });
 });

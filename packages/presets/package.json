@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./countries": {
+      "types": "./dist/countries.d.ts",
+      "source": "./src/countries.ts",
+      "default": "./dist/countries.js"
     }
   },
   "types": "./dist/index.d.ts",

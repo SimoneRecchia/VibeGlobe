@@ -228,18 +228,24 @@ class PolarCapTextures {
   /** The textures, empty until the base image is up. */
   textures: Texture[] = [];
   private base: Texture | undefined;
+  private renderer: WebGPURenderer | undefined;
 
   /** New colors, `#rrggbb`, drawn from the next frame. */
   setColors(north: string, south: string): void {
     this.colors = [north, south];
-    this.rebuild(this.base);
+    this.rebuild(this.base, this.renderer);
   }
 
-  /** Textures sampled like the base image `base`, or none without it; returns `base`. */
-  rebuild<T extends Texture | undefined>(base: T): T {
+  /**
+   * Textures sampled like the base image `base`, or none without it, uploaded now as the base image is: a cap that
+   * comes into view later uploads nothing (F052). Returns `base`.
+   */
+  rebuild<T extends Texture | undefined>(base: T, renderer: WebGPURenderer | undefined): T {
     this.dispose();
     this.base = base;
+    this.renderer = renderer;
     this.textures = base ? this.colors.map((rgb) => createColorTexture(rgb, base)) : [];
+    for (const texture of this.textures) renderer?.initTexture(texture);
     return base;
   }
 

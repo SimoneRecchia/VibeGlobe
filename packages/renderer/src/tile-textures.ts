@@ -218,25 +218,19 @@ export class TileTextures {
   }
 }
 
-/** A polar cap's fill color, sRGB 0–255. */
-export type CapRgb = readonly [number, number, number];
-
 /**
  * The polar caps' fills (KB-211), north then south: 1 × 1 textures of their colors, sampled like the base image (on
  * WebGPU the sampler set up with a binding stays when its texture changes), made again when the colors or the base
  * image change.
  */
 class PolarCapTextures {
-  private colors: readonly CapRgb[] = [
-    [0x78, 0xa9, 0xcd],
-    [0xf2, 0xf3, 0xf7],
-  ];
+  private colors: readonly string[] = ['#78a9cd', '#f2f3f7'];
   /** The textures, empty until the base image is up. */
   textures: Texture[] = [];
   private base: Texture | undefined;
 
-  /** New colors, sRGB 0–255, drawn from the next frame. */
-  setColors(north: CapRgb, south: CapRgb): void {
+  /** New colors, `#rrggbb`, drawn from the next frame. */
+  setColors(north: string, south: string): void {
     this.colors = [north, south];
     this.rebuild(this.base);
   }
@@ -256,9 +250,10 @@ class PolarCapTextures {
   }
 }
 
-/** A 1 × 1 texture of one sRGB color, sampled like `like`. */
-function createColorTexture(rgb: CapRgb, like: Texture): DataTexture {
-  const texture = new DataTexture(Uint8Array.of(rgb[0], rgb[1], rgb[2], 255), 1, 1);
+/** A 1 × 1 texture of one `#rrggbb` sRGB color, sampled like `like`. */
+function createColorTexture(hex: string, like: Texture): DataTexture {
+  const rgb = parseInt(hex.slice(1), 16);
+  const texture = new DataTexture(Uint8Array.of(rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255), 1, 1);
   texture.colorSpace = like.colorSpace;
   texture.wrapS = like.wrapS;
   texture.wrapT = like.wrapT;

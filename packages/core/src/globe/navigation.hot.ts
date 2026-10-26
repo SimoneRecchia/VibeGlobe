@@ -64,7 +64,7 @@ export function dragCamera(
   view: ViewState | undefined,
   position: unknown,
   point: unknown,
-  northUp = false,
+  northUp: boolean,
 ): boolean {
   if (position === null || typeof position !== 'object' || !readPixel(point)) return false;
   const lon = (position as GeoPosition).longitudeDeg;
@@ -111,7 +111,7 @@ export function zoomCamera(
   view: ViewState | undefined,
   point: unknown,
   deltaZoom: unknown,
-  northUp = false,
+  northUp: boolean,
 ): boolean {
   if (typeof deltaZoom !== 'number' || !(deltaZoom - deltaZoom === 0) || !readPixel(point)) return false;
   camera.update();

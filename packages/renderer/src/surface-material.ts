@@ -1,12 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import {
-  NORTH_CAP_TEXTURE,
-  SOUTH_CAP_TEXTURE,
-  type DepthPath,
-  type MorphFrame,
-  type TileDrawList,
-} from '@vibeglobe/core';
+import { type DepthPath, type MorphFrame, type TileDrawList } from '@vibeglobe/core';
 import { attribute, Fn, If, mix, positionGeometry, select, texture, uniform, vec3, vec4 } from 'three/tsl';
 import {
   DataTexture,
@@ -332,6 +326,10 @@ export function createSurfaceMaterial(
 }
 
 const NO_HEIGHTS = -1;
+
+/** The imagery handles of the polar caps' fills in core's draw list (KB-211). */
+const NORTH_CAP_TEXTURE = -2;
+const SOUTH_CAP_TEXTURE = -3;
 
 /** The imagery texture of a handle: a tile's, a polar cap's fill (KB-211), else the base image. */
 function imageryOf(

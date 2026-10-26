@@ -1,8 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { NORTH_CAP_TEXTURE, SOUTH_CAP_TEXTURE } from '../globe/polar-caps.js';
 import { NO_TERRAIN, type TileDrawLayer, type TileDrawList, type TileDrawOverlay } from '../globe/types.js';
-import { MERCATOR_ROOT, NORTH_CAP, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 
 /** Texture handle of a draw that samples the world base image (`GlobeOptions.baseImageryUrl`). */
 export const BASE_TEXTURE = -1;
@@ -184,8 +183,8 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
-    const texture =
-      tile.root === MERCATOR_ROOT ? BASE_TEXTURE : tile.root === NORTH_CAP ? NORTH_CAP_TEXTURE : SOUTH_CAP_TEXTURE;
+    // The caps' fills (`polar-caps.ts`): -2 for the north cap (root 1), -3 for the south cap (root 2).
+    const texture = tile.root === MERCATOR_ROOT ? BASE_TEXTURE : -1 - tile.root;
     list.textures[index] = texture;
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;

@@ -263,10 +263,10 @@ export interface RendererBackend {
   /** Optional: the atmosphere's sun lighting, time and haze (F394, F396). */
   setAtmosphere?(settings: Required<AtmosphereSettings>): void;
   /**
-   * Optional: the colors of the polar caps' fill handles (`NORTH_CAP_TEXTURE`, `SOUTH_CAP_TEXTURE`) (KB-211), sRGB channels 0–255;
+   * Optional: the colors of the polar caps' fill handles, -2 north and -3 south (KB-211), `#rrggbb` colors;
    * a renderer without it draws those tiles with the base image.
    */
-  setPolarCapColors?(northRgb: readonly [number, number, number], southRgb: readonly [number, number, number]): void;
+  setPolarCapColors?(northHex: string, southHex: string): void;
   destroy(): void;
 }
 
@@ -301,7 +301,7 @@ export interface NavigationApi {
   /**
    * How a drag moves the camera: 'free' (the default) turns the globe as a trackball, so the grabbed point stays under
    * the cursor over the poles and the heading turns with it; 'north-up' holds the heading, horizontal drags turning
-   * about the polar axis and vertical ones changing latitude, and stops at the poles. Other values are ignored.
+   * about the polar axis and vertical ones changing latitude, and stops at the poles. Any other value acts as 'free'.
    */
   navigationMode?: 'free' | 'north-up';
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
@@ -906,7 +906,7 @@ export interface Globe {
   setAtmosphere(settings: AtmosphereSettings): void;
   /**
    * Changes the fill of the polar caps that no imagery source covers (KB-211); fields not given keep their value. A
-   * color that is not `#rgb` or `#rrggbb` throws 'invalid-option'.
+   * color that is not `#rrggbb` throws 'invalid-option'.
    */
   setPolarCapColors(colors: import('./polar-caps.js').PolarCapColors): void;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */

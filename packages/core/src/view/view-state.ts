@@ -13,12 +13,6 @@ const RELIEF_TILT_RAD = (30 * Math.PI) / 180;
 /** The equator's length over 512 px: ground meters per pixel at ground zoom 0 (`groundZoomForRange`). */
 const METERS_PER_PIXEL_AT_ZERO = (2 * Math.PI * WGS84.semiMajorAxisMeters) / 512;
 
-/**
- * The view's ground radius, in view radii, from the polar caps at which the morph starts to fade, and where it is whole
- * (KB-211): the Mercator plane cannot show the caps beyond ±85.0511°, so a view that reaches them stays a globe.
- */
-const CAP_FADE_START_RADII = 1;
-const CAP_FADE_END_RADII = 2;
 /** The tilt's lengthening of the view toward the horizon is counted up to 1 / this cosine. */
 const MIN_TILT_COSINE = 0.2;
 
@@ -334,10 +328,11 @@ export class ViewState {
       (metersPerPixel * halfDiagonalPx) /
       WGS84.semiMajorAxisMeters /
       (cosine > MIN_TILT_COSINE ? cosine : MIN_TILT_COSINE);
-    const latitude = camera.pose.targetLatitudeRad;
-    capStep[0] = CAP_FADE_START_RADII * radiusRad;
-    capStep[1] = CAP_FADE_END_RADII * radiusRad;
-    capStep[2] = WEB_MERCATOR_MAX_LATITUDE_RAD - (latitude >= 0 ? latitude : -latitude);
+    // The morph fades out from two view radii from a cap to one (KB-211): the Mercator plane cannot show the caps beyond
+    // ±85.0511°, so a view that reaches them stays a globe.
+    capStep[0] = radiusRad;
+    capStep[1] = 2 * radiusRad;
+    capStep[2] = WEB_MERCATOR_MAX_LATITUDE_RAD - Math.abs(camera.pose.targetLatitudeRad);
     smootherstepInto(capStep);
     this.values[CAP_KEEP] = capStep[3] ?? 1;
     curveValues[CURVE_MORPH] = (curveValues[CURVE_MORPH] ?? 0) * (capStep[3] ?? 1);

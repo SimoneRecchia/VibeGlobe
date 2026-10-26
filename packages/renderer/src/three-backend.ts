@@ -31,7 +31,7 @@ import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampled
 import { patchIdentitySwizzle } from './webgpu-compat.js';
 import { chooseWebGPU, decodeBitmap, surfaceScope } from './environment.js';
 import * as surface from './surface-material.js';
-import { createBaseTexture, TileTextures, type CapRgb } from './tile-textures.js';
+import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeTile } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
@@ -400,8 +400,8 @@ export class ThreeBackend implements RendererBackend {
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
 
-  /** The polar caps' fill colors (KB-211), sRGB 0–255, from the next frame. */
-  readonly setPolarCapColors = (n: CapRgb, s: CapRgb): void => this.tileTextures.caps.setColors(n, s);
+  /** The polar caps' fill colors (KB-211), `#rrggbb`, from the next frame. */
+  readonly setPolarCapColors = (n: string, s: string): void => this.tileTextures.caps.setColors(n, s);
 
   /** The atmosphere's sun lighting, time and haze (F394, F396): uniforms only. */
   setAtmosphere(settings: Required<AtmosphereSettings>): void {

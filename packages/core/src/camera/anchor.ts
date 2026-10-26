@@ -27,9 +27,11 @@ export const ANCHOR_TRACKBALL = 1;
 export const ANCHOR_NORTH_UP = 2;
 /** How close to a pole a 'north-up' target goes, radians (89.9°): there the heading-held drag stops. */
 export const NORTH_UP_LIMIT_RAD = (89.9 * Math.PI) / 180;
-/** The target latitude Gauss–Newton may reach, radians: just short of a pole, or the north-up limit. */
-const latitudeLimit = new Float64Array([Math.PI / 2 - 1e-9]);
-/** Set when Gauss–Newton stopped because its target passed {@link latitudeLimit}. */
+/** The target latitude Gauss–Newton may reach otherwise, radians: just short of a pole. */
+const POLE_LIMIT_RAD = Math.PI / 2 - 1e-9;
+/** True while a 'north-up' solve runs: Gauss–Newton then stops at {@link NORTH_UP_LIMIT_RAD}. */
+let northUpSolve = false;
+/** Set when Gauss–Newton stopped because its target passed its latitude limit. */
 let passedLimit = false;
 
 const anchorEcef = new Float64Array(3);
@@ -85,7 +87,7 @@ export function solveAnchor(
   pixel: Float64Array,
   morph?: MorphFrame,
   guess?: Float64Array,
-  mode = ANCHOR_HOLD_HEADING,
+  mode: number = ANCHOR_HOLD_HEADING,
 ): boolean {
   geodeticArrayToEcef(anchor, anchorEcef);
   anchorGeodetic[0] = anchor[0] ?? 0;
@@ -97,35 +99,21 @@ export function solveAnchor(
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
-  if (mode === ANCHOR_HOLD_HEADING)
-    return gaussNewton(camera) || (guess !== undefined && retryFrom(camera, guess)) || rotateToPixel(camera);
-  return mode === ANCHOR_TRACKBALL ? solveTrackball(camera, guess) : solveNorthUp(camera, guess);
-}
-
-/**
- * A 'free' drag: on the globe (no morph) a rigid rotation about the Earth's center, so the grabbed point follows the
- * cursor over the poles and the heading turns with it; on the flattening or flat map, heading held as a zoom.
- */
-function solveTrackball(camera: Camera, guess: Float64Array | undefined): boolean {
-  if (solveMorph && (solveMorph.factors[0] ?? 0) > 0)
-    return gaussNewton(camera) || (guess !== undefined && retryFrom(camera, guess)) || rotateToPixel(camera);
-  if (rotateToPixel(camera)) return true;
-  restoreStart(camera);
-  return gaussNewton(camera);
-}
-
-/**
- * A 'north-up' drag or zoom: the heading is held and the target stays within {@link NORTH_UP_LIMIT_RAD} of the
- * equator. Where reaching the pixel needs a target beyond it, the target stops at the limit and only the longitude
- * follows the cursor: the camera halts at the pole, with no jump and no flip of the heading.
- */
-function solveNorthUp(camera: Camera, guess: Float64Array | undefined): boolean {
-  latitudeLimit[0] = NORTH_UP_LIMIT_RAD;
+  // A 'free' drag on the globe rotates rigidly first (a trackball); on the flattening or flat map it holds the heading.
+  if (mode === ANCHOR_TRACKBALL && !(solveMorph && (solveMorph.factors[0] ?? 0) > 0)) {
+    if (rotateToPixel(camera)) return true;
+    restoreStart(camera);
+    return gaussNewton(camera);
+  }
+  // 'North-up' never rotates rigidly, which would turn the heading: past its limit the target stops there.
+  const northUp = mode === ANCHOR_NORTH_UP;
+  northUpSolve = northUp;
   passedLimit = false;
-  const solved =
-    gaussNewton(camera) || (guess !== undefined && retryFrom(camera, guess)) || (passedLimit && holdAtLimit(camera));
-  latitudeLimit[0] = Math.PI / 2 - 1e-9;
-  return solved;
+  return (
+    gaussNewton(camera) ||
+    (guess !== undefined && retryFrom(camera, guess)) ||
+    (northUp ? passedLimit && holdAtLimit(camera) : rotateToPixel(camera))
+  );
 }
 
 /** Puts the target back where the solve started. */
@@ -135,28 +123,12 @@ function restoreStart(camera: Camera): void {
 }
 
 /**
- * The target at the north-up limit nearest the pole the solve headed for, its longitude solved alone (Newton on the
- * horizontal residual) so the grabbed point keeps its screen column; true when the target moved there. The vertical
- * residual stays: the camera halts at the pole while the cursor goes on.
+ * The target stopped at the north-up limit nearest the pole the solve headed for, with the longitude of its last step:
+ * the camera halts at the pole while the cursor goes on. True when the anchor is still in front of the eye.
  */
 function holdAtLimit(camera: Camera): boolean {
-  const pose = camera.pose;
-  const north = pose.targetLatitudeRad >= 0;
-  restoreStart(camera);
-  pose.targetLatitudeRad = north ? NORTH_UP_LIMIT_RAD : -NORTH_UP_LIMIT_RAD;
-  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-    if (!residual(camera, r0)) return false;
-    const lon = pose.targetLongitudeRad;
-    pose.targetLongitudeRad = lon + 1e-7;
-    if (!residual(camera, rLon)) return false;
-    const slope = ((rLon[0] ?? 0) - (r0[0] ?? 0)) / 1e-7;
-    pose.targetLongitudeRad = lon;
-    if (!(slope - slope === 0) || (slope < 1e-9 && slope > -1e-9)) break;
-    const moved = (r0[0] ?? 0) / slope;
-    const next = lon - moved;
-    pose.targetLongitudeRad = next >= -Math.PI && next < Math.PI ? next : wrapLongitudeRad(next);
-    if (moved < 1e-12 && moved > -1e-12) break;
-  }
+  // Past the limit, the target's latitude is nonzero.
+  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * NORTH_UP_LIMIT_RAD;
   return residual(camera, r0);
 }
 
@@ -177,9 +149,7 @@ function retryFrom(camera: Camera, guess: Float64Array): boolean {
  * where the optimizing compiler would not have finished warming up (KB-033).
  */
 function rotateToPixel(camera: Camera): boolean {
-  const pose = camera.pose;
-  pose.targetLongitudeRad = start[0] ?? 0;
-  pose.targetLatitudeRad = start[1] ?? 0;
+  restoreStart(camera);
   // Each rotation is exact for a sphere; on the ellipsoid a few converge to the pixel.
   for (let i = 0; i < RIGID_ITERATIONS; i++) {
     if (!rotateRigidly(camera)) return false;
@@ -217,7 +187,7 @@ function gaussNewton(camera: Camera): boolean {
     // Wrapping is a call with a double argument: only when the step leaves [-π, π).
     pose.targetLongitudeRad = nextLon >= -Math.PI && nextLon < Math.PI ? nextLon : wrapLongitudeRad(nextLon);
     pose.targetLatitudeRad = lat - dLat;
-    const limit = latitudeLimit[0] ?? 0;
+    const limit = northUpSolve ? NORTH_UP_LIMIT_RAD : POLE_LIMIT_RAD;
     if (pose.targetLatitudeRad > limit || pose.targetLatitudeRad < -limit) {
       passedLimit = true;
       return false;

@@ -411,3 +411,19 @@ describe('settings and lifecycle', () => {
     expect(h.element.style.touchAction).toBe('auto');
   });
 });
+
+describe('navigation mode', () => {
+  it("starts in 'free' or the option's mode, hands it to the engine and switches at runtime", () => {
+    const h = controlsHarness();
+    expect(h.controls.navigationMode).toBe('free');
+    expect(h.camera.navigation.navigationMode).toBe('free');
+    h.controls.setNavigationMode('north-up');
+    expect(h.controls.navigationMode).toBe('north-up');
+    expect(h.camera.navigation.navigationMode).toBe('north-up');
+    expect(() => h.controls.setNavigationMode('globe' as 'free')).toThrow(GlobeError);
+    expect(h.controls.navigationMode).toBe('north-up');
+    const northUp = controlsHarness({ navigationMode: 'north-up' });
+    expect(northUp.camera.navigation.navigationMode).toBe('north-up');
+    expect(() => createControls({ navigationMode: 'trackball' as 'free' })).toThrow(GlobeError);
+  });
+});

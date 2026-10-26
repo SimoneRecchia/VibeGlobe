@@ -1,7 +1,8 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { NORTH_CAP_TEXTURE, SOUTH_CAP_TEXTURE } from '../globe/polar-caps.js';
 import { NO_TERRAIN, type TileDrawLayer, type TileDrawList, type TileDrawOverlay } from '../globe/types.js';
-import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { MERCATOR_ROOT, NORTH_CAP, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 
 /** Texture handle of a draw that samples the world base image (`GlobeOptions.baseImageryUrl`). */
 export const BASE_TEXTURE = -1;
@@ -175,18 +176,21 @@ export function drawWithoutTerrain(list: DrawList, count: number): void {
 /**
  * Draws the first `count` tiles of a selection with the world base image, whose mesh keys the surface cache already
  * wrote into `list.meshKeys`. The base image is equirectangular with its top row at the north pole, so each tile
- * samples it through its geographic v (south fraction in latitude).
+ * samples it through its geographic v (south fraction in latitude). Polar cap tiles show their cap's fill instead
+ * (KB-211): the base image's polar rows, stretched around the pole, would show as radial stripes.
  */
 export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], count: number): void {
   list.count = count;
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
-    list.textures[index] = BASE_TEXTURE;
+    const texture =
+      tile.root === MERCATOR_ROOT ? BASE_TEXTURE : tile.root === NORTH_CAP ? NORTH_CAP_TEXTURE : SOUTH_CAP_TEXTURE;
+    list.textures[index] = texture;
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;
     list.toneSources[index] = -1;
-    list.fromTextures[index] = BASE_TEXTURE;
+    list.fromTextures[index] = texture;
     list.fromGeographic[index] = 1;
     list.fades[index] = 1;
     for (let slot = 0; slot < list.overlays.length; slot++) {

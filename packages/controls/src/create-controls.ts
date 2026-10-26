@@ -1,12 +1,17 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { Controls, ControlsFactory, NavigationApi } from '@vibeglobe/core';
+import type { Controls, ControlsFactory, NavigationApi, NavigationMode } from '@vibeglobe/core';
 import { HeadingTarget, Inertia, type InertiaTaus, KeyMotion, ZoomTarget } from './animators.js';
 import { CameraPort, FRAME_MS, type ConnectedGlobe } from './camera-port.js';
 import type { GestureContext } from './gesture-context.js';
 import { KeyboardInput } from './keyboard.js';
 import { MouseGestures } from './mouse-gestures.js';
-import { type ControlsOptions, resolveControlsOptions, type ResolvedControlsOptions } from './options.js';
+import {
+  type ControlsOptions,
+  resolveControlsOptions,
+  type ResolvedControlsOptions,
+  validNavigationMode,
+} from './options.js';
 import { TouchGestures } from './touch-gestures.js';
 import { WheelInput } from './wheel-input.js';
 import { ZoomBox } from './zoom-box.js';
@@ -28,6 +33,13 @@ export interface NavigationControls extends ControlsFactory {
   zoomOut(): void;
   /** Turns the view to north up along the shortest arc, keeping center and tilt. */
   resetNorth(): void;
+  /** How a drag moves the camera now (the `navigationMode` option, then {@link NavigationControls.setNavigationMode}). */
+  readonly navigationMode: NavigationMode;
+  /**
+   * Switches how a drag moves the camera, from the next input on: 'free' (trackball) or 'north-up' (north stays up,
+   * stops at the poles). Anything else throws a GlobeError ('invalid-option').
+   */
+  setNavigationMode(mode: NavigationMode): void;
 }
 
 /**
@@ -39,7 +51,11 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   const resolved = resolveControlsOptions(options);
   let globe: ConnectedGlobe | undefined;
   let current: Attached | undefined;
+  let mode = resolved.navigationMode;
+  let navigationApi: NavigationApi | undefined;
   const factory = (element: unknown, navigation: NavigationApi): Controls => {
+    navigationApi = navigation;
+    navigation.navigationMode = mode;
     const attached = attach(element as HTMLElement, navigation, resolved, globe);
     current = attached;
     return {
@@ -51,7 +67,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
       },
     };
   };
-  return Object.assign(factory, {
+  const controls = Object.assign(factory, {
     options: resolved,
     connect(target: ConnectedGlobe) {
       globe = target;
@@ -60,7 +76,14 @@ export function createControls(options?: ControlsOptions): NavigationControls {
     zoomIn: () => current?.keyboard.zoomBy(1),
     zoomOut: () => current?.keyboard.zoomBy(-1),
     resetNorth: () => current?.keyboard.resetNorth(),
+    navigationMode: mode,
+    setNavigationMode(next: NavigationMode) {
+      mode = validNavigationMode(next);
+      if (navigationApi) navigationApi.navigationMode = mode;
+    },
   });
+  // A getter: Object.assign would copy the mode once.
+  return Object.defineProperty(controls, 'navigationMode', { get: () => mode, enumerable: true });
 }
 
 /** One attachment to an input element. */

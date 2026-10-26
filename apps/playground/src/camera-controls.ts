@@ -48,5 +48,19 @@ export function showCameraControls(globe: Globe, app: HTMLElement, navigation: N
     button('Globe', 'reset-to-globe', () => void globe.resetToGlobe()),
     button('Home', 'home', () => void globe.goHome()),
   );
-  app.append(group);
+  app.append(group, navigationModeSelect(navigation));
+}
+
+/** How a drag moves the camera (F620): free (trackball) or north-up, switched at runtime. */
+function navigationModeSelect(navigation: NavigationControls): HTMLSelectElement {
+  const mode = document.createElement('select');
+  mode.id = 'navigation-mode';
+  mode.setAttribute('aria-label', 'Navigation mode');
+  for (const [value, text] of [
+    ['free', 'Free (trackball)'],
+    ['north-up', 'North up'],
+  ] as const)
+    mode.add(new Option(text, value, false, value === navigation.navigationMode));
+  mode.addEventListener('change', () => navigation.setNavigationMode(mode.value === 'north-up' ? 'north-up' : 'free'));
+  return mode;
 }

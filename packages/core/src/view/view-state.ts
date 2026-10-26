@@ -3,6 +3,7 @@
 import type { Camera } from '../camera/camera.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { GlobeError } from '../globe/errors.js';
+import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import { CURVE_MORPH, CURVE_RELIEF, evaluateViewCurves, smootherstepInto, type ViewCurves } from './curves.js';
 import { MorphFrame } from './morph.js';
 import { skyTiltLimitRad, terrainTiltLimitRad } from './tilt-limits.js';
@@ -12,7 +13,17 @@ const RELIEF_TILT_RAD = (30 * Math.PI) / 180;
 /** The equator's length over 512 px: ground meters per pixel at ground zoom 0 (`groundZoomForRange`). */
 const METERS_PER_PIXEL_AT_ZERO = (2 * Math.PI * WGS84.semiMajorAxisMeters) / 512;
 
+/**
+ * The view's ground radius, in view radii, from the polar caps at which the morph starts to fade, and where it is whole
+ * (KB-211): the Mercator plane cannot show the caps beyond ±85.0511°, so a view that reaches them stays a globe.
+ */
+const CAP_FADE_START_RADII = 1;
+const CAP_FADE_END_RADII = 2;
+/** The tilt's lengthening of the view toward the horizon is counted up to 1 / this cosine. */
+const MIN_TILT_COSINE = 0.2;
+
 const groundZoom = new Float64Array(1);
+const capStep = new Float64Array(4);
 const curveValues = new Float64Array(3);
 const anchor = new Float64Array(2);
 const factors = new Float64Array(2);
@@ -65,6 +76,8 @@ const KEPT = 11;
 const TILT_CAP = 12;
 /** The tilt the previous frame applied, radians: where a limit that no tilt satisfies holds the tilt (KB-153). */
 const PREVIOUS_TILT = 13;
+/** The share of the curve's morph the polar caps leave (KB-211): 0 where the view reaches a cap, else 1. */
+const CAP_KEEP = 14;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -75,7 +88,7 @@ const PREVIOUS_TILT = 13;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -165,6 +178,7 @@ export class ViewState {
     this.curves = curves;
     groundZoom[0] = this.values[GROUND_ZOOM] ?? 0;
     evaluateViewCurves(curves, groundZoom, curveValues);
+    curveValues[CURVE_MORPH] = (curveValues[CURVE_MORPH] ?? 0) * (this.values[CAP_KEEP] ?? 1);
     this.values[AUTO_TILT] = curveValues[2] ?? 0;
     this.values[MORPH_OFFSET] = shownMorph - (curveValues[CURVE_MORPH] ?? 0);
     this.values[RELIEF_OFFSET] = shownRelief - (curveValues[CURVE_RELIEF] ?? 0);
@@ -313,6 +327,20 @@ export class ViewState {
     groundZoom[0] = Math.log2(METERS_PER_PIXEL_AT_ZERO / metersPerPixel);
     this.values[GROUND_ZOOM] = groundZoom[0];
     evaluateViewCurves(this.curves, groundZoom, curveValues);
+    // The view's ground radius in radians, longer toward the horizon when tilted, against its distance to the caps.
+    const cosine = Math.cos(camera.pose.tiltRad);
+    const halfDiagonalPx = Math.sqrt(camera.widthPx * camera.widthPx + camera.heightPx * camera.heightPx) / 2;
+    const radiusRad =
+      (metersPerPixel * halfDiagonalPx) /
+      WGS84.semiMajorAxisMeters /
+      (cosine > MIN_TILT_COSINE ? cosine : MIN_TILT_COSINE);
+    const latitude = camera.pose.targetLatitudeRad;
+    capStep[0] = CAP_FADE_START_RADII * radiusRad;
+    capStep[1] = CAP_FADE_END_RADII * radiusRad;
+    capStep[2] = WEB_MERCATOR_MAX_LATITUDE_RAD - (latitude >= 0 ? latitude : -latitude);
+    smootherstepInto(capStep);
+    this.values[CAP_KEEP] = capStep[3] ?? 1;
+    curveValues[CURVE_MORPH] = (curveValues[CURVE_MORPH] ?? 0) * (capStep[3] ?? 1);
     this.values[AUTO_TILT] = curveValues[2] ?? 0;
     this.morph.factors[0] = (curveValues[CURVE_MORPH] ?? 0) + (this.values[MORPH_OFFSET] ?? 0);
   }

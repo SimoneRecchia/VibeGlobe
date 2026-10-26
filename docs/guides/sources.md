@@ -194,6 +194,19 @@ if (pair)
 
 `wmsImagery` takes the same `transforms`. Reprojected tiles are transparent outside the data, so the layers below show there.
 
+## Polar caps
+
+Web Mercator sources end at ±85.0511°. Beyond, the globe draws two polar caps in geographic tiles: a geographic (EPSG:4326) imagery source that covers them, such as NASA GIBS in `EPSG:4326`, fills them; otherwise each cap shows one fill color, the sea of the default base image in the north and its ice in the south. Choose the colors at start or change them at runtime:
+
+```ts
+import { createGlobe } from '@vibeglobe/core';
+
+const globe = createGlobe({ container, renderer, baseImageryUrl, polarCapColors: { north: '#0b2a4a' } });
+globe.setPolarCapColors({ north: '#1d3d5f', south: '#ffffff' });
+```
+
+A view that reaches a cap stays a globe at every zoom (ADR 0008, update of 2026-10-26), so the cap is always a whole disc.
+
 ## Layer composition and source chains
 
 `createGlobe({ imagery })` takes layers bottom first. A layer is a source, or a chain of sources in priority order with its look: each tile comes from the first source that has it, and a source that fails (errors, timeouts, offline) leaves its tiles to the next one ([ADR 0038](../adr/0038-imagery-layer-stack.md)).

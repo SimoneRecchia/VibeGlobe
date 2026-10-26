@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError } from './errors.js';
 import type { AtmosphereSettings, QualitySettings, RendererQuality } from './quality-types.js';
+import { DEFAULT_CAP_COLORS, hexRgb, type PolarCapColors } from './polar-caps.js';
 import type { Globe, RendererBackend } from './types.js';
 
 /** The default time of the Sun: the June solstice of 2026 at noon UTC, as ADR 0040's harness. */
@@ -62,11 +63,13 @@ export interface QualityParts {
 export class EngineQuality {
   private quality: Omit<Required<QualitySettings>, 'resolutionScale'>;
   private sky: Required<AtmosphereSettings>;
+  private caps: Required<PolarCapColors> = DEFAULT_CAP_COLORS;
 
   constructor(
     private readonly parts: QualityParts,
-    initial: { quality?: unknown; atmosphere?: unknown; maxScreenErrorPx?: number },
+    initial: { quality?: unknown; atmosphere?: unknown; maxScreenErrorPx?: number; polarCapColors?: unknown },
   ) {
+    if (initial.polarCapColors !== undefined) this.validateCaps(initial.polarCapColors);
     const quality = validateQuality(initial.quality ?? {});
     this.quality = {
       maxScreenErrorPx: initial.maxScreenErrorPx ?? 1,
@@ -103,6 +106,27 @@ export class EngineQuality {
     const globe = this.parts.globe;
     void renderer.setQuality?.(this.rendererQuality(renderer))?.then(() => globe.requestRender());
     renderer.setAtmosphere?.(this.sky);
+    this.applyCaps(renderer);
+  }
+
+  /** Validates and applies the polar caps' fill colors; fields not given keep their value. */
+  setCaps(colors: PolarCapColors): void {
+    this.validateCaps(colors);
+    this.applyCaps(this.parts.renderer());
+    this.parts.globe.requestRender();
+  }
+
+  private validateCaps(colors: unknown): void {
+    if (colors === null || typeof colors !== 'object')
+      throw new GlobeError('invalid-option', `polarCapColors must be an object, got ${String(colors)}`);
+    const { north, south } = colors as PolarCapColors;
+    if (north !== undefined) hexRgb('polarCapColors.north', north);
+    if (south !== undefined) hexRgb('polarCapColors.south', south);
+    this.caps = { north: north ?? this.caps.north, south: south ?? this.caps.south };
+  }
+
+  private applyCaps(renderer: RendererBackend | undefined): void {
+    renderer?.setPolarCapColors?.(hexRgb('north', this.caps.north), hexRgb('south', this.caps.south));
   }
 
   /** Validates and applies quality settings; fields not given keep their value. */

@@ -6,6 +6,7 @@
  * the settings panel and the help overlay, over the demo data layers and the space background. Loaded only when shown.
  */
 import type { Globe } from '@vibeglobe/core';
+import type { NavigationControls } from '@vibeglobe/controls';
 import type { GlobeLayers } from '@vibeglobe/layers';
 import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
 import type { Ui } from '@vibeglobe/ui';
@@ -57,10 +58,12 @@ async function addShowcaseControls(globe: Globe, ui: Ui, layers: GlobeLayers, ho
   ui.add(new HelpControl());
 }
 
-/** The quality preset and the space background, as the settings panel changes them. */
-function showcaseHooks(globe: Globe, handle: ShowcaseHandle): ShowcaseHooks {
+/** The quality preset, the space background and the navigation mode, as the settings panel changes them. */
+function showcaseHooks(globe: Globe, handle: ShowcaseHandle, navigation?: NavigationControls): ShowcaseHooks {
   let quality: { setPreset(preset: 'low' | 'medium' | 'high' | 'ultra'): void } | undefined;
   return {
+    navigationMode: () => navigation?.navigationMode ?? 'free',
+    setNavigationMode: (mode) => navigation?.setNavigationMode(mode),
     setQuality(preset) {
       if (quality) quality.setPreset(preset);
       else void import('@vibeglobe/quality').then(({ createQuality }) => (quality = createQuality(globe, { preset })));
@@ -85,12 +88,12 @@ export async function showPageUi(
   globe: Globe,
   container: HTMLElement,
   params: URLSearchParams,
-  { showcase, ui: withUi }: { showcase: boolean; ui: boolean },
+  { showcase, ui: withUi, navigation }: { showcase: boolean; ui: boolean; navigation?: NavigationControls },
 ): Promise<ShowcaseHandle> {
   await globe.ready;
   let layers: GlobeLayers | undefined;
   const handle: ShowcaseHandle = { ui: undefined, layers: undefined, space: undefined };
-  const hooks = showcaseHooks(globe, handle);
+  const hooks = showcaseHooks(globe, handle, navigation);
   if (showcase) {
     const { createGlobeLayers } = await import('@vibeglobe/layers');
     layers = createGlobeLayers(globe, { element: container });

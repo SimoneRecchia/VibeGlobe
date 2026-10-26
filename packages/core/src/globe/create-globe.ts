@@ -22,7 +22,6 @@ import type { Credit } from '../imagery/credits.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
-import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
 import { completedMovement, type Movements } from './movements.js';
 import { wireView } from './view-wiring.js';
@@ -185,7 +184,7 @@ class GlobeEngine implements Globe {
     return this.movements.reducedMotion;
   }
 
-  get viewMode(): ViewMode {
+  get viewMode(): Globe['viewMode'] {
     return this.surfaceFrame.view.mode;
   }
 
@@ -438,6 +437,7 @@ class GlobeEngine implements Globe {
   }
   readonly setQualitySettings: Globe['setQualitySettings'] = (s) => this.assertAlive() ?? this.helpers.quality.set(s);
   readonly setAtmosphere: Globe['setAtmosphere'] = (s) => this.assertAlive() ?? this.helpers.quality.setAtmosphere(s);
+  readonly setPolarCapColors: Globe['setPolarCapColors'] = (c) => this.assertAlive() ?? this.helpers.quality.setCaps(c);
   readonly captureFrame = (): Promise<FrameCapture> => this.helpers.captures.frame();
   readonly captureView: Globe['captureView'] = (size) => this.helpers.captures.view(size);
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */

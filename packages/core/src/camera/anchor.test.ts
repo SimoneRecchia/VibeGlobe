@@ -1,7 +1,7 @@
 import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import { geodeticToEcef } from '../geodesy/ecef.js';
-import { solveAnchor } from './anchor.js';
+import { ANCHOR_NORTH_UP, ANCHOR_TRACKBALL, NORTH_UP_LIMIT_RAD, solveAnchor } from './anchor.js';
 import { Camera } from './camera.js';
 import { projectToScreen } from './projection.js';
 
@@ -51,6 +51,80 @@ describe('solveAnchor', () => {
     expect(solveAnchor(c, Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0), Float64Array.of(500, 50))).toBe(true);
     const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
     expect(Math.hypot(x - 500, y - 50)).toBeLessThan(1);
+  });
+});
+
+describe('navigation modes: free and north-up drags', () => {
+  /** Drags the point under `from` to `to` in `steps` frames with a solve mode; returns the camera. */
+  function drag(c: Camera, from: [number, number], to: [number, number], steps: number, mode: number): boolean[] {
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    expect(c.pickEllipsoid(from[0], from[1], hit)).toBe(true);
+    const anchor = Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0);
+    const solved: boolean[] = [];
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const pixel = Float64Array.of(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t);
+      solved.push(solveAnchor(c, anchor, pixel, undefined, undefined, mode));
+    }
+    return solved;
+  }
+
+  it('free: the grabbed point stays under the cursor over the pole, and the heading turns with the globe', () => {
+    const c = camera(0, 80, 8e6);
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    // A point beyond the pole, dragged down: the camera moves north, over the pole.
+    expect(c.pickEllipsoid(500, 150, hit)).toBe(true);
+    const solved = drag(c, [500, 150], [500, 700], 30, ANCHOR_TRACKBALL);
+    expect(solved.every(Boolean)).toBe(true);
+    const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
+    expect(Math.hypot(x - 500, y - 700)).toBeLessThan(0.05);
+    // The view went over the pole: the target is on the far side and the heading turned to about south.
+    expect(Math.abs(c.pose.targetLongitudeRad / DEG)).toBeGreaterThan(170);
+    expect(Math.abs(c.pose.headingRad / DEG)).toBeGreaterThan(170);
+  });
+
+  it('free: a diagonal drag on the globe turns the heading', () => {
+    const c = camera(10, 45, 1e7);
+    drag(c, [300, 300], [700, 500], 10, ANCHOR_TRACKBALL);
+    expect(Math.abs(c.pose.headingRad / DEG)).toBeGreaterThan(1);
+  });
+
+  it('north-up: horizontal drags turn about the polar axis and vertical ones change latitude, heading held', () => {
+    const c = camera(10, 45, 1e7);
+    drag(c, [300, 400], [700, 400], 10, ANCHOR_NORTH_UP);
+    expect(c.pose.headingRad).toBe(0);
+    expect(c.pose.targetLongitudeRad / DEG).toBeLessThan(10);
+    expect(c.pose.targetLatitudeRad / DEG).toBeCloseTo(45, 0);
+    const longitude = c.pose.targetLongitudeRad;
+    drag(c, [500, 300], [500, 500], 10, ANCHOR_NORTH_UP);
+    expect(c.pose.headingRad).toBe(0);
+    expect(c.pose.targetLongitudeRad).toBeCloseTo(longitude, 9);
+    expect(c.pose.targetLatitudeRad / DEG).toBeGreaterThan(45);
+  });
+
+  it('north-up: dragging over the pole stops the camera there, without a jump or a flip', () => {
+    for (const latitude of [80, -80]) {
+      const c = camera(30, latitude, 8e6);
+      // Toward the pole: a point poleward of the target dragged away from it.
+      const from: [number, number] = latitude > 0 ? [500, 150] : [500, 650];
+      const to: [number, number] = latitude > 0 ? [500, 750] : [500, 50];
+      const latitudes: number[] = [];
+      const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      expect(c.pickEllipsoid(from[0], from[1], hit)).toBe(true);
+      const anchor = Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0);
+      for (let i = 1; i <= 40; i++) {
+        const t = i / 40;
+        const pixel = Float64Array.of(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t);
+        solveAnchor(c, anchor, pixel, undefined, undefined, ANCHOR_NORTH_UP);
+        latitudes.push(c.pose.targetLatitudeRad);
+        expect(c.pose.headingRad).toBe(0);
+        expect(c.pose.targetLongitudeRad / DEG).toBeCloseTo(30, 6);
+      }
+      // Monotonic toward the pole, ending at the limit: no flip back, no step larger than the drag's.
+      const sign = Math.sign(latitude);
+      expect(latitudes.every((value, i) => i === 0 || sign * (value - (latitudes[i - 1] ?? 0)) >= -1e-12)).toBe(true);
+      expect(Math.abs(latitudes.at(-1) ?? 0)).toBeCloseTo(NORTH_UP_LIMIT_RAD, 12);
+    }
   });
 });
 

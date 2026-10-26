@@ -11,7 +11,7 @@ import type { Camera } from '../camera/camera.js';
 import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
 import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
-import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
+import type { DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
@@ -154,7 +154,8 @@ export class ImageryRuntime {
   private readonly overlayFades = [new ImageryFades(), new ImageryFades()];
   /** Keeps a texture still faded from resident this frame. */
   private readonly keepTexture = (handle: number): void => {
-    if (handle !== BASE_TEXTURE) this.loaderOf(handle)?.markDrawn(handle);
+    // The base image and the caps' fills (KB-211) have negative handles and no loader.
+    if (handle >= 0) this.loaderOf(handle)?.markDrawn(handle);
   };
 
   constructor(

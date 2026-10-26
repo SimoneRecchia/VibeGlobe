@@ -81,6 +81,8 @@ export type {
   CameraConstraints,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
+export type { NavigationMode } from './globe/view-control.js';
+export { NORTH_CAP_TEXTURE, SOUTH_CAP_TEXTURE, type PolarCapColors } from './globe/polar-caps.js';
 export { MorphFrame, morphPointInto } from './view/morph.js';
 export { AUTO_TILT_RANGE_DEG, DEFAULT_VIEW_CURVES, validateViewCurves } from './view/curves.js';
 export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.js';

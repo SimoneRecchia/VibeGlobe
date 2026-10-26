@@ -411,7 +411,8 @@ if (params.get('experiment') === 'gpu-probes') {
   });
 } else if (app && canvas) {
   const scenario = params.get('scenario');
-  const navigation = createControls();
+  // `?navigationMode=free|north-up` picks how a drag moves the camera at start (the selectors change it at runtime).
+  const navigation = createControls(params.get('navigationMode') === 'north-up' ? { navigationMode: 'north-up' } : {});
   const globe = startGlobe(app, canvas, viewFromUrl(), backend, navigation);
   // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
   // A failed start records no time (the error reaches the status line and the error event, not a rejection here).
@@ -428,7 +429,9 @@ if (params.get('experiment') === 'gpu-probes') {
   }
   runScenario(globe, scenario);
   if (PAGE_UI || SHOWCASE)
-    void import('./showcase.js').then((m) => m.showPageUi(globe, app, params, { showcase: SHOWCASE, ui: PAGE_UI }));
+    void import('./showcase.js').then((m) =>
+      m.showPageUi(globe, app, params, { showcase: SHOWCASE, ui: PAGE_UI, navigation }),
+    );
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));

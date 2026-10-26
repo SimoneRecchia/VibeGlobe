@@ -5,7 +5,7 @@
  * return values, which V8 boxes (ADR 0018).
  * @benchmark packages/core/src/globe/frame-allocation.test.ts
  */
-import { solveAnchor } from '../camera/anchor.js';
+import { ANCHOR_HOLD_HEADING, ANCHOR_NORTH_UP, ANCHOR_TRACKBALL, solveAnchor } from '../camera/anchor.js';
 import type { Camera } from '../camera/camera.js';
 import type { GeodeticRad } from '../geodesy/ecef.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
@@ -36,13 +36,16 @@ function readPixel(point: unknown): boolean {
   return true;
 }
 
-/** Moves the camera so the point in `anchor` shows at `pixel`, or leaves it where it was when that is impossible. */
-function solveDrag(camera: Camera, view: ViewState | undefined, guess?: Float64Array): void {
+/**
+ * Moves the camera so the point in `anchor` shows at `pixel`, or leaves it where it was when that is impossible;
+ * `mode` is one of `solveAnchor`'s.
+ */
+function solveDrag(camera: Camera, view: ViewState | undefined, mode: number, guess?: Float64Array): void {
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
   start[2] = pose.headingRad;
-  if (!solveAnchor(camera, anchor, pixel, view?.morph, guess)) {
+  if (!solveAnchor(camera, anchor, pixel, view?.morph, guess, mode)) {
     pose.targetLongitudeRad = start[0] ?? 0;
     pose.targetLatitudeRad = start[1] ?? 0;
     pose.headingRad = start[2] ?? 0;
@@ -52,8 +55,17 @@ function solveDrag(camera: Camera, view: ViewState | undefined, guess?: Float64A
   camera.update();
 }
 
-/** Moves the camera so a WGS84 position shows at a screen point; returns false for invalid input (nothing changes). */
-export function dragCamera(camera: Camera, view: ViewState | undefined, position: unknown, point: unknown): boolean {
+/**
+ * Moves the camera so a WGS84 position shows at a screen point; returns false for invalid input (nothing changes).
+ * `northUp` holds the heading and stops at the poles; otherwise the globe turns freely, as a trackball.
+ */
+export function dragCamera(
+  camera: Camera,
+  view: ViewState | undefined,
+  position: unknown,
+  point: unknown,
+  northUp = false,
+): boolean {
   if (position === null || typeof position !== 'object' || !readPixel(point)) return false;
   const lon = (position as GeoPosition).longitudeDeg;
   const lat = (position as GeoPosition).latitudeDeg;
@@ -66,7 +78,7 @@ export function dragCamera(camera: Camera, view: ViewState | undefined, position
   anchor[2] = height;
   camera.update();
   view?.update(camera);
-  solveDrag(camera, view);
+  solveDrag(camera, view, northUp ? ANCHOR_NORTH_UP : ANCHOR_TRACKBALL);
   return true;
 }
 
@@ -92,9 +104,15 @@ function writeZoomGuess(camera: Camera): void {
 
 /**
  * Zooms by `deltaZoom` levels keeping the position under a screen point there, or about the target when the point is
- * off the globe; returns false for invalid input (nothing changes).
+ * off the globe; returns false for invalid input (nothing changes). `northUp` never turns the heading.
  */
-export function zoomCamera(camera: Camera, view: ViewState | undefined, point: unknown, deltaZoom: unknown): boolean {
+export function zoomCamera(
+  camera: Camera,
+  view: ViewState | undefined,
+  point: unknown,
+  deltaZoom: unknown,
+  northUp = false,
+): boolean {
   if (typeof deltaZoom !== 'number' || !(deltaZoom - deltaZoom === 0) || !readPixel(point)) return false;
   camera.update();
   // The point under the cursor as the frame shows it (ADR 0008: on the morphed surface).
@@ -112,6 +130,6 @@ export function zoomCamera(camera: Camera, view: ViewState | undefined, point: u
   view?.previewTilt(camera);
   // The new zoom has its own morph and relief: the point must stay under the cursor on that surface.
   view?.update(camera);
-  if (anchored) solveDrag(camera, view, zoomGuess);
+  if (anchored) solveDrag(camera, view, northUp ? ANCHOR_NORTH_UP : ANCHOR_HOLD_HEADING, zoomGuess);
   return true;
 }

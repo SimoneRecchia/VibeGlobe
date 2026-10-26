@@ -1,11 +1,11 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * The showcase's own controls (owner, 2026-10-25): a settings panel (theme, language, quality preset, atmosphere, fog,
+ * The showcase's own controls (owner, 2026-10-25): a settings panel (theme, language, navigation mode, quality preset, atmosphere, fog,
  * sun time, space background, network mode, backend) and a help overlay listing the gestures. Both are `UiControl`s,
  * so they sit in the UI's corners with its theme; their texts follow the UI's language (English or Italian).
  */
-import type { AtmosphereLevel, Globe } from '@vibeglobe/core';
+import type { AtmosphereLevel, Globe, NavigationMode } from '@vibeglobe/core';
 import type { ControlContext, ControlPosition, Ui, UiControl } from '@vibeglobe/ui';
 
 type Language = 'en' | 'it';
@@ -17,6 +17,9 @@ const TEXT = {
     light: 'Light',
     dark: 'Dark',
     language: 'Language',
+    navigation: 'Navigation',
+    free: 'Free (trackball)',
+    northUp: 'North up',
     quality: 'Quality',
     atmosphere: 'Atmosphere',
     fog: 'Fog',
@@ -48,6 +51,9 @@ const TEXT = {
     light: 'Chiaro',
     dark: 'Scuro',
     language: 'Lingua',
+    navigation: 'Navigazione',
+    free: 'Libera (trackball)',
+    northUp: 'Nord in alto',
     quality: 'Qualità',
     atmosphere: 'Atmosfera',
     fog: 'Nebbia',
@@ -84,6 +90,9 @@ export interface ShowcaseHooks {
   setQuality(preset: 'low' | 'medium' | 'high' | 'ultra'): void;
   /** Shows or hides the space background. */
   setSpace(on: boolean): void;
+  /** How a drag moves the camera now. */
+  navigationMode(): NavigationMode;
+  setNavigationMode(mode: NavigationMode): void;
 }
 
 /** A labeled row of the settings panel. */
@@ -197,7 +206,22 @@ export class SettingsControl extends PanelControl {
       this.#state.quality = quality.value;
       this.#hooks.setQuality(quality.value as 'low' | 'medium' | 'high' | 'ultra');
     });
-    this.box.append(row(t.theme, theme), row(t.language, language), row(t.quality, quality));
+    const navigation = select(
+      [
+        ['free', t.free],
+        ['north-up', t.northUp],
+      ],
+      this.#hooks.navigationMode(),
+    );
+    navigation.addEventListener('change', () =>
+      this.#hooks.setNavigationMode(navigation.value === 'north-up' ? 'north-up' : 'free'),
+    );
+    this.box.append(
+      row(t.theme, theme),
+      row(t.language, language),
+      row(t.navigation, navigation),
+      row(t.quality, quality),
+    );
     this.fillScene(globe);
     this.fillReloads();
   }

@@ -103,6 +103,8 @@ export class TileTextures {
 
   /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
   readonly tones = new ToneMatcher();
+  /** The polar caps' fills (KB-211), made again with the base image. */
+  readonly caps = new PolarCapTextures();
 
   constructor(private readonly anisotropy: () => number) {}
 
@@ -190,6 +192,7 @@ export class TileTextures {
   clear(): void {
     for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);
     this.entries.length = 0;
+    this.caps.dispose();
   }
 
   private create(tile: DecodedTile): Texture {
@@ -213,6 +216,57 @@ export class TileTextures {
     texture.needsUpdate = true;
     return texture;
   }
+}
+
+/** A polar cap's fill color, sRGB 0–255. */
+export type CapRgb = readonly [number, number, number];
+
+/**
+ * The polar caps' fills (KB-211), north then south: 1 × 1 textures of their colors, sampled like the base image (on
+ * WebGPU the sampler set up with a binding stays when its texture changes), made again when the colors or the base
+ * image change.
+ */
+export class PolarCapTextures {
+  private colors: readonly CapRgb[] = [
+    [0x78, 0xa9, 0xcd],
+    [0xf2, 0xf3, 0xf7],
+  ];
+  /** The textures, empty until the base image is up. */
+  textures: Texture[] = [];
+  private base: Texture | undefined;
+
+  /** New colors, sRGB 0–255, drawn from the next frame. */
+  setColors(north: CapRgb, south: CapRgb): void {
+    this.colors = [north, south];
+    this.rebuild(this.base);
+  }
+
+  /** Textures sampled like the base image `base`, or none without it; returns `base`. */
+  rebuild<T extends Texture | undefined>(base: T): T {
+    this.dispose();
+    this.base = base;
+    this.textures = base ? this.colors.map((rgb) => createColorTexture(rgb, base)) : [];
+    return base;
+  }
+
+  /** Frees the textures. */
+  dispose(): void {
+    for (const texture of this.textures) texture.dispose();
+    this.textures = [];
+  }
+}
+
+/** A 1 × 1 texture of one sRGB color, sampled like `like`. */
+function createColorTexture(rgb: CapRgb, like: Texture): DataTexture {
+  const texture = new DataTexture(Uint8Array.of(rgb[0], rgb[1], rgb[2], 255), 1, 1);
+  texture.colorSpace = like.colorSpace;
+  texture.wrapS = like.wrapS;
+  texture.wrapT = like.wrapT;
+  texture.minFilter = like.minFilter;
+  texture.magFilter = like.magFilter;
+  texture.anisotropy = like.anisotropy;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /**

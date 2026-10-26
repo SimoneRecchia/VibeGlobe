@@ -9,6 +9,14 @@
   },
   {
     "package": "@vibeglobe/tools",
+    "path": "configs/regions/europe-land.geojson",
+    "description": "Europe's land mask for the europe build (land and sea levels)",
+    "source": "Natural Earth 1:50m admin-0 countries, https://www.naturalearthdata.com/",
+    "license": "Public domain",
+    "notice": "Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com."
+  },
+  {
+    "package": "@vibeglobe/tools",
     "path": "configs/*.json",
     "description": "The pipeline's dataset configurations and their pinned source lists, written for this project",
     "source": "VibeGlobe",

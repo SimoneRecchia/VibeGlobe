@@ -1,5 +1,6 @@
 // Navigation modes: 'free' (the default, a trackball like Google Earth) and 'north-up' (north stays up, the camera
-// stops at the poles), chosen with `?navigationMode=` at start and the playground's selector at runtime.
+// stops at the poles), chosen with `?navigationMode=` at start and the playground's selector at runtime. The north-up
+// flick's inertia is checked in controls-inertia.spec.ts, which has the machine to itself.
 import { expect, test, type Page } from '@playwright/test';
 import type { CameraState, ScreenPoint } from '@vibeglobe/core';
 import { geoToScreen, nextFrame, openGlobe, screenToGeo, waitForIdle } from './support/globe.ts';
@@ -77,30 +78,5 @@ test.describe('navigation modes', () => {
     expect(turned.headingDeg).toBe(0);
     expect(turned.longitudeDeg).toBeGreaterThan(1);
     expect(turned.latitudeDeg).toBeCloseTo(40, 0);
-  });
-
-  test("'north-up' keeps the inertia of a flick", async ({ page }) => {
-    await openGlobe(page, 'backend=webgl2&lon=0&lat=40&zoom=3&navigationMode=north-up');
-    await waitForIdle(page);
-    // Warm-up: the first drag frames after start-up are slow (controls-inertia.spec.ts).
-    await drag(page, { xPx: 240, yPx: 200 }, { xPx: 250, yPx: 205 }, 5);
-    await waitForIdle(page);
-    await page.mouse.move(300, 200);
-    await page.mouse.down();
-    // Moves 16 ms apart and the release right after the last, not waiting for the page to handle it (KB-205).
-    for (let i = 1; i < 8; i++) {
-      await page.mouse.move(300 - 12 * i, 200);
-      await page.waitForTimeout(16);
-    }
-    const last = page.mouse.move(300 - 12 * 8, 200);
-    await page.waitForTimeout(16);
-    await page.mouse.up();
-    await last;
-    await nextFrame(page);
-    const released = await camera(page);
-    await waitForIdle(page);
-    const settled = await camera(page);
-    expect(settled.longitudeDeg).toBeGreaterThan(released.longitudeDeg + 0.1);
-    expect(settled.headingDeg).toBe(0);
   });
 });

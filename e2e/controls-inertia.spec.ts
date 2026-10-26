@@ -3,6 +3,7 @@
 import { expect, test } from '@playwright/test';
 import { DEFAULT_CONTROLS_OPTIONS } from '@vibeglobe/controls';
 import { camera, frames, openControls, positionAt, record, settle } from './support/controls.ts';
+import { nextFrame, openGlobe, waitForIdle } from './support/globe.ts';
 
 test('a released drag coasts with time-based inertia, and a release after holding still does not (F179)', async ({
   page,
@@ -203,4 +204,35 @@ test('a drag that leaves the globe keeps turning it, and its release glides (KB-
   expect(step(lon[offDisc[0] ?? 0] ?? 0, lon[offDisc.at(-1) ?? 0] ?? 0), trace).toBeLessThan(-1);
   // And the release glides on.
   expect(step(lon[releasedAt - 1] ?? 0, lon.at(-1) ?? 0), trace).toBeLessThan(-1);
+});
+
+test("'north-up' navigation keeps the inertia of a flick (F620)", async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 360 });
+  await openGlobe(page, 'backend=webgl2&lon=0&lat=40&zoom=3&navigationMode=north-up');
+  await waitForIdle(page);
+  const longitude = (): Promise<number> =>
+    page.evaluate(() => window.vibeglobePlayground?.globe.camera.longitudeDeg ?? Number.NaN);
+  // Warm-up, as above: the first drag frames after start-up are slow.
+  await page.mouse.move(240, 200);
+  await page.mouse.down();
+  await page.mouse.move(250, 205, { steps: 5 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await waitForIdle(page);
+  await page.mouse.move(300, 200);
+  await page.mouse.down();
+  // Moves 16 ms apart and the release right after the last, not waiting for the page to handle it (KB-205).
+  for (let i = 1; i < 8; i++) {
+    await page.mouse.move(300 - 12 * i, 200);
+    await page.waitForTimeout(16);
+  }
+  const last = page.mouse.move(300 - 12 * 8, 200);
+  await page.waitForTimeout(16);
+  await page.mouse.up();
+  await last;
+  await nextFrame(page);
+  const released = await longitude();
+  await waitForIdle(page);
+  expect(await longitude()).toBeGreaterThan(released + 0.1);
+  expect(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.headingDeg)).toBe(0);
 });

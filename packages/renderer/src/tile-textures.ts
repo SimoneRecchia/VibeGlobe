@@ -192,7 +192,8 @@ export class TileTextures {
   clear(): void {
     for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);
     this.entries.length = 0;
-    this.caps.dispose();
+    // Also drops the caps' renderer and base image: a destroyed globe the host still references holds neither (KB-045).
+    this.caps.rebuild(undefined, undefined);
   }
 
   private create(tile: DecodedTile): Texture {

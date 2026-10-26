@@ -1,6 +1,8 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
+  type CoverageArea,
+  coverageTest,
   GEOGRAPHIC_TILING,
   inCoverage,
   WEB_MERCATOR_TILING,
@@ -40,6 +42,11 @@ export interface XyzImageryOptions {
   subdomains?: readonly string[];
   /** The areas with data, radians; tiles outside are never requested (F094). */
   coverage?: readonly TileRectangleRad[];
+  /**
+   * Polygons the source has data for (land, a country's borders): tiles outside them are never requested, so the next
+   * source of the layer, or the layer below, is drawn there. By default only tiles wholly inside are requested.
+   */
+  area?: CoverageArea;
   decoder?: 'image' | 'ktx2';
   /** The network transport; `fetchTransport()` by default. */
   transport?: TileTransport;
@@ -84,6 +91,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
   const maxLevel = options.maxLevel ?? 19;
   const subdomains = options.subdomains ?? [];
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
+  const area = options.area ? coverageTest(options.area) : undefined;
   return {
     id: options.id,
     tiling,
@@ -91,7 +99,8 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     maxLevel,
     tileSizePx: options.tileSizePx ?? 256,
     pixelRatio: options.pixelRatio ?? 1,
-    ...(options.coverage ? { coverage: options.coverage } : {}),
+    // The area's bounding rectangles let the engine skip whole regions before asking for tiles.
+    ...(options.coverage || area ? { coverage: options.coverage ?? area?.rectangles ?? [] } : {}),
     transport: options.transport ?? fetchTransport(undefined, options.headers),
     // A custom transport (auth headers, sessions) is the only way to reach the tiles: a cache tier in front of the
     // source must use it rather than fetch the URLs itself (track B hook request 4, TB-01).
@@ -109,6 +118,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     request(coord: TileCoord, out: TileRequest, pixelRatio = 1): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';
+      if (area && !area.covers(tiling.tileExtent(coord, extent))) return 'noData';
       const rows = tiling.rootTilesY * 2 ** coord.level;
       const hostIndex = subdomains.length > 0 ? (coord.x + coord.y) % subdomains.length : 0;
       out.url = options.url

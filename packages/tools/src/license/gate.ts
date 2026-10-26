@@ -26,6 +26,7 @@ function sourceUrls(source: SourceConfig): string[] {
     case 'geotiff':
     case 'osm-extract':
     case 'xyz':
+    case 'pmtiles':
       return [source.url];
   }
 }

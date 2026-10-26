@@ -127,6 +127,8 @@ export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
+export { coverageTest } from './imagery/coverage-area.js';
+export type { CoverageArea, CoverageTest, PolygonDeg, RingDeg } from './imagery/coverage-area.js';
 export type { ImagerySource, TileSource } from './imagery/imagery-source.js';
 export type { RenderExtension, RenderExtensionContext } from './globe/render-extensions.js';
 export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';

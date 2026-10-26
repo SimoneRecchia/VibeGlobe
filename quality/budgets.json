@@ -107,6 +107,9 @@
     "quality": {
       "bundleGzipKB": 5
     },
+    "presets": {
+      "bundleGzipKB": 45
+    },
     "tools": {
       "bundleGzipKB": 100
     }

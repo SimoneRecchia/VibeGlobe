@@ -115,6 +115,32 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
+    // ADR 0182: the weekly planet archive, not the public tile endpoint (limited to 3,000 tiles or 50 MB a download).
+    id: 'openfreemap-planet',
+    name: 'OpenFreeMap planet vector tiles (OpenStreetMap, OpenMapTiles schema)',
+    license: 'ODbL-1.0 (data); CC-BY-4.0 (OpenMapTiles schema)',
+    licenseUrl: 'https://openfreemap.org/tos',
+    termsReadDate: '2026-10-26',
+    attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap',
+    sourceUrl: 'https://openfreemap.org/quick_start/',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
+    // ADR 0182: Terrarium tiles from each source's open terrain model; Copernicus GLO-30 up to level 12 in Europe.
+    id: 'mapterhorn',
+    name: 'Mapterhorn terrain (Terrarium)',
+    license: "Each source's open licence (CC-BY-4.0, Copernicus DEM licence, Etalab-2.0, …)",
+    licenseUrl: 'https://mapterhorn.com/attribution',
+    termsReadDate: '2026-10-26',
+    attribution: `© Mapterhorn (https://mapterhorn.com/attribution); ${COPERNICUS_DEM_ATTRIBUTION('WorldDEM-30')}`,
+    sourceUrl: 'https://mapterhorn.com',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
     id: 'openstreetmap-extract',
     name: 'OpenStreetMap data extracts',
     license: 'ODbL-1.0',

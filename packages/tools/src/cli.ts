@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { datasetArea, loadConfig } from './config/load.js';
 import { formatEstimate } from './estimate.js';
+import { measureSizes } from './measure.js';
 import { startFixtureServer } from './fixtures/server.js';
 import { PROVIDER_PROFILES } from './license/profiles.js';
 import { type Step, STEPS, estimateBuild, runBuild, selectedDatasets } from './pipeline/build.js';
@@ -80,7 +81,8 @@ export function helpText(): string {
     'Usage: vibeglobe-data <command> [options]',
     '',
     'Dataset pipeline (each step runs the steps before it, which resume where they stopped):',
-    '  estimate <config>   Tile counts, output size, download size and cost per dataset and zoom; downloads nothing',
+    '  estimate <config>   Tile counts (land and sea apart with a land mask), output size, download size and cost per',
+    '                      dataset and zoom; downloads nothing. --measure reads the tile sizes from the sample areas',
     '  download <config>   Download the sources (after the estimate and confirmation)',
     '  convert <config>    Download, then make the sources readable (unzip, or GDAL in a pinned Docker image)',
     '  tile <config>       ... then cut and encode the tiles into the static folder',
@@ -187,7 +189,7 @@ async function fixturesCommand(parsed: ParsedArgs, io: CliIo): Promise<number> {
   return 0;
 }
 
-const FLAGS = ['sample', 'yes', 'estimate-only', 'help'] as const;
+const FLAGS = ['sample', 'yes', 'estimate-only', 'measure', 'help'] as const;
 
 /** Runs the CLI; returns the exit code. */
 export async function main(args: string[], io: CliIo): Promise<number> {
@@ -205,7 +207,15 @@ export async function main(args: string[], io: CliIo): Promise<number> {
         sample: parsed.options.has('sample'),
         ...(typeof datasets === 'string' ? { datasets: datasets.split(',') } : {}),
       };
-      io.out(formatEstimate(estimateBuild(loaded, options)));
+      if (!parsed.options.has('measure')) {
+        io.out(formatEstimate(estimateBuild(loaded, options)));
+        return 0;
+      }
+      // Real tile sizes from the sample areas: a few archive tiles per zoom, or a sample build (F615).
+      io.out('Measuring tile sizes on the sample areas (only their tiles are read)…');
+      const measured = await measureSizes(loaded, { ...options, fetch: io.fetch });
+      for (const note of measured.notes) io.out(`  ${note}`);
+      io.out(formatEstimate(estimateBuild(loaded, { ...options, measured: measured.sizes })));
       return 0;
     }
     if (command === 'build' || (STEPS as readonly string[]).includes(command))

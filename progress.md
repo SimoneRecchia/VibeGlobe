@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-10-26: the Europe preset (targeted owner request)
+
+A map of Europe in the style of Google Earth from free sources that may be redistributed commercially, for hybrid use: the application's offline package up to a chosen level, with online detail on land beyond it. Engine gaps filled: polygon coverage areas of imagery and terrain sources (F610), package-only and network-only sources (F611), vector style credits shown with the imagery's (F612). Source chains (F247) and Terrarium terrain were already supported. New package `@vibeglobe/presets` with `europeOpen` (F613, ADR 0182; the national orthophotos are left out until their terms can be read, open question 34). Also the pipeline configuration `europe.json` with a Natural Earth land mask and a separate sea level (F614), `estimate` with land and sea counts and `--measure` (F615), the guide `docs/guides/europe-preset.md` (F616), and the playground's `?preset=europe` selector (F617). One pull request, which the owner merges.
+
 ## Handoff for Wednesday 28 October (written 2026-10-25, before the 22:00 Europe/Rome stop)
 
 The owner uses the engine in the first consumer on Monday and Tuesday and restarts the main session on Wednesday for

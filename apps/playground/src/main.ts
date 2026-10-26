@@ -22,6 +22,7 @@ import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
 import { customAdapters } from './custom-adapters.js';
 import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
+import { europeLayers, showEuropePreset } from './europe-preset.js';
 import { exposeTestHooks } from './test-hooks.js';
 import { PAGE_UI, SHOWCASE } from './page-mode.js';
 
@@ -281,7 +282,15 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
   // them too, or a production build has nothing to decode with (F463).
   const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
   const wrapped = offlineDemo && imagery.imagery ? { imagery: imagery.imagery.map(offlineDemo.wrap) } : {};
-  return { ...tiles3dWorkers, ...terrain, ...imagery, ...wrapped, ...customAdapters(params), ...montBlancLayers };
+  return {
+    ...tiles3dWorkers,
+    ...terrain,
+    ...imagery,
+    ...wrapped,
+    ...customAdapters(params),
+    ...montBlancLayers,
+    ...europeLayers,
+  };
 }
 
 /** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
@@ -433,6 +442,8 @@ if (params.get('experiment') === 'gpu-probes') {
   if (['quality', 'gpuLoad', 'atmosphere', 'sun', 'haze', 'fog'].some((name) => params.has(name)))
     void globe.ready.then(async () => (await import('./quality-demo.js')).startQuality(globe, params, canvas));
   if (/=mvt-|vectorStyle=/.test(location.search)) void import('./vector-tiles-demo.js').then((m) => m.show(globe));
+  // `?preset=europe`: the Europe preset's map types with their selector (F617).
+  if (params.get('preset') === 'europe') void showEuropePreset(globe, app);
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;

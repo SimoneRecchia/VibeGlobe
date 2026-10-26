@@ -21,6 +21,8 @@ export type TileEncoder = (samples: Float32Array, sizePx: number) => Uint8Array;
 /** Everything raster tiling needs. */
 export interface RasterTilingJob {
   area: Area;
+  /** The tiles to build at each zoom (land only beyond the sea's last zoom); every tile of the area by default. */
+  tilesAt?: (z: number) => Iterable<TileCoord>;
   minZoom: number;
   maxZoom: number;
   mosaic: Mosaic;
@@ -214,14 +216,14 @@ export function buildRasterTiles(job: RasterTilingJob): { built: number; skipped
       else levelSkipped++;
     };
     if (border === 0) {
-      for (const tile of areaTiles(job.area, z)) {
+      for (const tile of job.tilesAt?.(z) ?? areaTiles(job.area, z)) {
         const raw = ensureRaw(job, tile);
         count(encodeTile(job, tile, raw, outside) || raw.samples !== undefined);
       }
     } else {
       // Every raw tile of the level first: the borders read the neighbors'. A tile is rebuilt when its own raw
       // samples or a neighbor's changed.
-      const tiles = [...areaTiles(job.area, z)];
+      const tiles = [...(job.tilesAt?.(z) ?? areaTiles(job.area, z))];
       const rebuilt = new Set<string>();
       const regenerated = new Set<string>();
       for (const tile of tiles) {

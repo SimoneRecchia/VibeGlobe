@@ -13,6 +13,20 @@ export interface ZoomEstimate {
   z: number;
   tiles: number;
   bytes: number;
+  /** With a land mask: tiles touching land and tiles wholly at sea (0 beyond the sea's last zoom). */
+  land?: number;
+  sea?: number;
+  /** Whether the tile sizes of this zoom were measured on a sample rather than taken from the configuration. */
+  measured?: boolean;
+}
+
+/** Average tile sizes measured on a sample, by zoom: land tiles and sea tiles. */
+export type MeasuredSizes = Record<number, { land?: number; sea?: number }>;
+
+/** The land and sea split of a dataset's tiles (`LandMask`), as far as the estimate reads it. */
+export interface LandSplit {
+  landCount(z: number): number;
+  seaCount(z: number): number;
 }
 
 /** The estimate of one dataset over one area. */
@@ -42,9 +56,9 @@ export interface BuildEstimate {
   pricesReadDate: string;
 }
 
-/** Average encoded size of one tile of `dataset` at zoom `z`. */
-function bytesPerTile(dataset: DatasetConfig, z: number): number {
-  const value = dataset.bytesPerTile;
+/** Average encoded size of one tile of `dataset` at zoom `z` (over land, or at sea with `sea`). */
+function bytesPerTile(dataset: DatasetConfig, z: number, sea = false): number {
+  const value = (sea ? dataset.seaBytesPerTile : undefined) ?? dataset.bytesPerTile;
   if (typeof value === 'number') return value;
   const exact = value[String(z)];
   if (exact !== undefined) return exact;
@@ -56,11 +70,34 @@ function bytesPerTile(dataset: DatasetConfig, z: number): number {
 }
 
 /** Estimates one dataset over an area. */
-export function estimateDataset(dataset: DatasetConfig, area: Area, region: string): DatasetEstimate {
+export function estimateDataset(
+  dataset: DatasetConfig,
+  area: Area,
+  region: string,
+  land?: LandSplit,
+  measured: MeasuredSizes = {},
+): DatasetEstimate {
   const zooms: ZoomEstimate[] = [];
   for (let z = dataset.minZoom; z <= dataset.maxZoom; z++) {
-    const tiles = areaTileCount(area, z);
-    zooms.push({ z, tiles, bytes: tiles * bytesPerTile(dataset, z) });
+    const sample = measured[z];
+    const landBytes = sample?.land ?? bytesPerTile(dataset, z);
+    const seaBytes = sample?.sea ?? bytesPerTile(dataset, z, true);
+    const isMeasured = sample !== undefined ? { measured: true } : {};
+    if (land && dataset.seaMaxZoom !== undefined) {
+      const onLand = land.landCount(z);
+      const atSea = z <= dataset.seaMaxZoom ? land.seaCount(z) : 0;
+      zooms.push({
+        z,
+        tiles: onLand + atSea,
+        land: onLand,
+        sea: atSea,
+        bytes: onLand * landBytes + atSea * seaBytes,
+        ...isMeasured,
+      });
+    } else {
+      const tiles = areaTileCount(area, z);
+      zooms.push({ z, tiles, bytes: tiles * landBytes, ...isMeasured });
+    }
   }
   // The same files the build downloads: every source covering the area's tiles at the lowest zoom.
   const files = sourceFiles(dataset, { kind: 'bbox', bbox: coverage(area, dataset.minZoom) });
@@ -116,17 +153,34 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
+/** The rows of one dataset's table: per zoom, its tiles (land and sea when split), size and cumulative gigabytes. */
+function zoomRows(d: DatasetEstimate): string[] {
+  const split = d.zooms.some((z) => z.land !== undefined);
+  const cells = (values: string[]): string =>
+    `    ${values.map((v, i) => (i === 0 ? v.padEnd(5) : v.padStart(14))).join('')}`;
+  const rows = [cells(['zoom', ...(split ? ['land tiles', 'sea tiles'] : []), 'tiles', 'size', 'cumulative', 'sizes'])];
+  let cumulative = 0;
+  for (const zoom of d.zooms) {
+    cumulative += zoom.bytes;
+    rows.push(
+      cells([
+        `z${zoom.z}`,
+        ...(split ? [(zoom.land ?? 0).toLocaleString('en'), (zoom.sea ?? 0).toLocaleString('en')] : []),
+        zoom.tiles.toLocaleString('en'),
+        formatBytes(zoom.bytes),
+        `${(cumulative / GB).toFixed(2)} GB`,
+        zoom.measured ? 'measured' : 'configured',
+      ]),
+    );
+  }
+  return rows;
+}
+
 /** A readable table of the estimate: per dataset, region and zoom level, then totals and cost. */
 export function formatEstimate(estimate: BuildEstimate): string {
   const lines: string[] = ['Estimate (nothing has been downloaded):'];
   for (const d of estimate.datasets) {
-    lines.push(`  ${d.dataset} [${d.region}]`);
-    let previous: number | undefined;
-    for (const zoom of d.zooms) {
-      const growth = previous ? ` (×${(zoom.tiles / previous).toFixed(2)})` : '';
-      lines.push(`    z${zoom.z}: ${zoom.tiles.toLocaleString('en')} tiles, ${formatBytes(zoom.bytes)}${growth}`);
-      previous = zoom.tiles;
-    }
+    lines.push(`  ${d.dataset} [${d.region}]`, ...zoomRows(d));
     lines.push(
       `    total: ${d.tiles.toLocaleString('en')} tiles, ${formatBytes(d.outputBytes)} written; ` +
         `download ${d.downloadFiles} files, ${formatBytes(d.downloadBytes)}`,

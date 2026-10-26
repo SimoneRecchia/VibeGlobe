@@ -267,7 +267,8 @@ class OfflineEngine implements Offline {
       this.rules.set(source.id, rules);
       for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);
     }
-    this.registerEndpoint(source);
+    // A package-only source never touches the network, so it has no endpoint to check.
+    if (options.tiers !== 'package') this.registerEndpoint(source);
     this.wrapped.add(source.id);
     const layers = this.layersOf.get(source.id) ?? new Set<string>();
     layers.add(options.layerId ?? source.id);

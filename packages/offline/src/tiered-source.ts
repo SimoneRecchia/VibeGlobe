@@ -66,6 +66,19 @@ export interface TieredSourceOptions {
    * is unchanged. Default: conditional on the page's own origin, refetch elsewhere.
    */
   readonly revalidation?: 'conditional' | 'refetch';
+  /**
+   * Which tiers serve the source on top of the persistent cache: `all` (default), `package` (offline packages only, never
+   * the network: the offline stand-in of a layer, from its own provider) or `network` (never the packages). The mode
+   * still applies: a package-only source draws nothing in online-only mode, a network-only one nothing offline.
+   */
+  readonly tiers?: 'all' | 'package' | 'network';
+}
+
+/** The policy's decision for a source restricted to its tiers. */
+function withinTiers(decision: PolicyDecision, tiers: TieredSourceOptions['tiers']): PolicyDecision {
+  if (tiers === 'package') return { ...decision, useNetwork: false };
+  if (tiers === 'network') return { ...decision, readPackages: false };
+  return decision;
 }
 
 /** How long a tile that cannot be loaded while offline is held before the engine is told to ask again. */
@@ -182,7 +195,7 @@ class TileLoader {
     signal: AbortSignal,
   ): Promise<TransportResult> {
     const id = this.source.id;
-    const decision = this.context.decide(id, this.layerId);
+    const decision = withinTiers(this.context.decide(id, this.layerId), this.options.tiers);
     const key = tileKey(id, coord);
     const stored = decision.readPersistentCache ? await this.context.store.get(key).catch(() => undefined) : undefined;
     // A request the engine aborted meanwhile delivers nothing, so no tier counts it (TB-03).

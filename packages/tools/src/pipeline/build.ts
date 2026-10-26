@@ -6,9 +6,9 @@
  */
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { type LoadedConfig, datasetArea, loadConfig } from '../config/load.js';
+import { type LoadedConfig, datasetArea, datasetLandMask, datasetTiles, loadConfig } from '../config/load.js';
 import type { DatasetConfig } from '../config/schema.js';
-import { type BuildEstimate, estimateDataset, formatEstimate, totalEstimate } from '../estimate.js';
+import { type BuildEstimate, type MeasuredSizes, estimateDataset, formatEstimate, totalEstimate } from '../estimate.js';
 import { checkDatasets, describeViolations } from '../license/gate.js';
 import { outputMetadata } from '../output/metadata.js';
 import { outputPaths, writeOutputs } from '../output/write-outputs.js';
@@ -21,6 +21,7 @@ import { type DatasetFolders, convertSources, rasterMosaic, tileRasterDataset } 
 import { StepLog, sha256 } from './step-log.js';
 import { PIPELINE_VERSION } from '../version.js';
 import { tileVectorDataset } from './vector-dataset.js';
+import { extractPmtilesDataset } from './pmtiles-extract.js';
 
 /** The steps of a build, in order. */
 export const STEPS = ['download', 'convert', 'tile', 'package'] as const;
@@ -30,6 +31,8 @@ export type Step = (typeof STEPS)[number];
 /** Options of a build run. */
 export interface BuildOptions {
   configPath: string;
+  /** The loaded configuration, when the caller changed it (a sample area of its own); read from `configPath` otherwise. */
+  loaded?: LoadedConfig;
   outDir: string;
   sample: boolean;
   /** Skip the confirmation prompt (explicit `--yes`). */
@@ -80,12 +83,19 @@ export function selectedDatasets(
 /** Estimates every selected dataset of a configuration; downloads nothing. */
 export function estimateBuild(
   loaded: LoadedConfig,
-  options: Pick<BuildOptions, 'sample' | 'datasets' | 'sourceUrls'>,
+  options: Pick<BuildOptions, 'sample' | 'datasets' | 'sourceUrls'> & { measured?: Record<string, MeasuredSizes> },
 ): BuildEstimate {
   const region = options.sample ? 'sample area' : 'region';
-  const estimates = selectedDatasets(loaded, options).map((dataset) =>
-    estimateDataset(dataset, datasetArea(loaded, dataset, options.sample), region),
-  );
+  const estimates = selectedDatasets(loaded, options).map((dataset) => {
+    const area = datasetArea(loaded, dataset, options.sample);
+    return estimateDataset(
+      dataset,
+      area,
+      region,
+      datasetLandMask(loaded, dataset, area),
+      options.measured?.[dataset.id],
+    );
+  });
   return totalEstimate(estimates, loaded.config.prices);
 }
 
@@ -135,6 +145,7 @@ async function buildDataset(
   options: BuildOptions,
 ): Promise<{ transferred: number; built: number; skipped: number; outputs: string[] }> {
   const area = datasetArea(loaded, dataset, options.sample);
+  const tilesAt = datasetTiles(loaded, dataset, area);
   const files: SourceFile[] = sourceFiles(dataset, { kind: 'bbox', bbox: coverage(area, dataset.minZoom) });
   const f = folders(loaded, options, dataset);
   const lock = lockOf(loaded);
@@ -152,14 +163,16 @@ async function buildDataset(
       : convertSources(dataset, files, f, loaded.config.tools.gdal, options.outDir);
   if (options.until === 'convert') return result;
   const counts =
-    dataset.kind === 'vector'
-      ? tileVectorDataset(dataset, area, converted, f)
-      : tileRasterDataset(dataset, area, rasterMosaic(dataset, files, converted), f);
+    dataset.source.type === 'pmtiles'
+      ? await extractPmtilesDataset(dataset, area, f, options.fetch ?? fetch, tilesAt)
+      : dataset.kind === 'vector'
+        ? tileVectorDataset(dataset, area, converted, f)
+        : tileRasterDataset(dataset, area, rasterMosaic(dataset, files, converted), f, tilesAt);
   Object.assign(result, counts);
   if (options.until === 'tile') return result;
   const metadata = outputMetadata(loaded.config, dataset, area.bbox);
   const paths = outputPaths(join(options.outDir, 'output'), dataset);
-  result.outputs = writeOutputs(dataset, area, paths, metadata, f.report);
+  result.outputs = writeOutputs(dataset, area, paths, metadata, f.report, tilesAt);
   if (dataset.baseImage && dataset.kind === 'imagery') {
     result.outputs.push(
       writeBaseImage(dataset, rasterMosaic(dataset, files, converted), join(options.outDir, 'output'), f),
@@ -170,10 +183,15 @@ async function buildDataset(
 
 /** Runs a build. Throws before touching the disk or the network when the license gate refuses a source. */
 export async function runBuild(options: BuildOptions): Promise<BuildResult> {
-  const loaded = loadConfig(options.configPath);
+  const loaded = options.loaded ?? loadConfig(options.configPath);
   const datasets = selectedDatasets(loaded, options);
   const violations = checkDatasets(datasets);
   if (violations.length > 0) throw new Error(describeViolations(violations));
+  for (const dataset of datasets)
+    if (dataset.source.type === 'pmtiles' && dataset.source.url.includes('<version>'))
+      throw new Error(
+        `${dataset.id}: pin the archive's version before a build: --source-url ${dataset.id}=<the archive's URL>`,
+      );
   const estimate = estimateBuild(loaded, options);
   const confirmed = await confirm(options, estimate);
   const result: BuildResult = { estimate, confirmed, transferredBytes: 0, tilesBuilt: 0, tilesSkipped: 0, outputs: [] };

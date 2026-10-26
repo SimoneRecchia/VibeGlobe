@@ -14,6 +14,7 @@ import { type Raster, readGeoTiff } from '../raster/tiff.js';
 import { extractZipMember } from '../raster/zip.js';
 import type { SourceFile } from '../sources/files.js';
 import type { Area } from '../tiles/area.js';
+import type { TileCoord } from '../tiles/mercator.js';
 import { TILE_PX, type TileEncoder, buildRasterTiles } from './raster-tiles.js';
 import type { StepLog } from './step-log.js';
 
@@ -171,9 +172,11 @@ export function tileRasterDataset(
   area: Area,
   mosaic: Mosaic,
   folders: DatasetFolders,
+  tilesAt?: (z: number) => Iterable<TileCoord>,
 ): { built: number; skipped: number } {
   return buildRasterTiles({
     area,
+    ...(tilesAt ? { tilesAt } : {}),
     minZoom: dataset.minZoom,
     maxZoom: dataset.maxZoom,
     mosaic,

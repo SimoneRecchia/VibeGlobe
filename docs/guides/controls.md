@@ -41,6 +41,26 @@ A new press, touch or key stops inertia and running turns where they are; a whee
 
 Input over the map never scrolls or zooms the page: the map takes wheel events and sets `touch-action: none` while the controls are attached. Outside the map the page scrolls as usual.
 
+## Navigation modes
+
+How a drag moves the camera. Choose it at start with the `navigationMode` option and change it at runtime; the default is `'free'`.
+
+```ts
+const controls = createControls({ navigationMode: 'north-up' });
+// …later, for example from a settings menu:
+controls.setNavigationMode('free');
+console.log(controls.navigationMode); // 'free'
+```
+
+| Mode               | A drag                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'free'` (default) | Turns the globe about any axis, like a trackball (Google Earth): the grabbed point stays under the cursor, the view passes over the poles without stopping, and the heading turns with the globe (north is no longer up after a diagonal drag or a pass over a pole). On the flat map, at regional and street scale, a drag keeps the heading. |
+| `'north-up'`       | Keeps north up: horizontal motion turns the globe about the polar axis, vertical motion changes the latitude, and the heading never changes. At a pole (89.9°) the camera stops: vertical motion beyond it is ignored, horizontal motion still turns about the axis, with no jump and no flip.                                                 |
+
+In both modes inertia, zoom to the cursor, tilt and rotation gestures, and the compass (`resetNorth`, the `N` key, a click on the UI's compass: north up) work the same; a wheel zoom never turns the heading. Any value other than `'free'` and `'north-up'` throws a `GlobeError` (`invalid-option`). An input plug-in of its own sets `NavigationApi.navigationMode` on the navigation interface it receives.
+
+In the playground, `?navigationMode=north-up` starts in that mode and the "Navigation mode" selector (the settings panel on the showcase page) switches it.
+
 ## Key map
 
 The keys work while the map has focus (Tab reaches it; a focus ring shows when it is reached from the keyboard). Keys typed into other elements of the page never move the map, and keys with Ctrl, Alt or Meta are left to the browser.

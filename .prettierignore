@@ -15,3 +15,4 @@ benchmark-results/
 # Generated data (scripts/europe-land.ts), kept on a few lines.
 packages/presets/src/europe-land.ts
 packages/tools/configs/regions/europe-land.geojson
+packages/presets/src/countries/

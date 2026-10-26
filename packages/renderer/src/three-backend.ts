@@ -304,7 +304,8 @@ export class ThreeBackend implements RendererBackend {
     if (!this.imagery) return;
     const texture = createBaseTexture(this.imagery, this.anisotropy ?? this.capabilities.maxAnisotropy);
     this.imageryTexture?.dispose();
-    this.imageryTexture = texture;
+    // The polar caps' fills are sampled like the base image (KB-211).
+    this.imageryTexture = this.tileTextures.caps.rebuild(texture, this.renderer);
     this.material?.dispose();
     // A new renderer may have another depth path: the atmosphere is built again with the material it shades.
     this.atmosphere.rebuild(this.depthPath);
@@ -398,6 +399,9 @@ export class ThreeBackend implements RendererBackend {
     this.material = material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
+
+  /** The polar caps' fill colors (KB-211), `#rrggbb`, from the next frame. */
+  readonly setPolarCapColors = (n: string, s: string): void => this.tileTextures.caps.setColors(n, s);
 
   /** The atmosphere's sun lighting, time and haze (F394, F396): uniforms only. */
   setAtmosphere(settings: Required<AtmosphereSettings>): void {

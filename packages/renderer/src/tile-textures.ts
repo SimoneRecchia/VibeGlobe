@@ -103,6 +103,8 @@ export class TileTextures {
 
   /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
   readonly tones = new ToneMatcher();
+  /** The polar caps' fills (KB-211), made again with the base image. */
+  readonly caps = new PolarCapTextures();
 
   constructor(private readonly anisotropy: () => number) {}
 
@@ -190,6 +192,8 @@ export class TileTextures {
   clear(): void {
     for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);
     this.entries.length = 0;
+    // Also drops the caps' renderer and base image: a destroyed globe the host still references holds neither (KB-045).
+    this.caps.rebuild(undefined, undefined);
   }
 
   private create(tile: DecodedTile): Texture {
@@ -213,6 +217,58 @@ export class TileTextures {
     texture.needsUpdate = true;
     return texture;
   }
+}
+
+/**
+ * The polar caps' fills (KB-211), north then south: 1 × 1 textures of their colors, sampled like the base image (on
+ * WebGPU the sampler set up with a binding stays when its texture changes), made again when the colors or the base
+ * image change.
+ */
+class PolarCapTextures {
+  private colors: readonly string[] = ['#78a9cd', '#f2f3f7'];
+  /** The textures, empty until the base image is up. */
+  textures: Texture[] = [];
+  private base: Texture | undefined;
+  private renderer: WebGPURenderer | undefined;
+
+  /** New colors, `#rrggbb`, drawn from the next frame. */
+  setColors(north: string, south: string): void {
+    this.colors = [north, south];
+    this.rebuild(this.base, this.renderer);
+  }
+
+  /**
+   * Textures sampled like the base image `base`, or none without it, uploaded now as the base image is: a cap that
+   * comes into view later uploads nothing (F052). Returns `base`.
+   */
+  rebuild<T extends Texture | undefined>(base: T, renderer: WebGPURenderer | undefined): T {
+    this.dispose();
+    this.base = base;
+    this.renderer = renderer;
+    this.textures = base ? this.colors.map((rgb) => createColorTexture(rgb, base)) : [];
+    for (const texture of this.textures) renderer?.initTexture(texture);
+    return base;
+  }
+
+  /** Frees the textures. */
+  dispose(): void {
+    for (const texture of this.textures) texture.dispose();
+    this.textures = [];
+  }
+}
+
+/** A 1 × 1 texture of one `#rrggbb` sRGB color, sampled like `like`. */
+function createColorTexture(hex: string, like: Texture): DataTexture {
+  const rgb = parseInt(hex.slice(1), 16);
+  const texture = new DataTexture(Uint8Array.of(rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255), 1, 1);
+  texture.colorSpace = like.colorSpace;
+  texture.wrapS = like.wrapS;
+  texture.wrapT = like.wrapT;
+  texture.minFilter = like.minFilter;
+  texture.magFilter = like.magFilter;
+  texture.anisotropy = like.anisotropy;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /**

@@ -95,6 +95,9 @@ describe('frame loop allocation (F064)', () => {
       await Promise.resolve();
       renderer.flush();
       await globe.ready;
+      // Heading held: a trackball drag in a circle turns the heading a little every loop, so its tiles never settle
+      // (the trackball's own allocation is the next test's).
+      globe.navigation.navigationMode = 'north-up';
       const anchor = globe.navigation.grab({ xPx: 400, yPx: 300 });
       if (!anchor) throw new Error('no anchor');
       const point = { xPx: 400, yPx: 300 };
@@ -119,6 +122,29 @@ describe('frame loop allocation (F064)', () => {
       const bytesPerFrame = engine.reduce((sum, [, bytes]) => sum + bytes, 0) / FRAMES;
       // Any object allocated every frame costs at least 12 bytes; under half a byte per frame on average means no frame
       // allocates (what remains is the test runner's module plumbing re-entering the interpreter now and then).
+      expect(bytesPerFrame, JSON.stringify(engine)).toBeLessThan(0.5);
+      globe.destroy();
+    },
+    TIMEOUT_MS,
+  );
+  it(
+    "allocates nothing per frame in a 'free' (trackball) drag of the whole globe",
+    async () => {
+      const { renderer, factory } = fakeRenderer();
+      const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', view: { zoom: 0.5 } });
+      await Promise.resolve();
+      await Promise.resolve();
+      renderer.flush();
+      await globe.ready;
+      expect(globe.navigation.navigationMode).toBe('free');
+      const anchor = globe.navigation.grab({ xPx: 400, yPx: 300 });
+      if (!anchor) throw new Error('no anchor');
+      const point = { xPx: 400, yPx: 300 };
+      // The whole globe in view: its few coarse tiles are all built during the warm-up, whatever the heading.
+      dragFrames(globe, renderer, anchor, point, 5000, 0);
+      const sites = await profiled(() => dragFrames(globe, renderer, anchor, point, FRAMES, 5000));
+      const engine = [...sites].filter(([site]) => ENGINE_SOURCE.test(site));
+      const bytesPerFrame = engine.reduce((sum, [, bytes]) => sum + bytes, 0) / FRAMES;
       expect(bytesPerFrame, JSON.stringify(engine)).toBeLessThan(0.5);
       globe.destroy();
     },
@@ -153,6 +179,8 @@ describe('frame loop allocation (F064)', () => {
       let navigation: NavigationApi | undefined;
       const controls: ControlsFactory = (_element, api) => {
         navigation = api;
+        // Heading held, as above: the circle then repeats the same views.
+        api.navigationMode = 'north-up';
         let anchor: GeoPosition | undefined;
         return {
           update() {

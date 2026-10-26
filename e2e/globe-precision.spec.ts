@@ -36,9 +36,9 @@ for (const backend of BACKENDS) {
     const first = await stats(page);
     // Uploaded at start-up only: the pinned base imagery, the one-texel texture of the cross-fade binding (F105), the
     // flat height grids of a surface without terrain, of its cross-fade binding (M4) and of its edge-stitch binding
-    // (KB-178), and the one-texel textures of the two overlay bindings and of their cross-fade bindings (ADR 0038,
-    // KB-155).
-    expect(first.textureUploads).toBe(9);
+    // (KB-178), the one-texel textures of the two overlay bindings and of their cross-fade bindings (ADR 0038,
+    // KB-155), and the one-texel fills of the two polar caps (KB-211).
+    expect(first.textureUploads).toBe(11);
     expect(first.matrixUpdates).toBe(0);
     expect(first.drawCalls).toBeGreaterThan(0);
     const box = await page.locator('#globe').boundingBox();

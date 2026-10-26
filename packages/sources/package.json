@@ -35,6 +35,11 @@
       "types": "./dist/geotiff.d.ts",
       "source": "./src/geotiff.ts",
       "default": "./dist/geotiff.js"
+    },
+    "./tile-mask": {
+      "types": "./dist/tile-mask.d.ts",
+      "source": "./src/tile-mask.ts",
+      "default": "./dist/tile-mask.js"
     }
   },
   "types": "./dist/index.d.ts",

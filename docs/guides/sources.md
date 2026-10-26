@@ -194,6 +194,19 @@ if (pair)
 
 `wmsImagery` takes the same `transforms`. Reprojected tiles are transparent outside the data, so the layers below show there.
 
+## Polar caps
+
+Web Mercator sources end at ±85.0511°. Beyond, the globe draws two polar caps in geographic tiles: a geographic (EPSG:4326) imagery source that covers them, such as NASA GIBS in `EPSG:4326`, fills them; otherwise each cap shows one fill color, the sea of the default base image in the north and its ice in the south. Choose the colors at start or change them at runtime:
+
+```ts
+import { createGlobe } from '@vibeglobe/core';
+
+const globe = createGlobe({ container, renderer, baseImageryUrl, polarCapColors: { north: '#0b2a4a' } });
+globe.setPolarCapColors({ north: '#1d3d5f', south: '#ffffff' });
+```
+
+A view that reaches a cap stays a globe at every zoom (ADR 0008, update of 2026-10-26), so the cap is always a whole disc.
+
 ## Layer composition and source chains
 
 `createGlobe({ imagery })` takes layers bottom first. A layer is a source, or a chain of sources in priority order with its look: each tile comes from the first source that has it, and a source that fails (errors, timeouts, offline) leaves its tiles to the next one ([ADR 0038](../adr/0038-imagery-layer-stack.md)).
@@ -218,6 +231,53 @@ const globe = createGlobe({
 });
 globe.imageryLayers.set('labels', { visible: false }); // a hidden layer requests no tiles
 globe.imageryLayers.move('labels', 0); // reorder at runtime
+```
+
+A source limited to a country or a region gets its `area`: rectangles (`coverage`), polygons, or GeoJSON such as a
+country's borders. Tiles wholly outside the area are never requested. With GeoJSON (or `tiles: 'clip'`), tiles that
+cross the border are requested too, and their pixels outside the area become transparent when they are decoded, so the
+layer below shows there instead of the white or black filler many national services send beyond their country
+(F618, KB-209). Put such a source in its own layer above the fallback: a layer's chain draws each tile from one source.
+`@vibeglobe/presets/countries` has the borders of Europe's countries (`await countryBorders('AT')`, Natural Earth,
+public domain). `blankTile` is the fallback for services whose area is not known: their tiles of that color alone count
+as no data.
+
+```ts
+import { createGlobe } from '@vibeglobe/core';
+import { xyzImagery } from '@vibeglobe/sources';
+
+const world = xyzImagery({ id: 'world', url: 'https://world.example.com/{z}/{x}/{y}.jpg', maxLevel: 9 });
+const national = xyzImagery({
+  id: 'national-ortho',
+  url: 'https://ortho.example.com/{z}/{x}/{y}.jpg',
+  maxLevel: 19,
+  // The country's borders as GeoJSON: border tiles are clipped per pixel.
+  area: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [9.5, 46.4],
+        [17.2, 46.4],
+        [17.2, 49.0],
+        [9.5, 49.0],
+        [9.5, 46.4],
+      ],
+    ],
+  },
+});
+const legacy = xyzImagery({ id: 'legacy', url: 'https://legacy.example.com/{z}/{x}/{y}.png', blankTile: '#ffffff' });
+
+createGlobe({
+  container,
+  renderer,
+  baseImageryUrl,
+  workers,
+  imagery: [
+    { id: 'world', sources: [world] },
+    { id: 'national', sources: [national] },
+    { id: 'legacy', sources: [legacy] },
+  ],
+});
 ```
 
 ## Vector formats

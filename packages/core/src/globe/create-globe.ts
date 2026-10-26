@@ -22,12 +22,11 @@ import type { Credit } from '../imagery/credits.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
-import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
 import { completedMovement, type Movements } from './movements.js';
 import { wireView } from './view-wiring.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
+import { createFrameView, renderDrawing, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -185,7 +184,7 @@ class GlobeEngine implements Globe {
     return this.movements.reducedMotion;
   }
 
-  get viewMode(): ViewMode {
+  get viewMode(): Globe['viewMode'] {
     return this.surfaceFrame.view.mode;
   }
 
@@ -341,7 +340,8 @@ class GlobeEngine implements Globe {
     // A lift moved the camera after the selection: the next frame draws the new pose, until the lift settles (F146).
     if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.dirty = true;
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
-    if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
+    // Layers query the frame's own camera while it is drawn (KB-210).
+    if (!renderDrawing(this.cam, renderer, this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
     this.frameNumber++;
@@ -437,6 +437,7 @@ class GlobeEngine implements Globe {
   }
   readonly setQualitySettings: Globe['setQualitySettings'] = (s) => this.assertAlive() ?? this.helpers.quality.set(s);
   readonly setAtmosphere: Globe['setAtmosphere'] = (s) => this.assertAlive() ?? this.helpers.quality.setAtmosphere(s);
+  readonly setPolarCapColors: Globe['setPolarCapColors'] = (c) => this.assertAlive() ?? this.helpers.quality.setCaps(c);
   readonly captureFrame = (): Promise<FrameCapture> => this.helpers.captures.frame();
   readonly captureView: Globe['captureView'] = (size) => this.helpers.captures.view(size);
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */

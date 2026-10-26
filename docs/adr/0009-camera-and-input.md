@@ -157,3 +157,12 @@ The first M2 controls did the camera math in the DOM handlers: every `pointermov
 ## Update 2026-10-21 (engine clock)
 
 The engine clock of the M2 follow-ups is built (`packages/core/src/globe/engine-clock.ts`): engine time advances by the display frame's timestamp step, clamped to 100 ms, kept in a typed array so the frame loop does not box it (ADR 0018), and `GlobeOptions.manualClockStepMs` fixes the step per drawn frame for tests (ADR 0012). `Globe.timeMs` exposes it. Inertia and animations (M6) are functions of this time.
+
+## Update 2026-10-26: navigation modes
+
+A drag has two modes, the data property `NavigationApi.navigationMode` (anything but `'north-up'` acts as `'free'`), set by `@vibeglobe/controls` (`navigationMode` option, `setNavigationMode`):
+
+- **`'free'` (default):** on the globe (morph factor 0) the anchor solver rotates the camera rigidly about the Earth's center first, which was only the fallback near the poles: the grabbed point stays under the cursor anywhere, the view passes over the poles, and the heading turns with the globe. The rotations repeat until the residual is below 1e-5 px (up to six), so a trackball drag is as exact as the heading-held solve, and the rotation allocates nothing (ADR 0018). On the flattening and flat map the heading-held Gauss–Newton solve stays first. Being a trackball, a drag in a circle returns the grabbed point but not the heading; the allocation tests of a circular drag therefore hold the heading, and a whole-globe trackball drag has its own.
+- **`'north-up'`:** Gauss–Newton with the heading held and the target within 89.9° of the equator; where the pixel needs a target beyond it, the target stops at 89.9°, keeping the longitude of the solve's last step. No rigid rotation, so the heading never changes, also in a wheel zoom near a pole.
+
+Zooms keep the heading-held solve with its rigid fallback in `'free'`; rotation, tilt, inertia and the compass are unchanged in both modes.

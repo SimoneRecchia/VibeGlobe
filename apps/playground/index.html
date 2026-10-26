@@ -66,8 +66,16 @@
       #camera-controls input {
         width: 80px;
       }
+      /* The navigation mode (F620), above the status line: clear of the corners the wheel tests use. */
+      #navigation-mode {
+        position: absolute;
+        bottom: 30px;
+        left: 8px;
+        font-size: 12px;
+      }
       /* A ui layer brings its own controls to that corner (M12): the playground's toggles step aside. */
       #app:has(.vg-ui) #camera-controls,
+      #app:has(.vg-ui) #navigation-mode,
       #app:has(.vg-ui) #view-modes {
         display: none;
       }

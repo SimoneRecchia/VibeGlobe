@@ -12,6 +12,9 @@ import { ControlsSlot } from './controls-slot.js';
 
 const RAD = Math.PI / 180;
 
+/** How a drag moves the camera (see `NavigationApi.navigationMode`). */
+export type NavigationMode = NonNullable<NavigationApi['navigationMode']>;
+
 /** What the view API needs from its globe. */
 export interface ViewHost {
   readonly cam: Camera;
@@ -58,7 +61,8 @@ export class ViewControl {
         host.assertAlive();
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
-        if (dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
+        if (dragCamera(host.cam, host.view, anchor, point, this.navigation.navigationMode === 'north-up'))
+          host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
@@ -68,7 +72,8 @@ export class ViewControl {
           host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
             ? host.limitZoom(deltaZoom)
             : deltaZoom;
-        if (zoomCamera(host.cam, host.view, point, allowed)) host.requestRender();
+        if (zoomCamera(host.cam, host.view, point, allowed, this.navigation.navigationMode === 'north-up'))
+          host.requestRender();
       },
       requestUpdate: () => {
         this.updateRequested = true;
@@ -85,6 +90,8 @@ export class ViewControl {
       set coasting(value: boolean) {
         control.coasting = value === true;
       },
+      // How a drag moves the camera: set by the controls, read by each drag and zoom below.
+      navigationMode: 'free',
       get timeMs() {
         return host.timeMs();
       },

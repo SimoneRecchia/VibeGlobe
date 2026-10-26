@@ -124,7 +124,10 @@ function application(fetchImpl: typeof fetch) {
       toEqual: (wanted: unknown) => expect(value, JSON.stringify(value)).toEqual(wanted),
     }),
     __modules: {
-      '@vibeglobe/core': { ...core, createGlobe: () => ({ imageryLayers: layers }) },
+      '@vibeglobe/core': {
+        ...core,
+        createGlobe: () => ({ imageryLayers: layers, setPolarCapColors: () => undefined }),
+      },
       '@vibeglobe/gis': gis,
       '@vibeglobe/sources': sources,
       '@vibeglobe/sources/conformance': conformance,
@@ -174,6 +177,7 @@ it(
       '## Vector tiles in packages',
       '## Single georeferenced images',
       '## Reprojection',
+      '## Polar caps',
       '## Layer composition and source chains',
       '## Vector formats',
       '## Provider profiles',

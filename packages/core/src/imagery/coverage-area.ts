@@ -1,8 +1,9 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Polygon coverage of a source (land, a country's borders): which tiles it is asked for. A source that answers only
- * inside its area returns `noData` elsewhere, so the next source of the layer (or the one below) is drawn there.
+ * Polygon coverage of a source (land, a country's borders): which tiles it is asked for, and in `clip` mode which
+ * pixels of a tile across the border are its own. A source that answers only inside its area returns `noData`
+ * elsewhere, so the next source of the layer (or the layer below) is drawn there.
  */
 import type { TileRectangleRad } from '../tiling/tiling-scheme.js';
 
@@ -17,12 +18,31 @@ export interface CoverageArea {
   /** The polygons of the area (a GeoJSON MultiPolygon's coordinates). */
   readonly polygons: readonly PolygonDeg[];
   /**
-   * Which tiles are asked for: `inside` (default) only tiles wholly inside the area, for sources whose tiles carry
-   * opaque filler beyond it (JPEG orthophotos), so the source below shows at the edge; `overlap` every tile that
-   * touches the area, for sources whose tiles are transparent outside it.
+   * Which tiles are asked for: `inside` (default) only tiles wholly inside the area, so the source below shows at the
+   * edge; `overlap` every tile that touches the area, for sources whose tiles are transparent outside it; `clip` every
+   * tile that touches it, with the pixels of a tile across the border that lie outside the area made transparent
+   * when it is decoded, for sources whose tiles carry opaque filler beyond it (white or black around a country's
+   * orthophoto): the layers below show there (F618, KB-209).
    */
-  readonly tiles?: 'inside' | 'overlap';
+  readonly tiles?: 'inside' | 'overlap' | 'clip';
 }
+
+/**
+ * The area's outline over one tile, for the decoder's mask (F618): every ring of the polygons crossing the tile, as
+ * `x, y` pairs in tile units (0 to 1, `x` east, `y` south from the tile's north edge); filled with the even-odd rule.
+ */
+export interface TileMask {
+  readonly points: Float64Array;
+  /** The end of each ring in `points`, in pairs. */
+  readonly ringEnds: Uint32Array;
+}
+
+/** A GeoJSON geometry, feature or feature collection of polygons, the form country borders come in. */
+export type GeoJsonArea =
+  | { readonly type: 'Polygon'; readonly coordinates: readonly (readonly (readonly number[])[])[] }
+  | { readonly type: 'MultiPolygon'; readonly coordinates: readonly (readonly (readonly (readonly number[])[])[])[] }
+  | { readonly type: 'Feature'; readonly geometry: GeoJsonArea | null }
+  | { readonly type: 'FeatureCollection'; readonly features: readonly { readonly geometry: GeoJsonArea | null }[] };
 
 /** A tested area: the bounding rectangles of its polygons and the tile test. */
 export interface CoverageTest {
@@ -30,6 +50,11 @@ export interface CoverageTest {
   readonly rectangles: readonly TileRectangleRad[];
   /** True when the tile with this extent (radians) is to be requested. */
   covers(extent: TileRectangleRad): boolean;
+  /**
+   * In `clip` mode, the outline of the area over a requested tile, or undefined for a tile wholly inside it (no mask
+   * needed) and in the other modes. `mercator`: the tile's rows are Web Mercator (else geographic, linear in latitude).
+   */
+  mask(extent: TileRectangleRad, mercator: boolean): TileMask | undefined;
 }
 
 const DEG = Math.PI / 180;
@@ -136,10 +161,44 @@ function rectangleOverlaps(polygon: PreparedPolygon, e: TileRectangleRad): boole
   return edgesCross(polygon, e);
 }
 
+/** Web Mercator's northing of a latitude, radians, clamped to the projection's square. */
+function mercatorY(latRad: number): number {
+  const limit = 1.4844222297453324;
+  const lat = latRad > limit ? limit : latRad < -limit ? -limit : latRad;
+  return Math.log(Math.tan(Math.PI / 4 + lat / 2));
+}
+
+/** The rings of the polygons crossing a tile in its units; undefined when one polygon holds the whole tile. */
+function tileMask(polygons: readonly PreparedPolygon[], e: TileRectangleRad, mercator: boolean): TileMask | undefined {
+  const crossing: Float64Array[] = [];
+  for (const polygon of polygons) {
+    if (rectangleInside(polygon, e)) return undefined;
+    if (rectangleOverlaps(polygon, e)) crossing.push(...polygon.rings);
+  }
+  const top = mercator ? mercatorY(e.northRad) : e.northRad;
+  const height = (mercator ? mercatorY(e.southRad) : e.southRad) - top;
+  const width = e.eastRad - e.westRad;
+  const pairs = crossing.reduce((sum, ring) => sum + ring.length / 2, 0);
+  const points = new Float64Array(pairs * 2);
+  const ringEnds = new Uint32Array(crossing.length);
+  let at = 0;
+  crossing.forEach((ring, r) => {
+    for (let i = 0; i < ring.length; i += 2) {
+      const lat = ring[i + 1] ?? 0;
+      points[at * 2] = ((ring[i] ?? 0) - e.westRad) / width;
+      points[at * 2 + 1] = ((mercator ? mercatorY(lat) : lat) - top) / height;
+      at++;
+    }
+    ringEnds[r] = at;
+  });
+  return { points, ringEnds };
+}
+
 /** Prepares an area for tile tests: done once per source, the tests themselves allocate nothing. */
 export function coverageTest(area: CoverageArea): CoverageTest {
   const polygons = area.polygons.map(prepare);
-  const overlap = area.tiles === 'overlap';
+  const overlap = area.tiles === 'overlap' || area.tiles === 'clip';
+  const clip = area.tiles === 'clip';
   return {
     rectangles: polygons.map((p) => ({ westRad: p.west, southRad: p.south, eastRad: p.east, northRad: p.north })),
     covers(extent: TileRectangleRad): boolean {
@@ -147,5 +206,35 @@ export function coverageTest(area: CoverageArea): CoverageTest {
         if (overlap ? rectangleOverlaps(polygon, extent) : rectangleInside(polygon, extent)) return true;
       return false;
     },
+    mask(extent: TileRectangleRad, mercator: boolean): TileMask | undefined {
+      return clip ? tileMask(polygons, extent, mercator) : undefined;
+    },
   };
+}
+
+/** The polygons of a GeoJSON polygon, multipolygon, feature or feature collection (other geometries are ignored). */
+function geoJsonPolygons(input: GeoJsonArea): PolygonDeg[] {
+  const polygon = (rings: readonly (readonly (readonly number[])[])[]): PolygonDeg =>
+    rings.map((ring) => ring.map((p) => [p[0] ?? 0, p[1] ?? 0] as const));
+  switch (input.type) {
+    case 'Polygon':
+      return [polygon(input.coordinates)];
+    case 'MultiPolygon':
+      return input.coordinates.map(polygon);
+    case 'Feature':
+      return input.geometry ? geoJsonPolygons(input.geometry) : [];
+    case 'FeatureCollection':
+      return input.features.flatMap((f) => (f.geometry ? geoJsonPolygons(f.geometry) : []));
+    default:
+      return [];
+  }
+}
+
+/**
+ * A coverage area from GeoJSON (a country's borders as a Polygon, MultiPolygon, Feature or FeatureCollection) or an
+ * area as it is; GeoJSON is clipped per pixel (`clip`) unless `tiles` says otherwise (F618).
+ */
+export function coverageArea(input: CoverageArea | GeoJsonArea, tiles?: CoverageArea['tiles']): CoverageArea {
+  if ('polygons' in input) return tiles ? { ...input, tiles } : input;
+  return { polygons: geoJsonPolygons(input), tiles: tiles ?? 'clip' };
 }

@@ -10,6 +10,16 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./countries": {
+      "types": "./dist/countries.d.ts",
+      "source": "./src/countries.ts",
+      "default": "./dist/countries.js"
+    },
+    "./orthophotos": {
+      "types": "./dist/orthophotos.d.ts",
+      "source": "./src/orthophotos.ts",
+      "default": "./dist/orthophotos.js"
     }
   },
   "types": "./dist/index.d.ts",

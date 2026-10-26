@@ -59,6 +59,7 @@ it(
       '## Online only',
       '## Offline only',
       '## Your own sources',
+      '## National and regional orthophotos',
       '## Maximum online zoom per area',
       '## Building the package',
       '## Estimating the package',
@@ -69,7 +70,7 @@ it(
     for (const dataset of ['europe-satellite', 'europe-terrain', 'europe-vectors'])
       expect(GUIDE).toContain(`  ${dataset} [region]`);
     expect(GUIDE).toMatch(/zoom\s+land tiles\s+sea tiles\s+tiles\s+size\s+cumulative\s+sizes/);
-    expect(EXAMPLES.length).toBe(4);
+    expect(EXAMPLES.length).toBe(5);
     expect(typeErrors(EXAMPLES)).toEqual([]);
   },
 );

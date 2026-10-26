@@ -7477,6 +7477,39 @@
         "Open the playground with the preset, switch base maps and overlays, and assert the imagery layers and vector styles follow with no console error"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F618",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "A source's coverage can be a GeoJSON (multi)polygon such as a country's borders: tiles wholly outside are never requested, tiles across the border are clipped per pixel when decoded so the layer below shows outside the area, a translucent layer that covers none of a tile takes no overlay slot there, and `blankTile` treats tiles of one color as no data for services without a known area; `@vibeglobe/presets/countries` has Natural Earth borders of Europe's countries and regions, loaded per country.",
+      "steps": [
+        "Unit-test the clip mask of a border tile, GeoJSON areas, blank-tile detection, the overlay slots and the country borders",
+        "In the browser, a white service limited to a polygon shows white inside it and the layer below outside it within one tile, and a blankTile source shows the layer below"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F619",
+      "milestone": 5,
+      "section": "Map experience: globe, 2D and 3D",
+      "description": "The polar caps beyond ±85.05° are one continuous disc at every zoom and in every view mode: a view that reaches a cap stays a globe instead of flattening into the Web Mercator plane, a geographic (EPSG:4326) imagery source that covers a cap fills it, and otherwise the cap shows a fill color set at start and at runtime (default: the base image's sea in the north and ice in the south), with no gap at its edge, with terrain, at both poles and across the antimeridian.",
+      "steps": [
+        "Unit-test that the morph factor is 0 where the view reaches a cap and unchanged elsewhere, falling without a jump when panning toward a pole",
+        "In the browser, a view over each pole shows no background and one fill color, the color changes at runtime, a view across the antimeridian near the pole is whole, and a geographic source shows in the cap instead of the fill"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F620",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "Two navigation modes, set at start (`createControls({ navigationMode })`) and at runtime (`controls.setNavigationMode`), default 'free': 'free' turns the globe as a trackball, the grabbed point under the cursor, over the poles without stopping, the heading turning with it; 'north-up' turns about the polar axis horizontally and changes latitude vertically with the heading held, and stops at the poles without a jump or a flip. Inertia, zoom to the cursor, tilt and the compass work in both; the playground has a selector and the controls guide a section.",
+      "steps": [
+        "Unit-test the trackball over a pole, a heading-held north-up drag and its stop at the pole, the controls option and setter, and that the trackball drag allocates nothing per frame",
+        "In the browser, a free drag over the pole keeps the grabbed point under the cursor and turns the heading to south, the compass turns it back; a north-up drag stops at 89.9° with heading 0 and a horizontal one turns about the axis; a north-up flick coasts"
+      ],
+      "status": "passing"
     }
   ]
 }

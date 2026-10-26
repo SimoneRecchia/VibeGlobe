@@ -77,6 +77,12 @@ interface Candidate extends SymbolCandidate {
 const ecef = new Float64Array(3);
 const RAD = Math.PI / 180;
 
+/**
+ * How far outside the viewport, in CSS pixels, an anchor may lie and its label still be placed: every box of a placed
+ * label lies in the viewport, and a label's boxes surround its anchor (point labels up to their `text-offset`).
+ */
+const CULL_MARGIN_PX = 128;
+
 /** Whether a point on the globe faces the eye (from the flat map's half of the morph on, everything does). */
 function facing(lon: number, lat: number, view: FrameView, morph: number): boolean {
   if (morph >= 0.5) return true;
@@ -225,6 +231,14 @@ export class LabelPlacer {
       if (!facing(lon ?? 0, lat ?? 0, view, morph)) continue;
       const screen = this.project(lon ?? 0, lat ?? 0);
       if (screen === undefined) continue;
+      // A label whose anchor is off screen can never be placed: it is not shaped, styled or laid out (KB-210).
+      if (
+        screen.xPx < -CULL_MARGIN_PX ||
+        screen.yPx < -CULL_MARGIN_PX ||
+        screen.xPx > view.widthPx + CULL_MARGIN_PX ||
+        screen.yPx > view.heightPx + CULL_MARGIN_PX
+      )
+        continue;
       const feature = bucket.features[label.feature];
       const shaping = this.shaping(source, anchor.label, zoom, anchor.onLine !== undefined);
       if (shaping === undefined) continue;
@@ -364,17 +378,31 @@ export class LabelPlacer {
     const angle = tileUpright === screenRight ? onLine.anchor.angleRad : onLine.anchor.angleRad + Math.PI;
     const placed = placeGlyphsAlongLine(onLine.line, { ...onLine.anchor, angleRad: angle }, offsets);
     if (placed === undefined) return undefined;
+    // One projection per glyph: each glyph turns to the direction between its neighbors on screen (KB-210); a lone
+    // glyph projects a point ahead of it on the line.
+    const centers: { xPx: number; yPx: number }[] = [];
+    for (const p of placed) {
+      const center = project(p.x, p.y);
+      if (center === undefined) return undefined;
+      centers.push(center);
+    }
     const out: GlyphQuad[] = [];
     for (let i = 0; i < placed.length; i++) {
       const g = shaping.glyphs[i];
       const p = placed[i];
-      if (g === undefined || p === undefined) continue;
+      const center = centers[i];
+      if (g === undefined || p === undefined || center === undefined) continue;
       const rect = this.atlasRect(g.fontStack, g.code, g.glyph);
-      const center = project(p.x, p.y);
-      const ahead = project(p.x + Math.cos(p.angleRad) * 4, p.y + Math.sin(p.angleRad) * 4);
-      if (rect === undefined || center === undefined || ahead === undefined) return undefined;
-      const theta = Math.atan2(ahead.yPx - center.yPx, ahead.xPx - center.xPx);
-      out.push(rotatedGlyph(g, center, theta, rect, style));
+      if (rect === undefined) return undefined;
+      let from = centers[i - 1] ?? center;
+      let to = centers[i + 1] ?? center;
+      if (from === to) {
+        const ahead = project(p.x + Math.cos(p.angleRad) * 4, p.y + Math.sin(p.angleRad) * 4);
+        if (ahead === undefined) return undefined;
+        from = center;
+        to = ahead;
+      }
+      out.push(rotatedGlyph(g, center, Math.atan2(to.yPx - from.yPx, to.xPx - from.xPx), rect, style));
     }
     return out;
   }

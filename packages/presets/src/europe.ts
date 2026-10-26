@@ -26,6 +26,7 @@ import {
   type PresetSourceRecord,
   type SourceTiers,
 } from './sources.js';
+import type { OrthophotoLayers } from './orthophotos.js';
 import { composeStyle, type HillshadeSource, type StyleJson, type StyleSelection } from './styles.js';
 
 /** The offline engine, as far as the preset uses it (`createOffline()` of `@vibeglobe/offline`). */
@@ -60,6 +61,11 @@ export interface EuropeOpenOptions {
   readonly addSources?: readonly AddedSource[];
   /** Wraps each source with its tiers; required with a package (the package-only sources need it). */
   readonly offline?: OfflineWrapper;
+  /**
+   * National and regional orthophotos, each clipped to its borders, above the satellite composite in Satellite and
+   * Hybrid: `await europeOrthophotos()` of `@vibeglobe/presets/orthophotos` (ADR 0182).
+   */
+  readonly orthophotos?: OrthophotoLayers;
   /**
    * The deepest level of the package's vector tiles and terrain on land (the `maxZoom` of `europe-vectors` and
    * `europe-terrain` in its pipeline configuration; 14 and 12 by default, as in `europe.json`).
@@ -287,7 +293,8 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
       return true;
     },
   };
-  const imagery = satelliteLayers(build);
+  const imagery = [...satelliteLayers(build), ...(options.orthophotos?.layers ?? [])];
+  used.push(...(options.orthophotos?.sources ?? []));
   const terrain = terrainSource(build);
   const vectors = build.use(OPENFREEMAP);
   const hillshade: HillshadeSource | undefined = terrain

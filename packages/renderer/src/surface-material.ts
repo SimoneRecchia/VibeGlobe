@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { DepthPath, MorphFrame, TileDrawList } from '@vibeglobe/core';
+import { type DepthPath, type MorphFrame, type TileDrawList } from '@vibeglobe/core';
 import { attribute, Fn, If, mix, positionGeometry, select, texture, uniform, vec3, vec4 } from 'three/tsl';
 import {
   DataTexture,
@@ -327,22 +327,44 @@ export function createSurfaceMaterial(
 
 const NO_HEIGHTS = -1;
 
+/** The imagery handles of the polar caps' fills in core's draw list (KB-211). */
+const NORTH_CAP_TEXTURE = -2;
+const SOUTH_CAP_TEXTURE = -3;
+
+/** The imagery texture of a handle: a tile's, a polar cap's fill (KB-211), else the base image. */
+function imageryOf(
+  textures: { get(handle: number): Texture | undefined },
+  base: Texture,
+  caps: readonly Texture[] | undefined,
+  handle: number,
+): Texture {
+  if (handle === NORTH_CAP_TEXTURE) return caps?.[0] ?? base;
+  if (handle === SOUTH_CAP_TEXTURE) return caps?.[1] ?? base;
+  return textures.get(handle) ?? base;
+}
+
 /**
  * Points a mesh's draw state at draw `i` of a frame's list: its textures and the ones it fades from, looked up in
- * `textures` by handle, with the world base image for the base handle (or a texture no longer held); without
- * terrain the heights stay unset and the material's flat heights apply.
+ * `textures` by handle, with the polar caps' fills (`textures.caps`, north then south) for their handles and the world base
+ * image for the base handle (or a texture no longer held); without terrain the heights stay unset and the material's
+ * flat heights apply.
  */
 export function applyDraw(
   draw: SurfaceDraw,
   draws: TileDrawList,
   i: number,
-  textures: { get(handle: number): Texture | undefined; readonly tones?: ToneMatcher },
+  textures: {
+    get(handle: number): Texture | undefined;
+    readonly tones?: ToneMatcher;
+    readonly caps?: { readonly textures: readonly Texture[] };
+  },
   base: Texture,
 ): void {
   textures.tones?.apply(draws, i, draw.tones.elements);
   const terrain = draws.terrain;
-  draw.texture = textures.get(draws.textures[i] ?? -1) ?? base;
-  draw.fromTexture = textures.get(draws.fromTextures[i] ?? -1) ?? base;
+  const caps = textures.caps?.textures;
+  draw.texture = imageryOf(textures, base, caps, draws.textures[i] ?? -1);
+  draw.fromTexture = imageryOf(textures, base, caps, draws.fromTextures[i] ?? -1);
   draw.heights = textures.get(terrain.textures[i] ?? NO_HEIGHTS);
   draw.fromHeights = textures.get(terrain.fromTextures[i] ?? NO_HEIGHTS);
   const flags =

@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { GlobeError } from '@vibeglobe/core';
+import { GlobeError, type NavigationMode } from '@vibeglobe/core';
 
 /** Which gestures are on; every one is on by default. */
 export interface GestureSwitches {
@@ -111,6 +111,13 @@ export interface ControlsOptions {
    * quarter of its time constants; 'no-preference' never does.
    */
   readonly reducedMotion?: 'system' | 'reduce' | 'no-preference';
+  /**
+   * How a drag moves the camera: 'free' (default) turns the globe as a trackball, so the grabbed point stays under the
+   * cursor, the view passes over the poles and the heading turns with it; 'north-up' keeps north up, horizontal drags
+   * turning about the polar axis and vertical ones changing latitude, and stops at the poles. Changed at runtime with
+   * `setNavigationMode`.
+   */
+  readonly navigationMode?: NavigationMode;
 }
 
 /** Options with every default filled in. */
@@ -125,6 +132,7 @@ export interface ResolvedControlsOptions {
   readonly maxTiltDeg: number;
   readonly zoomAnimationMs: number;
   readonly reducedMotion: 'system' | 'reduce' | 'no-preference';
+  readonly navigationMode: NavigationMode;
 }
 
 /** The defaults: ADR 0009's starting values. */
@@ -169,6 +177,7 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
   maxTiltDeg: 89,
   zoomAnimationMs: 120,
   reducedMotion: 'system',
+  navigationMode: 'free',
 };
 
 function invalid(name: string, rule: string): GlobeError {
@@ -235,5 +244,12 @@ export function resolveControlsOptions(options: ControlsOptions = {}): ResolvedC
     maxTiltDeg: scalar('maxTiltDeg', options.maxTiltDeg, d.maxTiltDeg, 0, 89),
     zoomAnimationMs: scalar('zoomAnimationMs', options.zoomAnimationMs, d.zoomAnimationMs, 1, 10_000),
     reducedMotion,
+    navigationMode: validNavigationMode(options.navigationMode ?? d.navigationMode),
   };
+}
+
+/** A navigation mode, or a GlobeError ('invalid-option') for anything else. */
+export function validNavigationMode(mode: unknown): NavigationMode {
+  if (mode !== 'free' && mode !== 'north-up') throw invalid('navigationMode', "'free' or 'north-up'");
+  return mode;
 }

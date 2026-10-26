@@ -89,26 +89,36 @@ function mercator(lonDeg: number, latDeg: number): [number, number] {
 
 /**
  * Tiles of the detail the view needs, from a grid of screen samples: at each sample, the zoom at which a 512-pixel
- * tile matches the ground's scale there (the geometric mean of the scales along both screen axes), as the tile of
- * that zoom containing the sample. Combined with the surface's coverage by {@link viewTargets}, so no area is left
- * without a tile.
+ * tile matches the ground's scale there (the geometric mean of the scales along both screen axes, measured to the
+ * next sample of the grid), as the tile of that zoom containing the sample. Each sample is picked once: the scale
+ * comes from its grid neighbors rather than from extra picks a pixel away, which tripled the picks of every frame
+ * (KB-210). Combined with the surface's coverage by {@link viewTargets}, so no area is left without a tile.
  */
 export function sampledTiles(view: ViewSampler, widthPx: number, heightPx: number, maxZoom = 24): TileId[] {
   const out: TileId[] = [];
   const stepX = widthPx / SAMPLE_COLUMNS;
   const stepY = heightPx / SAMPLE_ROWS;
+  const columns = SAMPLE_COLUMNS + 1;
+  const grid: ([number, number] | undefined)[] = [];
+  for (let row = 0; row <= SAMPLE_ROWS; row++)
+    for (let col = 0; col <= SAMPLE_COLUMNS; col++) {
+      const here = view.screenToGeo({
+        xPx: Math.min(widthPx - 2, col * stepX),
+        yPx: Math.min(heightPx - 2, row * stepY),
+      });
+      grid.push(here && mercator(here.longitudeDeg, here.latitudeDeg));
+    }
+  const at = (row: number, col: number) => grid[row * columns + col];
   for (let row = 0; row <= SAMPLE_ROWS; row++) {
     for (let col = 0; col <= SAMPLE_COLUMNS; col++) {
-      const x = Math.min(widthPx - 2, col * stepX);
-      const y = Math.min(heightPx - 2, row * stepY);
-      const here = view.screenToGeo({ xPx: x, yPx: y });
-      const right = view.screenToGeo({ xPx: x + 1, yPx: y });
-      const down = view.screenToGeo({ xPx: x, yPx: y + 1 });
-      if (here === undefined || right === undefined || down === undefined) continue;
-      const p = mercator(here.longitudeDeg, here.latitudeDeg);
-      const r = mercator(right.longitudeDeg, right.latitudeDeg);
-      const d = mercator(down.longitudeDeg, down.latitudeDeg);
-      const perPx = Math.sqrt(Math.hypot(r[0] - p[0], r[1] - p[1]) * Math.hypot(d[0] - p[0], d[1] - p[1]));
+      const p = at(row, col);
+      // The neighbors to the right and below, or to the left and above on the grid's last column and row.
+      const r = at(row, col < SAMPLE_COLUMNS ? col + 1 : col - 1);
+      const d = at(row < SAMPLE_ROWS ? row + 1 : row - 1, col);
+      if (p === undefined || r === undefined || d === undefined) continue;
+      const perPx = Math.sqrt(
+        (Math.hypot(r[0] - p[0], r[1] - p[1]) / stepX) * (Math.hypot(d[0] - p[0], d[1] - p[1]) / stepY),
+      );
       if (!(perPx > 0)) continue;
       const z = Math.max(0, Math.min(maxZoom, Math.round(Math.log2(1 / (perPx * TILE_PX)))));
       const n = 2 ** z;

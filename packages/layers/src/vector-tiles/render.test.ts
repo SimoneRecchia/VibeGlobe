@@ -143,8 +143,11 @@ describe('vector tiles of a view (F441, F442)', () => {
         };
       },
     };
-    const tiles = sampledTiles(sampler, 640, 480);
+    let picks = 0;
+    const tiles = sampledTiles({ screenToGeo: (point) => (picks++, sampler.screenToGeo(point)) }, 640, 480);
     expect(new Set(tiles.map((t) => t.z))).toEqual(new Set([14]));
+    // One pick per sample of the 13 × 10 grid: the scale comes from the neighbors (KB-210).
+    expect(picks).toBe(130);
   });
 });
 

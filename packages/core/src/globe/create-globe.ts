@@ -27,7 +27,7 @@ import type { ViewControl } from './view-control.js';
 import { completedMovement, type Movements } from './movements.js';
 import { wireView } from './view-wiring.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
+import { createFrameView, renderDrawing, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -341,7 +341,8 @@ class GlobeEngine implements Globe {
     // A lift moved the camera after the selection: the next frame draws the new pose, until the lift settles (F146).
     if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.dirty = true;
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
-    if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
+    // Layers query the frame's own camera while it is drawn (KB-210).
+    if (!renderDrawing(this.cam, renderer, this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
     this.frameNumber++;

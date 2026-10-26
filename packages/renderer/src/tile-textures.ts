@@ -226,7 +226,7 @@ export type CapRgb = readonly [number, number, number];
  * WebGPU the sampler set up with a binding stays when its texture changes), made again when the colors or the base
  * image change.
  */
-export class PolarCapTextures {
+class PolarCapTextures {
   private colors: readonly CapRgb[] = [
     [0x78, 0xa9, 0xcd],
     [0xf2, 0xf3, 0xf7],

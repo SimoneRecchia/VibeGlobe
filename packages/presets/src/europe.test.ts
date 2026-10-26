@@ -56,7 +56,7 @@ describe('europeOpen (F613)', () => {
       expect(s.attribution[0]?.text).not.toBe('');
       expect(s.termsReadDate).toBe('2026-10-26');
     }
-    expect(preset.excluded.map((s) => s.id)).toContain('basemap-at');
+    expect(preset.excluded.map((s) => s.id)).toContain('pnoa');
     // Satellite: the package's composite, from the package only; terrain: the package, then online.
     const satellite = preset.baseMaps[0]?.imagery[0]?.sources ?? [];
     expect(satellite.map((s) => s.id)).toEqual(['europe-satellite']);

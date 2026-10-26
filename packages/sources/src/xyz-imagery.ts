@@ -2,8 +2,6 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   type CoverageArea,
-  coverageArea,
-  coverageTest,
   type GeoJsonArea,
   GEOGRAPHIC_TILING,
   inCoverage,
@@ -17,6 +15,7 @@ import {
   type Attribution,
   type CreditProfile,
 } from '@vibeglobe/core';
+import { sourceArea } from './clip-area.js';
 import { fetchTransport } from './fetch-transport.js';
 import { SourceConfigError } from './metadata.js';
 
@@ -99,7 +98,8 @@ function blankColor(color: XyzImageryOptions['blankTile']): readonly [number, nu
   if (color === undefined) return undefined;
   if (typeof color !== 'string') return color;
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
-  if (!match) throw new SourceConfigError('invalid-option', `blankTile ${JSON.stringify(color)} is not a #rrggbb color.`);
+  if (!match)
+    throw new SourceConfigError('invalid-option', `blankTile ${JSON.stringify(color)} is not a #rrggbb color.`);
   return [parseInt(match[1] ?? '0', 16), parseInt(match[2] ?? '0', 16), parseInt(match[3] ?? '0', 16)];
 }
 
@@ -111,10 +111,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
   const maxLevel = options.maxLevel ?? 19;
   const subdomains = options.subdomains ?? [];
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
-  const areaOption = options.area ? coverageArea(options.area) : undefined;
-  const area = areaOption ? coverageTest(areaOption) : undefined;
-  const clip = areaOption?.tiles === 'clip';
-  const mercator = tiling.crs === 'EPSG:3857';
+  const area = sourceArea(options.area, tiling);
   const blank = blankColor(options.blankTile);
   return {
     id: options.id,
@@ -124,7 +121,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     tileSizePx: options.tileSizePx ?? 256,
     pixelRatio: options.pixelRatio ?? 1,
     // The area's bounding rectangles let the engine skip whole regions before asking for tiles.
-    ...(options.coverage || area ? { coverage: options.coverage ?? area?.rectangles ?? [] } : {}),
+    ...(options.coverage || area ? { coverage: options.coverage ?? area?.test.rectangles ?? [] } : {}),
     transport: options.transport ?? fetchTransport(undefined, options.headers),
     // A custom transport (auth headers, sessions) is the only way to reach the tiles: a cache tier in front of the
     // source must use it rather than fetch the URLs itself (track B hook request 4, TB-01).
@@ -136,15 +133,15 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.maxRequestsPerSecond === undefined ? {} : { maxRequestsPerSecond: options.maxRequestsPerSecond }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
     ...(options.attribution ? { attribution: options.attribution } : {}),
-    ...(options.transparent || clip ? { transparent: true } : {}),
-    ...(clip && area ? { tileMask: (coord: TileCoord) => area.mask(tiling.tileExtent(coord, extent), mercator) } : {}),
+    ...(options.transparent || area?.clip ? { transparent: true } : {}),
+    ...(area?.tileMask ? { tileMask: area.tileMask } : {}),
     ...(blank ? { blankTile: { rgb: blank } } : {}),
     ...(options.profile ? { profile: options.profile } : {}),
     ...(options.url.includes('{r}') ? { highDpi: true } : {}),
     request(coord: TileCoord, out: TileRequest, pixelRatio = 1): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';
-      if (area && !area.covers(tiling.tileExtent(coord, extent))) return 'noData';
+      if (area && !area.test.covers(tiling.tileExtent(coord, extent))) return 'noData';
       const rows = tiling.rootTilesY * 2 ** coord.level;
       const hostIndex = subdomains.length > 0 ? (coord.x + coord.y) % subdomains.length : 0;
       out.url = options.url

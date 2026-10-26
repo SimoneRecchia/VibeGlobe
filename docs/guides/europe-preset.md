@@ -29,10 +29,10 @@ the packages as a test (`scripts/integration/europe-preset-guide.test.ts`).
 | 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it        |
 
 Low levels use Natural Earth (public domain, the base image) wherever nothing else is drawn. `preset.sources` lists
-every source in use with its terms, and `preset.excluded` the sources left out with the reason. The national
-orthophotos of basemap.at, SWISSIMAGE, IGN BD ORTHO, PNOA, PDOK, South Tyrol 2023 and Tuscany 2023 are left out until
-their terms can be read and recorded ([open question 34](../open-questions.md)). An application whose own review allows
-them adds them with `addSources` (below).
+every source in use with its terms, and `preset.excluded` the sources left out with the reason. Eleven national
+and regional orthophotos with verified terms come with `@vibeglobe/presets/orthophotos` (below); IGN BD ORTHO, PNOA,
+PDOK and others wait for their exact credit or endpoint ([open question 34](../open-questions.md)). An application whose
+own review allows them adds them with `addSources`.
 
 ## Hybrid: the package plus online detail
 
@@ -197,17 +197,35 @@ const preset = europeOpen({
 
 Google's tiles are never packaged or cached persistently (the Google profile, [ADR 0031](../adr/0031-google-maps-platform-terms.md)).
 
+## National and regional orthophotos
+
+`@vibeglobe/presets/orthophotos` adds the open orthophoto services whose terms were verified (ADR 0182): basemap.at,
+SWISSIMAGE, ČÚZK, DGT Portugal and seven German Länder. Each is a layer of its own, clipped per pixel to its country's or
+Land's borders (Natural Earth, loaded on demand), above the satellite composite; outside them the composite shows.
+
+```ts
+import { europeOpen } from '@vibeglobe/presets';
+import { europeOrthophotos } from '@vibeglobe/presets/orthophotos';
+
+const orthophotos = await europeOrthophotos({ exclude: ['de-nw-dop'], onlineMaxLevel: { 'swisstopo-swissimage': 18 } });
+const preset = europeOpen({ orthophotos });
+const credits = preset.sources.filter((s) => s.kind === 'imagery').map((s) => s.attribution[0]?.text);
+```
+
+SWISSIMAGE is free under fair use (up to about 20,000 users a day); the other services publish no limit. The services
+left out, with why, are `preset.excluded`.
+
 ## Maximum online zoom per area
 
 The deepest level asked for online, by area and source, with the default options (`onlineMaxLevel` lowers them).
 Beyond it the deepest tile is magnified.
 
-| Area                                                                       | Satellite                                                                               | Map, labels, roads, buildings                       | Terrain and relief                                               |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Land in Europe                                                             | none online; the package up to 13 (WorldCover)                                          | 14 (OpenFreeMap; the package first up to its level) | 17 (Mapterhorn, where it holds them; the package first up to 12) |
-| Sea in Europe                                                              | none online; the package up to 8                                                        | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
-| Outside Europe                                                             | none (Natural Earth)                                                                    | 14 (OpenFreeMap)                                    | none                                                             |
-| Austria, Switzerland, France, Spain, the Netherlands, South Tyrol, Tuscany | none until open question 34 is answered; with `addSources`, the orthophoto's own levels | as land in Europe                                   | as land in Europe                                                |
+| Area                                                                                                                                                          | Satellite                                                                              | Map, labels, roads, buildings                       | Terrain and relief                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| Land in Europe                                                                                                                                                | none online; the package up to 13 (WorldCover)                                         | 14 (OpenFreeMap; the package first up to its level) | 17 (Mapterhorn, where it holds them; the package first up to 12) |
+| Sea in Europe                                                                                                                                                 | none online; the package up to 8                                                       | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
+| Outside Europe                                                                                                                                                | none (Natural Earth)                                                                   | 14 (OpenFreeMap)                                    | none                                                             |
+| Austria, Switzerland, Czechia, mainland Portugal, Niedersachsen, NRW, Thüringen, Brandenburg, Berlin, Mecklenburg-Vorpommern, Sachsen-Anhalt, Rheinland-Pfalz | with `europeOrthophotos()`: 19 or 20, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
 
 Mapterhorn's tiles are asked for down to level 17; where it holds no deeper tile, its deepest one is magnified. OpenFreeMap's vector tiles stop at level 14 and are
 overzoomed beyond.

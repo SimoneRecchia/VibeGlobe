@@ -143,28 +143,75 @@ export const EUROPE_SOURCES: readonly PresetSourceRecord[] = [
   NATURAL_EARTH,
 ];
 
-const BLOCKED =
-  "terms not verifiable on 2026-10-26: the provider's own terms pages could not be read from the build environment " +
-  '(its network policy blocks the host); summaries suggest an open licence, to be confirmed (docs/open-questions.md)';
+const CREDIT =
+  'licence verified (commercial use and redistribution allowed), but the exact credit the provider requires is not ' +
+  'settled: ';
+const ENDPOINT = 'licence verified, but its Web Mercator (EPSG:3857) endpoint or layer was not confirmed';
 
-/** The online orthophotos left out, with why (ADR 0182). */
+/**
+ * The online orthophotos left out, with why (ADR 0182, terms read 2026-10-26). The included ones are in
+ * `@vibeglobe/presets/orthophotos`.
+ */
 export const EXCLUDED_SOURCES: readonly ExcludedSource[] = [
-  { id: 'basemap-at', name: 'basemap.at orthophoto (Austria)', reason: BLOCKED },
+  { id: 'ign-bd-ortho', name: 'IGN BD ORTHO (France)', reason: `${CREDIT}Etalab 2.0 asks for the update date` },
+  { id: 'pnoa', name: 'PNOA Máxima Actualidad (Spain)', reason: `${CREDIT}it names each image's year, which varies` },
+  { id: 'pdok-luchtfoto', name: 'PDOK Luchtfoto (Netherlands)', reason: `${CREDIT}no fixed text is given` },
+  { id: 'alto-adige-2023', name: 'Alto Adige / Südtirol orthophoto 2023', reason: `${CREDIT}no fixed text is given` },
+  { id: 'hr-dgu-dof', name: 'DGU DOF (Croatia)', reason: `${CREDIT}no fixed text is given` },
+  { id: 'ee-maaamet', name: 'Maa-amet orthophoto (Estonia)', reason: `${CREDIT}the agency was renamed` },
+  { id: 'de-sn-dop20', name: 'GeoSN DOP20 (Sachsen)', reason: `${CREDIT}two records give different texts` },
+  { id: 'de-sl-dop20', name: 'LVGL DOP20 (Saarland)', reason: `${CREDIT}two records give different texts` },
+  { id: 'de-by-dop20', name: 'DOP20 (Bayern)', reason: ENDPOINT },
+  { id: 'de-he-dop20', name: 'DOP20 (Hessen)', reason: ENDPOINT },
+  { id: 'de-sh-dop20', name: 'DOP20 OpenGBD (Schleswig-Holstein)', reason: ENDPOINT },
+  { id: 'de-hh-dop20', name: 'DOP20 (Hamburg)', reason: ENDPOINT },
+  { id: 'si-gurs-dof', name: 'GURS DOF (Slovenia)', reason: `${ENDPOINT} (only EPSG:3794)` },
+  { id: 'it-er-ortofoto', name: 'Ortofoto RER (Emilia-Romagna)', reason: `${ENDPOINT}; no fixed credit` },
   {
-    id: 'swissimage',
-    name: 'swisstopo SWISSIMAGE (Switzerland)',
-    reason:
-      "online use not verifiable on 2026-10-26: swisstopo's open-data terms allow commercial use and redistribution, but " +
-      'the geo.admin.ch WMTS is under a fair-use limit whose current figure could not be read (docs/open-questions.md)',
+    id: 'de-bw-dop20',
+    name: 'LGL DOP20 (Baden-Württemberg)',
+    reason: 'conflicting records: one INSPIRE record marks the service restricted, another open',
   },
-  { id: 'ign-bd-ortho', name: 'IGN BD ORTHO (France)', reason: BLOCKED },
-  { id: 'pnoa', name: 'PNOA (Spain)', reason: BLOCKED },
-  { id: 'pdok-luchtfoto', name: 'PDOK Luchtfoto (Netherlands)', reason: BLOCKED },
+  { id: 'de-hb-dop', name: 'DOP (Bremen)', reason: 'conflicting records: an open licence and an older one with fees' },
   {
-    id: 'alto-adige-2023',
-    name: 'Alto Adige / Südtirol orthophoto 2023',
-    reason:
-      'no licence specific to the 2023 orthophoto and no tiled endpoint found; earlier orthophotos were for internal use only',
+    id: 'de-bkg-dop',
+    name: 'BKG DOP20/DOP40 (Germany)',
+    reason: 'licensed for a fee through the ZSGT; an open licence is announced from 2027-01-01',
+  },
+  {
+    id: 'be-orthophotos',
+    name: 'Flanders, Wallonia and Brussels orthophotos',
+    reason: "the services' own terms (as distinct from the datasets') were not confirmed",
+  },
+  {
+    id: 'dk-geodanmark',
+    name: 'GeoDanmark orthophoto (Denmark)',
+    reason: 'CC BY 4.0, but a token from a user registration is required and the WMTS is in UTM32 only',
+  },
+  {
+    id: 'pl-geoportal-orto',
+    name: 'Geoportal ORTO (Poland)',
+    reason: 'free to use, but no named licence allows redistribution, and automatic downloading is prohibited',
+  },
+  { id: 'no-norge-i-bilder', name: 'Norge i bilder (Norway)', reason: 'Norge digitalt-lisens, not an open licence' },
+  { id: 'se-lantmateriet', name: 'Lantmäteriet orthophoto (Sweden)', reason: 'no open licence found; access keys' },
+  { id: 'fi-mml', name: 'MML orthophoto (Finland)', reason: 'CC BY 4.0, but the open interface needs an API key' },
+  { id: 'is-natt', name: 'NÁTT aerial basemap (Iceland)', reason: 'CC BY 4.0, but no endpoint was found' },
+  { id: 'lv-lgia', name: 'LĢIA orthophoto (Latvia)', reason: 'licence not confirmed by the provider' },
+  {
+    id: 'lt-ort10lt',
+    name: 'ORT10LT (Lithuania)',
+    reason: 'licence not verified; earlier terms barred redistribution',
+  },
+  {
+    id: 'it-pcn',
+    name: 'Geoportale Nazionale orthophotos (Italy)',
+    reason: 'conflicting terms (CC BY 4.0 and CC BY-NC-SA) and imagery from 2006–2012',
+  },
+  {
+    id: 'it-agea-regions',
+    name: 'Lombardia, Veneto, Piemonte, Valle d’Aosta, Sardegna orthophotos',
+    reason: 'recent orthophotos are AGEA: institutional use only, commercial use barred or not stated',
   },
   {
     id: 'toscana-2023',
@@ -172,5 +219,10 @@ export const EXCLUDED_SOURCES: readonly ExcludedSource[] = [
     reason:
       'conflicting terms (CC BY 4.0 in the catalogue record, rights reserved by the region and download on request in the ' +
       'same record) and no Web Mercator tile service, only a WMS',
+  },
+  {
+    id: 'it-other-regions',
+    name: 'Trentino, Friuli Venezia Giulia, Sicilia, Lazio, Puglia, Liguria orthophotos',
+    reason: 'no official licence or Web Mercator endpoint confirmed',
   },
 ];

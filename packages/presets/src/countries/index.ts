@@ -4,9 +4,9 @@
 import type { PolygonDeg } from '@vibeglobe/core';
 
 /**
- * The country borders of Europe by ISO 3166-1 alpha-2 code, each in its own module so that an application loads only
- * the countries it uses: Natural Earth 1:10m countries (public domain, https://www.naturalearthdata.com), clipped to
- * Europe and simplified to 0.003° (about 300 m) by scripts/europe-land.ts.
+ * The country borders of Europe by ISO 3166-1 alpha-2 code, and Germany's Länder by ISO 3166-2 code, each in its own
+ * module so that an application loads only those it uses: Natural Earth 1:10m countries and states (public domain,
+ * https://www.naturalearthdata.com), clipped to Europe and simplified to 0.003° (about 300 m) by scripts/europe-land.ts.
  */
 export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: readonly PolygonDeg[] }>>> = {
   AD: () => import('./ad.js'),
@@ -21,6 +21,22 @@ export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: r
   CY: () => import('./cy.js'),
   CZ: () => import('./cz.js'),
   DE: () => import('./de.js'),
+  'DE-BB': () => import('./de-bb.js'),
+  'DE-BE': () => import('./de-be.js'),
+  'DE-BW': () => import('./de-bw.js'),
+  'DE-BY': () => import('./de-by.js'),
+  'DE-HB': () => import('./de-hb.js'),
+  'DE-HE': () => import('./de-he.js'),
+  'DE-HH': () => import('./de-hh.js'),
+  'DE-MV': () => import('./de-mv.js'),
+  'DE-NI': () => import('./de-ni.js'),
+  'DE-NW': () => import('./de-nw.js'),
+  'DE-RP': () => import('./de-rp.js'),
+  'DE-SH': () => import('./de-sh.js'),
+  'DE-SL': () => import('./de-sl.js'),
+  'DE-SN': () => import('./de-sn.js'),
+  'DE-ST': () => import('./de-st.js'),
+  'DE-TH': () => import('./de-th.js'),
   DK: () => import('./dk.js'),
   EE: () => import('./ee.js'),
   ES: () => import('./es.js'),

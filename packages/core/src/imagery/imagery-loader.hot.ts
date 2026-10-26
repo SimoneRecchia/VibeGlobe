@@ -896,7 +896,10 @@ export class ImageryLoader implements NetworkPoolClient {
       const code = outcome.error.code;
       if (code === 'cancelled' || code === 'aborted') {
         record.state = UNLOADED;
-      } else if (code === 'task-failed' && (outcome.error.taskCode === 'unsupported' || outcome.error.taskCode === 'no-data')) {
+      } else if (
+        code === 'task-failed' &&
+        (outcome.error.taskCode === 'unsupported' || outcome.error.taskCode === 'no-data')
+      ) {
         // `no-data`: a tile the source fills with its blank color (F618).
         record.state = NO_DATA;
       } else if (code === 'task-failed' && outcome.error.taskCode === 'format-unsupported') {

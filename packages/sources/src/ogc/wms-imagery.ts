@@ -1,6 +1,8 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
+  type CoverageArea,
+  type GeoJsonArea,
   GEOGRAPHIC_TILING,
   WEB_MERCATOR_TILING,
   type TileCoord,
@@ -8,6 +10,7 @@ import {
   type TileRequest,
   type TileTransport,
 } from '@vibeglobe/core';
+import { sourceArea } from '../clip-area.js';
 import { fetchTransport } from '../fetch-transport.js';
 import {
   type Attribution,
@@ -68,6 +71,11 @@ export interface WmsImageryOptions {
   /** The `fetch` that loads the capabilities document. */
   readonly fetch?: typeof fetch;
   readonly maxRequestsPerHost?: number;
+  /**
+   * The polygons the service has data for, as in `xyzImagery` (F618): GeoJSON is clipped per pixel, so the layer below
+   * shows outside the area whatever the service answers there.
+   */
+  readonly area?: CoverageArea | GeoJsonArea;
 }
 
 /** The reference system to request: the preferred one when offered, else the other one the engine draws directly. */
@@ -187,6 +195,17 @@ function attributionOf(options: WmsImageryOptions, capabilities: WmsCapabilities
   return found.filter((a, i) => found.findIndex((b) => b.text === a.text) === i);
 }
 
+/** The coverage of the first layer whose capabilities give bounds. */
+function layerCoverage(
+  options: WmsImageryOptions,
+  capabilities: WmsCapabilities | undefined,
+): TileRectangleRad | undefined {
+  const bounds = options.layers
+    .map((n) => capabilities?.layers.find((l) => l.name === n)?.bounds)
+    .find((b) => b !== undefined);
+  return bounds ? coverageOf(...bounds) : undefined;
+}
+
 /**
  * A WMS imagery source (F231): one GetMap image per tile in WMS 1.1.1 or 1.3.0 (with 1.3.0's latitude-first axis order
  * for EPSG:4326), transparent by default, with a gutter cropped away so labels are not cut at tile edges. It requests
@@ -217,22 +236,22 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
     `&${version === '1.3.0' ? 'CRS' : 'SRS'}=${encodeURIComponent(requestCode(crs, options, capabilities))}` +
     `&WIDTH=${sizePx + 2 * gutterPx}&HEIGHT=${sizePx + 2 * gutterPx}${extra.join('')}&BBOX=`;
   const bbox = bboxWriter(crs, version, gutterPx / sizePx);
-  const bounds = options.layers
-    .map((n) => capabilities?.layers.find((l) => l.name === n)?.bounds)
-    .find((b) => b !== undefined);
-  const coverage = bounds ? coverageOf(...bounds) : undefined;
+  const coverage = layerCoverage(options, capabilities);
+  const tiling = tilingOfCrs(crs) === 'mercator' ? WEB_MERCATOR_TILING : GEOGRAPHIC_TILING;
+  const area = sourceArea(options.area, tiling);
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const source: DescribedImagerySource = {
     id: options.id,
-    tiling: tilingOfCrs(crs) === 'mercator' ? WEB_MERCATOR_TILING : GEOGRAPHIC_TILING,
+    tiling,
     minLevel: 0,
     maxLevel: options.maxLevel ?? 20,
     tileSizePx: sizePx,
     pixelRatio: 1,
-    ...(coverage ? { coverage: [coverage] } : {}),
+    ...(area ? { coverage: area.test.rectangles } : coverage ? { coverage: [coverage] } : {}),
     decoder: 'image',
-    // The layers below show through what the server leaves transparent (KB-154).
-    transparent: options.transparent !== false,
+    // The layers below show through what the server leaves transparent (KB-154), and outside a clipped area.
+    transparent: options.transparent !== false || area?.clip === true,
+    ...(area?.tileMask ? { tileMask: area.tileMask } : {}),
     transportRequired: true,
     transport: wmsTransport(
       options.transport ?? fetchTransport(),
@@ -245,6 +264,7 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
     profile: options.profile ?? CUSTOM_PROFILE,
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (!inLevelsAndCoverage(source, coord, extent)) return 'noData';
+      if (area && !area.test.covers(source.tiling.tileExtent(coord, extent))) return 'noData';
       out.url = prefix + bbox(source.tiling.tileExtent(coord, extent));
       out.hostIndex = 0;
       return out;

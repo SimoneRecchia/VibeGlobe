@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBlank } from './decode-image.js';
+import { isBlank } from './tile-mask.js';
 
 describe('decode-image blank tiles (F618)', () => {
   it('counts a tile as blank only when every pixel is opaque and within the tolerance of the color', () => {

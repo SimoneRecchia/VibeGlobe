@@ -7434,7 +7434,7 @@
         "Build the preset with default options and assert every base map and overlay, each source's coverage, levels, licence, attribution and reading date, and that online sources cover only land while the sea comes from the package",
         "Assert the options: the package manifest URL, a lower online maximum level, an excluded source and an added source"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F614",

@@ -1,0 +1,136 @@
+// Writes the Europe land mask of the Europe preset and its pipeline configuration from Natural Earth's 1:50m land
+// polygons (public domain): clipped to Europe's bounds and simplified to about a kilometre. Run once when the bounds
+// or the tolerance change:
+//   node scripts/europe-land.ts <ne_50m_land.geojson>
+// The input comes from https://github.com/nvkelso/natural-earth-vector (geojson/ne_50m_land.geojson).
+import { readFileSync, writeFileSync } from 'node:fs';
+
+/** West, south, east, north in degrees: mainland Europe, Iceland, the Azores, Madeira and the Canary Islands. */
+export const EUROPE_BOUNDS = [-32, 27, 45, 72] as const;
+/** Douglas–Peucker tolerance in degrees (about 1 km in latitude). */
+const TOLERANCE_DEG = 0.01;
+
+type Point = [number, number];
+type Ring = Point[];
+
+/** Sutherland–Hodgman clipping of a ring to the bounds. */
+function clipRing(ring: Ring, [west, south, east, north]: readonly number[]): Ring {
+  const edges: [(p: Point) => boolean, (a: Point, b: Point) => Point][] = [
+    [(p) => p[0] >= (west ?? 0), (a, b) => at(a, b, 0, west ?? 0)],
+    [(p) => p[0] <= (east ?? 0), (a, b) => at(a, b, 0, east ?? 0)],
+    [(p) => p[1] >= (south ?? 0), (a, b) => at(a, b, 1, south ?? 0)],
+    [(p) => p[1] <= (north ?? 0), (a, b) => at(a, b, 1, north ?? 0)],
+  ];
+  let out = ring;
+  for (const [inside, cross] of edges) {
+    const input = out;
+    out = [];
+    for (let i = 0; i < input.length; i++) {
+      const current = input[i] as Point;
+      const previous = input[(i + input.length - 1) % input.length] as Point;
+      if (inside(current)) {
+        if (!inside(previous)) out.push(cross(previous, current));
+        out.push(current);
+      } else if (inside(previous)) out.push(cross(previous, current));
+    }
+  }
+  return out;
+}
+
+/** The point of segment a–b where coordinate `axis` equals `value`. */
+function at(a: Point, b: Point, axis: 0 | 1, value: number): Point {
+  const t = (value - a[axis]) / (b[axis] - a[axis]);
+  return [round(a[0] + (b[0] - a[0]) * t), round(a[1] + (b[1] - a[1]) * t)];
+}
+
+const round = (v: number): number => Math.round(v * 1e3) / 1e3;
+
+/** Douglas–Peucker simplification of an open polyline. */
+function simplify(points: Ring, tolerance: number): Ring {
+  if (points.length < 3) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = keep[points.length - 1] = 1;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const [first, last] = stack.pop() as [number, number];
+    const [ax, ay] = points[first] as Point;
+    const [bx, by] = points[last] as Point;
+    let worst = 0;
+    let index = -1;
+    for (let i = first + 1; i < last; i++) {
+      const [px, py] = points[i] as Point;
+      const length = Math.hypot(bx - ax, by - ay);
+      const d =
+        length === 0 ? Math.hypot(px - ax, py - ay) : Math.abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / length;
+      if (d > worst) {
+        worst = d;
+        index = i;
+      }
+    }
+    if (worst > tolerance && index > 0) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return points.filter((_, i) => keep[i] === 1);
+}
+
+function area(ring: Ring): number {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x0, y0] = ring[i] as Point;
+    const [x1, y1] = ring[(i + 1) % ring.length] as Point;
+    sum += x0 * y1 - x1 * y0;
+  }
+  return Math.abs(sum) / 2;
+}
+
+const input = process.argv[2];
+if (!input) throw new Error('usage: node scripts/europe-land.ts <ne_50m_land.geojson>');
+const land = JSON.parse(readFileSync(input, 'utf8')) as {
+  features: { geometry: { type: string; coordinates: number[][][] | number[][][][] } }[];
+};
+const polygons: Ring[][] = [];
+for (const feature of land.features) {
+  const parts =
+    feature.geometry.type === 'Polygon'
+      ? [feature.geometry.coordinates as number[][][]]
+      : (feature.geometry.coordinates as number[][][][]);
+  for (const part of parts) {
+    const rings = part
+      .map((ring) =>
+        clipRing(
+          ring.map(([x, y]) => [x ?? 0, y ?? 0] as Point),
+          EUROPE_BOUNDS,
+        ),
+      )
+      .filter((ring) => ring.length >= 3)
+      .map((ring) =>
+        simplify([...ring, ring[0] as Point], TOLERANCE_DEG).map(([x, y]) => [round(x), round(y)] as Point),
+      )
+      .filter((ring) => ring.length >= 4 && area(ring) > 1e-4);
+    if (rings.length > 0 && rings[0] !== undefined) polygons.push(rings);
+  }
+}
+const header =
+  'Natural Earth 1:50m land (public domain, https://www.naturalearthdata.com), clipped to Europe and simplified to ' +
+  `${TOLERANCE_DEG}° by scripts/europe-land.ts.`;
+writeFileSync(
+  'packages/tools/configs/regions/europe-land.geojson',
+  `${JSON.stringify({ type: 'Feature', properties: { source: header }, geometry: { type: 'MultiPolygon', coordinates: polygons } })}\n`,
+);
+writeFileSync(
+  'packages/presets/src/europe-land.ts',
+  `// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Generated by scripts/europe-land.ts: do not edit.
+import type { PolygonDeg } from '@vibeglobe/core';
+
+/** ${header} */
+export const EUROPE_LAND: readonly PolygonDeg[] = ${JSON.stringify(polygons)};
+
+/** West, south, east, north in degrees of the area the Europe preset covers. */
+export const EUROPE_BOUNDS = ${JSON.stringify(EUROPE_BOUNDS)} as const;
+`,
+);
+console.log(`${polygons.length} polygons, ${polygons.flat().reduce((n, r) => n + r.length, 0)} points`);

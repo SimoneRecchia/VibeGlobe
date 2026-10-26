@@ -1,0 +1,252 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+/**
+ * `europeOpen`: Google Earth-like map types of Europe from free sources whose terms allow commercial use and
+ * redistribution (ADR 0182). In hybrid use the app's offline package, on its own server, holds every level up to its
+ * own and the sea; online detail on land loads beyond it, tile by tile.
+ */
+import type { ImageryLayerOptions, ImagerySource, TerrainSource, TileSource } from '@vibeglobe/core';
+import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
+import { EUROPE_LAND } from './europe-land.js';
+import {
+  EXCLUDED_SOURCES,
+  ESA_WORLDCOVER,
+  MAPTERHORN,
+  COPERNICUS_GLO30,
+  OPENFREEMAP,
+  type ExcludedSource,
+  type PresetSourceRecord,
+  type SourceTiers,
+} from './sources.js';
+import { composeStyle, type HillshadeSource, type StyleJson, type StyleSelection } from './styles.js';
+
+/** The offline engine, as far as the preset uses it (`createOffline()` of `@vibeglobe/offline`). */
+export interface OfflineWrapper {
+  source<S extends TileSource>(source: S, options: { tiers?: SourceTiers; layerId?: string }): S;
+}
+
+/** A source of the app's own (a customer's provider with its key, a national orthophoto), added to a layer. */
+export interface AddedSource {
+  /** The engine source; give it its `area` so it is asked only where it has data. */
+  readonly source: ImagerySource;
+  /** Its terms, listed with the preset's. */
+  readonly record: PresetSourceRecord;
+  /** `top` (default): asked first, above the preset's; `bottom`: only where nothing else has data. */
+  readonly position?: 'top' | 'bottom';
+}
+
+/** Options of {@link europeOpen}. */
+export interface EuropeOpenOptions {
+  /**
+   * The manifest of the app's offline package (built by the `europe.json` pipeline configuration and published on the
+   * app's server). Without it the preset is online only: no package-backed source.
+   */
+  readonly packageManifestUrl?: string;
+  /** The package's static tile folders (vector tiles, terrain for the hillshade); by default next to the manifest. */
+  readonly packageBaseUrl?: string;
+  /** The deepest level each online source is asked for, by source id (`openfreemap`, `europe-terrain`, …). */
+  readonly onlineMaxLevel?: Readonly<Record<string, number>>;
+  /** Source ids to leave out. */
+  readonly exclude?: readonly string[];
+  /** The app's own imagery sources, added to the satellite layer. */
+  readonly addSources?: readonly AddedSource[];
+  /** Wraps each source with its tiers; required with a package (the package-only sources need it). */
+  readonly offline?: OfflineWrapper;
+}
+
+/** A base map type. */
+export interface BaseMap {
+  readonly id: 'satellite' | 'hybrid' | 'map' | 'relief';
+  readonly name: string;
+  /** The imagery layers (`Globe.imageryLayers.set`). */
+  readonly imagery: readonly ImageryLayerOptions[];
+  /** The vector style parts drawn over the imagery. */
+  readonly style: StyleSelection;
+}
+
+/** An overlay, shown over any base map. */
+export interface Overlay {
+  readonly id: 'labels' | 'roads' | 'buildings' | 'terrain';
+  readonly name: string;
+  /** The vector style parts it adds; none for 3D terrain. */
+  readonly style: StyleSelection;
+}
+
+/** The Europe preset. */
+export interface EuropePreset {
+  readonly baseMaps: readonly BaseMap[];
+  readonly overlays: readonly Overlay[];
+  /** The 3D terrain (`GlobeOptions.terrain`, chosen when the globe is created); undefined when excluded. */
+  readonly terrain: TerrainSource | undefined;
+  /** Every source used, with its terms. */
+  readonly sources: readonly PresetSourceRecord[];
+  /** The sources left out, with why. */
+  readonly excluded: readonly ExcludedSource[];
+  /** The package manifest to serve (`PackageManager.addServedPackage`), when given. */
+  readonly packageManifestUrl: string | undefined;
+  /** The vector style URL the Map and the overlays derive from: online, or the package's copy offline. */
+  readonly styleUrl: (mode: 'online' | 'offline') => string;
+  /**
+   * The style of a base map with overlays, from the loaded style JSON ({@link EuropePreset.styleUrl}); undefined when
+   * the selection draws no vector layer.
+   */
+  styleFor(style: StyleJson, baseId: BaseMap['id'], overlayIds: readonly Overlay['id'][]): StyleJson | undefined;
+}
+
+const LAND = { polygons: EUROPE_LAND, tiles: 'overlap' as const };
+
+function levelOf(options: EuropeOpenOptions, record: PresetSourceRecord): number {
+  return Math.min(options.onlineMaxLevel?.[record.id] ?? record.maxLevel, record.maxLevel);
+}
+
+/** What building the preset shares between its parts. */
+interface Build {
+  readonly options: EuropeOpenOptions;
+  readonly packaged: boolean;
+  readonly packageBase: string;
+  readonly used: PresetSourceRecord[];
+  wrap<S extends TileSource>(source: S, tiers: SourceTiers, layerId: string): S;
+  /** Lists the source unless excluded; false when excluded. */
+  use(record: PresetSourceRecord): boolean;
+}
+
+/** Satellite: the app's sources first (national orthophotos within their borders), the package's composite below. */
+function satelliteLayers(build: Build): ImageryLayerOptions[] {
+  const { options, wrap, use } = build;
+  const added = (position: 'top' | 'bottom') =>
+    (options.addSources ?? [])
+      .filter((a) => (a.position ?? 'top') === position && use(a.record))
+      .map((a) => wrap(a.source, 'network', 'satellite'));
+  const satellite: ImagerySource[] = [...added('top')];
+  if (build.packaged && use(ESA_WORLDCOVER))
+    satellite.push(
+      wrap(
+        xyzImagery({
+          id: ESA_WORLDCOVER.id,
+          // Never fetched: the tiles come from the package, the URL only names them.
+          url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
+          maxLevel: ESA_WORLDCOVER.maxLevel,
+          attribution: ESA_WORLDCOVER.attribution,
+        }),
+        'package',
+        'satellite',
+      ),
+    );
+  satellite.push(...added('bottom'));
+  return satellite.length > 0 ? [{ id: 'satellite', sources: satellite }] : [];
+}
+
+/** Terrain: the package's extract first, then online on land up to the online level. */
+function terrainSource(build: Build): TerrainSource | undefined {
+  if (!build.use(MAPTERHORN)) return undefined;
+  if (build.packaged) build.used.push(COPERNICUS_GLO30);
+  return build.wrap(
+    heightmapTerrain({
+      id: MAPTERHORN.id,
+      url: MAPTERHORN.url ?? '',
+      encoding: 'terrarium',
+      tileSizePx: 512,
+      maxLevel: levelOf(build.options, MAPTERHORN),
+      area: LAND,
+      attribution: build.packaged
+        ? [...MAPTERHORN.attribution, ...COPERNICUS_GLO30.attribution]
+        : MAPTERHORN.attribution,
+    }),
+    build.packaged ? 'all' : 'network',
+    'terrain',
+  );
+}
+
+/** The base maps and overlays the included sources allow. */
+function mapTypes(
+  imagery: readonly ImageryLayerOptions[],
+  vectors: boolean,
+  terrain: boolean,
+): { baseMaps: BaseMap[]; overlays: Overlay[] } {
+  const baseMaps: BaseMap[] = [
+    { id: 'satellite', name: 'Satellite', imagery, style: {} },
+    { id: 'hybrid', name: 'Hybrid', imagery, style: vectors ? { labels: true, roads: true } : {} },
+  ];
+  if (vectors) baseMaps.push({ id: 'map', name: 'Map', imagery: [], style: { map: true } });
+  if (terrain) baseMaps.push({ id: 'relief', name: 'Relief', imagery: [], style: { hillshade: true } });
+  const overlays: Overlay[] = [];
+  if (vectors)
+    overlays.push(
+      { id: 'labels', name: 'Labels and borders', style: { labels: true } },
+      { id: 'roads', name: 'Roads', style: { roads: true } },
+      { id: 'buildings', name: '3D buildings', style: { buildings: true } },
+    );
+  if (terrain) overlays.push({ id: 'terrain', name: '3D terrain', style: {} });
+  return { baseMaps, overlays };
+}
+
+/** The style of a selection, its vector tiles asked for up to their online level (deeper levels magnify it). */
+function selectionStyle(
+  style: StyleJson,
+  selection: StyleSelection,
+  hillshade: HillshadeSource | undefined,
+  vectorMax: number,
+): StyleJson | undefined {
+  const composed = composeStyle(style, selection, hillshade);
+  if (composed === undefined) return undefined;
+  const sources = Object.fromEntries(
+    Object.entries(composed.sources).map(([id, source]) => [
+      id,
+      source['type'] === 'vector'
+        ? { ...source, maxzoom: Math.min(Number(source['maxzoom'] ?? vectorMax), vectorMax) }
+        : source,
+    ]),
+  );
+  return { ...composed, sources };
+}
+
+/** The Europe preset of free map types (ADR 0182). */
+export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
+  const excluded = new Set(options.exclude ?? []);
+  const packaged = options.packageManifestUrl !== undefined;
+  if (packaged && options.offline === undefined)
+    throw new Error('europeOpen: a packageManifestUrl needs the offline engine (options.offline)');
+  const used: PresetSourceRecord[] = [];
+  const build: Build = {
+    options,
+    packaged,
+    packageBase: options.packageBaseUrl ?? options.packageManifestUrl?.replace(/[^/]*$/, '') ?? '',
+    used,
+    wrap: (source, tiers, layerId) => (options.offline ? options.offline.source(source, { tiers, layerId }) : source),
+    use: (record) => {
+      if (excluded.has(record.id)) return false;
+      used.push(record);
+      return true;
+    },
+  };
+  const imagery = satelliteLayers(build);
+  const terrain = terrainSource(build);
+  const vectors = build.use(OPENFREEMAP);
+  const hillshade: HillshadeSource | undefined = terrain
+    ? {
+        tiles: [MAPTERHORN.url ?? ''],
+        maxzoom: levelOf(options, MAPTERHORN),
+        tileSize: 512,
+        attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+      }
+    : undefined;
+  const { baseMaps, overlays } = mapTypes(imagery, vectors, terrain !== undefined);
+  return {
+    baseMaps,
+    overlays,
+    terrain,
+    sources: used,
+    excluded: EXCLUDED_SOURCES.filter((s) => !used.some((u) => u.id === s.id)),
+    packageManifestUrl: options.packageManifestUrl,
+    styleUrl: (mode) =>
+      mode === 'offline' && packaged ? `${build.packageBase}styles/liberty.json` : (OPENFREEMAP.url ?? ''),
+    styleFor(style, baseId, overlayIds) {
+      const parts = [
+        baseMaps.find((b) => b.id === baseId)?.style,
+        ...overlayIds.map((id) => overlays.find((o) => o.id === id)?.style),
+      ];
+      const selection: StyleSelection = Object.assign({}, ...parts.filter((p) => p !== undefined));
+      return selectionStyle(style, selection, hillshade, levelOf(options, OPENFREEMAP));
+    },
+  };
+}

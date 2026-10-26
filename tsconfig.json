@@ -56,6 +56,12 @@
       "path": "./packages/quality/tsconfig.test.json"
     },
     {
+      "path": "./packages/presets"
+    },
+    {
+      "path": "./packages/presets/tsconfig.test.json"
+    },
+    {
       "path": "./packages/models"
     },
     {

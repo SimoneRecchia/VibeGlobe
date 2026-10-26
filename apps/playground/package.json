@@ -18,6 +18,7 @@
     "@vibeglobe/layers": "*",
     "@vibeglobe/models": "*",
     "@vibeglobe/offline": "*",
+    "@vibeglobe/presets": "*",
     "@vibeglobe/quality": "*",
     "@vibeglobe/renderer": "*",
     "@vibeglobe/sources": "*",

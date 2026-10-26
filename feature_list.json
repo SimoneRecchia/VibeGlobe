@@ -7445,7 +7445,7 @@
         "Validate europe.json and assert its datasets, their profiles and attributions match the preset's packaged sources",
         "Assert tiles above the sea's maximum level are counted and built only over land"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F615",
@@ -7456,7 +7456,7 @@
         "Run estimate on europe.json and assert the per-level table with land and sea counts and cumulative sizes for each dataset kind",
         "Assert measured sizes replace the configured ones for the sampled levels, and that rows not measured say so"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F616",
@@ -7466,7 +7466,7 @@
       "steps": [
         "Assert the guide has each section and its examples type-check against the package"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F617",
@@ -7476,7 +7476,7 @@
       "steps": [
         "Open the playground with the preset, switch base maps and overlays, and assert the imagery layers and vector styles follow with no console error"
       ],
-      "status": "failing"
+      "status": "passing"
     }
   ]
 }

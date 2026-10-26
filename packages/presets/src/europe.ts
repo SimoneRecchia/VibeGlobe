@@ -5,9 +5,17 @@
  * redistribution (ADR 0182). In hybrid use the app's offline package, on its own server, holds every level up to its
  * own and the sea; online detail on land loads beyond it, tile by tile.
  */
-import type { ImageryLayerOptions, ImagerySource, TerrainSource, TileSource } from '@vibeglobe/core';
+import {
+  coverageTest,
+  WEB_MERCATOR_TILING,
+  type ImageryLayerOptions,
+  type ImagerySource,
+  type TerrainSource,
+  type TileRectangleRad,
+  type TileSource,
+} from '@vibeglobe/core';
 import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
-import { EUROPE_LAND } from './europe-land.js';
+import { EUROPE_BOUNDS, EUROPE_LAND } from './europe-land.js';
 import {
   EXCLUDED_SOURCES,
   ESA_WORLDCOVER,
@@ -52,7 +60,15 @@ export interface EuropeOpenOptions {
   readonly addSources?: readonly AddedSource[];
   /** Wraps each source with its tiers; required with a package (the package-only sources need it). */
   readonly offline?: OfflineWrapper;
+  /**
+   * The deepest level of the package's vector tiles and terrain on land (the `maxZoom` of `europe-vectors` and
+   * `europe-terrain` in its pipeline configuration; 14 and 12 by default, as in `europe.json`).
+   */
+  readonly packageLevels?: { readonly vectors?: number; readonly terrain?: number };
 }
+
+/** Where the map's vector style and hillshade read their files from. */
+export type PresetMode = 'online' | 'hybrid' | 'offline';
 
 /** A base map type. */
 export interface BaseMap {
@@ -87,6 +103,13 @@ export interface EuropePreset {
   /** The vector style URL the Map and the overlays derive from: online, or the package's copy offline. */
   readonly styleUrl: (mode: 'online' | 'offline') => string;
   /**
+   * The `transformUrl` of `addVectorTiles` for the style's files in a mode: hybrid reads vector and hillshade tiles
+   * from the package up to its levels, and over the sea always (a tile it does not hold is drawn from its nearest
+   * ancestor), the network beyond on land; offline reads every file from the package's mirror of OpenFreeMap's
+   * style, fonts and sprites (`openfreemap/` next to the manifest) and every tile from the package.
+   */
+  transformUrl(mode: PresetMode): (url: string) => string;
+  /**
    * The style of a base map with overlays, from the loaded style JSON ({@link EuropePreset.styleUrl}); undefined when
    * the selection draws no vector layer.
    */
@@ -94,6 +117,9 @@ export interface EuropePreset {
 }
 
 const LAND = { polygons: EUROPE_LAND, tiles: 'overlap' as const };
+const OPENFREEMAP_ORIGIN = 'https://tiles.openfreemap.org/';
+/** A tile URL's level, column and row: OpenFreeMap's `…/{z}/{x}/{y}.pbf`, Mapterhorn's `…/{z}/{x}/{y}.webp`. */
+const TILE_PATH = /\/(\d+)\/(\d+)\/(\d+)\.(pbf|webp)$/;
 
 function levelOf(options: EuropeOpenOptions, record: PresetSourceRecord): number {
   return Math.min(options.onlineMaxLevel?.[record.id] ?? record.maxLevel, record.maxLevel);
@@ -200,6 +226,48 @@ function selectionStyle(
   return { ...composed, sources };
 }
 
+/** The package's files in place of the online ones (see {@link EuropePreset.transformUrl}). */
+function packageUrls(build: Build, mode: PresetMode): (url: string) => string {
+  if (mode === 'online' || !build.packaged) return (url) => url;
+  const [west, south, east, north] = EUROPE_BOUNDS;
+  const land = coverageTest(LAND);
+  const region = coverageTest({
+    polygons: [
+      [
+        [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+        ],
+      ],
+    ],
+    tiles: 'overlap',
+  });
+  const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
+  const levels = { pbf: build.options.packageLevels?.vectors ?? 14, webp: build.options.packageLevels?.terrain ?? 12 };
+  const terrainOrigin = MAPTERHORN.url?.replace(/\{z\}.*/, '') ?? '';
+  return (url) => {
+    const tile = TILE_PATH.exec(url);
+    if (!tile || !(url.startsWith(OPENFREEMAP_ORIGIN) || url.startsWith(terrainOrigin)))
+      // The style, its TileJSON, fonts and sprites: the package's mirror offline, the network otherwise.
+      return mode === 'offline' && url.startsWith(OPENFREEMAP_ORIGIN)
+        ? `${build.packageBase}openfreemap/${url.slice(OPENFREEMAP_ORIGIN.length)}`
+        : url;
+    const [, z, x, y, extension] = tile as unknown as [string, string, string, string, 'pbf' | 'webp'];
+    const tileExtent = WEB_MERCATOR_TILING.tileExtent(
+      { root: 0, level: Number(z), x: Number(x), y: Number(y) },
+      extent,
+    );
+    // Hybrid: the package up to its levels within its region, and over the sea at any level; the network on land
+    // beyond them and outside the region.
+    const packaged =
+      mode === 'offline' || (region.covers(tileExtent) && (Number(z) <= levels[extension] || !land.covers(tileExtent)));
+    const dataset = extension === 'pbf' ? 'europe-vectors' : 'europe-terrain';
+    return packaged ? `${build.packageBase}${dataset}/${z}/${x}/${y}.${extension}` : url;
+  };
+}
+
 /** The Europe preset of free map types (ADR 0182). */
 export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
   const excluded = new Set(options.exclude ?? []);
@@ -239,7 +307,8 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
     excluded: EXCLUDED_SOURCES.filter((s) => !used.some((u) => u.id === s.id)),
     packageManifestUrl: options.packageManifestUrl,
     styleUrl: (mode) =>
-      mode === 'offline' && packaged ? `${build.packageBase}styles/liberty.json` : (OPENFREEMAP.url ?? ''),
+      mode === 'offline' && packaged ? `${build.packageBase}openfreemap/styles/liberty` : (OPENFREEMAP.url ?? ''),
+    transformUrl: (mode) => packageUrls(build, mode),
     styleFor(style, baseId, overlayIds) {
       const parts = [
         baseMaps.find((b) => b.id === baseId)?.style,

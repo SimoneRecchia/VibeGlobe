@@ -120,7 +120,7 @@ export const COPERNICUS_GLO30: PresetSourceRecord = {
 };
 
 /** Natural Earth: the base image the app hosts, shown before any tile and at the lowest levels. */
-export const NATURAL_EARTH: PresetSourceRecord = {
+const NATURAL_EARTH: PresetSourceRecord = {
   id: 'natural-earth',
   name: 'Natural Earth',
   kind: 'base-image',

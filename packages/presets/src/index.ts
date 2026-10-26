@@ -7,7 +7,15 @@
  * @packageDocumentation
  */
 export { europeOpen } from './europe.js';
-export type { AddedSource, BaseMap, EuropeOpenOptions, EuropePreset, OfflineWrapper, Overlay } from './europe.js';
+export type {
+  AddedSource,
+  BaseMap,
+  EuropeOpenOptions,
+  EuropePreset,
+  OfflineWrapper,
+  Overlay,
+  PresetMode,
+} from './europe.js';
 export { EUROPE_BOUNDS, EUROPE_LAND } from './europe-land.js';
 export { EUROPE_SOURCES, EXCLUDED_SOURCES, TERMS_READ_DATE } from './sources.js';
 export type { ExcludedSource, PresetSourceRecord, SourceTiers } from './sources.js';

@@ -27,5 +27,8 @@
   ],
   "bin": {
     "vibeglobe-data": "./dist/bin.js"
+  },
+  "dependencies": {
+    "pmtiles": "4.5.0"
   }
 }

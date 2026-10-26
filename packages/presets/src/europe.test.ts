@@ -67,7 +67,7 @@ describe('europeOpen (F613)', () => {
     expect(preset.terrain?.request(SEA, out)).toBe('noData');
     expect(satellite[0]?.request(SEA, out)).not.toBe('noData');
     expect(preset.packageManifestUrl).toBe('https://app.test/maps/europe/manifest.json');
-    expect(preset.styleUrl('offline')).toBe('https://app.test/maps/europe/styles/liberty.json');
+    expect(preset.styleUrl('offline')).toBe('https://app.test/maps/europe/openfreemap/styles/liberty');
     expect(preset.styleUrl('online')).toBe('https://tiles.openfreemap.org/styles/liberty');
   });
 
@@ -106,6 +106,39 @@ describe('europeOpen (F613)', () => {
     ).toMatchObject({
       maxzoom: 10,
     });
+  });
+
+  it('reads vector and hillshade tiles from the package up to its levels and over the sea, online beyond on land', () => {
+    const preset = europeOpen({
+      packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
+      offline: fakeOffline(),
+      packageLevels: { vectors: 12 },
+    });
+    const vectors = (z: number, x: number, y: number) => `https://tiles.openfreemap.org/planet/v1/${z}/${x}/${y}.pbf`;
+    const hybrid = preset.transformUrl('hybrid');
+    // Level 13 over the Alps is beyond the package: online; over the Tyrrhenian Sea: the package (or its ancestor).
+    expect(hybrid(vectors(12, 2160, 1440))).toBe('https://app.test/maps/europe/europe-vectors/12/2160/1440.pbf');
+    expect(hybrid(vectors(13, 4320, 2880))).toBe(vectors(13, 4320, 2880));
+    expect(hybrid(vectors(13, 4320, 3104))).toBe('https://app.test/maps/europe/europe-vectors/13/4320/3104.pbf');
+    // Outside the package's region, and the style's own files, stay online.
+    expect(hybrid(vectors(13, 2275, 3000))).toBe(vectors(13, 2275, 3000));
+    expect(hybrid('https://tiles.openfreemap.org/fonts/Noto/0-255.pbf')).toBe(
+      'https://tiles.openfreemap.org/fonts/Noto/0-255.pbf',
+    );
+    // The hillshade: the package's terrain up to level 12, Mapterhorn beyond.
+    expect(hybrid('https://tiles.mapterhorn.com/12/2160/1440.webp')).toBe(
+      'https://app.test/maps/europe/europe-terrain/12/2160/1440.webp',
+    );
+    expect(hybrid('https://tiles.mapterhorn.com/13/4320/2880.webp')).toBe(
+      'https://tiles.mapterhorn.com/13/4320/2880.webp',
+    );
+    // Offline: every file from the package and its mirror of the style's files; online: every file unchanged.
+    const offline = preset.transformUrl('offline');
+    expect(offline(vectors(13, 4320, 2880))).toBe('https://app.test/maps/europe/europe-vectors/13/4320/2880.pbf');
+    expect(offline('https://tiles.openfreemap.org/fonts/Noto/0-255.pbf')).toBe(
+      'https://app.test/maps/europe/openfreemap/fonts/Noto/0-255.pbf',
+    );
+    expect(preset.transformUrl('online')(vectors(12, 2160, 1440))).toBe(vectors(12, 2160, 1440));
   });
 
   it('composes one style per selection: the whole map, overlays without a background, relief with its hillshade', () => {

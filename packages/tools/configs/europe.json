@@ -1,0 +1,136 @@
+{
+  "configVersion": "1.0.0",
+  "name": "europe",
+  "description": "The Europe preset's offline package (ADR 0182): ESA WorldCover imagery, Mapterhorn terrain and OpenFreeMap vector tiles, every level up to seaMaxZoom over land and sea, only land beyond",
+  "region": {
+    "bbox": [-32, 27, 45, 72]
+  },
+  "land": {
+    "polygon": "regions/europe-land.geojson"
+  },
+  "sampleArea": {
+    "bbox": [6.6796875, 45.82879925192134, 7.03125, 46.07323062540836],
+    "minZoom": 10
+  },
+  "seaSampleArea": {
+    "bbox": [10.2, 39.2, 10.6, 39.5],
+    "minZoom": 7
+  },
+  "prices": {
+    "currency": "USD",
+    "readDate": "2026-10-21",
+    "sourceUrl": "https://aws.amazon.com/s3/pricing/ (figures as quoted by https://upstash.com/blog/aws-s3-pricing-explained-2026; the official page was not reachable from the build container)",
+    "requesterPaysTransferPerGB": 0.09,
+    "requesterPaysGetPer1000": 0.0004,
+    "freeTransferPerGB": 0
+  },
+  "tools": {
+    "gdal": "docker.io/osgeo/gdal:ubuntu-small-3.6.3@sha256:398d5aca0ca88295c13ada87e0f382ed409dac13a952461187be72ce3c376513"
+  },
+  "datasets": [
+    {
+      "id": "europe-satellite",
+      "kind": "imagery",
+      "profile": "esa-worldcover-s2-2021",
+      "dataYear": 2021,
+      "sourceVersion": "ESA WorldCover 10 m 2021 v200, S2 RGBNIR composite",
+      "source": {
+        "type": "worldcover-s2",
+        "baseUrl": "https://esa-worldcover-s2.s3.eu-central-1.amazonaws.com",
+        "year": 2021,
+        "version": "v200",
+        "overview": 0,
+        "gapFill": {
+          "mapBaseUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com",
+          "classReflectance": {
+            "10": [447, 561, 408],
+            "20": [480, 710, 405],
+            "30": [1034, 1134, 904],
+            "40": [635, 751, 429],
+            "50": [1069, 1033, 879],
+            "60": [2614, 2640, 2565],
+            "70": [3870, 4178, 4485],
+            "100": [1771, 1786, 1604]
+          }
+        }
+      },
+      "minZoom": 5,
+      "maxZoom": 13,
+      "encoding": "jpeg",
+      "quality": 85,
+      "colorStretch": {
+        "maxReflectance": 3000,
+        "gamma": 2,
+        "noDataReflectance": [135, 245, 372]
+      },
+      "bytesPerTile": 20000,
+      "downloadBytesPerFile": 570000000,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      },
+      "seaMaxZoom": 8,
+      "seaBytesPerTile": 2500
+    },
+    {
+      "id": "europe-terrain",
+      "kind": "terrain",
+      "profile": "mapterhorn",
+      "dataYear": 2026,
+      "sourceVersion": "Mapterhorn planet archive, levels 0-12 (pin the release with --source-url before a build)",
+      "source": {
+        "type": "pmtiles",
+        "url": "https://download.mapterhorn.com/planet.pmtiles",
+        "extension": "webp"
+      },
+      "minZoom": 5,
+      "maxZoom": 12,
+      "seaMaxZoom": 8,
+      "encoding": "terrarium",
+      "bytesPerTile": {
+        "5": 120000,
+        "8": 110000,
+        "10": 95000,
+        "12": 80000
+      },
+      "seaBytesPerTile": 1500,
+      "downloadBytesPerFile": 1,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    },
+    {
+      "id": "europe-vectors",
+      "kind": "vector",
+      "profile": "openfreemap-planet",
+      "dataYear": 2026,
+      "sourceVersion": "OpenFreeMap weekly planet (pin its version folder with --source-url before a build)",
+      "source": {
+        "type": "pmtiles",
+        "url": "https://btrfs.openfreemap.com/areas/planet/<version>/tiles.pmtiles",
+        "extension": "pbf"
+      },
+      "minZoom": 5,
+      "maxZoom": 14,
+      "seaMaxZoom": 8,
+      "encoding": "mvt",
+      "bytesPerTile": {
+        "5": 120000,
+        "8": 70000,
+        "10": 35000,
+        "12": 20000,
+        "14": 12000
+      },
+      "seaBytesPerTile": 300,
+      "downloadBytesPerFile": 1,
+      "outputs": {
+        "static": true,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    }
+  ]
+}

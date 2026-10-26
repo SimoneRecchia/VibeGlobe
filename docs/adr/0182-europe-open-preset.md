@@ -51,8 +51,8 @@ How the sources are used:
 
 - **Satellite:** the application's own sources first (`addSources`), each within its `area`, then the package's WorldCover composite, which is package-only (F611). Online-only use has no global satellite imagery until an orthophoto or the application's own source is added. The base image shows there.
 - **Terrain:** one source. In hybrid use it is the package's Mapterhorn extract (GLO-30 heights up to level 12), then Mapterhorn online beyond it, on land only (F610's land mask from Natural Earth). The terrain cannot change while the globe runs, so 3D terrain is chosen when it is created.
-- **Map, labels, roads, 3D buildings:** composed from OpenFreeMap's Liberty style into one style per selection. Offline, the style, its glyphs and sprites come from the package's copy.
-- **Relief:** a hillshade of the same terrain tiles.
+- **Map, labels, roads, 3D buildings:** composed from OpenFreeMap's Liberty style into one style per selection. Its tiles go through `transformUrl(mode)`: in hybrid use the package's vector tiles up to its level and over the sea (a tile the package lacks is drawn from its nearest ancestor, F442), OpenFreeMap beyond them on land; offline, the style, its TileJSON, glyphs and sprites come from the package's mirror (`openfreemap/`).
+- **Relief:** a hillshade of the same terrain tiles, read from the package and Mapterhorn by the same rule.
 
 ## Consequences
 

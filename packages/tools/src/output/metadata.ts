@@ -37,7 +37,8 @@ const FORMATS: Record<DatasetConfig['encoding'], string> = { terrarium: 'png', p
 
 /** File extension of a dataset's tiles. */
 export function tileExtension(dataset: DatasetConfig): string {
-  return FORMATS[dataset.encoding];
+  // Tiles copied from an archive keep its format (Mapterhorn's Terrarium terrain is WebP).
+  return dataset.source.type === 'pmtiles' ? dataset.source.extension : FORMATS[dataset.encoding];
 }
 
 /** Builds the metadata of one dataset output. */

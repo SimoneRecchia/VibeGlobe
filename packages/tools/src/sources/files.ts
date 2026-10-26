@@ -154,6 +154,8 @@ export function sourceFiles(dataset: DatasetConfig, area: Area): SourceFile[] {
     case 'osm-extract':
       return [{ url: source.url, key: fileName(source.url), requesterPays: false, mayBeMissing: false }];
     case 'xyz':
+    case 'pmtiles':
+      // Read tile by tile with range requests, never downloaded whole.
       return [];
   }
 }

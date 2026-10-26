@@ -38,8 +38,8 @@ export interface HeightmapTerrainOptions {
   /** The areas with data, radians; tiles outside are never requested. */
   coverage?: readonly TileRectangleRad[];
   /**
-   * Polygons the source has data for (land, a country's borders): tiles outside them are never requested, so the next
-   * source of the layer, or the layer below, is drawn there. By default only tiles wholly inside are requested.
+   * Polygons the source has data for (land, a country's borders): tiles outside them are never requested, so the
+   * deepest tile above them is magnified there. By default only tiles wholly inside are requested.
    */
   area?: CoverageArea;
   /** The network transport; `fetchTransport()` by default. */

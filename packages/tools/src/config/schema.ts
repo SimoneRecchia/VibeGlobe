@@ -98,8 +98,27 @@ export interface XyzSource {
 }
 
 /** Any source a dataset can read. */
+/**
+ * Tiles copied from a PMTiles archive read with range requests (OpenFreeMap's weekly planet, Mapterhorn's terrain):
+ * only the tiles of the build's area and levels are read, never the whole archive.
+ */
+export interface PmtilesSource {
+  type: 'pmtiles';
+  /** URL of the archive. */
+  url: string;
+  /** File extension of its tiles in the outputs (`pbf`, `webp`, `png`, `jpg`). */
+  extension: string;
+}
+
+/** The source of a dataset. */
 export type SourceConfig =
-  CopernicusDemSource | S2CloudlessSource | WorldCoverSource | GeoTiffSource | OsmExtractSource | XyzSource;
+  | CopernicusDemSource
+  | S2CloudlessSource
+  | WorldCoverSource
+  | GeoTiffSource
+  | OsmExtractSource
+  | XyzSource
+  | PmtilesSource;
 
 /**
  * A fixed colour stretch from reflectance (× 10,000) to 8-bit RGB (ADR 0026):
@@ -141,6 +160,13 @@ export interface DatasetConfig {
   colorStretch?: ColorStretchConfig;
   /** Area override for this dataset; defaults to the build's region. */
   area?: AreaConfig;
+  /**
+   * The last zoom with sea tiles: deeper zooms keep only the tiles touching the build's `land` mask. Absent: every
+   * tile of the area at every zoom.
+   */
+  seaMaxZoom?: number;
+  /** Average encoded size of a tile wholly at sea, per zoom or one value, when it differs from `bytesPerTile`. */
+  seaBytesPerTile?: number | Record<string, number>;
   /** Average encoded tile size used by the estimate, in bytes, per zoom level or one value for all. */
   bytesPerTile: number | Record<string, number>;
   /** Average size of one downloaded source file, in bytes, used by the download and cost estimate. */
@@ -182,6 +208,10 @@ export interface BuildConfig {
   region: AreaConfig;
   /** Small area the configuration is verified on (`--sample`). */
   sampleArea: SampleAreaConfig;
+  /** The land polygons that tell land tiles from sea tiles (`seaMaxZoom`), as an area. */
+  land?: AreaConfig;
+  /** A small area wholly at sea, where `estimate --measure` measures sea tiles. */
+  seaSampleArea?: SampleAreaConfig;
   prices: PricesConfig;
   tools: ToolsConfig;
   datasets: DatasetConfig[];

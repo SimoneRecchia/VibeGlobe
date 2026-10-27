@@ -230,7 +230,6 @@ export const TARGETS: readonly FuzzTarget[] = [
     seeds: async () => [json(MANIFEST)],
     run: (input) => validateManifest(parsed(input)),
     allowed: (error) => error instanceof PackageError,
-    knownBugs: [{ id: 'TG-02', pattern: /TypeError: Cannot read properties of null[\s\S]*validateManifest/ }],
     iterations: 2000,
     timeLimitMs: 200,
   },
@@ -261,7 +260,6 @@ export const TARGETS: readonly FuzzTarget[] = [
     // Problems are reported in `problems`; loading never throws (F451).
     run: (input) => VectorStyle.load(parsed(input)),
     allowed: never,
-    knownBugs: [{ id: 'TG-03', pattern: /TypeError: Expr\.parse is not a function/ }],
     iterations: 1000,
     timeLimitMs: 1000,
   },

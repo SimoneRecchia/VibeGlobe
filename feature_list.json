@@ -6746,7 +6746,7 @@
         "Assert every target is listed in the suite and none crashes, hangs past its time limit or throws an uncaught error",
         "Assert the job runs in CI and saves any failing input as a regression fixture"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F514",

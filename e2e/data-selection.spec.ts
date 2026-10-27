@@ -269,16 +269,21 @@ for (const backend of BACKENDS) {
     if (!result.at) throw new Error('off screen');
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
-    const click = page.evaluate(
-      () =>
-        new Promise<{ id: string; heightMeters: number | undefined }>((resolve) =>
-          window.vibeglobeLayers?.layers['clamped']?.on('click', ({ feature, position }) =>
-            resolve({ id: String(feature.id), heightMeters: position?.heightMeters }),
-          ),
+    // The handler is registered before the click is sent: a click dispatched while the registering script had not run
+    // yet was never reported (KB-220).
+    await page.evaluate(() => {
+      const target = window as unknown as { clampedClick?: Promise<{ id: string; heightMeters: number | undefined }> };
+      target.clampedClick = new Promise((resolve) =>
+        window.vibeglobeLayers?.layers['clamped']?.on('click', ({ feature, position }) =>
+          resolve({ id: String(feature.id), heightMeters: position?.heightMeters }),
         ),
-    );
+      );
+    });
     await page.mouse.click(box.x + result.at.xPx, box.y + result.at.yPx);
-    const event = await click;
+    const event = await page.evaluate(
+      () =>
+        (window as unknown as { clampedClick: Promise<{ id: string; heightMeters: number | undefined }> }).clampedClick,
+    );
     expect(event.id).toBe('c44');
     expect(Math.abs((event.heightMeters ?? NaN) - result.ground)).toBeLessThan(30);
     expect(result.ground).toBeGreaterThan(1000);

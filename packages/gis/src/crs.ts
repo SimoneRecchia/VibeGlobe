@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Coordinate reference systems and transforms between them, through proj4js (MIT). Definitions live in a registry of
  * this module, not in proj4's global one, so registering a system never changes another library's state.

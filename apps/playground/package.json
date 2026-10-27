@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Demo app that exercises every engine feature; also the bed for visual and scenario tests.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,9 +16,14 @@
     "@vibeglobe/custom-layer-example": "*",
     "@vibeglobe/gis": "*",
     "@vibeglobe/layers": "*",
+    "@vibeglobe/models": "*",
+    "@vibeglobe/offline": "*",
+    "@vibeglobe/presets": "*",
+    "@vibeglobe/quality": "*",
     "@vibeglobe/renderer": "*",
     "@vibeglobe/sources": "*",
     "@vibeglobe/ui": "*",
-    "@vibeglobe/worker": "*"
+    "@vibeglobe/worker": "*",
+    "draco3d": "1.5.9"
   }
 }

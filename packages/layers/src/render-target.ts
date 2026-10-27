@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The small typed interface through which data layers draw (docs/parallel-tracks.md, "Data layers track"). The layers
  * package owns the feature data and decides what changed; the renderer owns GPU buffers and draws them. The main
@@ -25,6 +27,8 @@ export interface ScreenProjector {
   geoToScreen(position: GeoPosition): ScreenPoint | undefined;
   /** The current zoom (Web Mercator zoom, continuous). */
   zoom(): number;
+  /** The view's size in CSS pixels, when known (`createGlobeLayers` with an `element`): `geoToScreen` gives points outside it too. */
+  viewportPx?(): { readonly widthPx: number; readonly heightPx: number };
 }
 
 /** Size of a laid-out text, from the renderer's glyph metrics (label collision boxes). */

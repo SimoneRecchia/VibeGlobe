@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The offline package builder (F304, F305, F307): an area (bounding box or polygon), a zoom range and an XYZ source
  * whose license allows packaging, estimated before any tile is downloaded, then fetched resumably into a PMTiles or

@@ -106,10 +106,10 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
         204,
       );
     };
-    // Two sources of the same area: red first, green second.
+    // Two sources of the same area: red first, green second, each in its own color (no tone matching, F249).
     await openGlobe(
       page,
-      `backend=${backend}&imagery=red&chain=green&timeoutMs=1500&session=${session}&lon=12.5&lat=41.9&zoom=7`,
+      `backend=${backend}&imagery=red&chain=green&harmonize=0&timeoutMs=1500&session=${session}&lon=12.5&lat=41.9&zoom=7`,
     );
     await settle(page);
     const red = (rgb: number[]): boolean => (rgb[0] ?? 0) > 180 && (rgb[1] ?? 0) < 100;

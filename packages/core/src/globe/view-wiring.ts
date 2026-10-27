@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
 import type { ViewState } from '../view/view-state.js';
 import { currentView } from './camera-state.js';
@@ -15,6 +17,7 @@ export interface ViewWiring {
   readonly surface: {
     readonly view: ViewState;
     preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
+    preloadAhead(end: Float64Array, camera: Camera): void;
     cameraJumped(): void;
   };
   readonly emitter: Emitter<GlobeEvents>;
@@ -37,7 +40,9 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     requestRender: () => globe.requestRender(),
     userInput: (cause) => movements.userInput(cause),
     timeMs: () => globe.clock.timeMs,
+    timeInto: (out) => globe.clock.timeInto(out),
     limitZoom: (deltaZoom) => globe.constraints.limitZoomDelta(globe.cam, deltaZoom),
+    zoomLimited: () => globe.constraints.zoomLimited,
     interruptMovement: () => movements.interrupt(),
   });
   const movements: Movements = new Movements({
@@ -55,6 +60,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
     constrainEnd: (end) => globe.constraints.clampEnd(end),
     preloadView: (end, flight) => globe.surface.preloadView(end, globe.cam, flight),
+    preloadAhead: (end) => globe.surface.preloadAhead(end, globe.cam),
     cameraJumped: () => globe.surface.cameraJumped(),
   });
   return { viewControl, movements };

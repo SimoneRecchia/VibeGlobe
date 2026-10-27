@@ -1,11 +1,7 @@
-import {
-  decodeHeightmap,
-  heightGrid,
-  sampleHeight,
-  type HeightGrid,
-  type TerrainSource,
-  type TileCoord,
-} from '@vibeglobe/core';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { sampleHeight, type TerrainSource, type TileCoord } from '@vibeglobe/core';
+import { decodeHeightmap, heightGrid, type HeightGrid } from '@vibeglobe/core/decoders';
 import { decodeQuantizedMesh, rasterizeQuantizedMesh } from '@vibeglobe/core/decoders';
 import { check, type CheckResult } from './support.js';
 import { describe, fetchTile, runSharedChecks, sourceMetadataChecks, type TiledConformanceSubject } from './tiled.js';

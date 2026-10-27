@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
 import {
   groundZoomForRange,
@@ -50,6 +52,22 @@ export function newCameraState(): MutableCameraState {
     reliefFactor: 0.5,
     phase: 'globe',
   };
+}
+
+/**
+ * Writes the frame event's payload (F378): its frame number, the tiles drawn and the camera's Mercator zoom, without a
+ * camera state object. Allocates nothing.
+ */
+export function writeFramePayload(
+  camera: Camera,
+  out: { frameNumber: number; tiles: number; zoom: number },
+  frameNumber: number,
+  tiles: number,
+): void {
+  out.frameNumber = frameNumber;
+  out.tiles = tiles;
+  const groundZoom = groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
+  out.zoom = mercatorZoomFromGroundZoom(groundZoom, camera.pose.targetLatitudeRad);
 }
 
 /** Writes the camera's public state into `out` and returns it; allocates nothing, so the frame loop can use it. */

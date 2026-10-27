@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { ModelHandle, ModelOptions, ModelRenderer } from '../layers/models.js';
 import type { LayerRenderTarget } from '../layers/layer-target.js';
 import type { ImageryLayerInput, ImageryLayers, ImageryLayerState } from '../imagery/imagery-stack.js';
@@ -11,7 +13,9 @@ import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
+import type { NavigationModeSettings } from './navigation-types.js';
 import type { MorphFrame } from '../view/morph.js';
+import type { AtmosphereSettings, QualitySettings, RendererQuality } from './quality-types.js';
 import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewMode, ViewPhase } from '../view/view-state.js';
 import type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
@@ -165,16 +169,27 @@ export interface TileDrawLayer {
    * terrain coarser than its level's may differ from its neighbors by that terrain's error.
    */
   readonly skirtMeters: Float32Array;
+  /**
+   * Terrain only, four per draw (north, east, south, west edge): 1 where the edge's heights come from the draw's stitch
+   * texture, the coarser terrain its neighbor across that edge shows, so the two meet (KB-178); 0 elsewhere.
+   */
+  readonly stitchEdges?: Uint8Array;
+  /** Terrain only: the texture handle of each draw's stitch heights, or -1 for none. */
+  readonly stitchTextures?: Int32Array;
+  /** Terrain only: the UV transforms into the stitch textures, four per draw, as `uvTransforms`. */
+  readonly stitchTransforms?: Float32Array;
+  /**
+   * Terrain only, two per draw: the share of its heights a draw keeps on its north and south edges, linear between
+   * (1 except on polar caps over a Web Mercator terrain, which fade to the ellipsoid at the pole, KB-180).
+   */
+  readonly heightScales?: Float32Array;
 }
 
 /**
  * An overlay slot of every draw (F244, F246): imagery above the draw's own, shown with an opacity and a blend mode.
  * `opacities[i]` 0 means draw `i` shows nothing in this slot.
  */
-export interface TileDrawOverlay {
-  readonly textures: Int32Array;
-  readonly uvTransforms: Float32Array;
-  readonly geographic: Uint8Array;
+export interface TileDrawOverlay extends TileDrawLayer {
   readonly opacities: Float32Array;
   /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
   readonly blends: Uint8Array;
@@ -184,6 +199,11 @@ export interface TileDrawOverlay {
 export interface TileDrawList extends TileDrawLayer {
   readonly count: number;
   readonly meshKeys: Float64Array;
+  /**
+   * The source each draw's imagery comes from, for tone matching (F249, ADR 0044): `layer × 8 + index in its chain`,
+   * -1 where the draw's layer does not match tones (a single source, or `harmonize: false`).
+   */
+  readonly toneSources: Int16Array;
   /**
    * Terrain heights (M4, ADR 0006 §5): height-grid textures by handle, {@link NO_TERRAIN} where a draw shows the
    * ellipsoid (no terrain source, or none resident yet).
@@ -236,6 +256,18 @@ export interface RendererBackend {
   simulateDeviceLoss(): void;
   /** Test hook: the pixels of the frame just drawn, read in the same task (ADR 0012, Capture). */
   capture(): Promise<FrameCapture>;
+  /**
+   * Optional: applies the effects of the quality settings (F397–F399), between frames. A promise resolves when an
+   * effect that needed compiling is drawn from the next frame, which the engine then requests.
+   */
+  setQuality?(quality: RendererQuality): Promise<void> | undefined;
+  /** Optional: the atmosphere's sun lighting, time and haze (F394, F396). */
+  setAtmosphere?(settings: Required<AtmosphereSettings>): void;
+  /**
+   * Optional: the colors of the polar caps' fill handles, -2 north and -3 south (KB-211), `#rrggbb` colors;
+   * a renderer without it draws those tiles with the base image.
+   */
+  setPolarCapColors?(northHex: string, southHex: string): void;
   destroy(): void;
 }
 
@@ -243,7 +275,7 @@ export interface RendererBackend {
 export type RendererFactory = (container: unknown, events: RendererEvents) => Promise<RendererBackend>;
 
 /** Intents an input plug-in sends to the engine (ADR 0009). */
-export interface NavigationApi {
+export interface NavigationApi extends NavigationModeSettings {
   /** Starts a pan: returns the geodetic point under the pixel, or undefined when the pixel is off the globe. */
   grab(point: ScreenPoint): GeoPosition | undefined;
   /** Moves the camera so the grabbed position lies under `point`. */
@@ -269,6 +301,8 @@ export interface NavigationApi {
   coasting: boolean;
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
   readonly timeMs: number;
+  /** Writes {@link NavigationApi.timeMs} to `out[0]`: per-frame code reads it without a returned double (F064). */
+  timeInto(out: Float64Array): void;
   /** The applied heading and tilt, degrees. */
   readonly headingDeg: number;
   readonly tiltDeg: number;
@@ -350,6 +384,11 @@ export interface GlobeOptions {
   readonly controls?: ControlsFactory;
   /** URL of the pinned base imagery: an equirectangular image of the whole world. */
   readonly baseImageryUrl: string;
+  /**
+   * The fill of the polar caps beyond ±85.0511° that no imagery source covers (KB-211): Web Mercator sources end at
+   * that latitude, so the caps show these colors unless a geographic (EPSG:4326) source covers them.
+   */
+  readonly polarCapColors?: import('./polar-caps.js').PolarCapColors;
   readonly view?: ViewInit;
   /** Camera constraints held for every input and movement (F209–F211); see {@link Globe.setConstraints}. */
   readonly constraints?: CameraConstraints;
@@ -362,8 +401,12 @@ export interface GlobeOptions {
   readonly viewCurves?: ViewCurvesInit;
   /** Multiplies the device pixel ratio (default 1). */
   readonly resolutionScale?: number;
-  /** Largest projected geometric error, in CSS pixels (default 1). */
+  /** Largest projected geometric error, in CSS pixels (default 1); imagery texels scale with it. */
   readonly maxScreenErrorPx?: number;
+  /** Anti-aliasing, anisotropy, atmosphere level and fog at start (see {@link Globe.setQualitySettings}). */
+  readonly quality?: Omit<QualitySettings, 'resolutionScale' | 'maxScreenErrorPx'>;
+  /** The atmosphere's sun lighting, time and haze at start (see {@link Globe.setAtmosphere}). */
+  readonly atmosphere?: AtmosphereSettings;
   /**
    * Coarsest surface level drawn, an integer from 2 (the default) to 8: every visible surface tile is at least this
    * fine. Raising it costs draws and buys nothing visible in M2; benchmarks use it to set the tile count.
@@ -462,8 +505,11 @@ export type { ImageryStats };
 export interface GlobeEvents {
   /** The first complete frame was drawn. */
   ready: { readonly backend: BackendName };
-  /** A frame was drawn. The payload object is reused: read it inside the handler, do not keep it. */
-  frame: { readonly frameNumber: number; readonly tiles: number };
+  /**
+   * A frame was drawn, with the camera's zoom (as `Globe.camera.zoom`, without a new state object). The payload object
+   * is reused: read it inside the handler, do not keep it.
+   */
+  frame: { readonly frameNumber: number; readonly tiles: number; readonly zoom: number };
   /** Rendering stopped because nothing changes. The payload object is reused: read it inside the handler. */
   idle: { readonly frameNumber: number };
   /** The camera moved, once per drawn frame. The payload object is reused: read it inside the handler, do not keep it. */
@@ -641,6 +687,12 @@ export interface SurfaceStats {
   readonly onBaseImage: number;
 }
 
+/** Options of `Globe.reloadSource`. */
+export interface ReloadOptions {
+  /** Forget only the tiles found missing, keeping every tile drawn (default false: drop every tile). */
+  readonly missingOnly?: boolean;
+}
+
 /** A globe engine instance. */
 export interface Globe {
   /** Resolves after the first complete frame; rejects with a GlobeError when the engine cannot start. */
@@ -809,9 +861,11 @@ export interface Globe {
   readonly imageryLayers: ImageryLayers;
   /**
    * Drops every tile of the imagery or terrain source with this id from GPU and RAM memory, with its no-data and
-   * failure marks, so the view loads it again (a new offline package version, F279). False when no source has the id.
+   * failure marks, so the view loads it again (a new offline package version, F279). With `missingOnly`, forgets only
+   * the tiles it found missing and keeps every tile drawn (offline-only mode left, KB-158). False when no source has the
+   * id.
    */
-  reloadSource(sourceId: string): boolean;
+  reloadSource(sourceId: string, options?: ReloadOptions): boolean;
   /**
    * Adds a glTF 2.0 model at a coordinate with heading, pitch, roll and scale relative to the local east, north and up
    * axes (F361). Resolves with a handle once it is loaded; rejects with a GlobeError for invalid options or a file the
@@ -825,6 +879,31 @@ export interface Globe {
    * engine, never from page screenshots). Resolves after `ready`; rejects with 'destroyed' after `destroy()`.
    */
   captureFrame(): Promise<FrameCapture>;
+  /**
+   * The current view as an image of `size` in pixels, larger than the canvas if asked (F416): the view covers the
+   * image (another aspect ratio crops its sides, or its top and bottom), with tiles at the image's resolution. The live
+   * view keeps rendering while they load; once nothing is loading, one frame is drawn at the image's scale and read.
+   * Credits are not drawn: the caller adds them (the UI's screenshot control does). Rejects with 'display-only' while a
+   * display-only source is drawn (ADR 0031), 'invalid-option' for a size that is not positive integers or exceeds the
+   * GPU's largest texture, and 'destroyed' after `destroy()`.
+   */
+  captureView(size: { readonly widthPx: number; readonly heightPx: number }): Promise<FrameCapture>;
+  /** The quality settings in effect (F399). */
+  readonly qualitySettings: Required<QualitySettings>;
+  /**
+   * Changes level of detail and effects at runtime (F399): the next frame uses them, with no renderer rebuilt.
+   * Invalid values throw 'invalid-option'.
+   */
+  setQualitySettings(settings: QualitySettings): void;
+  /** The atmosphere's scene settings in effect. */
+  readonly atmosphere: Required<AtmosphereSettings>;
+  /** Changes the Sun's time, sun lighting or haze (F394, F396); shown from the next frame, nothing reloads. */
+  setAtmosphere(settings: AtmosphereSettings): void;
+  /**
+   * Changes the fill of the polar caps that no imagery source covers (KB-211); fields not given keep their value. A
+   * color that is not `#rrggbb` throws 'invalid-option'.
+   */
+  setPolarCapColors(colors: import('./polar-caps.js').PolarCapColors): void;
   /** Frees GPU memory, RAM, workers and listeners; later calls throw a GlobeError with code 'destroyed'. */
   destroy(): void;
 }

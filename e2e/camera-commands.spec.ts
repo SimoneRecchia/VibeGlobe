@@ -298,7 +298,13 @@ test('a drag released at speed is announced as user movement, then as inertia, w
   await page.mouse.down();
   await page.mouse.move(box.x + 220, box.y + 120, { steps: 6 });
   await page.mouse.up();
-  await page.waitForTimeout(2000);
+  // The glide lasts several time constants (KB-177): wait for its end rather than a fixed 2 s.
+  await page.waitForFunction(
+    () => (window as unknown as { moveEvents: string[] }).moveEvents.includes('end:inertia'),
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(200);
   const events = await page.evaluate(() => (window as unknown as { moveEvents: string[] }).moveEvents);
   const bounds = events.filter((event) => !event.startsWith('move:') && event !== 'frame');
   // User movements (a frame without a pointer move may end one, and the next move start another), then the inertia;

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * glTF models as data-layer features (`@vibeglobe/layers/models`), an entry of its own: applications that show no
  * models load none of it, as they load no glTF loader (`@vibeglobe/renderer/gltf`).
@@ -203,3 +205,6 @@ function poseOf(feature: ModelFeature, position: GeoPosition): ModelPose {
     ...(feature.scale === undefined ? {} : { scale: feature.scale }),
   };
 }
+
+export { ModelSetLayer } from './model-set-layer.js';
+export type { ModelSetItem, ModelSetLayerOptions } from './model-set-layer.js';

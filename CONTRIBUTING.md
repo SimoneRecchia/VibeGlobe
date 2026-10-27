@@ -4,7 +4,7 @@ Thank you for helping. VibeGlobe is built to a strict plan ([PLAN.md](PLAN.md)):
 
 ## Before you start
 
-- **Contributor license agreement:** every external pull request must include the acceptance line of the [CLA](CLA.md), so that the contribution can be offered under both the [PolyForm Noncommercial License](LICENSE.md) and the owner's commercial licenses. Pull requests without it are not reviewed.
+- **License and sign-off:** VibeGlobe is under the [Mozilla Public License 2.0](LICENSE.md), and contributions are accepted under it. Every commit carries a [Developer Certificate of Origin](DCO.md) sign-off (`git commit -s`, which adds `Signed-off-by: Your Name <email>`); pull requests with unsigned commits are not reviewed.
 - **Code of conduct:** everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 - **Security issues** are never reported in public issues: follow [SECURITY.md](SECURITY.md).
 - **Bigger changes:** open an issue first. Work that `PLAN.md` does not ask for goes to `docs/follow-ups.md`, not into the code.
@@ -20,12 +20,19 @@ Node.js 22.18 or later. `./init.sh` installs, builds, starts the playground and 
 - **Bugs:** list the bug in `docs/known-bugs.md` and start the fix with a failing regression test.
 - **Code:** TypeScript strict, ES modules, no `any`, TSDoc on public APIs, units in names; small focused modules; English everywhere.
 - **Third-party code:** permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL for fonts). Never copy code from other engines: study them, then write original code.
+- **License notice:** every new source file under `packages/*/src` opens with the MPL 2.0 notice (`npm run check`):
+
+  ```ts
+  // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+  // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  ```
+
 - **Decisions:** significant decisions are recorded as ADRs in `docs/adr/`.
 
 ## Submitting
 
 1. Run `npm run verify` and the end-to-end tests (`npm run test:e2e`) locally.
-2. Open a pull request with a clear description, the CLA acceptance line, and the feature-list entries it affects.
+2. Open a pull request with a clear description and the feature-list entries it affects; every commit signed off.
 3. CI runs the fast checks on every push and pull request; the end-to-end tests and benchmarks run on `main` and nightly. A maintainer may run the full suite on your branch before merging.
 
 ## Questions

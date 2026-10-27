@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Edge bleeding and PNG output of warped tiles (F226). Textures are filtered with straight (not premultiplied) alpha,
  * so a transparent texel's color leaks into its visible neighbors when sampled between them: a canvas leaves

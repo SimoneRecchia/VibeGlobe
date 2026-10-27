@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GltfLoaderFactory } from './layer-models.js';
 import { GlobeError, type RendererFactory, type RenderHost } from '@vibeglobe/core';
 import type { BackendChoice, DepthChoice } from './three-backend.js';
@@ -29,6 +31,12 @@ export interface RendererOptions {
    */
   readonly gpuTiming?: boolean;
   /**
+   * Allows multisampled anti-aliasing of the canvas (default true, F397), which `QualitySettings.antialias: 'msaa4'`
+   * (the default) asks for. False draws without it whatever the quality settings, for comparisons and devices too slow
+   * for it.
+   */
+  readonly antialias?: boolean;
+  /**
    * Limits the compressed texture families KTX2 imagery may use to these ('bc', 'etc2', 'astc'), among those the device
    * decodes (default: all of them; [] forces RGBA8). For tests, and for drivers that emulate a family (ADR 0020).
    */
@@ -47,6 +55,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     choice: options.backend ?? 'auto',
     depth: options.depth ?? 'auto',
     gpuTiming: options.gpuTiming ?? false,
+    antialias: options.antialias ?? true,
     compressedTextures: options.compressedTextures,
   } as const;
   return async (container, events) => {

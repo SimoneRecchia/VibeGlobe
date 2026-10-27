@@ -1,0 +1,114 @@
+---
+title: 3D models
+---
+
+# 3D models
+
+glTF 2.0 models stand on the globe in two ways, both from `@vibeglobe/layers/models` and both needing the renderer's
+glTF loader (`createRenderer({ gltf })` with `gltfLoader` from `@vibeglobe/renderer/gltf`):
+
+- `ModelLayer`: a few models, each its own file, pose and draw (F361, F379–F382), draggable;
+- `ModelSetLayer`: many copies of one model, such as the turbines of a wind farm or the panels of a solar park (F627),
+  drawn instanced and only near the camera.
+
+## Many copies of one model
+
+A `ModelSetLayer` loads its file once. Each mesh of the model is one instanced draw for all the copies in view nearer
+than `visibleBelowMeters` (3,000 m by default) to the eye; the farther copies are one instanced draw of a small
+placeholder of constant size on screen; copies outside the view, or behind the globe, are not drawn at all. Each copy is
+a feature: it is picked, hovered, clicked and selected like the others, and moved with `setFeaturePosition`.
+
+```ts
+import { createGlobeLayers } from '@vibeglobe/layers';
+import { ModelSetLayer } from '@vibeglobe/layers/models';
+
+// 2,000 turbines on a 50 × 40 grid 500 m apart, facing the prevailing wind.
+const turbines = [];
+for (let row = 0; row < 40; row++)
+  for (let column = 0; column < 50; column++)
+    turbines.push({
+      id: `T${row}-${column}`,
+      position: { longitudeDeg: 9 + column * 0.00635, latitudeDeg: 45.2 + row * 0.0045 },
+      headingDeg: 270,
+      properties: { farm: 'Example', row, column },
+    });
+const { stack, interaction } = createGlobeLayers(globe, { element: canvas });
+const farm = stack.add(
+  new ModelSetLayer({
+    id: 'wind-farm',
+    url: '/models/turbine.glb',
+    models: turbines,
+    visibleBelowMeters: 3000, // the model within 3 km of the camera
+    placeholder: { color: [0.2, 0.45, 0.9], sizePx: 8 }, // a blue mark beyond; sizePx 0 for none
+  }),
+);
+await farm.ready;
+interaction?.on('click', ({ feature }) => console.log(feature?.properties));
+```
+
+Measured in the playground (`?scenario=wind-farm`, the 84-triangle fixture turbine, `e2e/model-sets.spec.ts`): at
+1.2 km from the ground the 17 turbines in view cost 4 draw calls (three meshes and the placeholder) and 1,444
+triangles; from 14 km the 709 placeholders in view cost 1 draw call; looking elsewhere, the farm costs nothing. The
+renderer still walks every copy once a frame to place and cull it (a few arithmetic operations each), so tens of
+thousands of copies stay cheap; split a much larger set into one layer per area so whole areas can be hidden.
+
+Choose `visibleBelowMeters` by the model's size: a 120 m turbine is a few pixels tall at 3 km and a speck beyond, where
+the placeholder reads better; for 3 m solar panels 500 to 1,000 m is enough.
+
+## A light model
+
+Every triangle of a set is drawn once per copy in view, so the model's weight multiplies. Recommended limits for a
+model of a set (one copy of hundreds on screen at once):
+
+| Item          | Recommended                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Triangles     | 500 to 5,000 (a wind turbine reads well with about 1,000; the fixture's has 84); above 20,000 only for a few copies                                                           |
+| Meshes        | 1 to 3, each one draw for all copies: merge parts that share a material                                                                                                       |
+| Materials     | One per mesh; base color and an optional base color texture (the renderer draws unlit with a fixed shade, ADR 0037), no normal, metallic or emissive maps                     |
+| Textures      | At most 512 × 512 px, or a plain base color factor; PNG or JPEG                                                                                                               |
+| Compression   | meshopt (`EXT_meshopt_compression`) or Draco (`KHR_draco_mesh_compression`), with the loader's decoders set (below); quantized attributes (`KHR_mesh_quantization`) need none |
+| File size     | Under 200 KB compressed                                                                                                                                                       |
+| Units, origin | Meters, +Y up, −Z forward (glTF's convention), the origin at the model's foot so it stands on the ground                                                                      |
+
+`gltfpack` (meshoptimizer, MIT) simplifies, merges and compresses a model in one step, for example
+`gltfpack -i turbine.glb -o turbine-light.glb -si 0.2 -cc`: 20% of the triangles and meshopt compression.
+
+### Compressed models
+
+The renderer reads models with three.js's `GLTFLoader` (the `gltf` option of `createRenderer`), which decodes meshopt
+and Draco once it is given their decoders: meshopt with the engine's WebAssembly decoder (`meshopt-decoder.wasm` of
+`@vibeglobe/worker`, which the application hosts with the worker, ADR 0015), Draco with three.js's `DRACOLoader` and its
+decoder files, also hosted by the application. Both load only when a model needs them.
+
+```ts
+import { meshoptWasmDecoder } from '@vibeglobe/models';
+import { createRenderer } from '@vibeglobe/renderer';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+
+const renderer = createRenderer({
+  gltf: async () => {
+    const loader = new GLTFLoader();
+    const meshopt = meshoptWasmDecoder(() => WebAssembly.compileStreaming(fetch('/vibeglobe/meshopt-decoder.wasm')));
+    loader.setMeshoptDecoder(await meshopt());
+    loader.setDRACOLoader(new DRACOLoader().setDecoderPath('/vibeglobe/draco/'));
+    return loader;
+  },
+});
+```
+
+## Single models
+
+```ts
+import { ModelLayer } from '@vibeglobe/layers/models';
+
+const models = stack.add(
+  new ModelLayer({
+    models: [{ id: 'substation', url: '/models/substation.glb', position: { longitudeDeg: 9.1, latitudeDeg: 45.3 } }],
+    draggable: true,
+  }),
+);
+```
+
+`globe.addModel({ url, position, headingDeg, scale })` adds a model without a layer stack (F361). Data layers in
+general are in the [data layers guide](data-layers.md).

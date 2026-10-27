@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { DecodedTile } from '../scheduler/types.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type {
@@ -40,6 +42,8 @@ export interface FakeRenderer extends RendererBackend {
   unreportedResize: boolean;
   /** The size of the last resize. */
   lastResize: { widthPx: number; heightPx: number } | undefined;
+  /** The drawing buffer of the last resize, in device pixels (CSS size times pixel ratio, rounded down). */
+  bufferPx: { widthPx: number; heightPx: number } | undefined;
   destroyed: boolean;
   /** Runs pending frame callbacks; returns how many ran. */
   flush(): number;
@@ -78,6 +82,7 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
     size: { widthPx: 800, heightPx: 600 },
     unreportedResize: false,
     lastResize: undefined,
+    bufferPx: undefined,
     destroyed: false,
     addMesh: (mesh) => void renderer.meshes.set(mesh.key, mesh),
     removeMesh: (key) => void renderer.meshes.delete(key),
@@ -91,14 +96,15 @@ export function fakeRenderer(): { renderer: FakeRenderer; factory: RendererFacto
       renderer.lastDraws = draws;
       return true;
     },
-    resize: (widthPx: number, heightPx: number) => {
+    resize: (widthPx: number, heightPx: number, pixelRatio: number) => {
       renderer.lastResize = { widthPx, heightPx };
+      renderer.bufferPx = { widthPx: Math.floor(widthPx * pixelRatio), heightPx: Math.floor(heightPx * pixelRatio) };
     },
     setDebugMeshes: (meshes) => void (renderer.debugMeshes = meshes.length),
     stats: () => fakeStats(renderer),
     resourceCounts: () => fakeCounts(renderer),
     simulateDeviceLoss: () => renderer.events?.deviceLost('simulated'),
-    capture: () => Promise.resolve(blankFrame(renderer.size)),
+    capture: () => Promise.resolve(blankFrame(renderer.bufferPx ?? renderer.size)),
     destroy: () => {
       renderer.destroyed = true;
     },

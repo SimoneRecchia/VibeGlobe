@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The `transcode-ktx2` task (ADR 0020 rules 2–4): KTX2 bytes in, a tile in the GPU format the device decodes out. The
  * reader in core validates the file and predicts every level's size before the transcoder runs; the transcoder is
@@ -16,6 +18,7 @@ import {
 } from '@vibeglobe/core/decoders';
 import type { CompressedLevel, CompressedTileImage, Ktx2Info, Ktx2Target } from '@vibeglobe/core';
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
+import { compileWasm } from './wasm.js';
 
 /** Input of `transcode-ktx2`: the file (transferred) and the compressed families the device decodes. */
 export interface TranscodeKtx2Input {
@@ -53,14 +56,8 @@ const WASI_IMPORTS = {
 /** The bundled transcoder, next to this module (`assets.wasmBaseUrl` defaults to the worker's directory). */
 const TRANSCODER_URL = new URL('../wasm/vibeglobe-basis.wasm', import.meta.url);
 
-/** Fetches and compiles the bundled transcoder; streaming where the server sends `application/wasm`. */
-const fetchTranscoder: TranscoderLoader = async () => {
-  const response = await fetch(TRANSCODER_URL);
-  if (!response.ok) throw new Error(`${TRANSCODER_URL.href} answered ${response.status}`);
-  if (response.headers.get('Content-Type')?.startsWith('application/wasm'))
-    return WebAssembly.compileStreaming(response);
-  return WebAssembly.compile(await response.arrayBuffer());
-};
+/** Fetches and compiles the bundled transcoder. */
+const fetchTranscoder: TranscoderLoader = () => compileWasm(TRANSCODER_URL);
 
 function parseInput(input: unknown): TranscodeKtx2Input {
   if (typeof input !== 'object' || input === null)
@@ -158,6 +155,8 @@ export function createTranscodeKtx2(load: TranscoderLoader) {
         return wasm;
       })
       .catch((error: unknown) => {
+        // A failed load (a reset connection) is not kept: the next KTX2 task loads it again (TH-01).
+        instance = undefined;
         const reason = error instanceof Error ? error.message : String(error);
         throw new TaskError('format-unsupported', `the KTX2 transcoder could not be loaded: ${reason}`);
       }));

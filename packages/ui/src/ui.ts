@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The UI layer over a globe: places controls in the map's corners, applies the theme and the language, and lets the
  * application add, remove, replace and extend controls one by one (F418). The engine runs without any of it.
@@ -131,6 +133,23 @@ function keepClearOfCredits(container: HTMLElement, layer: HTMLElement): () => v
   };
 }
 
+/**
+ * Keeps each top corner above the bottom corner on its side (F437): its height is capped at what the bottom corner
+ * leaves, and its controls wrap into another column toward the middle.
+ */
+function keepCornersApart(layer: HTMLElement, corners: Map<ControlPosition, HTMLElement>): () => void {
+  const pairs = (['left', 'right'] as const).map((side) => [corners.get(`top-${side}`), corners.get(`bottom-${side}`)]);
+  const measure = (): void => {
+    for (const [top, bottom] of pairs)
+      if (top && bottom) top.style.maxHeight = `${String(Math.max(0, layer.clientHeight - bottom.offsetHeight))}px`;
+  };
+  const resize = new ResizeObserver(measure);
+  resize.observe(layer);
+  for (const [, bottom] of pairs) if (bottom) resize.observe(bottom);
+  measure();
+  return () => resize.disconnect();
+}
+
 class UiLayer implements Ui {
   readonly element: HTMLElement;
   readonly i18n = new Translator();
@@ -164,7 +183,9 @@ class UiLayer implements Ui {
         })),
     };
     this.#stopLanguage = this.i18n.onChange(() => this.localize());
-    this.#stopCredits = keepClearOfCredits(container, this.element);
+    const stopCredits = keepClearOfCredits(container, this.element);
+    const stopCorners = keepCornersApart(this.element, this.#corners);
+    this.#stopCredits = () => (stopCredits(), stopCorners());
   }
 
   get theme(): ThemeName {

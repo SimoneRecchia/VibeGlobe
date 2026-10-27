@@ -19,6 +19,8 @@ ui.setTheme('dark');
 ui.setLanguage('it');
 ```
 
+The overview minimap has an entry point of its own, so applications without it do not load it: `import { MinimapControl } from '@vibeglobe/ui/minimap'`.
+
 Every control implements `UiControl` (`id`, `position`, `mount(context)`, `localize()`, `destroy()`). An application's own control implements the same interface and receives the globe (public API only), the map container and the translator; built-in controls can be extended by subclassing.
 
 ## Keyboard
@@ -34,22 +36,27 @@ Every control implements `UiControl` (`id`, `position`, `mount(context)`, `local
 
 ## Theming
 
-The controls are styled only through CSS variables, so an application restyles them without touching internal selectors. Set them on the `.vg-ui` element (`ui.element`) or an ancestor:
+The controls are styled only through CSS variables, so an application restyles them without touching internal selectors. Set them on the `.vg-ui` element (`ui.element`), inline or in a rule of the page's stylesheet (`.vg-ui { --vg-ui-color: #222; }`): the defaults sit in the `vibeglobe-ui-theme` cascade layer, so a page rule wins in either theme. (Values set on an ancestor do not reach the controls: `.vg-ui` declares every variable itself.)
 
-| Variable                                                                     | Light default                      | Dark default       |
-| ---------------------------------------------------------------------------- | ---------------------------------- | ------------------ |
-| `--vg-ui-font-family`, `--vg-ui-font-size`                                   | system UI font, 13px               | same               |
-| `--vg-ui-monospace-font-family`                                              | monospace stack (debug panel)      | same               |
-| `--vg-ui-color`, `--vg-ui-muted-color`                                       | #1b1f24, #4d5560                   | #f1f3f7, #b9c0cc   |
-| `--vg-ui-background`, `--vg-ui-hover-background`                             | #ffffff, #e6e9ee                   | #1f232b, #323844   |
-| `--vg-ui-border-color`, `--vg-ui-border-width`, `--vg-ui-border-radius`      | #6b7380, 1px, 6px                  | #8d95a3, 1px, 6px  |
-| `--vg-ui-accent-color` (compass north)                                       | #b3261e                            | #f28b82            |
-| `--vg-ui-focus-color`, `--vg-ui-focus-width`                                 | #0b57d0, 3px                       | #8ab4f8, 3px       |
-| `--vg-ui-button-size`, `--vg-ui-touch-size`, `--vg-ui-icon-size`             | 36px, 44px (coarse pointers), 20px | same               |
-| `--vg-ui-spacing`, `--vg-ui-panel-width`                                     | 8px, 280px                         | same               |
-| `--vg-ui-shadow`, `--vg-ui-disabled-opacity`                                 | soft shadow, 0.4                   | darker shadow, 0.4 |
-| `--vg-ui-transition-duration`                                                | 150ms (0s with reduced motion)     | same               |
-| `--vg-ui-debug-color`, `--vg-ui-debug-background`, `--vg-ui-debug-font-size` | white on 75% black, 12px           | same               |
+| Variable                                                                                                       | Light default                      | Dark default       |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------ |
+| `--vg-ui-font-family`, `--vg-ui-font-size`                                                                     | system UI font, 13px               | same               |
+| `--vg-ui-monospace-font-family`                                                                                | monospace stack (debug panel)      | same               |
+| `--vg-ui-color`, `--vg-ui-muted-color`                                                                         | #1b1f24, #4d5560                   | #f1f3f7, #b9c0cc   |
+| `--vg-ui-background`, `--vg-ui-hover-background`                                                               | #ffffff, #e6e9ee                   | #1f232b, #323844   |
+| `--vg-ui-border-color`, `--vg-ui-border-width`, `--vg-ui-border-radius`                                        | #6b7380, 1px, 6px                  | #8d95a3, 1px, 6px  |
+| `--vg-ui-accent-color` (compass north)                                                                         | #b3261e                            | #f28b82            |
+| `--vg-ui-focus-color`, `--vg-ui-focus-width`                                                                   | #0b57d0, 3px                       | #8ab4f8, 3px       |
+| `--vg-ui-button-size`, `--vg-ui-touch-size`, `--vg-ui-icon-size`                                               | 36px, 44px (coarse pointers), 20px | same               |
+| `--vg-ui-spacing`, `--vg-ui-panel-width`                                                                       | 8px, 280px                         | same               |
+| `--vg-ui-shadow`, `--vg-ui-disabled-opacity`                                                                   | soft shadow, 0.4                   | darker shadow, 0.4 |
+| `--vg-ui-transition-duration`                                                                                  | 150ms (0s with reduced motion)     | same               |
+| `--vg-ui-debug-color`, `--vg-ui-debug-background`, `--vg-ui-debug-font-size`                                   | white on 75% black, 12px           | same               |
+| `--vg-ui-marker-color`, `--vg-ui-marker-outline-color` (geolocation marker; read when it is drawn)             | #1a73e8, white                     | same               |
+| `--vg-ui-drawing-color`, `--vg-ui-drawing-handle-color` (drawn and measured shapes; read when a tool is added) | #d93025, white                     | same               |
+| `--vg-ui-minimap-footprint-color` (read on each minimap update)                                                | #ff4040                            | same               |
+
+The colours of what controls draw on the map are read when a control creates its map layers (the drawing tools when added, the geolocation marker when first shown), the minimap's on every update: set them before adding the control.
 
 `THEME_VARIABLES` exports the exact values. Both built-in themes meet WCAG 2.1 AA contrast.
 

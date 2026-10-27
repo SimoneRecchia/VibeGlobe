@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The tilt control (F422): a vertical slider that sets the chosen tilt through the engine's `tiltTo` (F188), which
  * eases there and keeps it at every zoom (manual mode), and shows the applied tilt, marking when a temporary clamp

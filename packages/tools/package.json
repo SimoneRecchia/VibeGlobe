@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/tools",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe tools: command-line tools: data pipeline and offline package builder.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -12,12 +12,23 @@
       "default": "./dist/index.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "LICENSE.md",
     "!dist/tsconfig.tsbuildinfo",
-    "configs"
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "configs",
+    "!dist/**/__fixtures__"
   ],
   "bin": {
     "vibeglobe-data": "./dist/bin.js"
+  },
+  "dependencies": {
+    "pmtiles": "4.5.0"
   }
 }

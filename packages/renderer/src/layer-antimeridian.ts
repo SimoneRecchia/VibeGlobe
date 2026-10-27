@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Data-layer geometry at the antimeridian and the poles (F368). On the flat map ±180° are opposite edges, so a segment
  * or triangle spanning them must be cut there, or it is drawn the wrong way around the world; on the globe the cut is

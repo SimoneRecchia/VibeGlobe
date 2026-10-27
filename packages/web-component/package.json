@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/web-component",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe web-component: framework-neutral <vibe-globe> custom element.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -13,17 +13,25 @@
     },
     "./browser": "./dist/browser/vibe-globe.js"
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/controls": "0.0.0",
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/renderer": "0.0.0",
-    "@vibeglobe/sources": "0.0.0",
-    "@vibeglobe/ui": "0.0.0",
-    "@vibeglobe/worker": "0.0.0"
+    "@vibeglobe/controls": "0.1.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/renderer": "0.1.0",
+    "@vibeglobe/sources": "0.1.0",
+    "@vibeglobe/ui": "0.1.0",
+    "@vibeglobe/worker": "0.1.0"
   },
   "scripts": {
     "build:browser": "vite build"

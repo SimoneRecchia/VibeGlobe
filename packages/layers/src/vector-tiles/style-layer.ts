@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * One layer of a MapLibre Style Specification style, compiled by the specification's own expression engine
  * (`@maplibre/maplibre-gl-style-spec`, ISC; ADR 0041): its filter, paint and layout properties with the
@@ -67,7 +69,7 @@ export interface StyleLayerJson {
 
 interface Compiled {
   readonly kind: 'constant' | 'source' | 'camera' | 'composite';
-  evaluate(globals: { zoom: number }, feature?: unknown, featureState?: unknown): unknown;
+  evaluate(globals: { zoom: number } & ExpressionGlobals, feature?: unknown, featureState?: unknown): unknown;
 }
 
 /** A property or filter that failed to compile, with its JSON path inside the layer. */
@@ -116,9 +118,22 @@ function compileProperty(
     : Array.isArray(value) && !isExpression(value)
       ? ['literal', value]
       : value;
-  const compiled = createPropertyExpression(input, name, spec);
+  let compiled: ReturnType<typeof createPropertyExpression>;
+  try {
+    compiled = createPropertyExpression(input, name, spec);
+  } catch (error) {
+    // The style-spec throws for some malformed input (an operator named "__proto__", TG-03): a problem, never a throw.
+    return { problem: `invalid expression: ${error instanceof Error ? error.message : String(error)}` };
+  }
   if (compiled.result === 'error') return { problem: compiled.value.map((e) => `${e.key} ${e.message}`).join('; ') };
   return { expression: compiled.value as unknown as Compiled };
+}
+
+/** Values some paint expressions read besides the zoom: `heatmap-density`, `line-progress` (0–1), `elevation` (m). */
+export interface ExpressionGlobals {
+  readonly heatmapDensity?: number;
+  readonly lineProgress?: number;
+  readonly elevation?: number;
 }
 
 /** A compiled style layer. Runtime changes go through `VectorStyle`, which reports them to the renderer. */
@@ -198,9 +213,18 @@ export class StyleLayer {
     return this.filterFn === undefined ? true : this.filterFn(zoom, feature);
   }
 
-  /** Evaluates a paint property (the specification's default when unset), as a plain value. */
-  paint(name: string, zoom: number, feature?: StyleFeatureInput, state?: FeatureStateMap): unknown {
-    return this.evaluate('paint', name, zoom, feature, state);
+  /**
+   * Evaluates a paint property (the specification's default when unset), as a plain value. `globals` gives
+   * `['heatmap-density']` and `['line-progress']` to the properties that read them (F445).
+   */
+  paint(
+    name: string,
+    zoom: number,
+    feature?: StyleFeatureInput,
+    state?: FeatureStateMap,
+    globals?: ExpressionGlobals,
+  ): unknown {
+    return this.evaluate('paint', name, zoom, feature, state, globals);
   }
 
   /** Evaluates a layout property (the specification's default when unset), as a plain value. */
@@ -231,9 +255,10 @@ export class StyleLayer {
     zoom: number,
     feature?: StyleFeatureInput,
     state?: FeatureStateMap,
+    globals?: ExpressionGlobals,
   ): unknown {
     const compiled = this.expression(group, name);
     if (compiled === undefined) return undefined;
-    return plainValue(compiled.evaluate({ zoom }, feature, state));
+    return plainValue(compiled.evaluate({ zoom, ...globals }, feature, state));
   }
 }

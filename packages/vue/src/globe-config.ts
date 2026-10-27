@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { NavigationControls } from '@vibeglobe/controls';
 import type { GeoPosition, Globe, GlobeOptions, ImagerySource, ScreenPoint, ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
@@ -83,8 +85,11 @@ export function watchClicks(element: HTMLElement, globe: Globe, onClick: (event:
   };
 }
 
-/** The view fields that differ from the camera by more than rounding, or undefined when none do. */
-export function changedView(camera: Globe['camera'], view: ViewInit): ViewInit | undefined {
+/**
+ * The view fields that differ from the camera by more than rounding, or undefined when none do. With the `previous`
+ * props, only fields whose prop changed count: the others stay where the user navigated (KB-146).
+ */
+export function changedView(camera: Globe['camera'], view: ViewInit, previous?: ViewInit): ViewInit | undefined {
   const changed: Record<string, number> = {};
   const fields = [
     ['longitudeDeg', camera.longitudeDeg],
@@ -95,6 +100,7 @@ export function changedView(camera: Globe['camera'], view: ViewInit): ViewInit |
   ] as const;
   for (const [field, current] of fields) {
     const wanted = view[field];
+    if (previous !== undefined && previous[field] === wanted) continue;
     if (wanted !== undefined && Math.abs(wanted - current) > 1e-9) changed[field] = wanted;
   }
   return Object.keys(changed).length > 0 ? changed : undefined;

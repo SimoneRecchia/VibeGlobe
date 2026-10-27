@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The height function of a height grid (ADR 0006 §4, §5): piecewise linear over the grid's triangles, every cell split
  * along the same diagonal (north-west to south-east), so nested grids are exact and a child sampling its parent's

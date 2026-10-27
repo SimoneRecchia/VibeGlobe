@@ -17,3 +17,6 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-23T06:15:46Z: data-layer circles and an ellipse in the globe, 2D and tilted phases (M10, F356)
 - 2026-10-23T08:28:26Z: data-layer markers at device pixel ratios 1 and 2 and labels in several scripts, fonts, halos and offsets (M10, F352, F357)
 - 2026-10-23T13:56:15Z: tile placement of both tiling schemes in globe, 2D, tilted and polar views (M7, F224, F225)
+- 2026-10-24T19:57:57Z: data-layer labels drawn from signed distance fields (M10, F358, ADR 0045): the data-labels view
+- 2026-10-25T01:05:31Z: the space background on both backends (M11, F608, ADR 0181): `e2e/starfield.spec.ts` @baseline
+- 2026-10-26T17:46:00Z: the polar caps stay a globe and show their fill color (KB-211, F619): the north-pole and polar tiling views; the demotiles globe view after the label placement change (KB-210)

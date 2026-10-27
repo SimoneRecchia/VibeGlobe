@@ -6,6 +6,11 @@ import { brunnel, localizedName, localizedTextField, placePriority, roadClass, r
 import { CrossTileSymbolIndex, placeSymbols, SymbolFader, type SymbolCandidate } from './symbol-placement.js';
 import { DEFAULT_SHAPING, shapeText } from './text-shaping.js';
 import { StyleLayer } from './style-layer.js';
+import type { FrameView } from '@vibeglobe/core';
+import type { GlyphSource } from './glyph-source.js';
+import { LabelPlacer } from './label-placer.js';
+import { BUCKET_EXTENT } from './layout-tile.js';
+import type { VectorAtlas } from './vector-target.js';
 
 /** Encodes glyphs in the glyph-server PBF format, 10 px wide and 14 px high, advance 12. */
 function glyphPbf(name: string, codes: readonly number[]): Uint8Array {
@@ -221,6 +226,14 @@ describe('symbol collision, priorities, cross-tile ids and fades (F449, F454)', 
     expect(fader.update(330, new Set([2])).get(1)).toBeCloseTo(0.9, 6);
   });
 
+  it('keeps a fully shown label shown while it stays placed (TD-01)', () => {
+    const fader = new SymbolFader(300);
+    fader.update(0, new Set([1]));
+    expect(fader.update(300, new Set([1])).get(1)).toBe(1);
+    expect(fader.update(400, new Set([1])).get(1)).toBe(1);
+    expect(fader.update(500, new Set([1])).get(1)).toBe(1);
+  });
+
   it('ranks places by class, capital status and population', () => {
     const rome = placePriority({ class: 'city', capital: 2, population: 2_800_000 });
     const milan = placePriority({ class: 'city', population: 1_400_000 });
@@ -268,5 +281,43 @@ describe('OpenStreetMap roads (F453)', () => {
       [tunnel, path, primary, bridge, highBridge].sort((a, b) => a - b),
     );
     expect(brunnel({ tunnel: 'no' })).toBe('ground');
+  });
+});
+
+describe('label placement cost during camera motion (KB-210)', () => {
+  it('neither shapes nor styles a label whose anchor is off screen', () => {
+    const needed: string[] = [];
+    // Glyphs never arrive, so every label the placer shapes asks for its text's glyphs once per frame.
+    const glyphs = { need: (_font: string[], text: string) => void needed.push(text), ready: () => false };
+    const view = {
+      // 10 px per degree of longitude around the screen's center: 0° E is on screen, 144° E far to the right.
+      geoToScreen: ({ longitudeDeg }: { longitudeDeg: number }) => ({ xPx: 400 + longitudeDeg * 10, yPx: 300 }),
+      camera: { morphFactor: 1 },
+    };
+    const placer = new LabelPlacer(view, glyphs as unknown as GlyphSource, {} as VectorAtlas);
+    const layer = new StyleLayer({ id: 'places', type: 'symbol', source: 's', 'source-layer': 'place' });
+    const half = BUCKET_EXTENT / 2;
+    const bucket = {
+      layerId: 'places',
+      features: [
+        { id: 1, type: 'Point' as const, properties: {} },
+        { id: 2, type: 'Point' as const, properties: {} },
+      ],
+      labels: [
+        { feature: 0, text: 'here', anchor: [half, half] as [number, number] },
+        { feature: 1, text: 'there', anchor: [BUCKET_EXTENT * 0.9, half] as [number, number] },
+      ],
+    };
+    const source = {
+      layer,
+      layerIndex: 0,
+      opacity: 1,
+      tile: { z: 0, x: 0, y: 0 },
+      clip: [0, 0, BUCKET_EXTENT, BUCKET_EXTENT] as const,
+      bucket: bucket as never,
+      version: 1,
+    };
+    placer.frame([source], { widthPx: 800, heightPx: 600 } as FrameView, 2, 0);
+    expect(needed).toEqual(['here']);
   });
 });

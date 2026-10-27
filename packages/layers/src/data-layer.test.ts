@@ -47,6 +47,20 @@ describe('data layer', () => {
     }
   });
 
+  it('recolors one feature in place without evaluating its style, for live feeds (F378)', () => {
+    const layer = new DataLayer('point', { data: randomPoints(10_000), style: { 'circle-color': '#000000' } });
+    const { target, stack, handle } = setup(layer);
+    stack.frame(frameAt(16, 5));
+    target.clearWrites();
+    const evaluations = layer.stats.featureEvaluations;
+    expect(layer.setFeatureColor(9, 1, 0.5, 0.25)).toBe(true);
+    stack.frame(frameAt(32, 5));
+    expect([0, 1, 2, 3].map((c) => target.value(handle, 'color', 9, c))).toEqual([1, 0.5, 0.25, 1]);
+    expect(target.writes).toEqual([{ batch: 1, attribute: 'color', first: 9, count: 1 }]);
+    expect(layer.stats.featureEvaluations).toBe(evaluations);
+    expect(layer.setFeatureColor('missing', 1, 1, 1)).toBe(false);
+  });
+
   it('evaluates zoom-only styles once per frame as layer-wide values (F370)', () => {
     const layer = new DataLayer('point', {
       data: randomPoints(1000),

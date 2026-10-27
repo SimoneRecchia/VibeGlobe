@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Attribution, TileCoord, TileSource } from '@vibeglobe/core';
 import { ConnectivityMonitor, endpointOf, type HealthCheckTiming } from './connectivity.js';
 import { DEFAULT_CACHE_BYTES, indexedDbStore } from './idb-store.js';
@@ -26,8 +28,11 @@ export interface OfflineEvents {
   'connectivity-change': { connectivity: Connectivity; unreachable: readonly string[] };
   /** The browser deleted stored data (F275): the persistent cache, packages, or both. */
   'storage-lost': { cache: boolean; packages: readonly string[]; reason: string };
-  /** The network mode changed. */
-  'mode-change': { mode: NetworkMode };
+  /**
+   * The network mode changed. Leaving offline-only mode, `sourceIds` names every wrapped source: pass each to
+   * `globe.reloadSource`, as the tiles missed while offline read as no data (KB-158). Empty otherwise.
+   */
+  'mode-change': { mode: NetworkMode; sourceIds: readonly string[] };
   /** A problem the engine worked around (a full store, missing storage); reported once per kind. */
   warning: { code: 'quota' | 'storage-unavailable' | 'profile-rule'; message: string };
 }
@@ -79,9 +84,16 @@ export interface OfflineSettings {
 
 /** An offline engine: network modes, loading switches, the persistent cache and connectivity for wrapped sources. */
 export interface Offline {
+  /** The global network mode. */
   readonly mode: NetworkMode;
-  /** Changes the network mode at runtime; new requests follow it at once (F290). */
-  setMode(mode: NetworkMode): void;
+  /**
+   * Changes the network mode at runtime, globally or for one source or layer, as the switches (F290, KB-184): a layer's
+   * mode beats its source's, which beats the global one; `'inherit'` drops a source's or layer's own. New requests
+   * follow it at once.
+   */
+  setMode(mode: NetworkMode | 'inherit', scope?: SwitchScope): void;
+  /** The network mode in effect for a source (in a layer). */
+  modeOf(sourceId: string, layerId?: string): NetworkMode;
   /** Sets loading switches globally, or for one source or layer (F290). */
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void;
   /** The mode and the global switches. */
@@ -139,21 +151,32 @@ class OfflineEngine implements Offline {
   private currentMode: NetworkMode;
   private readonly switches = new SwitchBoard();
   private readonly rules = new Map<string, ProviderRules>();
+  /** The ids of the sources wrapped by {@link source}, in order. */
+  private readonly wrapped = new Set<string>();
+  /** The layers of each wrapped source (`TieredSourceOptions.layerId`, default the source's id). */
+  private readonly layersOf = new Map<string, Set<string>>();
+  /** The wrapped sources that load from each endpoint. */
+  private readonly sourcesOf = new Map<string, Set<string>>();
+  /** Network modes set for one source (`source:<id>`) or layer (`layer:<id>`), KB-184. */
+  private readonly modeOverrides = new Map<string, NetworkMode>();
   private readonly policy: NetworkPolicy;
   private readonly store: CacheStore;
   private readonly monitor: ConnectivityMonitor;
   private readonly handlers = new Map<keyof OfflineEvents, Set<(payload: never) => void>>();
   private readonly counters = new Map<string, TierCounters>();
   private readonly warned = new Set<string>();
-  private waiters: (() => void)[] = [];
+  /** Waits for a change, each for any change or for a check of its endpoint. */
+  private waiters: { readonly endpoint: string | undefined; readonly wake: () => void }[] = [];
+  /** Changes of connectivity, mode or switches so far (`TierContext.changes`, KB-190). */
+  private changeCount = 0;
   private packageReader: PackageReader | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly onServe: OfflineOptions['onServe'];
   private cacheMarked = false;
   /** Switches the application set on globally: a source registered later whose profile forbids one is warned about. */
   private readonly enabledGlobally = new Set<LoadingSwitch>();
-  /** The packages each source's tiles were read from: their credits join the source's (F306). */
-  private readonly servedPackages = new Map<string, Set<string>>();
+  /** Each package's credit for a source, by `packageId\u0000sourceId`: one object, so frames compare it by identity. */
+  private readonly packageCredits = new Map<string, Attribution | undefined>();
 
   constructor(options: OfflineOptions) {
     this.currentMode = options.mode ?? 'hybrid';
@@ -163,7 +186,7 @@ class OfflineEngine implements Offline {
     this.policy =
       options.policy ??
       defaultNetworkPolicy({
-        mode: () => this.currentMode,
+        mode: (sourceId, layerId) => this.modeOf(sourceId, layerId),
         switches: this.switches,
         rules: (id) => this.rules.get(id),
       });
@@ -171,11 +194,17 @@ class OfflineEngine implements Offline {
     this.monitor = new ConnectivityMonitor({
       ...options.healthChecks,
       fetch: this.fetchImpl,
-      enabled: () => this.currentMode !== 'offline',
+      // An endpoint is checked while a source loading from it may use the network (KB-192).
+      enabled: (endpoint) => [...(this.sourcesOf.get(endpoint) ?? [])].some((id) => this.usesNetwork(id)),
+      // One endpoint coming back while another stays down changes what a held miss waits for (KB-194).
+      onEndpointChange: () => this.wake(null),
       onChange: (connectivity, unreachable) => {
-        this.wake();
+        // A wait for one endpoint's check ends with that check (KB-161), not with another endpoint's change.
+        this.wake(null);
         this.emit('connectivity-change', { connectivity, unreachable });
       },
+      // A failed download waits for its endpoint's check, which may find it as it was.
+      onCheck: (endpoint) => this.wake(endpoint),
     });
     // Only the built-in store outlives the page; a memory or custom store is not checked.
     if (options.store === undefined || options.store === 'main-thread') void this.checkCacheEviction();
@@ -190,12 +219,27 @@ class OfflineEngine implements Offline {
     return this.monitor.connectivity;
   }
 
-  setMode(mode: NetworkMode): void {
-    if (mode === this.currentMode) return;
-    this.currentMode = mode;
+  setMode(mode: NetworkMode | 'inherit', scope?: SwitchScope): void {
+    const before = new Map([...this.wrapped].map((id) => [id, this.usesNetwork(id)]));
+    if (scope?.layerId === undefined && scope?.sourceId === undefined) {
+      if (mode === 'inherit' || mode === this.currentMode) return;
+      this.currentMode = mode;
+    } else {
+      const key = scope.layerId !== undefined ? `layer:${scope.layerId}` : `source:${scope.sourceId ?? ''}`;
+      if (mode === 'inherit') this.modeOverrides.delete(key);
+      else this.modeOverrides.set(key, mode);
+    }
+    // The sources that left offline-only mode: their unavailable tiles may load now.
+    const leftOffline = [...before].filter(([id, used]) => !used && this.usesNetwork(id));
     this.wake();
     if (mode !== 'offline') this.monitor.checkAll();
-    this.emit('mode-change', { mode });
+    this.emit('mode-change', { mode: this.currentMode, sourceIds: leftOffline.map(([id]) => id) });
+  }
+
+  modeOf(sourceId: string, layerId = sourceId): NetworkMode {
+    return (
+      this.modeOverrides.get(`layer:${layerId}`) ?? this.modeOverrides.get(`source:${sourceId}`) ?? this.currentMode
+    );
   }
 
   setSwitches(switches: Partial<LoadingSwitches>, scope?: SwitchScope): void {
@@ -223,27 +267,28 @@ class OfflineEngine implements Offline {
       this.rules.set(source.id, rules);
       for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);
     }
-    this.registerEndpoint(source);
+    // A package-only source never touches the network, so it has no endpoint to check.
+    if (options.tiers !== 'package') this.registerEndpoint(source);
+    this.wrapped.add(source.id);
+    const layers = this.layersOf.get(source.id) ?? new Set<string>();
+    layers.add(options.layerId ?? source.id);
+    this.layersOf.set(source.id, layers);
     const wrapped = { ...source, ...tieredSource(source, this.context(), { ...options, ...(rules ? { rules } : {}) }) };
-    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258), then each
-    // package its tiles came from (F306).
+    // Read whenever the engine lists credits: the source's own (live, a provider may change them, F258). A package's
+    // credit travels with the tiles it served and is listed while they are drawn (F306, KB-189).
     Object.defineProperty(wrapped, 'attribution', {
       enumerable: true,
-      get: () => this.creditsOf(source.id, (source as { attribution?: readonly Attribution[] }).attribution ?? []),
+      get: () => (source as { attribution?: readonly Attribution[] }).attribution ?? [],
     });
     return wrapped as S;
   }
 
-  /** A source's credits followed by those of the packages that served its tiles, each text once. */
-  private creditsOf(sourceId: string, own: readonly Attribution[]): readonly Attribution[] {
-    const packages = this.servedPackages.get(sourceId);
-    if (!packages || !this.packageReader?.attribution) return own;
-    const credits = [...own];
-    for (const packageId of packages) {
-      const credit = this.packageReader.attribution(packageId, sourceId);
-      if (credit && !credits.some((c) => c.text === credit.text)) credits.push(credit);
-    }
-    return credits;
+  /** The credit of a package's tiles of a source, made once (KB-189). */
+  private packageCredit(sourceId: string, packageId: string): Attribution | undefined {
+    const key = `${packageId}\u0000${sourceId}`;
+    if (!this.packageCredits.has(key))
+      this.packageCredits.set(key, this.packageReader?.attribution?.(packageId, sourceId));
+    return this.packageCredits.get(key);
   }
 
   stats(sourceId?: string): TierCounters {
@@ -271,6 +316,7 @@ class OfflineEngine implements Offline {
 
   setPackageReader(reader: PackageReader | undefined): void {
     this.packageReader = reader;
+    this.packageCredits.clear();
     this.wake();
   }
 
@@ -308,8 +354,24 @@ class OfflineEngine implements Offline {
   private registerEndpoint(source: TileSource): void {
     const probe = { url: '', hostIndex: 0 };
     const root = { root: 0 as const, level: source.minLevel, x: 0, y: 0 };
-    if (source.request(root, probe) === 'noData' || !/^https?:/.test(probe.url)) return;
-    this.monitor.addEndpoint(endpointOf(probe.url), probe.url);
+    if (source.request(root, probe) !== 'noData') this.addEndpoint(source.id, endpointOf(probe.url), probe.url);
+  }
+
+  /** Health-checks the endpoint while a source loading from it may use the network (KB-192). */
+  private addEndpoint(sourceId: string, endpoint: string, probeUrl: string): void {
+    if (!/^https?:/.test(probeUrl)) return;
+    const sources = this.sourcesOf.get(endpoint) ?? new Set<string>();
+    sources.add(sourceId);
+    this.sourcesOf.set(endpoint, sources);
+    this.monitor.addEndpoint(endpoint, probeUrl);
+  }
+
+  /** True while any layer of the wrapped source may use the network. */
+  private usesNetwork(sourceId: string): boolean {
+    for (const layerId of this.layersOf.get(sourceId) ?? [sourceId]) {
+      if (this.modeOf(sourceId, layerId) !== 'offline') return true;
+    }
+    return false;
   }
 
   private context(): Parameters<typeof tieredSource>[1] {
@@ -322,17 +384,19 @@ class OfflineEngine implements Offline {
       },
       readPackage: (sourceId, coord, signal) =>
         this.packageReader ? this.packageReader.read(sourceId, coord, signal) : Promise.resolve(undefined),
-      addEndpoint: (endpoint, probeUrl) => {
-        if (/^https?:/.test(probeUrl)) this.monitor.addEndpoint(endpoint, probeUrl);
-      },
+      addEndpoint: (sourceId, endpoint, probeUrl) => this.addEndpoint(sourceId, endpoint, probeUrl),
       reachable: (endpoint) => this.monitor.state(endpoint) === 'reachable',
       reportSuccess: (endpoint) => this.monitor.reportSuccess(endpoint),
       reportFailure: (endpoint) => this.monitor.reportFailure(endpoint),
-      waitForChange: (maxMs) =>
+      longestCheckMs: this.monitor.longestCheckMs,
+      waitForChange: (maxMs, endpoint) =>
         new Promise<void>((resolve) => {
-          const waiter = (): void => {
-            clearTimeout(timer);
-            resolve();
+          const waiter = {
+            endpoint,
+            wake: (): void => {
+              clearTimeout(timer);
+              resolve();
+            },
           };
           // A wait that times out leaves the list, which would otherwise grow for the whole outage.
           const timer = setTimeout(() => {
@@ -341,18 +405,15 @@ class OfflineEngine implements Offline {
           }, maxMs);
           this.waiters.push(waiter);
         }),
-      offlineOnly: () => this.currentMode === 'offline',
+      offlineOnly: (sourceId, layerId) => this.modeOf(sourceId, layerId) === 'offline',
+      changes: () => this.changeCount,
       count: (sourceId, tier, coord, packageId) => {
         let counters = this.counters.get(sourceId);
         if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
         counters[tier]++;
-        if (packageId !== undefined) {
-          let packages = this.servedPackages.get(sourceId);
-          if (!packages) this.servedPackages.set(sourceId, (packages = new Set()));
-          packages.add(packageId);
-        }
         if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
       },
+      packageCredit: (sourceId, packageId) => this.packageCredit(sourceId, packageId),
       fetch: this.fetchImpl,
     };
   }
@@ -406,10 +467,15 @@ class OfflineEngine implements Offline {
     this.emit('warning', { code, message });
   }
 
-  private wake(): void {
+  /** Ends every wait; with `endpoint`, only those for a check of it; with null, only those for any change. */
+  private wake(endpoint?: string | null): void {
+    // A check of one endpoint that finds it as it was changes nothing a miss waits for.
+    if (endpoint === undefined || endpoint === null) this.changeCount++;
     const waiters = this.waiters;
-    this.waiters = [];
-    for (const wake of waiters) wake();
+    const ends = (w: { readonly endpoint: string | undefined }): boolean =>
+      endpoint === undefined || w.endpoint === (endpoint ?? undefined);
+    this.waiters = waiters.filter((w) => !ends(w));
+    for (const waiter of waiters) if (ends(waiter)) waiter.wake();
   }
 
   private emit<E extends keyof OfflineEvents>(event: E, payload: OfflineEvents[E]): void {

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Column-major 4×4 matrices in Float64Array(16), the layout WebGPU and WebGL expect after rounding to float32.
 
 /** The parameters of a perspective projection. */

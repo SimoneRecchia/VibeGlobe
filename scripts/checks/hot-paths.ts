@@ -8,7 +8,8 @@ export function findHotPathViolations(sources: SourceFile[], fileExists: (path: 
   const violations: string[] = [];
   for (const source of sources) {
     const isHot = source.path.endsWith('.hot.ts');
-    const header = /^\s*\/\*\*([\s\S]*?)\*\//.exec(source.content)?.[1] ?? '';
+    // The header follows the license notice's line comments.
+    const header = /^\s*(?:\/\/[^\n]*\n\s*)*\/\*\*([\s\S]*?)\*\//.exec(source.content)?.[1] ?? '';
     if (!isHot) {
       if (/@hotpath\b/.test(source.content)) violations.push(`${source.path}: @hotpath modules must be named *.hot.ts`);
       continue;

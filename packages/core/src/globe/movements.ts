@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
 import { CameraAnimator, type AnimationKind } from '../camera/camera-animator.js';
 import { FadeJump } from '../camera/fade-jump.js';
@@ -26,6 +28,7 @@ import type {
 } from './types.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import { validateBounds, viewForBounds } from './fit-bounds.js';
+import { FlightLookahead } from './flight-preload.js';
 import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
@@ -64,6 +67,8 @@ export interface MovementHost {
    * more (undefined).
    */
   preloadView?(end: Float64Array | undefined, flight?: boolean): void;
+  /** Each frame of a flight: the pose it will have in about a second, whose tiles load instead of the view's (F287). */
+  preloadAhead?(end: Float64Array): void;
   /** The camera jumped (`jumpTo`): motion-aware detail does not count it as motion (F085). */
   cameraJumped?(): void;
 }
@@ -91,6 +96,7 @@ export class Movements {
   private running: Running | undefined;
   /** A movement started this frame: it begins at the frame's clock time, not before. */
   private readonly stepIo = new Float64Array(2);
+  private readonly lookahead = new FlightLookahead();
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
   /** What the running user movement is: input, or the controls' inertia after it (F200). */
@@ -144,6 +150,8 @@ export class Movements {
       kind === 'fly' && this.reducedMotion
         ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
         : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs, options ?? {});
+    if (animator instanceof CameraAnimator && kind === 'fly')
+      this.lookahead.plan(animator, camera, this.host.timeMs(), animator.durationMs);
     return this.begin(animator, options?.signal);
   }
 
@@ -168,7 +176,7 @@ export class Movements {
       }
       rate = options?.degreesPerSecond ?? 10;
       if (typeof rate !== 'number' || !Number.isFinite(rate))
-        throw new GlobeError('invalid-option', `degreesPerSecond must be a finite number, got ${String(rate)}`);
+        throw new GlobeError('invalid-option', `degreesPerSecond must be finite, got ${String(rate)}`);
       validSignal(options?.signal);
     } catch (error) {
       return rejected(error);
@@ -236,7 +244,7 @@ export class Movements {
       const valid = validateBounds(bounds);
       const padding = options?.paddingPx ?? 0;
       if (typeof padding !== 'number' || !(padding >= 0) || 2 * padding >= Math.min(camera.widthPx, camera.heightPx))
-        throw new GlobeError('invalid-option', `paddingPx must leave part of the viewport, got ${String(padding)}`);
+        throw new GlobeError('invalid-option', `paddingPx must leave part of the view, got ${String(padding)}`);
       if (options?.movement !== undefined && options.movement !== 'fly' && options.movement !== 'ease')
         throw new GlobeError('invalid-option', `movement must be 'fly' or 'ease', got ${String(options.movement)}`);
       const include = options?.include ?? [];
@@ -338,6 +346,9 @@ export class Movements {
       const opacity = running.animator.opacity;
       if (opacity !== undefined) this.host.setOpacity(opacity);
       this.host.cam.update();
+      const animator = running.animator;
+      if (!done && animator instanceof CameraAnimator && animator.kind === 'fly')
+        this.host.preloadAhead?.(this.lookahead.poseAhead(animator, this.host.cam, this.stepIo[0] ?? 0));
       this.moveEvent.cause = 'api';
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
       if (done) this.finish(running, 'completed');
@@ -450,7 +461,7 @@ function validDuration(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     throw new GlobeError(
       'invalid-option',
-      `A movement's durationMs must be a finite number of 0 or more, got ${String(value)}`,
+      `A movement's durationMs must be finite and 0 or more, got ${String(value)}`,
     );
   return value;
 }

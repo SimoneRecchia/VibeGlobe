@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Heightmap terrain encodings (F129, F130) and the height grid every terrain source is decoded to (ADR 0006 §5). Pure
  * functions over RGBA bytes: the worker decodes the PNG, these turn its pixels into heights, in Node for the tests.
@@ -42,23 +44,36 @@ export function decodeHeightmap(rgba: Uint8Array, sizePx: number, encoding: Heig
 }
 
 /**
+ * The border of a heightmap tile `sizePx` pixels wide: 1 for a power of two of 16 or more plus 2 (a tile carrying a ring of
+ * its neighbors' pixels, as the dataset pipeline writes terrain, KB-178), else 0.
+ */
+export function heightmapBorderPx(sizePx: number): number {
+  const inner = sizePx - 2;
+  return inner >= 16 && (inner & (inner - 1)) === 0 ? 1 : 0;
+}
+
+/**
  * Resamples per-pixel heights to a grid of `cells`² cells whose vertices span the tile from edge to edge. Pixel
- * values sit at pixel centers; a vertex between centers is interpolated bilinearly, and one in the half pixel outside
- * the outermost centers is extrapolated from the two nearest, so a tile needs no neighbor data (ADR 0006 §5) and a
- * plane stays exact up to the edges.
+ * values sit at pixel centers; a vertex between centers is interpolated bilinearly. A tile with a border
+ * ({@link heightmapBorderPx}) interpolates its edges between its own and its neighbors' pixels, so two neighbors give
+ * their shared edge the same heights; without one, a vertex in the half pixel outside the outermost centers is
+ * extrapolated from the two nearest, so a tile needs no neighbor data (ADR 0006 §5) and a plane stays exact up to the
+ * edges.
  */
 export function heightGrid(pixelHeights: Float32Array, sizePx: number, cells: number): HeightGrid {
+  const border = heightmapBorderPx(sizePx);
+  const inner = sizePx - 2 * border;
   const side = cells + 1;
   const heights = new Float32Array(side * side);
   let min = Infinity;
   let max = -Infinity;
   for (let row = 0; row < side; row++) {
-    const y = (row / cells) * sizePx - 0.5;
+    const y = (row / cells) * inner - 0.5 + border;
     const y0 = clamp(Math.floor(y), sizePx - 2);
     const y1 = y0 + 1;
     const fy = y - y0;
     for (let col = 0; col < side; col++) {
-      const x = (col / cells) * sizePx - 0.5;
+      const x = (col / cells) * inner - 0.5 + border;
       const x0 = clamp(Math.floor(x), sizePx - 2);
       const x1 = x0 + 1;
       const fx = x - x0;

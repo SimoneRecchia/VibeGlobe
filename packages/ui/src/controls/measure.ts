@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The measurement tools (F411), built on the drawing tools: a distance (a line: path length and bearing) or an area (a
  * polygon: area and perimeter), measured on the WGS84 ellipsoid by `@vibeglobe/gis` and shown live while drawing and

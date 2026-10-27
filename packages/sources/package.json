@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/sources",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe sources: source adapters for imagery, terrain, vector and 3D data, with provider profiles.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -35,14 +35,27 @@
       "types": "./dist/geotiff.d.ts",
       "source": "./src/geotiff.ts",
       "default": "./dist/geotiff.js"
+    },
+    "./tile-mask": {
+      "types": "./dist/tile-mask.d.ts",
+      "source": "./src/tile-mask.ts",
+      "default": "./dist/tile-mask.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
+    "@vibeglobe/core": "0.1.0",
     "fflate": "0.8.3",
     "pbf": "5.1.2",
     "pmtiles": "4.5.0",
@@ -52,6 +65,6 @@
   "devDependencies": {
     "@mapbox/vector-tile": "3.0.0",
     "@types/sql.js": "1.4.11",
-    "@vibeglobe/gis": "0.0.0"
+    "@vibeglobe/gis": "0.1.0"
   }
 }

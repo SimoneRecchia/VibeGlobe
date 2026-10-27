@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError, type Globe, type ScreenPoint } from '@vibeglobe/core';
 import type { Project } from './anchors.js';
 import { InteractionController } from './interaction.js';
@@ -55,16 +57,35 @@ function routePointer(element: HTMLElement, interaction: InteractionController, 
 export function createGlobeLayers(globe: Globe, options: { readonly element?: HTMLElement } = {}): GlobeLayers {
   const target = globe.layerTarget();
   if (!target) throw new GlobeError('invalid-option', 'The globe has no layer renderer yet: wait for globe.ready');
-  const projector = { geoToScreen: globe.geoToScreen.bind(globe), zoom: () => globe.camera.zoom };
+  const element = options.element;
+  // The zoom of the last frame drawn, from the frame event (no camera state object a frame, F378); a change between
+  // frames is flushed at it, and the next frame steps at its own.
+  const frameZoom = Float64Array.of(globe.camera.zoom);
+  const projector = {
+    geoToScreen: globe.geoToScreen.bind(globe),
+    zoom: () => frameZoom[0] ?? 0,
+    ...(element ? { viewportPx: () => ({ widthPx: element.clientWidth, heightPx: element.clientHeight }) } : {}),
+  };
   let inFrame = false;
   let detached = false;
   let flushQueued = false;
   // A change outside a frame (data streamed in, a style set) is written to the renderer before the next frame, so
   // that frame shows it (F372); changes during a frame's step are drawn by the frame they ask for.
+  // A layer asking for a frame from this step (labels fading, KB-135) gets the next frame, not another flush: the
+  // clock does not advance between microtasks, so flushing again would never end.
   const flush = (): void => {
     flushQueued = false;
     if (detached || inFrame) return;
-    stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
+    step();
+  };
+  const step = (event?: { readonly zoom: number }): void => {
+    inFrame = true;
+    if (event) frameZoom[0] = event.zoom;
+    try {
+      stack.frame({ nowMs: globe.timeMs, zoom: frameZoom[0] ?? 0, projector });
+    } finally {
+      inFrame = false;
+    }
   };
   const stack = new LayerStack(target, () => {
     if (!inFrame && !flushQueued) {
@@ -77,14 +98,7 @@ export function createGlobeLayers(globe: Globe, options: { readonly element?: HT
     pick: (point) => target.pick?.(point) ?? Promise.resolve(0),
     screenToGeo: (point) => globe.screenToGeo(point),
   });
-  const offFrame = globe.on('frame', () => {
-    inFrame = true;
-    try {
-      stack.frame({ nowMs: globe.timeMs, zoom: globe.camera.zoom, projector });
-    } finally {
-      inFrame = false;
-    }
-  });
+  const offFrame = globe.on('frame', step);
   const offPointer = options.element
     ? routePointer(options.element, interaction, (position, onGround) =>
         globe.geoToScreen(

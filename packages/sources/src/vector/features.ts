@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The engine's vector feature structures, which the GeoJSON, KML and GPX adapters produce (in workers) and data
  * layers consume: GeoJSON-shaped geometries in WGS84 degrees, heights in meters.

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
 import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
@@ -43,10 +45,15 @@ export function stackOf(entries: readonly StackEntry[], layers: readonly Imagery
 }
 
 const mapping = new Float64Array(8);
+
+/** A slot of {@link mapping} (all eight always exist). */
+function mapped(slot: number): number {
+  return mapping[slot] ?? 0;
+}
 const centerEcef = new Float64Array(3);
 const screen = new Float64Array(2);
 /** Overlays found for a draw, top first: handle, geographic, opacity, blend and the four UV numbers each. */
-const found = new Float64Array(MAX_OVERLAYS * 8);
+const found = new Float64Array(MAX_OVERLAYS * 9);
 
 /**
  * Textures the surface tiles of a frame with the imagery stack (M3 plan §2.5, ADR 0038). For each drawn tile and
@@ -80,39 +87,43 @@ export function drawImagery(
       const entry = layers[layer];
       if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
       const chosen = wantChain(entry.chain, tile, distance);
-      if (based || chosen < 0) continue;
-      const loader = entry.chain[chosen]?.loader;
-      const handle = mapping[MAPPING_HANDLE] ?? -1;
-      loader?.markDrawn(handle);
-      const geographic = entry.chain[chosen]?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
+      if (based) continue;
+      if (chosen < 0) {
+        // A layer whose sources cover none of this tile takes no slot, so several clipped layers (one per country)
+        // leave the slots to the ones that have data here (F618).
+        if (coversTile(entry.chain, tile)) overlays = keepSlot(entry, overlays);
+        continue;
+      }
+      const drawn = entry.chain[chosen];
+      const handle = mapped(MAPPING_HANDLE);
+      drawn?.loader.markDrawn(handle);
+      const geographic = drawn?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
       if (isOpaque(entry.entry)) {
         based = true;
-        visible?.mark(entry.chain[chosen]?.index ?? 0);
+        visible?.mark(drawn?.index ?? 0);
+        const credit = drawn?.loader.attributionOf(handle);
+        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
+        // Tone matching between the chain's sources (F249): which one this draw shows.
+        list.toneSources[index] = entry.entry.harmonize && entry.chain.length > 1 ? layer * 8 + chosen : -1;
         list.textures[index] = handle;
         list.geographic[index] = geographic;
-        list.imageryLevels[index] = mapping[MAPPING_LEVEL] ?? -1;
+        list.imageryLevels[index] = mapped(MAPPING_LEVEL);
         const at = index * 4;
-        list.uvTransforms[at] = mapping[MAPPING_SCALE_U] ?? 1;
-        list.uvTransforms[at + 1] = mapping[MAPPING_SCALE_V] ?? 1;
-        list.uvTransforms[at + 2] = mapping[MAPPING_OFFSET_U] ?? 0;
-        list.uvTransforms[at + 3] = mapping[MAPPING_OFFSET_V] ?? 0;
+        list.uvTransforms[at] = mapped(MAPPING_SCALE_U);
+        list.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
+        list.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
+        list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
       } else if (overlays < MAX_OVERLAYS) {
-        visible?.mark(entry.chain[chosen]?.index ?? 0);
-        const at = overlays * 8;
-        found[at] = handle;
-        found[at + 1] = geographic;
-        found[at + 2] = entry.entry.opacity;
-        found[at + 3] = BLEND_CODES[entry.entry.blend];
-        found[at + 4] = mapping[MAPPING_SCALE_U] ?? 1;
-        found[at + 5] = mapping[MAPPING_SCALE_V] ?? 1;
-        found[at + 6] = mapping[MAPPING_OFFSET_U] ?? 0;
-        found[at + 7] = mapping[MAPPING_OFFSET_V] ?? 0;
-        overlays++;
+        visible?.mark(drawn?.index ?? 0);
+        const credit = drawn?.loader.attributionOf(handle);
+        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
+        overlays = addOverlay(entry, overlays, handle, geographic);
       }
     }
     writeOverlays(list, index, overlays);
   }
-  if (center) prefetchStack(layers, center, centerDistance);
+  // Nothing finer shows under a center the fog nearly hides (F574, KB-174).
+  if (center && !hazed(center)) prefetchStack(layers, center, centerDistance);
 }
 
 /** Prefetches the children of the center tile from each visible layer, from the first source of its chain that has it. */
@@ -129,6 +140,33 @@ function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distan
   }
 }
 
+/** Adds a layer's tile in `mapping` to the overlays found for a draw; returns their count. */
+function addOverlay(layer: StackLayer, overlays: number, handle: number, geographic: number): number {
+  const at = overlays * 9;
+  found[at] = handle;
+  found[at + 1] = geographic;
+  found[at + 2] = layer.entry.opacity;
+  found[at + 3] = BLEND_CODES[layer.entry.blend];
+  found[at + 4] = mapped(MAPPING_SCALE_U);
+  found[at + 5] = mapped(MAPPING_SCALE_V);
+  found[at + 6] = mapped(MAPPING_OFFSET_U);
+  found[at + 7] = mapped(MAPPING_OFFSET_V);
+  found[at + 8] = mapped(MAPPING_LEVEL);
+  return overlays + 1;
+}
+
+/**
+ * A translucent layer still loading keeps its overlay slot, empty: the layers' slots do not shift when its tile arrives,
+ * so each slot's cross-fade stays within one layer (KB-155). Returns the overlays found so far.
+ */
+function keepSlot(layer: StackLayer, overlays: number): number {
+  if (isOpaque(layer.entry) || overlays >= MAX_OVERLAYS) return overlays;
+  found[overlays * 9] = -1;
+  found[overlays * 9 + 2] = 0;
+  found[overlays * 9 + 8] = -1;
+  return overlays + 1;
+}
+
 /** Writes the overlays found for draw `index` into the list's slots, bottom first; the slots left empty show nothing. */
 function writeOverlays(list: DrawList, index: number, overlays: number): void {
   for (let slot = 0; slot < list.overlays.length; slot++) {
@@ -136,10 +174,13 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
     if (!overlay) continue;
     if (slot >= overlays) {
       overlay.opacities[index] = 0;
+      overlay.textures[index] = -1;
+      overlay.levels[index] = -1;
       continue;
     }
-    const at = (overlays - 1 - slot) * 8;
+    const at = (overlays - 1 - slot) * 9;
     overlay.textures[index] = found[at] ?? -1;
+    overlay.levels[index] = found[at + 8] ?? -1;
     overlay.geographic[index] = found[at + 1] ?? 0;
     overlay.opacities[index] = found[at + 2] ?? 0;
     overlay.blends[index] = found[at + 3] ?? 0;
@@ -162,7 +203,10 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      if (fallback < 0 && mapInto(layer, tile)) fallback = k;
+      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless no later
+      // source can map the tile: then its ancestors are the last resort (KB-149).
+      if (fallback < 0 && mapInto(layer, tile) && !(unavailableAtMapping(layer) && laterMaps(chain, k, tile)))
+        fallback = k;
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -197,21 +241,39 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   return mapGeographic(tile, level, mapping, 0);
 }
 
+/** True when some source of the chain covers the tile (overwrites `mapping`). */
+function coversTile(chain: readonly ImageryLayer[], tile: QuadtreeTile): boolean {
+  for (const layer of chain) if (mapInto(layer, tile)) return true;
+  return false;
+}
+
+/** True when a source after `k` in the chain can map the tile (overwrites `mapping`). */
+function laterMaps(chain: readonly ImageryLayer[], k: number, tile: QuadtreeTile): boolean {
+  for (let j = k + 1; j < chain.length; j++) {
+    const later = chain[j];
+    if (later && mapInto(later, tile)) return true;
+  }
+  return false;
+}
+
+/** True when the source's tile in `mapping` (from {@link mapInto}) is known missing or failing. */
+function unavailableAtMapping(layer: ImageryLayer): boolean {
+  return layer.loader.unavailable(mapped(MAPPING_LEVEL), mapped(MAPPING_X), mapped(MAPPING_Y));
+}
+
 /** True when a source can give the tile at the surface's level now: within its levels, mapped, and not missing or failing. */
 function hasTile(layer: ImageryLayer, tile: QuadtreeTile): boolean {
   const source = layer.source;
   if (tile.level > topLevel(layer) || !mapInto(layer, tile)) return false;
-  const level = mapping[MAPPING_LEVEL] ?? 0;
-  if (level < source.minLevel) return false;
-  return !layer.loader.unavailable(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
+  return mapped(MAPPING_LEVEL) >= source.minLevel && !unavailableAtMapping(layer);
 }
 
 /** The deepest resident tile of a source for a tile, without requesting any (handle in `mapping`), or -1. */
 function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
-  for (let current = mapping[MAPPING_LEVEL] ?? 0; current >= source.minLevel; current--) {
-    const handle = layer.loader.readyHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
+  for (let current = mapped(MAPPING_LEVEL); current >= source.minLevel; current--) {
+    const handle = layer.loader.readyHandle(current, mapped(MAPPING_X), mapped(MAPPING_Y));
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;
       return handle;
@@ -227,12 +289,20 @@ function residentLayer(layer: ImageryLayer, tile: QuadtreeTile): number {
  */
 function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: number): void {
   if (tile.level >= topLevel(layer) || !mapInto(layer, tile)) return;
-  const level = mapping[MAPPING_LEVEL] ?? 0;
-  const x = 2 * (mapping[MAPPING_X] ?? 0);
-  const y = 2 * (mapping[MAPPING_Y] ?? 0);
+  const level = mapped(MAPPING_LEVEL);
+  const x = 2 * mapped(MAPPING_X);
+  const y = 2 * mapped(MAPPING_Y);
   const key = PREFETCH_CLASS + level + 1 + 2 * distance;
   for (let child = 0; child < 4; child++) layer.loader.want(level + 1, x + (child & 1), y + (child >> 1), key);
 }
+
+/**
+ * Below this fog visibility at a tile's closest point nothing is prefetched around or under it: its neighbors and
+ * children, deeper in the haze, would show at most half their detail (F574, KB-174).
+ */
+const PREFETCH_MIN_VISIBILITY = 0.5;
+
+const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
 
 /**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
@@ -242,23 +312,27 @@ function prefetchChildren(layer: ImageryLayer, tile: QuadtreeTile, distance: num
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
-  const wanted = mapping[MAPPING_LEVEL] ?? 0;
+  const wanted = mapped(MAPPING_LEVEL);
   const lowest = source.minLevel > floor ? source.minLevel : floor;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
+  // The level below was found missing: its parent is the finest this source can show there (KB-179).
+  let belowMissing = false;
   for (let current = wanted; current >= lowest; current--) {
-    const x = mapping[MAPPING_X] ?? 0;
-    const y = mapping[MAPPING_Y] ?? 0;
-    // The wanted tile and every second ancestor are requested; the others are only looked up.
+    const x = mapped(MAPPING_X);
+    const y = mapped(MAPPING_Y);
+    // The wanted tile, every second ancestor, the source's coarsest level and the parent of a missing tile are
+    // requested; the others are only looked up.
     const handle =
-      !arriving && (wanted - current) % 2 === 0
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
+      !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
+        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, !hazed(tile))
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;
       return handle;
     }
     if (handle === ARRIVING) arriving = true;
+    belowMissing = layer.loader.unavailable(current, x, y);
     if (current > lowest) mapAncestor(mapping, 0, 1);
   }
   return -1;
@@ -291,9 +365,9 @@ export function preloadImagery(stack: readonly StackLayer[], tiles: readonly Qua
       for (let k = 0; k < layer.chain.length; k++) {
         const source = layer.chain[k];
         if (!source || !hasTile(source, tile)) continue;
-        const level = mapping[MAPPING_LEVEL] ?? 0;
+        const level = mapped(MAPPING_LEVEL);
         if (source.loader.preloading)
-          source.loader.want(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0, PRELOAD_CLASS + level);
+          source.loader.want(level, mapped(MAPPING_X), mapped(MAPPING_Y), PRELOAD_CLASS + level);
         break;
       }
     }

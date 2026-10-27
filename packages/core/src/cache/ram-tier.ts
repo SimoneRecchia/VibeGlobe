@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The RAM tier of ADR 0007 §Memory (F097): encoded tile bytes kept after decode, so a tile that left the view, or
  * whose GPU copy was evicted or lost with the device, is decoded again without a new request. Lookups happen once per

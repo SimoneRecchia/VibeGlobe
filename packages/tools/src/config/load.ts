@@ -1,8 +1,12 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Loading and validating build configuration files. */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { findProfile } from '../license/profiles.js';
 import { type Area, type Ring, clipArea, polygonArea } from '../tiles/area.js';
+import { LandMask } from '../tiles/land.js';
+import type { TileCoord } from '../tiles/mercator.js';
 import { bboxProblems } from '../tiles/mercator.js';
 import type { AreaConfig, BuildConfig, DatasetConfig } from './schema.js';
 
@@ -15,9 +19,9 @@ const ENCODINGS: Record<DatasetConfig['kind'], DatasetConfig['encoding'][]> = {
   vector: ['mvt'],
 };
 const SOURCES: Record<DatasetConfig['kind'], string[]> = {
-  terrain: ['copernicus-dem'],
-  imagery: ['worldcover-s2', 's2cloudless', 'geotiff', 'xyz'],
-  vector: ['osm-extract'],
+  terrain: ['copernicus-dem', 'pmtiles'],
+  imagery: ['worldcover-s2', 's2cloudless', 'geotiff', 'xyz', 'pmtiles'],
+  vector: ['osm-extract', 'pmtiles'],
 };
 const MAX_ZOOM = 22;
 
@@ -73,6 +77,15 @@ function datasetProblems(dataset: DatasetConfig, index: number): string[] {
   if (!(typeof dataset.downloadBytesPerFile === 'number' && dataset.downloadBytesPerFile > 0))
     problems.push(`${where}.downloadBytesPerFile: must be a positive number`);
   if (dataset.area !== undefined) problems.push(...areaProblems(`${where}.area`, dataset.area));
+  if (
+    dataset.seaMaxZoom !== undefined &&
+    !(
+      Number.isInteger(dataset.seaMaxZoom) &&
+      dataset.seaMaxZoom >= dataset.minZoom &&
+      dataset.seaMaxZoom <= dataset.maxZoom
+    )
+  )
+    problems.push(`${where}.seaMaxZoom: must be an integer between minZoom and maxZoom`);
   const stretch = dataset.colorStretch as unknown;
   if (
     stretch !== undefined &&
@@ -107,6 +120,14 @@ export function configProblems(value: unknown): string[] {
   const tools = config.tools as unknown;
   if (!isRecord(tools) || !PINNED_IMAGE.test(String(tools['gdal'])))
     problems.push('tools.gdal: must be a Docker image pinned by digest (name@sha256:…)');
+  if (config.land !== undefined) problems.push(...areaProblems('land', config.land));
+  if (config.seaSampleArea !== undefined) problems.push(...areaProblems('seaSampleArea', config.seaSampleArea));
+  if (
+    Array.isArray(config.datasets) &&
+    config.land === undefined &&
+    config.datasets.some((d) => d.seaMaxZoom !== undefined)
+  )
+    problems.push('land: datasets with seaMaxZoom need the land mask');
   if (!Array.isArray(config.datasets) || config.datasets.length === 0) problems.push('datasets: must not be empty');
   else {
     config.datasets.forEach((dataset, i) => problems.push(...datasetProblems(dataset, i)));
@@ -155,4 +176,32 @@ function resolveArea(area: AreaConfig, configPath: string): Area {
 export function datasetArea(loaded: LoadedConfig, dataset: DatasetConfig, sample: boolean): Area {
   const area = resolveArea(dataset.area ?? loaded.config.region, loaded.path);
   return sample ? clipArea(area, resolveArea(loaded.config.sampleArea, loaded.path).bbox) : area;
+}
+
+/** Land masks already built, by configuration, area and zoom (a mask is one bitmap at its deepest zoom). */
+const masks = new Map<string, LandMask>();
+
+/** The land mask of a dataset's area, to its maximum zoom; undefined without `seaMaxZoom`. */
+export function datasetLandMask(loaded: LoadedConfig, dataset: DatasetConfig, area: Area): LandMask | undefined {
+  if (dataset.seaMaxZoom === undefined || loaded.config.land === undefined) return undefined;
+  const key = JSON.stringify([loaded.path, area.bbox, dataset.maxZoom]);
+  let mask = masks.get(key);
+  if (!mask) {
+    const land = resolveArea(loaded.config.land, loaded.path);
+    mask = new LandMask(land.kind === 'polygon' ? land.rings : [], area.bbox, dataset.maxZoom);
+    masks.set(key, mask);
+  }
+  return mask;
+}
+
+/** The tiles a dataset builds at a zoom: every tile up to its sea level, only land tiles beyond; undefined: all. */
+export function datasetTiles(
+  loaded: LoadedConfig,
+  dataset: DatasetConfig,
+  area: Area,
+): ((z: number) => Iterable<TileCoord>) | undefined {
+  const mask = datasetLandMask(loaded, dataset, area);
+  const seaMaxZoom = dataset.seaMaxZoom;
+  if (!mask || seaMaxZoom === undefined) return undefined;
+  return (z) => mask.tiles(z, seaMaxZoom);
 }

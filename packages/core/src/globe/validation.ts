@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { stackEntries, type ImageryLayerInput } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
 import { validateConstraints } from './constraints.hot.js';
@@ -113,7 +115,7 @@ export function validateOptions(options: unknown): GlobeOptions {
   ) {
     throw new GlobeError(
       'invalid-option',
-      `minSurfaceLevel must be an integer between 2 and 8, got ${describeInput(minLevel)}`,
+      `minSurfaceLevel must be an integer from 2 to 8, got ${describeInput(minLevel)}`,
     );
   }
   if (input.view !== undefined) validateView(input.view, DEFAULT_VIEW);
@@ -159,16 +161,17 @@ function validateImagery(imagery: unknown, workers: unknown): void {
   } catch (error) {
     throw new GlobeError('invalid-option', error instanceof Error ? error.message : String(error));
   }
+  if (imagery.length > 0) requireWorkers(workers, 'imagery');
+}
+
+/** Throws unless `workers` is a worker pool factory, which `what` (imagery, terrain) needs. */
+function requireWorkers(workers: unknown, what: string): void {
   const factory = workers as Partial<Record<string, unknown>> | null | undefined;
-  if (
-    imagery.length > 0 &&
-    (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function')
-  ) {
+  if (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function')
     throw new GlobeError(
       'invalid-option',
-      'workers is required when imagery is set: pass createWorkers() from @vibeglobe/worker',
+      `workers is required when ${what} is set (createWorkers() of @vibeglobe/worker)`,
     );
-  }
 }
 
 const TERRAIN_DECODERS: readonly string[] = ['terrarium', 'terrain-rgb', 'quantized-mesh', 'custom'];
@@ -196,18 +199,12 @@ function validateTerrain(terrain: unknown, workers: unknown): void {
   if (typeof decoder !== 'object' || decoder === null || !TERRAIN_DECODERS.includes(decoder['kind'] as string))
     throw new GlobeError('invalid-option', `terrain source ${id}: unknown decoder ${describeInput(decoder)}`);
   if (decoder['kind'] === 'custom' && typeof decoder['decode'] !== 'function')
-    throw new GlobeError('invalid-option', `terrain source ${id}: a custom decoder needs a decode function`);
+    throw new GlobeError('invalid-option', `terrain source ${id}: a custom decoder needs decode()`);
   const datum = source['datum'] as Partial<Record<string, unknown>> | null | undefined;
   const geoid = datum?.['kind'] === 'geoid' && typeof datum['model'] === 'object' && datum['model'] !== null;
   if (typeof datum !== 'object' || datum === null || !(datum['kind'] === 'ellipsoid' || geoid))
     throw new GlobeError('invalid-option', `terrain source ${id}: unknown vertical datum ${describeInput(datum)}`);
-  const factory = workers as Partial<Record<string, unknown>> | null | undefined;
-  if (typeof factory !== 'object' || factory === null || typeof factory['create'] !== 'function') {
-    throw new GlobeError(
-      'invalid-option',
-      'workers is required when terrain is set: pass createWorkers() from @vibeglobe/worker',
-    );
-  }
+  requireWorkers(workers, 'terrain');
 }
 
 /** The view when none is given: the whole globe centered on 0°, 20°N. */
@@ -259,11 +256,13 @@ export function validatePosition(position: unknown): void {
   if (position === null || typeof position !== 'object') {
     throw new GlobeError('invalid-coordinate', `A position must be an object, got ${describeInput(position)}`);
   }
-  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144).
+  // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144). The checks
+  // are inline: a double passed to a call the compiler does not inline is boxed, which a loaded machine shows.
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  requireFinite('longitudeDeg', longitudeDeg);
-  requireFinite('latitudeDeg', latitudeDeg);
-  requireFinite('heightMeters', heightMeters ?? 0);
+  if (typeof longitudeDeg !== 'number' || !Number.isFinite(longitudeDeg)) requireFinite('longitudeDeg', longitudeDeg);
+  if (typeof latitudeDeg !== 'number' || !Number.isFinite(latitudeDeg)) requireFinite('latitudeDeg', latitudeDeg);
+  if (heightMeters != null && (typeof heightMeters !== 'number' || !Number.isFinite(heightMeters)))
+    requireFinite('heightMeters', heightMeters);
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',
@@ -275,10 +274,7 @@ export function validatePosition(position: unknown): void {
 /** Validates a resolution scale given at runtime; throws a typed GlobeError. */
 export function validateResolutionScale(scale: unknown): number {
   if (typeof scale !== 'number' || !(scale >= 0.1 && scale <= 4)) {
-    throw new GlobeError(
-      'invalid-option',
-      `resolutionScale must be a number between 0.1 and 4, got ${describeInput(scale)}`,
-    );
+    throw new GlobeError('invalid-option', `resolutionScale must be from 0.1 to 4, got ${describeInput(scale)}`);
   }
   return scale;
 }

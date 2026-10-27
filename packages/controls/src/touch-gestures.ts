@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition } from '@vibeglobe/core';
 import type { MutablePoint, ReleaseVelocity } from './animators.js';
 import { type GestureContext, TapDetector } from './gesture-context.js';
@@ -6,8 +8,8 @@ import { SampleRing } from './samples.js';
 const DEG = 180 / Math.PI;
 /** A last finger lifted within this time of the one before it ends a two-finger gesture (its velocity carries on). */
 const LIFT_TOGETHER_MS = 50;
-/** How long a frame waits for the other finger's report of the same touch event. */
-const PARTNER_WAIT_MS = 40;
+/** How long a frame waits at least for the partner of a finger that moved alone, when they moved in step so far (KB-183). */
+const PARTNER_WAIT_MS = 100;
 
 /** Wraps an angle difference into (−π, π]. */
 function wrapRad(a: number): number {
@@ -36,6 +38,8 @@ export class TouchGestures {
   private rebaseline = false;
   // Gesture since the last re-baseline.
   private anchor: GeoPosition | undefined;
+  /** The pan turns the globe about the screen center: the fingers left the globe's disc (KB-202). */
+  private trackball = false;
   private readonly mid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly applied: MutablePoint = { xPx: 0, yPx: 0 };
   /** The midpoint when the fingers last changed, where the next frame grabs the anchor. */
@@ -58,15 +62,20 @@ export class TouchGestures {
   private sessionStartMs = 0;
   private sessionFingers = 0;
   private sessionMoved = false;
+  /** The report frames wait for the partner of (KB-183), NaN for none, and the host time the wait began. */
+  private waitedForMs = Number.NaN;
+  private waitStartMs = 0;
   private readonly tapMid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly taps: TapDetector;
   // Velocity of a two-finger gesture whose fingers lift one after the other.
   private readonly carried: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
   private carriedMs = -Infinity;
-  private carriedAnchor: GeoPosition | undefined;
+  private carriedTrackball = false;
   private readonly carriedPixel: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly velocity = new Float64Array(4);
   private readonly release: ReleaseVelocity = { panXPx: 0, panYPx: 0, headingDeg: 0, tiltDeg: 0, zoomLevels: 0 };
+  /** The time constants of a touch release: a twist's heading glides with `twistTauMs` (KB-177). */
+  private readonly taus = { panTauMs: 1, rotateTauMs: 1, twistTauMs: 1, tiltTauMs: 1, zoomTauMs: 1 };
 
   constructor(private readonly context: GestureContext) {
     this.taps = new TapDetector(context.options);
@@ -155,6 +164,7 @@ export class TouchGestures {
 
   private reset(): void {
     this.anchor = undefined;
+    this.trackball = false;
     this.dirty = false;
     this.rebaseline = false;
     this.carriedMs = -Infinity;
@@ -207,6 +217,7 @@ export class TouchGestures {
   private start(): void {
     this.rebaseline = false;
     this.anchor = this.context.options.gestures.dragPan ? this.context.port.grab(this.startMid) : undefined;
+    this.trackball = this.context.options.gestures.dragPan && !this.anchor;
     this.applied.xPx = this.startMid.xPx;
     this.applied.yPx = this.startMid.yPx;
     this.measure();
@@ -224,9 +235,11 @@ export class TouchGestures {
   }
 
   /**
-   * True while the fingers moved in step so far, only one has reported the latest touch event, and that report is less
-   * than 40 ms old: the browser dispatches each finger's move separately, and a frame between them would show half the
-   * motion. A finger that really stopped is applied once its partner's report is older.
+   * True while the fingers moved in step so far and only one has reported the latest touch event: the browser
+   * dispatches each finger's move separately, and a frame between them would show half the motion. The wait lasts at
+   * least one frame, however late it runs (KB-183: a 40 ms wait on the clock alone let a late frame through), and at
+   * least {@link PARTNER_WAIT_MS}, since a busy page can run more than one frame between the two reports (F180 on CI);
+   * a finger whose partner has not reported by then really stopped, and is applied.
    */
   private halfReported(): boolean {
     const a0 = this.moveMs[0] ?? 0;
@@ -234,15 +247,35 @@ export class TouchGestures {
     const p0 = this.previousMoveMs[0] ?? 0;
     const p1 = this.previousMoveMs[1] ?? 0;
     const half = (a0 > a1 && p0 === a1) || (a1 > a0 && p1 === a0);
-    const ageMs = half ? this.context.port.hostMs() - Math.max(a0, a1) : 0;
-    // A negative age means clocks that do not compare: never wait then.
-    if (!half || ageMs < 0 || ageMs >= PARTNER_WAIT_MS) return false;
-    this.context.port.requestNextFrame();
+    if (!half) return false;
+    const latest = a0 > a1 ? a0 : a1;
+    const port = this.context.port;
+    if (this.waitedForMs !== latest) {
+      this.waitedForMs = latest;
+      this.waitStartMs = port.hostMs();
+    } else if (port.hostMs() - this.waitStartMs >= PARTNER_WAIT_MS) return false;
+    port.requestNextFrame();
     return true;
   }
 
+  /**
+   * Keeps the grabbed point under the fingers while they are over the globe; off its disc their motion turns the
+   * globe about the screen center like a virtual trackball, and the globe is grabbed again where they return (KB-202).
+   */
   private applyPan(): void {
-    if (this.anchor) this.context.port.dragTo(this.anchor, this.mid);
+    const { port, options } = this.context;
+    if (options.gestures.dragPan) {
+      if (this.anchor && port.grab(this.mid)) {
+        port.dragTo(this.anchor, this.mid);
+        this.trackball = false;
+      } else {
+        const dx = this.mid.xPx - this.applied.xPx;
+        const dy = this.mid.yPx - this.applied.yPx;
+        if (dx !== 0 || dy !== 0) port.pivotPan(dx, dy, this.context.widthPx(), this.context.heightPx());
+        this.anchor = port.grab(this.mid);
+        this.trackball = true;
+      }
+    }
     this.applied.xPx = this.mid.xPx;
     this.applied.yPx = this.mid.yPx;
   }
@@ -318,14 +351,15 @@ export class TouchGestures {
     this.measureRelease(this.carried, timeMs);
     this.carriedMs = timeMs;
     // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
-    this.carriedAnchor = this.anchor;
+    this.carriedTrackball = this.trackball;
     this.carriedPixel.xPx = this.applied.xPx;
     this.carriedPixel.yPx = this.applied.yPx;
   }
 
   private measureRelease(out: ReleaseVelocity, releaseMs: number): void {
     const { options } = this.context;
-    this.samples.velocity(options.inertia.velocityWindowMs, this.velocity, releaseMs);
+    const { velocityWindowMs, stillMs, stillPx } = options.inertia;
+    this.samples.velocity(velocityWindowMs, this.velocity, releaseMs, stillMs, stillPx);
     const vx = this.velocity[0] ?? 0;
     const vy = this.velocity[1] ?? 0;
     out.panXPx = out.panYPx = out.headingDeg = out.tiltDeg = out.zoomLevels = 0;
@@ -347,7 +381,7 @@ export class TouchGestures {
     const { tapMaxMs } = options.touch;
     const quick = timeMs - this.sessionStartMs <= tapMaxMs && !this.sessionMoved;
     const carried = timeMs - this.carriedMs <= LIFT_TOGETHER_MS;
-    const anchor = carried ? this.carriedAnchor : this.anchor;
+    const trackball = carried ? this.carriedTrackball : this.trackball;
     const pixel = carried ? this.carriedPixel : this.applied;
     this.reset();
     if (quick && this.sessionFingers === 2) {
@@ -367,7 +401,18 @@ export class TouchGestures {
     if (!options.gestures.inertia) return false;
     if (carried) Object.assign(this.release, this.carried);
     else this.measureRelease(this.release, timeMs);
-    inertia.start(this.release, this.context.inertiaTaus(), anchor, pixel, options.maxTiltDeg);
+    Object.assign(this.taus, this.context.inertiaTaus());
+    this.taus.rotateTauMs = this.taus.twistTauMs;
+    const widthPx = this.context.widthPx();
+    const heightPx = this.context.heightPx();
+    // The glide turns the globe about the screen center as fast as the fingers did where they lifted (KB-202).
+    const release = this.release;
+    const pivot = trackball ? 1 : port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx);
+    const speed = Math.hypot(release.panXPx, release.panYPx) * pivot;
+    const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
+    release.panXPx *= scale;
+    release.panYPx *= scale;
+    inertia.start(release, this.taus, options.gestures.dragPan, pixel, options.maxTiltDeg, widthPx, heightPx);
     if (inertia.active) port.requestNextFrame();
     return inertia.active;
   }

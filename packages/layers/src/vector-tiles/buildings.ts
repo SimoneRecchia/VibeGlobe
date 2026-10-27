@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Building heights and extrusion geometry (F455, F456, F458; ADR 0041). Heights come from the tags in this order:
  * `height` / `render_height`, else `building:levels` × {@link LEVEL_HEIGHT_METERS}, else the default for the building

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The direct geodesic problem on the WGS84 ellipsoid — where a geodesic of given start, azimuth and length ends — after
  * C. F. F. Karney, "Algorithms for geodesics", J. Geodesy 87 (2013): the distance is mapped to an arc on

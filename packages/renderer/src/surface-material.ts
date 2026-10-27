@@ -1,42 +1,23 @@
-import type { DepthPath, MorphFrame, TileDrawList } from '@vibeglobe/core';
-import {
-  attribute,
-  clamp,
-  float,
-  floor,
-  Fn,
-  If,
-  int,
-  ivec2,
-  min,
-  mix,
-  positionGeometry,
-  select,
-  texture,
-  textureLoad,
-  textureSize,
-  uniform,
-  vec2,
-  vec3,
-  vec4,
-} from 'three/tsl';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { type DepthPath, type MorphFrame, type TileDrawList } from '@vibeglobe/core';
+import { attribute, Fn, If, mix, positionGeometry, select, texture, uniform, vec3, vec4 } from 'three/tsl';
 import {
   DataTexture,
   DoubleSide,
-  FloatType,
   Matrix3,
   Matrix4,
   MeshBasicNodeMaterial,
-  NearestFilter,
-  RedFormat,
   Vector4,
   type Material,
   type Node,
   type Object3D,
   type Texture,
-  type TextureNode,
 } from 'three/webgpu';
 import { makeMorphedEyeRelative } from './eye-relative.js';
+import { column, createFlatHeights, flag, mapUv, terrainHeight } from './surface-heights.js';
+import type { ToneMatcher } from './tone-matching.js';
+import type { Atmosphere } from './atmosphere/atmosphere.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
 export interface SurfaceDraw {
@@ -47,6 +28,8 @@ export interface SurfaceDraw {
   /** The terrain heights the tile shows and the ones it morphs from (ADR 0006 §4, F138). */
   heights: Texture | undefined;
   fromHeights: Texture | undefined;
+  /** The coarser terrain the tile's stitched edges take their heights from (KB-178). */
+  stitchHeights: Texture | undefined;
   /**
    * The four UV transforms (scale u, scale v, offset u, offset v), one per column: imagery, the imagery faded from,
    * terrain, the terrain morphed from. One matrix and one vector carry every per-draw number, as three.js rebuilds
@@ -60,6 +43,13 @@ export interface SurfaceDraw {
    * depth (terrain coarser than the tile's level, `TileDrawList.terrain.skirtMeters`).
    */
   readonly params: Vector4;
+  /**
+   * The tone gains of the draw's imagery (column 0, rgb) and of the imagery it fades from (column 1), 1 without tone
+   * matching (F249, ADR 0044). Packed here to add no uniform: column 2 (bits of the terrain edges that take the stitch
+   * heights, north 1, east 2, south 4, west 8, `TileDrawLayer.stitchEdges`, KB-178; 0; the terrain height scales at
+   * the north and south edges, `TileDrawLayer.heightScales`, KB-180), column 3 the UV transform into the stitch heights.
+   */
+  readonly tones: Matrix4;
   /** The imagery of the two overlay slots (ADR 0038), drawn above the tile's own; unset where a slot is empty. */
   overlay0: Texture | undefined;
   overlay1: Texture | undefined;
@@ -68,6 +58,14 @@ export interface SurfaceDraw {
    * (blend 0, blend 1, 0, 0), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2 screen).
    */
   readonly overlays: Matrix4;
+  /** The imagery each overlay slot cross-fades from (KB-155); unset where it fades in from nothing. */
+  overlayFrom0: Texture | undefined;
+  overlayFrom1: Texture | undefined;
+  /**
+   * The overlays' fades, by column: the two `from` UV transforms; (from geographic 0, from geographic 1, fade 0, fade
+   * 1), the fades as the base imagery's (1 only the slot's own imagery); (from set 0, from set 1, 0, 0).
+   */
+  readonly overlayFades: Matrix4;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -76,7 +74,17 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
 }
 
 /** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */
-const PER_DRAW_TEXTURES = ['surfaceTexture', 'fromTexture', 'heights', 'fromHeights', 'overlay0', 'overlay1'] as const;
+const PER_DRAW_TEXTURES = [
+  'surfaceTexture',
+  'fromTexture',
+  'heights',
+  'fromHeights',
+  'stitchHeights',
+  'overlay0',
+  'overlay1',
+  'overlayFrom0',
+  'overlayFrom1',
+] as const;
 
 /**
  * Attaches a draw state to a new surface mesh. Its textures reach the shared texture nodes just before the mesh is
@@ -89,26 +97,44 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     fromTexture: undefined,
     heights: undefined,
     fromHeights: undefined,
+    stitchHeights: undefined,
     transforms: new Matrix4().set(1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
     params: new Vector4(15, 1, 1, 0),
+    tones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0),
     overlay0: undefined,
     overlay1: undefined,
     overlays: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    overlayFrom0: undefined,
+    overlayFrom1: undefined,
+    overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
   };
   object.userData['surfaceDraw'] = draw;
-  const values = [draw.texture, draw.fromTexture, draw.heights, draw.fromHeights, draw.overlay0, draw.overlay1];
+  const values = [
+    draw.texture,
+    draw.fromTexture,
+    draw.heights,
+    draw.fromHeights,
+    draw.stitchHeights,
+    draw.overlay0,
+    draw.overlay1,
+    draw.overlayFrom0,
+    draw.overlayFrom1,
+  ];
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
     values[0] = draw.texture;
     values[1] = draw.fromTexture;
     values[2] = draw.heights;
     values[3] = draw.fromHeights;
-    values[4] = draw.overlay0;
-    values[5] = draw.overlay1;
+    values[4] = draw.stitchHeights;
+    values[5] = draw.overlay0;
+    values[6] = draw.overlay1;
+    values[7] = draw.overlayFrom0;
+    values[8] = draw.overlayFrom1;
     for (let i = 0; i < PER_DRAW_TEXTURES.length; i++) {
       const node = material.userData[PER_DRAW_TEXTURES[i] ?? ''] as { value: Texture } | undefined;
       // Draws without terrain use the material's flat heights; empty overlay slots keep their texture (opacity 0).
       const value =
-        values[i] ?? (i === 2 || i === 3 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
+        values[i] ?? (i >= 2 && i <= 4 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
       if (node && value) node.value = value;
     }
   };
@@ -130,61 +156,6 @@ function placeholderLike(like: Texture): DataTexture {
 }
 
 /**
- * The height grid of a surface without terrain: 2 × 2 vertices at height 0 (one cell, so the sampling below needs no
- * special case). Float32 with nearest filtering, like every height texture (`tile-textures.ts`).
- */
-function createFlatHeights(): DataTexture {
-  const texture = new DataTexture(new Float32Array(4), 2, 2, RedFormat, FloatType);
-  texture.minFilter = NearestFilter;
-  texture.magFilter = NearestFilter;
-  texture.generateMipmaps = false;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/** Bit `bit` (a power of two) of a float holding small integer flags, as 0 or 1. */
-function flag(flags: Node<'float'>, bit: number): Node<'float'> {
-  return floor(flags.div(bit)).mod(2);
-}
-
-/**
- * The height at `uv` of a grid texture of (cells + 1)² vertices (`terrain/sample-height.ts`, ADR 0006 §5): piecewise
- * linear over cells split along the north-west to south-east diagonal, read with `textureLoad` (no filtering of
- * float textures needed), positions clamped to the tile.
- */
-function sampleHeight(heights: TextureNode, uv: Node<'vec2'>): Node<'float'> {
-  // textureSize is typed without its components.
-  const size = textureSize(heights, int(0)) as unknown as Node<'ivec2'>;
-  const cells = float(size.x).sub(1);
-  const x = clamp(uv.x, 0, 1).mul(cells);
-  const y = clamp(uv.y, 0, 1).mul(cells);
-  const col = min(floor(x), cells.sub(1));
-  const row = min(floor(y), cells.sub(1));
-  const fx = x.sub(col);
-  const fy = y.sub(row);
-  const at = (dx: number, dy: number): Node<'float'> =>
-    textureLoad(heights, ivec2(int(col.add(dx)), int(row.add(dy)))).x;
-  const nw = at(0, 0);
-  const ne = at(1, 0);
-  const sw = at(0, 1);
-  const se = at(1, 1);
-  const upper = nw.add(ne.sub(nw).mul(fx)).add(se.sub(ne).mul(fy));
-  const lower = nw.add(se.sub(sw).mul(fx)).add(sw.sub(nw).mul(fy));
-  return select(fx.greaterThanEqual(fy), upper, lower);
-}
-
-/** Column `index` of a matrix uniform (the matrix times a unit vector). */
-function column(matrix: Node<'mat4'>, index: number): Node<'vec4'> {
-  return matrix.mul(vec4(index === 0 ? 1 : 0, index === 1 ? 1 : 0, index === 2 ? 1 : 0, index === 3 ? 1 : 0));
-}
-
-/** Tile coordinates through one transform column, with v linear in latitude when `geographic` is 1. */
-function mapUv(tileUv: Node<'vec3'>, transform: Node<'vec4'>, geographic: Node<'float'>): Node<'vec2'> {
-  const v = mix(tileUv.y, tileUv.z, geographic);
-  return vec2(tileUv.x.mul(transform.x).add(transform.z), v.mul(transform.y).add(transform.w));
-}
-
-/**
  * Places the surface's vertices (ADR 0008): skirt vertices carry a normal of length 2 (the mesh marks them so) and hang
  * `params.w` lower still; heights are scaled by the relief factor on both endpoints; on the plane each vertex sits at
  * its Mercator offset from the tile's plane center times σ, raised σ·k(φ)·h along the anchor's up.
@@ -196,7 +167,7 @@ function placeMorphed(
   params: Node<'vec4'>,
   morphParams: Node<'vec4'>,
   morphAxes: Node<'mat3'>,
-): void {
+): { eyeRelative: Node<'vec3'>; reliefMeters: Node<'float'> } {
   const tileNormal = attribute('tileNormal', 'vec3');
   const tilePlane = attribute('tilePlane', 'vec4');
   const skirt = tileNormal.length().greaterThan(1.5);
@@ -209,7 +180,14 @@ function placeMorphed(
     tilePlane.y.mul(sigma),
     reliefHeight.mul(tilePlane.w).mul(sigma).add(tilePlane.z).sub(skirtExtra),
   );
-  makeMorphedEyeRelative(material, depthPath, globeOffset, morphAxes.mul(planeLocal), morphParams.x);
+  const eyeRelative = makeMorphedEyeRelative(
+    material,
+    depthPath,
+    globeOffset,
+    morphAxes.mul(planeLocal),
+    morphParams.x,
+  );
+  return { eyeRelative, reliefMeters: reliefHeight };
 }
 
 /**
@@ -224,18 +202,44 @@ function overlaySlots(
   tileUv: Node<'vec3'>,
 ): (color: Node<'vec4'>) => void {
   const overlays = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlays);
+  const fades = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayFades);
   const looks = column(overlays, 2);
   const blends = column(overlays, 3);
+  const fadeLooks = column(fades, 2);
+  const fromSet = column(fades, 3);
   const slots = [0, 1].map((slot) => {
     const own = placeholderLike(placeholder);
-    material.addEventListener('dispose', () => own.dispose());
+    const fromOwn = placeholderLike(placeholder);
+    material.addEventListener('dispose', () => {
+      own.dispose();
+      fromOwn.dispose();
+    });
     const node = texture(own, mapUv(tileUv, column(overlays, slot), slot === 0 ? looks.x : looks.y));
+    const fromNode = texture(fromOwn, mapUv(tileUv, column(fades, slot), slot === 0 ? fadeLooks.x : fadeLooks.y));
     material.userData[`overlay${String(slot)}`] = node;
-    return { node, opacity: slot === 0 ? looks.z : looks.w, blend: slot === 0 ? blends.x : blends.y };
+    material.userData[`overlayFrom${String(slot)}`] = fromNode;
+    return {
+      node,
+      fromNode,
+      hasFrom: slot === 0 ? fromSet.x : fromSet.y,
+      fade: slot === 0 ? fadeLooks.z : fadeLooks.w,
+      opacity: slot === 0 ? looks.z : looks.w,
+      blend: slot === 0 ? blends.x : blends.y,
+    };
   });
   return (color) => {
-    for (const { node, opacity, blend } of slots) {
+    for (const { node: own, fromNode, hasFrom, fade, opacity, blend } of slots) {
       If(opacity.greaterThan(0), () => {
+        // The slot's imagery cross-fades from what it showed, or fades in from nothing (KB-155); like the base
+        // imagery's, only fading draws sample the second texture.
+        const node = own.toVar();
+        If(fade.lessThan(1), () => {
+          const from = vec4(0).toVar();
+          If(hasFrom.greaterThan(0.5), () => {
+            from.assign(fromNode);
+          });
+          node.assign(mix(from, node, fade));
+        });
         const over = node.xyz;
         const multiplied = color.xyz.mul(over);
         const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
@@ -251,9 +255,13 @@ function overlaySlots(
  * The UV transforms and flags are object-scope uniforms read from each mesh's {@link SurfaceDraw}, and the textures
  * are set per mesh before it draws (see {@link attachSurfaceDraw}), so tiles drawing different data tiles still share
  * the material. `placeholder` only fixes the texture binding's type. The material owns the flat heights of draws
- * without terrain and disposes them with itself.
+ * without terrain and disposes them with itself. With an `atmosphere`, haze and sun lighting shade its color.
  */
-export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
+export function createSurfaceMaterial(
+  placeholder: Texture,
+  depthPath: DepthPath,
+  atmosphere?: Atmosphere,
+): MeshBasicNodeMaterial {
   const tileUv = attribute('tileUv', 'vec3');
   // Per frame (ADR 0008): the morph factor, the relief factor and σ; the anchor's east, north and up axes in ECEF.
   const morphParams = uniform(new Vector4(0, 1, 1, 0));
@@ -261,58 +269,57 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
   const transforms = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.transforms);
   const params = uniform(new Vector4(15, 1, 1, 0)).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.params);
   const fade = params.y;
-  const morph = params.z;
   const uv = mapUv(tileUv, column(transforms, 0), flag(params.x, 1));
   const fromUv = mapUv(tileUv, column(transforms, 1), flag(params.x, 2));
   const material = new MeshBasicNodeMaterial();
+  const tones = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.tones);
   const map = texture(placeholder, uv);
   // Textures of their own, as bindings are shared between nodes made from the same texture; tiny, so the bindings
   // cost no copy on the GPU. Every draw points them at real textures.
   const fromPlaceholder = placeholderLike(placeholder);
   const flatHeights = createFlatHeights();
   const fromFlat = createFlatHeights();
+  const stitchFlat = createFlatHeights();
   const fromMap = texture(fromPlaceholder, fromUv);
   const heights = texture(flatHeights);
   const fromHeights = texture(fromFlat);
+  const stitchHeights = texture(stitchFlat);
   // Disposed with the material: an undisposed texture keeps its renderer reachable through its dispose listener.
   const disposeOwn = (): void => {
     material.removeEventListener('dispose', disposeOwn);
     fromPlaceholder.dispose();
     flatHeights.dispose();
     fromFlat.dispose();
+    stitchFlat.dispose();
   };
   material.addEventListener('dispose', disposeOwn);
   material.userData['surfaceTexture'] = map;
   material.userData['fromTexture'] = fromMap;
   material.userData['heights'] = heights;
   material.userData['fromHeights'] = fromHeights;
+  material.userData['stitchHeights'] = stitchHeights;
   material.userData['flatHeights'] = flatHeights;
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;
-  // Terrain: displaced along the ellipsoid normal by mix(H_from, H_to, morph) (ADR 0006 §4, §5); the morph samples
-  // the second grid only while it runs.
-  const height = Fn(() => {
-    const h = sampleHeight(heights, mapUv(tileUv, column(transforms, 2), flag(params.x, 4))).toVar();
-    If(morph.lessThan(1), () => {
-      const from = sampleHeight(fromHeights, mapUv(tileUv, column(transforms, 3), flag(params.x, 8)));
-      h.assign(mix(from, h, morph));
-    });
-    return h;
-  })();
+  const height = terrainHeight(tileUv, { heights, fromHeights, stitchHeights }, transforms, params, tones);
   // A cross-fade mixes the two imageries in one draw, never two overlapping draws (ADR 0006), and in a perceptual
   // space (gamma 2, close to sRGB): a linear-light mix would change dark pixels several times faster than bright ones.
   // Only fading draws sample the second texture (fade is uniform per draw, so the branch is too): on a software
   // rasterizer the extra fetch costs about half a frame.
   const composeOverlays = overlaySlots(material, placeholder, tileUv);
   material.colorNode = Fn(() => {
-    const color = map.toVar();
+    // Each imagery with its source's tone gain (F249): 1 unless the layer matches its chain's tones.
+    const color = map.mul(vec4(column(tones, 0).xyz, 1)).toVar();
     If(fade.lessThan(1), () => {
-      color.assign(mix(fromMap.sqrt(), color.sqrt(), fade).pow2());
+      color.assign(mix(fromMap.mul(vec4(column(tones, 1).xyz, 1)).sqrt(), color.sqrt(), fade).pow2());
     });
     composeOverlays(color);
     return color;
   })();
-  placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
+  const { eyeRelative, reliefMeters } = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
+  // Haze and sun lighting (F394, F396), slopes shaded by the relief drawn: the uniforms live in the atmosphere, so a
+  // new one needs a new material.
+  atmosphere?.applyToSurface(material, eyeRelative, reliefMeters);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;
@@ -320,21 +327,44 @@ export function createSurfaceMaterial(placeholder: Texture, depthPath: DepthPath
 
 const NO_HEIGHTS = -1;
 
+/** The imagery handles of the polar caps' fills in core's draw list (KB-211). */
+const NORTH_CAP_TEXTURE = -2;
+const SOUTH_CAP_TEXTURE = -3;
+
+/** The imagery texture of a handle: a tile's, a polar cap's fill (KB-211), else the base image. */
+function imageryOf(
+  textures: { get(handle: number): Texture | undefined },
+  base: Texture,
+  caps: readonly Texture[] | undefined,
+  handle: number,
+): Texture {
+  if (handle === NORTH_CAP_TEXTURE) return caps?.[0] ?? base;
+  if (handle === SOUTH_CAP_TEXTURE) return caps?.[1] ?? base;
+  return textures.get(handle) ?? base;
+}
+
 /**
  * Points a mesh's draw state at draw `i` of a frame's list: its textures and the ones it fades from, looked up in
- * `textures` by handle, with the world base image for the base handle (or a texture no longer held); without
- * terrain the heights stay unset and the material's flat heights apply.
+ * `textures` by handle, with the polar caps' fills (`textures.caps`, north then south) for their handles and the world base
+ * image for the base handle (or a texture no longer held); without terrain the heights stay unset and the material's
+ * flat heights apply.
  */
 export function applyDraw(
   draw: SurfaceDraw,
   draws: TileDrawList,
   i: number,
-  textures: { get(handle: number): Texture | undefined },
+  textures: {
+    get(handle: number): Texture | undefined;
+    readonly tones?: ToneMatcher;
+    readonly caps?: { readonly textures: readonly Texture[] };
+  },
   base: Texture,
 ): void {
+  textures.tones?.apply(draws, i, draw.tones.elements);
   const terrain = draws.terrain;
-  draw.texture = textures.get(draws.textures[i] ?? -1) ?? base;
-  draw.fromTexture = textures.get(draws.fromTextures[i] ?? -1) ?? base;
+  const caps = textures.caps?.textures;
+  draw.texture = imageryOf(textures, base, caps, draws.textures[i] ?? -1);
+  draw.fromTexture = imageryOf(textures, base, caps, draws.fromTextures[i] ?? -1);
   draw.heights = textures.get(terrain.textures[i] ?? NO_HEIGHTS);
   draw.fromHeights = textures.get(terrain.fromTextures[i] ?? NO_HEIGHTS);
   const flags =
@@ -343,8 +373,18 @@ export function applyDraw(
     4 * (terrain.geographic[i] ?? 1) +
     8 * (terrain.fromGeographic[i] ?? 1);
   draw.params.set(flags, draws.fades[i] ?? 1, terrain.fades[i] ?? 1, terrain.skirtMeters[i] ?? 0);
-  const e = draw.transforms.elements;
+  const t = draw.tones.elements;
   const at = i * 4;
+  draw.stitchHeights = textures.get(terrain.stitchTextures?.[i] ?? NO_HEIGHTS);
+  let edges = 0;
+  for (let c = 0; c < 4; c++) {
+    if (draw.stitchHeights && (terrain.stitchEdges?.[at + c] ?? 0) > 0) edges += 2 ** c;
+    t[12 + c] = terrain.stitchTransforms?.[at + c] ?? 0;
+  }
+  t[8] = edges;
+  t[10] = terrain.heightScales?.[i * 2] ?? 1;
+  t[11] = terrain.heightScales?.[i * 2 + 1] ?? 1;
+  const e = draw.transforms.elements;
   for (let c = 0; c < 4; c++) {
     e[c] = draws.uvTransforms[at + c] ?? 0;
     e[4 + c] = draws.fromUvTransforms[at + c] ?? 0;
@@ -362,6 +402,7 @@ function applyOverlays(
   textures: { get(handle: number): Texture | undefined },
 ): void {
   const o = draw.overlays.elements;
+  const f = draw.overlayFades.elements;
   for (let slot = 0; slot < 2; slot++) {
     const overlay = draws.overlays[slot];
     const shown = overlay && (overlay.opacities[i] ?? 0) > 0 ? textures.get(overlay.textures[i] ?? -1) : undefined;
@@ -371,6 +412,15 @@ function applyOverlays(
     o[10 + slot] = shown && overlay ? (overlay.opacities[i] ?? 0) : 0;
     o[12 + slot] = overlay?.blends[i] ?? 0;
     for (let c = 0; c < 4; c++) o[slot * 4 + c] = overlay?.uvTransforms[i * 4 + c] ?? 0;
+    // The cross-fade (KB-155): from the imagery the slot showed, or from nothing when it had none.
+    const fade = overlay?.fades[i] ?? 1;
+    const from = shown && overlay && fade < 1 ? textures.get(overlay.fromTextures[i] ?? -1) : undefined;
+    if (slot === 0) draw.overlayFrom0 = from;
+    else draw.overlayFrom1 = from;
+    f[8 + slot] = overlay?.fromGeographic[i] ?? 0;
+    f[10 + slot] = shown ? fade : 1;
+    f[12 + slot] = from ? 1 : 0;
+    for (let c = 0; c < 4; c++) f[slot * 4 + c] = overlay?.fromUvTransforms[i * 4 + c] ?? 0;
   }
 }
 
@@ -381,6 +431,8 @@ function applyOverlays(
 export function setSurfaceMorph(material: Material, morph: MorphFrame): void {
   const params = material.userData['morphParams'] as { value: Vector4 } | undefined;
   const axes = material.userData['morphAxes'] as { value: Matrix3 } | undefined;
-  params?.value.set(morph.morph, morph.relief, morph.sigma, 0);
+  // From the factors array, not the getters: a double returned by a call that is not inlined is boxed (F064).
+  const factors = morph.factors;
+  params?.value.set(factors[0] ?? 0, factors[1] ?? 1, factors[2] ?? 1, 0);
   axes?.value.fromArray(morph.axes);
 }

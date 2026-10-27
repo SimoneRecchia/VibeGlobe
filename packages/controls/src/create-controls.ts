@@ -1,10 +1,21 @@
-import type { Controls, ControlsFactory, NavigationApi } from '@vibeglobe/core';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { Controls, ControlsFactory, NavigationApi, NavigationMode } from '@vibeglobe/core';
 import { HeadingTarget, Inertia, type InertiaTaus, KeyMotion, ZoomTarget } from './animators.js';
-import { CameraPort, type ConnectedGlobe } from './camera-port.js';
+import { CameraPort, FRAME_MS, type ConnectedGlobe } from './camera-port.js';
 import type { GestureContext } from './gesture-context.js';
 import { KeyboardInput } from './keyboard.js';
 import { MouseGestures } from './mouse-gestures.js';
-import { type ControlsOptions, resolveControlsOptions, type ResolvedControlsOptions } from './options.js';
+import {
+  type ControlsOptions,
+  resolveControlsOptions,
+  type ResolvedControlsOptions,
+  type TiltPolicy,
+  validNavigationMode,
+  validNorthUpLatitude,
+  validTiltPolicy,
+} from './options.js';
+import { TiltPolicyState } from './tilt-policy.js';
 import { TouchGestures } from './touch-gestures.js';
 import { WheelInput } from './wheel-input.js';
 import { ZoomBox } from './zoom-box.js';
@@ -26,6 +37,34 @@ export interface NavigationControls extends ControlsFactory {
   zoomOut(): void;
   /** Turns the view to north up along the shortest arc, keeping center and tilt. */
   resetNorth(): void;
+  /** How a drag moves the camera now (the `navigationMode` option, then {@link NavigationControls.setNavigationMode}). */
+  readonly navigationMode: NavigationMode;
+  /**
+   * Switches how a drag moves the camera, from the next input on: 'free' (trackball) or 'north-up' (north stays up,
+   * stops at the poles). Anything else throws a GlobeError ('invalid-option').
+   */
+  setNavigationMode(mode: NavigationMode): void;
+  /** The 'north-up' latitude limit now, degrees (the `northUpMaxLatitudeDeg` option, then the setter below). */
+  readonly northUpMaxLatitudeDeg: number;
+  /**
+   * Sets the highest latitude a 'north-up' camera looks at, degrees from 1 to 89.9, from the next input on; anything
+   * else throws a GlobeError ('invalid-option').
+   */
+  setNorthUpMaxLatitude(deg: number): void;
+  /** The tilt policy in force (F625), or null for none: the `tiltPolicy` option, then {@link NavigationControls.setTiltPolicy}. */
+  readonly tiltPolicy: TiltPolicy | null;
+  /**
+   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m
+   * and 60°), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
+   * `autoTiltBelowMeters` the tilt rises by itself to `autoTiltMaxDeg`; both change continuously with the distance. A
+   * tilt chosen by hand below the lock stays until changed or until the camera passes the lock. Invalid input throws a
+   * GlobeError ('invalid-option').
+   */
+  setTiltPolicy(policy: boolean | Partial<TiltPolicy> | null): void;
+  /** False while the tilt policy keeps the view flat (beyond its lock): a 3D button should be disabled then. */
+  readonly tiltAvailable: boolean;
+  /** Calls `listener` with {@link NavigationControls.tiltAvailable} each time it changes; returns the unsubscribe. */
+  onTiltAvailabilityChange(listener: (available: boolean) => void): () => void;
 }
 
 /**
@@ -37,11 +76,22 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   const resolved = resolveControlsOptions(options);
   let globe: ConnectedGlobe | undefined;
   let current: Attached | undefined;
+  let mode = resolved.navigationMode;
+  let maxLatitudeDeg = resolved.northUpMaxLatitudeDeg;
+  let navigationApi: NavigationApi | undefined;
+  const tilt = new TiltPolicyState(resolved.tiltPolicy);
   const factory = (element: unknown, navigation: NavigationApi): Controls => {
+    navigationApi = navigation;
+    navigation.navigationMode = mode;
+    navigation.northUpMaxLatitudeDeg = maxLatitudeDeg;
+    tilt.write(navigation);
     const attached = attach(element as HTMLElement, navigation, resolved, globe);
     current = attached;
     return {
-      update: attached.update,
+      update() {
+        tilt.check(navigationApi, globe);
+        attached.update();
+      },
       interrupt: attached.interrupt,
       destroy() {
         attached.destroy();
@@ -49,7 +99,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
       },
     };
   };
-  return Object.assign(factory, {
+  const controls = Object.assign(factory, {
     options: resolved,
     connect(target: ConnectedGlobe) {
       globe = target;
@@ -58,7 +108,30 @@ export function createControls(options?: ControlsOptions): NavigationControls {
     zoomIn: () => current?.keyboard.zoomBy(1),
     zoomOut: () => current?.keyboard.zoomBy(-1),
     resetNorth: () => current?.keyboard.resetNorth(),
+    navigationMode: mode,
+    setNavigationMode(next: NavigationMode) {
+      mode = validNavigationMode(next);
+      if (navigationApi) navigationApi.navigationMode = mode;
+    },
+    northUpMaxLatitudeDeg: maxLatitudeDeg,
+    setNorthUpMaxLatitude(deg: number) {
+      maxLatitudeDeg = validNorthUpLatitude(deg);
+      if (navigationApi) navigationApi.northUpMaxLatitudeDeg = maxLatitudeDeg;
+    },
+    tiltPolicy: tilt.policy,
+    setTiltPolicy(next: boolean | Partial<TiltPolicy> | null) {
+      tilt.policy = validTiltPolicy(next, resolved.maxTiltDeg);
+      tilt.write(navigationApi);
+      navigationApi?.requestUpdate();
+    },
+    tiltAvailable: true,
+    onTiltAvailabilityChange: (listener: (available: boolean) => void) => tilt.listen(listener),
   });
+  Object.defineProperty(controls, 'tiltPolicy', { get: () => tilt.policy, enumerable: true });
+  Object.defineProperty(controls, 'tiltAvailable', { get: () => tilt.available, enumerable: true });
+  // Getters: Object.assign would copy the values once.
+  Object.defineProperty(controls, 'northUpMaxLatitudeDeg', { get: () => maxLatitudeDeg, enumerable: true });
+  return Object.defineProperty(controls, 'navigationMode', { get: () => mode, enumerable: true });
 }
 
 /** One attachment to an input element. */
@@ -82,6 +155,7 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
   const quarter: InertiaTaus = {
     panTauMs: full.panTauMs / 4,
     rotateTauMs: full.rotateTauMs / 4,
+    twistTauMs: full.twistTauMs / 4,
     tiltTauMs: full.tiltTauMs / 4,
     zoomTauMs: full.zoomTauMs / 4,
   };
@@ -145,8 +219,9 @@ function attach(
       // The wheel's zoom goes first, so a drag started during it keeps its grabbed point under the pointer.
       wheel.apply();
       const zooming = zoom.pending !== 0;
-      // Every frame reads the engine clock (`NavigationApi.timeMs`, no allocation), so animations start where it was.
-      const now = port.beginFrame();
+      // Every frame reads the engine clock (`NavigationApi.timeInto`, no allocation), so animations start where it was.
+      port.beginFrame();
+      const now = port.times[FRAME_MS] ?? 0;
       let moving = zooming && zoom.step(now, port);
       mouse.apply();
       touch.apply();

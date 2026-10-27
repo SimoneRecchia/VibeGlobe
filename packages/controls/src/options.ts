@@ -1,4 +1,6 @@
-import { GlobeError } from '@vibeglobe/core';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { GlobeError, type NavigationMode } from '@vibeglobe/core';
 
 /** Which gestures are on; every one is on by default. */
 export interface GestureSwitches {
@@ -24,16 +26,40 @@ export interface GestureSwitches {
   readonly inertia: boolean;
 }
 
+/**
+ * The tilt policy (F625): far from the ground the view stays flat and cannot tilt; close to it the tilt rises by itself.
+ * Distances are from the eye to the point looked at, which is the height above the ground when looking straight down.
+ */
+export interface TiltPolicy {
+  /** Beyond this distance the tilt is 0° and neither gestures nor the API can tilt, meters (default 20,000). */
+  readonly lock2DAboveMeters: number;
+  /** Within this distance the automatic tilt rises from 0°, meters (default 2,000), below the lock. */
+  readonly autoTiltBelowMeters: number;
+  /** The automatic tilt reached at a quarter of `autoTiltBelowMeters`, degrees (default 60), at most `maxTiltDeg`. */
+  readonly autoTiltMaxDeg: number;
+}
+
 /** Inertia time constants (ADR 0009 §6): the remaining motion decays as e^(−t/τ). */
 export interface InertiaSettings {
+  /** Pan glide after a drag; 650 ms keeps a fifth of the release speed after 1 s (KB-177). */
   readonly panTauMs: number;
+  /** Rotation glide after a rotate drag (Ctrl or right button); 650 ms by default, like the pan (KB-177). */
   readonly rotateTauMs: number;
+  /** Heading glide after a two-finger twist: short, so a twist ends close to where the fingers left it (KB-177). */
+  readonly twistTauMs: number;
   readonly tiltTauMs: number;
   readonly zoomTauMs: number;
   /** The fastest pan a release carries on, in CSS pixels per second. */
   readonly maxPanSpeedPxPerS: number;
-  /** Velocity is measured over this much time before the release. */
+  /**
+   * Velocity is the least-squares slope of the motion over this much time before the latest move (stretched when
+   * events come slower), however long before the release that move came (KB-177).
+   */
   readonly velocityWindowMs: number;
+  /** A release after the pointer stayed within {@link stillPx} for at least this long does not glide (KB-177). */
+  readonly stillMs: number;
+  /** Motion within this distance, in CSS pixels, counts as holding still (sensor jitter). */
+  readonly stillPx: number;
 }
 
 /** Wheel and trackpad zoom (ADR 0009 §4). */
@@ -98,6 +124,24 @@ export interface ControlsOptions {
    * quarter of its time constants; 'no-preference' never does.
    */
   readonly reducedMotion?: 'system' | 'reduce' | 'no-preference';
+  /**
+   * How a drag moves the camera: 'free' (default) turns the globe as a trackball, so the grabbed point stays under the
+   * cursor, the view passes over the poles and the heading turns with it; 'north-up' keeps north up, horizontal drags
+   * turning about the polar axis and vertical ones changing latitude, and stops at the poles. Changed at runtime with
+   * `setNavigationMode`.
+   */
+  readonly navigationMode?: NavigationMode;
+  /**
+   * 'north-up' only: the highest latitude of the point the camera looks at, degrees, from 1 to 89.9 (default 85).
+   * Drags and zooms stop there, short of the pole, where turning about the polar axis would spin the view. Changed at
+   * runtime with `setNorthUpMaxLatitude`.
+   */
+  readonly northUpMaxLatitudeDeg?: number;
+  /**
+   * The tilt policy (F625): `true` for the defaults (20,000 m, 2,000 m, 60°), an object for some of them, omitted or
+   * `false` for none (the engine's zoom curves tilt the view). Changed at runtime with `setTiltPolicy`.
+   */
+  readonly tiltPolicy?: boolean | Partial<TiltPolicy>;
 }
 
 /** Options with every default filled in. */
@@ -112,7 +156,18 @@ export interface ResolvedControlsOptions {
   readonly maxTiltDeg: number;
   readonly zoomAnimationMs: number;
   readonly reducedMotion: 'system' | 'reduce' | 'no-preference';
+  readonly navigationMode: NavigationMode;
+  readonly northUpMaxLatitudeDeg: number;
+  /** The tilt policy in force at start, or null for none. */
+  readonly tiltPolicy: TiltPolicy | null;
 }
+
+/** The tilt policy's defaults (F625). */
+export const DEFAULT_TILT_POLICY: TiltPolicy = Object.freeze({
+  lock2DAboveMeters: 20_000,
+  autoTiltBelowMeters: 2_000,
+  autoTiltMaxDeg: 60,
+});
 
 /** The defaults: ADR 0009's starting values. */
 export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
@@ -129,12 +184,15 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
     inertia: true,
   },
   inertia: {
-    panTauMs: 200,
-    rotateTauMs: 200,
+    panTauMs: 650,
+    rotateTauMs: 650,
+    twistTauMs: 200,
     tiltTauMs: 150,
     zoomTauMs: 150,
     maxPanSpeedPxPerS: 2500,
-    velocityWindowMs: 80,
+    velocityWindowMs: 50,
+    stillMs: 150,
+    stillPx: 2,
   },
   wheel: { pixelsPerLevel: 300, pinchPixelsPerLevel: 100, notchSmoothingMs: 100, maxLeadLevels: 2 },
   keyboard: { panViewportsPerS: 0.8, rotateDegPerS: 90, tiltDegPerS: 45, smoothingMs: 150, zoomLevelsPerPress: 1 },
@@ -153,6 +211,9 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
   maxTiltDeg: 89,
   zoomAnimationMs: 120,
   reducedMotion: 'system',
+  navigationMode: 'free',
+  northUpMaxLatitudeDeg: 85,
+  tiltPolicy: null,
 };
 
 function invalid(name: string, rule: string): GlobeError {
@@ -204,7 +265,13 @@ export function resolveControlsOptions(options: ControlsOptions = {}): ResolvedC
   }
   return {
     gestures: switches(options.gestures),
-    inertia: numbers('inertia', d.inertia, options.inertia, ['panTauMs', 'rotateTauMs', 'tiltTauMs', 'zoomTauMs']),
+    inertia: numbers('inertia', d.inertia, options.inertia, [
+      'panTauMs',
+      'rotateTauMs',
+      'twistTauMs',
+      'tiltTauMs',
+      'zoomTauMs',
+    ]),
     wheel: numbers('wheel', d.wheel, options.wheel, ['pixelsPerLevel', 'pinchPixelsPerLevel', 'maxLeadLevels']),
     keyboard: numbers('keyboard', d.keyboard, options.keyboard, ['smoothingMs', 'zoomLevelsPerPress']),
     touch: numbers('touch', d.touch, options.touch, ['tapMaxMs', 'doubleTapMs', 'tiltDecisionMs']),
@@ -213,5 +280,37 @@ export function resolveControlsOptions(options: ControlsOptions = {}): ResolvedC
     maxTiltDeg: scalar('maxTiltDeg', options.maxTiltDeg, d.maxTiltDeg, 0, 89),
     zoomAnimationMs: scalar('zoomAnimationMs', options.zoomAnimationMs, d.zoomAnimationMs, 1, 10_000),
     reducedMotion,
+    navigationMode: validNavigationMode(options.navigationMode ?? d.navigationMode),
+    northUpMaxLatitudeDeg: validNorthUpLatitude(options.northUpMaxLatitudeDeg ?? d.northUpMaxLatitudeDeg),
+    tiltPolicy: validTiltPolicy(options.tiltPolicy ?? false, scalar('maxTiltDeg', options.maxTiltDeg, 89, 0, 89)),
   };
+}
+
+/** A 'north-up' latitude limit, degrees from 1 to 89.9, or a GlobeError ('invalid-option') for anything else. */
+export function validNorthUpLatitude(deg: unknown): number {
+  return scalar('northUpMaxLatitudeDeg', deg as number, 85, 1, 89.9);
+}
+
+/** A navigation mode, or a GlobeError ('invalid-option') for anything else. */
+export function validNavigationMode(mode: unknown): NavigationMode {
+  if (mode !== 'free' && mode !== 'north-up') throw invalid('navigationMode', "'free' or 'north-up'");
+  return mode;
+}
+
+/**
+ * A tilt policy with its defaults filled in (`true` for all of them), null for `false` or `null`, or a GlobeError
+ * ('invalid-option'): the lock from 1 m to 40,000 km, the automatic tilt's distance below it, its tilt from 1° to
+ * `maxTiltDeg`.
+ */
+export function validTiltPolicy(policy: unknown, maxTiltDeg = 89): TiltPolicy | null {
+  if (policy === false || policy === null) return null;
+  if (policy === true) return DEFAULT_TILT_POLICY;
+  if (typeof policy !== 'object') throw invalid('tiltPolicy', 'a boolean or an object');
+  const input = policy as Partial<TiltPolicy>;
+  const d = DEFAULT_TILT_POLICY;
+  const lock = scalar('tiltPolicy.lock2DAboveMeters', input.lock2DAboveMeters, d.lock2DAboveMeters, 1, 4e7);
+  const below = scalar('tiltPolicy.autoTiltBelowMeters', input.autoTiltBelowMeters, d.autoTiltBelowMeters, 0, lock);
+  if (below <= 0 || below >= lock) throw invalid('tiltPolicy.autoTiltBelowMeters', 'above 0 and below the lock');
+  const tilt = scalar('tiltPolicy.autoTiltMaxDeg', input.autoTiltMaxDeg, d.autoTiltMaxDeg, 1, maxTiltDeg);
+  return Object.freeze({ lock2DAboveMeters: lock, autoTiltBelowMeters: below, autoTiltMaxDeg: tilt });
 }

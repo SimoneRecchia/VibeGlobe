@@ -149,3 +149,56 @@ describe('XYZ and TMS addressing (F229)', () => {
     },
   );
 });
+
+describe('xyzImagery coverage area', () => {
+  it('requests no tile outside its polygons or beyond its levels, and exposes their bounds as its coverage', () => {
+    const square: [number, number][] = [
+      [10, 46],
+      [16, 46],
+      [16, 49],
+      [10, 49],
+      [10, 46],
+    ];
+    const source = xyzImagery({
+      id: 'ortho',
+      url: 'https://t/{z}/{x}/{y}.jpg',
+      maxLevel: 12,
+      area: { polygons: [[square]] },
+    });
+    const out = { url: '', hostIndex: 0 };
+    // Level 10 tiles of Web Mercator: x = 540 is about 9.8°–10.2° E (the western edge), 550 about 13.4° E.
+    expect(source.request(tile(10, 550, 354), out)).toMatchObject({ url: 'https://t/10/550/354.jpg' });
+    expect(source.request(tile(10, 540, 354), out)).toBe('noData');
+    expect(source.request(tile(10, 600, 354), out)).toBe('noData');
+    expect(source.request(tile(13, 4400, 2832), out)).toBe('noData');
+    expect(source.coverage?.length).toBe(1);
+  });
+
+  it('clips a GeoJSON area per pixel: border tiles requested with a mask, the source transparent; blankTile parsed (F618)', () => {
+    const source = xyzImagery({
+      id: 'ortho',
+      url: 'https://t/{z}/{x}/{y}.jpg',
+      area: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [10, 46],
+            [16, 46],
+            [16, 49],
+            [10, 49],
+            [10, 46],
+          ],
+        ],
+      },
+      blankTile: '#ffffff',
+    });
+    const out = { url: '', hostIndex: 0 };
+    expect(source.transparent).toBe(true);
+    expect(source.blankTile).toEqual({ rgb: [255, 255, 255] });
+    // Level 10, x = 540 straddles 10° E: requested now, with the outline over it; x = 550 lies wholly inside.
+    expect(source.request(tile(10, 540, 354), out)).toMatchObject({ url: 'https://t/10/540/354.jpg' });
+    expect(source.tileMask?.(tile(10, 540, 354))?.ringEnds.length).toBe(1);
+    expect(source.tileMask?.(tile(10, 550, 354))).toBeUndefined();
+    expect(() => xyzImagery({ id: 'x', url: 'https://t/{z}/{x}/{y}.jpg', blankTile: 'white' })).toThrow(/#rrggbb/);
+  });
+});

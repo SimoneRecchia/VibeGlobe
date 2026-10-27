@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Probes of what the browser offers, and image decoding with and without a DOM.
 import { GlobeError } from '@vibeglobe/core';
 import type { BackendChoice, DrawingSurface } from './three-backend.js';
@@ -52,4 +54,11 @@ export async function chooseWebGPU(
     );
   }
   return webgpu;
+}
+
+/** The global scope a drawing surface lives in: the page's window, or the worker's global scope. */
+export function surfaceScope(surface: DrawingSurface): typeof globalThis {
+  return surface.kind === 'element'
+    ? ((surface.container.ownerDocument.defaultView ?? globalThis) as typeof globalThis)
+    : globalThis;
 }

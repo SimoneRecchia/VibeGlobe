@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { createControls, type NavigationControls } from '@vibeglobe/controls';
 import {
   createGlobe,
@@ -161,6 +163,14 @@ function changedView(camera: CameraState, view: ViewInit): ViewInit {
   return changed;
 }
 
+/** The view fields each view attribute sets. */
+const VIEW_FIELDS: Readonly<Record<string, readonly (keyof ViewInit)[]>> = {
+  center: ['longitudeDeg', 'latitudeDeg'],
+  zoom: ['zoom'],
+  'heading-deg': ['headingDeg'],
+  'tilt-deg': ['tiltDeg'],
+};
+
 /** Whether the engine's mode is the toggle's choice ('3d' chooses a tilt: the engine reports 'manual'). */
 function sameMode(engine: Globe['viewMode'], chosen: '2d' | '3d' | 'auto'): boolean {
   return engine === (chosen === '3d' ? 'manual' : chosen);
@@ -303,13 +313,19 @@ function makeElementClass(): new () => VibeGlobeElement {
       });
     }
 
-    attributeChangedCallback(): void {
+    attributeChangedCallback(name: string, previous: string | null, value: string | null): void {
       const globe = this.#engine?.globe;
-      if (!globe) return;
-      this.#engine?.ui.sync();
-      const mode = parseViewMode(this.getAttribute('view-mode'));
-      if (mode && !sameMode(globe.viewMode, mode)) globe.setViewMode(mode);
-      const changed = changedView(globe.camera, readView(this));
+      if (!globe || previous === value) return;
+      // Only the attribute that changed applies: the rest of the view stays where the user navigated (KB-145).
+      if (name === 'view-mode') {
+        const mode = parseViewMode(value);
+        if (mode && !sameMode(globe.viewMode, mode)) globe.setViewMode(mode);
+        return;
+      }
+      const fields = VIEW_FIELDS[name];
+      if (!fields) return this.#engine?.ui.sync();
+      const view = readView(this);
+      const changed = changedView(globe.camera, Object.fromEntries(fields.map((f) => [f, view[f]])) as ViewInit);
       if (Object.keys(changed).length > 0) globe.jumpTo(changed);
     }
   };

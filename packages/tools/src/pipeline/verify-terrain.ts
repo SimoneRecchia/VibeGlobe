@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Independent check of terrain tiles (F339): heights decoded from the output at random points are compared with the
  * same interpolation computed from source pixels that GDAL reads, in its pinned Docker image, from the downloaded DEM
@@ -71,7 +73,9 @@ function outputHeight(tiles: string, point: Point): number {
   const png = decodePng(
     new Uint8Array(readFileSync(join(tiles, `${point.tile.z}/${point.tile.x}/${point.tile.y}.png`))),
   );
-  const p = png.pixels.subarray((point.py * TILE_PX + point.px) * 3);
+  // Terrain tiles carry a one-pixel border of their neighbors' heights (KB-178).
+  const border = (png.width - TILE_PX) / 2;
+  const p = png.pixels.subarray(((point.py + border) * png.width + point.px + border) * 3);
   return terrariumHeight(p[0] ?? 0, p[1] ?? 0, p[2] ?? 0);
 }
 

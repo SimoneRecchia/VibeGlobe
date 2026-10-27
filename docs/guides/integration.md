@@ -40,8 +40,9 @@ them), and the element brings `@vibeglobe/ui` and `@vibeglobe/sources`; npm inst
 
 ## Licensing
 
-VibeGlobe is released under the [PolyForm Noncommercial License 1.0.0](../../LICENSE.md): you may use, change and
-redistribute it for any noncommercial purpose. Commercial use needs a separate license from the copyright holder. The
+VibeGlobe is open source under the [Mozilla Public License 2.0](../../LICENSE.md): you may use, change and
+redistribute it for any purpose, commercial included, inside works under any license; a modified VibeGlobe file you
+distribute stays available under the MPL 2.0 with its notice. There is no separate commercial license. The
 third-party code the packages ship is under permissive licenses only (MIT, BSD, Apache-2.0, ISC), listed in
 `THIRD_PARTY_NOTICES.md`; keep that notice with your distribution. Map data and imagery have licenses of their own:
 the engine shows each source's required credits (see "Attribution" below).

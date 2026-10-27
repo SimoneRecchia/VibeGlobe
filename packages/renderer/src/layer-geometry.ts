@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   layerOrigin,
   writeLayerVertex,
@@ -22,7 +24,8 @@ import {
   type Triangle,
 } from './layer-subdivision.js';
 import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
-import type { TextStyle } from './layer-atlas.js';
+import { LABEL_BUFFER_TEXELS, labelReferencePx, SDF_UNITS_PER_TEXEL } from './label-sdf.js';
+import { writePointQuad } from './layer-points.hot.js';
 
 /** The vertex arrays of a layer mesh, sized for its vertices (ADR 0037). */
 export interface LayerArrays {
@@ -34,12 +37,20 @@ export interface LayerArrays {
   readonly heights: Float32Array;
   readonly colors: Float32Array;
   readonly corners: Float32Array;
-  /** Atlas coordinates of labels and marker images; (−1, −1) where a quad is a solid shape. */
+  /**
+   * Four per vertex: atlas coordinates of labels and marker images, (−1, −1) where a quad is a solid shape; for labels
+   * the halo's sRGB color packed as 0xRRGGBB and its alpha (F358).
+   */
   readonly uvs: Float32Array;
   readonly indices: Uint32Array;
   /** Lines only: the other endpoint of each vertex's segment. */
   readonly other?: { positions: Float32Array; normals: Float32Array; planes: Float32Array; heights: Float32Array };
 }
+
+/** The vertex values of a hidden quad: transparent, collapsed, without an image. */
+const HIDDEN_COLOR = [0, 0, 0, 0];
+const HIDDEN_CORNER = [0, 0, 2, 2];
+const HIDDEN_UV = [-1, -1, 0, 0];
 
 /** A feature's straight RGBA with its opacity and visibility applied to alpha. */
 function colorOf(batch: BatchContents, feature: number, attribute: BatchAttribute = 'color'): number[] {
@@ -110,7 +121,7 @@ class Builder {
     color: number[],
     corner: number[],
     to?: number[],
-    uv: number[] = [-1, -1],
+    uv: number[] = HIDDEN_UV,
   ): void {
     const lon = this.place(lonDeg);
     this.attributesOf(lon, latDeg, this);
@@ -169,9 +180,10 @@ function quadIndices(builder: Builder): void {
   builder.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
-/** Where labels and marker images come from (`LayerAtlas`). */
+/** Where labels and marker images come from: label distance fields (`LabelSdf`) and images (`LayerAtlas`). */
 export interface QuadImages {
-  text(text: string, sizePx: number, style: TextStyle): AtlasRect;
+  /** The distance field of a feature's text at a size in a font, or undefined while it is generated (F358). */
+  text(text: string, sizePx: number, font: string, feature: number): AtlasRect | undefined;
   image(name: string): AtlasRect | undefined;
 }
 
@@ -192,19 +204,25 @@ function anchorShift(anchor: number, w: number, h: number): [number, number] {
   return [x, y];
 }
 
-/** A style color (sRGB, 0–1) as CSS, opaque unless `withAlpha`. */
-function cssOf(batch: BatchContents, attribute: BatchAttribute, feature: number, withAlpha: boolean): string {
-  const [r = 0, g = 0, b = 0, a = 1] = [0, 1, 2, 3].map((c) => valueOf(batch, attribute, feature, c));
-  return `rgba(${[r, g, b].map((v) => String(Math.round(v * 255))).join(', ')}, ${String(withAlpha ? a : 1)})`;
-}
-
-/** How a label's text is drawn (F357): `text-font`, `text-color`, `text-halo-color` and `text-halo-width`. */
-function textStyleOf(batch: BatchContents, feature: number): TextStyle {
+/**
+ * How a label's distance field is drawn (F357, F358): `layerCorner.zw` = (3 + the halo's width in field units, field
+ * units per CSS pixel), `layerUv.zw` = `text-halo-color` as sRGB bytes, red × 256 + green and blue × 256 + alpha (the
+ * alpha with the feature's opacity): 16 bits a value, which interpolation across the quad keeps to well under one.
+ */
+function labelShading(batch: BatchContents, feature: number): { corner: [number, number]; halo: [number, number] } {
+  const sizePx = Math.max(valueOf(batch, 'sizePx', feature), 1e-3);
+  const perPx = (SDF_UNITS_PER_TEXEL * labelReferencePx(sizePx)) / sizePx;
+  // One texel inside the field's reach, where its value is still above 0 (a halo out to 0 would fill the quad).
+  const haloTexels = Math.min(
+    LABEL_BUFFER_TEXELS - 1,
+    (valueOf(batch, 'widthPx', feature) * perPx) / SDF_UNITS_PER_TEXEL,
+  );
+  const opacity = valueOf(batch, 'opacity', feature);
+  const byte = (c: number): number =>
+    Math.round(Math.min(1, Math.max(0, valueOf(batch, 'outlineColor', feature, c) * (c === 3 ? opacity : 1))) * 255);
   return {
-    font: batch.strings.get('font')?.[feature] ?? '',
-    fill: cssOf(batch, 'color', feature, false),
-    halo: cssOf(batch, 'outlineColor', feature, true),
-    haloPx: valueOf(batch, 'widthPx', feature),
+    corner: [3 + haloTexels * SDF_UNITS_PER_TEXEL, perPx],
+    halo: [byte(0) * 256 + byte(1), byte(2) * 256 + byte(3)],
   };
 }
 
@@ -222,8 +240,10 @@ function boxOf(
     // when its fade-in starts, which rewrites its quad (F359).
     if (valueOf(batch, 'opacity', feature) * valueOf(batch, 'visible', feature) <= 0)
       return { w: 0, h: 0, rect: undefined };
-    const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size, textStyleOf(batch, feature));
-    return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: size / 2, h: size / 2, rect };
+    // Until its field arrives a label is collapsed: drawn once the field is in the atlas.
+    const font = batch.strings.get('font')?.[feature] ?? '';
+    const rect = images?.text(batch.strings.get('text')?.[feature] ?? '', size, font, feature);
+    return rect ? { w: rect.widthPx / 2, h: rect.heightPx / 2, rect } : { w: 0, h: 0, rect };
   }
   // Markers: the image at `sizePx` tall (its natural height when unset), or a solid square without one.
   const name = batch.strings.get('icon')?.[feature] ?? '';
@@ -256,12 +276,7 @@ function quadVertices(batch: BatchContents, feature: number, images: QuadImages 
       height,
       color: [0, 0, 0, 0],
       corners: [none, none, none, none],
-      uvs: [
-        [-1, -1],
-        [-1, -1],
-        [-1, -1],
-        [-1, -1],
-      ],
+      uvs: [HIDDEN_UV, HIDDEN_UV, HIDDEN_UV, HIDDEN_UV],
     };
   }
   const { w, h, rect } = boxOf(batch, feature, images);
@@ -274,19 +289,25 @@ function quadVertices(batch: BatchContents, feature: number, images: QuadImages 
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const round = batch.kind === 'point';
-  // Marker images keep their own colors (MapLibre tints only SDF icons), and labels are drawn in theirs (F357): white,
-  // with the feature's alpha.
-  const own = (batch.kind === 'marker' || batch.kind === 'label') && rect;
+  // Marker images keep their own colors (MapLibre tints only SDF icons): white, with the feature's alpha. A label's
+  // color is its text's; its halo and field scale ride in the corner and uv spares (F358).
+  const own = batch.kind === 'marker' && rect;
   const color = own ? [1, 1, 1, colorOf(batch, feature)[3] ?? 1] : colorOf(batch, feature);
+  const label = batch.kind === 'label' && rect ? labelShading(batch, feature) : undefined;
   const corners: number[][] = [];
   const uvs: number[][] = [];
   for (const [sx, sy] of QUAD_CORNERS) {
     const x = sx * w;
     const y = sy * h;
     // corner.zw: the unit square for round points, 2 for every other quad.
-    corners.push([dx + x * cos - y * sin, dy + x * sin + y * cos, round ? sx : 2, round ? sy : 2]);
+    const zw = label ? label.corner : round ? [sx, sy] : [2, 2];
+    corners.push([dx + x * cos - y * sin, dy + x * sin + y * cos, zw[0] ?? 2, zw[1] ?? 2]);
     // Atlas rows run downward: the quad's top (sy = 1) samples v0.
-    uvs.push(rect ? [sx < 0 ? rect.u0 : rect.u1, sy > 0 ? rect.v0 : rect.v1] : [-1, -1]);
+    uvs.push(
+      rect
+        ? [sx < 0 ? rect.u0 : rect.u1, sy > 0 ? rect.v0 : rect.v1, label?.halo[0] ?? 0, label?.halo[1] ?? 0]
+        : HIDDEN_UV,
+    );
   }
   return { lon, lat, height, color, corners, uvs };
 }
@@ -319,10 +340,6 @@ function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages |
   }
 }
 
-const HIDDEN_COLOR = [0, 0, 0, 0];
-const HIDDEN_CORNER = [0, 0, 2, 2];
-const HIDDEN_UV = [-1, -1];
-
 /**
  * Rewrites the vertices of features [first, end) of a quad batch in place (F376, F377); returns false when its arrays do
  * not hold them (the batch must be rebuilt).
@@ -336,6 +353,11 @@ export function rewriteQuads(
   ground: LayerGround | undefined,
 ): boolean {
   if (end * 4 > arrays.vertices) return false;
+  if (batch.kind === 'point') {
+    // Points have no image: the allocation-free path of live feeds (F378).
+    for (let feature = first; feature < end; feature++) writePointQuad(batch, arrays, feature, ground);
+    return true;
+  }
   for (let feature = first; feature < end; feature++) {
     const q = quadVertices(batch, feature, images);
     const height = q.height + (ground?.heightAt(q.lon, q.lat) ?? 0);
@@ -346,7 +368,7 @@ export function rewriteQuads(
       arrays.heights[v] = height;
       arrays.colors.set(q.color, v * 4);
       arrays.corners.set(q.corners[c] ?? [], v * 4);
-      arrays.uvs.set(q.uvs[c] ?? [-1, -1], v * 2);
+      arrays.uvs.set(q.uvs[c] ?? HIDDEN_UV, v * 4);
     }
   }
   return true;

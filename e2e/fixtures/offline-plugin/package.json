@@ -3,6 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "description": "An application's own cache store and network policy for @vibeglobe/offline, written against its public interfaces only (F327).",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module"
 }

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The draw interface of data layers (ADR 0029, ADR 0037): types and constants only. `@vibeglobe/layers` decides what
  * changed and writes it here; the renderer owns the GPU buffers and draws them.
@@ -155,6 +157,11 @@ export interface LayerRenderTarget {
   stats?(): { readonly rebuilds: number; readonly rangeUploads: number; readonly uploadedVertices: number };
   /** Optional, set by the engine: where clamped and draped features take their heights from (ADR 0037). */
   setGround?(ground: LayerGround): void;
+  /**
+   * Optional, set by the engine: called when content the target prepares off the frame (label glyphs generated in a
+   * worker, F358) is ready to draw, so the engine draws a frame.
+   */
+  onContentReady?(listener: () => void): void;
 }
 
 /**

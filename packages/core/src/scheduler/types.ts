@@ -1,3 +1,6 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { Attribution } from '../imagery/credits.js';
 /**
  * Contracts between the tile scheduler, the network transport, the worker pool and the caches (ADR 0007, ADR 0011,
  * docs/plan/m3-imagery-streaming.md §2.2). Core stays DOM-free: sources implement the transport with `fetch` and
@@ -42,6 +45,11 @@ export type TransportResult =
       readonly endAgoMs?: number;
       /** Served from the HTTP cache: not a measure of the link. */
       readonly cached?: boolean;
+      /**
+       * A credit of this tile alone, listed while the tile is drawn: the offline package it came from (F306, KB-189).
+       * Return the same object for every tile it covers, so the frame compares credits without allocating.
+       */
+      readonly attribution?: Attribution;
     }
   | { readonly kind: 'status'; readonly status: number; readonly retryAfterMs: number | undefined }
   | { readonly kind: 'timeout' | 'aborted' }

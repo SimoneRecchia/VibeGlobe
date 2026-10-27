@@ -1,0 +1,25 @@
+# 0044. Tone matching of source chains
+
+- Status: Accepted
+- Date: 2026-10-24
+- Milestone: M7 (F249)
+
+## Context
+
+A layer's chain of sources (ADR 0038) can mix sources of different brightness and color balance: a global package and a regional online source, for one. Where the active source changes, at a level or at a coverage edge, the change of tone shows as a step. F249 asks that neither the switch nor the boundary is visible, and that a layer can turn the adjustment off.
+
+## Options considered
+
+1. **Per-channel gains from the means in view.** Each tile's mean color is measured once at upload (a 4 × 4 downscale on a 2D canvas); each frame the renderer averages the drawn tiles of each source and scales a later source's colors by the first source's mean over its own. Cheap (one multiply in the shader, a few dozen additions per frame), no extra passes.
+2. **Histogram matching.** Matches contrast too, but needs histograms per tile and a lookup texture per source; much more code for the fixture-free cases the plan names.
+3. **Feathered blending across the boundary.** Hides the edge but not a switch between levels, and needs both sources loaded on both sides.
+
+## Decision
+
+Option 1. Core marks each draw with its layer and chain position (`TileDrawList.toneSources`, -1 for draws that are not matched: single-source layers, base images, `harmonize: false`). The renderer's `ToneMatcher` sets each later source's gain to the reference's mean over its own from the frame's draws, clamped to ×0.5–×2, and keeps the last gain while either is out of view; the imagery a draw fades from keeps the gain of the source it was drawn as, so a cross-fade does not jump. Means are taken in sRGB and the shader multiplies linear texels, so the gain applied is the sRGB ratio to the power 2.2. Gains follow the view each frame without easing: an idle engine draws no further frame that could ease them in. `ImageryLayerOptions.harmonize` (default true) turns it off per layer.
+
+## Consequences
+
+- Means exist only for images a 2D canvas can draw (`ImageBitmap`, image and canvas elements); compressed (KTX2) tiles keep gain 1.
+- Matching is global per source and view, not local: a source whose tone varies across the view is matched on average.
+- `e2e/imagery-tone-matching.spec.ts` checks the boundary, the switch and the raw colors against the `toned` fixture pattern.

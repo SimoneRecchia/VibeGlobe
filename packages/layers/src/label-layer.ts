@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A label layer (F357, F359, F360): text at coordinates, styled with MapLibre `text-*` properties, decluttered by
  * {@link LabelPlacer} with fades. Glyph rendering (SDF atlases) is the renderer's; this layer decides what shows.
@@ -70,24 +72,55 @@ export class LabelLayer extends DataLayer {
 
   #placedCount = -1;
 
-  *#inputs(): Generator<PlacementInput> {
+  /** One mutable input and one iterator result, refilled for each label (KB-171): the placer copies what it reads. */
+  readonly #input = {
+    id: 0 as FeatureId,
+    longitudeDeg: 0,
+    latitudeDeg: 0,
+    heightMeters: 0,
+    text: '',
+    sizePx: 0,
+    anchor: 0,
+    offsetXEm: 0,
+    offsetYEm: 0,
+    sortKey: 0,
+    enabled: false,
+  };
+  readonly #result: { done: boolean; value: PlacementInput } = { done: false, value: this.#input };
+
+  /** The labels as placement reads them, each valid until the next is read; every call reads from the first. */
+  #inputs(): Iterable<PlacementInput> {
+    const cursor = { index: 0 };
+    const iterator: IterableIterator<PlacementInput> = {
+      next: () => this.#nextInput(cursor),
+      [Symbol.iterator]: () => iterator,
+    };
+    return iterator;
+  }
+
+  #nextInput(cursor: { index: number }): IteratorResult<PlacementInput> {
     const p = this.store.array('position');
-    for (let i = 0; i < this.store.count; i++) {
+    for (; cursor.index < this.store.count; cursor.index++) {
+      const i = cursor.index;
       const id = this.store.idAt(i);
       if (id === undefined) continue;
-      yield {
-        id,
-        longitudeDeg: p[3 * i] ?? 0,
-        latitudeDeg: p[3 * i + 1] ?? 0,
-        heightMeters: p[3 * i + 2] ?? 0,
-        text: this.store.stringAt('text', i),
-        sizePx: this.attributeValue('sizePx', i, 0),
-        anchor: this.attributeValue('anchor', i, 0),
-        offsetXEm: this.attributeValue('offsetPx', i, 0),
-        offsetYEm: this.attributeValue('offsetPx', i, 1),
-        sortKey: this.sortKey(i),
-        enabled: this.featureVisibility(i) > 0,
-      };
+      const input = this.#input;
+      input.id = id;
+      input.longitudeDeg = p[3 * i] ?? 0;
+      input.latitudeDeg = p[3 * i + 1] ?? 0;
+      input.heightMeters = p[3 * i + 2] ?? 0;
+      input.text = this.store.stringAt('text', i);
+      input.sizePx = this.attributeValue('sizePx', i, 0);
+      input.anchor = this.attributeValue('anchor', i, 0);
+      input.offsetXEm = this.attributeValue('offsetPx', i, 0);
+      input.offsetYEm = this.attributeValue('offsetPx', i, 1);
+      input.sortKey = this.sortKey(i);
+      input.enabled = this.featureVisibility(i) > 0;
+      cursor.index++;
+      this.#result.done = false;
+      return this.#result;
     }
+    this.#result.done = true;
+    return this.#result;
   }
 }

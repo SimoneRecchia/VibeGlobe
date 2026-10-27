@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/ui",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe ui: optional ready-made UI controls, theming and translations.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -10,15 +10,28 @@
       "types": "./dist/index.d.ts",
       "source": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./minimap": {
+      "types": "./dist/minimap.d.ts",
+      "source": "./src/minimap.ts",
+      "default": "./dist/minimap.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/gis": "0.0.0",
-    "@vibeglobe/layers": "0.0.0"
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/gis": "0.1.0",
+    "@vibeglobe/layers": "0.1.0"
   }
 }

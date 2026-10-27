@@ -1,6 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { TileTransport, TileRequest, TimeoutsMs } from '../scheduler/types.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import type { TileRectangleRad, TilingScheme } from '../tiling/tiling-scheme.js';
+import type { TileMask } from './coverage-area.js';
 import type { Attribution, CreditProfile } from './credits.js';
 
 /**
@@ -44,6 +47,11 @@ export interface TileSource {
    * `@vibeglobe/offline` resolves it from the network mode, the switches and the provider's profile (F271, F281–F285).
    */
   loadingFlags?(): number;
+  /**
+   * Optional: how many of the source's requests in flight wait for connectivity to return (`@vibeglobe/offline`
+   * during an outage). They do not keep the engine busy, so it goes idle with the view as complete as it can be (KB-194).
+   */
+  heldRequests?(): number;
 }
 
 /** Tiles stay in RAM and GPU memory after they leave the screen, within the budgets (F281); off: only the working set. */
@@ -74,6 +82,26 @@ export interface ImagerySource extends TileSource {
   readonly transparent?: boolean;
   /** How the bytes are decoded in the worker pool: browser image formats, or KTX2 (ADR 0020). */
   readonly decoder: 'image' | 'ktx2';
+  /**
+   * The outline of the source's area over a tile that crosses its border: the decoder makes the pixels outside it
+   * transparent, so the layers below show there (F618, KB-209). Undefined for a tile wholly inside. Browser image
+   * formats only; a source with masks is `transparent`.
+   */
+  tileMask?(coord: TileCoord): TileMask | undefined;
+  /**
+   * A color that, filling a whole tile, means the source has no data there (white or black filler a service sends
+   * outside its area): such a tile counts as `noData` (F618). The fallback for services whose area is not known as a
+   * polygon; browser image formats only.
+   */
+  readonly blankTile?: BlankTile;
+}
+
+/** A tile color that means "no data" (F618). */
+export interface BlankTile {
+  /** sRGB channels, 0–255. */
+  readonly rgb: readonly [number, number, number];
+  /** The largest difference per channel still counted as that color (default 2: JPEG noise). */
+  readonly tolerance?: number;
 }
 
 /**
@@ -83,11 +111,22 @@ export interface ImagerySource extends TileSource {
 export function imageryDecodeTask(
   source: ImagerySource,
   formats: readonly string[],
-): (bytes: ArrayBuffer, contentType: string) => { task: string; input: unknown } {
-  return (bytes, contentType) =>
-    source.decoder === 'ktx2'
-      ? { task: 'transcode-ktx2', input: { bytes, formats } }
-      : { task: 'decode-image', input: { bytes, contentType } };
+): (bytes: ArrayBuffer, contentType: string, coord?: TileCoord) => { task: string; input: unknown } {
+  return (bytes, contentType, coord) => {
+    if (source.decoder === 'ktx2') return { task: 'transcode-ktx2', input: { bytes, formats } };
+    // Border tiles carry the area's outline and every tile the blank color, for the decoder (F618).
+    const mask = coord && source.tileMask?.(coord);
+    const blank = source.blankTile;
+    return {
+      task: 'decode-image',
+      input: {
+        bytes,
+        contentType,
+        ...(mask ? { mask } : {}),
+        ...(blank ? { blank: { rgb: blank.rgb, tolerance: blank.tolerance ?? 2 } } : {}),
+      },
+    };
+  };
 }
 
 /** True when a tile's extent overlaps at least one coverage rectangle (edges touching do not count). */

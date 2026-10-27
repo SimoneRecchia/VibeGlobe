@@ -107,15 +107,17 @@ describe('view transitions keep the frame loop running (KB-095)', () => {
     globe.setViewMode('2d');
     ticks(60);
     expect(globe.camera.tiltDeg).toBe(0);
-    globe.jumpTo({ zoom: 2.4 });
+    // A view whose ground does not reach the polar caps, which keep the globe round (KB-211).
+    globe.jumpTo({ zoom: 5.5 });
     frames(1);
-    globe.setViewCurves({ morph: { startGroundZoom: 2, endGroundZoom: 3 } });
+    globe.setViewCurves({ morph: { startGroundZoom: 5, endGroundZoom: 7 } });
     ticks(60);
-    // Ground zoom 2.9 (zoom 2.4 at 45°): smootherstep(2, 3, 2.9).
-    expect(globe.camera.morphFactor).toBeCloseTo(0.99144, 4);
+    // Ground zoom 6 (zoom 5.5 at 45°): smootherstep(5, 7, 6).
+    expect(globe.camera.morphFactor).toBeCloseTo(0.5, 4);
     globe.setViewCurves({});
     ticks(60);
-    expect(globe.camera.morphFactor).toBe(0);
+    // The default band, 4 to 6.5: smootherstep(4, 6.5, 6).
+    expect(globe.camera.morphFactor).toBeCloseTo(0.94208, 4);
     globe.destroy();
   });
 });
@@ -244,6 +246,28 @@ describe('temporary tilt clamps (F165, F166)', () => {
     view.applyTilt(camera, 2, mountain);
     expect(camera.pose.tiltRad / DEG).toBeCloseTo(55, 9);
   });
+
+  it('holds the tilt a limit lowered when even a vertical view stops clearing, instead of jumping back up (KB-153)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.chooseTilt(55 * DEG);
+    const camera = new Camera();
+    camera.widthPx = 320;
+    camera.heightPx = 240;
+    camera.pose.rangeMeters = 2000;
+    camera.update();
+    // A slope whose ground rises under the eye as the view tilts: the limit holds the tilt below the wanted 55°.
+    const slope = {
+      probeGround: (c: Camera): void =>
+        void (c.groundHeightMeters = c.eyeGeodetic.heightMeters - 1000 + 1500 * Math.sin(c.pose.tiltRad)),
+    };
+    view.applyTilt(camera, 2, slope);
+    const limited = camera.pose.tiltRad / DEG;
+    expect(limited).toBeLessThan(54);
+    // Then the ground rises above even a vertical view's eye.
+    const above = { probeGround: (c: Camera): void => void (c.groundHeightMeters = c.eyeGeodetic.heightMeters + 50) };
+    view.applyTilt(camera, 2, above);
+    expect(camera.pose.tiltRad / DEG).toBeCloseTo(limited, 6);
+  });
 });
 
 describe('view regressions of the M5 review', () => {
@@ -286,5 +310,46 @@ describe('view regressions of the M5 review', () => {
     // 120 Hz and 30 Hz reach the same tilt after the same 192 ms.
     expect(tiltAfter(8)).toBeGreaterThan(1);
     expect(tiltAfter(8)).toBeCloseTo(tiltAfter(32), 6);
+  });
+});
+
+describe('the globe stays round where the view reaches a polar cap (KB-211)', () => {
+  /** The morph factor of a 480 × 360 view at a target latitude and Mercator zoom (ground zoom when `ground`). */
+  const morphAt = (latitudeDeg: number, zoom: number, ground = false): number => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    const camera = new Camera();
+    camera.widthPx = 480;
+    camera.heightPx = 360;
+    camera.pose.targetLatitudeRad = latitudeDeg * DEG;
+    // The range of Mercator zoom `zoom` at that latitude: ground zoom plus log2 of the Mercator scale.
+    const scale = ground ? 1 : 1 / Math.cos(Math.min(Math.abs(latitudeDeg), 85.0511) * DEG);
+    const metersPerPixel = (2 * Math.PI * 6378137) / 512 / 2 ** (zoom + Math.log2(scale));
+    camera.pose.rangeMeters = (metersPerPixel * camera.heightPx) / 2 / Math.tan(camera.fovYRad / 2);
+    camera.update();
+    view.update(camera);
+    return view.morph.factors[0] ?? 0;
+  };
+
+  it('does not flatten a view that shows the pole or the cap beyond 85.05°, north or south', () => {
+    // The Mercator plane cannot show the caps: zoomed in there it drew a band ending at the pole, nothing beyond.
+    expect(morphAt(89.9, 5)).toBe(0);
+    expect(morphAt(-89.9, 5)).toBe(0);
+    expect(morphAt(86, 8)).toBe(0);
+    expect(morphAt(82, 3)).toBe(0);
+  });
+
+  it('flattens as before where the caps are out of view, and eases in between', () => {
+    expect(morphAt(45, 8)).toBe(1);
+    expect(morphAt(70, 8)).toBe(1);
+    expect(morphAt(84.9, 15)).toBe(1);
+    // Panning north keeps the camera's range: the factor falls without a jump.
+    let previous = morphAt(60, 7, true);
+    expect(previous).toBe(1);
+    for (let latitude = 60; latitude <= 90; latitude += 0.02) {
+      const m = morphAt(latitude, 7, true);
+      expect(Math.abs(m - previous), `${latitude.toFixed(2)}°`).toBeLessThan(0.05);
+      previous = m;
+    }
+    expect(previous).toBe(0);
   });
 });

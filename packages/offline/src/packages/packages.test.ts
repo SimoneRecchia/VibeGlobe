@@ -375,16 +375,25 @@ describe('served offline packages and integrity', () => {
 });
 
 describe('package credits (F306)', () => {
-  it("adds the package's recorded attribution to its source's credits once its tiles are read", async () => {
+  it("gives each tile a package serves the package's recorded credit, listed while the tile is drawn, never the source's (KB-189)", async () => {
     const data = archive('1');
     const { manager, source } = setup();
     await manager.install({
       manifest: new Blob([JSON.stringify(await manifestOf('1', data))]),
       files: { 'rome.pmtiles': new Blob([data as Uint8Array<ArrayBuffer>]) },
     });
+    const result = (coord: TileCoord): Promise<TransportResult> => {
+      const request = source.request(coord, { url: '', hostIndex: 0 });
+      if (request === 'noData' || request === 'unknown') throw new Error('no request');
+      return new Promise((resolve) => source.transport.start(request, { firstByteMs: 1000, totalMs: 1000 }, resolve));
+    };
+    const first = await result(tile(1, 1, 0));
+    const second = await result(tile(1, 0, 0));
+    expect(first.kind === 'ok' && first.attribution).toEqual({ text: '© OpenStreetMap contributors' });
+    // One object for every tile of the package, so the engine's frames compare it by identity.
+    expect(second.kind === 'ok' && second.attribution).toBe(first.kind === 'ok' && first.attribution);
+    // The source's own credits do not grow: the engine lists the package's only while its tiles are drawn.
     expect(source.attribution ?? []).toEqual([]);
-    expect(await load(source, tile(1, 1, 0))).toBe('1:1/1/0');
-    expect(source.attribution).toEqual([{ text: '© OpenStreetMap contributors' }]);
     (await manager.list()).forEach((p) => expect(p.licenses).toEqual(['ODbL-1.0']));
   });
 });

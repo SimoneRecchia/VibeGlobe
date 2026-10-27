@@ -1,8 +1,8 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { readLayerJson, readRanges, TerrainAvailability } from '@vibeglobe/core/decoders';
 import {
   GEOGRAPHIC_TILING,
-  readLayerJson,
-  readRanges,
-  TerrainAvailability,
   WEB_MERCATOR_TILING,
   WGS84,
   type TerrainSource,

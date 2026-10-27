@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { looksLikePortal } from './network-fetch.js';
 import type { Connectivity } from './types.js';
 
@@ -14,10 +16,17 @@ export interface HealthCheckTiming {
 /** Options of {@link ConnectivityMonitor}. */
 export interface ConnectivityOptions extends HealthCheckTiming {
   readonly fetch?: typeof fetch;
-  /** False while health checks must not run (offline-only mode never touches the network, F292). */
-  readonly enabled: () => boolean;
+  /**
+   * False while health checks of the endpoint must not run: offline-only mode never touches the network (F292), and
+   * neither does a layer or source set to it (KB-192).
+   */
+  readonly enabled: (endpoint: string) => boolean;
+  /** Called when one endpoint's state changes, whether or not the overall connectivity does (KB-194). */
+  readonly onEndpointChange?: (endpoint: string) => void;
   /** Called when the overall connectivity changes. */
   readonly onChange: (connectivity: Connectivity, unreachable: readonly string[]) => void;
+  /** Called after every check of an endpoint, whether or not it changed the state. */
+  readonly onCheck?: (endpoint: string) => void;
 }
 
 /** The reachability of one endpoint. */
@@ -29,6 +38,8 @@ interface Endpoint {
   lastCheckMs: number;
   waitMs: number;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** When the pending check runs. */
+  dueMs: number;
   checking: boolean;
 }
 
@@ -79,6 +90,7 @@ export class ConnectivityMonitor {
       lastCheckMs: Number.NEGATIVE_INFINITY,
       waitMs: this.minIntervalMs,
       timer: undefined,
+      dueMs: Number.POSITIVE_INFINITY,
       checking: false,
     });
   }
@@ -119,11 +131,24 @@ export class ConnectivityMonitor {
     globalThis.removeEventListener?.('offline', this.onOffline);
   }
 
+  /** Time limit of one check. */
+  get timeoutMs(): number {
+    return this.options.timeoutMs ?? 5000;
+  }
+
+  /** The longest a check takes from its request to its end: the least interval between checks, then its limit. */
+  get longestCheckMs(): number {
+    return this.minIntervalMs + this.timeoutMs;
+  }
+
   private schedule(name: string, entry: Endpoint, delayMs: number): void {
-    if (this.destroyed || entry.checking || !this.options.enabled()) return;
+    if (this.destroyed || entry.checking || !this.options.enabled(name)) return;
     const earliest = entry.lastCheckMs + this.minIntervalMs - Date.now();
     const wait = Math.max(delayMs, earliest, 0);
-    if (entry.timer !== undefined) return;
+    // A pending check stays unless this one is due sooner (KB-159: an online event brings a backed-off check forward).
+    if (entry.timer !== undefined && entry.dueMs <= Date.now() + wait) return;
+    clearTimeout(entry.timer);
+    entry.dueMs = Date.now() + wait;
     entry.timer = setTimeout(() => {
       entry.timer = undefined;
       void this.check(name, entry);
@@ -131,13 +156,14 @@ export class ConnectivityMonitor {
   }
 
   private async check(name: string, entry: Endpoint): Promise<void> {
-    if (this.destroyed || !this.options.enabled()) return;
+    if (this.destroyed || !this.options.enabled(name)) return;
     entry.checking = true;
     entry.lastCheckMs = Date.now();
     const reachable = await this.probe(entry.probeUrl);
     entry.checking = false;
     if (this.destroyed) return;
     this.mark(name, entry, reachable ? 'reachable' : 'unreachable');
+    this.options.onCheck?.(name);
     if (!reachable) {
       // Back off while the endpoint stays down: 2 s, 4 s, … up to the maximum.
       this.schedule(name, entry, entry.waitMs);
@@ -148,7 +174,7 @@ export class ConnectivityMonitor {
   private async probe(url: string): Promise<boolean> {
     const fetchImpl = this.options.fetch ?? ((input, init) => fetch(input, init));
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 5000);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await fetchImpl(url, {
         signal: controller.signal,
@@ -170,6 +196,7 @@ export class ConnectivityMonitor {
     if (entry.state === state) return;
     entry.state = state;
     if (state === 'unreachable') this.schedule(name, entry, entry.waitMs);
+    this.options.onEndpointChange?.(name);
     const down = this.unreachable();
     const next: Connectivity =
       down.length === 0 ? 'online' : down.length === this.endpoints.size ? 'offline' : 'degraded';

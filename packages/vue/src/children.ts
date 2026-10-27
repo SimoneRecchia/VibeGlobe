@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Globe, ImageryLayerInput } from '@vibeglobe/core';
 import type { DataLayer, Feature, LayerStyle } from '@vibeglobe/layers';
 import type { UiControl } from '@vibeglobe/ui';
@@ -33,6 +35,24 @@ function onAttached(name: string, use: (extras: GlobeExtras) => Promise<(() => v
 }
 
 /**
+ * Replaces a layer's features shown from a component: removes the previous ones and adds the new, giving the features
+ * without an id one (`<layer>:<index>`) so they can be removed again (KB-147). Returns the ids now shown.
+ */
+export function replaceFeatures(
+  layer: Pick<DataLayer, 'removeFeature' | 'addFeatures'>,
+  shown: readonly (string | number)[],
+  features: readonly Feature[],
+  layerId: string,
+): (string | number)[] {
+  for (const id of shown) layer.removeFeature(id);
+  const named = features.map((feature, index) =>
+    feature.id === undefined ? { ...feature, id: `${layerId}:${String(index)}` } : feature,
+  );
+  layer.addFeatures(named);
+  return named.map((feature) => feature.id ?? '');
+}
+
+/**
  * A data layer of the enclosing globe (`@vibeglobe/layers`): points, markers, labels, lines, polygons or circles from
  * GeoJSON features, styled with MapLibre properties. Changing `features`, `style` or `visible` updates the layer in
  * place; unmounting removes it and frees its GPU buffers.
@@ -61,11 +81,9 @@ export const VibeDataLayer = defineComponent({
       const layer: DataLayer = stack.add(
         factories[props.kind]({ id: props.id, ...(props.style ? { style: props.style } : {}) }),
       );
-      let shown: (string | number)[] = [];
+      let shown: readonly (string | number)[] = [];
       const show = (features: readonly Feature[]): void => {
-        for (const id of shown) layer.removeFeature(id);
-        layer.addFeatures(features);
-        shown = features.map((feature, index) => feature.id ?? index);
+        shown = replaceFeatures(layer, shown, features, props.id);
       };
       show(props.features);
       stack.setVisible(props.id, props.visible);

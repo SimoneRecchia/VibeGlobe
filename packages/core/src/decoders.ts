@@ -1,6 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Tile decoders that run in the engine's workers (`@vibeglobe/core/decoders`, quantized-mesh and KTX2): kept out of the main entry so that
- * applications load them only with the worker program.
+ * Tile decoders that run in the engine's workers (`@vibeglobe/core/decoders`: heightmaps, quantized-mesh and KTX2),
+ * the height grids of custom terrain decoders, the geoid file format and the quantized-mesh `layer.json` reader: kept
+ * out of the main entry so that applications load them only with the worker program or the adapters that need them.
  * @packageDocumentation
  */
 export {
@@ -23,3 +26,12 @@ export {
   ktx2LevelSize,
   readKtx2,
 } from './imagery/ktx2.js';
+export { readLayerJson, readRanges, TerrainAvailability } from './terrain/layer-json.js';
+export type { TerrainLayer, TileRange } from './terrain/layer-json.js';
+export { decodeHeightmap, heightGrid, heightmapBorderPx } from './terrain/heightmap.js';
+export type { HeightGrid, HeightmapEncoding } from './terrain/heightmap.js';
+export { chooseGrid, gridErrorMeters, GRID_CELLS } from './terrain/grid-size.js';
+export type { MeasuredGrid } from './terrain/grid-size.js';
+export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
+export { buildTileMesh } from './surface/surface-mesh.js';
+export { geoidModel } from './terrain/vertical-datum.js';

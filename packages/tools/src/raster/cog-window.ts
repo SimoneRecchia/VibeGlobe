@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Windowed reading of cloud-optimized GeoTIFFs over HTTP (ADR 0026): the header is read with one range request, then
  * only the internal tiles of one overview level that intersect a bounding box. They are kept compressed, as they

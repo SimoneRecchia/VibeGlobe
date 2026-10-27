@@ -52,4 +52,20 @@ describe('runtime credits', () => {
     expect(shown).toHaveLength(1);
     expect(reported).toHaveLength(2);
   });
+
+  it('lists the credit of a terrain tile drawn, from an offline package, under the terrain source (KB-193)', () => {
+    const terrain = { id: 'relief', attribution: [{ text: 'Relief' }] };
+    const reported: string[][] = [];
+    const credits = new RuntimeCredits(
+      [undefined, terrain],
+      new Set(),
+      (list) => reported.push(list.map((credit) => credit.text)),
+      () => undefined,
+      1,
+    );
+    const pack = { text: '© Package' };
+    const list = { terrain: { textures: new Int32Array([7]) } } as unknown as DrawList;
+    credits.afterFrame(list, 1, { attributionOf: (handle) => (handle === 7 ? pack : undefined) });
+    expect(reported.at(-1)).toEqual(['Relief', '© Package']);
+  });
 });

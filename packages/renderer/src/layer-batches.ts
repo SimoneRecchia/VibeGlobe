@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   ATTRIBUTE_COMPONENTS,
   type BatchAttribute,
@@ -24,7 +26,10 @@ import { releaseMesh } from './release-mesh.js';
 import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
+import { FieldWaits, LabelSdf } from './label-sdf.js';
+import { FeatureChanges, stableRanges } from './layer-changes.hot.js';
 import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
+import type { QuadImages } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
 
@@ -33,8 +38,10 @@ const LAYER_RENDER_ORDER = 1000;
 
 interface Batch extends BatchContents {
   readonly descriptor: BatchDescriptor;
-  /** Feature ranges [first, end) changed since the last frame, rewritten in place when the layout allows. */
-  readonly ranges: [number, number][];
+  /** Features changed since the last frame, rewritten in place when the layout allows. */
+  readonly changes: FeatureChanges;
+  /** Update ranges handed to three.js, one pool per quad attribute, reused every frame (F378). */
+  readonly rangePools: UpdateRange[][];
   capacity: number;
   order: number;
   visible: boolean;
@@ -56,7 +63,7 @@ const QUAD_ATTRIBUTES = [
   ['layerHeight', 1],
   ['layerColor', 4],
   ['layerCorner', 4],
-  ['layerUv', 2],
+  ['layerUv', 4],
 ] as const;
 
 function shapeOf(batch: BatchContents): LayerShape {
@@ -75,7 +82,7 @@ export class LayerBatches implements LayerRenderTarget {
   private readonly batches = new Map<number, Batch>();
   /** The batches and materials again, as arrays: each frame walks them by index, which allocates nothing (F064). */
   private readonly batchList: Batch[] = [];
-  private readonly materials = new Map<LayerShape, MeshBasicNodeMaterial>();
+  private readonly materials = new Map<LayerShape | 'label', MeshBasicNodeMaterial>();
   private readonly materialList: MeshBasicNodeMaterial[] = [];
   /** glTF models (F361), placed with the batches. */
   readonly models: LayerModels;
@@ -83,9 +90,18 @@ export class LayerBatches implements LayerRenderTarget {
   private rebuilds = 0;
   private rangeUploads = 0;
   private uploadedVertices = 0;
-  /** Labels and marker images (ADR 0037). */
+  /** Marker images (ADR 0037). */
   private readonly atlas = new LayerAtlas();
   private atlasGeneration = 0;
+  /** Label distance fields (F358), created with the first label. */
+  private labels: LabelSdf | undefined;
+  private readonly waits = new FieldWaits<Batch>();
+  private contentReady: (() => void) | undefined;
+  /** Images and label fields as the geometry builders read them. */
+  private readonly images: QuadImages = {
+    text: (text, sizePx, font, feature) => this.labelSdf().quad(text, sizePx, font) ?? this.waits.note(feature),
+    image: (name) => this.atlas.image(name),
+  };
   /** The terrain clamped and draped features stand on, and the version their heights were taken at. */
   private ground: LayerGround | undefined;
   private groundVersion = -1;
@@ -110,7 +126,8 @@ export class LayerBatches implements LayerRenderTarget {
       order: 0,
       visible: true,
       dirty: true,
-      ranges: [],
+      changes: new FeatureChanges(),
+      rangePools: QUAD_ATTRIBUTES.map(() => []),
       attributes: new Map(),
       uniforms: new Map(),
       strings: new Map(),
@@ -176,6 +193,9 @@ export class LayerBatches implements LayerRenderTarget {
   /** See {@link LayerRenderTarget}. */
   setUniform(handle: BatchHandle, attribute: BatchAttribute, value: Float64Array | undefined): void {
     const batch = this.get(handle);
+    const current = batch.uniforms.get(attribute);
+    // The layers send layer-wide values again as the zoom changes: an unchanged one rebuilds nothing (F378).
+    if (value ? current !== undefined && sameValues(current, value) : current === undefined) return;
     if (value) batch.uniforms.set(attribute, Float64Array.from(value));
     else batch.uniforms.delete(attribute);
     batch.dirty = true;
@@ -193,8 +213,10 @@ export class LayerBatches implements LayerRenderTarget {
   }
 
   /** See {@link LayerRenderTarget}. */
-  stats(): { rebuilds: number; rangeUploads: number; uploadedVertices: number } {
-    return { rebuilds: this.rebuilds, rangeUploads: this.rangeUploads, uploadedVertices: this.uploadedVertices };
+  stats(): { rebuilds: number; rangeUploads: number; uploadedVertices: number; labelFields: object } {
+    // `labelFields`: label distance fields generated in the worker and on the calling thread (F358).
+    const { rebuilds, rangeUploads, uploadedVertices } = this;
+    return { rebuilds, rangeUploads, uploadedVertices, labelFields: { ...this.labels?.generated } };
   }
 
   /**
@@ -203,7 +225,7 @@ export class LayerBatches implements LayerRenderTarget {
    */
   private changed(batch: Batch, first: number, end: number): void {
     if (batch.dirty) return;
-    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.ranges.push([first, end]);
+    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.changes.mark(first, end);
     else batch.dirty = true;
   }
 
@@ -240,9 +262,14 @@ export class LayerBatches implements LayerRenderTarget {
     for (const batch of this.batches.values()) if (batch.kind === 'marker') batch.dirty = true;
   }
 
-  /** See {@link LayerRenderTarget}: measured as the atlas draws labels. */
+  /** See {@link LayerRenderTarget}: measured as the label fields are drawn. */
   measureText(text: string, sizePx: number): { widthPx: number; heightPx: number } {
-    return this.atlas.measure(text, sizePx);
+    return this.labelSdf().measure(text, sizePx, '');
+  }
+
+  /** See {@link LayerRenderTarget}: label fields generated in the worker are ready. */
+  onContentReady(listener: () => void): void {
+    this.contentReady = listener;
   }
 
   /** See {@link LayerRenderTarget}: picked on the CPU against the last drawn frame, features before models. */
@@ -272,7 +299,6 @@ export class LayerBatches implements LayerRenderTarget {
   place(view: FrameView): void {
     this.lastView = view;
     this.models.place(view);
-    this.atlas.setPixelRatio(view.pixelRatio);
     const version = this.ground?.version() ?? 0;
     if (version !== this.groundVersion) {
       // Finer terrain arrived: features on the ground are placed on it again.
@@ -283,14 +309,18 @@ export class LayerBatches implements LayerRenderTarget {
     if (this.atlas.generation !== this.atlasGeneration) {
       // The atlas started over: every label and marker is drawn into it again.
       this.atlasGeneration = this.atlas.generation;
-      for (const batch of this.batchList) if (batch.kind === 'label' || batch.kind === 'marker') batch.dirty = true;
+      for (const batch of this.batchList) if (batch.kind === 'marker') batch.dirty = true;
     }
+    // Label fields arrived: the labels waiting for them are rewritten; the atlas started over: labels are rebuilt.
+    if (this.labels) this.waits.settle(this.labels, this.rewriteWaiting, this.rebuildLabels);
+    // Labels still waiting for their fields are content to come: the engine does not go idle before it is drawn.
+    if (this.labels?.generating) this.contentReady?.();
     const batches = this.batchList;
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       if (!batch) continue;
       if (batch.dirty) this.rebuild(batch);
-      else if (batch.ranges.length > 0) this.rewrite(batch);
+      else if (!batch.changes.empty) this.rewrite(batch);
       const mesh = batch.mesh;
       if (!mesh || !batch.arrays) continue;
       mesh.visible = batch.visible;
@@ -301,7 +331,7 @@ export class LayerBatches implements LayerRenderTarget {
       const material = this.materialList[i];
       if (!material) continue;
       setSurfaceMorph(material, view.morph);
-      setLayerViewport(material, view.widthPx, view.heightPx);
+      setLayerViewport(material, view);
     }
   }
 
@@ -321,6 +351,7 @@ export class LayerBatches implements LayerRenderTarget {
   dispose(): void {
     this.models.dispose();
     this.atlas.dispose();
+    this.labels?.dispose();
     for (const batch of this.batches.values()) this.disposeMesh(batch);
     this.batches.clear();
     this.batchList.length = 0;
@@ -340,41 +371,82 @@ export class LayerBatches implements LayerRenderTarget {
     return batch;
   }
 
-  private material(shape: LayerShape): MeshBasicNodeMaterial {
-    let material = this.materials.get(shape);
+  private labelSdf(): LabelSdf {
+    if (!this.labels) {
+      this.labels = new LabelSdf();
+      this.labels.onReady(() => this.contentReady?.());
+    }
+    return this.labels;
+  }
+
+  /** The material of a batch: labels have their own, over the label fields. */
+  private material(batch: Batch): MeshBasicNodeMaterial {
+    const key = batch.kind === 'label' ? 'label' : shapeOf(batch);
+    let material = this.materials.get(key);
     if (!material) {
-      material = createLayerMaterial(shape, this.depthPath, this.atlas.texture);
-      this.materials.set(shape, material);
+      material =
+        key === 'label'
+          ? createLayerMaterial('quad', this.depthPath, undefined, this.labelSdf().atlas.texture)
+          : createLayerMaterial(key, this.depthPath, this.atlas.texture);
+      this.materials.set(key, material);
       this.materialList.push(material);
     }
     return material;
   }
 
-  /** Rewrites the changed feature ranges of a quad batch and uploads only those vertices (F376, F377). */
+  /**
+   * Rewrites the changed features of a quad batch and uploads only their vertices, one upload per run of consecutive
+   * features (F376–F378); rebuilds the batch when its arrays do not hold them.
+   */
   private rewrite(batch: Batch): void {
-    const { arrays, mesh } = batch;
-    for (const [first, end] of batch.ranges.splice(0)) {
-      const ground = this.groundOf(batch);
-      if (!arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.atlas, ground)) {
-        this.rebuild(batch);
-        return;
-      }
-      for (const [name, size] of QUAD_ATTRIBUTES) {
-        const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
-        attribute.addUpdateRange(first * 4 * size, (end - first) * 4 * size);
-        attribute.needsUpdate = true;
-      }
-      this.rangeUploads++;
-      this.uploadedVertices += (end - first) * 4;
-    }
+    this.rewriting = this.waits.current = batch;
+    const ok = batch.changes.drain(this.rewriteRun);
+    this.rewriting = this.waits.current = undefined;
+    if (!ok) this.rebuild(batch);
   }
+
+  /** For {@link FieldWaits.settle}, created once: a closure made each frame would allocate (F064). */
+  private readonly rewriteWaiting = (batch: Batch, feature: number): void => this.changed(batch, feature, feature + 1);
+  private readonly rebuildLabels = (): void => {
+    for (const batch of this.batchList) if (batch.kind === 'label') batch.dirty = true;
+  };
+
+  /** The batch {@link LayerBatches.rewrite} drains, for {@link LayerBatches.rewriteRun}. */
+  private rewriting: Batch | undefined;
+
+  /** Rewrites and uploads one run [first, end) of the batch being rewritten; false when the batch must be rebuilt. */
+  private readonly rewriteRun = (first: number, end: number): boolean => {
+    const batch = this.rewriting;
+    const arrays = batch?.arrays;
+    const mesh = batch?.mesh;
+    if (!batch || !arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.images, this.groundOf(batch)))
+      return false;
+    for (let i = 0; i < QUAD_ATTRIBUTES.length; i++) {
+      const [name, size] = QUAD_ATTRIBUTES[i] ?? ['', 0];
+      const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
+      // As `addUpdateRange`, with range objects of a pool, into a list three.js empties without dropping its storage.
+      const ranges = stableRanges(attribute);
+      const pool = batch.rangePools[i] ?? [];
+      const range = pool[ranges.length] ?? { start: 0, count: 0 };
+      if (pool[ranges.length] === undefined) pool.push(range);
+      range.start = first * 4 * size;
+      range.count = (end - first) * 4 * size;
+      ranges[ranges.length++] = range;
+      attribute.needsUpdate = true;
+    }
+    this.rangeUploads++;
+    this.uploadedVertices += (end - first) * 4;
+    return true;
+  };
 
   private rebuild(batch: Batch): void {
     batch.dirty = false;
-    batch.ranges.length = 0;
+    batch.changes.clear();
     this.rebuilds++;
     this.disposeMesh(batch);
-    const arrays = buildLayerArrays(batch, this.atlas, this.groundOf(batch));
+    this.waits.current = batch;
+    const arrays = buildLayerArrays(batch, this.images, this.groundOf(batch));
+    this.waits.current = undefined;
     batch.arrays = arrays;
     if (!arrays) return;
     const geometry = new BufferGeometry();
@@ -384,10 +456,10 @@ export class LayerBatches implements LayerRenderTarget {
     geometry.setAttribute('layerHeight', new BufferAttribute(arrays.heights, 1));
     geometry.setAttribute('layerColor', new BufferAttribute(arrays.colors, 4));
     geometry.setAttribute('layerCorner', new BufferAttribute(arrays.corners, 4));
-    if (shapeOf(batch) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 2));
+    if (shapeOf(batch) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 4));
     if (arrays.other) setOtherEndpoint(geometry, arrays.other, arrays.vertices);
     geometry.setIndex(new BufferAttribute(arrays.indices, 1));
-    const mesh = new Mesh(geometry, this.material(shapeOf(batch)));
+    const mesh = new Mesh(geometry, this.material(batch));
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
     mesh.frustumCulled = false;
@@ -422,4 +494,17 @@ function setOtherEndpoint(geometry: BufferGeometry, other: NonNullable<LayerArra
   geometry.setAttribute('otherNormal', new InterleavedBufferAttribute(buffer, 3, 3));
   geometry.setAttribute('otherPlane', new InterleavedBufferAttribute(buffer, 4, 6));
   geometry.setAttribute('otherHeight', new InterleavedBufferAttribute(buffer, 1, 10));
+}
+
+/** A range of a buffer attribute's components to upload, as three.js keeps them. */
+interface UpdateRange {
+  start: number;
+  count: number;
+}
+
+/** True when two attribute values hold the same components. */
+function sameValues(a: Float64Array, b: Float64Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

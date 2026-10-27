@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The quantized-mesh-1.0 terrain format (F127): a little-endian header, zig-zag delta-encoded vertex coordinates,
  * high-water-mark triangle indices in 16 or 32 bits, edge vertex lists and length-prefixed extensions. Decoded to its

@@ -79,6 +79,18 @@ describe('wmsImagery (F231, F227)', () => {
     expect(box[0]).toBeCloseTo(-20037508.3428 / 8, 2);
   });
 
+  it('declares itself transparent unless asked for an opaque background, so the layers below show (KB-154)', async () => {
+    const overlay = await wmsImagery({ id: 'w', url: 'https://wms.test/map', layers: ['labels'], transport: never });
+    const opaque = await wmsImagery({
+      id: 'o',
+      url: 'https://wms.test/map',
+      layers: ['ortho'],
+      transparent: false,
+      transport: never,
+    });
+    expect([overlay.transparent, opaque.transparent]).toEqual([true, false]);
+  });
+
   it('puts latitude first for EPSG:4326 in 1.3.0 only, and names SRS in 1.1.1', async () => {
     const v130 = await urlOf(
       { id: 'a', capabilities: AASG, layers: ['Wellheader'], preferredCrs: 'EPSG:4326', gutterPx: 0 },
@@ -216,32 +228,35 @@ describe('wmsImagery (F231, F227)', () => {
     expect(failed).toEqual({ kind: 'status', status: 400, retryAfterMs: undefined });
   });
 
-  it('passes the tiled conformance suite', async () => {
-    const bytes = new TextEncoder().encode('png');
-    const service: typeof fetch = (input) => {
-      const bbox = query(String(input)).get('BBOX') ?? '';
-      // The fixture server has no data for the tile whose BBOX starts at 626172.1357 (level 6, column 33).
-      if (bbox.startsWith('626172.1357')) return Promise.resolve(new Response(null, { status: 404 }));
-      return Promise.resolve(new Response(bytes.slice(), { headers: { 'Content-Type': 'image/png' } }));
-    };
-    const results = await runTiledConformance({
-      name: 'wms',
-      create: (fetchImpl) =>
-        wmsImagery({
-          id: 'w',
-          capabilities: SYNTHETIC,
-          layers: ['ortho'],
-          gutterPx: 0,
-          cropImage: identityCrop,
-          transport: fetchTransport(fetchImpl),
-        }),
-      fixture: service,
-      tiles: [coord(6, 34, 23), coord(2, 2, 1)].map((c) => ({ coord: c, bytes })),
-      missing: [coord(6, 33, 23)],
-      outside: [coord(3, 1, 3)],
+  for (const gutterPx of [0, undefined])
+    it(`passes the tiled conformance suite ${gutterPx === 0 ? 'without a gutter' : 'with the default gutter'}`, async () => {
+      const bytes = new TextEncoder().encode('png');
+      const service: typeof fetch = (input) => {
+        const [minX = 0, , maxX = 0] = (query(String(input)).get('BBOX') ?? '').split(',').map(Number);
+        // The fixture server has no data for the tile of level 6, column 33 (626 172 m to 1 252 344 m east).
+        const centerX = (minX + maxX) / 2;
+        if (centerX > 626172.1357 && centerX < 1252344.2714)
+          return Promise.resolve(new Response(null, { status: 404 }));
+        return Promise.resolve(new Response(bytes.slice(), { headers: { 'Content-Type': 'image/png' } }));
+      };
+      const results = await runTiledConformance({
+        name: 'wms',
+        create: (fetchImpl) =>
+          wmsImagery({
+            id: 'w',
+            capabilities: SYNTHETIC,
+            layers: ['ortho'],
+            ...(gutterPx === undefined ? {} : { gutterPx }),
+            cropImage: identityCrop,
+            transport: fetchTransport(fetchImpl),
+          }),
+        fixture: service,
+        tiles: [coord(6, 34, 23), coord(2, 2, 1)].map((c) => ({ coord: c, bytes })),
+        missing: [coord(6, 33, 23)],
+        outside: [coord(3, 1, 3)],
+      });
+      expect(failures(results)).toEqual([]);
     });
-    expect(failures(results)).toEqual([]);
-  });
 
   it('never crashes on fuzzed capabilities documents', async () => {
     const results = await runParserConformance({

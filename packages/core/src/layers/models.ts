@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError } from '../globe/errors.js';
 import type { GeoPosition, RendererBackend } from '../globe/types.js';
 import { validatePosition } from '../globe/validation.js';
@@ -39,8 +41,27 @@ export interface ModelRenderer {
   setPickId?(id: number, pickId: number): void;
   /** Blends the model toward a color, `[r, g, b, amount]` from 0 to 1 (selection and hover styles, F381); `undefined` clears it. */
   setHighlight?(id: number, rgba: readonly [number, number, number, number] | undefined): void;
-  /** Shows or hides a model. */
+  /** Shows or hides a model, or a set of models. */
   setVisible?(id: number, visible: boolean): void;
+  /**
+   * Loads one model for many copies drawn instanced (F627, `ModelSetLayer`); resolves with the set's id, which
+   * `remove` and `setVisible` also take.
+   */
+  loadSet?(source: { readonly url?: string; readonly data?: ArrayBuffer }, options: ModelSetOptions): Promise<number>;
+  /** Sets the copies of a set: their poses, and the pick id of each (0 for none). */
+  setInstances?(id: number, poses: readonly ModelPose[], pickIds: readonly number[]): void;
+  /** Blends one copy of a set toward a color, `[r, g, b, amount]`; `undefined` clears it. */
+  setInstanceHighlight?(id: number, index: number, rgba: readonly [number, number, number, number] | undefined): void;
+}
+
+/** How a set of models draws its copies (F627). */
+export interface ModelSetOptions {
+  /** Copies nearer the eye than this are drawn as the model, farther ones as the placeholder, meters. */
+  readonly visibleBelowMeters: number;
+  /** The placeholder's color, `[r, g, b]` from 0 to 1. */
+  readonly placeholderColor: readonly [number, number, number];
+  /** The placeholder's size on screen, CSS pixels; 0 draws none. */
+  readonly placeholderSizePx: number;
 }
 
 /** Throws a GlobeError unless the pose is valid. */

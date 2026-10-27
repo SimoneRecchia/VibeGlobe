@@ -2,6 +2,7 @@
 // pan, a flight) on fully offline, 400 kbps, flaky, high-latency and LAN-only links, with every loading feature on,
 // recording every request the page makes. Small canvas, as the other offline specs on the software GPU.
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { backoffViolations, type Attempt } from '../scripts/fixtures/network/links.ts';
 import { nextFrame } from './support/globe.ts';
 import {
   emptyPixels,
@@ -65,11 +66,11 @@ async function navigate(page: Page): Promise<number> {
 }
 
 /** Starts the harness over a world base package with the online source behind `link`; returns each tile's attempts. */
-async function startOn(page: Page, link: Link, session: string): Promise<Map<string, number[]>> {
+async function startOn(page: Page, link: Link, session: string): Promise<Record<string, Attempt[]>> {
   await openHarness(page);
   await startHarness(page, { sources: [{ id: 'world', pattern: 'world', session }], view: ROME });
   await page.evaluate((s) => window.offlineHarness?.installFixture(s), { ...WORLD_BASE, session });
-  const attempts = new Map<string, number[]>();
+  const attempts: Record<string, Attempt[]> = {};
   let index = 0;
   await page.route(`**/fixture-tiles/${session}/**`, async (route: Route) => {
     const path = new URL(route.request().url()).pathname;
@@ -77,8 +78,17 @@ async function startOn(page: Page, link: Link, session: string): Promise<Map<str
     // asks the network for it as a tile: each request for it is a health check.
     const probe = path.endsWith('/0/0/0.png');
     const key = probe ? `health check ${path}` : path;
-    attempts.set(key, [...(attempts.get(key) ?? []), Date.now()]);
-    if (link.drop(index++)) return route.abort('connectionreset');
+    const startMs = Date.now();
+    // The globe's frame when the handler runs: never earlier than the request's own frame.
+    const frame = await page
+      .evaluate(() => window.offlineHarness?.globe?.frameNumber ?? 0)
+      .catch(() => Number.MAX_SAFE_INTEGER);
+    const attempt = { startMs, frame, failed: false };
+    (attempts[key] ??= []).push(attempt);
+    if (link.drop(index++)) {
+      attempt.failed = true;
+      return route.abort('connectionreset');
+    }
     try {
       const response = await route.fetch();
       const body = await response.body();
@@ -100,24 +110,18 @@ async function startOn(page: Page, link: Link, session: string): Promise<Map<str
 }
 
 /**
- * No tile is retried endlessly, and retries of one tile come further and further apart; health checks never come
- * closer together than their minimum interval.
+ * Bounded retries with backoff, as track F's suite judges them (ADR 0151): at most six attempts in a row of failures,
+ * each retry in a later frame than its failure, health checks never closer together than their minimum interval. The
+ * engine's retries wait a random delay under a doubling ceiling (ADR 0007), so single waits may shrink.
  */
-function expectBackoff(attempts: Map<string, number[]>): void {
-  for (const [path, times] of attempts) {
-    if (path.startsWith('health check')) {
-      const gaps = times.slice(1).map((t, i) => t - (times[i] ?? t));
-      for (const gap of gaps)
-        expect(gap, `${path}: ${gaps.join(', ')} ms`).toBeGreaterThanOrEqual(HEALTH.minIntervalMs * 0.9);
-      continue;
-    }
-    expect(times.length, `attempts of ${path}`).toBeLessThanOrEqual(6);
-    const gaps = times.slice(1).map((t, i) => t - (times[i] ?? t));
-    for (let i = 2; i < gaps.length; i++)
-      expect(gaps[i] ?? 0, `retry ${String(i)} of ${path}: ${gaps.join(', ')} ms`).toBeGreaterThanOrEqual(
-        (gaps[1] ?? 0) * 0.9,
-      );
-  }
+function expectBackoff(attempts: Record<string, Attempt[]>): void {
+  expect(
+    backoffViolations(attempts, {
+      maxAttempts: 6,
+      healthMinIntervalMs: HEALTH.minIntervalMs,
+      isHealthCheck: (key) => key.startsWith('health check'),
+    }),
+  ).toEqual([]);
 }
 
 for (const link of LINKS)

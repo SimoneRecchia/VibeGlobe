@@ -33,7 +33,7 @@ Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 
 - English everywhere (code, comments, docs, commit messages). TypeScript strict, ESM, no `any`, TSDoc on public APIs, units in names (`Meters`, `Deg`, `Rad`, `Px`, `Ms`).
 - Hot paths: performance-critical modules are named `*.hot.ts` and open with a TSDoc header `@hotpath <reason>` and `@benchmark <path>`; they are exempt from the function and module length limits (`npm run check`).
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
-- VibeGlobe is under PolyForm Noncommercial 1.0.0 (`LICENSE.md`); every package.json declares `PolyForm-Noncommercial-1.0.0` (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
+- VibeGlobe is under the Mozilla Public License 2.0 (`LICENSE.md`, ADR 0043); every package.json declares `MPL-2.0` and every source file under `packages/*/src` opens with the MPL notice (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
 - The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys (`GOOGLE_MAPS_API_KEY` comes from the environment).
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
@@ -76,4 +76,5 @@ Owner's rules (2026-10-21, ADR 0022): most waste is extra tests, repeated runs a
 - CI (ADR 0015, ADR 0022): every push runs one fast job with every non-browser check; the sharded end-to-end suite, the isolated measurements, cross-browser runs and benchmarks run only on `main`, nightly and manual runs (`workflow_dispatch`), so run the affected end-to-end specs locally before pushing.
 - The repository (`SimoneRecchia/VibeGlobe`) is public since 2026-10-21: everything pushed is published, so never commit secrets, personal data or third-party material whose license does not allow it.
 - Vite's dev server can miss edits written by scripts and keep serving a stale module (a page that disagrees with Node tests): restart it (`npm run dev`, after removing `node_modules/.vite`) before the end-to-end runs that follow such edits.
+- A spec that fails only in CI (fonts, software GPU): reproduce it in CI's image against the host's dev server, `docker run --rm --network host -v $PWD:/work -w /work mcr.microsoft.com/playwright:v1.64.1-noble npx playwright test <spec> --no-deps`.
 - Cloud containers: Playwright uses the preinstalled Chromium via `VIBEGLOBE_CHROMIUM_PATH=/opt/pw-browsers/chromium` (`init.sh` sets it).

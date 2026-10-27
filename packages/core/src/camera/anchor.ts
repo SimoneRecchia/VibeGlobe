@@ -1,5 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { ecefArrayToGeodetic, geodeticArrayToEcef } from '../geodesy/ecef.js';
-import { enuFrame } from '../geodesy/enu.js';
+import { enuFrameAtArray } from '../geodesy/enu.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import type { Camera } from './camera.js';
 import { projectToScreen } from './projection.js';
@@ -10,7 +12,29 @@ const MAX_ITERATIONS = 8;
 const TOLERANCE_PX = 0.001;
 /** A solve succeeds only within this residual (ADR 0009: anchor drift at most 0.01 px). */
 const ACCEPT_PX = 0.01;
-const RIGID_ITERATIONS = 4;
+const RIGID_ITERATIONS = 6;
+/**
+ * Rigid rotations stop below this residual: each is exact on a sphere and converges on the ellipsoid, a few more
+ * steps leaving a 'free' drag (which uses them first) as exact as Gauss–Newton.
+ */
+const RIGID_TOLERANCE_PX = 1e-5;
+
+/** {@link solveAnchor}'s modes: heading held, rotating rigidly only where that fails (zooms, KB-094). */
+export const ANCHOR_HOLD_HEADING = 0;
+/** A 'free' drag: on the globe the camera rotates rigidly about the Earth's center, turning the heading (trackball). */
+export const ANCHOR_TRACKBALL = 1;
+/** A 'north-up' drag or zoom: the heading never changes, and the target stops at {@link northUpLimitRad}. */
+export const ANCHOR_NORTH_UP = 2;
+/**
+ * `[0]`: the highest latitude a 'north-up' target reaches, radians (`NavigationApi.northUpMaxLatitudeDeg`, 85° by
+ * default; each drag and zoom writes it): there the heading-held drag stops, short of the poles, where turning about the polar axis would spin the
+ * view. A target already beyond it stays where it is. `[1]`: the limit of the running solve, the pole's otherwise.
+ */
+export const northUpLimitRad = new Float64Array(2);
+/** The target latitude Gauss–Newton may reach otherwise (`northUpLimitRad[1]` of other solves), radians. */
+const POLE_LIMIT_RAD = Math.PI / 2 - 1e-9;
+/** Set when Gauss–Newton stopped because its target passed its latitude limit. */
+let passedLimit = false;
 
 const anchorEcef = new Float64Array(3);
 /** The pixel the anchor must reach, CSS pixels. */
@@ -65,6 +89,7 @@ export function solveAnchor(
   pixel: Float64Array,
   morph?: MorphFrame,
   guess?: Float64Array,
+  mode: number = ANCHOR_HOLD_HEADING,
 ): boolean {
   geodeticArrayToEcef(anchor, anchorEcef);
   anchorGeodetic[0] = anchor[0] ?? 0;
@@ -76,7 +101,39 @@ export function solveAnchor(
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
-  return gaussNewton(camera) || (guess !== undefined && retryFrom(camera, guess)) || rotateToPixel(camera);
+  northUpLimitRad[1] = POLE_LIMIT_RAD;
+  // A 'free' drag on the globe rotates rigidly first (a trackball); on the flattening or flat map it holds the heading.
+  if (mode === ANCHOR_TRACKBALL && !(solveMorph && (solveMorph.factors[0] ?? 0) > 0)) {
+    if (rotateToPixel(camera)) return true;
+    restoreStart(camera);
+    return gaussNewton(camera);
+  }
+  // 'North-up' never rotates rigidly, which would turn the heading: past its limit the target stops there.
+  const northUp = mode === ANCHOR_NORTH_UP;
+  passedLimit = false;
+  // A target beyond the limit (a jump there) goes no further toward the pole, without a snap back to the limit.
+  if (northUp) northUpLimitRad[1] = Math.max(Math.abs(start[1] ?? 0), northUpLimitRad[0] ?? 0);
+  return (
+    gaussNewton(camera) ||
+    (guess !== undefined && retryFrom(camera, guess)) ||
+    (northUp ? passedLimit && holdAtLimit(camera) : rotateToPixel(camera))
+  );
+}
+
+/** Puts the target back where the solve started. */
+function restoreStart(camera: Camera): void {
+  camera.pose.targetLongitudeRad = start[0] ?? 0;
+  camera.pose.targetLatitudeRad = start[1] ?? 0;
+}
+
+/**
+ * The target stopped at the north-up limit nearest the pole the solve headed for, with the longitude of its last step:
+ * the camera halts at the pole while the cursor goes on. True when the anchor is still in front of the eye.
+ */
+function holdAtLimit(camera: Camera): boolean {
+  // Past the limit, the target's latitude is nonzero.
+  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * (northUpLimitRad[1] ?? 0);
+  return residual(camera, r0);
 }
 
 /**
@@ -96,13 +153,11 @@ function retryFrom(camera: Camera, guess: Float64Array): boolean {
  * where the optimizing compiler would not have finished warming up (KB-033).
  */
 function rotateToPixel(camera: Camera): boolean {
-  const pose = camera.pose;
-  pose.targetLongitudeRad = start[0] ?? 0;
-  pose.targetLatitudeRad = start[1] ?? 0;
+  restoreStart(camera);
   // Each rotation is exact for a sphere; on the ellipsoid a few converge to the pixel.
   for (let i = 0; i < RIGID_ITERATIONS; i++) {
     if (!rotateRigidly(camera)) return false;
-    if (shorterThan(r0, TOLERANCE_PX)) return true;
+    if (shorterThan(r0, RIGID_TOLERANCE_PX)) return true;
   }
   return shorterThan(r0, ACCEPT_PX);
 }
@@ -136,8 +191,11 @@ function gaussNewton(camera: Camera): boolean {
     // Wrapping is a call with a double argument: only when the step leaves [-π, π).
     pose.targetLongitudeRad = nextLon >= -Math.PI && nextLon < Math.PI ? nextLon : wrapLongitudeRad(nextLon);
     pose.targetLatitudeRad = lat - dLat;
-    const latitudeLimit = Math.PI / 2 - 1e-9;
-    if (pose.targetLatitudeRad > latitudeLimit || pose.targetLatitudeRad < -latitudeLimit) return false;
+    const limit = northUpLimitRad[1] ?? 0;
+    if (pose.targetLatitudeRad > limit || pose.targetLatitudeRad < -limit) {
+      passedLimit = true;
+      return false;
+    }
   }
   if (!residual(camera, r0)) return false;
   return shorterThan(r0, ACCEPT_PX);
@@ -148,66 +206,74 @@ const hit = new Float64Array(3);
 const rotation = new Float64Array(9);
 const enu = new Float64Array(9);
 const vector = new Float64Array(3);
+/** The sphere test's radius in, the distance along the ray out ({@link sphereHit}). */
+const sphere = new Float64Array(2);
+const rotatedTarget = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+/** A target's longitude and latitude for {@link enuFrameAtArray}. */
+const position = new Float64Array(2);
 
 /**
  * Rotates the camera about the Earth's center so the anchor moves under the pixel and updates the heading to match;
  * leaves the residual in `r0`. Returns false when the pixel's ray misses the anchor's sphere or the anchor goes behind
- * the eye.
+ * the eye. The main path of a 'free' drag, so it allocates nothing: doubles stay in arrays (ADR 0018).
  */
 function rotateRigidly(camera: Camera): boolean {
   camera.update();
-  camera.rayDirection(targetPx[0] ?? 0, targetPx[1] ?? 0, ray);
+  camera.rayDirectionAt(targetPx, ray);
   const eye = camera.eyeEcef;
-  const distance = sphereHit(eye, ray, Math.hypot(anchorEcef[0] ?? 0, anchorEcef[1] ?? 0, anchorEcef[2] ?? 0));
-  if (distance === undefined) return false;
-  for (let i = 0; i < 3; i++) hit[i] = (eye[i] ?? 0) + distance * (ray[i] ?? 0);
+  const ax = anchorEcef[0] ?? 0;
+  const ay = anchorEcef[1] ?? 0;
+  const az = anchorEcef[2] ?? 0;
+  sphere[0] = Math.sqrt(ax * ax + ay * ay + az * az);
+  if (!sphereHit(eye, ray)) return false;
+  for (let i = 0; i < 3; i++) hit[i] = (eye[i] ?? 0) + (sphere[1] ?? 0) * (ray[i] ?? 0);
   rotationBetween(hit, anchorEcef, rotation);
   const pose = camera.pose;
   // Heading: rotate the current horizontal viewing direction and measure it in the new target's local frame.
-  enuFrame(pose.targetLongitudeRad, pose.targetLatitudeRad, enu);
+  position[0] = pose.targetLongitudeRad;
+  position[1] = pose.targetLatitudeRad;
+  enuFrameAtArray(position, enu);
   const sinH = Math.sin(pose.headingRad);
   const cosH = Math.cos(pose.headingRad);
   for (let i = 0; i < 3; i++) vector[i] = sinH * (enu[i] ?? 0) + cosH * (enu[3 + i] ?? 0);
-  const heading = rotate(rotation, vector, ray);
+  rotate(rotation, vector, ray);
   rotate(rotation, camera.targetEcef, hit);
   // The rotated target, converted exactly (it keeps its height above the ellipsoid only approximately).
   ecefArrayToGeodetic(hit, rotatedTarget);
   pose.targetLongitudeRad = rotatedTarget.longitudeRad;
   pose.targetLatitudeRad = rotatedTarget.latitudeRad;
-  enuFrame(pose.targetLongitudeRad, pose.targetLatitudeRad, enu);
-  const east = dot(heading, enu, 0);
-  const north = dot(heading, enu, 3);
-  if (Math.hypot(east, north) > 1e-9) pose.headingRad = Math.atan2(east, north);
+  position[0] = pose.targetLongitudeRad;
+  position[1] = pose.targetLatitudeRad;
+  enuFrameAtArray(position, enu);
+  const east = (ray[0] ?? 0) * (enu[0] ?? 0) + (ray[1] ?? 0) * (enu[1] ?? 0) + (ray[2] ?? 0) * (enu[2] ?? 0);
+  const north = (ray[0] ?? 0) * (enu[3] ?? 0) + (ray[1] ?? 0) * (enu[4] ?? 0) + (ray[2] ?? 0) * (enu[5] ?? 0);
+  if (east * east + north * north > 1e-18) pose.headingRad = Math.atan2(east, north);
   // The residual, in r0, tells the caller how close the rotation landed.
   return residual(camera, r0);
 }
 
-const rotatedTarget = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
-
-function dot(v: Float64Array, basis: Float64Array, offset: number): number {
-  return (
-    (v[0] ?? 0) * (basis[offset] ?? 0) + (v[1] ?? 0) * (basis[offset + 1] ?? 0) + (v[2] ?? 0) * (basis[offset + 2] ?? 0)
-  );
-}
-
-function rotate(m: Float64Array, v: Float64Array, out: Float64Array): Float64Array {
+function rotate(m: Float64Array, v: Float64Array, out: Float64Array): void {
   const x = v[0] ?? 0;
   const y = v[1] ?? 0;
   const z = v[2] ?? 0;
   for (let row = 0; row < 3; row++)
     out[row] = (m[row * 3] ?? 0) * x + (m[row * 3 + 1] ?? 0) * y + (m[row * 3 + 2] ?? 0) * z;
-  return out;
 }
 
 /** The rotation about the origin taking direction `from` to direction `to` (Rodrigues), row-major 3×3. */
 function rotationBetween(from: Float64Array, to: Float64Array, out: Float64Array): void {
-  const fl = Math.hypot(from[0] ?? 0, from[1] ?? 0, from[2] ?? 0);
-  const tl = Math.hypot(to[0] ?? 0, to[1] ?? 0, to[2] ?? 0);
-  const ax = ((from[1] ?? 0) * (to[2] ?? 0) - (from[2] ?? 0) * (to[1] ?? 0)) / (fl * tl);
-  const ay = ((from[2] ?? 0) * (to[0] ?? 0) - (from[0] ?? 0) * (to[2] ?? 0)) / (fl * tl);
-  const az = ((from[0] ?? 0) * (to[1] ?? 0) - (from[1] ?? 0) * (to[0] ?? 0)) / (fl * tl);
-  const cos =
-    ((from[0] ?? 0) * (to[0] ?? 0) + (from[1] ?? 0) * (to[1] ?? 0) + (from[2] ?? 0) * (to[2] ?? 0)) / (fl * tl);
+  const fx = from[0] ?? 0;
+  const fy = from[1] ?? 0;
+  const fz = from[2] ?? 0;
+  const tx = to[0] ?? 0;
+  const ty = to[1] ?? 0;
+  const tz = to[2] ?? 0;
+  // Not Math.hypot: V8 boxes its arguments.
+  const lengths = Math.sqrt(fx * fx + fy * fy + fz * fz) * Math.sqrt(tx * tx + ty * ty + tz * tz);
+  const ax = (fy * tz - fz * ty) / lengths;
+  const ay = (fz * tx - fx * tz) / lengths;
+  const az = (fx * ty - fy * tx) / lengths;
+  const cos = (fx * tx + fy * ty + fz * tz) / lengths;
   const k = 1 / (1 + cos);
   out[0] = cos + ax * ax * k;
   out[1] = ax * ay * k - az;
@@ -220,15 +286,19 @@ function rotationBetween(from: Float64Array, to: Float64Array, out: Float64Array
   out[8] = cos + az * az * k;
 }
 
-/** Distance along a unit ray to a sphere of the given radius about the origin, or undefined if it misses. */
-function sphereHit(origin: Float64Array, direction: Float64Array, radius: number): number | undefined {
+/**
+ * Whether a unit ray from `origin` meets the sphere of radius `sphere[0]` about the origin, in front of it; the
+ * distance along the ray to the near hit goes to `sphere[1]`.
+ */
+function sphereHit(origin: Float64Array, direction: Float64Array): boolean {
+  const radius = sphere[0] ?? 0;
   const b =
     (origin[0] ?? 0) * (direction[0] ?? 0) +
     (origin[1] ?? 0) * (direction[1] ?? 0) +
     (origin[2] ?? 0) * (direction[2] ?? 0);
   const c = (origin[0] ?? 0) ** 2 + (origin[1] ?? 0) ** 2 + (origin[2] ?? 0) ** 2 - radius * radius;
   const discriminant = b * b - c;
-  if (discriminant < 0) return undefined;
-  const t = -b - Math.sqrt(discriminant);
-  return t >= 0 ? t : undefined;
+  if (discriminant < 0) return false;
+  sphere[1] = -b - Math.sqrt(discriminant);
+  return (sphere[1] ?? 0) >= 0;
 }

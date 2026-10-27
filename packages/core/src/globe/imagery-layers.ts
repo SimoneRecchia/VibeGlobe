@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { StackLayer } from '../imagery/imagery-draws.js';
 import {
   applyChanges,
@@ -57,6 +59,7 @@ class ImageryLayersController implements ImageryLayers {
       opacity: entry.opacity,
       visible: entry.visible,
       blend: entry.blend,
+      harmonize: entry.harmonize,
       sources: entry.sources.map(sourceInfo),
     }));
   }
@@ -86,8 +89,7 @@ class ImageryLayersController implements ImageryLayers {
   /** See {@link ImageryLayers.add}. */
   add(input: ImageryLayerInput, index?: number): void {
     const imagery = this.frame.imagery;
-    if (!imagery)
-      throw new GlobeError('invalid-option', 'Imagery layers can be added once the globe has started with workers');
+    if (!imagery) throw new GlobeError('invalid-option', 'Imagery layers need a started globe with workers');
     let problem = '';
     const [entry] = validStack([input], (message) => (problem = message));
     if (!entry) throw new GlobeError('invalid-option', problem || 'The imagery layer has no source');

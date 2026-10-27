@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The Sun's apparent direction from the Earth's center, for sun lighting by date and time (F396). Low-precision solar
 // coordinates (Meeus, Astronomical Algorithms, 2nd ed., ch. 25: about 0.01°) and Greenwich mean sidereal time (ch. 12),
 // written from the published formulas. Earth-fixed axes: x toward 0° N 0° E, y toward 0° N 90° E, z toward the North

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @hotpath Rebuilt and drained every frame over every queued tile request (ADR 0007: heapify, drop, dispatch); a
  * priority passed as a call argument would be boxed in code V8 did not inline, so priorities are read from typed arrays

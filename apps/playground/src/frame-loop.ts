@@ -1,4 +1,5 @@
-import { FrameStats, type GeoPosition, type Globe } from '@vibeglobe/core';
+import type { GeoPosition, Globe } from '@vibeglobe/core';
+import { FrameStats } from '@vibeglobe/core/diagnostics';
 
 /** Called once per frame with the frame statistics after the frame was recorded. */
 export type FrameListener = (stats: FrameStats, timestampMs: number) => void;
@@ -53,24 +54,23 @@ export function startFrameLoop(onFrame: FrameListener): FrameLoop {
 }
 
 /**
- * Drives continuous circular drag motion through the navigation API and records the engine's CPU time per frame: a
- * marker callback registered before each drag step runs first in the next animation frame, and the engine's `frame`
- * event ends the measurement, so the sample covers the engine's whole frame (benchmark scenarios `drag-*`).
+ * Moves the camera once per display frame with `move` (which returns false while it cannot move yet) and records the
+ * engine's CPU time per frame: a marker callback registered before each move runs first in the next animation frame,
+ * and the engine's `frame` event ends the measurement, so the sample covers the engine's whole frame (benchmark
+ * scenarios `drag-*` and `3dtiles-city`).
  */
-export function startDragLoop(globe: Globe): FrameLoop {
+export function startMeasuredLoop(globe: Globe, move: () => boolean): FrameLoop {
   const cpuMs = new Float64Array(CPU_SAMPLE_CAPACITY);
   const gpuMs = new Float64Array(CPU_SAMPLE_CAPACITY);
   let cpuCount = 0;
   let gpuCount = 0;
   let frameStartMs = -1;
   let handle = 0;
-  let angle = 0;
-  const center = { xPx: 0, yPx: 0 };
-  const point = { xPx: 0, yPx: 0 };
-  let anchor: GeoPosition | undefined;
   const gpuTiming = new URLSearchParams(location.search).has('gpuTiming');
+  // Whether the latest step moved the camera: the marker, registered before it, runs in the frame it caused.
+  let moved = false;
   const markStart = (): void => {
-    frameStartMs = performance.now();
+    frameStartMs = moved ? performance.now() : -1;
   };
   const unsubscribe = globe.on('frame', () => {
     if (frameStartMs < 0) return;
@@ -82,30 +82,15 @@ export function startDragLoop(globe: Globe): FrameLoop {
     if (gpu !== null) gpuMs[gpuCount++ % CPU_SAMPLE_CAPACITY] = gpu;
   });
   const tick = (): void => {
-    anchor ??= globe.navigation.grab(center);
-    if (anchor) {
-      angle += 0.05;
-      point.xPx = center.xPx + 30 * Math.cos(angle);
-      point.yPx = center.yPx + 30 * Math.sin(angle);
-      requestAnimationFrame(markStart);
-      globe.navigation.dragTo(anchor, point);
-    }
+    requestAnimationFrame(markStart);
+    moved = move();
     handle = requestAnimationFrame(tick);
   };
   void globe.ready.then(() => {
-    const canvas = document.querySelector('#globe');
-    center.xPx = (canvas?.clientWidth ?? 0) / 2;
-    center.yPx = (canvas?.clientHeight ?? 0) / 2;
     handle = requestAnimationFrame(tick);
   });
   return {
-    cpuFrameTimesMs() {
-      const count = Math.min(cpuCount, CPU_SAMPLE_CAPACITY);
-      return Array.from(
-        { length: count },
-        (_, index) => cpuMs[(cpuCount - count + index) % CPU_SAMPLE_CAPACITY] as number,
-      );
-    },
+    cpuFrameTimesMs: () => ringSamples(cpuMs, cpuCount),
     resetCpuSamples() {
       cpuCount = 0;
       gpuCount = 0;
@@ -116,6 +101,28 @@ export function startDragLoop(globe: Globe): FrameLoop {
       unsubscribe();
     },
   };
+}
+
+/** Continuous circular drag motion through the navigation API, measured by {@link startMeasuredLoop} (`drag-*`). */
+export function startDragLoop(globe: Globe): FrameLoop {
+  let angle = 0;
+  const center = { xPx: 0, yPx: 0 };
+  const point = { xPx: 0, yPx: 0 };
+  let anchor: GeoPosition | undefined;
+  return startMeasuredLoop(globe, () => {
+    if (center.xPx === 0) {
+      const canvas = document.querySelector('#globe');
+      center.xPx = (canvas?.clientWidth ?? 0) / 2;
+      center.yPx = (canvas?.clientHeight ?? 0) / 2;
+    }
+    anchor ??= globe.navigation.grab(center);
+    if (!anchor) return false;
+    angle += 0.05;
+    point.xPx = center.xPx + 30 * Math.cos(angle);
+    point.yPx = center.yPx + 30 * Math.sin(angle);
+    globe.navigation.dragTo(anchor, point);
+    return true;
+  });
 }
 
 /** The samples of a ring buffer that has received `count` values, oldest first. */

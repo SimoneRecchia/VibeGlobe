@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The picking id scheme (ADR 0029): every pickable feature draws a 32-bit id into the renderer's id buffer as RGBA8.
  * The high 8 bits are the layer's slot (1–255, assigned while the layer is in the stack), the low 24 bits the

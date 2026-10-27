@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { Camera } from '../camera/camera.js';
 import {
   selectQuadtreeTiles,
@@ -41,4 +43,70 @@ export class FlightPreload {
   clear(): void {
     this.count = 0;
   }
+}
+
+/** During the descent, how far ahead along a flight its tiles come from, milliseconds (F287). */
+const DESCENT_AHEAD_MS = 500;
+/** Samples of a flight's path searched for its highest point. */
+const PEAK_SAMPLES = 32;
+
+/**
+ * The view a flight will show next whose tiles load instead of the current view's (F287). Until its highest point,
+ * the view there: its tiles are coarser than every view of the climb and cover them, so they draw at once and stay
+ * drawn, where each level of the climb would be replaced by the next before it shows. After it, the view half a
+ * second ahead: inside the current one, its tiles draw within the half second.
+ */
+export class FlightLookahead {
+  /** Longitude, latitude (radians), range (meters), heading and tilt (radians) ahead, as `FlightPreload.select` takes. */
+  readonly end = new Float64Array(5);
+  private readonly camera = new Camera();
+  private readonly io = new Float64Array(2);
+  /** The engine time of the running flight's highest point. */
+  private readonly peakMs = new Float64Array(1);
+
+  /** Finds the highest point of a flight starting at `startMs` and lasting `durationMs` (once, when it starts). */
+  plan(animator: FlightAnimator, current: Camera, startMs: number, durationMs: number): void {
+    let highest = -1;
+    this.peakMs[0] = startMs;
+    for (let i = 1; i <= PEAK_SAMPLES; i++) {
+      const atMs = startMs + (durationMs * i) / PEAK_SAMPLES;
+      const range = this.evaluate(animator, current, atMs)[2] ?? 0;
+      if (range > highest) {
+        highest = range;
+        this.peakMs[0] = atMs;
+      }
+    }
+  }
+
+  /** Writes the pose whose tiles load at the engine time `nowMs` into {@link end}. */
+  poseAhead(animator: FlightAnimator, current: Camera, nowMs: number): Float64Array {
+    const peakMs = this.peakMs[0] ?? 0;
+    return this.evaluate(animator, current, nowMs < peakMs ? peakMs : nowMs + DESCENT_AHEAD_MS);
+  }
+
+  private evaluate(animator: FlightAnimator, current: Camera, atMs: number): Float64Array {
+    const camera = this.camera;
+    const from = current.pose;
+    const pose = camera.pose;
+    camera.fovYRad = current.fovYRad;
+    camera.widthPx = current.widthPx;
+    camera.heightPx = current.heightPx;
+    pose.targetHeightMeters = from.targetHeightMeters;
+    pose.tiltRad = from.tiltRad;
+    this.io[0] = atMs;
+    this.io[1] = from.tiltRad;
+    animator.step(camera, this.io);
+    const end = this.end;
+    end[0] = pose.targetLongitudeRad;
+    end[1] = pose.targetLatitudeRad;
+    end[2] = pose.rangeMeters;
+    end[3] = pose.headingRad;
+    end[4] = this.io[1] ?? Number.NaN;
+    return end;
+  }
+}
+
+/** What {@link FlightLookahead} needs of a flight: its pose at any engine time. */
+interface FlightAnimator {
+  step(camera: Camera, io: Float64Array): boolean;
 }

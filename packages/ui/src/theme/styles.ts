@@ -1,7 +1,10 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The ui package's stylesheet. Every color, font and size comes from a documented CSS variable ({@link THEME_VARIABLES}),
- * so an application restyles every control by setting variables on the `.vg-ui` element (or any ancestor, as the
- * defaults apply only where the variable is not inherited); internal selectors are not part of the API.
+ * so an application restyles every control by setting variables on the `.vg-ui` element, in a rule of its own
+ * stylesheet (`.vg-ui { --vg-ui-color: … }`, which wins in either theme: the defaults sit in the `vibeglobe-ui-theme`
+ * cascade layer) or inline; internal selectors are not part of the API.
  */
 
 /** Names of the theme's CSS variables. */
@@ -45,6 +48,21 @@ const LIGHT = {
   '--vg-ui-debug-color': '#ffffff',
   '--vg-ui-debug-background': 'rgba(0, 0, 0, 0.75)',
   '--vg-ui-debug-font-size': '12px',
+  /**
+   * What controls draw on the map, read when a control creates its map layers (the minimap: on every update): the
+   * geolocation marker and its accuracy circle.
+   */
+  '--vg-ui-marker-color': '#1a73e8',
+  '--vg-ui-marker-outline-color': '#ffffff',
+  /** Drawn and measured shapes, and the fill of their edit handles. */
+  '--vg-ui-drawing-color': '#d93025',
+  '--vg-ui-drawing-handle-color': '#ffffff',
+  /** Provider logos in the attribution: height and clear space (Google's policy: 16–19 px, 10 px around, 5 px below). */
+  '--vg-ui-logo-height': '16px',
+  '--vg-ui-logo-clear': '10px',
+  '--vg-ui-logo-clear-bottom': '5px',
+  /** The minimap's view footprint (its fill is the same color, translucent). */
+  '--vg-ui-minimap-footprint-color': '#ff4040',
 } as const;
 
 /** The dark theme's values. */
@@ -75,12 +93,16 @@ function declarations(values: Readonly<Record<string, string>>): string {
     .join('');
 }
 
-/** The theme blocks: the only place where literal colors, fonts and sizes appear. */
+/**
+ * The theme blocks: the only place where literal colors, fonts and sizes appear. In a cascade layer, so any rule of the
+ * page's own stylesheets overrides them (KB-165); reduced motion overrides both themes (KB-164).
+ */
 export const THEME_CSS =
+  '@layer vibeglobe-ui-theme{' +
   // A debug panel outside a UI layer (the playground's) takes the defaults itself; inside one it inherits the layer's.
   `.vg-ui,.vibeglobe-debug-overlay:not(.vg-ui .vibeglobe-debug-overlay){${declarations(LIGHT)}}` +
   `.vg-ui[data-theme="dark"]{${declarations(DARK)}}` +
-  '@media (prefers-reduced-motion: reduce){.vg-ui{--vg-ui-transition-duration:0s;}}';
+  '@media (prefers-reduced-motion: reduce){.vg-ui,.vg-ui[data-theme]{--vg-ui-transition-duration:0s;}}}';
 
 /** The rules of every control: values come from the theme variables only (F429, checked by styles.test.ts). */
 export const RULES_CSS = `
@@ -89,8 +111,8 @@ export const RULES_CSS = `
 .vg-ui [hidden]{display:none !important}
 .vg-ui__corner > *{pointer-events:auto}
 .vg-ui__corner{position:absolute;display:flex;flex-direction:column;gap:var(--vg-ui-spacing);padding:var(--vg-ui-spacing);max-width:100%}
-.vg-ui__corner--top-left{top:0;left:0;align-items:flex-start}
-.vg-ui__corner--top-right{top:0;right:0;align-items:flex-end}
+.vg-ui__corner--top-left{top:0;left:0;align-items:flex-start;box-sizing:border-box;flex-wrap:wrap;align-content:flex-start}
+.vg-ui__corner--top-right{top:0;right:0;align-items:flex-end;box-sizing:border-box;flex-wrap:wrap-reverse;align-content:flex-start}
 .vg-ui__corner--bottom-left{bottom:0;left:0;align-items:flex-start;flex-direction:column-reverse}
 .vg-ui__corner--bottom-right{bottom:0;right:0;align-items:flex-end;flex-direction:column-reverse}
 .vg-ui__control{pointer-events:auto;display:flex;flex-direction:column;background:var(--vg-ui-background);border:var(--vg-ui-border-width) solid var(--vg-ui-border-color);border-radius:var(--vg-ui-border-radius);box-shadow:var(--vg-ui-shadow)}
@@ -136,7 +158,7 @@ export const RULES_CSS = `
 .vg-ui__attribution[data-expanded="false"] .vg-ui__credit:not(.vg-ui__credit--required){display:none}
 .vg-ui__credit{display:flex;align-items:center;gap:calc(var(--vg-ui-spacing) / 2)}
 .vg-ui__credit a{color:inherit}
-.vg-ui__credit-logo{height:var(--vg-ui-icon-size)}
+.vg-ui__credit-logo{height:var(--vg-ui-logo-height);margin:var(--vg-ui-logo-clear) var(--vg-ui-logo-clear) var(--vg-ui-logo-clear-bottom)}
 .vg-ui__panel{padding:var(--vg-ui-spacing);border-top:var(--vg-ui-border-width) solid var(--vg-ui-border-color);min-width:calc(var(--vg-ui-panel-width) / 2)}
 .vg-ui__layers-group{border:0;margin:0;padding:0}
 .vg-ui__layers-group legend{font-weight:600;padding:0}

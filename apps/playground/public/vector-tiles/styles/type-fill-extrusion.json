@@ -1,0 +1,35 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: fill-extrusion layers",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "building",
+      "type": "fill-extrusion",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-extrusion-color": "#c08060",
+        "fill-extrusion-opacity": 1
+      }
+    }
+  ]
+}

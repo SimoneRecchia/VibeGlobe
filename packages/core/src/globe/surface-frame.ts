@@ -1,6 +1,8 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { LayerGround } from '../layers/layer-target.js';
 import { refuseDisplayOnly } from './display-only.js';
-import { motionOf } from './motion-detail.js';
+import { BASE_TEXEL, FACTOR, motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -23,7 +25,7 @@ import { validStack } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
-import { liftMeters } from '../terrain/collision.js';
+import { liftMeters, shortfallMeters } from '../terrain/collision.js';
 import { displayedHeightMeters } from '../terrain/displayed-height.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel, terrainHeightRange } from '../terrain/terrain-draws.js';
 import type {
@@ -36,6 +38,7 @@ import type {
   SurfaceTileInfo,
   TerrainStats,
   TileDrawList,
+  ReloadOptions,
 } from './types.js';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -45,17 +48,32 @@ const DEFAULT_CLEARANCE_METERS = 10;
 /** ADR 0006's τ_imagery: the largest an imagery texel may look, in render-target pixels. */
 const MAX_TEXEL_ERROR_PX = 1.5;
 
+/**
+ * Render-target pixels per CSS pixel and the largest screen error (CSS pixels) of each surface frame, outside the
+ * class the frame loop writes (F064).
+ */
+const resolutions = new WeakMap<object, Float64Array>();
+
+function resolutionOf(owner: object): Float64Array {
+  let resolution = resolutions.get(owner);
+  if (!resolution) resolutions.set(owner, (resolution = Float64Array.of(1, 1)));
+  return resolution;
+}
+
 /** Surface tile keys are exact integers up to level 25 (quadtreeTileKey). */
 const MAX_LEVEL = 25;
 
 /** A lift change smaller than this, meters, is rounding, not motion (KB-089). */
 const LIFT_SETTLED_METERS = 1e-3;
+/** The eye looks this many frames ahead along its motion for terrain to load (KB-219): a second at 60 Hz. */
+const AHEAD_FRAMES = 60;
+/** Below this height above the drawn ground the eye's own finest terrain is loaded (KB-219), meters. */
+const LOAD_BELOW_METERS = 5000;
+/** The priority of those loads: the first of the visible tiles (ADR 0007), as the eye's safety depends on them. */
+const AHEAD_PRIORITY = 1024;
 
 /** The sample `terrainHeightRad` writes. */
 const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
-
-/** During a flight a visible tile loads once wanted this long: the moving view would show it only for a moment (F287). */
-const FLIGHT_SETTLE_MS = 400;
 
 /**
  * The surface part of a frame: selects the quadtree tiles for the camera, makes sure their meshes exist and fills the
@@ -81,6 +99,7 @@ export class SurfaceFrame {
     terrainMinMeters: 0,
     terrainMaxMeters: 0,
     terrainRange: undefined as ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined,
+    fogHaze: undefined as number | undefined,
   };
   /** The imagery runtime, once `startImagery` ran with imagery or terrain. */
   imagery: ImageryRuntime | undefined;
@@ -92,7 +111,12 @@ export class SurfaceFrame {
   /** A synchronous elevation query's position in radians, in an array so passing it boxes nothing (ADR 0018). */
   private readonly queryRad = new Float64Array(2);
   /** The finest resident terrain under the eye at the drawn scale, from {@link probeGround}. */
-  private readonly probed = new Float64Array(1);
+  /**
+   * The finest resident height under the eye and its drawn scale (probeGround), then the last frame's eye
+   * (radians), its finest terrain level and height (meters)
+   * and the eye's shortfall below that height, for {@link SurfaceFrame.keepAboveTerrain}.
+   */
+  private readonly probed = new Float64Array(7);
   /** The finest resident terrain under the eye, each frame. */
   private readonly eyeGround: ElevationSample = { heightMeters: 0, level: -1, noData: true };
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
@@ -103,7 +127,7 @@ export class SurfaceFrame {
     private readonly clock: { timeInto(out: Float64Array): void },
     private readonly observability: Observability,
   ) {
-    this.selection.maxScreenErrorPx = options.maxScreenErrorPx ?? 1;
+    this.setScreenError(options.maxScreenErrorPx ?? 1);
     this.selection.minLevel = options.minSurfaceLevel ?? 2;
     this.fadeMs = options.imageryFadeMs ?? DEFAULT_FADE_MS;
     this.clearanceMeters = options.terrainClearanceMeters ?? DEFAULT_CLEARANCE_METERS;
@@ -150,7 +174,7 @@ export class SurfaceFrame {
       terrain,
     );
     this.imagery = imagery;
-    imagery.setPixelRatio(MAX_TEXEL_ERROR_PX / motionOf(this).baseTexelErrorPx);
+    imagery.setPixelRatio(resolutionOf(this)[0] ?? 1);
     this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
     this.selection.imageryMaxLevel = imagery.maxLevel;
     if (terrain) {
@@ -195,6 +219,7 @@ export class SurfaceFrame {
     const scale = (factors[1] ?? 1) * (1 - m + m * (factors[2] ?? 1) * (this.queryRad[1] ?? 1));
     camera.groundHeightMeters = (drawn === drawn ? drawn : finest) * scale;
     this.probed[0] = finest * scale;
+    this.probed[1] = scale;
   }
 
   /**
@@ -211,9 +236,33 @@ export class SurfaceFrame {
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
     this.probeGround(camera);
-    const finest = this.probed[0] ?? 0;
+    const probed = this.probed;
+    const finest = probed[0] ?? 0;
     const surface = camera.groundHeightMeters;
-    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
+    // Along the eye's way (KB-219): the finest terrain under the eye and a second ahead at this frame's motion is
+    // loaded, so it is in memory by the time the eye gets there. A step over 0.01 rad (60 km) is a jump, not motion.
+    const dLon = eye.longitudeRad - (probed[2] ?? 0);
+    const dLat = eye.latitudeRad - (probed[3] ?? 0);
+    const moving = dLon < 0.01 && dLon > -0.01 && dLat < 0.01 && dLat > -0.01;
+    probed[2] = eye.longitudeRad;
+    probed[3] = eye.latitudeRad;
+    if (eye.heightMeters - surface < LOAD_BELOW_METERS) {
+      heights.wantFinest(eye.longitudeRad, eye.latitudeRad, AHEAD_PRIORITY);
+      if (moving)
+        heights.wantFinest(
+          eye.longitudeRad + AHEAD_FRAMES * dLon,
+          eye.latitudeRad + AHEAD_FRAMES * dLat,
+          AHEAD_PRIORITY,
+        );
+    }
+    // The eye's shortfall is its own, not the lift's: a movement or input writes the target back onto the ellipsoid
+    // each frame, and a catch-up of the lift restarted every frame (KB-219).
+    const level = this.eyeGround.level;
+    const risen = level !== probed[4] && moving ? finest - (probed[5] ?? 0) : 0;
+    probed[6] = shortfallMeters(probed[6] ?? 0, risen);
+    probed[4] = level;
+    probed[5] = finest;
+    const next = liftMeters(eye.heightMeters - lift, surface, finest - (probed[6] ?? 0), this.clearanceMeters);
     imagery.chargeTerrainMs(imagery.now() - start);
     // Under a millimeter the lift has settled: rounding alone would keep moving the eye, and drawing, forever.
     const change = next - lift;
@@ -244,14 +293,16 @@ export class SurfaceFrame {
     const selectionStart = timed ? imagery.now() : 0;
     // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
     motionOf(this).flying = imagery?.preload.flying === true;
-    const motion = motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
+    const motion = motionOf(this).state[FACTOR] ?? 1;
     // Written only when it changes: a new double in the options' field would allocate every frame (F064).
-    const texelErrorPx = motionOf(this).baseTexelErrorPx * motion;
+    const texelErrorPx = (motionOf(this).state[BASE_TEXEL] ?? 1.5) * motion;
     if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
     if (imagery)
       for (const layer of imagery.layers) {
         layer.loader.prefetchPaused = motion > 1 || imagery.preload.flying;
-        layer.loader.settleMs = imagery.preload.flying ? FLIGHT_SETTLE_MS : 0;
+        // A flight requests no visible tile: the view ahead and the destination load instead (F287).
+        layer.loader.settleMs = imagery.preload.flying ? Number.POSITIVE_INFINITY : 0;
       }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
@@ -284,6 +335,12 @@ export class SurfaceFrame {
     this.imagery.preload.flying = end !== undefined && flight;
     if (end) this.imagery.preload.select(camera, end, this.selection);
     else this.imagery.preload.clear();
+    this.imagery.ahead.clear();
+  }
+
+  /** Each frame of a flight: loads the tiles of the pose it will have in about a second (F287). */
+  preloadAhead(end: Float64Array, camera: Camera): void {
+    this.imagery?.ahead.select(camera, end, this.selection);
   }
 
   /** The camera jumped: no motion for motion-aware detail (F085). */
@@ -303,13 +360,35 @@ export class SurfaceFrame {
    * render-target pixels, so a sharper canvas gets finer imagery (F109, M3 plan §2.5).
    */
   setPixelRatio(pixelRatio: number): void {
-    this.selection.maxTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
-    motionOf(this).baseTexelErrorPx = MAX_TEXEL_ERROR_PX / pixelRatio;
+    resolutionOf(this)[0] = pixelRatio;
+    this.applyTexelError();
     // High-DPI sources switch to their `@2x` tiles (F241).
     if (this.imagery) {
       this.imagery.setPixelRatio(pixelRatio);
       this.imageryChanged();
     }
+  }
+
+  /**
+   * Sets the largest projected geometric error in CSS pixels (F399): imagery texels scale with it, so a coarser
+   * quality loads coarser tiles of both kinds.
+   */
+  setScreenError(maxScreenErrorPx: number): void {
+    resolutionOf(this)[1] = maxScreenErrorPx;
+    this.selection.maxScreenErrorPx = maxScreenErrorPx;
+    this.applyTexelError();
+  }
+
+  /** The haze of fog-aware detail (F395), or undefined while the atmosphere or its fog is off. */
+  setFog(haze: number | undefined): void {
+    this.selection.fogHaze = haze;
+  }
+
+  private applyTexelError(): void {
+    const [pixelRatio = 1, screenErrorPx = 1] = resolutionOf(this);
+    const texelErrorPx = (MAX_TEXEL_ERROR_PX * screenErrorPx) / pixelRatio;
+    this.selection.maxTexelErrorPx = texelErrorPx;
+    motionOf(this).baseTexelErrorPx = texelErrorPx;
   }
 
   /** True once the pinned imagery base is resident (always without imagery): `ready` waits for it (F084). */
@@ -370,8 +449,8 @@ export class SurfaceFrame {
   }
 
   /** Throws when a drawn layer's source is display only: its pixels may not be read back (F323). */
-  refuseReadback(): void {
-    refuseDisplayOnly(this.imagery, 'captureFrame', 'imagery');
+  refuseReadback(api: 'captureFrame' | 'captureView' = 'captureFrame'): void {
+    refuseDisplayOnly(this.imagery, api, 'imagery');
   }
 
   /** The imagery counters, if there is imagery. */
@@ -380,8 +459,8 @@ export class SurfaceFrame {
   }
 
   /** See `Globe.reloadSource`. */
-  reloadSource(sourceId: string): boolean {
-    return this.imagery?.reloadSource(sourceId) ?? false;
+  reloadSource(sourceId: string, options?: ReloadOptions): boolean {
+    return this.imagery?.reloadSource(sourceId, options?.missingOnly) ?? false;
   }
 
   /** The terrain counters, if there is terrain. */
@@ -395,7 +474,7 @@ export class SurfaceFrame {
    */
   get fading(): boolean {
     const imagery = this.imagery;
-    return imagery !== undefined && (imagery.fading || motionOf(this).factor > 1);
+    return imagery !== undefined && (imagery.fading || (motionOf(this).state[FACTOR] ?? 1) > 1);
   }
 
   /** True while imagery the view wants is still loading. */
@@ -429,6 +508,6 @@ export class SurfaceFrame {
 function tileErrorMessage(event: TileErrorEvent): string {
   const tile = `${event.sourceId}: tile ${event.level}/${event.x}/${event.y}`;
   return event.reason === 'cors'
-    ? `${event.sourceId}: tiles are blocked by CORS: the server answers without Access-Control-Allow-Origin, so the browser cannot use them as textures; the source's tiles count as unavailable (first: tile ${event.level}/${event.x}/${event.y})`
+    ? `${event.sourceId}: tiles are blocked by CORS: the server sends no Access-Control-Allow-Origin, so the browser cannot use them as textures: they count as unavailable (first: tile ${event.level}/${event.x}/${event.y})`
     : `${tile} ${event.reason}`;
 }

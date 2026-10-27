@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
 import { projectToScreen } from '../camera/projection.js';
 import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
@@ -16,6 +18,34 @@ const screenScratch = new Float64Array(2);
 const pick: GeodeticRad = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
 const pixel = new Float64Array(2);
 const geodetic = new Float64Array(3);
+/**
+ * The camera whose frame is being drawn: its matrices and the view state are the frame's, brought up to date before the
+ * draw, so the queries layers make while drawing (labels projected glyph by glyph, tiles picked under a grid) skip
+ * updating them again for every point (KB-210). Module state, so the frame loop's classes keep their shape.
+ */
+let drawing: Camera | undefined;
+
+/** Draws a frame with `renderer`, the queries layers make meanwhile reusing `camera` as the frame has it. */
+export function renderDrawing<V, D>(
+  camera: Camera,
+  renderer: { render(view: V, draws: D): boolean },
+  view: V,
+  draws: D,
+): boolean {
+  drawing = camera;
+  try {
+    return renderer.render(view, draws);
+  } finally {
+    drawing = undefined;
+  }
+}
+
+/** Brings the camera and the view up to date, unless they are the frame being drawn's. */
+function current(camera: Camera, view: ViewState): void {
+  if (drawing === camera) return;
+  camera.update();
+  view.update(camera);
+}
 
 /**
  * The position under a screen point as the frame shows it (ADR 0008: on the morphed surface, measured on the
@@ -28,8 +58,7 @@ export function positionAt(
   point: ScreenPoint,
   heightAt?: (longitudeRad: number, latitudeRad: number) => number,
 ): GeoPosition | undefined {
-  camera.update();
-  view.update(camera);
+  current(camera, view);
   pixel[0] = point.xPx;
   pixel[1] = point.yPx;
   pick.heightMeters = 0;
@@ -46,8 +75,7 @@ export function positionAt(
 
 /** The screen point showing a position as the frame draws it (camera and view brought up to date), or undefined behind it. */
 export function screenOf(camera: Camera, view: ViewState, position: GeoPosition): ScreenPoint | undefined {
-  camera.update();
-  view.update(camera);
+  current(camera, view);
   geodetic[0] = position.longitudeDeg * RAD;
   geodetic[1] = position.latitudeDeg * RAD;
   geodetic[2] = position.heightMeters ?? 0;

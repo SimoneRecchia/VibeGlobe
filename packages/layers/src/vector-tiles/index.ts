@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Vector tiles (M13, computational parts; ADR 0041): MapLibre style evaluation and validation, layer fades,
  * tessellation, text shaping, label placement and building extrusion. The renderer draws what these modules build.
@@ -69,5 +71,45 @@ export {
   toTargetTile,
 } from './tile-pyramid.js';
 export type { OverzoomTransform, SourceCoverage, TileDraw, TileId } from './tile-pyramid.js';
-export { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile, VECTOR_TILE_TASKS } from './layout-tile.js';
+export { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile, SIDE_STEP_UNITS, VECTOR_TILE_TASKS } from './layout-tile.js';
 export type { Bucket, BucketFeature, BucketGeometry, BucketLabel, LayoutInput } from './layout-tile.js';
+export {
+  densifyLine,
+  globeVertices,
+  maxEdgeUnits,
+  subdividedFill,
+  tileOrigin,
+  tileToLonLat,
+} from './globe-vertices.js';
+export type { GlobeVertices } from './globe-vertices.js';
+export { addVectorTiles } from './add-vector-tiles.js';
+export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
+export { pickVectorFeatures } from './vector-picking.js';
+export type { DrawnTile, PickContext, PickedVectorFeature } from './vector-picking.js';
+export { VectorInteraction } from './vector-interaction.js';
+export type { VectorFeatureEvent } from './vector-interaction.js';
+export { LabelPlacer } from './label-placer.js';
+export type { LabelSource, LabelView, PlacedLabel } from './label-placer.js';
+export { GlyphSource, LOCAL_FONT_STACK } from './glyph-source.js';
+export type { SpriteImage } from './glyph-source.js';
+export { VectorTileLoader } from './tile-loader.js';
+export type { LoadedTile, TileLoaderOptions, WantedTile } from './tile-loader.js';
+export { meshGeometry } from './tile-meshes.js';
+export type { MeshGeometry } from './tile-meshes.js';
+export { linearColor, meshKindOf, meshPaint, zoomBracket } from './vector-paint.js';
+export type { MeshPaint } from './vector-paint.js';
+export { viewTargets } from './view-tiles.js';
+export type { SurfaceTileRef } from './view-tiles.js';
+export type {
+  AtlasRect,
+  LabelQuads,
+  RasterizedGlyph,
+  VectorAtlas,
+  VectorDraw,
+  VectorLayerDraws,
+  VectorMesh,
+  VectorMeshData,
+  VectorMeshKind,
+  VectorMeshUpdate,
+  VectorTileTarget,
+} from './vector-target.js';

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The drawing tool's model (F407–F410): its mode, the shapes, the shape being drawn, the edit selection and the events
  * the application receives. Input (`draw-input.ts`) calls its commands with geographic positions; the layers

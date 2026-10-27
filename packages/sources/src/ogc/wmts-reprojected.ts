@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { ImagePart } from '../reproject/reprojected-imagery.js';
 import type { SourceBbox } from '../reproject/warp-math.js';
 import { STANDARD_PIXEL_M } from './crs.js';

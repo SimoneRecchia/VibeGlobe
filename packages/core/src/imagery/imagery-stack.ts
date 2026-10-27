@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { rgba8Bytes } from '../cache/byte-size.js';
 import { LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
@@ -20,6 +22,12 @@ export interface ImageryLayerOptions {
   readonly visible?: boolean;
   /** Default 'normal'. */
   readonly blend?: ImageryBlend;
+  /**
+   * Matches the tones of the chain's sources (F249, ADR 0044): a later source's colors are scaled toward the first
+   * source's where both show, so neither a switch nor a boundary between them shows (default true; false shows the
+   * sources' own colors).
+   */
+  readonly harmonize?: boolean;
 }
 
 /** A layer of `GlobeOptions.imagery`: a single source, or a layer with a chain of sources and its look. */
@@ -51,6 +59,8 @@ export interface ImageryLayerState {
   readonly opacity: number;
   readonly visible: boolean;
   readonly blend: ImageryBlend;
+  /** Whether the chain's tones are matched (F249). */
+  readonly harmonize: boolean;
   /** The layer's sources in priority order (F220). */
   readonly sources: readonly ImagerySourceInfo[];
 }
@@ -91,6 +101,7 @@ export interface ImageryLayerChanges {
   readonly opacity?: number;
   readonly visible?: boolean;
   readonly blend?: ImageryBlend;
+  readonly harmonize?: boolean;
 }
 
 /**
@@ -126,6 +137,7 @@ export interface StackEntry {
   opacity: number;
   visible: boolean;
   blend: ImageryBlend;
+  harmonize: boolean;
 }
 
 function isSource(input: ImageryLayerInput): input is ImagerySource {
@@ -143,6 +155,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
         opacity: 1,
         visible: true,
         blend: 'normal',
+        harmonize: true,
       };
     const first = input.sources[0];
     if (!first) throw new RangeError('An imagery layer needs at least one source');
@@ -153,6 +166,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
       opacity: 1,
       visible: true,
       blend: 'normal',
+      harmonize: true,
     };
     applyChanges(entry, input);
     return entry;
@@ -167,7 +181,8 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
 
 /** Applies changes to a layer; throws `RangeError` for an opacity outside 0–1 or an unknown blend mode. */
 export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): void {
-  const { opacity, visible, blend } = changes;
+  const { opacity, visible, blend, harmonize } = changes;
+  if (harmonize !== undefined) entry.harmonize = harmonize;
   if (opacity !== undefined) {
     if (!(opacity >= 0 && opacity <= 1)) throw new RangeError(`Opacity ${String(opacity)} is not between 0 and 1`);
     entry.opacity = opacity;
@@ -190,8 +205,15 @@ export function isOpaque(entry: StackEntry): boolean {
  */
 export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: number): number[] {
   const sources = entries.flatMap((entry) => entry.sources);
-  // Only the first source of a chain pins a base: the later ones serve finer levels or stand in (F247).
-  const heads = entries.flatMap((entry) => entry.sources.map((_, index) => index === 0));
+  // One source of a chain pins a base, the later ones serving finer levels or standing in (F247): the first that has
+  // level 0, so a chain over a world source from a source that starts deeper pins the world's low levels (KB-218).
+  const heads = entries.flatMap((entry) => {
+    const base = Math.max(
+      0,
+      entry.sources.findIndex((source) => !source.minLevel),
+    );
+    return entry.sources.map((_, index) => index === base);
+  });
   const levels = sources.map(() => -1);
   let used = 0;
   for (let level = 0; level <= 25; level++) {

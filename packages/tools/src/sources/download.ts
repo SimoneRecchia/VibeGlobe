@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The download step: resumable HTTP downloads with checksums (F335) and requester-pays signing. */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -76,6 +78,11 @@ async function streamTo(response: Response, path: string): Promise<number> {
   return total;
 }
 
+/** Names a download the lock file does not pin, with the checksum to pin it (DP-006). */
+function reportUnpinned(context: DownloadContext, key: string, expected: string | undefined, checksum: string): void {
+  if (expected === undefined) context.report(`unpinned ${key}: add "${key}": "${checksum}" to the lock file`);
+}
+
 /** Downloads one file into `<folder>/<key>`, resuming a partial download, verifying the lock checksum. */
 export async function downloadFile(file: SourceFile, context: DownloadContext): Promise<DownloadResult> {
   const target = join(context.folder, file.key);
@@ -122,6 +129,7 @@ export async function downloadFile(file: SourceFile, context: DownloadContext): 
   rmSync(partial, { force: true });
   context.log.record(STEP, file.key, checksum);
   context.report(`downloaded ${file.key} (${bytes.length} bytes${offset > 0 ? `, resumed at ${offset}` : ''})`);
+  reportUnpinned(context, file.key, expected, checksum);
   return { key: file.key, status: 'downloaded', transferred, sha256: checksum };
 }
 
@@ -155,6 +163,7 @@ async function downloadWindow(
   writeAtomic(target, result.file);
   context.log.record(STEP, file.key, checksum);
   context.report(`read ${file.key}: ${result.tiles} internal tiles, ${result.transferred} bytes`);
+  reportUnpinned(context, file.key, expected, checksum);
   return { key: file.key, status: 'downloaded', transferred: result.transferred, sha256: checksum };
 }
 

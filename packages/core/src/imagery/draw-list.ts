@@ -1,5 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { NO_TERRAIN, type TileDrawLayer, type TileDrawList, type TileDrawOverlay } from '../globe/types.js';
-import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 
 /** Texture handle of a draw that samples the world base image (`GlobeOptions.baseImageryUrl`). */
 export const BASE_TEXTURE = -1;
@@ -19,6 +21,16 @@ export class DrawLayer implements TileDrawLayer {
   seeded: Uint8Array;
   /** Skirt depth added to the mesh's own, meters (terrain shown from a coarser level than the tile's, M4 review). */
   skirtMeters: Float32Array;
+  /** The source of each draw's imagery for tone matching, `layer × 8 + chain index`, or -1 (F249). */
+  toneSources: Int16Array;
+  /** Terrain only: 1 on each edge (north, east, south, west) that samples the stitch texture (KB-178). */
+  stitchEdges: Uint8Array;
+  /** Terrain only: the coarser terrain tile a draw's stitched edges sample, or -1 (KB-178). */
+  stitchTextures: Int32Array;
+  /** Terrain only: the UV transforms into the stitch textures, four per draw. */
+  stitchTransforms: Float32Array;
+  /** Terrain only: the share of its heights a draw keeps on its north and south edges (polar caps, KB-180). */
+  heightScales: Float32Array;
 
   constructor(capacity: number) {
     this.textures = new Int32Array(capacity);
@@ -31,6 +43,11 @@ export class DrawLayer implements TileDrawLayer {
     this.fades = new Float32Array(capacity);
     this.seeded = new Uint8Array(capacity);
     this.skirtMeters = new Float32Array(capacity);
+    this.toneSources = new Int16Array(capacity).fill(-1);
+    this.stitchEdges = new Uint8Array(capacity * 4);
+    this.stitchTextures = new Int32Array(capacity).fill(-1);
+    this.stitchTransforms = new Float32Array(capacity * 4);
+    this.heightScales = new Float32Array(capacity * 2).fill(1);
   }
 
   /** Draw `index` shows `texture` (with no fade yet) through the transform in `transform[0..3]`. */
@@ -55,18 +72,17 @@ export class DrawLayer implements TileDrawLayer {
 /** Overlays a draw can show above its base imagery (F244, F246): further visible layers are left out. */
 export const MAX_OVERLAYS = 2;
 
-/** One overlay slot's per-draw arrays (`TileDrawList.overlays`). */
-export class OverlaySlot implements TileDrawOverlay {
-  textures: Int32Array;
-  uvTransforms: Float32Array;
-  geographic: Uint8Array;
+/**
+ * One overlay slot's per-draw arrays (`TileDrawList.overlays`): a layer's, with the `from` imagery of its cross-fades
+ * (KB-155), and the overlay's opacity and blend mode.
+ */
+export class OverlaySlot extends DrawLayer implements TileDrawOverlay {
   opacities: Float32Array;
   blends: Uint8Array;
 
   constructor(capacity: number) {
-    this.textures = new Int32Array(capacity).fill(-1);
-    this.uvTransforms = new Float32Array(capacity * 4);
-    this.geographic = new Uint8Array(capacity);
+    super(capacity);
+    this.textures.fill(-1);
     this.opacities = new Float32Array(capacity);
     this.blends = new Uint8Array(capacity);
   }
@@ -99,6 +115,10 @@ export class DrawList implements TileDrawList {
   /** Imagery texture handle of each draw. */
   get textures(): Int32Array {
     return this.imagery.textures;
+  }
+  /** The tone-matching source of each draw's imagery (F249). */
+  get toneSources(): Int16Array {
+    return this.imagery.toneSources;
   }
   /** Imagery UV transforms, four per draw. */
   get uvTransforms(): Float32Array {
@@ -155,17 +175,21 @@ export function drawWithoutTerrain(list: DrawList, count: number): void {
 /**
  * Draws the first `count` tiles of a selection with the world base image, whose mesh keys the surface cache already
  * wrote into `list.meshKeys`. The base image is equirectangular with its top row at the north pole, so each tile
- * samples it through its geographic v (south fraction in latitude).
+ * samples it through its geographic v (south fraction in latitude). Polar cap tiles show their cap's fill instead
+ * (KB-211): the base image's polar rows, stretched around the pole, would show as radial stripes.
  */
 export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], count: number): void {
   list.count = count;
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
-    list.textures[index] = BASE_TEXTURE;
+    // The caps' fills (`polar-caps.ts`): -2 for the north cap (root 1), -3 for the south cap (root 2).
+    const texture = tile.root === MERCATOR_ROOT ? BASE_TEXTURE : -1 - tile.root;
+    list.textures[index] = texture;
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;
-    list.fromTextures[index] = BASE_TEXTURE;
+    list.toneSources[index] = -1;
+    list.fromTextures[index] = texture;
     list.fromGeographic[index] = 1;
     list.fades[index] = 1;
     for (let slot = 0; slot < list.overlays.length; slot++) {

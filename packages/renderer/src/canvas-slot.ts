@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError, type FrameCapture } from '@vibeglobe/core';
 import type { DrawingSurface } from './three-backend.js';
 import { canvasFits, recordContext } from './recovery.js';

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Built-in provider profiles: the license and attribution of every source the pipeline and the package builder know,
  * as re-verified in ADR 0025 (docs/adr/0025-default-data-licenses.md). The attribution strings here are the ones the
@@ -113,6 +115,32 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
+    // ADR 0182: the weekly planet archive, not the public tile endpoint (limited to 3,000 tiles or 50 MB a download).
+    id: 'openfreemap-planet',
+    name: 'OpenFreeMap planet vector tiles (OpenStreetMap, OpenMapTiles schema)',
+    license: 'ODbL-1.0 (data); CC-BY-4.0 (OpenMapTiles schema)',
+    licenseUrl: 'https://openfreemap.org/tos',
+    termsReadDate: '2026-10-26',
+    attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap',
+    sourceUrl: 'https://openfreemap.org/quick_start/',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
+    // ADR 0182: Terrarium tiles from each source's open terrain model; Copernicus GLO-30 up to level 12 in Europe.
+    id: 'mapterhorn',
+    name: 'Mapterhorn terrain (Terrarium)',
+    license: "Each source's open licence (CC-BY-4.0, Copernicus DEM licence, Etalab-2.0, …)",
+    licenseUrl: 'https://mapterhorn.com/attribution',
+    termsReadDate: '2026-10-26',
+    attribution: `© Mapterhorn (https://mapterhorn.com/attribution); ${COPERNICUS_DEM_ATTRIBUTION('WorldDEM-30')}`,
+    sourceUrl: 'https://mapterhorn.com',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
     id: 'openstreetmap-extract',
     name: 'OpenStreetMap data extracts',
     license: 'ODbL-1.0',
@@ -167,12 +195,12 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
   {
     id: 'fixture',
     name: 'VibeGlobe test fixture',
-    license: 'PolyForm-Noncommercial-1.0.0',
-    licenseUrl: 'https://polyformproject.org/licenses/noncommercial/1.0.0/',
+    license: 'MPL-2.0',
+    licenseUrl: 'https://mozilla.org/MPL/2.0/',
     termsReadDate: '2026-10-21',
     attribution: 'VibeGlobe test fixture',
     sourceUrl: 'https://github.com/SimoneRecchia/VibeGlobe',
-    commercialUse: false,
+    commercialUse: true,
     redistribution: true,
     offlinePackaging: true,
   },
@@ -180,7 +208,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
 
 /** Hosts that always refuse, whatever profile a configuration names (public OSM tiles, Google). */
 export const FORBIDDEN_HOSTS: readonly { pattern: RegExp; profile: string }[] = [
-  { pattern: /(^|\.)tile\.openstreetmap\.(org|de|fr)$/i, profile: 'openstreetmap-tile-servers' },
+  { pattern: /(^|\.)tile\.(openstreetmap\.(org|de|fr)|osm\.org)$/i, profile: 'openstreetmap-tile-servers' },
   { pattern: /(^|\.)(googleapis|google|gstatic|ggpht)\.com$/i, profile: 'google-maps-platform' },
 ];
 

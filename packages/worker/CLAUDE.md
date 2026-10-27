@@ -2,6 +2,8 @@
 
 The single prebuilt worker program of the page-wide worker pool (ADR 0011): `src/vibeglobe-worker.ts` is the module worker entry that answers the handshake and runs the built-in tasks; `createWorkers()` (`src/index.ts`) returns the `WorkerEndpointFactory` that core's pool (`packages/core/src/scheduler/worker-pool.ts`) uses to start it.
 
+Two programs (ADR 0172): `vibeglobe-worker.js` (every task, entry `src/index.ts`) and `vibeglobe-worker-basic.js` (imagery, terrain, KTX2 and vector parsers only, entry `src/basic.ts`, export `@vibeglobe/worker/basic`); `@vibeglobe/layers` and `@vibeglobe/models` are optional peer dependencies, imported only by `src/tasks.ts`.
+
 ## Rules
 
 - Workers start only with the literal `new Worker(new URL('./vibeglobe-worker.js', import.meta.url), { type: 'module', name: 'vibeglobe' })`, so bundlers find the entry, or from a configured URL that must be same-origin. Never `blob:` or `data:` workers, `eval`, `new Function` or a CDN.

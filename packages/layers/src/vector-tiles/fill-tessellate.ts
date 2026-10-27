@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Polygon tessellation of vector-tile geometry in tile coordinates (y down, 0 to `extent`), run in workers (F443):
  * rings are grouped into polygons by winding (MVT 2.1: exterior rings clockwise in screen space), clipped to the tile

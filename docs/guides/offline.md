@@ -38,7 +38,13 @@ offline.destroy();
 | `online`           | never          | yes                                                    |
 | `offline`          | yes            | never, not even health checks (air-gapped sites)       |
 
-The mode changes at runtime; new requests follow it at once.
+The mode changes at runtime; new requests follow it at once. It can also be set for one source or one layer, which
+then keeps its own while the others follow the global mode: `offline.setMode('online', { layerId: 'labels' })`. A
+layer's mode beats its source's, which beats the global one; `setMode('inherit', { layerId })` drops a layer's own, and
+`offline.modeOf(sourceId, layerId)` reads the mode in effect. In offline-only mode a tile no tier holds reads as no data;
+when a change takes sources out of offline-only mode, the `mode-change` event names them in `sourceIds`: pass each to
+`globe.reloadSource` with `missingOnly`, so those tiles load again and every tile drawn stays (`offline.on('mode-change',
+({ sourceIds }) => sourceIds.forEach((id) => globe.reloadSource(id, { missingOnly: true })))`).
 
 ```ts
 import { createOffline } from '@vibeglobe/offline';

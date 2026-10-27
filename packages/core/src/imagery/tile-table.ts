@@ -1,4 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
+import type { Attribution } from './credits.js';
 import { NO_SLOT } from '../scheduler/network-pool.js';
 import { MAX_TILE_LEVEL, packTileKey, type TileCoord } from '../tiling/tile-key.js';
 
@@ -37,8 +40,17 @@ export interface TileRecord {
   readonly pinned: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
+  /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
+  rounds: number;
+  /**
+   * The loader's count of network successes when the tile's current round of attempts started, or `-1` while it waits
+   * for its source to be stable (KB-204).
+   */
+  roundSuccesses: number;
   /** Until when (the loader's clock) the tile may be reused, for sources that respect cache headers (F260). */
   freshUntilMs: number;
+  /** The credit of the tile alone, from its last response (`TransportResult.attribution`, KB-189). */
+  attribution: Attribution | undefined;
 }
 
 /**
@@ -101,7 +113,10 @@ export class TileTable {
       task: -1,
       pinned: level <= this.pinnedLevel,
       availabilityUnknown: false,
+      rounds: 0,
+      roundSuccesses: 0,
       freshUntilMs: Infinity,
+      attribution: undefined,
     };
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);

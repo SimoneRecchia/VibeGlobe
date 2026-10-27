@@ -144,7 +144,9 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     test(`WMS labels crossing tile edges are whole and tiles join without seams (F231)`, async ({ page }) => {
       await page.route('https://wms.test/map**', (route) => png(route, renderGetMap(route.request().url())));
       await openSources(page, `backend=${backend}&lon=12.4&lat=41.6&zoom=5.5`);
-      const source = `(s, gutter) => s.wmsImagery({ id: 'labels-' + gutter, url: 'https://wms.test/map', layers: ['labels'], gutterPx: gutter })`;
+      // The fixture server draws an opaque background: the source says so (WMS sources are transparent by default,
+      // KB-154), and draws as the base.
+      const source = `(s, gutter) => s.wmsImagery({ id: 'labels-' + gutter, url: 'https://wms.test/map', layers: ['labels'], gutterPx: gutter, transparent: false })`;
       await mountSource(page, source, 32);
       const whole = await settledSourceFrame(page, 20);
       await expectNoEmptyPixels(page, whole);

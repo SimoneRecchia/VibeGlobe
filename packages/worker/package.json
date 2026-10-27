@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/worker",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe worker program: the single module worker that runs decoding tasks for the shared worker pool.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -11,21 +11,54 @@
       "source": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./basic": {
+      "types": "./dist/basic.d.ts",
+      "source": "./src/basic.ts",
+      "default": "./dist/basic.js"
+    },
     "./vibeglobe-worker.js": {
       "source": "./src/vibeglobe-worker.ts",
       "default": "./dist/vibeglobe-worker.js"
+    },
+    "./vibeglobe-worker-basic.js": {
+      "source": "./src/vibeglobe-worker-basic.ts",
+      "default": "./dist/vibeglobe-worker-basic.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "LICENSE.md",
     "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
     "wasm/vibeglobe-basis.wasm",
+    "wasm/meshopt-decoder.wasm",
     "wasm/licenses",
-    "wasm/third-party.json"
+    "wasm/third-party.json",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/sources": "0.0.0",
-    "@vibeglobe/layers": "0.0.0"
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/sources": "0.1.0"
+  },
+  "peerDependencies": {
+    "@vibeglobe/layers": "0.1.0",
+    "@vibeglobe/models": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@vibeglobe/layers": {
+      "optional": true
+    },
+    "@vibeglobe/models": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@vibeglobe/layers": "0.1.0",
+    "@vibeglobe/models": "0.1.0"
   }
 }

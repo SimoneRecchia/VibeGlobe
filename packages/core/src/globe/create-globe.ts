@@ -1,27 +1,32 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { requestingTarget } from '../layers/layer-geometry.js';
-import { addExtension } from './render-extensions.js';
+import { extendGlobe, releaseExtensionPools, type ExtensionParts } from './render-extensions.js';
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
-import { applyView, newCameraState, readCameraState, requestedCameraState, writeCameraState } from './camera-state.js';
+import { applyView, newCameraState, readCameraState, requestedCameraState } from './camera-state.js';
+import { writeCameraState, writeFramePayload } from './camera-state.js';
 import { Emitter } from './emitter.js';
 import { GlobeError } from './errors.js';
 import { debugMeshesOf } from './debug-mesh.js';
 import { createObservability, PHASE_RENDER, type GlobeDiagnostics } from '../diagnostics/observability.js';
 import { EngineClock } from './engine-clock.js';
-import { captureWhenDrawn, FrameWaits } from './frame-waits.js';
+import { FrameWaits, startedPromise } from './frame-waits.js';
+import { rendererEvents } from './renderer-events.js';
+import { EngineQuality, type QualityParts } from './engine-quality.js';
+import { ViewCaptures, type CaptureParts } from './capture-view.js';
 import { imageryLayersOf } from './imagery-layers.js';
 import type { ImageryLayers } from '../imagery/imagery-stack.js';
 import type { Credit } from '../imagery/credits.js';
 import { Constraints, validateConstraints } from './constraints.hot.js';
 import { NO_RENDERER_STATS, NO_RESOURCES } from './diagnostics.js';
 import { SurfaceFrame } from './surface-frame.js';
-import type { ViewMode } from '../view/view-state.js';
 import type { ViewControl } from './view-control.js';
 import { completedMovement, type Movements } from './movements.js';
 import { wireView } from './view-wiring.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
-import { createFrameView, screenOf, type MutableFrameView } from './view-geometry.js';
+import { createFrameView, renderDrawing, screenOf, type MutableFrameView } from './view-geometry.js';
 import type {
   BackendName,
   CameraState,
@@ -37,12 +42,10 @@ import type {
   NavigationApi,
   RendererBackend,
   RendererCapabilities,
-  RendererEvents,
   RendererStats,
   SurfaceStats,
   SurfaceTileInfo,
   ResourceCounts,
-  ScreenPoint,
 } from './types.js';
 import {
   DEFAULT_VIEW,
@@ -77,12 +80,13 @@ class GlobeEngine implements Globe {
   private frameId: number | undefined;
   /** Frames drawn so far (`Globe.frameNumber`). */
   frameNumber = 0;
-  private readonly framePayload = { frameNumber: 0, tiles: 0 };
-  private readonly idlePayload = { frameNumber: 0 };
   /** The debug quads, kept for a renderer that does not exist yet. */
   private debugMeshes: DebugMeshData[] = [];
-  /** The camera-change payload, reused every frame (KB-037). */
+  private readonly framePayload = { frameNumber: 0, tiles: 0, zoom: 0.5 };
+  private readonly idlePayload = { frameNumber: 0 };
   private readonly cameraPayload = newCameraState();
+  /** The capture, quality and extension helpers in one field: each new field changes the class's layout (F064). */
+  private readonly helpers: { captures: ViewCaptures; quality: EngineQuality; parts: ExtensionParts };
   private readonly surfaceFrame: SurfaceFrame;
   /** The timestamp of the frame being drawn, for the clock (in an array: ADR 0018). */
   private readonly frameTime = new Float64Array(1);
@@ -119,6 +123,23 @@ class GlobeEngine implements Globe {
     this.diagnostics = this.diag.api;
     this.surfaceFrame = new SurfaceFrame(options, this.clock, this.diag);
     this.frameView = createFrameView(this.cam, this.surfaceFrame.view.morph);
+    // The private parts the capture and quality helpers use, read when used.
+    const parts: CaptureParts & QualityParts & ExtensionParts = {
+      globe: this,
+      check: (api) => (this.assertAlive(), this.surfaceFrame.refuseReadback(api)),
+      waits: () => this.captureWaits,
+      renderer: () => (this.destroyed ? undefined : this.renderer),
+      failure: () => this.failure,
+      draw: (renderer) => this.drawNow(renderer),
+      camera: () => this.cam,
+      frameView: () => this.frameView,
+      surface: () => this.surfaceFrame,
+      resolutionScale: () => this.resolutionScale,
+      workers: options.workers,
+      report: (error) => (this.diag.logger.log('error', error.message), this.emitter.emit('error', error)),
+    };
+    const quality = new EngineQuality(parts, options);
+    this.helpers = { captures: new ViewCaptures(parts), quality, parts };
     this.pendingView = validateView(options.view ?? {}, DEFAULT_VIEW);
     ({ viewControl: this.viewControl, movements: this.movements } = wireView({
       cam: this.cam,
@@ -134,19 +155,11 @@ class GlobeEngine implements Globe {
     this.navigation = this.viewControl.navigation;
     if (options.constraints) this.setConstraints(options.constraints);
     if (options.view?.tiltDeg !== undefined) this.viewControl.chooseTilt(this.pendingView.tiltDeg);
-    this.ready = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve;
-      this.rejectReady = reject;
-      this.start().catch((error: unknown) =>
-        this.failStart(
-          error instanceof GlobeError
-            ? error
-            : new GlobeError('renderer-failed', 'The renderer failed to start', { cause: error }),
-        ),
-      );
-    });
-    // Callers that never await `ready` must not see an unhandled rejection; the error event reports it.
-    this.ready.catch(() => undefined);
+    this.ready = startedPromise(
+      (resolve, reject) => ((this.resolveReady = resolve), (this.rejectReady = reject)),
+      () => this.start(),
+      (error) => this.failStart(error),
+    );
   }
 
   get backend(): BackendName | undefined {
@@ -171,7 +184,7 @@ class GlobeEngine implements Globe {
     return this.movements.reducedMotion;
   }
 
-  get viewMode(): ViewMode {
+  get viewMode(): Globe['viewMode'] {
     return this.surfaceFrame.view.mode;
   }
 
@@ -204,20 +217,15 @@ class GlobeEngine implements Globe {
   }
 
   private async start(): Promise<void> {
-    const events: RendererEvents = {
-      deviceLost: (reason) => this.emitter.emit('device-lost', { reason }),
-      deviceRestored: () => {
-        this.attachControls();
-        this.emitter.emit('device-restored', {});
-        this.requestRender();
-      },
-      backendFallback: (reason) => this.emitter.emit('backend-fallback', { reason }),
-      // Nothing is drawn any more: a first frame that never came will not come (KB-036), nor a frame to capture.
-      failed: (error) => this.failStart(error),
-    };
+    const events = rendererEvents(
+      this.emitter,
+      () => (this.attachControls(), this.requestRender()),
+      (error) => this.failStart(error),
+    );
     const renderer = await this.options.renderer(this.options.container, events);
     if (this.destroyed) return renderer.destroy();
     this.renderer = renderer;
+    this.helpers.quality.attach(renderer);
     // Loads finishing after destroy ask for nothing.
     this.surfaceFrame.startImagery(this.options, renderer, {
       requestFrame: () => this.destroyed || this.requestRender(),
@@ -229,6 +237,7 @@ class GlobeEngine implements Globe {
     // After the terrain starts: its errors set the skirt depths.
     this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);
     renderer.layers?.setGround?.(this.surfaceFrame.layerGround());
+    renderer.layers?.onContentReady?.(() => this.requestRender());
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);
     this.syncSize();
     this.cleanups.push(
@@ -284,10 +293,7 @@ class GlobeEngine implements Globe {
   /** Draws a frame now when one can be drawn (instead of on the next display frame), else requests one. */
   private renderNow(): void {
     const renderer = this.renderer;
-    if (!renderer || !this.visible || !this.imageryLoaded) {
-      this.requestRender();
-      return;
-    }
+    if (!renderer || !this.visible || !this.imageryLoaded) return this.requestRender();
     this.drawNow(renderer);
   }
 
@@ -334,14 +340,13 @@ class GlobeEngine implements Globe {
     // A lift moved the camera after the selection: the next frame draws the new pose, until the lift settles (F146).
     if (this.surfaceFrame.keepAboveTerrain(this.cam)) this.dirty = true;
     // A renderer that is recovering draws nothing: no frame, no events, and `ready` waits for a drawn one.
-    if (!renderer.render(this.frameView, draws)) return this.clock.skipped();
+    // Layers query the frame's own camera while it is drawn (KB-210).
+    if (!renderDrawing(this.cam, renderer, this.frameView, draws)) return this.clock.skipped();
     this.diag.timer.end(PHASE_RENDER);
     const count = this.surfaceFrame.drawn();
     this.frameNumber++;
-    // Payloads are built only for listeners, and the frame payload is reused: the steady-state frame allocates nothing.
     if (this.emitter.has('frame')) {
-      this.framePayload.frameNumber = this.frameNumber;
-      this.framePayload.tiles = count;
+      writeFramePayload(this.cam, this.framePayload, this.frameNumber, count);
       this.emitter.emit('frame', this.framePayload);
     }
     if (this.emitter.has('camera-change'))
@@ -387,16 +392,13 @@ class GlobeEngine implements Globe {
   readonly goHome: Globe['goHome'] = (options) =>
     this.movements.goHome(this.options.home ?? this.options.view ?? DEFAULT_VIEW, options);
 
-  screenToGeo(point: ScreenPoint): GeoPosition | undefined {
-    this.assertAlive();
-    return this.viewControl.positionAt(validateScreenPoint(point), (λ, φ) => this.surfaceFrame.terrainHeightRad(λ, φ));
-  }
-
-  geoToScreen(position: GeoPosition): ScreenPoint | undefined {
-    this.assertAlive();
-    validatePosition(position);
-    return this.waiting ? undefined : screenOf(this.cam, this.surfaceFrame.view, position);
-  }
+  readonly screenToGeo: Globe['screenToGeo'] = (point) =>
+    this.assertAlive() ??
+    this.viewControl.positionAt(validateScreenPoint(point), (λ, φ) => this.surfaceFrame.terrainHeightRad(λ, φ));
+  readonly geoToScreen: Globe['geoToScreen'] = (position) =>
+    this.assertAlive() ??
+    validatePosition(position) ??
+    (this.waiting ? undefined : screenOf(this.cam, this.surfaceFrame.view, position));
 
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void {
     this.assertAlive();
@@ -410,7 +412,7 @@ class GlobeEngine implements Globe {
   readonly surfaceTiles = (): SurfaceTileInfo[] => this.surfaceFrame.describe(this.cam);
   readonly surfaceStats = (): SurfaceStats => this.surfaceFrame.stats();
   readonly imageryStats = (): ImageryStats | undefined => this.surfaceFrame.imageryStats();
-  readonly reloadSource = (sourceId: string): boolean => this.surfaceFrame.reloadSource(sourceId);
+  readonly reloadSource: Globe['reloadSource'] = (id, options) => this.surfaceFrame.reloadSource(id, options);
   readonly terrainStats = (): TerrainStats | undefined => this.surfaceFrame.terrainStats();
   readonly elevationAt = (position: GeoPosition, out?: ElevationSample): ElevationSample =>
     this.assertAlive() ?? this.surfaceFrame.elevationAt(position, out ?? { heightMeters: 0, level: -1, noData: true });
@@ -425,22 +427,19 @@ class GlobeEngine implements Globe {
     this.renderer?.setDebugMeshes(this.debugMeshes);
     this.requestRender();
   };
-  readonly addRenderExtension: Globe['addRenderExtension'] = (create) =>
-    this.assertAlive() ?? addExtension(this.renderer, create, () => this.requestRender(), this.surfaceFrame.imagery);
-  async captureFrame(): Promise<FrameCapture> {
-    this.assertAlive();
-    this.surfaceFrame.refuseReadback();
-    return captureWhenDrawn({
-      ready: this.ready,
-      waits: this.captureWaits,
-      state: () => ({
-        renderer: this.destroyed ? undefined : this.renderer,
-        failure: this.failure,
-        frames: this.frameNumber,
-      }),
-      draw: (renderer) => this.drawNow(renderer),
-    });
+  readonly addRenderExtension: Globe['addRenderExtension'] = (c) =>
+    this.assertAlive() ?? extendGlobe(this.helpers.parts, c);
+  get qualitySettings(): Globe['qualitySettings'] {
+    return this.helpers.quality.settings;
   }
+  get atmosphere(): Globe['atmosphere'] {
+    return this.helpers.quality.atmosphere;
+  }
+  readonly setQualitySettings: Globe['setQualitySettings'] = (s) => this.assertAlive() ?? this.helpers.quality.set(s);
+  readonly setAtmosphere: Globe['setAtmosphere'] = (s) => this.assertAlive() ?? this.helpers.quality.setAtmosphere(s);
+  readonly setPolarCapColors: Globe['setPolarCapColors'] = (c) => this.assertAlive() ?? this.helpers.quality.setCaps(c);
+  readonly captureFrame = (): Promise<FrameCapture> => this.helpers.captures.frame();
+  readonly captureView: Globe['captureView'] = (size) => this.helpers.captures.view(size);
   /** True while there is no camera to draw or query: before the first size, and while the container has none. */
   private get waiting(): boolean {
     return this.pendingView !== undefined || this.collapsed;
@@ -460,6 +459,7 @@ class GlobeEngine implements Globe {
     this.surfaceFrame.destroy();
     this.surface?.clear();
     this.renderer?.destroy();
+    releaseExtensionPools(this.helpers.parts);
     this.captureWaits.end(new GlobeError('destroyed', 'The globe was destroyed'));
     this.emitter.clear();
   }

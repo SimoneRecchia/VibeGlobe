@@ -1,26 +1,201 @@
 # Progress
 
-## Handoff (2026-10-23 ~21:15 UTC, main session moving to another account)
+## 2026-10-27: tilt policy, terrain clearance, progressive roads and model sets (targeted owner request)
 
-Branch `claude/happy-galileo-b07j98`; pull request SimoneRecchia/VibeGlobe#25 (into `main`, squash only) is **open, not merged**: Fast checks fail on bbf4758 and again on cee7d3c in `packages/core/src/globe/terrain-globe.test.ts`, so this is a real failure, not a flake. At line 669 (F126, "selects the stored set of terrain tiles for scripted cameras") the snapshot gets four `mercator/10/532-533/362-363` tiles at level 7 instead of 8. At line 555 the expected `{ code: 'resource-failed' }` error is undefined. Both are probably caused by today's motion-detail changes (the coarse factor held while the camera slows, and jumps).
+Requests from integrating the engine in an application with wind and solar farms. (1) F625: an optional tilt policy of
+the controls by the distance to the point looked at (`tiltPolicy`, `setTiltPolicy`; 20,000 m lock, automatic tilt
+from 2,000 m to 60° at 500 m), applied by the engine each frame so API tilts are capped too; `tiltAvailable` and
+`onTiltAvailabilityChange` disable the UI's 3D button; the playground's showcase has it on (`?tiltPolicy=1`
+elsewhere). Off by default: on, it would change every existing view the end-to-end suite encodes. (2) KB-219, the camera entering the terrain, was not reproduced on the fixture terrain in any movement (open question
+36); hardened as asked: the terrain under and ahead of the eye loads first, and the smooth rise to late terrain is
+kept by the eye across movement frames. The core budget went from 64 to 65 KB (owner). (3) F626: the preset's roads by class from levels 6, 9, 11, 13
+and 14, names from 13. On the fixture tiles (OpenFreeMap is not reachable here; the fixture z12 tiles hold 41 roads)
+a drag's main-thread time per frame barely moves: z8 with roads p50 3.5 → 4.0 ms, z12 with roads 5.2 → 5.1 ms. (4)
+F627: `ModelSetLayer`, one model for many copies, instanced, the model within `visibleBelowMeters` (3,000 m) and a
+placeholder beyond, nothing out of view; 2,000 turbines cost 4 draws near the farm and 1 from 14 km
+(`?scenario=wind-farm`), and a models guide (`docs/guides/models.md`). The WebGPU variants of F146 and F147 time out
+on this container's software GPU and were left to CI.
 
-What I was doing: closing the regressions of the full CI runs after today's adaptive-loading work (motion-aware detail, flight settle, Resource Timing bandwidth estimate), then picking the next M10/M12/M14 entries. The last full CI run (workflow_dispatch on bbf4758, run 40021954210) was still running.
+## 2026-10-27: Europe preset styles, satellite chain and north-up limit (targeted owner request)
 
-Next steps, in order:
+Problems the owner found with the Europe preset in an application, fixed as KB-214 to KB-218 with regression tests
+(F621–F624). Map is a political map (neutral land, water, borders, names; roads an overlay off by default); Relief is
+that map over a `color-relief` tint, now drawn by `@vibeglobe/layers`, and the hillshade. The satellite chain is NASA's
+Blue Marble from GIBS (EPSG:4326, up to level 7, filling the polar caps), the package's WorldCover from 5 to 11, then
+the orthophotos from level 12, whose white tiles count as no data; Map and Relief give the caps their own colors.
+Terrascope's WorldCover WMTS is left out: its terms do not clearly allow free commercial use (open question 35). The
+first source of a chain that starts at level 0 is now the pinned base, so far views are sharp at once; a second lap
+at 3000 km has no blurry tile. 'north-up' stops at a configurable latitude, 85° by default. The package goes to
+level 11 (owner), and the guide has the WorldCover package's size per deepest level, measured on real tiles of six
+areas: 0.58, 2.20, 7.93 and 27.0 GB for levels 10 to 13. Not done, as the hosts are blocked here: each orthophoto
+service's real minimum level and which ones stay broken (open question 34 (c)); no service was removed. The core
+bundle is 4 bytes under its 64 KB budget after trimming messages.
 
-1. Fix `terrain-globe.test.ts:555` and `:669` (F126): reproduce with `npx vitest run packages/core/src/globe/terrain-globe.test.ts` (and under `npx vitest run packages/core`), then compare with the commit before 2844131 (motion hold) and bbf4758 (`jumpTo` announces jumps via `MovementsHost.cameraJumped`, `MotionDetail.jumped`). Fix with a regression test first if it is a bug.
-2. Read the result of the full CI run 40021954210 (or start a new `workflow_dispatch` of `ci.yml` on the branch). Expected failure: F287 only (a failing entry, docs/hardening-backlog.md). Earlier runs today also showed F322 and F090 (fixed since), F413/F426 (timeouts raised). Shard 11 of run 40021954210 failed on F322 (`e2e/offline-profiles.spec.ts:216`): it passed on retry but counts as flaky, with `route.fetch: read ECONNRESET` in `e2e/support/offline.ts:57`. The last local run before the handoff also failed F322 (together with F287), so F322 needs a root cause, not a re-run. Shard 9 failed on F488 (`e2e/nuxt-features.spec.ts:55`, webgpu): the check "security: CSP-safe styles" failed once and passed on retry, so it counts as flaky and also needs a root cause. Isolated measurements failed on F064 (`e2e/globe-allocation.spec.ts:202`, failed on retry too), a real regression: the engine allocates 83 bytes per frame against a limit of 12. The allocating sites are `motion-detail.ts` `update`, `view-control.ts` `get timeMs`, `controls/src/camera-port.ts` `beginFrame` and `renderer/src/extensions.ts` `frame` (the render-extension hook). Fix these without allocations, following the rules in `packages/core/CLAUDE.md` (no new fields on per-frame classes, no doubles passed as arguments). In the same run, the probe `deterministic-mode` reported "first frame: nothing within 60000 ms". Shard 3 failed four times, on both backends and on retry. F359 (`e2e/data-label-collision.spec.ts:99`) fails at `waitForIdle`. F385 (`e2e/data-layer-removal.spec.ts:184`) hits the 240 s timeout in `vibeglobeCycle`. Hypothesis to check first: the engine no longer goes idle since the KB-131 change, where frames keep running while the motion factor is above 1, or the motion hold keeps the factor above 1. That would also explain the `deterministic-mode` probe.
-3. Once Fast checks are green, merge #25 into `main` (squash), then run `npx tsc -b --force`. Tracks D, E and F of round 3 start from `main` after this merge (the owner was waiting for it).
-4. Continue the entries: F416 (`Globe.captureView` larger than the canvas: off-screen tiled rendering with a view-offset camera; the UI's screenshot control uses it, hook A (4)); C (3) `Globe.setQualitySettings` and C (4) the quality page (M11, unblocks F399 and the Vue `qualityPreset` prop of F474); M11 atmosphere wiring (docs/parallel-tracks.md "Atmosphere hook"); F358 data-layer labels with track D's SDF atlas once it lands; F374 marker level of detail; C (1) `parse-model` in the worker program (needs a meshopt WebAssembly loader of our own without Blob workers, F100); KB-132 (allocation test flaky about 1 in 10).
-5. At the end of each milestone: fresh-context review (correctness only), full CI run, `progress.md` hours and Monday estimate.
+## 2026-10-26: polar caps and navigation modes (targeted owner request)
 
-Render-extension hook (on the branch, not yet on `main`): `Globe.addRenderExtension(create)` (core `render-extensions.ts`); the context gives `renderer` (three.js `ThreeExtensionContext` from `@vibeglobe/renderer`: `scene`, `depthPath()`), `requestRender`, `network` (the page's `NetworkPool`) and `workers`; `frame(view)` runs before every draw, `dispose()` on destroy. Worker program tasks: `layout-vector-tile` registered; `parse-model` removed again (C (1) reopened, see docs/parallel-tracks.md).
+Two problems found integrating the engine in an application. (1) KB-211, the North Pole showed as a light-blue crescent beside striped tiles: every view mode flattens into the Web Mercator plane once zoomed in (ADR 0008), and the plane cannot show the caps beyond 85.05° (a band ending at the pole, nothing beyond it, stretched wedge tiles), while caps without a geographic source showed the equirectangular base image's stretched polar rows. A view that reaches a cap now stays a globe, and such caps show a fill color (`polarCapColors`, `setPolarCapColors`; F619). (2) Navigation modes 'free' (default, trackball over the poles, heading turns) and 'north-up' (heading held, stops at 89.9°) through `createControls({ navigationMode })` and `controls.setNavigationMode` (F620, ADR 0009 update), with a playground selector and a section in `docs/guides/controls.md`. Pushed to the same pull request as the earlier requests of the day (#56), which the owner merges.
 
-Next round of parallel tracks (docs/parallel-tracks.md, "Candidate tracks ... round 3"), confirmed to the owner, to start once #25 is merged: D vector tile rendering (F440–F459; also exports its SDF atlas and text material for F358), E 3D Tiles (F461–F471; its Google data access must use `refuseDisplayOnly`, F323), F network simulation suite (F315, F329's scenario specs; owns `scripts/fixtures/tiles/link.ts`, which this session rewrote as a round-robin queue).
+## 2026-10-26: the Europe preset (targeted owner request)
 
-Open pull requests: SimoneRecchia/VibeGlobe#25 (this branch).
+A map of Europe in the style of Google Earth from free sources that may be redistributed commercially, for hybrid use: the application's offline package up to a chosen level, with online detail on land beyond it. Engine gaps filled: polygon coverage areas of imagery and terrain sources (F610), package-only and network-only sources (F611), vector style credits shown with the imagery's (F612). Source chains (F247) and Terrarium terrain were already supported. New package `@vibeglobe/presets` with `europeOpen` (F613, ADR 0182; the national orthophotos are left out until their terms can be read, open question 34). Also the pipeline configuration `europe.json` with a Natural Earth land mask and a separate sea level (F614), `estimate` with land and sea counts and `--measure` (F615), the guide `docs/guides/europe-preset.md` (F616), and the playground's `?preset=europe` selector (F617). One pull request, which the owner merges.
 
-Pending owner steps: docs/open-questions.md (2 and 13–17): reference desktop and tablet (frame-time budgets: F167, F378, F389, F399–F403, F438's manual step, the hardening-backlog rows), real dataset downloads (F339, F551, F554), EGM2008 grid (F133), npm publishing (F555), the live OpenStreetMap run (F264 step 4, `test:live-sources` workflow), Google API key runs, KB-110 (F137 and F148: ask the owner, as directed at the end of M5).
+## Handoff (written 2026-10-27, before an account change)
+
+The owner continues from another account. Branch `claude/wizardly-archimedes-up4ww2` is restarted from `main` after
+each merge; everything is merged into `main`: pull requests #26 to #58 (squash merges; #41 superseded by #43, to
+close). Since the last handoff (2026-10-25) four targeted owner requests came from integrating the engine in the first
+consumer (an application with wind and solar farms on the globe), each one pull request:
+
+- #55 (F610–F617): the Europe preset `@vibeglobe/presets` (`europeOpen`): Satellite, Hybrid, Map, Relief and overlays
+  from free sources that allow commercial use, ADR 0182 with every source's terms; `europe.json` for the offline
+  package; guide `docs/guides/europe-preset.md`.
+- #56 (F618–F620, KB-209–KB-211): source areas as GeoJSON clipped per pixel and `blankTile`; faster drags over vector
+  roads; eleven national and regional orthophotos (`@vibeglobe/presets/orthophotos`); polar caps as a continuous disc
+  with `polarCapColors`; navigation modes 'free' and 'north-up'.
+- #57 (F621–F624, KB-214–KB-218): political Map and Relief with an elevation tint (`color-relief` in
+  `@vibeglobe/layers`); satellite chain NASA Blue Marble (GIBS, EPSG:4326, fills the caps) → package WorldCover (z5–z11)
+  → orthophotos from z12 (white tiles are no data); Terrascope left out (question 35); package to z11 (owner); the
+  WorldCover package size table in the guide (z10 0.58 GB, z11 2.20 GB, z12 7.93 GB, z13 27.0 GB); north-up latitude
+  limit (85° by default); a chain's world source pinned so far views are sharp at once.
+- #58 (F625–F627, KB-219): the controls' tilt policy (`tiltPolicy`, `setTiltPolicy`, `tiltAvailable`; opt-in, on in
+  the showcase); terrain clearance hardening (terrain under and ahead of the eye loads first); the preset's roads by
+  class from levels 6/9/11/13/14, names from 13; `ModelSetLayer` (instanced copies of one model, a placeholder beyond
+  `visibleBelowMeters`, nothing out of view; `?scenario=wind-farm`, guide `docs/guides/models.md`). The core bundle
+  budget is 65 KB (owner, 2026-10-27); core is at 64.38 KB.
+
+**State.** `npm run status`: 467 passing, 80 failing, 33 pending (owner steps), 22 superseded, 80.5% of the 580
+active entries. M1, M2, M3 and M9 are complete; in M4–M14 every failing entry is in `docs/hardening-backlog.md`; M15
+is 10 of 53. `npm run status` names F137 (M4) next.
+
+**Open problems from the first consumer** (what the next session should pick up first):
+
+1. KB-219, the camera entering the terrain while zooming: not reproduced on the fixture terrain (every movement keeps
+   the eye 10 m above the drawn surface); hardened only. Question 36 asks the owner for the view, terrain and device.
+2. The national orthophotos: each service's real minimum level, and which ones still answer white or empty tiles, could
+   not be checked (the providers' hosts are blocked in the cloud environment); all start at level 12 meanwhile.
+   Question 34 (c).
+3. ESA WorldCover online from Terrascope: excluded until VITO confirms free use from a commercial product (question 35).
+4. Progressive roads: measured only on the fixture tiles (a z12 tile holds 41 roads), where a drag's main-thread time
+   barely moves (z12 with roads p50 5.2 → 5.1 ms). Measure again on OpenFreeMap's real tiles (z8 and z12, with and
+   without roads) once its host is reachable or on the owner's machine.
+5. The tilt policy is opt-in: on by default it would change every existing view. The owner decides whether
+   `createControls()` should turn it on by default (then the end-to-end specs that tilt by API at high altitude need
+   updating, logged in `docs/test-changes.md`).
+6. Models: the renderer reads them with three.js's `GLTFLoader`; meshopt and Draco work once the application gives the
+   decoders (`docs/guides/models.md`), KTX2 textures do not yet; hook request C (2) of `docs/parallel-tracks.md`
+   (meshes built from `@vibeglobe/models`' `ModelDescription`) is still open.
+7. The WebGPU variants of F146 and F147 time out on the cloud container's software GPU: check them in the next full CI
+   run.
+
+**Open bugs** (`docs/known-bugs.md`, all "Open"): KB-219 (above); KB-180 and KB-181 (terrain near the poles and a crack
+at level 14, waiting for the owner's exact views); KB-110 (F137's crack sweep pops once on CI's software GPU); KB-097
+and KB-170 (M5 relief and tilt in the descent onto a flank); KB-203, KB-206, KB-207, KB-208, KB-212 and KB-213 (flaky
+or unreproduced on CI, M15 hardening); TG-01, TG-04 and TG-06 (track G). KB-097, KB-110 and KB-170 may stay open until
+the hardening weeks (ADR 0046).
+
+**The full suite on CI.** Not run on `main` since #53 (the last full run, 40224392533, passed every job but one F081
+retry). First job: dispatch `ci.yml` on `main` (eight shards), and fix what it reports by reproducing it in CI's image
+(`CLAUDE.md`), until one run is green.
+
+**Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):
+
+1. The first consumer's open problems above, then KB-180 and KB-181, F137 and F148 (crack sweep, KB-110).
+2. The globe-to-street zoom: F167 and F157 (KB-097, KB-170).
+3. Data layers on real GPUs and terrain: F363 to F366 (clamping, draping, morph), F351 to F354, F361 (hook C (2)),
+   F371 to F375 and F389, F379.
+4. Vector tiles and 3D Tiles: F440, F444, F445, F451, F452, F455, F463, F470.
+5. Atmosphere and anti-aliasing on real GPUs: F391, F392, F394, F397.
+6. Adaptive loading and network modes: F286 to F288, F293 to F295, F300, F301, F315, then F329.
+7. M15: TG-01, TG-04, TG-06 and the remaining M15 entries (cross-browser F504, soak, chaos, fuzzing, the WebGL2 CPU
+   p95 of `drag-200/400/800` on the owner's Mac, the release).
+
+**Open owner questions** (`docs/open-questions.md`): 13 (legal review of the README licensing text), 16
+(`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment), 34 (orthophoto evidence,
+credits, per-service levels), 35 (Terrascope), 36 (KB-219's reproduction); the `v0.1.0` tag of the pre-release commit
+`04f9286` is the owner's to push (`npm run release:pack` rebuilds the 0.1.0 tarballs, `release-0.1.0/README.md`). The 33 pending entries wait for the owner steps listed there.
+
+**Cloud environment.** The network policy blocks the providers' hosts (OpenFreeMap, Mapterhorn, GIBS, Terrascope, the
+orthophoto services): tests route them to fixtures. Allowing them under the environment's network access settings
+would let a session check the orthophotos and measure the roads on real tiles.
+
+**Start of the next session.** Read this, run `./init.sh`, dispatch the full CI run on `main`, ask the owner for the
+first consumer's newest findings and the answers to questions 34–36, then follow the order above.
+
+## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
+
+Owner requirement of 2026-10-24: an optional space background like Google Earth's, off by default (ADR 0181). `main`
+carries the main session's entries F600–F606 for it; the track added F607–F609 (`docs/feature-changes.md`).
+
+- `packages/renderer/src/starfield/`: `addSpaceBackground(globe, options)` (`@vibeglobe/renderer/starfield`), a render
+  extension: the 9,096 stars of the Yale Bright Star Catalog (public domain; MIT JSON conversion; recorded in
+  `THIRD_PARTY_NOTICES.md`), an engine asset `bsc5-stars.bin` fetched when first drawn (`catalogUrl`), drawn as Gaussian
+  sprites with a 0.75 device-pixel floor and pixel-ratio-independent light, and a procedural Milky Way in galactic axes
+  (no image). Sky orientation by precession and Greenwich mean sidereal time from `Globe.atmosphere.timeMs`; fades under
+  the daytime sky near the ground. Guide `docs/guides/space-background.md`.
+- Playground `?stars=1` (`&starCatalog=<url>`; handle in `window.vibeglobeStars`). Tests: three unit files in the folder;
+  `e2e/starfield.spec.ts`, `e2e/starfield-motion.spec.ts` (0.5 px per-frame tracking, flicker, seam and poles, fade,
+  lazy asset, guide), `e2e/starfield-cost.spec.ts`; helpers in `e2e/support/starfield.ts`.
+- Status: F600–F604, F606–F609 passing; F605 pending its GPU-time step on the reference desktop (`docs/open-questions.md`).
+- Hook requests I (1)–(6) in `docs/parallel-tracks.md`.
+- Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the e2e
+  predictions fit the camera from ground points instead. On CI's software GPU the background costs about 10–15 % of the
+  frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
+
+## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
+
+Owner requirement of 2026-10-24: an optional space background like Google Earth's, off by default (ADR 0181). `main`
+carries the main session's entries F600–F606 for it; the track added F607–F609 (`docs/feature-changes.md`).
+
+- `packages/renderer/src/starfield/`: `addSpaceBackground(globe, options)` (`@vibeglobe/renderer/starfield`), a render
+  extension: the 9,096 stars of the Yale Bright Star Catalog (public domain; MIT JSON conversion; recorded in
+  `THIRD_PARTY_NOTICES.md`), an engine asset `bsc5-stars.bin` fetched when first drawn (`catalogUrl`), drawn as Gaussian
+  sprites with a 0.75 device-pixel floor and pixel-ratio-independent light, and a procedural Milky Way in galactic axes
+  (no image). Sky orientation by precession and Greenwich mean sidereal time from `Globe.atmosphere.timeMs`; fades under
+  the daytime sky near the ground. Guide `docs/guides/space-background.md`.
+- Playground `?stars=1` (`&starCatalog=<url>`; handle in `window.vibeglobeStars`). Tests: three unit files in the folder;
+  `e2e/starfield.spec.ts`, `e2e/starfield-motion.spec.ts` (0.5 px per-frame tracking, flicker, seam and poles, fade,
+  lazy asset, guide), `e2e/starfield-cost.spec.ts`; helpers in `e2e/support/starfield.ts`.
+- Status: F600–F604, F606–F609 passing; F605 pending its GPU-time step on the reference desktop (`docs/open-questions.md`).
+- Hook requests I (1)–(6) in `docs/parallel-tracks.md`.
+- Notes: `geoToScreen` scales heights by the relief factor (0 at globe scale), so it cannot project far points; the e2e
+  predictions fit the camera from ground points instead. On CI's software GPU the background costs about 10–15 % of the
+  frame rate (per-triangle setup of the 9,096 sprites); its main-thread cost is under 0.1 ms.
+
+## Track H, packaging and release (2026-10-24)
+
+Branch `ccr-1bf24b9b-dyvgg5`, pull request SimoneRecchia/VibeGlobe#33 into `main` (the owner merges). Owns
+`scripts/release/`, `examples/`, `.github/workflows/release.yml`, `.claude/skills/release/` and the build fields of the
+packages' `package.json` (ADR 0171; numbers 0171–0179).
+
+- Passing: F532 (core, renderer, sources and `@vibeglobe/worker/basic` install no layers, UI, offline, Vue or Web
+  Component package; the globe renders and navigates; ADR 0172, made by this track with the owner's go-ahead),
+  F503 (321.7 KB gzip before the first frame, budget 351 KB; six optional modules fetched only when enabled),
+  F519 (`scripts/release/assets.json`, notices of data files), F526 (changelog from the history), F530 (tarballs and a
+  strict consumer), F531 (Vite and Nuxt builds, assets from a separate static server, no `'unsafe-eval'`), F535 (the
+  release skill, dry run followed to the end).
+- Pending owner steps: F558 (the approved publish from CI), F559 (install from npm once published); question 17.
+- Hook requests: H (1) done by this track (ADR 0172); H (2) `@types/three` as a dependency of `@vibeglobe/renderer` (consumers install it
+  meanwhile). Known bug TH-01 (a failed transcoder load is cached for the session) is the worker package's.
+- Commands: `node scripts/release/check-tarballs.ts`, `node scripts/release/check-consumers.ts [F503] [F531] [F532]`
+  (`VIBEGLOBE_CHROMIUM_PATH` in cloud containers, `VIBEGLOBE_RELEASE_KEEP=1` keeps the built projects),
+  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-cube.ts`.
+- About 3 hours of agent time.
+
+## Track F, network simulation suite (2026-10-23)
+
+Branch `claude/festive-brahmagupta-82m0hu`, pull request into `main` (the owner merges). Owns `e2e/network/`,
+`scripts/fixtures/tiles/link.ts` and `scripts/fixtures/network/` (ADR 0151; numbers 0151–0159).
+
+- F315: the navigation scenario on fully offline, 400 kbps, flaky, 500 ms latency and LAN-only links on WebGPU and
+  forced WebGL2, every frame checked for holes, black pixels and pops, retries bounded with backoff
+  (`e2e/network/links.spec.ts`). Stays `failing`: only frame times within budget on the reference hardware remain
+  (`docs/hardening-backlog.md`, open question 2).
+- F329's scenario specs, all passing on both backends: the network suite (`links.spec.ts`), connectivity dropping
+  mid-pan and returning after a flight (`drop-return.spec.ts`), both offline setups in offline-only mode
+  (`offline-setups.spec.ts`), and the three network modes with the loading switches all on and all off
+  (`modes.spec.ts`; the full 16-combination matrix with its request and storage checks stays
+  `e2e/offline-matrix.spec.ts`). F329's acceptance (known bugs, the fresh-context review) is the main session's.
+- Hook requests: none.
 
 ## Current state
 
@@ -40,6 +215,14 @@ Pending owner steps: docs/open-questions.md (2 and 13–17): reference desktop a
 - Hours: about 8 hours of agent time on 2026-10-23 after the morning (11:30–19:30 UTC). Monday (26 October 08:00 Europe/Rome) is not reachable for every entry: M10 (renderer items F358, F374, F375, F378), M11 wiring (atmosphere, quality settings) and M12's larger-than-canvas capture (F416) remain for the main session, with M13 in tracks D and E; the hardening-only leftovers wait for the two hardening weeks.
 - Owner questions open: `docs/open-questions.md` 2 and 13–17; questions 18 and 19 were decided by the agent (ADR 0018, ADR 0012) and may be revisited.
 
+## Track E: 3D Tiles (`packages/renderer/src/tiles3d`, `packages/sources/src/tiles3d`)
+
+Branch `claude/keen-davinci-ym90tk`; entries, blockers and hook requests E (1)–(5) in `docs/parallel-tracks.md` ("E. 3D Tiles track: status"); ADR 0141.
+
+- **2026-10-23:** Passing: F461 (no holes while streaming, both backends, slow link; debug overlay), F462 (center-first requests through the page's pool within host limits, cancellation in flights, LRU budget; the 10-minute navigation ran once), F464 (no street-level jitter, WGS84 alignment), F465 (globe, flattening, 2D and 3D phases), F466 (picking with batch tables and 1.1 property tables), F467 (no z-fighting on terrain: a 0.1% relative depth pull). Pending owner steps: F468 (run with a real key), F469 (three-hour real session). Failing with blockers: F463 (hook E (1), `parse-model` in the worker program), F470 (hook E (2), extension credits in the engine's attribution), F471 (reference devices; hook E (5), benchmark history).
+- Found and fixed while building (before commit, no known bug left open): every in-flight request was cancelled each frame (a loading tile is not re-requested by traversal); rigid per-tileset placement drifted on the flat map (0.4% north–south Mercator stretch) and failed for Google's whole-Earth root: tiles are now placed by the local derivative of the frame's mapping at each tile's center (sub-millimeter); render extensions receive `network` and `workers` only on a globe with tiled imagery, so the scenarios use `imagery=world`.
+- About 6 hours of agent time.
+
 ## Track B: source adapters and offline (`packages/sources`, `packages/offline`)
 
 Branch `claude/laughing-tesla-a6tkm3`, pull request SimoneRecchia/VibeGlobe#20; entries, blockers and hook requests (1)–(5) in `docs/parallel-tracks.md` ("Track B, source adapters and offline: status").
@@ -55,6 +238,15 @@ Branch `claude/vigilant-hawking-h8r4u4`; owned entries, blockers and hook reques
 - **2026-10-23:** `@vibeglobe/models` (ADR 0121): GLB and glTF parsing and validation, Draco (`draco3d`) and meshopt (`meshoptimizer`) decoding in a worker task, sparse accessors, node transforms and a renderer-neutral `ModelDescription`; conformance suite over eleven Khronos samples (sixteen variants), fuzzed corrupt input, decoding in a Chromium module worker (`e2e/models.spec.ts`). `@vibeglobe/quality` (ADR 0122): presets, `choosePreset`, the `FrameTimeGovernor` (median window, dead band, reaction and stable timers, minimum change interval, raise backoff) and `createQuality`, checked in Node and on the real engine (`e2e/quality.spec.ts`).
 - Pending: F400 (reference desktop and tablet). Failing with blockers: F361 (hooks 1–2: worker registration, renderer drawing `ModelDescription`), F399 (hook 3: runtime level of detail and effects; reference desktop), F401 and F402 (hook 4: a real GPU load in the playground; 5-minute browser run in the hardening backlog).
 - About 3 hours of agent time (2026-10-23).
+
+## Track D: vector tile rendering (`packages/renderer/src/vector-tiles/`, `packages/layers/src/vector-tiles/`)
+
+Branch `claude/keen-feynman-ic048f`, pull request SimoneRecchia/VibeGlobe#31; hook requests D (1)–(4) in `docs/parallel-tracks.md`; ADRs 0131 (rendering), 0132 (labels, SDF atlas and text material for F358), 0133 (raster-like layers).
+
+- **2026-10-24:** Passing: F441, F442, F443, F446, F447, F448, F449, F450, F454, F456, F457, F458, F459. Only their `@baseline` views remain (hook request D (3), `docs/hardening-backlog.md`): F440, F444 (MapLibre's demotiles style, BSD-3-Clause, unchanged), F445 (every layer type, raster, hillshade and heatmap included), F452, F455. Blocked: F451 on hook request D (1) (engine log and `error` event for extensions); F453 on the data pipeline's Italy OpenStreetMap tiles, whose source host this environment refuses (open question 25); its checks on the fixture city pass (`e2e/vector-tiles/osm-roads.spec.ts`).
+- Bug found and fixed: TD-01 (shown labels faded down every other frame). Found by F443's trace: the engine gives extensions its workers only with tiled imagery or terrain (hook request D (4)); one shader program per mesh kind removed the 50–200 ms program builds when a layer first appeared.
+- Notes: the `@baseline` tests fail in a full CI run until the baselines workflow records them (D (3)). Fixtures: `node e2e/vector-tiles/fixtures/generate.ts [--tiles]`. Vite can keep serving stale modules after scripted edits: restart it before a run.
+- About 14 hours of agent time (2026-10-23 and 24).
 
 ## A. UI, GIS and framework adapters track (2026-10-23)
 

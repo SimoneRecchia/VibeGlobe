@@ -1,28 +1,18 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Every built-in task by name: the table the worker program registers, and the one the inline executor loads lazily
- * after repeated worker start failures (ADR 0011 rule 6). Later increments add tasks from `sources` and `layers`.
+ * after repeated worker start failures (ADR 0011 rule 6). The basic program registers `BASIC_TASKS` alone (ADR 0172).
  */
-import { decodeImage } from './decode-image.js';
-import { decodeTerrain } from './decode-terrain.js';
+import { BASIC_TASKS } from './basic-tasks.js';
 import type { TaskFunction, TaskTable } from './protocol.js';
-import { transcodeKtx2 } from './transcode-ktx2.js';
+import { compileWasm } from './wasm.js';
 
-let vectorTasks: Promise<TaskTable> | undefined;
+/** meshoptimizer's decoder module, shipped next to the worker program without its JavaScript (F100). */
+const MESHOPT_URL = new URL('../wasm/meshopt-decoder.wasm', import.meta.url);
+
 let clusterTasks: Promise<TaskTable> | undefined;
 const lazyTables = new Map<string, Promise<TaskTable>>();
-
-/**
- * A vector task of `@vibeglobe/sources/vector` (F371, M13): the parsers load on the first such task, in their own
- * chunk, so workers that only decode imagery never load them.
- */
-function vectorTask(name: string): TaskFunction {
-  return async (input, context) => {
-    vectorTasks ??= import('@vibeglobe/sources/vector').then((module) => module.VECTOR_TASKS);
-    const task = (await vectorTasks)[name];
-    if (!task) throw Object.assign(new Error(`no vector task ${name}`), { code: 'unknown-task' });
-    return task(input, context);
-  };
-}
 
 /** A clustering task of `@vibeglobe/layers` (F373), loaded like the vector tasks on the first one. */
 function clusterTask(name: string): TaskFunction {
@@ -36,7 +26,7 @@ function clusterTask(name: string): TaskFunction {
 
 /**
  * A task of a table another package provides, imported on its first use in its own chunk: vector-tile layout of
- * `@vibeglobe/layers/vector-tiles` (M13).
+ * `@vibeglobe/layers/vector-tiles` (M13), glTF parsing of `@vibeglobe/models` (F361, M13).
  */
 function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): TaskFunction {
   return async (input, context) => {
@@ -48,15 +38,9 @@ function lazyTask(table: string, load: () => Promise<TaskTable>, name: string): 
   };
 }
 
-/** The built-in tasks. */
+/** The built-in tasks: the basic ones and those of `@vibeglobe/layers` and `@vibeglobe/models` (ADR 0172). */
 export const TASKS: TaskTable = Object.freeze({
-  'decode-image': decodeImage,
-  'decode-terrain': decodeTerrain,
-  'transcode-ktx2': transcodeKtx2,
-  'parse-geojson': vectorTask('parse-geojson'),
-  'parse-kml': vectorTask('parse-kml'),
-  'parse-gpx': vectorTask('parse-gpx'),
-  'decode-mvt': vectorTask('decode-mvt'),
+  ...BASIC_TASKS,
   'cluster-load': clusterTask('cluster-load'),
   'cluster-items': clusterTask('cluster-items'),
   'cluster-expansion': clusterTask('cluster-expansion'),
@@ -66,5 +50,14 @@ export const TASKS: TaskTable = Object.freeze({
     'vector-tile',
     () => import('@vibeglobe/layers/vector-tiles').then((module) => module.VECTOR_TILE_TASKS),
     'layout-vector-tile',
+  ),
+  // Draco and meshopt decode in the task: meshopt through the module above, Draco from the input's `dracoWasmUrl`.
+  'parse-model': lazyTask(
+    'models',
+    () =>
+      import('@vibeglobe/models').then((module) =>
+        module.createModelTasks({ meshopt: module.meshoptWasmDecoder(() => compileWasm(MESHOPT_URL)) }),
+      ),
+    'parse-model',
   ),
 });

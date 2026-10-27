@@ -111,3 +111,44 @@ it(
     expect(buildingWithHeight).toBe(true);
   },
 );
+
+it(
+  'the OpenStreetMap vector outputs of both shipped configurations, built on their sample areas, pass the MVT conformance suite (F551)',
+  { timeout: 120_000 },
+  async () => {
+    const extract = await syntheticExtract();
+    for (const config of ['world-low', 'italy-high']) {
+      const out = join(dir, `${config}-sample`);
+      await runBuild({
+        configPath: new URL(`../../packages/tools/configs/${config}.json`, import.meta.url).pathname,
+        outDir: out,
+        sample: true,
+        yes: true,
+        interactive: false,
+        until: 'package',
+        datasets: ['vectors'],
+        // The synthetic extract stands in for the planet file (95 GB) and the Geofabrik extract.
+        sourceUrls: { vectors: 'https://download.fixture.test/sample.osm.pbf' },
+        fetch: (() => Promise.resolve(new Response(extract.slice()))) as typeof fetch,
+        ask: () => Promise.resolve(false),
+        report: () => undefined,
+      });
+      const built = tiles(join(out, 'output', 'vectors'));
+      expect(built.length, config).toBeGreaterThan(0);
+      const results = await runParserConformance({
+        name: `${config} sample vector tiles`,
+        parse: (input: Uint8Array) => decodeMvt(input),
+        fixtures: built.map((tile) => ({
+          name: tile.name,
+          input: tile.bytes,
+          expect: (decoded: MvtTile | undefined) =>
+            decoded && decoded.issues.length === 0 && decoded.layers.length > 0
+              ? undefined
+              : `not a valid tile: ${JSON.stringify(decoded?.issues)}`,
+        })),
+        fuzzRuns: 5,
+      });
+      expect(failures(results), config).toEqual([]);
+    }
+  },
+);

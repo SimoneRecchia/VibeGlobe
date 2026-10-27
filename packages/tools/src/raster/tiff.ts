@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A built-in GeoTIFF reader for the default datasets (ADR 0024): classic TIFF, tiled or stripped, chunky samples,
  * no/LZW/DEFLATE compression, predictors 1–3, unsigned 8/16-bit, signed 16-bit and float32 samples, with the

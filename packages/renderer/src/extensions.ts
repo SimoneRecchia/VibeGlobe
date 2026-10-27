@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { DepthPath, FrameView, RenderExtension } from '@vibeglobe/core';
 import type { Scene } from 'three/webgpu';
 
@@ -14,27 +16,31 @@ export interface ThreeExtensionContext {
 
 /** The render extensions of one renderer: placed every frame before drawing, disposed on removal or destruction. */
 export class RenderExtensions {
-  private readonly active = new Set<RenderExtension>();
+  /** An array, not a set: iterating a set allocates an iterator on every frame (F064, ADR 0018). */
+  private readonly active: RenderExtension[] = [];
 
   /** `context` is what every extension of this renderer receives. */
   constructor(readonly context: ThreeExtensionContext) {}
 
   /** Adds an extension; returns the function that removes and disposes it. */
   add(extension: RenderExtension): () => void {
-    this.active.add(extension);
+    this.active.push(extension);
     return () => {
-      if (this.active.delete(extension)) extension.dispose();
+      const index = this.active.indexOf(extension);
+      if (index < 0) return;
+      this.active.splice(index, 1);
+      extension.dispose();
     };
   }
 
   /** Places every extension's objects for the frame. */
   frame(view: FrameView): void {
-    for (const extension of this.active) extension.frame(view);
+    const active = this.active;
+    for (let i = 0; i < active.length; i++) active[i]?.frame(view);
   }
 
   /** Disposes every extension (the renderer is destroyed). */
   dispose(): void {
-    for (const extension of this.active) extension.dispose();
-    this.active.clear();
+    for (const extension of this.active.splice(0)) extension.dispose();
   }
 }

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * 3D Tiles bounding volumes (F460, F461; ADR 0041): `box` (center and three half-axes), `region` (west, south, east,
  * north in radians, minimum and maximum height in meters on WGS84) and `sphere`, transformed to Earth-centered,

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "commit": "7436a3318cb3bba23b3a2d050b3fa61c35146b19",
+  "date": "2026-10-24T23:18:23.473Z",
+  "device": {
+    "name": "macbook-apple-m5-macos-26-6-2",
+    "os": "darwin 25.6.0",
+    "cpu": "Apple M5",
+    "node": "v26.12.0"
+  },
+  "results": {
+    "eye-relative-5000-draws": {
+      "medianMs": 0.03545800000000554,
+      "p95Ms": 0.036624999999986585
+    }
+  },
+  "violations": []
+}

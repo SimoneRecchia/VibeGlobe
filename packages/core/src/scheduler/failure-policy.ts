@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Failure classes and retry rules of ADR 0007 (§Failures and timeouts; docs/plan/m3-imagery-streaming.md §3): which
  * transport results mean no data, which are worth a retry and when, and which are final. Classes are small integers so

@@ -14,6 +14,18 @@ npm run dev        # playground at http://localhost:5173
 npm run status     # feature-list progress
 ```
 
+## The playground
+
+`npm run dev` opens the showcase at http://localhost:5173: every control of `@vibeglobe/ui` (search with typed
+coordinates and a demo place list, compass, zoom, tilt, 2D / 3D / Auto, reset to globe and home, fullscreen,
+coordinate and elevation readout, scale bar, measurement, drawing, layer switcher, saved views, screenshot,
+geolocation, minimap, attribution), a settings panel (theme, language, quality, atmosphere, fog, sun time, space
+background, network mode, backend), demo data layers (clustered markers, a polygon, a line, labels), the best data
+built locally by the dataset pipeline (otherwise Natural Earth) and a help overlay of the gestures. `?ui=0` hides the
+controls; the test scenarios keep their own parameters ([apps/playground/CLAUDE.md](apps/playground/CLAUDE.md)).
+
+![The playground's showcase: the globe over the space background with every control and the settings panel open](docs/images/playground-showcase.png)
+
 ## Documentation
 
 - [PLAN.md](PLAN.md): the owner's master brief.
@@ -21,7 +33,7 @@ npm run status     # feature-list progress
 - [docs/adr/](docs/adr/README.md): architecture decisions.
 - [docs/research/](docs/research/README.md): research survey.
 - [progress.md](progress.md): session log.
-- [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, with the [contributor license agreement](CLA.md).
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, with the [Developer Certificate of Origin](DCO.md) sign-off.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): community standards.
 
@@ -31,12 +43,15 @@ The packages will be published on the public npm registry under the [`@vibeglobe
 
 ## Licensing
 
-VibeGlobe is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md) (SPDX `PolyForm-Noncommercial-1.0.0`).
+VibeGlobe is open source under the [Mozilla Public License 2.0](LICENSE.md) (SPDX `MPL-2.0`), copyright Simone Recchia. There is no separate commercial license.
 
-- **Noncommercial use is free:** you may use, change and share VibeGlobe at no cost for any noncommercial purpose, as the license defines it (personal projects, research, study, and use by charitable, educational, public research and government organizations).
-- **Commercial use needs a commercial license:** any commercial use, including selling or reselling VibeGlobe or products and services built on it, requires a separate commercial license from the owner, Simone Recchia.
-- **Requesting a commercial license:** open an issue with the "Commercial license inquiry" template (it asks only for your organization, the intended use and how to reach you; keep confidential details for the private follow-up), or contact [@SimoneRecchia](https://github.com/SimoneRecchia) directly. The owner answers privately.
+- **Any use, commercial included:** you may use, change and distribute VibeGlobe, alone or inside larger works under other licenses, at no cost.
+- **Changes to VibeGlobe's own files stay open:** if you distribute a modified VibeGlobe file, its source is available under the MPL 2.0, and its license notice is kept. Your own files that only use VibeGlobe may stay under any license.
 
 Third-party components keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data shown by the engine is licensed by its providers; the default datasets and their attribution rules are documented with the data pipeline.
 
-External contributions are accepted under the [contributor license agreement](CLA.md), so that they can be offered under both the noncommercial and the commercial licenses.
+External contributions carry a [Developer Certificate of Origin](DCO.md) sign-off on every commit.
+
+## Contact
+
+Security reports and code-of-conduct reports: recchia.sim@gmail.com (see [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)).

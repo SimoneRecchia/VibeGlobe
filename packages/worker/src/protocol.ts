@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The message protocol between the worker pool (`@vibeglobe/core`, `scheduler/worker-protocol.ts`) and this worker
  * program, and the task contract (ADR 0011 rules 3, 5 and 6). Core owns the shapes; an incompatible change bumps
@@ -30,7 +32,14 @@ export const WORKER_BUILD_ID = '@vibeglobe/worker@0.0.0';
 
 /** Stable codes of task failures raised by this package's tasks. */
 export type TaskErrorCode =
-  'invalid-input' | 'undecodable' | 'unsupported' | 'format-unsupported' | 'cancelled' | 'unknown-task';
+  | 'invalid-input'
+  | 'undecodable'
+  | 'unsupported'
+  | 'format-unsupported'
+  | 'cancelled'
+  | 'unknown-task'
+  /** The input decodes, but holds no data (a tile of the source's blank color, F618). */
+  | 'no-data';
 
 /** A typed task failure; its `code` crosses the thread boundary and becomes the pool error's `taskCode`. */
 export class TaskError extends Error {

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { LinearFilter, SRGBColorSpace, Texture } from 'three/webgpu';
 
 /** A drawn region of the atlas: texture coordinates and its size in CSS pixels. */
@@ -16,20 +18,8 @@ export type AtlasImage = CanvasImageSource & { readonly width: number; readonly 
 const SIZE = 2048;
 /** Pixels between entries, so linear filtering never reads a neighbor. */
 const GAP = 2;
-const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
 
 type Canvas2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
-
-/** How a label's text is drawn (F357): a CSS font-family list, fill and halo colors (CSS), halo width in CSS pixels. */
-export interface TextStyle {
-  readonly font: string;
-  readonly fill: string;
-  readonly halo: string;
-  readonly haloPx: number;
-}
-
-/** White text with a dark halo, tinted by the label's color (`text` without a style). */
-const DEFAULT_TEXT: TextStyle = { font: '', fill: '#ffffff', halo: 'rgba(0, 0, 0, 0.85)', haloPx: 2 };
 
 function createCanvas(): { canvas: OffscreenCanvas | HTMLCanvasElement; context: Canvas2D } {
   const canvas =
@@ -42,8 +32,8 @@ function createCanvas(): { canvas: OffscreenCanvas | HTMLCanvasElement; context:
 }
 
 /**
- * The texture atlas of labels and marker images (ADR 0037): text rasterized with the browser's fonts at the screen's
- * pixel ratio in its colors and halo, and the images applications register, packed in rows.
+ * The texture atlas of marker images (ADR 0037): the images applications register, packed in rows. (Labels are
+ * distance fields in their own atlas, `LabelSdf`, F358.)
  * When full it starts over and the batches using it rebuild.
  */
 export class LayerAtlas {
@@ -54,12 +44,10 @@ export class LayerAtlas {
   private x = GAP;
   private y = GAP;
   private rowHeight = 0;
-  /** The font last set for measuring (drawing sets its own). */
-  private measureFont = '';
   /** Increased when the atlas starts over: entries handed out before are stale. */
   generation = 0;
 
-  constructor(private pixelRatio = 1) {
+  constructor() {
     const { canvas, context } = createCanvas();
     this.context = context;
     this.texture = new Texture(canvas as unknown as HTMLCanvasElement);
@@ -80,56 +68,6 @@ export class LayerAtlas {
     return this.images.has(name);
   }
 
-  /** Sets the pixel ratio text is rasterized at; a change starts the atlas over. */
-  setPixelRatio(pixelRatio: number): void {
-    if (pixelRatio === this.pixelRatio) return;
-    this.pixelRatio = pixelRatio;
-    this.reset();
-  }
-
-  /**
-   * The entry of a text at a size (CSS pixels) in a style, drawn on first use: the style's fonts before the system's
-   * (which carry the scripts a font lacks: Greek, Cyrillic, CJK), its fill, and a halo of its color and width.
-   */
-  text(text: string, sizePx: number, style: TextStyle = DEFAULT_TEXT): AtlasEntry {
-    const key = `t:${String(sizePx)}:${style.font}:${style.fill}:${style.halo}:${String(style.haloPx)}:${text}`;
-    const cached = this.entries.get(key);
-    if (cached) return cached;
-    const context = this.context;
-    const scale = this.pixelRatio;
-    const font = `${String(sizePx * scale)}px ${style.font ? `${style.font}, ` : ''}${FONT}`;
-    context.font = this.measureFont = font;
-    const halo = Math.max(0, style.haloPx) * scale;
-    const pad = Math.ceil(halo) + scale;
-    const width = Math.ceil(context.measureText(text).width + 2 * pad);
-    const height = Math.ceil(sizePx * 1.3 * scale + 2 * pad);
-    const at = this.allocate(width, height);
-    context.font = font;
-    context.textBaseline = 'middle';
-    context.lineJoin = 'round';
-    if (halo > 0) {
-      context.lineWidth = 2 * halo;
-      context.strokeStyle = style.halo;
-      context.strokeText(text, at.x + pad, at.y + height / 2);
-    }
-    context.fillStyle = style.fill;
-    context.fillText(text, at.x + pad, at.y + height / 2);
-    return this.remember(key, at.x, at.y, width, height, scale);
-  }
-
-  /** The size in CSS pixels {@link text} draws a text at in a style, without drawing it (label collision, F359). */
-  measure(text: string, sizePx: number, style: TextStyle = DEFAULT_TEXT): { widthPx: number; heightPx: number } {
-    const scale = this.pixelRatio;
-    const font = `${String(sizePx * scale)}px ${style.font ? `${style.font}, ` : ''}${FONT}`;
-    // Parsing a font is slower than measuring: labels of one layer share theirs.
-    if (font !== this.measureFont) this.context.font = this.measureFont = font;
-    const pad = Math.ceil(Math.max(0, style.haloPx) * scale) + scale;
-    return {
-      widthPx: Math.ceil(this.context.measureText(text).width + 2 * pad) / scale,
-      heightPx: Math.ceil(sizePx * 1.3 * scale + 2 * pad) / scale,
-    };
-  }
-
   /** The entry of a registered image at its natural size, or undefined when none has that name. */
   image(name: string): AtlasEntry | undefined {
     const key = `i:${name}`;
@@ -139,17 +77,17 @@ export class LayerAtlas {
     if (!image) return undefined;
     const at = this.allocate(image.width, image.height);
     this.context.drawImage(image, at.x, at.y);
-    return this.remember(key, at.x, at.y, image.width, image.height, 1);
+    return this.remember(key, at.x, at.y, image.width, image.height);
   }
 
-  private remember(key: string, x: number, y: number, width: number, height: number, scale: number): AtlasEntry {
+  private remember(key: string, x: number, y: number, width: number, height: number): AtlasEntry {
     const entry = {
       u0: x / SIZE,
       v0: y / SIZE,
       u1: (x + width) / SIZE,
       v1: (y + height) / SIZE,
-      widthPx: width / scale,
-      heightPx: height / scale,
+      widthPx: width,
+      heightPx: height,
     };
     this.entries.set(key, entry);
     this.texture.needsUpdate = true;

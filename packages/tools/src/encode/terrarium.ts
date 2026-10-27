@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Terrarium height encoding: `height = R·256 + G + B/256 − 32768` meters, a step of 1/256 m (ADR 0024). */
 import { encodePng } from './png.js';
 

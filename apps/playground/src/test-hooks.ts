@@ -51,6 +51,8 @@ interface PlaygroundTestHooks {
   showHud(on: boolean): void;
   /** The levels of the engine messages collected with `?logSink=1`, oldest first (F120). */
   loggedLevels(): string[];
+  /** The log entries collected with `?logSink=1` (F120, F574). */
+  loggedEntries(): LogEntry[];
   /** Forgets the collected log messages. */
   clearLog(): void;
   /** The geodesic distance between two positions through core's geodesic API (F158). */
@@ -135,6 +137,7 @@ export function exposeTestHooks(
     workerTask: taskRunner(),
     showHud: parts.showHud,
     loggedLevels: () => parts.logEntries.map((entry) => entry.level),
+    loggedEntries: () => parts.logEntries.map((entry) => ({ ...entry })),
     clearLog: () => void (parts.logEntries.length = 0),
     geodesicDistanceMeters: (from, to) =>
       geodesicInverse(from.longitudeDeg, from.latitudeDeg, to.longitudeDeg, to.latitudeDeg).distanceMeters,

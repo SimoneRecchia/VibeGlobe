@@ -60,14 +60,33 @@ const VARIABLE_PROBES: readonly (readonly [variable: string, selector: string, p
   ['--vg-ui-debug-color', '.vibeglobe-debug-overlay', 'color', 'rgb(22, 23, 24)'],
   ['--vg-ui-debug-background', '.vibeglobe-debug-overlay', 'background-color', 'rgb(25, 26, 27)'],
   ['--vg-ui-debug-font-size', '.vibeglobe-debug-overlay', 'font-size', '15px'],
+  // A credit's logo and its clear space (ADR 0032 amendment): a logo element added to the layer.
+  ['--vg-ui-logo-height', '.vg-ui__credit-logo', 'height', '19px'],
+  ['--vg-ui-logo-clear', '.vg-ui__credit-logo', 'margin-left', '12px'],
+  ['--vg-ui-logo-clear-bottom', '.vg-ui__credit-logo', 'margin-bottom', '7px'],
+];
+
+/** Variables read by script when a control draws on the map, not through CSS: `packages/ui/src/theme/value.test.ts`. */
+const MAP_COLOR_VARIABLES = [
+  '--vg-ui-marker-color',
+  '--vg-ui-marker-outline-color',
+  '--vg-ui-drawing-color',
+  '--vg-ui-drawing-handle-color',
+  '--vg-ui-minimap-footprint-color',
 ];
 
 test('a test theme restyles every control through the documented CSS variables (F429)', async ({ page }) => {
   await openAllControls(page);
   const documented = await page.evaluate(() => Object.keys(window.vibeglobeUi?.ui.THEME_VARIABLES.light ?? {}));
   // Every documented variable is probed here, except the touch target size, which applies to coarse pointers only
-  // (checked below with a touch screen).
-  expect([...VARIABLE_PROBES.map(([name]) => name), '--vg-ui-touch-size'].sort()).toEqual(documented.sort());
+  // (checked below with a touch screen), and the map colors, which controls read when they draw (KB-166).
+  expect([...VARIABLE_PROBES.map(([name]) => name), '--vg-ui-touch-size', ...MAP_COLOR_VARIABLES].sort()).toEqual(
+    documented.sort(),
+  );
+  await page.evaluate(() => {
+    const logo = Object.assign(document.createElement('img'), { className: 'vg-ui__credit-logo', alt: '' });
+    window.vibeglobeUi?.layer.element.append(logo);
+  });
   // Bring the probed states about: the zoom-in button disabled at the maximum zoom, a hover, a keyboard focus.
   await page.evaluate(() => window.vibeglobePlayground?.globe.jumpTo({ zoom: 22 }));
   const before = await screenshots(page);
@@ -393,4 +412,21 @@ test('every control meets WCAG 2.1 AA contrast in both themes, backed against an
     });
     expect(failures, theme).toEqual([]);
   }
+});
+
+test.describe('the cascade of the theme variables (M12 review)', () => {
+  test('a page rule on .vg-ui restyles the controls in either theme, and reduced motion holds in the dark theme (KB-164, KB-165)', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openUi(page, { theme: 'dark' });
+    const zoomIn = page.locator('.vg-ui__button--zoom-in');
+    // KB-164: the dark block also set the transition duration, over the reduced-motion override.
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+    // KB-165: the theme's own declarations came after the page's sheets and beat them.
+    await page.addStyleTag({ content: '.vg-ui{--vg-ui-color:rgb(255, 0, 0)}' });
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 0, 0)');
+    await page.evaluate(() => window.vibeglobeUi?.layer.setTheme('light'));
+    expect(await zoomIn.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 0, 0)');
+  });
 });

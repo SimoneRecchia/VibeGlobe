@@ -12,14 +12,16 @@ import {
   type GlobeExtras,
   type NetworkModeTarget,
 } from '@vibeglobe/vue';
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { FEATURE_GROUPS } from '../../utils/feature-groups';
 
 const route = useRoute();
 const group = computed(() => FEATURE_GROUPS.find((candidate) => candidate.id === route.params['group']));
 const globeComponent = shallowRef<{ globe: Globe | undefined; extras: GlobeExtras }>();
 const imagery = shallowRef<ImagerySource[]>();
-const offline = shallowRef<NetworkModeTarget & { stats(id?: string): { network: number } }>();
+const offline = shallowRef<
+  NetworkModeTarget & { stats(id?: string): { network: number; package: number }; installArea(): Promise<number> }
+>();
 const controls = shallowRef<UiControl[]>([]);
 const backend = shallowRef<'auto' | 'webgpu' | 'webgl2'>('auto');
 const points: Feature[] = [
@@ -27,27 +29,51 @@ const points: Feature[] = [
   { type: 'Feature', id: 'milan', geometry: { type: 'Point', coordinates: [9.19, 45.46] }, properties: {} },
 ];
 
+// The page's own setup (sources, controls) can finish after the globe is ready: the checks wait for it (F488).
+let setUp: () => void = () => undefined;
+const pageSetUp = new Promise<void>((resolve) => (setUp = resolve));
+
 onMounted(async () => {
   const forced = new URLSearchParams(location.search).get('backend');
   if (forced === 'webgpu' || forced === 'webgl2') backend.value = forced;
   const { generatedFetch, generatedImagery } = await import('../../utils/generated-source');
   const source = generatedImagery();
   if (group.value?.id === 'offline') {
-    const { createOffline } = await import('@vibeglobe/offline');
+    const { createOffline, createPackageManager } = await import('@vibeglobe/offline');
     const engine = createOffline({ store: 'memory', fetch: generatedFetch });
-    offline.value = engine;
+    // An offline package downloaded in the browser: the area around Tokyo to level 5.
+    const packages = createPackageManager(engine, { fetch: generatedFetch });
+    const installArea = async (): Promise<number> => {
+      await packages.ready;
+      const installed = await packages.install({
+        id: 'tokyo',
+        version: '1',
+        area: { westDeg: 138.7, southDeg: 35, eastDeg: 140.7, northDeg: 36.4 },
+        minLevel: 0,
+        maxLevel: 5,
+        sources: [{ source, license: 'CC0-1.0', attribution: { text: 'Generated tiles' } }],
+      });
+      return installed.report?.tiles ?? 0;
+    };
+    offline.value = Object.assign(engine, { installArea });
     imagery.value = [engine.source(source)];
   } else imagery.value = [source];
   const ui = await import('@vibeglobe/ui');
   if (group.value?.id === 'navigation' || group.value?.id === 'security') controls.value = [new ui.ZoomControl()];
   if (group.value?.id === 'ui')
     controls.value = [new ui.ZoomControl(), new ui.CompassControl(), new ui.ScaleBarControl()];
+  setUp();
 });
 
 async function onReady(): Promise<void> {
   const globe = globeComponent.value?.globe;
   const extras = globeComponent.value?.extras;
   if (globe === undefined || extras === undefined || group.value === undefined) return;
+  // The controls set up last are mounted by the next tick and added once the globe's UI has loaded: awaiting the same
+  // load after them, the checks see them added.
+  await pageSetUp;
+  await nextTick();
+  if (controls.value.length > 0) await extras.ui();
   const { checksFor } = await import('../../utils/feature-checks');
   const checks = checksFor(group.value.id, { globe, extras, ...(offline.value ? { offline: offline.value } : {}) });
   (window as unknown as { featureChecks: unknown }).featureChecks = {
@@ -84,6 +110,7 @@ onBeforeUnmount(() => {
         :longitude-deg="12.5"
         :latitude-deg="41.9"
         :zoom="5"
+        :quality-preset="group?.id === 'debugging' ? 'low' : undefined"
         @ready="onReady"
       >
         <template v-if="group?.id === 'data-layers'">

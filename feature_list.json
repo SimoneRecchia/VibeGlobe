@@ -573,7 +573,7 @@
         "Open the README licensing section and confirm it states that noncommercial use is free, that any commercial use including resale needs a commercial license from the owner, and how to request one",
         "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0015 explains why each allowlisted license permits distribution inside a PolyForm Noncommercial project"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F544",
@@ -587,7 +587,7 @@
         "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature, question and commercial-license templates, a security link instead of blank issues, and the CLA acceptance line",
         "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F545",
@@ -926,7 +926,7 @@
         "Confirm it records frame-time and input-latency measurements for main-thread and worker rendering in the supported browsers",
         "Confirm it states the decision and, if adopted, which browsers use it and how the fallback works"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F066",
@@ -1051,7 +1051,7 @@
         "Follow it on a machine with a GPU and confirm the WebGPU visual tests and the benchmarks run",
         "Confirm results are saved in the documented location with the device, OS, browser and GPU recorded"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F076",
@@ -1574,7 +1574,7 @@
         "Run the start-up benchmark on the reference desktop and record time from engine creation to the first frame with complete imagery",
         "Confirm it is at most 1 s and record the result"
       ],
-      "status": "pending"
+      "status": "passing"
     },
     {
       "id": "F116",
@@ -2121,7 +2121,7 @@
         "Assert the applied tilt increases monotonically to the configured automatic tilt and the relief factor reaches 1",
         "Capture screenshots at fixed zoom levels and assert the diff against the baselines is within the visual tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F155",
@@ -2910,7 +2910,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F218",
@@ -2938,7 +2938,7 @@
         "Assert the custom imagery and terrain render with zero black pixels after the base has loaded, and the custom vector and 3D adapters deliver their parsed content through the public API at the expected coordinates",
         "Run the shared runtime contract test against every built-in adapter and every custom adapter and assert all pass"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F220",
@@ -3328,7 +3328,7 @@
         "Assert frame-difference analysis shows no visible jump when the active source switches",
         "Disable harmonization for the layer and assert the raw source colors are shown"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F250",
@@ -3532,7 +3532,7 @@
         "Assert the profile honors the servers' cache headers and never sends no-cache request headers",
         "Run the opt-in live test at low volume, as the policy allows"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F265",
@@ -3594,7 +3594,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F270",
@@ -4257,7 +4257,7 @@
         "Call each data-access API (tile data access, pixel readback, elevation sampling, package export) on a Google fixture source",
         "Assert each call is refused with an error naming the Google profile rule"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F324",
@@ -4345,7 +4345,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F330",
@@ -4488,7 +4488,7 @@
         "Load the output in the playground through the terrain adapter and verify relief displays with no cracks on WebGPU and forced WebGL2",
         "Verify the output attribution includes the Copernicus DEM notice with the modification statement"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F340",
@@ -4542,7 +4542,7 @@
         "Run the estimate command on both full configurations and confirm it completes without downloading anything",
         "Add a new test region with only a new configuration file and confirm it builds without code changes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F343",
@@ -4634,7 +4634,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F348",
@@ -4777,7 +4777,7 @@
         "Zoom continuously while recording frames and verify text shows no blur steps or shimmer by frame differencing",
         "Verify glyphs are generated or loaded off the main thread and cached in an atlas"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F359",
@@ -4979,7 +4979,7 @@
         "Verify through the debug overlay that far or dense markers use the simplified representation and near ones the full marker",
         "Verify the switch is a cross-fade with no pop by frame differencing and draw calls stay within the documented budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F375",
@@ -5027,7 +5027,7 @@
         "Record frame times for 60 seconds while panning and zooming",
         "Verify p95 frame time is at most 16.7 ms on the reference desktop and the per-frame JavaScript heap allocation stays at zero in the render loop"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F379",
@@ -5214,7 +5214,7 @@
         "Run temporal glitch detection on the sky and atmosphere regions and verify no frame-to-frame jump above threshold at any phase boundary",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F394",
@@ -5239,7 +5239,7 @@
         "Verify the fog-enabled run requests at least 25% fewer tiles over the scenario (the measured reduction is recorded in the ADR) with no visible difference in the fogged region",
         "Verify no black or empty pixels appear near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F396",
@@ -5252,7 +5252,7 @@
         "Capture screenshots and verify the terminator position and terrain shading direction match the sun direction on WebGPU and forced WebGL2",
         "Verify lighting is off unless enabled and changing the time updates the view without a full reload"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F397",
@@ -5278,7 +5278,7 @@
         "Verify the anisotropy level equals the device maximum reported by capability detection, unless the quality preset lowers it",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F399",
@@ -5291,7 +5291,7 @@
         "Record every frame and verify switching never shows black areas, flicker or a frozen frame",
         "Verify frame time decreases from ultra to low on the reference desktop"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F400",
@@ -5315,7 +5315,7 @@
         "Verify adaptive quality lowers detail or resolution within the documented reaction time and frame time returns within the target",
         "Record frames and verify the reduction causes no visible pop or flicker"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F402",
@@ -5327,7 +5327,7 @@
         "Verify quality rises back step by step to the preset level once frame time has been stable for the documented interval",
         "Run a load that hovers around the threshold for 5 minutes and verify quality changes no more often than the documented minimum interval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F403",
@@ -5341,7 +5341,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F404",
@@ -5505,7 +5505,7 @@
         "Verify the live view keeps rendering without stutter during export",
         "Export a view containing Google content and assert the export follows the Google terms ADR and always includes the Google logo and attributions"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F417",
@@ -5781,7 +5781,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F439",
@@ -5821,7 +5821,7 @@
         "Assert by frame differencing that vector features do not jump or slide during the morph",
         "Capture the same area in the globe, 2D and 3D phases and assert colors, line widths and feature presence match within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F442",
@@ -5834,7 +5834,7 @@
         "Assert no frame shows an empty area where vector content exists at a coarser level",
         "Assert out-of-coverage vector tiles are never requested"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F443",
@@ -5847,7 +5847,7 @@
         "Assert main-thread CPU time per frame stays within the per-frame budget documented in docs/plan",
         "Assert no long task (over 50 ms) occurs on the main thread while tiles load"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F444",
@@ -5886,7 +5886,7 @@
         "Record frames during a continuous zoom and assert interpolated paint properties change smoothly",
         "Set feature-state on a feature at runtime and assert its style changes on the next frame"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F447",
@@ -5899,7 +5899,7 @@
         "Record frames while zooming across each minzoom and maxzoom and assert frame differences show a fade, not a single-frame pop",
         "Toggle visibility at runtime and assert the layer hides and shows without reloading tiles"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F448",
@@ -5912,7 +5912,7 @@
         "Assert text from 10 to 32 px is crisp and glyph ranges are requested only for characters in use",
         "Render labels with Latin, Cyrillic, Greek and CJK characters and assert each renders or falls back to a configured font without missing boxes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F449",
@@ -5925,7 +5925,7 @@
         "Assert road labels follow curved lines and are not duplicated where a road crosses a tile boundary",
         "Record frames during slow pan, zoom, rotate and tilt and assert labels fade in and out with no flicker (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F450",
@@ -5938,7 +5938,7 @@
         "Assert from the request log that no tile is downloaded again",
         "Assert no recorded frame during the changes contains black or empty pixels"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F451",
@@ -5977,7 +5977,7 @@
         "Assert bridges draw above the roads they cross and tunnels draw below or dashed as styled",
         "Assert road-name labels appear along the roads at street zoom"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F454",
@@ -5990,7 +5990,7 @@
         "Switch the label language between English and Italian and assert names use name:en or name:it with a fallback to name",
         "Assert place labels do not flicker during the zoom (frame differencing)"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F455",
@@ -6017,7 +6017,7 @@
         "Reload and pan so the buildings come from different tiles and assert the heights are identical",
         "Check the defaults table is documented in the data layers guide"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F457",
@@ -6030,7 +6030,7 @@
         "Assert buildings fade or grow in rather than pop (frame differencing below the popping threshold)",
         "Assert walls facing different directions receive different shading in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F458",
@@ -6042,7 +6042,7 @@
         "Assert the rendered height relative to the rendered ground scale matches the projection scale factor at each latitude",
         "Measure a building's height through the engine API and assert it equals the source height in meters"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F459",
@@ -6055,7 +6055,7 @@
         "Assert the selection highlight appears on the picked feature in a screenshot",
         "Repeat on both backends and with touch emulation"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F460",
@@ -6081,7 +6081,7 @@
         "Repeat with a slow network profile and assert still no holes",
         "Check the debug overlay shows each tile's level and screen-space error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F462",
@@ -6094,7 +6094,7 @@
         "Run 10 minutes of randomized navigation and assert GPU and RAM use stay within the configured budgets",
         "Assert evicted tiles reload correctly when revisited"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F463",
@@ -6120,7 +6120,7 @@
         "Assert surveyed reference points in the tileset project onto the same pixels as markers placed at their WGS84 coordinates",
         "Repeat on both backends"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F465",
@@ -6132,7 +6132,7 @@
         "Assert by frame differencing that tileset geometry does not jump during the morph",
         "Capture the same view in each phase and compare positions and colors within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F466",
@@ -6144,7 +6144,7 @@
         "Assert the click event carries the expected feature properties",
         "Assert the reported coordinates and height match the fixture's known positions within tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F467",
@@ -6156,7 +6156,7 @@
         "Record frames while orbiting at street level and assert no shimmer where the tileset meets the terrain (temporal z-fighting analysis)",
         "Assert terrain does not show through the tileset surface in screenshots"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F468",
@@ -6169,7 +6169,7 @@
         "In CI, run the same flow against a mock Map Tiles server",
         "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F469",
@@ -6182,7 +6182,7 @@
         "Record frames across the renewal and assert no holes or blank frames",
         "Manually keep a real session open beyond three hours on the reference desktop and record the renewal in the test log"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F470",
@@ -6208,7 +6208,7 @@
         "Assert zero holes or black pixels after the root tile has loaded",
         "Record the results in the benchmark history"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F472",
@@ -6223,7 +6223,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F473",
@@ -6249,7 +6249,7 @@
         "Assert the engine instance and canvas are the same object before and after (no remount)",
         "Assert from the request log that unchanged sources are not downloaded again"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F475",
@@ -6425,7 +6425,7 @@
         "Run the example's Playwright suite on both backends",
         "Assert every feature check passes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F489",
@@ -6465,7 +6465,7 @@
         "Confirm no known bug remains open for this milestone",
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F491",
@@ -6575,7 +6575,7 @@
         "Measure JS heap after forced garbage collection, GPU resource counters, worker count and listener count before and after",
         "Assert no growth beyond the documented tolerance"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F500",
@@ -6624,7 +6624,7 @@
         "Assert it is within the initial-bundle budget",
         "Enable each optional module at runtime and assert its code is fetched only at that moment"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F504",
@@ -6722,7 +6722,7 @@
         "Assert the engine reports the condition through its events and logs and continues from memory, packages and network",
         "Assert no blank frame and no uncaught error"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F512",
@@ -6770,7 +6770,7 @@
         "Assert no frames are rendered or requests made beyond the throttled rate while hidden",
         "Assert the view resumes at the correct camera state, the flight completes or resumes smoothly, and tiles refresh"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F516",
@@ -6818,7 +6818,7 @@
         "Assert each has a recorded license that is permissive (MIT, BSD, Apache-2.0, ISC, OFL for fonts, public domain or compatible data licenses)",
         "Assert each appears in the generated third-party notices"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F520",
@@ -6854,7 +6854,7 @@
         "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
         "Assert every link in the README resolves"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F522",
@@ -6914,7 +6914,7 @@
         "Assert CHANGELOG.md has an entry for each released version with categorized changes",
         "Assert breaking changes are marked"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F527",
@@ -6938,7 +6938,7 @@
         "Assert the licensing section, contributing guide, contributor license agreement, security policy and code of conduct are reachable from the navigation",
         "Run a link checker over the built site and assert zero broken links"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F528",
@@ -6974,7 +6974,7 @@
         "Install the tarballs in a strict TypeScript consumer project and run the type checker",
         "Assert no errors and no reference to source files outside the tarballs"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F531",
@@ -6986,7 +6986,7 @@
         "Configure custom asset URLs pointing to a separate static server and assert assets load from there",
         "Assert no asset is inlined in a way that requires unsafe-eval"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F532",
@@ -6998,7 +6998,7 @@
         "Assert installation pulls no layers, UI, offline, Vue or Web Component packages",
         "Assert the app renders the globe and navigates"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F533",
@@ -7036,7 +7036,7 @@
         "Assert publishing happens only from CI with the npm token stored as a CI secret",
         "Assert the workflow publishes only after the owner has approved the release"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F535",
@@ -7048,7 +7048,7 @@
         "Check it covers version bump, changelog, tags, publishing and post-release checks",
         "Follow it for a dry-run release and assert it completes"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F536",
@@ -7072,7 +7072,7 @@
         "Assert the globe renders",
         "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F537",
@@ -7122,7 +7122,7 @@
         "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the PolyForm-Noncommercial-1.0.0 license",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F540",
@@ -7146,7 +7146,7 @@
         "Query the repository through the GitHub API and confirm it is public",
         "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F541",
@@ -7161,6 +7161,432 @@
         "A fresh-context reviewer checks the milestone against PLAN.md and its acceptance criteria and reports no correctness or requirement gaps"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F566",
+      "milestone": 1,
+      "section": "Fixed constraints",
+      "description": "VibeGlobe is open source under the Mozilla Public License 2.0: LICENSE.md holds the official MPL-2.0 text, every package.json declares MPL-2.0, every distributed source file opens with the MPL notice, the README explains the license, and every shipped dependency's license allows distribution inside an MPL-2.0 project.",
+      "steps": [
+        "Compare LICENSE.md, and every package's LICENSE.md, with the official MPL-2.0 text from Mozilla and confirm they are identical",
+        "Run npm run check and confirm it requires the SPDX identifier MPL-2.0 in the root, library and app package.json files and the MPL notice at the top of every distributed source file under packages/*/src; confirm its unit tests cover a missing field and a missing notice",
+        "Open the README licensing section and confirm it states MPL-2.0, that any use including commercial use is allowed, that modified VibeGlobe files stay under the MPL, and that there is no separate commercial license",
+        "Run the license audit and confirm every shipped third-party package is under a license in the permissive allowlist, and that ADR 0043 explains why each allowlisted license permits distribution inside an MPL-2.0 project"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F567",
+      "milestone": 1,
+      "section": "Documentation and distribution",
+      "description": "The repository has a contributing guide that requires a Developer Certificate of Origin sign-off on every commit, the DCO text, a security policy and a code of conduct with the reporting contact, issue templates and a pull request template that asks for the sign-off.",
+      "steps": [
+        "Open CONTRIBUTING.md and confirm it requires a DCO sign-off (git commit -s) on every commit and states the repository rules (feature list, tests, bugs, licenses, ADRs) and how to submit",
+        "Open DCO.md and confirm it holds the Developer Certificate of Origin 1.1 and the sign-off format",
+        "Open SECURITY.md and CODE_OF_CONDUCT.md and confirm supported versions, a private reporting channel with the owner's contact address, a response time and the enforcement contact",
+        "Open .github/ISSUE_TEMPLATE/ and .github/pull_request_template.md and confirm bug, feature and question templates, a security link instead of blank issues, no commercial-license template, and the sign-off item",
+        "Confirm the README links to the licensing section, the contributing guide, the security policy and the code of conduct"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F568",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The README explains what VibeGlobe is, how to install it from the public npm registry (@vibeglobe), the licensing (MPL-2.0, no separate commercial license), a minimal usage example, and links to every guide.",
+      "steps": [
+        "Open README.md and confirm the npm installation and licensing sections",
+        "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
+        "Assert every link in the README resolves"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F569",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The documentation site also contains the licensing section (MPL-2.0), the contributing guide with the Developer Certificate of Origin, the security policy and the code of conduct with the reporting contact, with no broken links.",
+      "steps": [
+        "Build the documentation site",
+        "Assert the licensing section, contributing guide, Developer Certificate of Origin, security policy and code of conduct are reachable from the navigation",
+        "Run a link checker over the built site and assert zero broken links"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F570",
+      "milestone": 15,
+      "section": "Milestones (all must be completed)",
+      "description": "Version 1.0.0 of every package is published to npm under @vibeglobe with the MPL-2.0 license.",
+      "steps": [
+        "Obtain the owner's approval to publish 1.0.0, as PLAN.md requires for externally visible actions",
+        "Run the release workflow for 1.0.0",
+        "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the MPL-2.0 license",
+        "Install 1.0.0 into a fresh consumer project and assert the globe renders"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F571",
+      "milestone": 15,
+      "section": "Fixed constraints",
+      "description": "By the first release the repository is public, as an open-source project under the Mozilla Public License 2.0.",
+      "steps": [
+        "Obtain the owner's approval to make the repository public, as PLAN.md requires for repository settings",
+        "Query the repository through the GitHub API and confirm it is public and its detected license is MPL-2.0",
+        "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F572",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "Google Photorealistic 3D Tiles follow the billing region's terms: an EEA billing account is refused with a configuration error naming the Map Tiles API EEA terms, while the engine keeps working; for other accounts the tiles load through the Map Tiles API session with the customer's own key and render a city in the 3D view, tested against the Map Tiles stand-in.",
+      "steps": [
+        "Create the 3D Tiles adapter with billingRegion 'eea' and assert the configuration error names the EEA terms, and that satellite tiles, the Street View layer and Street View are refused the same way while roadmap and terrain load",
+        "Open the 3dtiles-google scenario with googleRegion=eea and assert the playground shows the error, sends no request to the Map Tiles API and keeps rendering",
+        "Run the non-EEA flow against the Map Tiles stand-in: a session is created and photorealistic tiles stream and render over Rome",
+        "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F573",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "Google 3D Tiles sessions are renewed when their token expires without a visible interruption or a reload, tested against the Map Tiles stand-in.",
+      "steps": [
+        "Run against the stand-in, whose session token expires after 60 seconds, while navigating continuously",
+        "Assert a new session is requested before or at expiry and no tile request fails because of the expired token",
+        "Record frames across the renewal and assert no holes or blank frames"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F574",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Fog-aware detail: a tile entirely inside full fog is never requested at a fine level, and the tilted fog scenario requests measurably fewer tiles than the same run at full detail.",
+      "steps": [
+        "Unit-test the level selection with fog: a tile whose nearest point lies beyond the full-fog distance is not refined below the fog's coarse level, while a tile partly inside the visible range is",
+        "Run the same tilted flight scenario with fog-aware detail on and off and record every tile request with its level and position",
+        "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
+        "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F600",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "An optional space background draws stars and the Milky Way behind the globe, off by default and switched on per instance through a render extension.",
+      "steps": [
+        "Start a globe with default options and confirm no space background draws and none of its assets are requested",
+        "Turn the space background on and off at runtime and confirm stars and the Milky Way appear and disappear in the next frame",
+        "Confirm it is a render extension that the renderer package ships and the core does not depend on"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F601",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background moves consistently with the globe, as in Google Earth: stars keep fixed directions in the sky's frame, so orbiting, tilting and zooming turn them together with the globe without drift or parallax.",
+      "steps": [
+        "Orbit, tilt and zoom with the space background on and track several stars' screen positions against their catalog directions in every frame",
+        "Assert each star stays within 0.5 px of its expected position for the camera of that frame",
+        "Assert the stars' motion has no lag or jump relative to the globe between frames"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F602",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Stars come from a permissively licensed catalog with sizes and brightness by magnitude, and do not shimmer, alias or pop while the camera moves.",
+      "steps": [
+        "Load the catalog and confirm its license is recorded in THIRD_PARTY_NOTICES.md",
+        "Record frames of a slow orbit and assert no star's brightness changes by more than the flicker threshold between frames",
+        "Compare a still view with its reviewed baseline on both backends"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F603",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The Milky Way is drawn from a permissively licensed panorama with no seam, pole pinch or banding.",
+      "steps": [
+        "Look toward the panorama's seam and both poles and confirm no visible seam or pinch",
+        "Assert no banding in the gradient regions (no step above the threshold between neighboring pixels)",
+        "Compare with reviewed baselines on both backends"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F604",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background stays behind the globe and its atmosphere: never drawn over the globe's disc or the day sky, and it fades out near the ground and on the flat map.",
+      "steps": [
+        "Assert no star pixel inside the globe's disc or where the atmosphere's sky is brighter than the stars",
+        "Zoom from space to street level and into the flat map and assert the background fades out smoothly, with no pop",
+        "Assert zero black or empty pixels in every recorded frame"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F605",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background renders the same on WebGPU and WebGL2, loads its assets lazily from the consumer's asset host, and costs at most 0.3 ms GPU per frame on the reference desktop.",
+      "steps": [
+        "Compare the same views on WebGPU and forced WebGL2 within the baseline tolerance",
+        "Confirm the catalog and panorama are requested only when the background is first switched on, from the configured asset base URL (ADR 0015)",
+        "Measure its GPU time on the reference desktop and assert at most 0.3 ms per frame"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F606",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The playground switches the space background on and the guides document it, with its options and asset hosting.",
+      "steps": [
+        "Open the playground with the space background switch and confirm it draws",
+        "Open the guide and confirm it documents enabling it, its options and where its assets are hosted"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F607",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background's sky is fixed in the celestial frame by the engine's date and time: it is rotated by Greenwich sidereal time from the atmosphere's time (a fixed epoch when the application sets none), with precession from J2000, tested against published values.",
+      "steps": [
+        "Unit-test sidereal time and precession against Meeus's worked examples, the celestial pole and a sidereal day",
+        "Change the engine's time by six hours and assert the rendered stars move to their newly predicted screen positions, on both backends"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F608",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Screenshot comparison of the space background against baselines recorded in the pinned CI environment, on WebGPU and WebGL2.",
+      "steps": [
+        "Capture the space background view on both backends and compare it with its baseline at ADR 0012's tolerances",
+        "Assert the two backends' skies agree within the cross-backend tolerance"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F609",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background's frame-time cost is checked: with it on, the main-thread time per frame grows by under 0.5 ms and the frame rate stays at least 80 % of the rate without it on CI's software GPU.",
+      "steps": [
+        "Alternate windows with and without the background during a continuous drag and assert the median main-thread overhead is under 0.5 ms",
+        "Assert the median frame-rate ratio is at least 0.8"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F610",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "An imagery or terrain source can declare its coverage as polygons (land, a country's borders) besides its levels: outside the polygons and beyond its maximum level it makes no request, and the next source of the layer, the layer below or its deepest level magnified is drawn instead.",
+      "steps": [
+        "Give a source a country polygon with a hole and assert which tiles it asks for, wholly inside by default and every touching tile with overlap",
+        "Assert a source with an area returns no data outside it and beyond its maximum level, and exposes the polygons' bounds as its coverage"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F611",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "A layer's offline package and its online detail can come from different providers: a source wrapped as package-only never touches the network and a network-only one never reads packages, so offline-only mode draws only the package and online-only mode only the network.",
+      "steps": [
+        "Wrap a packaged source as package-only and an online one as network-only and load tiles in hybrid, online-only and offline-only modes",
+        "Assert the package-only source makes no request in any mode, draws nothing online, and the network-only one draws nothing offline"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F612",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "The credits list together the attributions of every visible source, the vector tile style's sources (their style or TileJSON attribution) included, while one of their layers is shown.",
+      "steps": [
+        "Show a fixture imagery source and a vector style whose source declares an HTML attribution",
+        "Assert the credits list both, and that hiding every layer of the vector source removes its credit and keeps the imagery's"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F613",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`@vibeglobe/presets` exports `europeOpen(options)`: Google Earth-like map types for Europe (Satellite, Hybrid, Map, Relief bases; labels and borders, roads, 3D buildings and 3D terrain overlays) built only from free sources whose terms allow commercial use and redistribution, each with its coverage, levels, licence, exact attribution and the date its terms were read; options set the app's package manifest, each source's online maximum level, excluded and added sources.",
+      "steps": [
+        "Build the preset with default options and assert every base map and overlay, each source's coverage, levels, licence, attribution and reading date, and that online sources cover only land while the sea comes from the package",
+        "Assert the options: the package manifest URL, a lower online maximum level, an excluded source and an added source"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F614",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "The pipeline configuration `europe.json` builds the Europe preset's offline package from the same sources, with separate levels for land (a Natural Earth land mask) and sea, chosen by parameters.",
+      "steps": [
+        "Validate europe.json and assert its datasets, their profiles and attributions match the preset's packaged sources",
+        "Assert tiles above the sea's maximum level are counted and built only over land"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F615",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "`vibeglobe-data estimate <config>` counts the tiles of each level, land and sea separately, measures the real tile size on a sample of tiles where the source can be reached, and prints per level the tiles and cumulative gigabytes for imagery, vector and terrain, without downloading the whole region.",
+      "steps": [
+        "Run estimate on europe.json and assert the per-level table with land and sea counts and cumulative sizes for each dataset kind",
+        "Assert measured sizes replace the configured ones for the sampled levels, and that rows not measured say so"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F616",
+      "milestone": 7,
+      "section": "Documentation and distribution",
+      "description": "The guide `docs/guides/europe-preset.md` shows the Europe preset in hybrid, online-only and offline-only use, with the maximum online zoom per area and an example output of `estimate`.",
+      "steps": [
+        "Assert the guide has each section and its examples type-check against the package"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F617",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The playground has a selector of the Europe preset's map types and overlays.",
+      "steps": [
+        "Open the playground with the preset, switch base maps and overlays, and assert the imagery layers and vector styles follow with no console error"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F618",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "A source's coverage can be a GeoJSON (multi)polygon such as a country's borders: tiles wholly outside are never requested, tiles across the border are clipped per pixel when decoded so the layer below shows outside the area, a translucent layer that covers none of a tile takes no overlay slot there, and `blankTile` treats tiles of one color as no data for services without a known area; `@vibeglobe/presets/countries` has Natural Earth borders of Europe's countries and regions, loaded per country.",
+      "steps": [
+        "Unit-test the clip mask of a border tile, GeoJSON areas, blank-tile detection, the overlay slots and the country borders",
+        "In the browser, a white service limited to a polygon shows white inside it and the layer below outside it within one tile, and a blankTile source shows the layer below"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F619",
+      "milestone": 5,
+      "section": "Map experience: globe, 2D and 3D",
+      "description": "The polar caps beyond ±85.05° are one continuous disc at every zoom and in every view mode: a view that reaches a cap stays a globe instead of flattening into the Web Mercator plane, a geographic (EPSG:4326) imagery source that covers a cap fills it, and otherwise the cap shows a fill color set at start and at runtime (default: the base image's sea in the north and ice in the south), with no gap at its edge, with terrain, at both poles and across the antimeridian.",
+      "steps": [
+        "Unit-test that the morph factor is 0 where the view reaches a cap and unchanged elsewhere, falling without a jump when panning toward a pole",
+        "In the browser, a view over each pole shows no background and one fill color, the color changes at runtime, a view across the antimeridian near the pole is whole, and a geographic source shows in the cap instead of the fill"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F620",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "Two navigation modes, set at start (`createControls({ navigationMode })`) and at runtime (`controls.setNavigationMode`), default 'free': 'free' turns the globe as a trackball, the grabbed point under the cursor, over the poles without stopping, the heading turning with it; 'north-up' turns about the polar axis horizontally and changes latitude vertically with the heading held, and stops at the poles without a jump or a flip. Inertia, zoom to the cursor, tilt and the compass work in both; the playground has a selector and the controls guide a section.",
+      "steps": [
+        "Unit-test the trackball over a pole, a heading-held north-up drag and its stop at the pole, the controls option and setter, and that the trackball drag allocates nothing per frame",
+        "In the browser, a free drag over the pole keeps the grabbed point under the cursor and turns the heading to south, the compass turns it back; a north-up drag stops at 89.9° with heading 0 and a horizontal one turns about the axis; a north-up flick coasts"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F621",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's Map is a political map like Google Maps' (neutral land, blue water, country and region borders, place names; no land cover, land use or buildings), with roads as a separate overlay off by default, and Relief is that map over a light tint by elevation (a MapLibre `color-relief` layer, drawn by `@vibeglobe/layers`) and a hillshade; both from OpenFreeMap's tiles and the same terrain.",
+      "steps": [
+        "Unit-test the composed Map and Relief styles, the roads overlay, and the `color-relief` colors by elevation",
+        "In the browser, Map shows no land-cover, land-use, building or road layer until Roads is on, and Relief adds the tint and the hillshade"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F622",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's satellite chain: NASA's Blue Marble from GIBS in EPSG:4326 at the lowest levels and over the polar caps, the package's ESA WorldCover composite from level 5 to 11, then the orthophotos from level 12, each white tile counting as no data; the caps look like the surface around them in every base map (Blue Marble in Satellite and Hybrid, the map's own colors in Map and Relief).",
+      "steps": [
+        "Unit-test the chain's sources and levels, Blue Marble's request over the north cap, and the orthophotos' level 12 start and blank tiles",
+        "In the browser, the north cap shows the map's water in Map and Relief and Blue Marble in Satellite"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F623",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "'north-up' navigation stops the latitude of the point looked at at a configurable limit (`createControls({ northUpMaxLatitudeDeg })`, `controls.setNorthUpMaxLatitude`, default 85°), without a rotation about the pole or a jump; a camera already beyond it stays where it is; 'free' is unchanged.",
+      "steps": [
+        "Unit-test the stop at the default and at a custom limit, a start beyond the limit, and the option and setter",
+        "In the browser, a north-up drag over the pole holds the heading and the camera's latitude, with no flip"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F624",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "Panning a far view stays sharp: the first source of an imagery chain that starts at level 0 pins its low levels in memory even when the chain's first source starts deeper, so a view never seen shows the pinned levels at once, and at 3000 km above the ground a second lap around the world shows every tile at its own level.",
+      "steps": [
+        "Unit-test which source of a chain is pinned",
+        "In the browser, a far jump with a slow server shows the pinned levels in the next frames, and a second lap at 3000 km has no tile below its own level"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F625",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "An optional tilt policy of the controls (`createControls({ tiltPolicy })`, `controls.setTiltPolicy({ lock2DAboveMeters, autoTiltBelowMeters, autoTiltMaxDeg })`, defaults 20,000 m, 2,000 m and 60°), by the distance from the eye to the point looked at: beyond the lock the tilt is 0° and neither gestures nor the API tilt it, and `tiltAvailable` with `onTiltAvailabilityChange` disables the UI's 3D button; within `autoTiltBelowMeters` the tilt rises continuously to `autoTiltMaxDeg` and falls back rising; a tilt chosen by hand below the lock stays until changed or until the camera passes the lock, falling continuously before it.",
+      "steps": [
+        "Unit-test the automatic tilt and the lock by distance, a hand-chosen tilt below and past the lock, the 3D mode, the option, setter, availability events and blocked tilt gestures, and the UI's disabled 3D button",
+        "In the browser, with `?tiltPolicy=1`, far away an API tilt leaves the view flat and 3D is disabled; zooming to street level and back the tilt rises to 60° and returns to 0° with no step above 3° per frame"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F626",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's roads appear by class with the level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest from 14, and road names from 13, in the Roads overlay and in Hybrid.",
+      "steps": [
+        "Unit-test the composed road layers' levels and filters by class at each level",
+        "Measure the frame time of a drag at levels 8 and 12 with and without roads, before and after"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F627",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "Model sets (`ModelSetLayer` of `@vibeglobe/layers/models`): many copies of one glTF model loaded once, each of its meshes one instanced draw for the copies in view nearer than `visibleBelowMeters` (default 3,000 m), a placeholder of constant size on screen beyond, nothing for copies out of view or behind the globe; copies picked, highlighted and moved like features; a models guide with the limits of a light model and an example of 2,000 turbines.",
+      "steps": [
+        "Unit-test that the layer loads its model once with every copy's pose and pick id, highlights, moves, hides and removes copies, and validates its options",
+        "In the browser, 2,000 turbines cost at most 4 draw calls near the farm and 1 from 14 km (placeholders, only those in view), nothing looking elsewhere, and a copy picks as its feature"
+      ],
+      "status": "passing"
     }
   ]
 }

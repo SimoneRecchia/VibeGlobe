@@ -61,6 +61,8 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
   test(`tile edges with contrasting colors show no line or seam at fractional zooms, tilts and DPR 2 on ${backend} (F106)`, async ({
     browser,
   }) => {
+    // Six views at two pixel ratios on a software GPU: 3.4 min for WebGPU in CI's image, over 5 min on a slow runner.
+    test.setTimeout(600_000);
     for (const deviceScaleFactor of [1, 2]) {
       // At DPR 2 a smaller canvas keeps the pixel count, and so the cost, of the DPR 1 run.
       const viewport = deviceScaleFactor === 1 ? { width: 800, height: 600 } : { width: 400, height: 300 };

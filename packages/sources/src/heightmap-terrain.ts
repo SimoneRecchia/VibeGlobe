@@ -1,4 +1,8 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
+  type CoverageArea,
+  coverageTest,
   GEOGRAPHIC_TILING,
   heightmapGeometricErrorMeters,
   inCoverage,
@@ -33,6 +37,11 @@ export interface HeightmapTerrainOptions {
   datum?: VerticalDatum;
   /** The areas with data, radians; tiles outside are never requested. */
   coverage?: readonly TileRectangleRad[];
+  /**
+   * Polygons the source has data for (land, a country's borders): tiles outside them are never requested, so the
+   * deepest tile above them is magnified there. By default only tiles wholly inside are requested.
+   */
+  area?: CoverageArea;
   /** The network transport; `fetchTransport()` by default. */
   transport?: TileTransport;
   maxRequestsPerHost?: number;
@@ -52,12 +61,14 @@ export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSourc
   const tileSizePx = options.tileSizePx ?? 256;
   const equatorMeters = 2 * Math.PI * WGS84.semiMajorAxisMeters;
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
+  const area = options.area ? coverageTest(options.area) : undefined;
   return {
     id: options.id,
     tiling,
     minLevel,
     maxLevel,
-    ...(options.coverage ? { coverage: options.coverage } : {}),
+    // The area's bounding rectangles let the engine skip whole regions before asking for tiles.
+    ...(options.coverage || area ? { coverage: options.coverage ?? area?.rectangles ?? [] } : {}),
     transport: options.transport ?? fetchTransport(),
     decoder: { kind: options.encoding },
     attribution: options.attribution ?? [],
@@ -70,6 +81,7 @@ export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSourc
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';
+      if (area && !area.covers(tiling.tileExtent(coord, extent))) return 'noData';
       const rows = tiling.rootTilesY * 2 ** coord.level;
       out.url = options.url
         .replace('{z}', String(coord.level))

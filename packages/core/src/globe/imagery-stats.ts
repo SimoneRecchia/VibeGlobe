@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Counters of the imagery streaming of one engine instance (`Globe.imageryStats()`). */
 export interface ImageryStats {
   /** Tiles waiting for a request slot, in flight, being decoded, on the GPU, failed, without data. */

@@ -1,9 +1,14 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { externalUris, readDocument, type ModelResources } from '../index.js';
+import { externalUris, meshoptWasmDecoder, readDocument, type ModelResources } from '../index.js';
 
 const ROOT = fileURLToPath(new URL('./khronos/', import.meta.url));
+
+/** The meshopt decoder the engine's worker program ships, compiled from its file. */
+export const meshopt = meshoptWasmDecoder(() =>
+  WebAssembly.compile(readFileSync(new URL('../../../worker/wasm/meshopt-decoder.wasm', import.meta.url))),
+);
 
 /** A Khronos sample model variant from `khronos/` (see its README for licenses): the file and its external files. */
 export interface SampleFile {

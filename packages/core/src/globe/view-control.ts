@@ -1,4 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
+import { northUpLimitRad } from '../camera/anchor.js';
 import { validateViewCurves, type ViewCurvesInit } from '../view/curves.js';
 import type { ViewState } from '../view/view-state.js';
 import type { Emitter } from './emitter.js';
@@ -9,6 +12,9 @@ import { positionAt } from './view-geometry.js';
 import { ControlsSlot } from './controls-slot.js';
 
 const RAD = Math.PI / 180;
+
+/** How a drag moves the camera (see `NavigationApi.navigationMode`). */
+export type NavigationMode = NonNullable<NavigationApi['navigationMode']>;
 
 /** What the view API needs from its globe. */
 export interface ViewHost {
@@ -23,8 +29,12 @@ export interface ViewHost {
   userInput(cause: 'user' | 'inertia'): void;
   /** The engine clock's time, milliseconds. */
   timeMs(): number;
+  /** Writes the engine clock's time to `out[0]` (F064). */
+  timeInto(out: Float64Array): void;
   /** The part of a zoom step the zoom limits allow (KB-126). */
   limitZoom(deltaZoom: number): number;
+  /** Whether zoom limits are set: without them a step goes through untouched, with no call (KB-132). */
+  zoomLimited(): boolean;
   /** Stops a running API movement (KB-127). */
   interruptMovement(): void;
 }
@@ -52,15 +62,17 @@ export class ViewControl {
         host.assertAlive();
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
-        if (dragCamera(host.cam, host.view, anchor, point)) host.requestRender();
+        if (dragCamera(host.cam, host.view, anchor, point, this.northUp())) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
         const allowed =
-          typeof deltaZoom === 'number' && Number.isFinite(deltaZoom) ? host.limitZoom(deltaZoom) : deltaZoom;
-        if (zoomCamera(host.cam, host.view, point, allowed)) host.requestRender();
+          host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
+            ? host.limitZoom(deltaZoom)
+            : deltaZoom;
+        if (zoomCamera(host.cam, host.view, point, allowed, this.northUp())) host.requestRender();
       },
       requestUpdate: () => {
         this.updateRequested = true;
@@ -77,9 +89,15 @@ export class ViewControl {
       set coasting(value: boolean) {
         control.coasting = value === true;
       },
+      // How a drag moves the camera: set by the controls, read by each drag and zoom below.
+      navigationMode: 'free',
+      get tiltPolicy() {
+        return host.view.tiltPolicy;
+      },
       get timeMs() {
         return host.timeMs();
       },
+      timeInto: (out) => host.timeInto(out),
       get headingDeg() {
         return host.cam.pose.headingRad / RAD;
       },
@@ -129,6 +147,12 @@ export class ViewControl {
     const requested = this.updateRequested;
     this.updateRequested = false;
     return requested;
+  }
+
+  /** Whether drags and zooms hold north up; if so, writes their latitude limit (`NavigationApi.northUpMaxLatitudeDeg`). */
+  private northUp(): boolean {
+    northUpLimitRad[0] = (this.navigation.northUpMaxLatitudeDeg ?? 85) * RAD;
+    return this.navigation.navigationMode === 'north-up';
   }
 
   /** See `NavigationApi.orbit`: invalid input is ignored. */

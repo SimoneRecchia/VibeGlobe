@@ -33,6 +33,8 @@ const SCENARIOS: Record<string, string> = {
   'startup-imagery': '?scenario=frame-loop&imagery=world',
   // F564: streaming along the Milan–Tokyo path from the local fixture server.
   'stream-path': '?scenario=path-milan-tokyo&imagery=world',
+  // F471: the fixture city's 3D Tiles (Draco) during an endless tour of pans, zooms, rotations and tilts.
+  '3dtiles-city': '?scenario=3dtiles-city&tiles3d=draco&tour=1',
   ...Object.fromEntries(
     (['webgl2', 'webgpu'] as const).flatMap((backend) =>
       [
@@ -42,6 +44,12 @@ const SCENARIOS: Record<string, string> = {
       ].map(([draws, view]) => [`drag-${draws}-${backend}`, `?scenario=drag&gpuTiming=1&backend=${backend}&${view}`]),
     ),
   ),
+  // KB-210: a drag over a city with a vector style of roads and labels on imagery and terrain (the fixture streets style,
+  // world imagery and Terrarium terrain from the local fixture server), at street level and tilted. Not in the budgets
+  // yet: on a software GPU its first frame takes longer than this runner waits; run it with `--budgets` and a file that
+  // names it on a real GPU (docs/follow-ups.md).
+  'drag-vector-roads':
+    '?scenario=drag&gpuTiming=1&backend=webgl2&vectorStyle=streets&imagery=world&terrain=terrarium&lon=9.19&lat=45.465&zoom=15&tilt=45',
   // ADR 0005: the fragment depth path may cost at most 1.25 times the clip-control path in GPU time.
   'drag-400-webgl2-fragment': '?scenario=drag&gpuTiming=1&backend=webgl2&depth=fragment&zoom=3&level=5',
 };
@@ -55,11 +63,54 @@ interface PlaygroundHooks {
     rendererStats(): { drawCalls: number };
     imageryStats():
       { ready: number; requested: number; failed: number; gpuBytes: number; ramBytes: number } | undefined;
+    diagnostics: {
+      setPhaseTiming(enabled: boolean, userTiming?: boolean): void;
+      phaseTimesMs(): Record<string, number>;
+    };
+    on(type: 'frame', listener: () => void): () => void;
   };
   cpuFrameTimesMs(): number[];
   gpuFrameTimesMs(): number[];
   resetCpuSamples(): void;
   firstFrameMs: number | undefined;
+}
+
+/**
+ * Runs in the page: samples `durationMs` of animation frames with the CPU and GPU times the playground records and the
+ * median of the engine's phase times per frame (without User Timing marks), which show where a frame's CPU time goes.
+ */
+async function samplePage(durationMs: number) {
+  const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
+  hooks.resetCpuSamples();
+  const diagnostics = hooks.globe.diagnostics;
+  diagnostics.setPhaseTiming(true, false);
+  const phases: Record<string, number>[] = [];
+  const stopPhases = hooks.globe.on('frame', () => phases.push({ ...diagnostics.phaseTimesMs() }));
+  const timestamps: number[] = [];
+  await new Promise<void>((done) => {
+    const start = performance.now();
+    const tick = (time: number): void => {
+      timestamps.push(time);
+      if (time - start < durationMs) requestAnimationFrame(tick);
+      else done();
+    };
+    requestAnimationFrame(tick);
+  });
+  stopPhases();
+  diagnostics.setPhaseTiming(false);
+  const median = (values: number[]): number => [...values].sort((a, b) => a - b)[values.length >> 1] ?? 0;
+  const phaseMedianMs = Object.fromEntries(
+    Object.keys(phases[0] ?? {}).map((phase) => [phase, median(phases.map((frame) => frame[phase] ?? 0))]),
+  );
+  const frameTimesMs = timestamps.slice(1).map((time, index) => time - (timestamps[index] as number));
+  return {
+    frameTimesMs,
+    cpuFrameMs: hooks.cpuFrameTimesMs(),
+    gpuFrameMs: hooks.gpuFrameTimesMs(),
+    drawCalls: hooks.globe.rendererStats().drawCalls,
+    imagery: hooks.globe.imageryStats() ?? null,
+    phaseMedianMs,
+  };
 }
 
 async function measureRun(browser: Browser, url: string): Promise<RunResult> {
@@ -76,32 +127,11 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
       () => (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground.firstFrameMs ?? null,
     );
     await page.waitForTimeout(DISCARD_MS);
-    const sample = await page.evaluate(async (durationMs) => {
-      const hooks = (window as unknown as { vibeglobePlayground: PlaygroundHooks }).vibeglobePlayground;
-      hooks.resetCpuSamples();
-      const timestamps: number[] = [];
-      await new Promise<void>((done) => {
-        const start = performance.now();
-        const tick = (time: number): void => {
-          timestamps.push(time);
-          if (time - start < durationMs) requestAnimationFrame(tick);
-          else done();
-        };
-        requestAnimationFrame(tick);
-      });
-      const frameTimesMs = timestamps.slice(1).map((time, index) => time - (timestamps[index] as number));
-      return {
-        frameTimesMs,
-        cpuFrameMs: hooks.cpuFrameTimesMs(),
-        gpuFrameMs: hooks.gpuFrameTimesMs(),
-        drawCalls: hooks.globe.rendererStats().drawCalls,
-        imagery: hooks.globe.imageryStats() ?? null,
-      };
-    }, SAMPLE_MS);
+    const sample = await page.evaluate(samplePage, SAMPLE_MS);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('HeapProfiler.collectGarbage');
     const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
-    return summarizeRun(
+    const run = summarizeRun(
       sample.frameTimesMs,
       sample.cpuFrameMs,
       usedSize,
@@ -116,6 +146,7 @@ async function measureRun(browser: Browser, url: string): Promise<RunResult> {
         ramMB: sample.imagery.ramBytes / 1048576,
       },
     );
+    return { ...run, phaseMedianMs: sample.phaseMedianMs };
   } finally {
     await page.close();
   }

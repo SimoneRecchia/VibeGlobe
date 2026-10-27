@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { TileCoord, TileRectangleRad, TilingScheme } from '@vibeglobe/core';
 
 /** A box in degrees. */
@@ -94,7 +96,8 @@ export function* tilesOfArea(
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   for (let level = minLevel; level <= maxLevel; level++) {
     const nw = { ...tiling.tileAt(box.westDeg * DEG, box.northDeg * DEG, level, corner) };
-    const se = { ...tiling.tileAt(box.eastDeg * DEG, box.southDeg * DEG, level, corner) };
+    // A box reaching the antimeridian ends in the last column: 180° itself wraps around to the first (KB-198).
+    const se = { ...tiling.tileAt(Math.min(box.eastDeg, 180 - 1e-9) * DEG, box.southDeg * DEG, level, corner) };
     for (let y = nw.y; y <= se.y; y++) {
       for (let x = nw.x; x <= se.x; x++) {
         const coord: TileCoord = { root: nw.root, level, x, y };

@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/layers",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe layers: data layers: primitives, labels, styling, picking and draping.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -32,14 +32,22 @@
       "default": "./dist/cluster-worker.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
     "@maplibre/maplibre-gl-style-spec": "26.4.4",
-    "@vibeglobe/core": "0.0.0",
-    "@vibeglobe/sources": "0.0.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/sources": "0.1.0",
     "earcut": "3.2.4",
     "pbf": "5.1.2",
     "rbush": "4.0.1",

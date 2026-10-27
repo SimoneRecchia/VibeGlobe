@@ -1,8 +1,8 @@
 {
   "name": "@vibeglobe/renderer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "VibeGlobe renderer: renderer backend: WebGPU with automatic WebGL2 fallback, shaders, GPU resource management.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -15,18 +15,43 @@
       "types": "./dist/gltf.d.ts",
       "source": "./src/gltf.ts",
       "default": "./dist/gltf.js"
+    },
+    "./vector-tiles": {
+      "types": "./dist/vector-tiles/index.d.ts",
+      "source": "./src/vector-tiles/index.ts",
+      "default": "./dist/vector-tiles/index.js"
+    },
+    "./tiles3d": {
+      "types": "./dist/tiles3d/index.d.ts",
+      "source": "./src/tiles3d/index.ts",
+      "default": "./dist/tiles3d/index.js"
+    },
+    "./starfield": {
+      "types": "./dist/starfield/index.d.ts",
+      "source": "./src/starfield/index.ts",
+      "default": "./dist/starfield/index.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.0.0",
+    "@types/three": "0.186.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/models": "0.1.0",
     "earcut": "3.2.4",
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@types/three": "0.186.0"
+    "@vibeglobe/sources": "0.1.0"
   }
 }

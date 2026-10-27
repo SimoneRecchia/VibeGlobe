@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Which OpenStreetMap objects become vector-tile features (F341): roads, places and buildings, each with the lowest
  * zoom at which it appears and the attributes the engine uses (building height and levels where present).
@@ -69,23 +71,30 @@ function named(
   return properties;
 }
 
-/** The place feature of a node, if it is one. */
-export function placeFeature(node: OsmNode): VectorFeature | undefined {
+/** The place feature of a node, if it is one and shows by `maxZoom`. */
+export function placeFeature(node: OsmNode, maxZoom = Infinity): VectorFeature | undefined {
   const place = node.tags['place'];
   const minZoom = place === undefined ? undefined : PLACE_MIN_ZOOM[place];
-  if (minZoom === undefined) return undefined;
+  if (minZoom === undefined || minZoom > maxZoom) return undefined;
   const properties = named(node.tags, { class: place ?? '' });
   const population = Number(node.tags['population']);
   if (Number.isFinite(population) && population > 0) properties['population'] = population;
   return { id: node.id, layer: 'places', type: 'point', coordinates: [[node.lon, node.lat]], properties, minZoom };
 }
 
-/** Whether a way can become a feature (decides which nodes must be kept). */
-export function wantedWay(way: OsmWay): boolean {
+/**
+ * Whether a way can become a feature that shows by `maxZoom` (decides which nodes must be kept): a world build to
+ * zoom 6 reads no building or street (DP-003).
+ */
+export function wantedWay(way: OsmWay, maxZoom = Infinity): boolean {
   const highway = way.tags['highway'];
-  if (highway !== undefined && ROAD_MIN_ZOOM[highway] !== undefined && way.tags['area'] !== 'yes') return true;
+  const roadZoom = highway === undefined ? undefined : ROAD_MIN_ZOOM[highway];
+  if (roadZoom !== undefined && way.tags['area'] !== 'yes') return roadZoom <= maxZoom;
   return (
-    way.tags['building'] !== undefined && way.tags['building'] !== 'no' && way.refs[0] === way.refs[way.refs.length - 1]
+    BUILDING_MIN_ZOOM <= maxZoom &&
+    way.tags['building'] !== undefined &&
+    way.tags['building'] !== 'no' &&
+    way.refs[0] === way.refs[way.refs.length - 1]
   );
 }
 

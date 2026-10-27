@@ -50,6 +50,24 @@
       "path": "./packages/offline/tsconfig.test.json"
     },
     {
+      "path": "./packages/quality"
+    },
+    {
+      "path": "./packages/quality/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/presets"
+    },
+    {
+      "path": "./packages/presets/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/models"
+    },
+    {
+      "path": "./packages/models/tsconfig.test.json"
+    },
+    {
       "path": "./packages/ui"
     },
     {
@@ -72,18 +90,6 @@
     },
     {
       "path": "./packages/web-component/tsconfig.test.json"
-    },
-    {
-      "path": "./packages/models"
-    },
-    {
-      "path": "./packages/models/tsconfig.test.json"
-    },
-    {
-      "path": "./packages/quality"
-    },
-    {
-      "path": "./packages/quality/tsconfig.test.json"
     },
     {
       "path": "./packages/tools"

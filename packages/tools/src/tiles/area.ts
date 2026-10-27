@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Areas a build or package covers (a bounding box or a polygon) and the exact tile sets they select. */
 import {
   type BBoxDeg,
@@ -37,7 +39,7 @@ export function polygonArea(rings: Ring[]): Area {
 }
 
 /** A ring in fractional tile coordinates of zoom `z`. */
-function ringToTileSpace(ring: Ring, z: number): Ring {
+export function ringToTileSpace(ring: Ring, z: number): Ring {
   return ring.map(([lon, lat]) => [snapToTileEdge(lonToTileX(lon, z)), snapToTileEdge(latToTileY(lat, z))]);
 }
 
@@ -67,7 +69,7 @@ function segmentHitsSquare(a: [number, number], b: [number, number], x: number, 
 }
 
 /** Marks every tile whose open square an edge of the rings crosses. */
-function edgeTiles(rings: Ring[], range: TileRange, marked: Set<number>, width: number): void {
+export function edgeTiles(rings: Ring[], range: TileRange, mark: (x: number, y: number) => void): void {
   for (const ring of rings) {
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
       const a = ring[j] as [number, number];
@@ -77,14 +79,14 @@ function edgeTiles(rings: Ring[], range: TileRange, marked: Set<number>, width: 
       const y0 = Math.max(range.minY, Math.floor(Math.min(a[1], b[1])));
       const y1 = Math.min(range.maxY, Math.ceil(Math.max(a[1], b[1])) - 1);
       for (let y = y0; y <= y1; y++) {
-        for (let x = x0; x <= x1; x++) if (segmentHitsSquare(a, b, x, y)) marked.add(y * width + x);
+        for (let x = x0; x <= x1; x++) if (segmentHitsSquare(a, b, x, y)) mark(x, y);
       }
     }
   }
 }
 
 /** Marks every tile whose center lies inside the rings (even-odd), row by row. */
-function interiorTiles(rings: Ring[], range: TileRange, marked: Set<number>, width: number): void {
+export function interiorTiles(rings: Ring[], range: TileRange, mark: (x: number, y: number) => void): void {
   for (let y = range.minY; y <= range.maxY; y++) {
     const py = y + 0.5;
     const crossings: number[] = [];
@@ -99,7 +101,7 @@ function interiorTiles(rings: Ring[], range: TileRange, marked: Set<number>, wid
     for (let k = 0; k + 1 < crossings.length; k += 2) {
       const from = Math.max(range.minX, Math.ceil((crossings[k] ?? 0) - 0.5));
       const to = Math.min(range.maxX, Math.floor((crossings[k + 1] ?? 0) - 0.5));
-      for (let x = from; x <= to; x++) marked.add(y * width + x);
+      for (let x = from; x <= to; x++) mark(x, y);
     }
   }
 }
@@ -117,8 +119,9 @@ export function* areaTiles(area: Area, z: number): Generator<TileCoord> {
   const rings = area.rings.map((ring) => ringToTileSpace(ring, z));
   const width = 2 ** z;
   const marked = new Set<number>();
-  edgeTiles(rings, range, marked, width);
-  interiorTiles(rings, range, marked, width);
+  const mark = (x: number, y: number): void => void marked.add(y * width + x);
+  edgeTiles(rings, range, mark);
+  interiorTiles(rings, range, mark);
   for (const key of [...marked].sort((p, q) => p - q)) yield { z, x: key % width, y: Math.floor(key / width) };
 }
 

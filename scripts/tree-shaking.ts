@@ -5,7 +5,11 @@ import { ROOT_DIR } from './workspace.ts';
 
 const CASES = [
   { importName: 'WGS84', from: '@vibeglobe/core', needs: ['packages/core/dist/geodesy/wgs84.js'] },
-  { importName: 'FrameStats', from: '@vibeglobe/core', needs: ['packages/core/dist/diagnostics/frame-stats.js'] },
+  {
+    importName: 'FrameStats',
+    from: '@vibeglobe/core/diagnostics',
+    needs: ['packages/core/dist/diagnostics/frame-stats.js'],
+  },
   {
     importName: 'createDebugOverlay',
     from: '@vibeglobe/ui',

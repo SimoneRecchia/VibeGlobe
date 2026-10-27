@@ -1,0 +1,18 @@
+
+> vibeglobe@0.0.0 bench:offscreen
+> node benchmarks/offscreen.ts --browser webkit --hardware
+
+{"backend":"webgpu","mode":"main","load":false,"frames":599,"frameIntervalP50Ms":17,"frameIntervalP95Ms":18,"inputs":48031,"inputLatencyP50Ms":8,"inputLatencyP95Ms":16}
+{"backend":"webgpu","mode":"main","load":true,"frames":533,"frameIntervalP50Ms":17,"frameIntervalP95Ms":42,"inputs":34111,"inputLatencyP50Ms":9,"inputLatencyP95Ms":35}
+{"backend":"webgpu","mode":"main","load":false,"screenshots":15,"misalignmentP50Px":0.39,"misalignmentMaxPx":0.71}
+{"backend":"webgpu","mode":"worker","load":false,"frames":666,"frameIntervalP50Ms":15,"frameIntervalP95Ms":16,"inputs":49550,"inputLatencyP50Ms":7,"inputLatencyP95Ms":14}
+{"backend":"webgpu","mode":"worker","load":true,"frames":588,"frameIntervalP50Ms":16,"frameIntervalP95Ms":29,"inputs":34966,"inputLatencyP50Ms":8,"inputLatencyP95Ms":15}
+{"backend":"webgpu","mode":"worker","load":false,"screenshots":15,"misalignmentP50Px":0.35,"misalignmentMaxPx":0.71}
+{"backend":"webgl2","mode":"main","load":false,"frames":600,"frameIntervalP50Ms":17,"frameIntervalP95Ms":18,"inputs":47913,"inputLatencyP50Ms":8,"inputLatencyP95Ms":16}
+{"backend":"webgl2","mode":"main","load":true,"frames":600,"frameIntervalP50Ms":16,"frameIntervalP95Ms":41,"inputs":32586,"inputLatencyP50Ms":9,"inputLatencyP95Ms":35}
+{"backend":"webgl2","mode":"main","load":false,"screenshots":15,"misalignmentP50Px":0.27,"misalignmentMaxPx":0.71}
+{"backend":"webgl2","mode":"worker","load":false,"frames":665,"frameIntervalP50Ms":15,"frameIntervalP95Ms":16,"inputs":49068,"inputLatencyP50Ms":8,"inputLatencyP95Ms":15}
+{"backend":"webgl2","mode":"worker","load":true,"frames":584,"frameIntervalP50Ms":15,"frameIntervalP95Ms":28,"inputs":35010,"inputLatencyP50Ms":8,"inputLatencyP95Ms":15}
+{"backend":"webgl2","mode":"worker","load":false,"screenshots":15,"misalignmentP50Px":0.5,"misalignmentMaxPx":73.85}
+Results: /Users/s1imone/WebstormProjects/VibeGlobe/benchmarks/results/macbook-apple-m5-macos-26-6-2/offscreen-2026-10-24T23-29-25-177Z.json
+

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Credit } from '@vibeglobe/core';
 
 /** Inline declarations that page CSS cannot override (inline `!important` wins over any stylesheet rule). */
@@ -155,7 +157,10 @@ function creditNode(document: Document, credit: Credit): HTMLElement {
     const logo = document.createElement('img');
     logo.src = credit.logo.src;
     logo.alt = credit.logo.alt;
-    logo.style.height = '14px';
+    // A provider logo at the size and clear space Google's attribution policy asks for (16–19 px high, 10 px clear
+    // left, right and top, 5 px below; ADR 0031), which suit every logo.
+    logo.style.height = '16px';
+    logo.style.margin = '10px 10px 5px';
     logo.style.verticalAlign = 'middle';
     pinItem(logo, 'inline-block');
     item.append(logo);

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   GlobeError,
   IntegerKeyMap,
@@ -7,6 +9,8 @@ import {
   type RendererBackend,
   type FrameCapture,
   type RendererCapabilities,
+  type RendererQuality,
+  type AtmosphereSettings,
   type RendererEvents,
   type RendererStats,
   type RenderHost,
@@ -25,15 +29,21 @@ import { LayerBatches } from './layer-batches.js';
 import { createTileMesh } from './tile-mesh.js';
 import { countVertexArrays, releaseVertexArraysWithBuffers, useFloatMultisampledDepth } from './webgl-compat.js';
 import { patchIdentitySwizzle } from './webgpu-compat.js';
-import { chooseWebGPU, decodeBitmap } from './environment.js';
+import { chooseWebGPU, decodeBitmap, surfaceScope } from './environment.js';
 import * as surface from './surface-material.js';
 import { createBaseTexture, TileTextures } from './tile-textures.js';
 import { depthPathOf, useFloatSceneDepth } from './depth.js';
 import { placeTile } from './eye-relative.js';
 import { EngineCamera } from './engine-camera.js';
-import { countCalls, countMatrixUpdates, PipelineSwitches, readGpuTime, stopInternalLoop } from './three-hooks.js';
+import { stopInternalLoop } from './three-hooks.js';
+import { BackendCounters } from './backend-counters.js';
 import { warmUpPipelines, webgpuSelfTest } from './warm-up.js';
 import { releaseMesh } from './release-mesh.js';
+import { SceneAtmosphere } from './atmosphere/scene-atmosphere.js';
+import { Antialiasing } from './antialiasing.js';
+import type { BackendSettings } from './backend-settings.js';
+
+export type { BackendSettings } from './backend-settings.js';
 import {
   RecoveryLimiter,
   createFailureMessage,
@@ -59,16 +69,6 @@ export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
  * uses hardware reversed-Z.
  */
 export type DepthChoice = 'auto' | 'fragment';
-
-/** How a backend is set up: the {@link RendererOptions} it uses. */
-export interface BackendSettings {
-  readonly choice: BackendChoice;
-  readonly depth: DepthChoice;
-  /** Measures each frame's GPU time with timestamp queries where the device offers them (benchmarks only). */
-  readonly gpuTiming: boolean;
-  /** The compressed families KTX2 imagery may use, among the device's; undefined for all of them. */
-  readonly compressedTextures: readonly string[] | undefined;
-}
 
 /**
  * Where the backend draws (ADR 0011): a canvas it manages inside a page container (an existing one, or one it
@@ -99,24 +99,20 @@ export class ThreeBackend implements RendererBackend {
   readonly models = this.layers.models;
   /** Subsystems added from outside the core loop (`Globe.addRenderExtension`, M13). */
   readonly extensions = new RenderExtensions({ scene: this.scene, depthPath: () => this.depthPath });
-  private textureUploads = 0;
-  private meshUploads = 0;
-  private matrixUpdates = 0;
-  private pipelineCompiles = 0;
-  private pipelineSwitches: PipelineSwitches | undefined;
+  /** Sky, haze and sun lighting while the quality's atmosphere level is not 'off' (ADR 0040). */
+  private readonly atmosphere = new SceneAtmosphere(this.scene);
+  /** Anisotropic filtering of imagery tiles (F398), at most the device's. */
+  private anisotropy: number | undefined;
+  private readonly counters = new BackendCounters();
   /** Why WebGPU failed its start-up self-test, after which this backend uses WebGL2 (ADR 0010 §2). */
   private webgpuFailure: string | undefined;
-  private lastDrawCalls = 0;
-  private lastTriangles = 0;
-  /** GPU time of the last frame measured, with the `gpuTiming` option and timestamp queries; null otherwise. */
-  private gpuFrameMs: number | null = null;
   private beginFrame: () => void = () => undefined;
   /** Meshes shown by the last frame, reused across frames. */
   private readonly shown: (Mesh | undefined)[] = [];
   private shownCount = 0;
   private material: MeshBasicNodeMaterial | undefined;
   private imageryTexture: Texture | undefined;
-  private readonly tileTextures = new TileTextures(() => this.capabilities.maxAnisotropy);
+  private readonly tileTextures = new TileTextures(() => this.anisotropy ?? this.capabilities.maxAnisotropy);
   private imagery: ImageBitmap | undefined;
   private size = { widthPx: 1, heightPx: 1, pixelRatio: 1 };
   private destroyed = false;
@@ -132,6 +128,8 @@ export class ThreeBackend implements RendererBackend {
   private lossWatch: LossWatch = { held: () => false, stop: () => undefined };
   /** The active depth path (ADR 0005 §4). */
   private depthPath: DepthPath = 'reversed-z';
+  /** Multisampling or the FXAA pass (KB-140). */
+  private readonly antialiasing = new Antialiasing();
 
   private constructor(
     private readonly surface: DrawingSurface,
@@ -161,15 +159,8 @@ export class ThreeBackend implements RendererBackend {
     return this.canvases.inputElement;
   }
 
-  /** The global scope the canvas lives in: the page's window, or the worker's global scope. */
-  private scope(): typeof globalThis {
-    return this.surface.kind === 'element'
-      ? ((this.surface.container.ownerDocument.defaultView ?? globalThis) as typeof globalThis)
-      : globalThis;
-  }
-
   private async initRenderer(): Promise<void> {
-    const scope = this.scope();
+    const scope = surfaceScope(this.surface);
     const choice = this.webgpuFailure === undefined ? this.settings.choice : 'webgl2';
     const webgpu = await chooseWebGPU(scope, this.surface, choice);
     const forceWebGL = !webgpu;
@@ -182,7 +173,7 @@ export class ThreeBackend implements RendererBackend {
     const canvas = this.canvases.next(webgpu);
     const renderer = new WebGPURenderer({
       canvas: canvas as HTMLCanvasElement,
-      antialias: true,
+      antialias: this.settings.antialias,
       // three.js turns this off on WebGL2 without EXT_clip_control; the engine then writes depth itself.
       reversedDepthBuffer: webgpu || this.settings.depth === 'auto',
       forceWebGL,
@@ -219,9 +210,7 @@ export class ThreeBackend implements RendererBackend {
       throw new GlobeError('unsupported-device', 'WebGPU was requested, but it failed to initialize.');
     }
     if (fellBack) this.events.backendFallback('WebGPU initialization failed; using WebGL2');
-    countCalls(renderer.backend, 'updateTexture', () => this.textureUploads++);
-    countCalls(renderer.backend, 'createRenderPipeline', () => this.pipelineCompiles++);
-    this.pipelineSwitches = new PipelineSwitches(renderer.backend);
+    this.counters.watch(renderer);
     this.renderer = renderer;
     this.capabilities = readCapabilities(renderer, sceneDepth, this.settings.compressedTextures);
     renderer.setPixelRatio(this.size.pixelRatio);
@@ -257,9 +246,8 @@ export class ThreeBackend implements RendererBackend {
 
   private entryFor(data: TileMeshData): TileEntry {
     const mesh = createTileMesh(data, this.material);
-    countMatrixUpdates(mesh, () => this.matrixUpdates++);
+    this.counters.meshAdded(mesh);
     this.scene.add(mesh);
-    this.meshUploads++;
     return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 
@@ -271,19 +259,7 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Cumulative counters (F052). */
-  stats(): RendererStats {
-    return {
-      drawCalls: this.lastDrawCalls,
-      triangles: this.lastTriangles,
-      textureUploads: this.textureUploads,
-      meshUploads: this.meshUploads,
-      matrixUpdates: this.matrixUpdates,
-      pipelineCompiles: this.pipelineCompiles,
-      pipelineSwitches: this.pipelineSwitches?.count ?? 0,
-      compressedTextures: this.tileTextures.compressedCount,
-      gpuFrameMs: this.gpuFrameMs,
-    };
-  }
+  readonly stats = (): RendererStats => this.counters.stats(this.tileTextures.compressedCount);
 
   /** Releases a surface tile mesh. */
   removeMesh(key: number): void {
@@ -318,18 +294,22 @@ export class ThreeBackend implements RendererBackend {
   }
 
   /** Compiles the surface pipelines before the first frame (ADR 0010 §4); `pipelineCompiles` counts from here. */
-  private async warmUpPipelines(): Promise<void> {
-    if (this.material) await warmUpPipelines(this.renderer, [this.material]);
-    this.pipelineCompiles = 0;
+  private async warmUpPipelines(material = this.material): Promise<void> {
+    const sky = this.atmosphere.skyMaterial;
+    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material]);
+    this.counters.resetCompiles();
   }
 
   private createImageryResources(): void {
     if (!this.imagery) return;
-    const texture = createBaseTexture(this.imagery, this.capabilities.maxAnisotropy);
+    const texture = createBaseTexture(this.imagery, this.anisotropy ?? this.capabilities.maxAnisotropy);
     this.imageryTexture?.dispose();
-    this.imageryTexture = texture;
+    // The polar caps' fills are sampled like the base image (KB-211).
+    this.imageryTexture = this.tileTextures.caps.rebuild(texture, this.renderer);
     this.material?.dispose();
-    this.material = surface.createSurfaceMaterial(texture, this.depthPath);
+    // A new renderer may have another depth path: the atmosphere is built again with the material it shades.
+    this.atmosphere.rebuild(this.depthPath);
+    this.material = surface.createSurfaceMaterial(texture, this.depthPath, this.atmosphere.current);
     const material = this.material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
   }
@@ -344,6 +324,7 @@ export class ThreeBackend implements RendererBackend {
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
+    this.tileTextures.tones.frame(draws, this.tileTextures.imageOf);
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
       if (!entry) continue;
@@ -357,13 +338,11 @@ export class ThreeBackend implements RendererBackend {
     this.layers.place(view);
     this.extensions.frame(view);
     this.camera.apply(view, this.depthPath);
+    this.atmosphere.update(view);
     this.beginFrame();
-    this.pipelineSwitches?.begin();
-    this.renderer.render(this.scene, this.camera);
-    if (this.settings.gpuTiming) readGpuTime(this.renderer, (ms) => (this.gpuFrameMs = ms));
-    const info = this.renderer.info.render as { drawCalls?: number; calls?: number; triangles: number };
-    this.lastDrawCalls = info.drawCalls ?? info.calls ?? 0;
-    this.lastTriangles = info.triangles;
+    this.counters.beforeRender();
+    this.antialiasing.render(this.renderer, this.scene, this.camera);
+    this.counters.afterRender(this.renderer, this.settings.gpuTiming);
     return true;
   }
 
@@ -391,6 +370,44 @@ export class ThreeBackend implements RendererBackend {
   /** The frame just drawn, read from the canvas in the calling task (ADR 0012, Capture). */
   readonly capture = (): Promise<FrameCapture> => captureCanvas(this.canvases.drawingCanvas);
 
+  /**
+   * Applies the effects of the engine's quality settings (F398, F399, KB-140): anisotropy, the atmosphere level and the
+   * anti-aliasing.
+   */
+  setQuality(quality: RendererQuality): Promise<void> | undefined {
+    this.anisotropy = quality.anisotropy;
+    if (!this.destroyed) this.tileTextures.refilter(this.renderer, this.imageryTexture);
+    const atmosphereChanged = this.atmosphere.setQuality(quality, this.depthPath);
+    if (this.destroyed || this.failed) return undefined;
+    this.antialiasing.set(quality.antialias);
+    // A recovering backend loads the pass with its new renderer; the atmosphere appearing or going away rebuilds the
+    // surface material that it shades.
+    const pass = this.recovering ? undefined : this.antialiasing.prepare(this.renderer, this.scene, this.camera);
+    const material = atmosphereChanged && this.imageryTexture ? this.swapMaterial(this.imageryTexture) : undefined;
+    return pass || material ? Promise.all([pass, material]).then(() => undefined) : undefined;
+  }
+
+  /**
+   * Replaces the surface material once the new one is compiled: until then the frames keep the old one, since a
+   * material whose pipeline is still compiling is skipped and the globe would vanish for a frame (F399).
+   */
+  private async swapMaterial(texture: Texture): Promise<void> {
+    const material = surface.createSurfaceMaterial(texture, this.depthPath, this.atmosphere.current);
+    await this.warmUpPipelines(material);
+    if (this.destroyed || this.imageryTexture !== texture) return material.dispose();
+    this.material?.dispose();
+    this.material = material;
+    this.tiles.forEach((entry) => (entry.mesh.material = material));
+  }
+
+  /** The polar caps' fill colors (KB-211), `#rrggbb`, from the next frame. */
+  readonly setPolarCapColors = (n: string, s: string): void => this.tileTextures.caps.setColors(n, s);
+
+  /** The atmosphere's sun lighting, time and haze (F394, F396): uniforms only. */
+  setAtmosphere(settings: Required<AtmosphereSettings>): void {
+    this.atmosphere.setSky(settings);
+  }
+
   /** Test hook: destroys the WebGPU device or loses the WebGL2 context. */
   readonly simulateDeviceLoss = (): void => releaseDevice(this.renderer.backend);
 
@@ -415,6 +432,7 @@ export class ThreeBackend implements RendererBackend {
 
   private async recover(delayMs: number): Promise<void> {
     try {
+      this.antialiasing.release();
       this.renderer.dispose();
       this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
       this.tileTextures.disposeTextures();
@@ -433,6 +451,7 @@ export class ThreeBackend implements RendererBackend {
         return;
       }
       this.setDebugMeshes(this.debugEntries.map((entry) => entry.data));
+      await this.antialiasing.prepare(this.renderer, this.scene, this.camera);
       this.canvases.attach();
       this.recovering = false;
       this.events.deviceRestored();
@@ -488,6 +507,7 @@ export class ThreeBackend implements RendererBackend {
     this.setDebugMeshes([]);
     this.layers.dispose();
     this.extensions.dispose();
+    this.atmosphere.dispose();
     this.material?.dispose();
     this.material = undefined;
     this.imageryTexture?.dispose();

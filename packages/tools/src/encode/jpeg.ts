@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A baseline JPEG encoder written from ITU-T T.81: YCbCr 4:4:4, the Annex K example quantization tables scaled by
  * quality, and the Annex K example Huffman tables. Deterministic for a given input and quality.

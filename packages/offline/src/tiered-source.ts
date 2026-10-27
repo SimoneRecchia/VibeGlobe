@@ -1,4 +1,14 @@
-import type { AbortHandle, TileSource, TileCoord, TileRequest, TimeoutsMs, TransportResult } from '@vibeglobe/core';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type {
+  AbortHandle,
+  Attribution,
+  TileSource,
+  TileCoord,
+  TileRequest,
+  TimeoutsMs,
+  TransportResult,
+} from '@vibeglobe/core';
 import { freshnessOf, type SourceCachePolicy } from './cache-policy.js';
 import { endpointOf } from './connectivity.js';
 import { fetchTile, type FetchOutcome } from './network-fetch.js';
@@ -23,16 +33,22 @@ export interface TierContext {
   };
   readPackage(sourceId: string, coord: TileCoord, signal: AbortSignal): Promise<PackageTile | undefined>;
   /** Makes an endpoint known to the health checks, with a tile URL it serves (a source may spread tiles over hosts). */
-  addEndpoint(endpoint: string, probeUrl: string): void;
+  addEndpoint(sourceId: string, endpoint: string, probeUrl: string): void;
   /** False while the endpoint is known to be unreachable. */
   reachable(endpoint: string): boolean;
   reportSuccess(endpoint: string): void;
   reportFailure(endpoint: string): void;
-  /** Resolves when connectivity or the mode changes, or after `maxMs`. */
-  waitForChange(maxMs: number): Promise<void>;
-  /** True in offline-only mode. */
-  offlineOnly(): boolean;
+  /** Resolves when connectivity or the mode changes, after a check of `endpoint` when given, or after `maxMs`. */
+  waitForChange(maxMs: number, endpoint?: string): Promise<void>;
+  /** The longest a triggered health check takes to finish, its wait for the least interval between checks included. */
+  readonly longestCheckMs: number;
+  /** True where offline-only mode is in effect for the source in its layer. */
+  offlineOnly(sourceId: string, layerId: string): boolean;
+  /** Counts changes of connectivity, mode or switches: a miss is worth retrying only after one (KB-190). */
+  changes(): number;
   count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
+  /** The credit a package's tiles of a source carry (F306, KB-189): one object per package and source, or none. */
+  packageCredit(sourceId: string, packageId: string): Attribution | undefined;
   readonly fetch: typeof fetch;
 }
 
@@ -50,10 +66,31 @@ export interface TieredSourceOptions {
    * is unchanged. Default: conditional on the page's own origin, refetch elsewhere.
    */
   readonly revalidation?: 'conditional' | 'refetch';
+  /**
+   * Which tiers serve the source on top of the persistent cache: `all` (default), `package` (offline packages only, never
+   * the network: the offline stand-in of a layer, from its own provider) or `network` (never the packages). The mode
+   * still applies: a package-only source draws nothing in online-only mode, a network-only one nothing offline.
+   */
+  readonly tiers?: 'all' | 'package' | 'network';
+}
+
+/** The policy's decision for a source restricted to its tiers. */
+function withinTiers(decision: PolicyDecision, tiers: TieredSourceOptions['tiers']): PolicyDecision {
+  if (tiers === 'package') return { ...decision, useNetwork: false };
+  if (tiers === 'network') return { ...decision, readPackages: false };
+  return decision;
 }
 
 /** How long a tile that cannot be loaded while offline is held before the engine is told to ask again. */
 const OFFLINE_HOLD_MS = 500;
+/**
+ * How long a tile asked for again with nothing changed since its last miss is held: a change of connectivity or mode
+ * hands it back at once, so this only bounds a request nothing wakes. Handing it back every 500 ms kept the engine
+ * asking for the whole outage (KB-190).
+ */
+const REPEATED_MISS_HOLD_MS = 60_000;
+/** Misses remembered per source; more are forgotten, at worst costing one more short hold each. */
+const MAX_REMEMBERED_MISSES = 4096;
 
 /** The cache key of a tile of a source. */
 export function tileKey(sourceId: string, coord: TileCoord): string {
@@ -63,8 +100,8 @@ export function tileKey(sourceId: string, coord: TileCoord): string {
 
 const FAILED_NETWORK: TransportResult = { kind: 'network-error' };
 const FAILED_TIMEOUT: TransportResult = { kind: 'timeout' };
-/** How long a failed download waits for the health check it triggered before the failure counts. */
-const CHECK_WAIT_MS = 3000;
+/** How long a failed download waits beyond the health check's time limit before the failure counts (M8 #5a). */
+const CHECK_MARGIN_MS = 1000;
 
 const NO_HEADERS = { cacheControl: null, expires: null, date: null, etag: null, lastModified: null };
 
@@ -80,11 +117,11 @@ let wrapperCount = 0;
  * own GPU and RAM tiers sit above, unchanged. The source keeps its id, levels and coverage.
  */
 export function tieredSource(source: TileSource, context: TierContext, options: TieredSourceOptions = {}): TileSource {
-  const prefix = `vibeglobe-tile:${++wrapperCount}/`;
+  const wrapper = ++wrapperCount;
   const layerId = options.layerId ?? source.id;
   const scratch: TileRequest = { url: '', hostIndex: 0 };
   const coordOf = (url: string): TileCoord | undefined => {
-    const [root, level, x, y] = url.slice(prefix.length).split('/').map(Number);
+    const [root, level, x, y] = url.split('/').slice(-4).map(Number);
     if (level === undefined || x === undefined || y === undefined || (root !== 0 && root !== 1 && root !== 2))
       return undefined;
     return { root, level, x, y };
@@ -96,6 +133,7 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
     // F290): 1 keeps tiles in memory, 2 prefetches (`LOAD_KEEP_IN_MEMORY`, `LOAD_PREFETCH` of `@vibeglobe/core`).
     loadingFlags: () =>
       (context.decide(source.id, layerId).keepInMemory ? 1 : 0) | (context.prefetch(source.id, layerId) ? 2 : 0),
+    heldRequests: () => loader.held,
     transport: {
       start(request: TileRequest, timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
         const coord = coordOf(request.url);
@@ -108,14 +146,23 @@ export function tieredSource(source: TileSource, context: TierContext, options: 
       },
     },
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' | 'unknown' {
-      if (source.request(coord, out) === 'noData') return 'noData';
-      out.url = `${prefix}${coord.root}/${coord.level}/${coord.x}/${coord.y}`;
+      // Availability not known yet stays unknown: a request now would read as no data for good (KB-157).
+      const real = source.request(coord, out);
+      if (real === 'noData' || real === 'unknown') return real;
+      // The tile's own host, so the engine keeps each host's request limits for the wrapped source too (KB-156).
+      const host = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(real.url)?.[1] ?? 'local';
+      out.url = `vibeglobe-tile://${host}/${String(wrapper)}/${coord.root}/${coord.level}/${coord.x}/${coord.y}`;
       return out;
     },
   };
 }
 
 class TileLoader {
+  /** Requests held until a change of connectivity, mode or switches (KB-194). */
+  held = 0;
+  /** The change count at each tile's last miss, by tile key (KB-190). */
+  private readonly misses = new Map<string, number>();
+
   constructor(
     private readonly source: TileSource,
     private readonly context: TierContext,
@@ -148,7 +195,7 @@ class TileLoader {
     signal: AbortSignal,
   ): Promise<TransportResult> {
     const id = this.source.id;
-    const decision = this.context.decide(id, this.layerId);
+    const decision = withinTiers(this.context.decide(id, this.layerId), this.options.tiers);
     const key = tileKey(id, coord);
     const stored = decision.readPersistentCache ? await this.context.store.get(key).catch(() => undefined) : undefined;
     // A request the engine aborted meanwhile delivers nothing, so no tier counts it (TB-03).
@@ -162,11 +209,19 @@ class TileLoader {
       if (signal.aborted) return ABORTED;
       if (tile) {
         this.context.count(id, 'package', coord, tile.packageId);
-        return { kind: 'ok', bytes: tile.bytes, contentType: tile.contentType, cached: true };
+        // The package's credit is listed while this tile is drawn, and no longer (F306, KB-189).
+        const attribution = this.context.packageCredit(id, tile.packageId);
+        return {
+          kind: 'ok',
+          bytes: tile.bytes,
+          contentType: tile.contentType,
+          cached: true,
+          ...(attribution ? { attribution } : {}),
+        };
       }
     }
     const endpoint = endpointOf(url);
-    if (decision.useNetwork) this.context.addEndpoint(endpoint, url);
+    if (decision.useNetwork) this.context.addEndpoint(this.source.id, endpoint, url);
     if (decision.useNetwork && this.context.reachable(endpoint)) {
       const outcome = this.ownTransport(url)
         ? await this.viaTransport(url, timeouts, signal)
@@ -178,7 +233,7 @@ class TileLoader {
       // failure (which would make it probe the host one request at a time, slowing cached and packaged tiles too);
       // a failure on a reachable endpoint does, and the engine backs off (F298, F315).
       if (!stored) {
-        await this.context.waitForChange(CHECK_WAIT_MS);
+        await this.context.waitForChange(this.context.longestCheckMs + CHECK_MARGIN_MS, endpoint);
         if (this.context.reachable(endpoint) && !signal.aborted) return result;
       }
     }
@@ -187,7 +242,7 @@ class TileLoader {
       this.context.count(id, 'persistent', coord);
       return okOf(stored);
     }
-    return this.miss(decision);
+    return this.miss(decision, key, signal);
   }
 
   /**
@@ -302,10 +357,28 @@ class TileLoader {
    * for now: hold the request briefly, then tell the engine to ask again (an abort, not a failure), so the tile loads
    * once connectivity returns without spending the engine's retries (F298, F299).
    */
-  private async miss(decision: PolicyDecision): Promise<TransportResult> {
-    if (this.context.offlineOnly() || !decision.useNetwork) return NOT_FOUND;
+  private async miss(decision: PolicyDecision, key: string, signal: AbortSignal): Promise<TransportResult> {
+    if (this.context.offlineOnly(this.source.id, this.layerId) || !decision.useNetwork) return NOT_FOUND;
     this.context.count(this.source.id, 'offlineMisses');
-    await this.context.waitForChange(OFFLINE_HOLD_MS);
+    // Asked again with nothing changed since its last miss: wait for a change instead (KB-190).
+    const changes = this.context.changes();
+    const repeated = this.misses.get(key) === changes;
+    if (this.misses.size >= MAX_REMEMBERED_MISSES) this.misses.clear();
+    this.misses.set(key, changes);
+    if (!repeated) await this.context.waitForChange(OFFLINE_HOLD_MS);
+    else {
+      // Waiting for connectivity: not loading, so the engine may go idle meanwhile (KB-194). An abort ends the hold.
+      this.held++;
+      let holding = true;
+      const release = (): void => {
+        if (holding) this.held--;
+        holding = false;
+      };
+      signal.addEventListener('abort', release, { once: true });
+      await this.context.waitForChange(REPEATED_MISS_HOLD_MS);
+      signal.removeEventListener('abort', release);
+      release();
+    }
     // Not a failure: a transient error would make the engine probe the host with one request at a time, which would
     // also slow the tiles the cache and the packages hold.
     return { kind: 'aborted' };

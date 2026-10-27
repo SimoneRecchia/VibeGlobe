@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Structure-of-arrays storage of a layer's features with per-feature dirty flags (ADR 0029). A change to one feature
  * marks only that feature's attributes, and {@link FeatureStore.flush} uploads the changed features as contiguous runs,
@@ -17,6 +19,8 @@ import {
 export type FeatureId = string | number;
 
 const STRING_CHANNELS: readonly BatchStringChannel[] = ['text', 'icon', 'font'];
+/** Above every feature index; a small integer (2^30 − 1), unlike Infinity. */
+const NONE_DIRTY = 0x3fffffff;
 const STRING_BIT: Readonly<Record<BatchStringChannel, number>> = {
   text: 1 << BATCH_ATTRIBUTES.length,
   icon: 1 << (BATCH_ATTRIBUTES.length + 1),
@@ -46,7 +50,8 @@ export class FeatureStore {
   readonly #strings: Record<BatchStringChannel, string[]> = { text: [], icon: [], font: [] };
   #arrays: Record<BatchAttribute, Float64Array | Float32Array | Uint32Array>;
   #dirty: Uint32Array;
-  #dirtyMin = Infinity;
+  /** The lowest dirty feature; NONE_DIRTY (a small integer, which a field stores unboxed, F378) when none is. */
+  #dirtyMin = NONE_DIRTY;
   #dirtyMax = -1;
   /** Called when the store goes from clean to dirty: the host draws a frame, which flushes it. */
   onDirty: (() => void) | undefined;
@@ -206,24 +211,18 @@ export class FeatureStore {
       this.#flushedCapacity = this.#capacity;
     }
     if (this.#dirtyMax >= 0) {
-      for (const attribute of BATCH_ATTRIBUTES) {
-        this.#flushRuns(ATTRIBUTE_BIT[attribute], (first, count) => {
-          target.writeRange(handle, attribute, first, count, this.#arrays[attribute]);
-        });
+      // Indexed loops and no closures: the flush runs every frame a live feed changes features (F378).
+      for (let a = 0; a < BATCH_ATTRIBUTES.length; a++) {
+        const attribute = BATCH_ATTRIBUTES[a];
+        if (attribute !== undefined) this.#flushRuns(ATTRIBUTE_BIT[attribute], target, handle, attribute, undefined);
       }
-      for (const channel of STRING_CHANNELS) {
-        this.#flushRuns(STRING_BIT[channel], (first, count) => {
-          target.writeStrings(handle, channel, first, count, this.#strings[channel]);
-        });
+      for (let k = 0; k < STRING_CHANNELS.length; k++) {
+        const channel = STRING_CHANNELS[k];
+        if (channel !== undefined) this.#flushRuns(STRING_BIT[channel], target, handle, undefined, channel);
       }
-      this.#flushRuns(GEOMETRY_BIT, (first, count) => {
-        for (let i = first; i < first + count; i++) {
-          const geometry = this.#geometry[i];
-          if (geometry !== undefined) target.writeGeometry(handle, i, geometry);
-        }
-      });
+      this.#flushRuns(GEOMETRY_BIT, target, handle, undefined, undefined);
       this.#dirty.fill(0, this.#dirtyMin, this.#dirtyMax + 1);
-      this.#dirtyMin = Infinity;
+      this.#dirtyMin = NONE_DIRTY;
       this.#dirtyMax = -1;
     }
     if (this.#count !== this.#flushedCount) {
@@ -239,16 +238,39 @@ export class FeatureStore {
     for (let i = 0; i < this.#count; i++) this.#mark(i, ~0 >>> 0);
   }
 
-  #flushRuns(bit: number, write: (first: number, count: number) => void): void {
+  /** Writes the runs of features dirty in `bit`: of an attribute, of a string channel, or (neither) their geometry. */
+  #flushRuns(
+    bit: number,
+    target: LayerRenderTarget,
+    handle: BatchHandle,
+    attribute: BatchAttribute | undefined,
+    channel: BatchStringChannel | undefined,
+  ): void {
     let runStart = -1;
     const end = Math.min(this.#dirtyMax, this.#count - 1);
     for (let i = this.#dirtyMin; i <= end + 1; i++) {
       const isDirty = i <= end && ((this.#dirty[i] ?? 0) & bit) !== 0;
       if (isDirty && runStart < 0) runStart = i;
       else if (!isDirty && runStart >= 0) {
-        write(runStart, i - runStart);
+        this.#writeRun(target, handle, attribute, channel, runStart, i - runStart);
         runStart = -1;
       }
+    }
+  }
+
+  #writeRun(
+    target: LayerRenderTarget,
+    handle: BatchHandle,
+    attribute: BatchAttribute | undefined,
+    channel: BatchStringChannel | undefined,
+    first: number,
+    count: number,
+  ): void {
+    if (attribute !== undefined) return target.writeRange(handle, attribute, first, count, this.#arrays[attribute]);
+    if (channel !== undefined) return target.writeStrings(handle, channel, first, count, this.#strings[channel]);
+    for (let i = first; i < first + count; i++) {
+      const geometry = this.#geometry[i];
+      if (geometry !== undefined) target.writeGeometry(handle, i, geometry);
     }
   }
 

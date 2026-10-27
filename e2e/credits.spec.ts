@@ -1,5 +1,6 @@
 // Credits (M7): the live list of the visible sources' credits with its event (F254), and the engine's own attribution
 // element, which keeps required credits visible whatever the configuration or the page's CSS asks (F255).
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openGlobe, waitForIdle } from './support/globe.ts';
 import { fixtureSession, waitForImagery } from './support/imagery.ts';
@@ -67,6 +68,49 @@ test.describe('credits of the visible sources (F254)', () => {
     expect(await credits(page)).toEqual([
       { text: 'Fixture smooth', required: false, sources: ['fixture-smooth', 'overlay-smooth'] },
     ]);
+  });
+});
+
+test.describe('credits of imagery and vector tiles together', () => {
+  test.use({ viewport: { width: 320, height: 240 } });
+
+  test("list a vector style source's attribution with the imagery's, while one of its layers is shown", async ({
+    page,
+  }) => {
+    const style = JSON.parse(
+      readFileSync(new URL('../apps/playground/public/vector-tiles/styles/demotiles.json', import.meta.url), 'utf8'),
+    ) as { sources: Record<string, Record<string, unknown>>; layers: { id: string; source?: string }[] };
+    // The style credits its vector source in HTML, as styles do ("© OpenMapTiles Data from OpenStreetMap").
+    style.sources['maplibre'] = {
+      ...style.sources['maplibre'],
+      attribution: '<a href="https://vector.test/">&copy; Vector Example</a> data',
+    };
+    await page.route('https://styles.test/credited.json', (route) =>
+      route.fulfill({ json: style, headers: { 'Access-Control-Allow-Origin': '*' } }),
+    );
+    const session = await fixtureSession(page);
+    await openGlobe(
+      page,
+      `backend=webgl2&imagery=smooth&session=${session}&vectorStyle=https://styles.test/credited.json&lon=12.5&lat=41.9&zoom=3`,
+    );
+    await waitForImagery(page);
+    await expect
+      .poll(async () => (await credits(page)).map((c) => c.text))
+      .toEqual(['Fixture smooth', '© Vector Example data']);
+    // No layer of the source shown: its credit goes, the imagery's stays.
+    await page.evaluate(
+      (ids) => {
+        const layer = (
+          window as unknown as {
+            vibeglobeVectorTiles?: { layer?: { style: { setVisibility(id: string, on: boolean): void } } };
+          }
+        ).vibeglobeVectorTiles?.layer;
+        for (const id of ids) layer?.style.setVisibility(id, false);
+        window.vibeglobePlayground?.globe.requestRender();
+      },
+      style.layers.filter((l) => l.source === 'maplibre').map((l) => l.id),
+    );
+    await expect.poll(async () => (await credits(page)).map((c) => c.text)).toEqual(['Fixture smooth']);
   });
 });
 

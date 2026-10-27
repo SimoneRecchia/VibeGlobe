@@ -1,5 +1,7 @@
 import type { FrameCapture, Globe, ViewInit } from '@vibeglobe/core';
+import { ACCEPTANCE_SCENARIOS } from './acceptance-scenarios.js';
 import { checkPops } from './pops.js';
+import { segments, type FrameScenario } from './scenario-paths.js';
 
 export { countPops } from './pops.js';
 
@@ -8,16 +10,6 @@ export { countPops } from './pops.js';
  * windows (no view) between moves; the harness draws and reads every frame through `captureFrame()` and runs the
  * detectors in the page, so no frame crosses into the test. Loaded only when a test asks for it.
  */
-
-/** A frame-stepped scenario: how many frames, and the view of each (undefined: the camera holds still). */
-interface FrameScenario {
-  readonly frames: number;
-  view(frame: number): ViewInit | undefined;
-  /** Measure, in every frame, how far the terrain rises above the ellipsoid's horizon (F142). */
-  readonly relief?: boolean;
-  /** Record the camera state of every frame: zoom, morph and relief factors, applied tilt (M5). */
-  readonly samples?: boolean;
-}
 
 /** The globe element's size in CSS pixels, which `screenToGeo` and `geoToScreen` use. */
 interface CssSize {
@@ -57,32 +49,11 @@ export interface ScenarioReport {
    */
   maxChangedShare: number;
   maxChangedFrame: number;
-  /** With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase and heading. */
-  samples: [number, number, number, number, string, string, number][];
-}
-
-/** Each segment of a scenario: `motion` frames moving from one view to the next, then `hold` frames still. */
-function segments(views: readonly ViewInit[], motion: number, hold: number): FrameScenario {
-  const step = motion + hold;
-  return {
-    frames: (views.length - 1) * step + hold,
-    view(frame) {
-      const segment = Math.floor(frame / step);
-      const into = frame - segment * step;
-      const from = views[segment];
-      const to = views[segment + 1];
-      if (!from || !to || into >= motion) return frame === 0 ? views[0] : undefined;
-      const t = (into + 1) / motion;
-      const mixed: Record<string, number> = {};
-      // Only the fields both views give: a view without a tilt leaves the view mode's tilt (M5).
-      for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
-        const a = (from as Record<string, number | undefined>)[key];
-        const b = (to as Record<string, number | undefined>)[key];
-        if (a !== undefined && b !== undefined) mixed[key] = a + (b - a) * t;
-      }
-      return mixed as ViewInit;
-    },
-  };
+  /**
+   * With `samples`: each frame's zoom, morph factor, relief factor, applied tilt (degrees), view mode, phase, heading
+   * and the eye's height above the ellipsoid (meters).
+   */
+  samples: [number, number, number, number, string, string, number, number][];
 }
 
 /** Plays scenarios one after the other. */
@@ -118,6 +89,7 @@ function orbit(
 
 /** The frame-stepped scenarios by name. */
 const SCENARIOS: Record<string, FrameScenario> = {
+  ...ACCEPTANCE_SCENARIOS,
   // From orbit to street level over Rome, turning while it zooms (F105).
   'zoom-orbit-to-street': segments(
     [2, 4, 6, 8, 10, 12, 14, 16].map((zoom, i) => ({
@@ -398,8 +370,8 @@ function measureMotion(
   }
   if (!scenario.samples) return;
   const camera = globe.camera;
-  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg } = camera;
-  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg]);
+  const { zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg, altitudeMeters } = camera;
+  report.samples.push([zoom, morphFactor, reliefFactor, tiltDeg, viewMode, phase, headingDeg, altitudeMeters]);
 }
 
 /**
@@ -438,8 +410,7 @@ export async function recordScenario(
   const report = emptyReport(scenario.frames);
   // Only the harness draws while it records: each capture is exactly one drawn frame, one step of the engine clock,
   // so a pixel's change between captures is its change in one frame.
-  const requestAnimationFrame = window.requestAnimationFrame;
-  window.requestAnimationFrame = () => 0;
+  const restoreFrames = holdDisplayFrames();
   let previous: FrameCapture | undefined;
   let previousLevels = new Map<string, number>();
   const terrain = globe.terrainStats() !== undefined;
@@ -478,8 +449,32 @@ export async function recordScenario(
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   } finally {
-    window.requestAnimationFrame = requestAnimationFrame;
+    restoreFrames();
     globe.requestRender();
   }
   return report;
+}
+
+/**
+ * Holds the display's frames while a recording draws its own: the engine's frame requests meanwhile are kept, under
+ * ids far above the browser's, and handed to the real `requestAnimationFrame` when the returned function restores it.
+ * Dropping them (`() => 0`) left the engine waiting for a frame that never came after the recording (TG-05).
+ */
+function holdDisplayFrames(): () => void {
+  const request = window.requestAnimationFrame;
+  const cancel = window.cancelAnimationFrame;
+  const held = new Map<number, FrameRequestCallback>();
+  let nextId = 1_000_000_000;
+  window.requestAnimationFrame = (callback) => {
+    held.set(nextId, callback);
+    return nextId++;
+  };
+  window.cancelAnimationFrame = (id) => {
+    if (!held.delete(id)) cancel.call(window, id);
+  };
+  return () => {
+    window.requestAnimationFrame = request;
+    window.cancelAnimationFrame = cancel;
+    for (const callback of held.values()) request.call(window, callback);
+  };
 }

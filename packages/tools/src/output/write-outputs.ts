@@ -1,9 +1,12 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The package step: static folder metadata, PMTiles and MBTiles from a dataset's encoded tiles (F336). */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatasetConfig } from '../config/schema.js';
 import { writeAtomic } from '../pipeline/step-log.js';
 import { type Area, areaTiles } from '../tiles/area.js';
+import type { TileCoord } from '../tiles/mercator.js';
 import { writeMbtiles } from './mbtiles.js';
 import { type OutputMetadata, mbtilesMetadata, tileExtension } from './metadata.js';
 import { COMPRESSION, TILE_TYPES, writePmtiles } from './pmtiles.js';
@@ -29,17 +32,26 @@ function builtTiles(
   dataset: DatasetConfig,
   area: Area,
   staticFolder: string,
+  tilesAt?: (z: number) => Iterable<TileCoord>,
 ): { z: number; x: number; y: number; read: () => Uint8Array }[] {
   const tiles = [];
+  // Vector tiles without features are not written, nor tiles an archive does not hold.
+  const mayBeMissing = dataset.kind === 'vector' || dataset.source.type === 'pmtiles';
   for (let z = dataset.minZoom; z <= dataset.maxZoom; z++) {
-    for (const tile of areaTiles(area, z)) {
+    for (const tile of tilesAt?.(z) ?? areaTiles(area, z)) {
       const path = join(staticFolder, `${z}/${tile.x}/${tile.y}.${tileExtension(dataset)}`);
-      // Vector tiles without features are not written.
-      if (dataset.kind !== 'vector' || existsSync(path))
-        tiles.push({ ...tile, read: () => new Uint8Array(readFileSync(path)) });
+      if (!mayBeMissing || existsSync(path)) tiles.push({ ...tile, read: () => new Uint8Array(readFileSync(path)) });
     }
   }
   return tiles;
+}
+
+/** The PMTiles tile type of a dataset's tiles. */
+function tileType(dataset: DatasetConfig): number {
+  const extension = tileExtension(dataset);
+  if (extension === 'webp') return TILE_TYPES.webp;
+  if (extension === 'pbf' || dataset.encoding === 'mvt') return TILE_TYPES.mvt;
+  return TILE_TYPES[dataset.encoding === 'terrarium' ? 'png' : dataset.encoding];
 }
 
 /** Writes the metadata file and the enabled packages; returns the written paths. */
@@ -49,17 +61,18 @@ export function writeOutputs(
   paths: OutputPaths,
   metadata: OutputMetadata,
   report: (line: string) => void,
+  tilesAt?: (z: number) => Iterable<TileCoord>,
 ): string[] {
   const written = [join(paths.staticFolder, 'metadata.json')];
   writeAtomic(written[0] as string, `${JSON.stringify(metadata, null, 2)}\n`);
-  const tiles = builtTiles(dataset, area, paths.staticFolder);
+  const tiles = builtTiles(dataset, area, paths.staticFolder, tilesAt);
   if (paths.pmtiles) {
     const [west, south, east, north] = metadata.bounds;
     const { addressed, contents } = writePmtiles(
       paths.pmtiles,
       tiles,
       {
-        tileType: TILE_TYPES[dataset.encoding === 'terrarium' ? 'png' : dataset.encoding],
+        tileType: tileType(dataset),
         tileCompression: COMPRESSION.none,
         minZoom: dataset.minZoom,
         maxZoom: dataset.maxZoom,

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Machine-readable license and attribution metadata of every output (F337): the static folder's `metadata.json`, the
  * PMTiles JSON metadata and the MBTiles metadata table all carry the same fields.
@@ -35,7 +37,8 @@ const FORMATS: Record<DatasetConfig['encoding'], string> = { terrarium: 'png', p
 
 /** File extension of a dataset's tiles. */
 export function tileExtension(dataset: DatasetConfig): string {
-  return FORMATS[dataset.encoding];
+  // Tiles copied from an archive keep its format (Mapterhorn's Terrarium terrain is WebP).
+  return dataset.source.type === 'pmtiles' ? dataset.source.extension : FORMATS[dataset.encoding];
 }
 
 /** Builds the metadata of one dataset output. */

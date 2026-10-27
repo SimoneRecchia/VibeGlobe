@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Mapbox Vector Tile 2.1 encoding (https://github.com/mapbox/vector-tile-spec/tree/master/2.1), written from the
  * specification, and a decoder used by the tests.

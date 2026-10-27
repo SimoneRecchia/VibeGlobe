@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
 import { FlightPreload } from './flight-preload.js';
 import { applyPixelRatio } from './imagery-variants.js';
@@ -8,16 +10,18 @@ import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
 import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
-import { runtimeCredits, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
-import { BASE_TEXTURE, type DrawList } from '../imagery/draw-list.js';
+import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
+import type { DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
 import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
+import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
+import { stitchTerrainEdges } from '../terrain/terrain-stitch.hot.js';
 import {
   drawTerrain,
   recordShownTerrain,
@@ -97,29 +101,6 @@ function terrainDecodeTask(
   };
 }
 
-/** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
-let pagePool: { pool: NetworkPool; users: number } | undefined;
-
-function acquireNetworkPool(host: RendererBackend['host']): NetworkPool {
-  pagePool ??= {
-    pool: new NetworkPool({
-      now: () => host.now(),
-      setTimer: (callback, delayMs) => host.setTimer(callback, delayMs),
-      clearTimer: (handle) => host.clearTimer(handle),
-      adaptive: true,
-    }),
-    users: 0,
-  };
-  pagePool.users++;
-  return pagePool.pool;
-}
-
-function releaseNetworkPool(pool: NetworkPool): void {
-  if (pagePool?.pool !== pool || --pagePool.users > 0) return;
-  pool.dispose();
-  pagePool = undefined;
-}
-
 /**
  * The imagery of one engine instance (M3 plan §2.3): a loader per layer over a network pool, a lease on the shared
  * worker pool, and the memory they share (GPU residency and RAM tier, ADR 0007). Each frame wants tiles between the
@@ -138,6 +119,8 @@ export class ImageryRuntime {
   nextIndex: number;
   /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
   readonly preload = new FlightPreload();
+  /** The tiles of the view a flight will show in about a second, loaded instead of the current view's (F287). */
+  readonly ahead = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
   private readonly byIndex = new Map<number, ImageryLoader>();
@@ -167,9 +150,12 @@ export class ImageryRuntime {
   private readonly fades = new ImageryFades();
   /** Terrain height transitions (ADR 0006 §4, F138): the same mechanism as imagery's cross-fades. */
   private readonly terrainFades = new ImageryFades();
+  /** The overlay slots' cross-fades (KB-155). */
+  private readonly overlayFades = [new ImageryFades(), new ImageryFades()];
   /** Keeps a texture still faded from resident this frame. */
   private readonly keepTexture = (handle: number): void => {
-    if (handle !== BASE_TEXTURE) this.loaderOf(handle)?.markDrawn(handle);
+    // The base image and the caps' fills (KB-211) have negative handles and no loader.
+    if (handle >= 0) this.loaderOf(handle)?.markDrawn(handle);
   };
 
   constructor(
@@ -235,6 +221,7 @@ export class ImageryRuntime {
       decodeTask: imageryDecodeTask(source, formats),
     });
     this.byIndex.set(index, loader);
+    warnOfProfile(this.renderer, source, this.loaderContext.observability);
     return { source, loader, index };
   }
 
@@ -369,7 +356,10 @@ export class ImageryRuntime {
 
   /** True while a tile of the last frame was cross-fading: the engine keeps drawing (F105). */
   get fading(): boolean {
-    return this.fades.fading || this.terrainFades.fading;
+    const overlays = this.overlayFades;
+    return (
+      this.fades.fading || this.terrainFades.fading || overlays[0]?.fading === true || overlays[1]?.fading === true
+    );
   }
 
   /**
@@ -389,8 +379,13 @@ export class ImageryRuntime {
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
+    if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
     if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
+    for (let slot = 0; slot < list.overlays.length; slot++) {
+      const overlay = list.overlays[slot];
+      if (overlay) this.overlayFades[slot]?.apply(list, overlay, nowMs, fadeMs, this.keepTexture);
+    }
     const terrain = this.terrain;
     const host = this.renderer.host;
     let terrainStart = terrain ? host.now() : 0;
@@ -400,11 +395,12 @@ export class ImageryRuntime {
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       recordShownTerrain(list, tiles, count, terrain);
       if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);
+      stitchTerrainEdges(list, tiles, count, terrain);
       this.serveElevationQueries();
       this.terrainMs = host.now() - terrainStart + this.chargedMs;
       this.chargedMs = 0;
     }
-    this.credits.afterFrame(list, count);
+    this.credits.afterFrame(list, count, this.terrain?.loader);
     for (const layer of this.layers) layer.loader.scheduleRequests();
     terrainStart = terrain ? host.now() : 0;
     terrain?.loader.scheduleRequests();
@@ -425,7 +421,11 @@ export class ImageryRuntime {
   }
 
   /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
-  readonly stackChanged = (): void => ((this.fades.snapNext = true), this.callbacks.requestFrame());
+  readonly stackChanged = (): void => {
+    this.fades.snapNext = true;
+    for (const fades of this.overlayFades) fades.snapNext = true;
+    this.callbacks.requestFrame();
+  };
   /** The list of layers changed: added, removed or moved (`imagery-layers-change`). */
   readonly layersChanged = (): void => this.callbacks.layersChange?.();
 
@@ -444,15 +444,15 @@ export class ImageryRuntime {
   }
 
   /** Reloads the loaders of every layer, and the terrain, whose source has this id (`Globe.reloadSource`). */
-  reloadSource(sourceId: string): boolean {
+  reloadSource(sourceId: string, missingOnly?: boolean): boolean {
     let found = false;
     for (const layer of this.layers)
       if (layer.source.id === sourceId) {
-        layer.loader.reload();
+        layer.loader.reload(missingOnly);
         found = true;
       }
     if (this.terrain?.source.id === sourceId) {
-      this.terrain.loader.reload();
+      this.terrain.loader.reload(missingOnly);
       found = true;
     }
     return found;

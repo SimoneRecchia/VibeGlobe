@@ -1,4 +1,7 @@
-import { projectLayerPoint, type FrameView, type LayerGround } from '@vibeglobe/core';
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { type FrameView, type LayerGround } from '@vibeglobe/core';
+import { projectLayerPoint } from '@vibeglobe/core/layers';
 import { valueOf, type BatchContents } from './layer-geometry.js';
 
 /** How far from a feature's drawn shape a pointer still picks it, CSS pixels. */

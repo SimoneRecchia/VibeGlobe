@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Feature interaction (F379–F382): hover enter and leave, click, selection and dragging, driven by pointer input and
  * the renderer's id buffer. Picks are asynchronous; a pick answered after a newer one was started is dropped, so

@@ -1,10 +1,13 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Rate limits of the network pool (F222): rings of the last request start times. */
 
 /**
  * The window of a rate limit: a second plus a margin, because requests reach the server with uneven delays, and two
- * starts just over a second apart here can arrive within the same second there.
+ * starts just over a second apart here can arrive within the same second there (a busy page delayed some by more than
+ * 150 ms on CI: F222 counted 11 in one second at the server).
  */
-const RATE_WINDOW_MS = 1150;
+const RATE_WINDOW_MS = 1250;
 
 /** Start times of the last `maxRequestsPerSecond` requests, a ring. */
 export interface RateRing {

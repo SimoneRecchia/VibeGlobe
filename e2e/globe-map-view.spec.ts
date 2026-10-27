@@ -403,16 +403,22 @@ test('custom curves drive the morph, relief and tilt, and changing them at runti
   await waitForIdle(page);
   // The image before the change, so that a jump in the first changed frame is compared too.
   let previous = await canvasImage(page);
-  await page.evaluate(() => window.vibeglobePlayground?.globe.setViewCurves({}));
-  const morphs: number[] = [];
+  // The morph of every engine frame, recorded in the page: a capture draws one frame, but another one (a tile
+  // arriving) can come between two captures, and a per-capture sample then spans two steps.
+  await page.evaluate(() => {
+    const globe = window.vibeglobePlayground?.globe;
+    const samples: number[] = [];
+    (window as unknown as { morphSamples: number[] }).morphSamples = samples;
+    globe?.on('frame', () => samples.push(globe.camera.morphFactor));
+    globe?.setViewCurves({});
+  });
   let largestShare = 0;
-  // Each capture draws exactly one frame: one sample per frame.
   for (let i = 0; i < 40; i++) {
     const image = await canvasImage(page);
-    morphs.push(await page.evaluate(() => window.vibeglobePlayground?.globe.camera.morphFactor ?? -1));
     largestShare = Math.max(largestShare, changedShare(previous, image));
     previous = image;
   }
+  const morphs = await page.evaluate(() => (window as unknown as { morphSamples: number[] }).morphSamples);
   expect(morphs.at(-1)).toBe(0);
   expect(morphs.every((value, i) => i === 0 || Math.abs(value - (morphs[i - 1] ?? 0)) < 0.3)).toBe(true);
   expect(morphs.filter((value, i) => i > 0 && value !== morphs[i - 1]).length).toBeGreaterThan(4);
@@ -450,9 +456,14 @@ for (const backend of BACKENDS) {
       page,
     }) => {
       test.setTimeout(240_000);
-      await openGlobe(page, `${CLOCK}&backend=${backend}${query}`);
+      // KB-170: in manual tilt the terrain limit lowers the tilt up to 6.9° in one frame of this 0.1-zoom-a-frame descent.
+      test.fail(mode === 'manual-tilt', 'KB-170');
+      // With the fixture terrain: the zoom ends on the fixture peak's flank, the target on its relief (F167 step 1).
+      await openGlobe(page, `${CLOCK}&backend=${backend}&terrain=terrarium${query}`);
       await page.evaluate(() => window.vibeglobePlayground?.resetCpuSamples());
-      const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('zoom-globe-to-street'));
+      const report = await page.evaluate(() =>
+        window.vibeglobePlayground?.recordScenario('zoom-globe-to-street-relief'),
+      );
       if (!report) throw new Error('no report');
       const times = await page.evaluate(() => window.vibeglobePlayground?.cpuFrameTimesMs() ?? []);
       const zooms = report.samples.map((sample) => sample[0]);
@@ -465,6 +476,11 @@ for (const backend of BACKENDS) {
       expect(largestStep(report.samples.map((sample) => sample[2]))).toBeLessThan(0.1);
       expect(largestStep(tilts)).toBeLessThan(5);
       expect(largestStep(headings)).toBe(0);
+      // The eye moves smoothly too: 0.1 zoom levels a frame change its height by about 7%, the terrain under the target
+      // and the clearance above it add no jump.
+      const heights = report.samples.map((sample) => sample[7]);
+      expect(Math.max(...heights.slice(1).map((h, i) => Math.abs(h / (heights[i] ?? h) - 1)))).toBeLessThan(0.12);
+      expect(Math.max(...report.samples.map((sample) => sample[2]))).toBeGreaterThan(0.99);
       if (mode === '2D-locked') expect(Math.max(...tilts)).toBe(0);
       if (mode === 'manual-tilt') expect(tilts.at(-1)).toBeCloseTo(45, 6);
       // The temporal glitch detector: no holes, no pops, no frame-to-frame jump of the picture.

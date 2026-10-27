@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The 2D / 3D / Auto toggle (F421): 2D keeps the tilt at 0°, 3D chooses the default tilt, Auto restores the zoom-driven
  * curves, each through the engine's `setViewMode` (F163), which eases to the new tilt. A Back to Auto button next to it
@@ -11,6 +13,14 @@ import { controlFrame } from './dom.js';
 export interface ViewModeControlOptions {
   readonly id?: string;
   readonly position?: ControlPosition;
+  /**
+   * Whether the camera may tilt now, with its changes: the controls of `@vibeglobe/controls` with a tilt policy (F625).
+   * The 3D button is disabled while it says no.
+   */
+  readonly tilt?: {
+    readonly tiltAvailable: boolean;
+    onTiltAvailabilityChange(listener: (available: boolean) => void): () => void;
+  };
 }
 
 /** The toggle's choices, as `Globe.setViewMode` takes them. */
@@ -33,11 +43,14 @@ export class ViewModeControl implements UiControl {
   readonly #buttons = new Map<ViewModeChoice, HTMLButtonElement>();
   #back: HTMLButtonElement | undefined;
   #stop: (() => void) | undefined;
+  #stopTilt: (() => void) | undefined;
+  readonly #tilt: ViewModeControlOptions['tilt'];
 
   /** @param options - Placement; every field is optional. */
   constructor(options: ViewModeControlOptions = {}) {
     this.id = options.id ?? 'view-mode';
     this.position = options.position ?? 'top-right';
+    this.#tilt = options.tilt;
   }
 
   /** Builds the control's element (UiControl). */
@@ -65,6 +78,12 @@ export class ViewModeControl implements UiControl {
     frame.append(group, back);
     this.#stop = context.globe.on('view-mode-change', ({ mode }) => this.#show(mode));
     this.#show(context.globe.viewMode);
+    const tilt = this.#tilt;
+    const threeD = this.#buttons.get('3d');
+    if (tilt !== undefined && threeD !== undefined) {
+      threeD.disabled = !tilt.tiltAvailable;
+      this.#stopTilt = tilt.onTiltAvailabilityChange((available) => (threeD.disabled = !available));
+    }
     return frame;
   }
 
@@ -99,6 +118,7 @@ export class ViewModeControl implements UiControl {
   /** Releases listeners (UiControl). */
   destroy(): void {
     this.#stop?.();
+    this.#stopTilt?.();
     this.#context = undefined;
   }
 

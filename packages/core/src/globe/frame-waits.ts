@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Emitter } from './emitter.js';
 import { GlobeError as GlobeErrorClass, type GlobeError } from './errors.js';
 import type { FrameCapture, GlobeEvents, RendererBackend } from './types.js';
@@ -54,4 +56,28 @@ export async function captureWhenDrawn(source: CaptureSource): Promise<FrameCapt
     if (source.state().frames > frames) return renderer.capture();
     await source.waits.next();
   }
+}
+
+/**
+ * `Globe.ready`: `bind` receives the promise's resolve and reject, `start` runs, and a start that throws or rejects
+ * goes to `fail` as a GlobeError ('renderer-failed' for any other error). Callers that never await the promise see no
+ * unhandled rejection: the error event reports it.
+ */
+export function startedPromise(
+  bind: (resolve: () => void, reject: (error: GlobeError) => void) => void,
+  start: () => Promise<void>,
+  fail: (error: GlobeError) => void,
+): Promise<void> {
+  const ready = new Promise<void>((resolve, reject) => {
+    bind(resolve, reject);
+    start().catch((error: unknown) =>
+      fail(
+        error instanceof GlobeErrorClass
+          ? error
+          : new GlobeErrorClass('renderer-failed', 'The renderer failed to start', { cause: error }),
+      ),
+    );
+  });
+  ready.catch(() => undefined);
+  return ready;
 }

@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Line tessellation for vector-tile lines (F440, F443), original code (ADR 0041). Each vertex carries its point on the
  * center line, an extrusion vector in units of half the line width, and the distance along the line; the renderer

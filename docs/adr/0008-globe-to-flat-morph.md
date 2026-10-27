@@ -168,3 +168,9 @@ Verification in M5:
 ## Update 2026-10-20
 
 The owner confirmed both follow-up points ([ADR 0015](0015-owner-decisions-2026-10-20.md), decisions 8 and 9): pans keep ground scale constant in the flat 2D phase, accepting the small Mercator-zoom drift; and the phase table holds, with a 0° 2D band at region and city scale and tilt rising only at neighborhood scale, each curve easing in and out at its ends. `PLAN.md` now says so, and F548 replaces F149.
+
+## Update 2026-10-26: the caps stay round (KB-211)
+
+The plane endpoint cannot show the caps beyond ±85.0511°: zoomed in on a pole, every view mode flattened into the Mercator plane, where the cap was a band ending in a line at the pole with nothing beyond it (a crescent in the view), and its wedge tiles were stretched into stripes. The morph factor is now multiplied by a cap factor of the view: smootherstep of the target's latitude distance to the nearer cap edge, from 1 to 2 view radii (the ground distance from the screen center to a corner, lengthened by 1 / cos(tilt), at most fivefold). A view that reaches a cap stays a globe at every zoom and in every view mode; elsewhere the curves are unchanged, so the morph factor is still a smooth function of the zoom and, panning, of the latitude. In a 320 × 240 view the curves are unchanged below about 67° at every zoom, and below about 76° from ground zoom 5.
+
+The caps no Web Mercator source covers show a fill color, `GlobeOptions.polarCapColors` and `Globe.setPolarCapColors` (default: the Natural Earth base image's sea in the north, its ice in the south), `#rrggbb` colors drawn by the renderer as a 1 × 1 texture under the imagery handles -2 (north) and -3 (south). The base image's polar rows, stretched around the pole, showed as radial stripes. A geographic (EPSG:4326) imagery source that covers a cap shows there instead, as before.

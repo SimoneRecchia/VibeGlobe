@@ -2,7 +2,15 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts", "benchmarks/*.ts", "e2e/**/*.spec.ts", "e2e/support/*-worker.ts"],
+      "entry": [
+        "scripts/*.ts",
+        "benchmarks/*.ts",
+        "e2e/**/*.spec.ts",
+        "e2e/support/*-worker.ts",
+        "e2e/**/*.bug.ts",
+        "e2e/robustness/*.config.ts",
+        "scripts/release/*.ts"
+      ],
       "project": ["scripts/**/*.ts", "benchmarks/**/*.ts", "e2e/**/*.ts", "*.config.ts"],
       "includeEntryExports": true,
       "ignore": ["scripts/fixtures/**"],

@@ -1,4 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { CompressedTileImage, DecodedTile, Ktx2Target } from '@vibeglobe/core';
+import { ToneMatcher } from './tone-matching.js';
 import {
   ClampToEdgeWrapping,
   CompressedTexture,
@@ -98,6 +101,11 @@ export class TileTextures {
   private bytes = 0;
   private compressed = 0;
 
+  /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
+  readonly tones = new ToneMatcher();
+  /** The polar caps' fills (KB-211), made again with the base image. */
+  readonly caps = new PolarCapTextures();
+
   constructor(private readonly anisotropy: () => number) {}
 
   /** Number of textures held. */
@@ -114,6 +122,9 @@ export class TileTextures {
   get gpuBytes(): number {
     return this.bytes;
   }
+
+  /** The decoded image under a handle, if any (tone matching measures it on first use, F249). */
+  readonly imageOf = (handle: number): unknown => this.entries[handle]?.tile.image;
 
   /** The texture under a handle, if any. */
   get(handle: number): Texture | undefined {
@@ -138,6 +149,7 @@ export class TileTextures {
     entry.texture.dispose();
     if (closeImage) (entry.tile.image as { close?: () => void }).close?.();
     this.entries[handle] = undefined;
+    this.tones.release(handle);
     this.count--;
     this.bytes -= entry.tile.gpuBytes;
     if (isCompressed(entry.tile.image)) this.compressed--;
@@ -157,10 +169,31 @@ export class TileTextures {
     }
   }
 
+  /**
+   * Gives every texture held the current anisotropy (F398: a quality preset changed it): those with another level are
+   * created and uploaded again from their kept images, as after a device loss, and `base` (the world image) is
+   * filtered again. Height grids are not filtered so.
+   */
+  refilter(renderer: WebGPURenderer, base?: Texture): void {
+    const level = this.anisotropy();
+    if (base && base.anisotropy !== level) {
+      base.anisotropy = level;
+      base.needsUpdate = true;
+    }
+    for (const entry of this.entries) {
+      if (!entry || isHeights(entry.tile.image) || entry.texture.anisotropy === level) continue;
+      entry.texture.dispose();
+      entry.texture = this.create(entry.tile);
+      renderer.initTexture(entry.texture);
+    }
+  }
+
   /** Releases everything. */
   clear(): void {
     for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);
     this.entries.length = 0;
+    // Also drops the caps' renderer and base image: a destroyed globe the host still references holds neither (KB-045).
+    this.caps.rebuild(undefined, undefined);
   }
 
   private create(tile: DecodedTile): Texture {
@@ -184,6 +217,58 @@ export class TileTextures {
     texture.needsUpdate = true;
     return texture;
   }
+}
+
+/**
+ * The polar caps' fills (KB-211), north then south: 1 × 1 textures of their colors, sampled like the base image (on
+ * WebGPU the sampler set up with a binding stays when its texture changes), made again when the colors or the base
+ * image change.
+ */
+class PolarCapTextures {
+  private colors: readonly string[] = ['#78a9cd', '#f2f3f7'];
+  /** The textures, empty until the base image is up. */
+  textures: Texture[] = [];
+  private base: Texture | undefined;
+  private renderer: WebGPURenderer | undefined;
+
+  /** New colors, `#rrggbb`, drawn from the next frame. */
+  setColors(north: string, south: string): void {
+    this.colors = [north, south];
+    this.rebuild(this.base, this.renderer);
+  }
+
+  /**
+   * Textures sampled like the base image `base`, or none without it, uploaded now as the base image is: a cap that
+   * comes into view later uploads nothing (F052). Returns `base`.
+   */
+  rebuild<T extends Texture | undefined>(base: T, renderer: WebGPURenderer | undefined): T {
+    this.dispose();
+    this.base = base;
+    this.renderer = renderer;
+    this.textures = base ? this.colors.map((rgb) => createColorTexture(rgb, base)) : [];
+    for (const texture of this.textures) renderer?.initTexture(texture);
+    return base;
+  }
+
+  /** Frees the textures. */
+  dispose(): void {
+    for (const texture of this.textures) texture.dispose();
+    this.textures = [];
+  }
+}
+
+/** A 1 × 1 texture of one `#rrggbb` sRGB color, sampled like `like`. */
+function createColorTexture(hex: string, like: Texture): DataTexture {
+  const rgb = parseInt(hex.slice(1), 16);
+  const texture = new DataTexture(Uint8Array.of(rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255), 1, 1);
+  texture.colorSpace = like.colorSpace;
+  texture.wrapS = like.wrapS;
+  texture.wrapT = like.wrapT;
+  texture.minFilter = like.minFilter;
+  texture.magFilter = like.magFilter;
+  texture.anisotropy = like.anisotropy;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /**

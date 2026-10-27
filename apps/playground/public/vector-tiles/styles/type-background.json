@@ -1,0 +1,25 @@
+{
+  "version": 8,
+  "name": "VibeGlobe fixture: background layers",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": ["/vector-tiles/tiles/{z}/{x}/{y}.pbf"],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "Fixture data (invented)"
+    }
+  },
+  "sprite": "/vector-tiles/sprite",
+  "glyphs": "/vector-tiles/glyphs/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": ["interpolate", ["linear"], ["zoom"], 2, "#3d6e8f", 14, "#8fb8d0"],
+        "background-opacity": 0.9
+      }
+    }
+  ]
+}

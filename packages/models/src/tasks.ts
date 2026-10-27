@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { TaskTable } from '@vibeglobe/core';
 import { transferables } from './build.js';
 import type { DracoDecoderModule, DracoLoader } from './draco.js';
@@ -12,6 +14,11 @@ export interface ParseModelTaskInput {
   readonly bytes: ArrayBuffer;
   readonly resources?: Readonly<Record<string, ArrayBuffer>>;
   readonly limits?: ModelLimits;
+  /**
+   * Where the consumer hosts Draco's `draco_decoder.wasm` (ADR 0015), for the task's default Draco loader; in Node the
+   * decoder package finds its own file.
+   */
+  readonly dracoWasmUrl?: string;
 }
 
 /** Decoders the worker's model task uses. */
@@ -44,7 +51,13 @@ export function loadDraco3d(wasmUrl?: string): DracoLoader {
  * next to its own tasks (hook request), so decoding never runs on the main thread.
  */
 export function createModelTasks(options: ModelTaskOptions = {}): TaskTable {
-  const draco = options.draco ?? loadDraco3d();
+  // One Draco loader per decoder location, each loading its module once.
+  const dracoLoaders = new Map<string | undefined, DracoLoader>();
+  const dracoFor = (url: string | undefined): DracoLoader => {
+    let loader = dracoLoaders.get(url);
+    if (!loader) dracoLoaders.set(url, (loader = loadDraco3d(url)));
+    return loader;
+  };
   return Object.freeze({
     [PARSE_MODEL_TASK]: async (input: unknown) => {
       const value = input as ParseModelTaskInput;
@@ -52,7 +65,7 @@ export function createModelTasks(options: ModelTaskOptions = {}): TaskTable {
       for (const [uri, buffer] of Object.entries(value.resources ?? {})) resources[uri] = new Uint8Array(buffer);
       const model = await parseModel(new Uint8Array(value.bytes), {
         resources,
-        draco,
+        draco: options.draco ?? dracoFor(value.dracoWasmUrl),
         ...(options.meshopt ? { meshopt: options.meshopt } : {}),
         ...(value.limits ? { limits: value.limits } : {}),
       });

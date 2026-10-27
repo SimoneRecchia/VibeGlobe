@@ -1,0 +1,388 @@
+
+> vibeglobe@0.0.0 build
+> tsc -b && npm run build:browser -w @vibeglobe/web-component && npm run build -w @vibeglobe/playground && npm run build -w @vibeglobe/lazy-host && npm run build -w @vibeglobe/adapter-examples && npm run build -w @vibeglobe/nuxt-example
+
+
+> @vibeglobe/web-component@0.0.0 build:browser
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 576 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/browser/assets/label-sdf-worker-Bg5y4GI4.js      1.25 kB
+dist/browser/assets/cluster-worker-LjGkdm1H.js       11.02 kB
+dist/browser/assets/src-D6_QBKDW.js                  26.65 kB
+dist/browser/assets/vector-BLeWG3c0.js               29.18 kB
+dist/browser/assets/draco3d-BGaVHQsF.js             101.10 kB
+dist/browser/assets/vector-tiles-CovBeSa0.js        138.65 kB
+dist/browser/assets/vibeglobe-worker-B4rbyCT8.js    612.51 kB
+dist/browser/errors-BpIkvDUm.js                       0.19 kB │ gzip:   0.15 kB
+dist/browser/wgs84--D61YJWv.js                        0.24 kB │ gzip:   0.20 kB
+dist/browser/layer-target-BCjyb8tW.js                 0.42 kB │ gzip:   0.27 kB
+dist/browser/cluster-worker-W603Iawd.js               0.84 kB │ gzip:   0.49 kB
+dist/browser/fxaa-Cg5O5ks9.js                         1.14 kB │ gzip:   0.63 kB
+dist/browser/integer-key-map.hot-DLR2flA6.js          2.46 kB │ gzip:   0.87 kB
+dist/browser/protocol-BZ3QI4EC.js                     3.45 kB │ gzip:   1.30 kB
+dist/browser/browser-host-hBy82iMz.js                 5.94 kB │ gzip:   2.23 kB
+dist/browser/earcut-BdWvME6a.js                      10.30 kB │ gzip:   3.59 kB
+dist/browser/worker-pool-D7vcOxFL.js                 12.31 kB │ gzip:   3.91 kB
+dist/browser/cluster-DxeUEPZ4.js                     14.63 kB │ gzip:   5.11 kB
+dist/browser/layer-geometry-B2cadD-r.js              23.49 kB │ gzip:   7.52 kB
+dist/browser/vector-tiles-Cvi3X5fg.js                31.73 kB │ gzip:   9.95 kB
+dist/browser/src-BuYbqjF9.js                         33.23 kB │ gzip:  10.46 kB
+dist/browser/vector-BqkIwY0v.js                      38.89 kB │ gzip:  12.37 kB
+dist/browser/src-BEtWJsB6.js                         62.53 kB │ gzip:  18.95 kB
+dist/browser/draco3d-BuUZhuH7.js                    125.20 kB │ gzip:  25.73 kB
+dist/browser/expression-C2Z7Ll8Z.js                 141.32 kB │ gzip:  27.82 kB
+dist/browser/vibe-globe.js                          253.35 kB │ gzip:  71.76 kB
+dist/browser/src-BiuiZ_EC.js                        258.25 kB │ gzip:  73.45 kB
+dist/browser/tasks-CwXswyww.js                      615.26 kB │ gzip: 303.44 kB
+dist/browser/three-backend-DOJqsdK3.js            1,190.13 kB │ gzip: 292.12 kB
+
+✓ built in 396ms
+
+> @vibeglobe/playground@0.0.0 build
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 658 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/label-sdf-worker-DnOv_oda.js             1.26 kB
+dist/index.html                                      3.75 kB │ gzip:   1.28 kB
+dist/assets/meshopt-decoder-CO-HBMUy.wasm            8.41 kB │ gzip:   3.37 kB
+dist/assets/draco_decoder-C7nU2fZe.wasm            272.67 kB │ gzip:  82.56 kB
+dist/assets/vibeglobe-basis-f-Il4uAz.wasm          435.03 kB │ gzip: 209.67 kB
+dist/assets/vibeglobe-worker-CbWzcOBc.js           449.10 kB
+dist/assets/worker-CXWojbMm.js                   1,194.21 kB
+dist/assets/vector-Bm7Nd619.js                       0.05 kB │ gzip:   0.07 kB
+dist/assets/cluster-worker-BbCkBSvS.js               0.06 kB │ gzip:   0.08 kB
+dist/assets/vector-tiles-DVDgmZ52.js                 0.10 kB │ gzip:   0.10 kB
+dist/assets/src-DrWaTNDG.js                          0.11 kB │ gzip:   0.11 kB
+dist/assets/errors-5QWERjz7.js                       0.11 kB │ gzip:   0.11 kB
+dist/assets/protocol-BQ5tyBzH.js                     0.13 kB │ gzip:   0.13 kB
+dist/assets/wgs84-BK00NRJi.js                        0.16 kB │ gzip:   0.15 kB
+dist/assets/metadata-DzKKuL_2.js                     0.19 kB │ gzip:   0.17 kB
+dist/assets/layer-target-D3ll3zP8.js                 0.28 kB │ gzip:   0.21 kB
+dist/assets/web-mercator-C2k6Lm8x.js                 0.37 kB │ gzip:   0.25 kB
+dist/assets/marker-images-DnZdqvt-.js                0.42 kB │ gzip:   0.26 kB
+dist/assets/src-CHIW_Qnc.js                          0.53 kB │ gzip:   0.33 kB
+dist/assets/layers-stream-D5uDEqLq.js                0.57 kB │ gzip:   0.42 kB
+dist/assets/rolldown-runtime-WkwZ5CU-.js             0.59 kB │ gzip:   0.36 kB
+dist/assets/hud-DtrS6Jh7.js                          0.70 kB │ gzip:   0.50 kB
+dist/assets/layers-live-CwcOgm4e.js                  0.72 kB │ gzip:   0.48 kB
+dist/assets/layers-lod-Cn8rBrFn.js                   0.81 kB │ gzip:   0.55 kB
+dist/assets/fxaa-Cm1I_UCZ.js                         0.95 kB │ gzip:   0.56 kB
+dist/assets/geodesic-direct-DASIMSG-.js              1.07 kB │ gzip:   0.67 kB
+dist/assets/tiles3d-tour-CRWjkA4O.js                 1.13 kB │ gzip:   0.63 kB
+dist/assets/layers-cluster-CTTeIaO2.js               1.18 kB │ gzip:   0.74 kB
+dist/assets/layers-street-BXmMaEp1.js                1.20 kB │ gzip:   0.64 kB
+dist/assets/src-hx2phPoq.js                          1.26 kB │ gzip:   0.68 kB
+dist/assets/cluster-worker-DrcGWXLk.js               1.33 kB │ gzip:   0.70 kB
+dist/assets/eye-relative-Dg2YQfGC.js                 1.37 kB │ gzip:   0.65 kB
+dist/assets/gpu-probes-xbRi9tTX.js                   1.39 kB │ gzip:   0.77 kB
+dist/assets/tiling-scheme-Dr2w94v7.js                1.42 kB │ gzip:   0.66 kB
+dist/assets/preload-helper-BLdHbfdN.js               1.51 kB │ gzip:   0.79 kB
+dist/assets/tile-view-Chki_IU6.js                    1.65 kB │ gzip:   0.87 kB
+dist/assets/integer-key-map.hot-Cga6JABo.js          1.81 kB │ gzip:   0.70 kB
+dist/assets/observability-qhdy2ZiX.js                2.04 kB │ gzip:   0.90 kB
+dist/assets/quality-demo-Dnbja3tS.js                 2.20 kB │ gzip:   1.19 kB
+dist/assets/layers-formats-DSvEe1sp.js               2.22 kB │ gzip:   1.09 kB
+dist/assets/src-D-u_jSzF.js                          2.29 kB │ gzip:   1.16 kB
+dist/assets/webgpu-compat-CA8NPI9r.js                2.69 kB │ gzip:   1.21 kB
+dist/assets/display-only-D2GmZQTY.js                 2.76 kB │ gzip:   1.24 kB
+dist/assets/heightmap-Cjaf3xyv.js                    3.11 kB │ gzip:   1.33 kB
+dist/assets/fetch-transport-DiCBV4cb.js              3.37 kB │ gzip:   1.57 kB
+dist/assets/sdf-atlas-ByO5COkV.js                    3.70 kB │ gzip:   1.63 kB
+dist/assets/morph-BK9-6_p_.js                        3.74 kB │ gzip:   1.53 kB
+dist/assets/geodesic-series-CeHXboPA.js              3.79 kB │ gzip:   1.69 kB
+dist/assets/geodesic-inverse-DOfUKR47.js             4.57 kB │ gzip:   2.23 kB
+dist/assets/browser-host-DMYMh74q.js                 4.87 kB │ gzip:   1.96 kB
+dist/assets/tile-meshes-3ydYfqZo.js                  5.37 kB │ gzip:   2.52 kB
+dist/assets/tiles3d-google-provider-SrKEeRXS.js      5.39 kB │ gzip:   2.47 kB
+dist/assets/rbush-CaohfFwn.js                        5.71 kB │ gzip:   2.16 kB
+dist/assets/src-D3bRbcw7.js                          6.44 kB │ gzip:   2.29 kB
+dist/assets/scenario-harness-BXefDWvk.js             6.49 kB │ gzip:   2.61 kB
+dist/assets/gpu-probes-M5Fe9fr2.js                   6.95 kB │ gzip:   2.92 kB
+dist/assets/earcut-igf7EuqS.js                       7.16 kB │ gzip:   3.11 kB
+dist/assets/reprojected-layers-Bxtb8H_F.js           9.39 kB │ gzip:   4.15 kB
+dist/assets/worker-pool-CF8hzz-J.js                  9.65 kB │ gzip:   3.40 kB
+dist/assets/cluster-CwesNnPa.js                     10.63 kB │ gzip:   4.34 kB
+dist/assets/layer-geometry-BFgGuy42.js              12.57 kB │ gzip:   5.25 kB
+dist/assets/three.tsl-fluDdJrM.js                   13.13 kB │ gzip:   4.33 kB
+dist/assets/three.tsl-DivGOjvK.js                   18.23 kB │ gzip:   7.05 kB
+dist/assets/tasks-Bnmk47Ic.js                       19.00 kB │ gzip:   7.16 kB
+dist/assets/three.webgpu-D9pPf54l.js                19.35 kB │ gzip:   7.43 kB
+dist/assets/layers-demo-BLZ8hY_5.js                 23.01 kB │ gzip:   6.90 kB
+dist/assets/src-CL0xL_gB.js                         26.14 kB │ gzip:   9.18 kB
+dist/assets/vector-tiles-Bvj14urP.js                27.38 kB │ gzip:  10.12 kB
+dist/assets/vector-CnxCy-ZV.js                      34.42 kB │ gzip:  12.07 kB
+dist/assets/src-1UYxlxsE.js                         40.55 kB │ gzip:  13.90 kB
+dist/assets/tiles3d-demo-cYOqLkwi.js                42.34 kB │ gzip:  15.10 kB
+dist/assets/gltf-Be3ovGzp.js                        45.27 kB │ gzip:  13.49 kB
+dist/assets/three-backend-BvlIxQaX.js               70.78 kB │ gzip:  25.30 kB
+dist/assets/src-FRfRgK0Q.js                         90.85 kB │ gzip:  27.78 kB
+dist/assets/vector-tiles-demo-B3JJ8qB8.js           93.63 kB │ gzip:  31.50 kB
+dist/assets/draco3d-CeAnW6ad.js                    101.01 kB │ gzip:  23.14 kB
+dist/assets/expression-8o_hcM2M.js                 105.29 kB │ gzip:  24.62 kB
+dist/assets/crs-B1tQxWQS.js                        130.90 kB │ gzip:  43.87 kB
+dist/assets/index-DRAtwIRN.js                      214.46 kB │ gzip:  70.24 kB
+dist/assets/three.core-CKhs1Kmj.js                 378.37 kB │ gzip: 101.27 kB
+dist/assets/three.webgpu-CQKmILwk.js               690.40 kB │ gzip: 192.35 kB
+
+✓ built in 4.92s
+
+> @vibeglobe/lazy-host@0.0.0 build
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 171 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                               0.73 kB │ gzip:   0.46 kB
+dist/assets/label-sdf-worker-DnOv_oda.js      1.26 kB
+dist/.vite/manifest.json                      3.43 kB │ gzip:   0.62 kB
+dist/assets/rolldown-runtime-DK3Fl9T5.js      0.15 kB │ gzip:   0.15 kB
+dist/assets/fxaa-Ck0uguTl.js                  0.95 kB │ gzip:   0.56 kB
+dist/assets/dist-BRKr46X2.js                  2.39 kB │ gzip:   1.16 kB
+dist/assets/index-Bs-1jt4s.js                 3.29 kB │ gzip:   1.59 kB
+dist/assets/webgpu-compat-CXinuKRe.js         4.04 kB │ gzip:   1.75 kB
+dist/assets/browser-host-DMYMh74q.js          4.87 kB │ gzip:   1.96 kB
+dist/assets/gpu-probes-Quj4IpL1.js            6.96 kB │ gzip:   2.92 kB
+dist/assets/three.tsl-CacuOeVr.js            26.63 kB │ gzip:   8.26 kB
+dist/assets/dist-jk7Z9hXe.js                 30.32 kB │ gzip:   9.57 kB
+dist/assets/three-backend-DSQCdanc.js        80.85 kB │ gzip:  29.21 kB
+dist/assets/dist-BeutAohN.js                189.81 kB │ gzip:  62.65 kB
+dist/assets/three.webgpu-BUbefvTF.js      1,076.25 kB │ gzip: 294.53 kB
+
+✓ built in 729ms
+
+> @vibeglobe/adapter-examples@0.0.0 build
+> vue-tsc --noEmit && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 659 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/vue-element.html                              0.73 kB │ gzip:   0.37 kB
+dist/react.html                                    0.77 kB │ gzip:   0.40 kB
+dist/index.html                                    0.85 kB │ gzip:   0.39 kB
+dist/element-ui.html                               0.96 kB │ gzip:   0.51 kB
+dist/live.html                                     1.11 kB │ gzip:   0.45 kB
+dist/assets/label-sdf-worker-DnOv_oda.js           1.26 kB
+dist/assets/cache-worker-CMV-9KD5.js               5.20 kB
+dist/assets/meshopt-decoder-CO-HBMUy.wasm          8.41 kB │ gzip:   3.37 kB
+dist/assets/vibeglobe-basis-f-Il4uAz.wasm        435.03 kB │ gzip: 209.67 kB
+dist/assets/vibeglobe-worker-CbWzcOBc.js         449.10 kB
+dist/assets/live-35SOKisK.css                      0.06 kB │ gzip:   0.08 kB
+dist/assets/CameraReadout-DTnb7VJL.css             0.14 kB │ gzip:   0.14 kB
+dist/assets/index-Cg_M9qh-.css                     0.22 kB │ gzip:   0.18 kB
+dist/assets/wgs84-BK00NRJi.js                      0.16 kB │ gzip:   0.15 kB
+dist/assets/layer-target-D3ll3zP8.js               0.28 kB │ gzip:   0.21 kB
+dist/assets/element-ui-BdeBOcC6.js                 0.61 kB │ gzip:   0.41 kB
+dist/assets/cluster-worker-DdDu5Igs.js             0.63 kB │ gzip:   0.39 kB
+dist/assets/rolldown-runtime-XKyaHtl9.js           0.72 kB │ gzip:   0.42 kB
+dist/assets/vue-element-3A6eU3FC.js                0.75 kB │ gzip:   0.51 kB
+dist/assets/fxaa-GBUK7F5P.js                       0.90 kB │ gzip:   0.53 kB
+dist/assets/index-D_h3aBbV.js                      2.15 kB │ gzip:   1.06 kB
+dist/assets/geodesic-series-CeHXboPA.js            3.79 kB │ gzip:   1.69 kB
+dist/assets/browser-host-DMYMh74q.js               4.87 kB │ gzip:   1.96 kB
+dist/assets/element-hooks-BmhM1XjU.js              6.12 kB │ gzip:   2.68 kB
+dist/assets/src-h4g7o8RY.js                        6.67 kB │ gzip:   2.45 kB
+dist/assets/earcut-igf7EuqS.js                     7.16 kB │ gzip:   3.11 kB
+dist/assets/CameraReadout-jqceweyi.js              7.25 kB │ gzip:   3.01 kB
+dist/assets/cluster-CwesNnPa.js                   10.63 kB │ gzip:   4.34 kB
+dist/assets/tasks-BGk3T2Ht.js                     19.18 kB │ gzip:   7.17 kB
+dist/assets/vector-tiles-BOsryJHd.js              23.91 kB │ gzip:   8.70 kB
+dist/assets/src-Dl9j7q_C.js                       26.14 kB │ gzip:   9.18 kB
+dist/assets/live-BErICAmI.js                      28.65 kB │ gzip:  10.28 kB
+dist/assets/vector-DtSKDAtc.js                    29.13 kB │ gzip:  10.87 kB
+dist/assets/src-B8v2PC4-.js                       47.87 kB │ gzip:  16.79 kB
+dist/assets/runtime-dom.esm-bundler-D6ABJkIO.js   62.30 kB │ gzip:  24.51 kB
+dist/assets/draco3d-BqOXnwaY.js                  101.01 kB │ gzip:  23.14 kB
+dist/assets/expression-yjrm7OUu.js               105.18 kB │ gzip:  24.63 kB
+dist/assets/src-qKBb21cU.js                      199.17 kB │ gzip:  66.32 kB
+dist/assets/react-Cu-xz4FA.js                    219.17 kB │ gzip:  68.52 kB
+dist/assets/hooks-CVc-yV5a.js                    226.20 kB │ gzip:  74.53 kB
+dist/assets/three-backend-DGy8lDct.js            964.81 kB │ gzip: 269.06 kB
+
+✓ built in 420ms
+
+> @vibeglobe/nuxt-example@0.0.0 build
+> nuxt build
+
+┌  Building Nuxt for production...
+│
+●  Nuxt 4.5.2 (with Nitro 2.13.5, Vite 8.3.4 and Vue 3.5.44)
+│
+●  Nitro preset: node-server
+ℹ Building client...
+ℹ vite v8.3.4 building client environment for production...
+transforming...
+✓ 778 modules transformed.
+rendering chunks...
+computing gzip size...
+ℹ .nuxt/dist/client/_nuxt/label-sdf-worker-DnOv_oda.js     1.26 kB
+.nuxt/dist/client/_nuxt/cache-worker-CMV-9KD5.js         5.20 kB
+.nuxt/dist/client/_nuxt/meshopt-decoder.CO-HBMUy.wasm    8.41 kB │ gzip:   3.37 kB
+.nuxt/dist/client/manifest.json                          8.84 kB │ gzip:   1.39 kB
+.nuxt/dist/client/_nuxt/vibeglobe-basis.f-Il4uAz.wasm  435.03 kB │ gzip: 209.67 kB
+.nuxt/dist/client/_nuxt/vibeglobe-worker-DC66DLZn.js   449.15 kB
+.nuxt/dist/client/_nuxt/globe.CY0r4rwY.css               0.09 kB │ gzip:   0.09 kB
+.nuxt/dist/client/_nuxt/entry.DkgHQ1aN.css               0.19 kB │ gzip:   0.17 kB
+.nuxt/dist/client/_nuxt/_group_.B7gYsYk4.css             0.20 kB │ gzip:   0.14 kB
+.nuxt/dist/client/_nuxt/error-500.B4nQBaYX.css           1.90 kB │ gzip:   0.72 kB
+.nuxt/dist/client/_nuxt/error-404.C0e4stit.css           2.42 kB │ gzip:   0.85 kB
+.nuxt/dist/client/_nuxt/BK00NRJi.js                      0.16 kB │ gzip:   0.15 kB
+.nuxt/dist/client/_nuxt/D3ll3zP8.js                      0.28 kB │ gzip:   0.21 kB
+.nuxt/dist/client/_nuxt/DbbQAWHH.js                      0.62 kB │ gzip:   0.39 kB
+.nuxt/dist/client/_nuxt/Brs2gAR_.js                      0.66 kB │ gzip:   0.44 kB
+.nuxt/dist/client/_nuxt/C3I24Mi_.js                      0.89 kB │ gzip:   0.52 kB
+.nuxt/dist/client/_nuxt/DdxpR-lV.js                      1.14 kB │ gzip:   0.55 kB
+.nuxt/dist/client/_nuxt/DFrjIWTu.js                      2.26 kB │ gzip:   1.10 kB
+.nuxt/dist/client/_nuxt/B9qLK3RR.js                      3.35 kB │ gzip:   1.51 kB
+.nuxt/dist/client/_nuxt/CgWCoZi0.js                      3.38 kB │ gzip:   1.58 kB
+.nuxt/dist/client/_nuxt/COp0FtjS.js                      3.66 kB │ gzip:   1.65 kB
+.nuxt/dist/client/_nuxt/DLNqNzWv.js                      3.78 kB │ gzip:   1.68 kB
+.nuxt/dist/client/_nuxt/xrC1Spj9.js                      4.35 kB │ gzip:   2.05 kB
+.nuxt/dist/client/_nuxt/DMYMh74q.js                      4.87 kB │ gzip:   1.96 kB
+.nuxt/dist/client/_nuxt/C4k3vt__.js                      5.22 kB │ gzip:   2.19 kB
+.nuxt/dist/client/_nuxt/h4g7o8RY.js                      6.67 kB │ gzip:   2.45 kB
+.nuxt/dist/client/_nuxt/Bw0zvmV3.js                      6.70 kB │ gzip:   2.84 kB
+.nuxt/dist/client/_nuxt/igf7EuqS.js                      7.16 kB │ gzip:   3.11 kB
+.nuxt/dist/client/_nuxt/CwesNnPa.js                     10.63 kB │ gzip:   4.34 kB
+.nuxt/dist/client/_nuxt/B86GIX1b.js                     19.15 kB │ gzip:   7.19 kB
+.nuxt/dist/client/_nuxt/LVd9yJdy.js                     23.88 kB │ gzip:   8.69 kB
+.nuxt/dist/client/_nuxt/BNQYycfo.js                     26.64 kB │ gzip:   9.37 kB
+.nuxt/dist/client/_nuxt/CKC1wRs3.js                     29.12 kB │ gzip:  10.85 kB
+.nuxt/dist/client/_nuxt/ClqC-FMo.js                     47.81 kB │ gzip:  16.75 kB
+.nuxt/dist/client/_nuxt/TIdc7Y8N.js                     49.17 kB │ gzip:  17.25 kB
+.nuxt/dist/client/_nuxt/-lGEfSJv.js                     83.23 kB │ gzip:  24.78 kB
+.nuxt/dist/client/_nuxt/BylNd9vd.js                    101.00 kB │ gzip:  23.13 kB
+.nuxt/dist/client/_nuxt/yjrm7OUu.js                    105.18 kB │ gzip:  24.63 kB
+.nuxt/dist/client/_nuxt/CyKpAk5T.js                    144.98 kB │ gzip:  49.63 kB
+.nuxt/dist/client/_nuxt/LfadHbUa.js                    182.41 kB │ gzip:  67.58 kB
+.nuxt/dist/client/_nuxt/Dw01P-sA.js                    222.26 kB │ gzip:  72.92 kB
+.nuxt/dist/client/_nuxt/Cb6-Wv7_.js                    964.82 kB │ gzip: 269.06 kB
+
+ℹ ✓ built in 908ms
+✔ Client built in 940ms
+ℹ Building server...
+ℹ vite v8.3.4 building ssr environment for production...
+transforming...
+✓ 426 modules transformed.
+rendering chunks...
+ℹ .nuxt/dist/server/_nuxt/entry-styles.DIdqG3cH.mjs             0.08 kB
+.nuxt/dist/server/_nuxt/globe-styles.DgKvwQJI.mjs             0.08 kB
+.nuxt/dist/server/_nuxt/_group_-styles.CXj7VBjf.mjs           0.08 kB
+.nuxt/dist/server/_nuxt/error-404-styles.DU8ouMQP.mjs         0.08 kB
+.nuxt/dist/server/_nuxt/error-500-styles.BMFE-pI7.mjs         0.08 kB
+.nuxt/dist/server/styles.mjs                                  0.75 kB
+.nuxt/dist/server/_nuxt/globe-styles-1.mjs-Ct4XWX6n.js        0.38 kB │ map:   2.24 kB
+.nuxt/dist/server/_nuxt/entry-styles-1.mjs-CoEA3UOT.js        0.47 kB │ map:   0.48 kB
+.nuxt/dist/server/_nuxt/_group_-styles-1.mjs-ik0i1qdA.js      0.51 kB │ map:   6.22 kB
+.nuxt/dist/server/_nuxt/feature-groups-BYp4l3tf.js            1.46 kB │ map:   2.23 kB
+.nuxt/dist/server/_nuxt/pages-Bqphq4Ic.js                     1.95 kB │ map:   1.84 kB
+.nuxt/dist/server/_nuxt/error-500-styles-1.mjs-DfXtDzO9.js    2.31 kB │ map:   5.15 kB
+.nuxt/dist/server/_nuxt/error-404-styles-1.mjs-Bs8qyehW.js    2.83 kB │ map:   5.80 kB
+.nuxt/dist/server/_nuxt/error-500-CwvaXtBD.js                 4.33 kB │ map:   5.53 kB
+.nuxt/dist/server/_nuxt/error-404-CqsRiVtV.js                 5.00 kB │ map:   6.41 kB
+.nuxt/dist/server/_nuxt/globe-CTmWhx7n.js                     5.45 kB │ map:  10.67 kB
+.nuxt/dist/server/_nuxt/vibe-globe-BbI6-AQe.js                5.95 kB │ map:  13.30 kB
+.nuxt/dist/server/_nuxt/nuxt-4fWra5Qr.js                      6.58 kB │ map:  22.63 kB
+.nuxt/dist/server/_nuxt/feature-checks-gVaXmLip.js            7.49 kB │ map:  14.82 kB
+.nuxt/dist/server/_nuxt/_group_-DIVMeCHK.js                  11.28 kB │ map:  26.77 kB
+.nuxt/dist/server/_nuxt/geodesic-series-9a8FOv0P.js          12.08 kB │ map:  21.67 kB
+.nuxt/dist/server/_nuxt/dist-fUzvopeA.js                     32.73 kB │ map:  46.48 kB
+.nuxt/dist/server/_nuxt/dist-B-6HMryq.js                     36.60 kB │ map:  68.47 kB
+.nuxt/dist/server/server.mjs                                 43.15 kB │ map: 125.78 kB
+.nuxt/dist/server/_nuxt/dist-CZ1elTPy.js                    144.80 kB │ map: 266.51 kB
+
+ℹ ✓ built in 321ms
+✔ Server built in 332ms
+[nitro] ✔ Generated public .output/public
+[nitro] ℹ Building Nuxt Nitro server (preset: node-server, compatibility date: 2026-10-01)
+[nitro] ✔ Nuxt Nitro server built
+  ├─ .output/server/chunks/_/error-500.mjs (5.05 kB) (2.06 kB gzip)
+  ├─ .output/server/chunks/build/_group_-DIVMeCHK.mjs (8.07 kB) (2.47 kB gzip)
+  ├─ .output/server/chunks/build/_group_-styles.CXj7VBjf.mjs (476 B) (277 B gzip)
+  ├─ .output/server/chunks/build/dist-B-6HMryq.mjs (34.6 kB) (9.84 kB gzip)
+  ├─ .output/server/chunks/build/dist-CZ1elTPy.mjs (21.1 kB) (5.52 kB gzip)
+  ├─ .output/server/chunks/build/dist-fUzvopeA.mjs (34.9 kB) (9.48 kB gzip)
+  ├─ .output/server/chunks/build/entry-styles.DIdqG3cH.mjs (451 B) (305 B gzip)
+  ├─ .output/server/chunks/build/error-404-CqsRiVtV.mjs (5.52 kB) (2.25 kB gzip)
+  ├─ .output/server/chunks/build/error-404-styles.DU8ouMQP.mjs (2.76 kB) (1 kB gzip)
+  ├─ .output/server/chunks/build/error-500-CwvaXtBD.mjs (4.8 kB) (2.02 kB gzip)
+  ├─ .output/server/chunks/build/error-500-styles.BMFE-pI7.mjs (2.23 kB) (877 B gzip)
+  ├─ .output/server/chunks/build/feature-checks-gVaXmLip.mjs (8.11 kB) (2.57 kB gzip)
+  ├─ .output/server/chunks/build/feature-groups-BYp4l3tf.mjs (1.5 kB) (648 B gzip)
+  ├─ .output/server/chunks/build/globe-CTmWhx7n.mjs (4.52 kB) (1.55 kB gzip)
+  ├─ .output/server/chunks/build/globe-styles.DgKvwQJI.mjs (352 B) (230 B gzip)
+  ├─ .output/server/chunks/build/pages-Bqphq4Ic.mjs (2.39 kB) (992 B gzip)
+  ├─ .output/server/chunks/build/vibe-globe-BbI6-AQe.mjs (5.33 kB) (1.9 kB gzip)
+  ├─ .output/server/chunks/nitro/nitro.mjs (171 kB) (42.3 kB gzip)
+  ├─ .output/server/chunks/routes/renderer.mjs (16.3 kB) (5.59 kB gzip)
+  ├─ .output/server/chunks/virtual/_virtual_spa-template.mjs (94 B) (100 B gzip)
+  ├─ .output/server/chunks/virtual/entry.mjs (57.9 kB) (15.6 kB gzip)
+  ├─ .output/server/chunks/virtual/precomputed.mjs (20.1 kB) (2.42 kB gzip)
+  ├─ .output/server/chunks/virtual/styles.mjs (832 B) (330 B gzip)
+  ├─ .output/server/index.mjs (353 B) (203 B gzip)
+  └─ .output/server/package.json (973 B) (426 B gzip)
+Σ Total size: 3.03 MB (744 kB gzip)
+[nitro] ✔ You can preview this build using node .output/server/index.mjs
+│
+└  ✨ Build complete!
+
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[33m[PLUGIN_TIMINGS] [0mJavaScript callbacks ran for 4.7s of this 4.9s build (97%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin vite:prepare-out-dir renderStart (86%, 4.2s, 1 call)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - plugin vite:worker-import-meta-url transform (3 calls)
+  - plugin vite:asset-import-meta-url transform (2 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+ WARN  [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+
+
+ WARN  [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+
+
+ WARN  [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_encoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details. (x2)
+
+
+ WARN  [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/s1imone/WebstormProjects/VibeGlobe/node_modules/draco3d/draco_decoder_nodejs.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+

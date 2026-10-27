@@ -1,0 +1,1829 @@
+{
+  "schemaVersion": 1,
+  "commit": "7436a3318cb3bba23b3a2d050b3fa61c35146b19",
+  "date": "2026-10-24T23:35:51.140Z",
+  "device": {
+    "name": "macbook-apple-m5-macos-26-6-2",
+    "os": "darwin 25.6.0",
+    "browser": "chromium 156.0.8078.4",
+    "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+    "pixelRatio": 1,
+    "resolution": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "method": {
+    "warmUpRuns": 1,
+    "runs": 5,
+    "discardMs": 2000,
+    "sampleMs": 3000,
+    "budgetStatistic": "median of per-run p95"
+  },
+  "scenarios": {
+    "frame-loop": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 6.171627044677734,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 144.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.09999990463256836,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 6.174530029296875,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.90000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 6.1716156005859375,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 144.79999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 6.176273345947266,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999990463256836,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 6.17633056640625,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 146,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 0,
+      "jsHeapMB": 6.174530029296875,
+      "startupMs": 145.5,
+      "drawCalls": 27,
+      "gpuFrameP95Ms": null
+    },
+    "debug-overlay": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.19999980926513672,
+            "p99": 0.3000001907348633,
+            "max": 0.39999985694885254
+          },
+          "jsHeapMB": 6.631122589111328,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.19999980926513672,
+            "p99": 0.2999999523162842,
+            "max": 0.39999985694885254
+          },
+          "jsHeapMB": 6.6310882568359375,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 162.70000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.10000014305114746,
+            "p99": 0.2999999523162842,
+            "max": 0.40000009536743164
+          },
+          "jsHeapMB": 6.631122589111328,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.20000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.20000004768371582,
+            "p99": 0.3000001907348633,
+            "max": 0.39999985694885254
+          },
+          "jsHeapMB": 6.631111145019531,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.80000019073486,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0.19999980926513672,
+            "p99": 0.3000001907348633,
+            "max": 0.40000009536743164
+          },
+          "jsHeapMB": 6.6309967041015625,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.60000014305115,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.799999999999727,
+      "cpuFrameP95Ms": 0.19999980926513672,
+      "jsHeapMB": 6.631111145019531,
+      "startupMs": 145.60000014305115,
+      "drawCalls": 27,
+      "gpuFrameP95Ms": null
+    },
+    "drag-200-webgl2": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.9000000953674316,
+            "p95": 5.099999904632568,
+            "p99": 5.400000095367432,
+            "max": 5.599999904632568
+          },
+          "jsHeapMB": 11.019420623779297,
+          "gpuFrameMs": {
+            "p50": 3.705749,
+            "p95": 4.209666,
+            "p99": 4.409749,
+            "max": 4.420458
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 234,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 181,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.9000000953674316,
+            "p95": 5.200000047683716,
+            "p99": 5.700000047683716,
+            "max": 5.799999952316284
+          },
+          "jsHeapMB": 10.734378814697266,
+          "gpuFrameMs": {
+            "p50": 3.7729160000000004,
+            "p95": 4.121875,
+            "p99": 4.372874,
+            "max": 4.443581999999999
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 234.20000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 4,
+            "p95": 5.099999904632568,
+            "p99": 5.5,
+            "max": 5.5
+          },
+          "jsHeapMB": 11.019676208496094,
+          "gpuFrameMs": {
+            "p50": 3.723249,
+            "p95": 4.229665,
+            "p99": 4.4507080000000006,
+            "max": 4.642125
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 233.30000019073486,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 181,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.800000000000182,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.5,
+            "p95": 5,
+            "p99": 5.6000001430511475,
+            "max": 5.800000190734863
+          },
+          "jsHeapMB": 11.008312225341797,
+          "gpuFrameMs": {
+            "p50": 3.908916,
+            "p95": 4.3263739999999995,
+            "p99": 4.615458,
+            "max": 4.681625
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 234.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.700000047683716,
+            "p95": 5,
+            "p99": 5.400000095367432,
+            "max": 5.700000047683716
+          },
+          "jsHeapMB": 11.020111083984375,
+          "gpuFrameMs": {
+            "p50": 3.789208,
+            "p95": 4.331291,
+            "p99": 4.585375,
+            "max": 4.906665
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 234.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 5.099999904632568,
+      "jsHeapMB": 11.019420623779297,
+      "startupMs": 234.20000004768372,
+      "drawCalls": 359,
+      "gpuFrameP95Ms": 4.229665
+    },
+    "drag-400-webgl2": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.1000001430511475,
+            "p95": 5,
+            "p99": 5.200000047683716,
+            "max": 5.5
+          },
+          "jsHeapMB": 8.744224548339844,
+          "gpuFrameMs": {
+            "p50": 3.613957,
+            "p95": 3.798082,
+            "p99": 3.872041,
+            "max": 3.907415
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.40000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999272,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.799999952316284,
+            "p95": 5.300000190734863,
+            "p99": 5.699999809265137,
+            "max": 5.699999809265137
+          },
+          "jsHeapMB": 8.733177185058594,
+          "gpuFrameMs": {
+            "p50": 3.6125,
+            "p95": 3.795332,
+            "p99": 3.867915,
+            "max": 3.880749
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.200000047683716,
+            "p95": 5.099999904632568,
+            "p99": 5.5,
+            "max": 5.5
+          },
+          "jsHeapMB": 8.744476318359375,
+          "gpuFrameMs": {
+            "p50": 3.628666,
+            "p95": 3.846125,
+            "p99": 3.914874,
+            "max": 3.915374
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3,
+            "p95": 4.900000095367432,
+            "p99": 5.200000047683716,
+            "max": 5.800000190734863
+          },
+          "jsHeapMB": 8.743324279785156,
+          "gpuFrameMs": {
+            "p50": 3.617541,
+            "p95": 3.8317490000000003,
+            "p99": 3.9294580000000003,
+            "max": 3.9410410000000002
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.90000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.5999999046325684,
+            "p95": 5.299999952316284,
+            "p99": 5.799999952316284,
+            "max": 6
+          },
+          "jsHeapMB": 8.746253967285156,
+          "gpuFrameMs": {
+            "p50": 3.544207,
+            "p95": 3.818248,
+            "p99": 3.927124,
+            "max": 4.031748
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.90000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 5.099999904632568,
+      "jsHeapMB": 8.744224548339844,
+      "startupMs": 222.5,
+      "drawCalls": 146,
+      "gpuFrameP95Ms": 3.818248
+    },
+    "drag-800-webgl2": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 6.1000001430511475,
+            "p95": 6.6000001430511475,
+            "p99": 6.8999998569488525,
+            "max": 6.900000095367432
+          },
+          "jsHeapMB": 22.068912506103516,
+          "gpuFrameMs": {
+            "p50": 7.367041,
+            "p95": 7.677207,
+            "p99": 7.772583,
+            "max": 7.772583
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 291.7999999523163,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 6.099999904632568,
+            "p95": 6.699999809265137,
+            "p99": 6.900000095367432,
+            "max": 7.1000001430511475
+          },
+          "jsHeapMB": 22.069751739501953,
+          "gpuFrameMs": {
+            "p50": 7.370083,
+            "p95": 7.667624,
+            "p99": 7.729373000000001,
+            "max": 7.729373000000001
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 291.90000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000273,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 6.099999904632568,
+            "p95": 6.699999809265137,
+            "p99": 7,
+            "max": 7.299999952316284
+          },
+          "jsHeapMB": 22.052352905273438,
+          "gpuFrameMs": {
+            "p50": 7.311166,
+            "p95": 7.665125,
+            "p99": 7.819749,
+            "max": 7.819749
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 309.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 6.099999904632568,
+            "p95": 6.799999952316284,
+            "p99": 7,
+            "max": 7.299999952316284
+          },
+          "jsHeapMB": 22.05529022216797,
+          "gpuFrameMs": {
+            "p50": 7.114332,
+            "p95": 7.668915999999999,
+            "p99": 7.8162080000000005,
+            "max": 7.8162080000000005
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 309.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 6.099999904632568,
+            "p95": 6.6000001430511475,
+            "p99": 6.900000095367432,
+            "max": 7.200000047683716
+          },
+          "jsHeapMB": 22.068912506103516,
+          "gpuFrameMs": {
+            "p50": 7.279916,
+            "p95": 7.691331999999999,
+            "p99": 7.812665,
+            "max": 7.812665
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 310.2999999523163,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.799999999999727,
+      "cpuFrameP95Ms": 6.699999809265137,
+      "jsHeapMB": 22.068912506103516,
+      "startupMs": 309.5,
+      "drawCalls": 1425,
+      "gpuFrameP95Ms": 7.668915999999999
+    },
+    "drag-200-webgpu": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.700000047683716,
+            "p95": 4.200000047683716,
+            "p99": 4.599999904632568,
+            "max": 4.699999809265137
+          },
+          "jsHeapMB": 10.618095397949219,
+          "gpuFrameMs": {
+            "p50": 1.797013,
+            "p95": 2.107176,
+            "p99": 2.232424,
+            "max": 2.2519240000000003
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 173.09999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.5,
+            "p95": 3.9000000953674316,
+            "p99": 5.099999904632568,
+            "max": 5.199999809265137
+          },
+          "jsHeapMB": 10.795928955078125,
+          "gpuFrameMs": {
+            "p50": 1.834764,
+            "p95": 2.187341,
+            "p99": 2.280215,
+            "max": 2.299965
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 173.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.5999999046325684,
+            "p95": 4,
+            "p99": 5,
+            "max": 5
+          },
+          "jsHeapMB": 10.795024871826172,
+          "gpuFrameMs": {
+            "p50": 1.82789,
+            "p95": 2.175176,
+            "p99": 2.242633,
+            "max": 2.2572159999999997
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 173.20000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.8000001907348633,
+            "p95": 4.299999952316284,
+            "p99": 5,
+            "max": 5.199999809265137
+          },
+          "jsHeapMB": 10.61800765991211,
+          "gpuFrameMs": {
+            "p50": 1.790681,
+            "p95": 2.175425,
+            "p99": 2.226092,
+            "max": 2.248633
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 173.09999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000273,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.5,
+            "p95": 4.6000001430511475,
+            "p99": 5.400000095367432,
+            "max": 5.700000047683716
+          },
+          "jsHeapMB": 10.806339263916016,
+          "gpuFrameMs": {
+            "p50": 1.849971,
+            "p95": 2.199258,
+            "p99": 2.2620899999999997,
+            "max": 2.266964
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 173.09999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 359,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 4.200000047683716,
+      "jsHeapMB": 10.795024871826172,
+      "startupMs": 173.09999990463257,
+      "drawCalls": 359,
+      "gpuFrameP95Ms": 2.175425
+    },
+    "drag-400-webgpu": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.9000000953674316,
+            "p95": 5,
+            "p99": 5.299999952316284,
+            "max": 5.299999952316284
+          },
+          "jsHeapMB": 8.64596176147461,
+          "gpuFrameMs": {
+            "p50": 1.569559,
+            "p95": 1.737682,
+            "p99": 1.784181,
+            "max": 1.797473
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 158.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.8999998569488525,
+            "p95": 5,
+            "p99": 5.299999952316284,
+            "max": 5.299999952316284
+          },
+          "jsHeapMB": 8.645587921142578,
+          "gpuFrameMs": {
+            "p50": 1.579268,
+            "p95": 1.767932,
+            "p99": 1.813806,
+            "max": 1.850263
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 157.79999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.9000000953674316,
+            "p95": 4.900000095367432,
+            "p99": 5.200000047683716,
+            "max": 5.299999952316284
+          },
+          "jsHeapMB": 8.643131256103516,
+          "gpuFrameMs": {
+            "p50": 1.527686,
+            "p95": 1.753808,
+            "p99": 1.798056,
+            "max": 1.837056
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 158.19999980926514,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3,
+            "p95": 4.900000095367432,
+            "p99": 5.1000001430511475,
+            "max": 5.200000047683716
+          },
+          "jsHeapMB": 8.6448974609375,
+          "gpuFrameMs": {
+            "p50": 1.580101,
+            "p95": 1.703225,
+            "p99": 1.769598,
+            "max": 1.7898900000000002
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 158,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999272,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 2.799999952316284,
+            "p95": 4.800000190734863,
+            "p99": 5.1000001430511475,
+            "max": 5.299999952316284
+          },
+          "jsHeapMB": 8.645267486572266,
+          "gpuFrameMs": {
+            "p50": 1.5804749999999999,
+            "p95": 1.716517,
+            "p99": 1.751223,
+            "max": 1.7674720000000002
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 157.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.799999999999272,
+      "cpuFrameP95Ms": 4.900000095367432,
+      "jsHeapMB": 8.645267486572266,
+      "startupMs": 158,
+      "drawCalls": 146,
+      "gpuFrameP95Ms": 1.737682
+    },
+    "drag-800-webgpu": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 5.3999998569488525,
+            "p95": 5.799999952316284,
+            "p99": 5.900000095367432,
+            "max": 6
+          },
+          "jsHeapMB": 22.176380157470703,
+          "gpuFrameMs": {
+            "p50": 3.878232,
+            "p95": 4.130812000000001,
+            "p99": 4.168979,
+            "max": 4.191478
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 273.7999999523163,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 5.3999998569488525,
+            "p95": 5.799999952316284,
+            "p99": 6.099999904632568,
+            "max": 6.1000001430511475
+          },
+          "jsHeapMB": 22.175540924072266,
+          "gpuFrameMs": {
+            "p50": 3.9150650000000002,
+            "p95": 4.121812,
+            "p99": 4.165812,
+            "max": 4.168936
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 271.39999985694885,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 5.299999952316284,
+            "p95": 5.700000047683716,
+            "p99": 5.799999952316284,
+            "max": 5.800000190734863
+          },
+          "jsHeapMB": 22.17833709716797,
+          "gpuFrameMs": {
+            "p50": 3.922774,
+            "p95": 4.112687,
+            "p99": 4.193728,
+            "max": 4.193978
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 273.2000000476837,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999272,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 5.299999952316284,
+            "p95": 5.599999904632568,
+            "p99": 5.799999952316284,
+            "max": 6
+          },
+          "jsHeapMB": 22.178871154785156,
+          "gpuFrameMs": {
+            "p50": 3.692943,
+            "p95": 4.103853,
+            "p99": 4.157352,
+            "max": 4.176562
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 273.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 5.400000095367432,
+            "p95": 5.700000047683716,
+            "p99": 6,
+            "max": 6
+          },
+          "jsHeapMB": 22.175457000732422,
+          "gpuFrameMs": {
+            "p50": 3.950815,
+            "p95": 4.1204790000000004,
+            "p99": 4.152645,
+            "max": 4.203645
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 273.2000000476837,
+          "steadyStateAllocations": null,
+          "drawCalls": 1425,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.799999999999272,
+      "cpuFrameP95Ms": 5.700000047683716,
+      "jsHeapMB": 22.176380157470703,
+      "startupMs": 273.2000000476837,
+      "drawCalls": 1425,
+      "gpuFrameP95Ms": 4.1204790000000004
+    },
+    "drag-400-webgl2-fragment": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.6000001430511475,
+            "p95": 5.400000095367432,
+            "p99": 5.799999952316284,
+            "max": 5.900000095367432
+          },
+          "jsHeapMB": 8.74295425415039,
+          "gpuFrameMs": {
+            "p50": 4.065125,
+            "p95": 4.296208,
+            "p99": 4.357374,
+            "max": 4.371874
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.69999980926514,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.1000001430511475,
+            "p95": 5.099999904632568,
+            "p99": 5.599999904632568,
+            "max": 5.6000001430511475
+          },
+          "jsHeapMB": 8.754638671875,
+          "gpuFrameMs": {
+            "p50": 4.082291,
+            "p95": 4.277791000000001,
+            "p99": 4.348208,
+            "max": 4.3533740000000005
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.70000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.200000047683716,
+            "p95": 5.200000047683716,
+            "p99": 5.6000001430511475,
+            "max": 5.799999952316284
+          },
+          "jsHeapMB": 8.7452392578125,
+          "gpuFrameMs": {
+            "p50": 4.098041,
+            "p95": 4.281124999999999,
+            "p99": 4.361332,
+            "max": 4.3746659999999995
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 222.79999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.800000000000182,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.0999999046325684,
+            "p95": 5,
+            "p99": 5.5,
+            "max": 5.6000001430511475
+          },
+          "jsHeapMB": 8.758064270019531,
+          "gpuFrameMs": {
+            "p50": 4.1029160000000005,
+            "p95": 4.249999,
+            "p99": 4.30154,
+            "max": 4.34679
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 221.79999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 3.299999952316284,
+            "p95": 5.5,
+            "p99": 5.800000190734863,
+            "max": 5.900000095367432
+          },
+          "jsHeapMB": 8.755268096923828,
+          "gpuFrameMs": {
+            "p50": 4.108874,
+            "p95": 4.283457,
+            "p99": 4.338915,
+            "max": 4.360999
+          },
+          "gpuMemoryMB": null,
+          "startupMs": 221.59999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 146,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 5.200000047683716,
+      "jsHeapMB": 8.754638671875,
+      "startupMs": 222.69999980926514,
+      "drawCalls": 146,
+      "gpuFrameP95Ms": 4.281124999999999
+    },
+    "3dtiles-city": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 8.140464782714844,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.40000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 21,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999272,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 8.139278411865234,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.30000019073486,
+          "steadyStateAllocations": null,
+          "drawCalls": 21,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 8.142642974853516,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 146.20000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 21,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 8.141120910644531,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 145.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 21,
+          "streaming": null
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.800000000000182,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 8.141029357910156,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 146.09999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 21,
+          "streaming": null
+        }
+      ],
+      "frameTimeP95Ms": 16.799999999999727,
+      "cpuFrameP95Ms": 0,
+      "jsHeapMB": 8.141029357910156,
+      "startupMs": 145.40000009536743,
+      "drawCalls": 21,
+      "gpuFrameP95Ms": null
+    },
+    "startup-imagery": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999990463256836,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 7.652782440185547,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 224.59999990463257,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": {
+            "tiles": 85,
+            "requests": 85,
+            "failed": 0,
+            "gpuMB": 28.33322525024414,
+            "ramMB": 1.1695642471313477
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000273,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999990463256836,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 7.652229309082031,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 224,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": {
+            "tiles": 85,
+            "requests": 85,
+            "failed": 0,
+            "gpuMB": 28.33322525024414,
+            "ramMB": 1.1695642471313477
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 7.642303466796875,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 222.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": {
+            "tiles": 85,
+            "requests": 85,
+            "failed": 0,
+            "gpuMB": 28.33322525024414,
+            "ramMB": 1.1695642471313477
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999990463256836,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 7.64141845703125,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 223.90000009536743,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": {
+            "tiles": 85,
+            "requests": 85,
+            "failed": 0,
+            "gpuMB": 28.33322525024414,
+            "ramMB": 1.1695642471313477
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000014305114746,
+            "max": 0.10000014305114746
+          },
+          "jsHeapMB": 7.643318176269531,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 224.29999995231628,
+          "steadyStateAllocations": null,
+          "drawCalls": 27,
+          "streaming": {
+            "tiles": 85,
+            "requests": 85,
+            "failed": 0,
+            "gpuMB": 28.33322525024414,
+            "ramMB": 1.1695642471313477
+          }
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 0,
+      "jsHeapMB": 7.643318176269531,
+      "startupMs": 224,
+      "drawCalls": 27,
+      "gpuFrameP95Ms": null
+    },
+    "stream-path": {
+      "runs": [
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000273,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 20.258792877197266,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 224,
+          "steadyStateAllocations": null,
+          "drawCalls": 29,
+          "streaming": {
+            "tiles": 1228,
+            "requests": 1474,
+            "failed": 0,
+            "gpuMB": 409.33177185058594,
+            "ramMB": 3.547046661376953
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999272,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 21.154090881347656,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 223.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 29,
+          "streaming": {
+            "tiles": 1511,
+            "requests": 1767,
+            "failed": 0,
+            "gpuMB": 503.66474533081055,
+            "ramMB": 4.202310562133789
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.799999999999727,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 20.867565155029297,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 223.70000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 29,
+          "streaming": {
+            "tiles": 1408,
+            "requests": 1726,
+            "failed": 0,
+            "gpuMB": 469.33154296875,
+            "ramMB": 3.9827146530151367
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000273,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 20.880935668945312,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 222.70000004768372,
+          "steadyStateAllocations": null,
+          "drawCalls": 29,
+          "streaming": {
+            "tiles": 1408,
+            "requests": 1722,
+            "failed": 0,
+            "gpuMB": 469.33154296875,
+            "ramMB": 3.9942855834960938
+          }
+        },
+        {
+          "frames": 180,
+          "frameTimeMs": {
+            "p50": 16.699999999999818,
+            "p95": 16.700000000000728,
+            "p99": 16.800000000000182,
+            "max": 16.800000000000182,
+            "over16_7": 0,
+            "over33_3": 0
+          },
+          "cpuFrameMs": {
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jsHeapMB": 20.789215087890625,
+          "gpuFrameMs": null,
+          "gpuMemoryMB": null,
+          "startupMs": 223.5,
+          "steadyStateAllocations": null,
+          "drawCalls": 29,
+          "streaming": {
+            "tiles": 1382,
+            "requests": 1727,
+            "failed": 0,
+            "gpuMB": 460.66490936279297,
+            "ramMB": 3.9858198165893555
+          }
+        }
+      ],
+      "frameTimeP95Ms": 16.700000000000728,
+      "cpuFrameP95Ms": 0,
+      "jsHeapMB": 20.867565155029297,
+      "startupMs": 223.5,
+      "drawCalls": 29,
+      "gpuFrameP95Ms": null
+    }
+  },
+  "coldStarts": {
+    "runs": 10,
+    "firstFrameMs": [
+      221.90000009536743, 221.89999985694885, 221.5, 221.5, 222.20000004768372, 222.90000009536743, 222.29999995231628,
+      223.29999995231628, 223.40000009536743, 222.90000009536743
+    ],
+    "p90Ms": 223.29999995231628
+  },
+  "violations": ["drag-800-webgl2: median cpu p95 6.700 ms > 6 ms"]
+}

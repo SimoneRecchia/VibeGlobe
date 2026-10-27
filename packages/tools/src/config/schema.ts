@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Versioned build configuration files (ADR 0024): every build is defined only by one of these JSON files, so a new
  * region or dataset needs no code change.
@@ -21,7 +23,10 @@ export interface CopernicusDemSource {
   type: 'copernicus-dem';
   /** Bucket URL, `https://copernicus-dem-30m.s3.amazonaws.com`. */
   baseUrl: string;
-  /** Dataset release the bucket serves (pinned for reproducibility). */
+  /**
+   * Dataset release the bucket serves. The bucket holds only its current release, so the lock file's checksums pin
+   * it: a newer release fails the download instead of changing the outputs.
+   */
   release: string;
   /** Grid spacing: 1 arc second (GLO-30) or 3 arc seconds (GLO-90). */
   arcSeconds: 1 | 3;
@@ -93,8 +98,27 @@ export interface XyzSource {
 }
 
 /** Any source a dataset can read. */
+/**
+ * Tiles copied from a PMTiles archive read with range requests (OpenFreeMap's weekly planet, Mapterhorn's terrain):
+ * only the tiles of the build's area and levels are read, never the whole archive.
+ */
+export interface PmtilesSource {
+  type: 'pmtiles';
+  /** URL of the archive. */
+  url: string;
+  /** File extension of its tiles in the outputs (`pbf`, `webp`, `png`, `jpg`). */
+  extension: string;
+}
+
+/** The source of a dataset. */
 export type SourceConfig =
-  CopernicusDemSource | S2CloudlessSource | WorldCoverSource | GeoTiffSource | OsmExtractSource | XyzSource;
+  | CopernicusDemSource
+  | S2CloudlessSource
+  | WorldCoverSource
+  | GeoTiffSource
+  | OsmExtractSource
+  | XyzSource
+  | PmtilesSource;
 
 /**
  * A fixed colour stretch from reflectance (× 10,000) to 8-bit RGB (ADR 0026):
@@ -136,6 +160,13 @@ export interface DatasetConfig {
   colorStretch?: ColorStretchConfig;
   /** Area override for this dataset; defaults to the build's region. */
   area?: AreaConfig;
+  /**
+   * The last zoom with sea tiles: deeper zooms keep only the tiles touching the build's `land` mask. Absent: every
+   * tile of the area at every zoom.
+   */
+  seaMaxZoom?: number;
+  /** Average encoded size of a tile wholly at sea, per zoom or one value, when it differs from `bytesPerTile`. */
+  seaBytesPerTile?: number | Record<string, number>;
   /** Average encoded tile size used by the estimate, in bytes, per zoom level or one value for all. */
   bytesPerTile: number | Record<string, number>;
   /** Average size of one downloaded source file, in bytes, used by the download and cost estimate. */
@@ -177,6 +208,10 @@ export interface BuildConfig {
   region: AreaConfig;
   /** Small area the configuration is verified on (`--sample`). */
   sampleArea: SampleAreaConfig;
+  /** The land polygons that tell land tiles from sea tiles (`seaMaxZoom`), as an area. */
+  land?: AreaConfig;
+  /** A small area wholly at sea, where `estimate --measure` measures sea tiles. */
+  seaSampleArea?: SampleAreaConfig;
   prices: PricesConfig;
   tools: ToolsConfig;
   datasets: DatasetConfig[];

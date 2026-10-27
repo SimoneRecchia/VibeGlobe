@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The search box (F426): typed coordinates in every format of `@vibeglobe/gis` (F405), and places from the
  * application's geocoder when one is configured; none is bundled and no request is made without one.

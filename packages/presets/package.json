@@ -1,0 +1,44 @@
+{
+  "name": "@vibeglobe/presets",
+  "version": "0.1.0",
+  "description": "VibeGlobe presets: ready map types from free, redistributable sources (europeOpen).",
+  "license": "MPL-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./countries": {
+      "types": "./dist/countries.d.ts",
+      "source": "./src/countries.ts",
+      "default": "./dist/countries.js"
+    },
+    "./orthophotos": {
+      "types": "./dist/orthophotos.d.ts",
+      "source": "./src/orthophotos.ts",
+      "default": "./dist/orthophotos.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts",
+    "!src/**/__fixtures__",
+    "!src/**/__snapshots__",
+    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
+    "!dist/**/__fixtures__"
+  ],
+  "dependencies": {
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/sources": "0.1.0"
+  },
+  "devDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.4"
+  }
+}

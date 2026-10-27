@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Memory budget for 3D Tiles content (F462; ADR 0041): least-recently-used eviction of loaded content within a byte
  * budget. Tiles the current view uses are never evicted, so the cache may overflow its budget while the view needs

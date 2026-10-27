@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { CameraMovement, CameraState, GeoPosition, NavigationApi, ScreenPoint, ViewInit } from '@vibeglobe/core';
 import { createControls, type NavigationControls } from './create-controls.js';
 import type { ControlsOptions } from './options.js';
@@ -74,7 +76,7 @@ export class FlatCamera {
 
   readonly navigation: NavigationApi = this.createNavigation();
 
-  private createNavigation(): NavigationApi {
+  protected createNavigation(): NavigationApi {
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- the getters below read this camera
     const camera = this;
     return {
@@ -99,6 +101,8 @@ export class FlatCamera {
       },
       requestUpdate: () => void this.requests++,
       interruptMovement: () => void this.movementInterruptions++,
+      // The engine's tilt policy array (F625): the tests write `[3]` as the engine would.
+      tiltPolicy: new Float64Array(4),
       orbit: (deltaHeadingDeg, deltaTiltDeg) => {
         this.jumps++;
         this.headingDeg = (((this.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;
@@ -106,6 +110,9 @@ export class FlatCamera {
       },
       get timeMs() {
         return camera.timeMs;
+      },
+      timeInto: (out: Float64Array) => {
+        out[0] = camera.timeMs;
       },
       get coasting() {
         return camera.coasting;
@@ -123,11 +130,129 @@ export class FlatCamera {
   }
 }
 
+/** A 3-vector. */
+type Vec3 = [number, number, number];
+
+/**
+ * A zoomed-out globe behind {@link NavigationApi} (KB-202): a sphere of `radiusPx` seen orthographically at the screen
+ * center, surrounded by empty space. `grab` finds nothing off its disc and `dragTo` leaves the camera where it was when
+ * the pixel is off the disc or the point is behind, as the engine does; otherwise it turns the globe by the shortest
+ * rotation that brings the point under the pixel. Positions are degrees on the unit sphere.
+ */
+export class OrthoGlobe extends FlatCamera {
+  /** Columns: the view-frame axes (x right, y down, z toward the eye) in globe coordinates; rows map view to globe. */
+  private m: number[] | undefined;
+
+  constructor(
+    widthPx: number,
+    heightPx: number,
+    readonly radiusPx: number,
+  ) {
+    super(widthPx, heightPx);
+  }
+
+  /** The globe-to-view rotation, row-major (identity at first: the globe point (0, 0, 1) faces the eye). */
+  private rotation(): number[] {
+    return (this.m ??= [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  }
+
+  /** The view-frame unit vector under a pixel, or undefined off the disc. */
+  viewVector(point: ScreenPoint): Vec3 | undefined {
+    const x = (point.xPx - this.widthPx / 2) / this.radiusPx;
+    const y = (point.yPx - this.heightPx / 2) / this.radiusPx;
+    const r2 = x * x + y * y;
+    return r2 <= 1 ? [x, y, Math.sqrt(1 - r2)] : undefined;
+  }
+
+  /** The globe vector the screen center shows: it moves as the globe turns. */
+  centerVector(): Vec3 {
+    const m = this.rotation();
+    // The view z axis in globe coordinates: the transpose's third column, the rotation's third row.
+    return [m[6] ?? 0, m[7] ?? 0, m[8] ?? 0];
+  }
+
+  private toGlobe(v: Vec3): Vec3 {
+    const m = this.rotation();
+    // globe = Rᵀ · view, R globe-to-view.
+    return [
+      (m[0] ?? 0) * v[0] + (m[3] ?? 0) * v[1] + (m[6] ?? 0) * v[2],
+      (m[1] ?? 0) * v[0] + (m[4] ?? 0) * v[1] + (m[7] ?? 0) * v[2],
+      (m[2] ?? 0) * v[0] + (m[5] ?? 0) * v[1] + (m[8] ?? 0) * v[2],
+    ];
+  }
+
+  private toView(g: Vec3): Vec3 {
+    const m = this.rotation();
+    return [
+      (m[0] ?? 0) * g[0] + (m[1] ?? 0) * g[1] + (m[2] ?? 0) * g[2],
+      (m[3] ?? 0) * g[0] + (m[4] ?? 0) * g[1] + (m[5] ?? 0) * g[2],
+      (m[6] ?? 0) * g[0] + (m[7] ?? 0) * g[1] + (m[8] ?? 0) * g[2],
+    ];
+  }
+
+  protected override createNavigation(): NavigationApi {
+    const flat = super.createNavigation();
+    const RAD = Math.PI / 180;
+    const navigation: NavigationApi = Object.create(flat) as NavigationApi;
+    navigation.grab = (point) => {
+      const v = this.viewVector(point);
+      if (!v) return undefined;
+      const g = this.toGlobe(v);
+      return {
+        longitudeDeg: Math.atan2(g[0], g[2]) / RAD,
+        latitudeDeg: Math.asin(Math.max(-1, Math.min(1, -g[1]))) / RAD,
+      };
+    };
+    navigation.dragTo = (anchor, point) => {
+      this.drags++;
+      if (this.coasting) this.coastingChanges++;
+      const b = this.viewVector(point);
+      const lon = anchor.longitudeDeg * RAD;
+      const lat = anchor.latitudeDeg * RAD;
+      const view = this.toView([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)]);
+      // Unit length, or rounding would shrink the rotation a little at every step.
+      const length = Math.hypot(...view);
+      const a: Vec3 = [view[0] / length, view[1] / length, view[2] / length];
+      // Off the disc, or a point behind the globe: no solution, the camera stays.
+      if (!b || a[2] < 0) return;
+      // The shortest rotation from a to b (Rodrigues), applied after the current one.
+      const axis: Vec3 = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      const sin = Math.hypot(...axis);
+      const cos = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      if (sin < 1e-15) return;
+      const [kx, ky, kz] = [axis[0] / sin, axis[1] / sin, axis[2] / sin];
+      const t = 1 - cos;
+      const r = [
+        cos + kx * kx * t,
+        kx * ky * t - kz * sin,
+        kx * kz * t + ky * sin,
+        ky * kx * t + kz * sin,
+        cos + ky * ky * t,
+        ky * kz * t - kx * sin,
+        kz * kx * t - ky * sin,
+        kz * ky * t + kx * sin,
+        cos + kz * kz * t,
+      ];
+      const m = this.rotation();
+      const next: number[] = [];
+      for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++) {
+          let sum = 0;
+          for (let k = 0; k < 3; k++) sum += (r[i * 3 + k] ?? 0) * (m[k * 3 + j] ?? 0);
+          next.push(sum);
+        }
+      this.m = next;
+    };
+    return navigation;
+  }
+}
+
 /** A fake document: overlays the zoom box appends land in `overlays`. */
 function fakeDocument(overlays: FakeOverlay[], reducedMotion: boolean, hostNow: () => number) {
   return {
     ...fakeTarget(),
     defaultView: {
+      ...fakeTarget(),
       performance: { now: hostNow },
       matchMedia: () => ({ matches: reducedMotion }),
     },
@@ -190,6 +315,10 @@ function fakeGlobe(camera: FlatCamera) {
     get camera(): CameraState {
       return { headingDeg: camera.headingDeg, tiltDeg: camera.tiltDeg } as CameraState;
     },
+    viewMode: 'auto' as 'auto' | '2d' | 'manual',
+    setViewMode(mode: '2d' | '3d' | 'auto'): void {
+      this.viewMode = mode === '3d' ? 'manual' : mode;
+    },
     jumpTo(view: ViewInit): CameraMovement {
       camera.jumps++;
       if (view.headingDeg !== undefined) camera.headingDeg = view.headingDeg;
@@ -200,16 +329,27 @@ function fakeGlobe(camera: FlatCamera) {
   };
 }
 
+/** The flat map, or with `globeRadiusPx` a zoomed-out globe of that radius surrounded by space (KB-202). */
+function harnessCamera(width: number, height: number, globeRadiusPx: number | undefined): FlatCamera {
+  return globeRadiusPx === undefined ? new FlatCamera(width, height) : new OrthoGlobe(width, height, globeRadiusPx);
+}
+
 const NO_MODIFIERS = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, repeat: false };
 
+/** How {@link controlsHarness} sets up; `globeRadiusPx` gives an {@link OrthoGlobe} instead of the flat map. */
+interface HarnessSetup {
+  connect?: boolean;
+  reducedMotion?: boolean;
+  hostNow?: () => number;
+  globeRadiusPx?: number;
+}
+
 /** Controls attached to a fake 800 × 600 canvas at (10, 20), a {@link FlatCamera} and an engine clock. */
-export function controlsHarness(
-  options?: ControlsOptions,
-  { connect = true, reducedMotion = false, hostNow = (): number => 0 } = {},
-) {
+export function controlsHarness(options?: ControlsOptions, setup: HarnessSetup = {}) {
+  const { connect = true, reducedMotion = false, hostNow = (): number => 0 } = setup;
   const width = 800;
   const height = 600;
-  const camera = new FlatCamera(width, height);
+  const camera = harnessCamera(width, height, setup.globeRadiusPx);
   const overlays: FakeOverlay[] = [];
   const doc = fakeDocument(overlays, reducedMotion, hostNow);
   const element = fakeElement(doc, width, height);
@@ -249,6 +389,8 @@ export function controlsHarness(
     overlays,
     prevented: () => prevented,
     fire: (type: string, event: object) => fire(element, type, event),
+    /** Fires an event at the window (`blur` when the page loses focus). */
+    fireWindow: (type: string) => fire(doc.defaultView, type, {}),
     pointer,
     key,
     /** Advances the engine clock by `dtMs` and runs one frame's update. */

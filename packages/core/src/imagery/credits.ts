@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** A credit a source asks for: text, an optional link and an optional logo (docs/plan/api.md, `Attribution`). */
 export interface Attribution {
   readonly text: string;
@@ -14,6 +16,8 @@ export interface CreditProfile {
   readonly id?: string;
   /** The terms allow drawing only: pixel readback, tile data and elevation sampling are refused (F323, ADR 0031). */
   readonly displayOnly?: boolean;
+  /** A warning about the provider's terms, logged once per engine instance however many of its sources draw (F267). */
+  readonly warning?: string;
 }
 
 /** The credit metadata a tiled source may carry (`DescribedImagerySource` in `@vibeglobe/sources`). */
@@ -83,6 +87,12 @@ function sameCredit(a: Attribution, b: Attribution | undefined): boolean {
 export class VisibleSources {
   private shown: Uint8Array;
   private previous: Uint8Array;
+  /**
+   * Credits of single tiles the frame draws (`TransportResult.attribution`, KB-189) with the index of the source that
+   * drew them, and the settled frame's.
+   */
+  private shownCredits = new Map<Attribution, number>();
+  private previousCredits = new Map<Attribution, number>();
 
   constructor(count: number) {
     this.shown = new Uint8Array(count);
@@ -94,15 +104,30 @@ export class VisibleSources {
     this.shown[index] = 1;
   }
 
-  /** Ends a frame: true when its visible sources differ from the previous frame's. */
+  /** Records that the frame draws a tile of source `index` with a credit of its own. */
+  markCredit(attribution: Attribution, index: number): void {
+    this.shownCredits.set(attribution, index);
+  }
+
+  /** Ends a frame: true when its visible sources or tile credits differ from the previous frame's. */
   settle(): boolean {
-    let changed = false;
+    let changed = this.shownCredits.size !== this.previousCredits.size;
     for (let i = 0; i < this.shown.length; i++) if (this.shown[i] !== this.previous[i]) changed = true;
+    if (!changed) for (const credit of this.shownCredits.keys()) if (!this.previousCredits.has(credit)) changed = true;
     const swap = this.previous;
     this.previous = this.shown;
     this.shown = swap;
     this.shown.fill(0);
+    const credits = this.previousCredits;
+    this.previousCredits = this.shownCredits;
+    this.shownCredits = credits;
+    this.shownCredits.clear();
     return changed;
+  }
+
+  /** The credits of single tiles the last settled frame drew, with the index of the source that drew each. */
+  tileCredits(): ReadonlyMap<Attribution, number> {
+    return this.previousCredits;
   }
 
   /** True when the last settled frame showed source `index`. */

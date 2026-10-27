@@ -1,12 +1,14 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * A dataset build from a configuration file: license gate, estimate and confirmation before any download, then the
  * download, convert, tile and package steps of each dataset, each resumable (ADR 0024).
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { type LoadedConfig, datasetArea, loadConfig } from '../config/load.js';
+import { type LoadedConfig, datasetArea, datasetLandMask, datasetTiles, loadConfig } from '../config/load.js';
 import type { DatasetConfig } from '../config/schema.js';
-import { type BuildEstimate, estimateDataset, formatEstimate, totalEstimate } from '../estimate.js';
+import { type BuildEstimate, type MeasuredSizes, estimateDataset, formatEstimate, totalEstimate } from '../estimate.js';
 import { checkDatasets, describeViolations } from '../license/gate.js';
 import { outputMetadata } from '../output/metadata.js';
 import { outputPaths, writeOutputs } from '../output/write-outputs.js';
@@ -16,8 +18,10 @@ import type { AwsCredentials } from '../sources/sigv4.js';
 import { coverage } from '../tiles/area.js';
 import { writeBaseImage } from './base-image.js';
 import { type DatasetFolders, convertSources, rasterMosaic, tileRasterDataset } from './raster-dataset.js';
-import { StepLog } from './step-log.js';
+import { StepLog, sha256 } from './step-log.js';
+import { PIPELINE_VERSION } from '../version.js';
 import { tileVectorDataset } from './vector-dataset.js';
+import { extractPmtilesDataset } from './pmtiles-extract.js';
 
 /** The steps of a build, in order. */
 export const STEPS = ['download', 'convert', 'tile', 'package'] as const;
@@ -27,6 +31,8 @@ export type Step = (typeof STEPS)[number];
 /** Options of a build run. */
 export interface BuildOptions {
   configPath: string;
+  /** The loaded configuration, when the caller changed it (a sample area of its own); read from `configPath` otherwise. */
+  loaded?: LoadedConfig;
   outDir: string;
   sample: boolean;
   /** Skip the confirmation prompt (explicit `--yes`). */
@@ -77,12 +83,19 @@ export function selectedDatasets(
 /** Estimates every selected dataset of a configuration; downloads nothing. */
 export function estimateBuild(
   loaded: LoadedConfig,
-  options: Pick<BuildOptions, 'sample' | 'datasets' | 'sourceUrls'>,
+  options: Pick<BuildOptions, 'sample' | 'datasets' | 'sourceUrls'> & { measured?: Record<string, MeasuredSizes> },
 ): BuildEstimate {
   const region = options.sample ? 'sample area' : 'region';
-  const estimates = selectedDatasets(loaded, options).map((dataset) =>
-    estimateDataset(dataset, datasetArea(loaded, dataset, options.sample), region),
-  );
+  const estimates = selectedDatasets(loaded, options).map((dataset) => {
+    const area = datasetArea(loaded, dataset, options.sample);
+    return estimateDataset(
+      dataset,
+      area,
+      region,
+      datasetLandMask(loaded, dataset, area),
+      options.measured?.[dataset.id],
+    );
+  });
   return totalEstimate(estimates, loaded.config.prices);
 }
 
@@ -96,15 +109,28 @@ async function confirm(options: BuildOptions, estimate: BuildEstimate): Promise<
   return options.ask('Proceed with the download and build? [y/N] ');
 }
 
-function folders(options: BuildOptions, dataset: DatasetConfig): DatasetFolders {
-  const root = options.outDir;
+/** What the logged work of a dataset depends on: its configuration, area, tools and the pipeline (DP-002). */
+function fingerprint(loaded: LoadedConfig, dataset: DatasetConfig, sample: boolean): { work: string; source: string } {
+  const hash = (value: unknown): string => sha256(new TextEncoder().encode(JSON.stringify(value)));
+  const area = datasetArea(loaded, dataset, sample);
   return {
-    downloads: join(root, 'downloads', dataset.id),
-    work: join(root, 'work', dataset.id),
-    tiles: join(root, 'output', dataset.id),
-    log: new StepLog(join(root, 'steps', `${dataset.id}.log`)),
-    report: (line) => options.report(`[${dataset.id}] ${line}`),
+    work: hash({ dataset, area, tools: loaded.config.tools, pipeline: PIPELINE_VERSION }),
+    source: hash({ source: dataset.source, sourceVersion: dataset.sourceVersion }),
   };
+}
+
+function folders(loaded: LoadedConfig, options: BuildOptions, dataset: DatasetConfig): DatasetFolders {
+  const root = options.outDir;
+  const report = (line: string): void => options.report(`[${dataset.id}] ${line}`);
+  const log = new StepLog(join(root, 'steps', `${dataset.id}.log`), fingerprint(loaded, dataset, options.sample));
+  const work = join(root, 'work', dataset.id);
+  const tiles = join(root, 'output', dataset.id);
+  if (log.changed) {
+    // Tiles of the earlier configuration (another zoom range or area) must not stay in the outputs.
+    report('configuration changed since the logged work: converting and tiling again');
+    for (const folder of [work, tiles]) rmSync(folder, { recursive: true, force: true });
+  }
+  return { downloads: join(root, 'downloads', dataset.id), work, tiles, log, report };
 }
 
 function lockOf(loaded: LoadedConfig): Record<string, string> {
@@ -119,8 +145,9 @@ async function buildDataset(
   options: BuildOptions,
 ): Promise<{ transferred: number; built: number; skipped: number; outputs: string[] }> {
   const area = datasetArea(loaded, dataset, options.sample);
+  const tilesAt = datasetTiles(loaded, dataset, area);
   const files: SourceFile[] = sourceFiles(dataset, { kind: 'bbox', bbox: coverage(area, dataset.minZoom) });
-  const f = folders(options, dataset);
+  const f = folders(loaded, options, dataset);
   const lock = lockOf(loaded);
   const downloadContext = { folder: f.downloads, log: f.log, fetch: options.fetch, lock, report: f.report };
   const results = await downloadAll(files, {
@@ -136,14 +163,16 @@ async function buildDataset(
       : convertSources(dataset, files, f, loaded.config.tools.gdal, options.outDir);
   if (options.until === 'convert') return result;
   const counts =
-    dataset.kind === 'vector'
-      ? tileVectorDataset(dataset, area, converted, f)
-      : tileRasterDataset(dataset, area, rasterMosaic(dataset, files, converted), f);
+    dataset.source.type === 'pmtiles'
+      ? await extractPmtilesDataset(dataset, area, f, options.fetch ?? fetch, tilesAt)
+      : dataset.kind === 'vector'
+        ? tileVectorDataset(dataset, area, converted, f)
+        : tileRasterDataset(dataset, area, rasterMosaic(dataset, files, converted), f, tilesAt);
   Object.assign(result, counts);
   if (options.until === 'tile') return result;
   const metadata = outputMetadata(loaded.config, dataset, area.bbox);
   const paths = outputPaths(join(options.outDir, 'output'), dataset);
-  result.outputs = writeOutputs(dataset, area, paths, metadata, f.report);
+  result.outputs = writeOutputs(dataset, area, paths, metadata, f.report, tilesAt);
   if (dataset.baseImage && dataset.kind === 'imagery') {
     result.outputs.push(
       writeBaseImage(dataset, rasterMosaic(dataset, files, converted), join(options.outDir, 'output'), f),
@@ -154,10 +183,15 @@ async function buildDataset(
 
 /** Runs a build. Throws before touching the disk or the network when the license gate refuses a source. */
 export async function runBuild(options: BuildOptions): Promise<BuildResult> {
-  const loaded = loadConfig(options.configPath);
+  const loaded = options.loaded ?? loadConfig(options.configPath);
   const datasets = selectedDatasets(loaded, options);
   const violations = checkDatasets(datasets);
   if (violations.length > 0) throw new Error(describeViolations(violations));
+  for (const dataset of datasets)
+    if (dataset.source.type === 'pmtiles' && dataset.source.url.includes('<version>'))
+      throw new Error(
+        `${dataset.id}: pin the archive's version before a build: --source-url ${dataset.id}=<the archive's URL>`,
+      );
   const estimate = estimateBuild(loaded, options);
   const confirmed = await confirm(options, estimate);
   const result: BuildResult = { estimate, confirmed, transferredBytes: 0, tilesBuilt: 0, tilesSkipped: 0, outputs: [] };

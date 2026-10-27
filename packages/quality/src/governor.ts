@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Options of the frame-time governor (F401, F402); every time is in milliseconds. */
 export interface GovernorOptions {
   /** Frame time the governor keeps, ms (default 1000 / 60). */

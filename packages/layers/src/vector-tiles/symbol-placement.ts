@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Symbol placement for vector-tile labels (F449, F454), original code (ADR 0041): collision of screen-space boxes in
  * an rbush index with priorities (the topmost style layer first, then `symbol-sort-key`, then importance), a
@@ -158,7 +160,8 @@ export class SymbolFader {
     for (const id of placed) if (!this.opacity.has(id)) this.opacity.set(id, 0);
     for (const [id, value] of this.opacity) {
       const target = placed.has(id) ? 1 : 0;
-      const next = value < target ? Math.min(1, value + step) : Math.max(0, value - step);
+      // A label at its target stays there (TD-01: a shown label was faded down every other frame).
+      const next = value < target ? Math.min(target, value + step) : Math.max(target, value - step);
       if (next === 0 && target === 0) this.opacity.delete(id);
       else this.opacity.set(id, next);
     }

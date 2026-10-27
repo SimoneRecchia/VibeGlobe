@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The source files a dataset build downloads, computed from its area without touching the network. */
 import type { CopernicusDemSource, DatasetConfig, S2CloudlessSource, WorldCoverSource } from '../config/schema.js';
 import { type Area, intersectBBox } from '../tiles/area.js';
@@ -152,6 +154,8 @@ export function sourceFiles(dataset: DatasetConfig, area: Area): SourceFile[] {
     case 'osm-extract':
       return [{ url: source.url, key: fileName(source.url), requesterPays: false, mayBeMissing: false }];
     case 'xyz':
+    case 'pmtiles':
+      // Read tile by tile with range requests, never downloaded whole.
       return [];
   }
 }

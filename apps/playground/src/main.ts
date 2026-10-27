@@ -1,7 +1,6 @@
 import { createControls } from '@vibeglobe/controls';
 import {
   createGlobe,
-  readGeoidFile,
   WGS84,
   type Globe,
   type GlobeOptions,
@@ -10,24 +9,31 @@ import {
   type ViewInit,
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
+import { readGeoidFile } from '@vibeglobe/core/decoders';
 import { heightmapTerrain, quantizedMeshTerrain, xyzImagery } from '@vibeglobe/sources';
-import { sourceLines } from './source-lines.js';
 import { chainSources, credits, imageExtension, overlayLayers, tileVariant } from './fixture-layers.js';
 import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
-import { startDragLoop, startFrameLoop, type FrameLoop } from './frame-loop.js';
+import { startDragLoop, startFrameLoop, startMeasuredLoop, type FrameLoop } from './frame-loop.js';
 import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
+import { customAdapters } from './custom-adapters.js';
+import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
+import { europeLayers, showEuropePreset } from './europe-preset.js';
 import { exposeTestHooks } from './test-hooks.js';
+import { PAGE_UI, SHOWCASE } from './page-mode.js';
 
-const OVERLAY_REFRESH_MS = 250;
 /** Engine log messages collected with `?logSink=1` (F120). */
 const logEntries: LogEntry[] = [];
 
 const params = new URLSearchParams(location.search);
+// `?network=online|hybrid|offline` wraps the fixture imagery with the offline engine in that mode (KB-185).
+const offlineDemo = params.has('network')
+  ? (await import('./offline-demo.js')).playgroundOffline(params.get('network'))
+  : undefined;
 // `?utm=` layers need the gis package and proj4: loaded only then, so the engine alone loads neither (F418).
 const reprojected = params.has('utm') ? await import('./reprojected-layers.js') : undefined;
 
@@ -120,7 +126,7 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     tilt: '70',
   },
 };
-for (const [name, value] of Object.entries(TERRAIN_SCENARIOS[params.get('scenario') ?? ''] ?? {}))
+for (const [name, value] of Object.entries({ ...TERRAIN_SCENARIOS, ...REAL_DATA }[params.get('scenario') ?? ''] ?? {}))
   if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
@@ -140,6 +146,8 @@ function viewFromUrl(): ViewInit {
     const value = params.get(param);
     if (value !== null) view[field] = Number(value);
   }
+  // The showcase opens on Europe, the whole globe in view (owner, 2026-10-25).
+  if (SHOWCASE && Object.keys(view).length === 0) return { longitudeDeg: 10, latitudeDeg: 44, zoom: 2.2 };
   return view;
 }
 
@@ -204,7 +212,9 @@ function fixtureImagery(): Pick<GlobeOptions, 'imagery' | 'workers' | 'memory'> 
     ...(ramBudgetBytes === undefined ? {} : { ramBudgetBytes }),
   };
   const chain = chainSources(params, base, session, imageryTiling, ITALY);
-  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain] } : source;
+  // `?harmonize=0` shows the chain's sources in their own colors (F249).
+  const harmonize = params.get('harmonize') !== '0';
+  const layer = chain.length > 0 ? { id: 'chain', sources: [source, ...chain], harmonize } : source;
   // `?utm=32632,32633` adds fixture rasters served in those UTM zones, reprojected on the client (F226).
   const utm = reprojected?.utmLayers(params, base, session) ?? [];
   return { imagery: [layer, ...utm, ...overlayLayers(params, base, session, imageryTiling, ITALY)], workers, memory };
@@ -268,10 +278,21 @@ const quantizedMesh =
 function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' | 'memory'> {
   const imagery = fixtureImagery();
   const terrain = fixtureTerrain();
-  return { ...terrain, ...imagery };
+  // 3D Tiles decode their glTF content with the engine's workers (`parse-model`): a globe without tiled sources needs
+  // them too, or a production build has nothing to decode with (F463).
+  const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
+  const wrapped = offlineDemo && imagery.imagery ? { imagery: imagery.imagery.map(offlineDemo.wrap) } : {};
+  return {
+    ...tiles3dWorkers,
+    ...terrain,
+    ...imagery,
+    ...wrapped,
+    ...customAdapters(params),
+    ...montBlancLayers,
+    ...europeLayers,
+  };
 }
 
-/** Creates one engine instance in a container with its own canvas. */
 /** Starts a globe; `controls` is its navigation, whose commands the page's buttons may call (F174). */
 function startGlobe(
   container: HTMLElement,
@@ -288,6 +309,7 @@ function startGlobe(
       depth,
       canvas: target,
       gpuTiming: params.has('gpuTiming'),
+      antialias: params.get('antialias') !== '0',
       // Models (F361) load the glTF loader on the first model only.
       gltf: async () => (await import('@vibeglobe/renderer/gltf')).gltfLoader(),
       // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
@@ -309,6 +331,8 @@ function startGlobe(
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).
     ...(params.has('logSink') ? { logSink: (entry: LogEntry) => void logEntries.push(entry) } : {}),
+    // `?logLevel=debug` logs every tile request the engine starts (F574's request record).
+    ...(params.get('logLevel') === 'debug' ? { logLevel: 'debug' as const } : {}),
     // `?terrainClearance=` sets how far above the terrain the eye stays (F146).
     ...(params.has('terrainClearance') ? { terrainClearanceMeters: Number(params.get('terrainClearance')) } : {}),
     // `?curves=` sets the Auto mode's zoom curves as JSON (F150).
@@ -372,74 +396,6 @@ function startSecondGlobe(host: HTMLElement): Globe {
   return startGlobe(second, secondCanvas, { longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 2 });
 }
 
-async function startDebugOverlay(globe: Globe, host: HTMLElement): Promise<FrameLoop> {
-  // Loaded on demand so the overlay code is not part of the default page.
-  const [{ createDebugOverlay }, { addTileViewToggle }] = await Promise.all([
-    import('@vibeglobe/ui'),
-    import('./tile-view.js'),
-  ]);
-  const overlay = createDebugOverlay(host);
-  addTileViewToggle(globe, host, params.has('imagery') ? `fixture-${params.get('imagery')}` : undefined);
-  let info: (readonly [string, string])[] = [];
-  let pipelineCompiles = -1;
-  let surfaceInfo = '';
-  // Read at start and again after a recovery, which may have switched the backend (KB-049).
-  const readInfo = (): void => {
-    const caps = globe.capabilities;
-    if (!caps) return;
-    pipelineCompiles = Number.NaN;
-    info = [
-      ['backend', `backend ${caps.backend}`],
-      ['max-texture-size', `max texture ${caps.maxTextureSize}`],
-      ['max-anisotropy', `anisotropy ${caps.maxAnisotropy}`],
-      ['compressed-formats', `compressed ${caps.compressedTextureFormats.join(', ') || 'none'}`],
-      ['device-memory', `memory ${caps.deviceMemoryGiB === undefined ? 'unknown' : `${caps.deviceMemoryGiB} GiB`}`],
-      ['adapter', `adapter ${caps.adapter}`],
-      ['depth', `depth ${caps.depthPath} ${caps.depthFormat}`],
-      ...sourceLines(globe),
-    ];
-  };
-  void globe.ready.then(readInfo);
-  globe.on('device-restored', readInfo);
-  let lastRefreshMs = -Infinity;
-  return startFrameLoop((stats, timestampMs) => {
-    if (timestampMs - lastRefreshMs < OVERLAY_REFRESH_MS) return;
-    lastRefreshMs = timestampMs;
-    overlay.update({ frameTimeMs: stats.meanFrameTimeMs, framesPerSecond: stats.framesPerSecond });
-    // Pipelines compiled after the warm-up stay 0 in normal use (ADR 0010 §4).
-    const rendererStats = globe.rendererStats();
-    const compiles = info.length > 0 ? rendererStats.pipelineCompiles : -1;
-    // Draw calls and pipeline changes of the last frame (F103).
-    const draws = `draw calls ${rendererStats.drawCalls} · pipeline switches ${rendererStats.pipelineSwitches}`;
-    // The surface selection: drawn tiles and what culling skipped (F086, F087).
-    const selection = globe.surfaceStats();
-    const surface =
-      `tiles ${selection.tiles} · level ≤ ${selection.maxLevel} · culled: frustum ${selection.culledByFrustum}, ` +
-      `horizon ${selection.culledByHorizon} · imagery from ancestor ${selection.fromAncestor}, base ${selection.onBaseImage}` +
-      // The largest projected texel of any drawn tile, which the selection keeps at or below 1.5 px (F081).
-      ` · texel ≤ ${Math.max(0, ...globe.surfaceTiles().map((tile) => tile.texelErrorPx)).toFixed(2)} px`;
-    // The imagery caches: RAM hits (F097) and memory against the budgets (F098).
-    const imagery = globe.imageryStats();
-    const mb = (bytes: number): string => (bytes / 1048576).toFixed(1);
-    const cache = imagery
-      ? `RAM hits ${imagery.ramHits} · misses ${imagery.ramMisses} · requests in flight ${imagery.loading} · ` +
-        `GPU ${mb(imagery.gpuBytes)}/${mb(imagery.gpuBudgetBytes)} MB · RAM ` +
-        `${mb(imagery.ramBytes)}/${mb(imagery.ramBudgetBytes)} MB · evicted ${imagery.evicted} · bandwidth ` +
-        `${(imagery.bandwidthBitsPerSecond / 1e6).toFixed(2)} Mbps · latency ${imagery.latencyMs.toFixed(0)} ms`
-      : '';
-    if (compiles === pipelineCompiles && surface + cache + draws === surfaceInfo) return;
-    pipelineCompiles = compiles;
-    surfaceInfo = surface + cache + draws;
-    overlay.setInfo([
-      ...info,
-      ['pipeline-compiles', `pipelines after warm-up ${compiles}`],
-      ['draws', draws],
-      ['surface', surface],
-      ...(imagery ? ([['cache', cache]] as [string, string][]) : []),
-    ]);
-  });
-}
-
 const experiment = params.get('experiment') === 'offscreen' ? params.get('render') : null;
 
 if (params.get('experiment') === 'gpu-probes') {
@@ -455,7 +411,12 @@ if (params.get('experiment') === 'gpu-probes') {
   });
 } else if (app && canvas) {
   const scenario = params.get('scenario');
-  const navigation = createControls();
+  // `?navigationMode=free|north-up` picks how a drag moves the camera at start (the selectors change it at runtime);
+  // `?tiltPolicy=1` turns the tilt policy on with its defaults (F625), as the showcase page does.
+  const navigation = createControls({
+    ...(params.get('navigationMode') === 'north-up' ? { navigationMode: 'north-up' } : {}),
+    ...(params.get('tiltPolicy') === '1' || (SHOWCASE && params.get('tiltPolicy') !== '0') ? { tiltPolicy: true } : {}),
+  });
   const globe = startGlobe(app, canvas, viewFromUrl(), backend, navigation);
   // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
   // A failed start records no time (the error reaches the status line and the error event, not a rejection here).
@@ -465,14 +426,34 @@ if (params.get('experiment') === 'gpu-probes') {
   );
   const globes = scenario === 'two-globes' ? [globe, startSecondGlobe(app)] : [globe];
   showCursorReadout(globe, app);
-  showViewModeControls(globe, app, params.get('viewMode'));
-  showCameraControls(globe, app, navigation);
+  // The page's own buttons, which tests drive, unless the UI controls take their place (`page-mode.ts`).
+  if (!PAGE_UI) {
+    showViewModeControls(globe, app, params.get('viewMode'));
+    showCameraControls(globe, app, navigation);
+  }
   runScenario(globe, scenario);
+  if (PAGE_UI || SHOWCASE)
+    void import('./showcase.js').then((m) =>
+      m.showPageUi(globe, app, params, { showcase: SHOWCASE, ui: PAGE_UI, navigation }),
+    );
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
+  // `?scenario=wind-farm`: 2,000 instanced turbines of one model set (F627), loaded only when asked for.
+  if (scenario === 'wind-farm')
+    void globe.ready.then(async () => (await import('./wind-farm.js')).showWindFarm(globe, params));
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
-  if (scenario?.startsWith('data-') || scenario?.startsWith('draped-'))
+  // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.
+  const tiles3dShown = scenario?.startsWith('3dtiles-')
+    ? globe.ready.then(async () => (await import('./tiles3d-tour.js')).showTiles3D(globe, app, params))
+    : undefined;
+  if (scenario?.startsWith('data-') || scenario?.startsWith('draped-') || scenario === 'live-feed')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showDataScenario(globe, scenario));
+  // Quality presets, adaptive quality, an artificial GPU load and the atmosphere (M11), loaded only when asked for.
+  if (['quality', 'gpuLoad', 'atmosphere', 'sun', 'haze', 'fog'].some((name) => params.has(name)))
+    void globe.ready.then(async () => (await import('./quality-demo.js')).startQuality(globe, params, canvas));
+  if (/=mvt-|vectorStyle=/.test(location.search)) void import('./vector-tiles-demo.js').then((m) => m.show(globe));
+  // `?preset=europe`: the Europe preset's map types with their selector (F617).
+  if (params.get('preset') === 'europe') void showEuropePreset(globe, app);
   if (experiment === 'main') instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;
@@ -481,13 +462,18 @@ if (params.get('experiment') === 'gpu-probes') {
   const showBackend = (): void =>
     setStatus(`${globe.backend ?? ''} · WGS84, a = ${WGS84.semiMajorAxisMeters} m · Made with Natural Earth`);
   globe.on('device-restored', showBackend);
+  offlineDemo?.attach(globe);
   globe.ready.then(showBackend, (error: unknown) =>
     setStatus(`The globe could not start: ${error instanceof Error ? error.message : String(error)}`),
   );
   let loop: FrameLoop | undefined;
-  if (params.has('debug')) loop = await startDebugOverlay(globe, app);
+  if (params.has('debug'))
+    loop = await (await import('./debug-overlay.js')).startDebugOverlay(globe, app, params, offlineDemo);
   else if (scenario === 'frame-loop') loop = startFrameLoop(() => undefined);
   else if (scenario === 'drag') loop = startDragLoop(globe);
+  // `?scenario=3dtiles-city&tour=1`: the tour of the `3dtiles-city` benchmark, its frames measured like a drag.
+  else if (tiles3dShown && params.get('tour') === '1')
+    loop = startMeasuredLoop(globe, (await import('./tiles3d-tour.js')).cityTour(globe, tiles3dShown));
   // `?hud=1` shows the performance HUD (F119).
   const { createHud } = await import('./hud.js');
   const hud = createHud(globe, app);

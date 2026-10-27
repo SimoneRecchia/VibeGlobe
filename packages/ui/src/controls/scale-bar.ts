@@ -1,3 +1,5 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The scale bar (F412): the geodesic ground length of a horizontal screen line through the view center, measured on
  * every drawn camera change from the engine's own `screenToGeo`, so it stays right in the globe, 2D and tilted 3D

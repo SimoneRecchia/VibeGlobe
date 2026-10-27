@@ -1,5 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import { rebuildLater, sameValues, touchBatch } from './layer-pick-grid.js';
 import {
   ATTRIBUTE_COMPONENTS,
   type BatchAttribute,
@@ -187,7 +188,7 @@ export class LayerBatches implements LayerRenderTarget {
   writeGeometry(handle: BatchHandle, feature: number, geometry: FeatureGeometry): void {
     const batch = this.get(handle);
     batch.geometry.set(feature, geometry);
-    batch.dirty = true;
+    rebuildLater(batch);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -198,7 +199,7 @@ export class LayerBatches implements LayerRenderTarget {
     if (value ? current !== undefined && sameValues(current, value) : current === undefined) return;
     if (value) batch.uniforms.set(attribute, Float64Array.from(value));
     else batch.uniforms.delete(attribute);
-    batch.dirty = true;
+    rebuildLater(batch);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -209,7 +210,7 @@ export class LayerBatches implements LayerRenderTarget {
     batch.count = count;
     // Features appended within the room a quad batch reserved are written in place (F372); fewer features rebuild it.
     if (count > previous) this.changed(batch, previous, count);
-    else batch.dirty = true;
+    else rebuildLater(batch);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -224,8 +225,9 @@ export class LayerBatches implements LayerRenderTarget {
    * anything else is rebuilt on the next frame.
    */
   private changed(batch: Batch, first: number, end: number): void {
-    if (batch.dirty) return;
-    if (shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices) batch.changes.mark(first, end);
+    touchBatch(batch);
+    const inPlace = !batch.dirty && shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices;
+    if (inPlace) batch.changes.mark(first, end);
     else batch.dirty = true;
   }
 
@@ -501,11 +503,4 @@ function setOtherEndpoint(geometry: BufferGeometry, other: NonNullable<LayerArra
 interface UpdateRange {
   start: number;
   count: number;
-}
-
-/** True when two attribute values hold the same components. */
-function sameValues(a: Float64Array, b: Float64Array): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
 }

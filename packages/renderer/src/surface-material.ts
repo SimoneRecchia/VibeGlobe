@@ -132,38 +132,43 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
   };
   object.userData['surfaceDraw'] = draw;
-  const values = [
-    draw.texture,
-    draw.fromTexture,
-    draw.heights,
-    draw.fromHeights,
-    draw.stitchHeights,
-    draw.overlay0,
-    draw.overlay1,
-    draw.overlayFrom0,
-    draw.overlayFrom1,
-  ];
+  // The textures are read from the draw state at each draw, never kept: a mesh not drawn after a device loss kept the
+  // lost renderer alive through them (TG-01).
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
-    values[0] = draw.texture;
-    values[1] = draw.fromTexture;
-    values[2] = draw.heights;
-    values[3] = draw.fromHeights;
-    values[4] = draw.stitchHeights;
-    values[5] = draw.overlay0;
-    values[6] = draw.overlay1;
-    values[7] = draw.overlayFrom0;
-    values[8] = draw.overlayFrom1;
     for (let i = 0; i < PER_DRAW_TEXTURES.length; i++) {
       const node = material.userData[PER_DRAW_TEXTURES[i] ?? ''] as { value: Texture } | undefined;
       // Draws without terrain use the material's flat heights; empty overlay slots keep their texture (opacity 0).
       const value =
-        values[i] ?? (i >= 2 && i <= 4 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
+        drawTexture(draw, i) ??
+        (i >= 2 && i <= 4 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
       if (node && value) node.value = value;
     }
-    // Hold no texture between draws: a mesh not drawn after a device loss kept the lost renderer alive (TG-01).
-    values.fill(undefined);
   };
   return draw;
+}
+
+/** The texture of a draw for the node `PER_DRAW_TEXTURES[index]`. */
+function drawTexture(draw: SurfaceDraw, index: number): Texture | undefined {
+  switch (index) {
+    case 0:
+      return draw.texture;
+    case 1:
+      return draw.fromTexture;
+    case 2:
+      return draw.heights;
+    case 3:
+      return draw.fromHeights;
+    case 4:
+      return draw.stitchHeights;
+    case 5:
+      return draw.overlay0;
+    case 6:
+      return draw.overlay1;
+    case 7:
+      return draw.overlayFrom0;
+    default:
+      return draw.overlayFrom1;
+  }
 }
 
 /** A texture object of its own for a second binding of the same kind, sampled like `like`. */

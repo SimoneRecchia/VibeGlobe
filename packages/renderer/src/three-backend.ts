@@ -434,7 +434,10 @@ export class ThreeBackend implements RendererBackend {
     try {
       this.antialiasing.release();
       this.renderer.dispose();
-      this.tiles.forEach((entry) => entry.mesh.geometry.dispose());
+      this.tiles.forEach((entry) => {
+        entry.mesh.geometry.dispose();
+        surface.clearSurfaceDraw(entry.draw);
+      });
       this.tileTextures.disposeTextures();
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       if (this.destroyed) return;

@@ -60,6 +60,8 @@ interface Entry {
   task: number | undefined;
   retryAtMs: number;
   usedAtFrame: number;
+  /** The next request fetches past the HTTP cache: the last bytes did not lay out (TG-04). */
+  reload?: boolean;
 }
 
 /** Loads and lays out the tiles of one source. */
@@ -225,7 +227,11 @@ export class VectorTileLoader {
 
   private start(entry: Entry): boolean {
     const network = this.options.network;
-    const request = { url: entry.url, hostIndex: Math.max(0, this.hostOf(entry.url)) };
+    const request = {
+      url: entry.url,
+      hostIndex: Math.max(0, this.hostOf(entry.url)),
+      ...(entry.reload === true ? { reload: true } : {}),
+    };
     const done = (result: TransportResult) => this.fetched(entry, result);
     if (network !== undefined) {
       if (!network.hasFreeSlot(request.hostIndex)) return false;
@@ -303,6 +309,8 @@ export class VectorTileLoader {
       entry.task = undefined;
       if (this.disposed || this.entries.get(entry.key) !== entry || entry.state === 'ready') return;
       delete entry.bytes;
+      // The browser may have stored the broken body with the server's validators: revalidating returns it again.
+      entry.reload = true;
       this.failed(entry);
     };
     const workers = this.options.workers;

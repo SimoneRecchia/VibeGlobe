@@ -101,6 +101,7 @@ export function fetchTransport(
           signal: controller.signal,
           mode: 'cors',
           credentials: extras.credentials ?? 'omit',
+          ...(request.reload === true ? { cache: 'reload' as const } : {}),
           ...(merged ? { headers: merged } : {}),
         });
         clearTimeout(firstByte);

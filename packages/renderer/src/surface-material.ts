@@ -73,6 +73,22 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
   return object?.userData['surfaceDraw'] as SurfaceDraw | undefined;
 }
 
+/**
+ * Forgets every texture a surface mesh's draw state names (TG-01): after a device loss they belong to the lost
+ * renderer, whose texture system listens to them, so a mesh not drawn again would keep that renderer alive.
+ */
+export function clearSurfaceDraw(draw: SurfaceDraw): void {
+  draw.texture = undefined;
+  draw.fromTexture = undefined;
+  draw.heights = undefined;
+  draw.fromHeights = undefined;
+  draw.stitchHeights = undefined;
+  draw.overlay0 = undefined;
+  draw.overlay1 = undefined;
+  draw.overlayFrom0 = undefined;
+  draw.overlayFrom1 = undefined;
+}
+
 /** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */
 const PER_DRAW_TEXTURES = [
   'surfaceTexture',
@@ -137,6 +153,8 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
         values[i] ?? (i >= 2 && i <= 4 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
       if (node && value) node.value = value;
     }
+    // Hold no texture between draws: a mesh not drawn after a device loss kept the lost renderer alive (TG-01).
+    values.fill(undefined);
   };
   return draw;
 }

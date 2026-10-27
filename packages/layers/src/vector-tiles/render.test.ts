@@ -249,6 +249,29 @@ describe('tile loading (F442, F450)', () => {
     expect(loader.requestLog).toEqual(['c', 'c']);
   });
 
+  it('asks for a fresh copy, past the HTTP cache, when retrying bytes that did not lay out (TG-04)', async () => {
+    // The browser may keep a corrupted body with the server's ETag; revalidating it gives the same bytes back.
+    const corrupt = new Uint8Array([0x1a, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x08]).buffer;
+    const reloads: (boolean | undefined)[] = [];
+    const transport: TileTransport = {
+      start(request: TileRequest, _timeouts, done: (result: TransportResult) => void) {
+        reloads.push(request.reload);
+        queueMicrotask(() => done({ kind: 'ok', bytes: corrupt.slice(0), contentType: 'application/x-protobuf' }));
+        return () => undefined;
+      },
+    };
+    let nowMs = 0;
+    const loader = new VectorTileLoader({ transport, onReady: () => undefined, now: () => nowMs });
+    loader.setLayers(layers, 1);
+    const wanted = [{ url: 'c', tile: { z: 1, x: 0, y: 0 }, priority: 0 }];
+    loader.update(wanted, new Set());
+    await tick();
+    nowMs = 6_000;
+    loader.update(wanted, new Set());
+    await tick();
+    expect(reloads).toEqual([undefined, true]);
+  });
+
   it('cancels tiles no frame wants any more', () => {
     const aborted: string[] = [];
     const transport: TileTransport = {

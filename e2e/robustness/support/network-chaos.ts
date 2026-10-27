@@ -173,7 +173,8 @@ async function vectorChaos(page: Page, context: BrowserContext, backend: string,
   const errors = await collectErrors(page);
   await openGlobe(page, VECTOR_QUERY(backend));
   expect(await addStyle(page)).toBe('ok');
-  const chaos = await injectChaos(page, /\/vector-tiles\/(?!styles\/)/, random);
+  // Tiles and glyphs only: in development the dev server serves the layers' modules under `/vector-tiles/` too.
+  const chaos = await injectChaos(page, /\/vector-tiles\/(tiles|glyphs)\//, random);
   for (let i = 0; i < scaled(40); i++) {
     const view = {
       longitudeDeg: 9.19 + (random() - 0.5) * 0.2,

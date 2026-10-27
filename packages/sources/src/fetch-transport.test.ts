@@ -90,3 +90,24 @@ describe('cache lifetime of responses (F260)', () => {
     expect(result).toMatchObject({ kind: 'ok', maxAgeMs: 5000 });
   });
 });
+
+describe('reloads past the HTTP cache (TG-04)', () => {
+  it('fetches with cache "reload" when the request asks for a fresh copy, and with the default cache otherwise', async () => {
+    const modes: (RequestCache | undefined)[] = [];
+    const transport = fetchTransport((_input, init) => {
+      modes.push(init?.cache);
+      return Promise.resolve(png());
+    });
+    const start = (reload?: boolean): Promise<TransportResult> =>
+      new Promise((resolve) =>
+        transport.start(
+          { url: 'https://t.test/1/0/0.pbf', hostIndex: 0, ...(reload ? { reload } : {}) },
+          timeouts,
+          resolve,
+        ),
+      );
+    await start();
+    await start(true);
+    expect(modes).toEqual([undefined, 'reload']);
+  });
+});

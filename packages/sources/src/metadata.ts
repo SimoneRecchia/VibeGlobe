@@ -38,6 +38,8 @@ export interface ProviderProfile {
   readonly sessionRenewalSeconds?: number;
   /** The ADR that records the reading of the provider's terms. */
   readonly termsAdr?: string;
+  /** A warning about the provider's terms, which the engine logs once per instance (KB-PT-07, F267). */
+  readonly warning?: string;
 }
 
 /** The metadata of this package's adapters, on any tiled source (imagery or terrain). */

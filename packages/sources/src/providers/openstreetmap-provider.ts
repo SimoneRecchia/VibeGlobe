@@ -16,7 +16,15 @@ import { xyzImagery } from '../xyz-imagery.js';
 /** At most this many requests in flight to the public servers (ADR 0032). */
 export const OSM_PUBLIC_MAX_CONCURRENT = 2;
 
-/** The OpenStreetMap public-servers profile, mapped from the OSMF tile usage policy in ADR 0032. */
+/** The warning that the public servers are not for production products (F267). */
+const OSM_PUBLIC_WARNING =
+  '[vibeglobe] The OpenStreetMap public tile servers are for light use only and unsuitable for production products; ' +
+  'serve tiles built by the data pipeline instead (docs/guides/sources.md).';
+
+/**
+ * The OpenStreetMap public-servers profile, mapped from the OSMF tile usage policy in ADR 0032. Its warning is logged
+ * by the engine once per instance, however many sources use it (KB-PT-07).
+ */
 export const OSM_PUBLIC_PROFILE: ProviderProfile = Object.freeze({
   id: 'osm-public',
   forbids: new Set(['prefetch', 'offlinePackaging', 'persistentCache'] as const),
@@ -24,6 +32,7 @@ export const OSM_PUBLIC_PROFILE: ProviderProfile = Object.freeze({
   maxConcurrentRequests: OSM_PUBLIC_MAX_CONCURRENT,
   requiredAttribution: { text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' },
   termsAdr: 'docs/adr/0032-openstreetmap-tile-usage-policy.md',
+  warning: OSM_PUBLIC_WARNING,
 });
 
 /** Options of {@link openStreetMapImagery}. */
@@ -38,7 +47,10 @@ export interface OpenStreetMapImageryOptions {
   readonly url?: string;
   /** The `fetch` of tile requests; the global one by default. */
   readonly fetch?: typeof fetch;
-  /** Receives the one warning that the public servers are not for production (default `console.warn`). */
+  /**
+   * Also receives the warning that the public servers are not for production, when the source is created. Without it
+   * nothing is logged then: the engine logs the profile's warning once per instance (KB-PT-07).
+   */
   readonly warn?: (message: string) => void;
 }
 
@@ -78,7 +90,7 @@ const OSM_REPORT_ISSUE = { text: 'Report a map issue', url: 'https://www.openstr
  * Raster tiles from the OpenStreetMap Foundation's public servers (F264–F267) under their usage policy (ADR 0032):
  * light use only, at most two requests in flight, the application identified on every request, attribution to
  * OpenStreetMap contributors, and no prefetch or offline packaging. The public servers are unsuitable for production
- * products, so creating the source warns once; products use self-hosted tiles from the data pipeline.
+ * products, so the engine warns once per instance; products use self-hosted tiles from the data pipeline.
  */
 export function openStreetMapImagery(options: OpenStreetMapImageryOptions): DescribedImagerySource {
   checkIdentity(options);
@@ -88,10 +100,7 @@ export function openStreetMapImagery(options: OpenStreetMapImageryOptions): Desc
       'osm-subdomains',
       'OpenStreetMap public servers: request https://tile.openstreetmap.org/{z}/{x}/{y}.png, without subdomains (tile usage policy, ADR 0032)',
     );
-  (options.warn ?? ((message: string) => console.warn(message)))(
-    '[vibeglobe] The OpenStreetMap public tile servers are for light use only and unsuitable for production products; ' +
-      'serve tiles built by the data pipeline instead (docs/guides/sources.md).',
-  );
+  options.warn?.(OSM_PUBLIC_WARNING);
   const source = xyzImagery({
     id: options.id ?? 'osm-public',
     url: options.url ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',

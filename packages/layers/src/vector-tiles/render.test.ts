@@ -1,5 +1,5 @@
 import { geodeticToEcef, type TileRequest, type TileTransport, type TransportResult } from '@vibeglobe/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { encodeMvt } from '../__fixtures__/mvt-writer.js';
 import { fillArea, tessellateFill, tileClipRect } from './fill-tessellate.js';
 import { globeVertices, maxEdgeUnits, subdividedFill, tileOrigin, tileToLonLat } from './globe-vertices.js';
@@ -247,6 +247,58 @@ describe('tile loading (F442, F450)', () => {
     await tick();
     expect(loader.get(tile)?.buckets[0]?.layerId).toBe('water');
     expect(loader.requestLog).toEqual(['c', 'c']);
+  });
+
+  it('asks for a fresh copy, past the HTTP cache, when retrying bytes that did not lay out (TG-04)', async () => {
+    // The browser may keep a corrupted body with the server's ETag; revalidating it gives the same bytes back.
+    const corrupt = new Uint8Array([0x1a, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x08]).buffer;
+    const reloads: (boolean | undefined)[] = [];
+    const transport: TileTransport = {
+      start(request: TileRequest, _timeouts, done: (result: TransportResult) => void) {
+        reloads.push(request.reload);
+        queueMicrotask(() => done({ kind: 'ok', bytes: corrupt.slice(0), contentType: 'application/x-protobuf' }));
+        return () => undefined;
+      },
+    };
+    let nowMs = 0;
+    const loader = new VectorTileLoader({ transport, onReady: () => undefined, now: () => nowMs });
+    loader.setLayers(layers, 1);
+    const wanted = [{ url: 'c', tile: { z: 1, x: 0, y: 0 }, priority: 0 }];
+    loader.update(wanted, new Set());
+    await tick();
+    nowMs = 6_000;
+    loader.update(wanted, new Set());
+    await tick();
+    expect(reloads).toEqual([undefined, true]);
+  });
+
+  it('asks for a frame again while a wanted failed tile waits, even when a frame came a moment before its retry (TG-04)', async () => {
+    vi.useFakeTimers();
+    try {
+      const transport: TileTransport = {
+        start(_request, _timeouts, done: (result: TransportResult) => void) {
+          queueMicrotask(() => done({ kind: 'network-error' }));
+          return () => undefined;
+        },
+      };
+      let nowMs = 0;
+      let frames = 0;
+      const loader = new VectorTileLoader({ transport, onReady: () => frames++, now: () => nowMs });
+      const wanted = [{ url: 'f', tile: { z: 1, x: 0, y: 0 }, priority: 0 }];
+      loader.update(wanted, new Set());
+      await Promise.resolve();
+      // The retry's frame comes a millisecond early by the loader's clock: the tile is not due yet.
+      nowMs = 4_999;
+      vi.advanceTimersByTime(5_000);
+      expect(frames).toBe(1);
+      loader.update(wanted, new Set());
+      expect(loader.loading).toBe(1);
+      // Another frame is asked for when it is due.
+      vi.advanceTimersByTime(100);
+      expect(frames).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('cancels tiles no frame wants any more', () => {

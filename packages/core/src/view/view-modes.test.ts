@@ -268,6 +268,32 @@ describe('temporary tilt clamps (F165, F166)', () => {
     view.applyTilt(camera, 2, above);
     expect(camera.pose.tiltRad / DEG).toBeCloseTo(limited, 6);
   });
+
+  it('lowers the tilt under the terrain limit by at most 4° a frame (KB-170)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.chooseTilt(45 * DEG);
+    const camera = new Camera();
+    camera.widthPx = 320;
+    camera.heightPx = 240;
+    camera.pose.rangeMeters = 2000;
+    camera.update();
+    const flat = { probeGround: (c: Camera): void => void (c.groundHeightMeters = 0) };
+    view.applyTilt(camera, 2, flat);
+    expect(camera.pose.tiltRad / DEG).toBeCloseTo(45, 6);
+    // The flank rises under the eye at once: the limit falls to about 20°, the tilt follows over several frames.
+    const flank = {
+      probeGround: (c: Camera): void =>
+        void (c.groundHeightMeters = c.eyeGeodetic.heightMeters - 1880 * Math.cos(c.pose.tiltRad) + 1700),
+    };
+    let previous = 45;
+    for (let frame = 0; frame < 12; frame++) {
+      view.applyTilt(camera, 2, flank);
+      const tilt = camera.pose.tiltRad / DEG;
+      expect(previous - tilt, `frame ${frame}`).toBeLessThanOrEqual(4 + 1e-9);
+      previous = tilt;
+    }
+    expect(previous).toBeLessThan(26);
+  });
 });
 
 describe('view regressions of the M5 review', () => {

@@ -48,6 +48,11 @@ const OFFSET_KEPT = 0.75;
 const OFFSET_FRAME_MS = 1000 / 60;
 const MIN_TILT_OFFSET_RAD = (0.05 * Math.PI) / 180;
 const MIN_FACTOR_OFFSET = 1e-4;
+/**
+ * The most the terrain limit lowers the tilt in one frame, radians (KB-170): a fast descent onto a flank would drop it
+ * by several degrees a frame; the collision's lift keeps the eye its clearance above the ground meanwhile (F146).
+ */
+const MAX_LIMIT_DROP_RAD = (4 * Math.PI) / 180;
 
 /** Slots of {@link ViewState}'s values: doubles in an array, as a double field may be boxed (ADR 0018). */
 const GROUND_ZOOM = 0;
@@ -211,7 +216,8 @@ export class ViewState {
     this.tiltPolicy[3] = allowed;
     this.computeTarget();
     const target = values[TARGET_TILT] ?? 0;
-    if (this.snap) values[TILT_OFFSET] = 0;
+    const snapped = this.snap;
+    if (snapped) values[TILT_OFFSET] = 0;
     // The share kept over the time since the last frame, so transitions take the same time at every frame rate.
     const elapsed = (this.frameTimeMs[0] ?? 0) - (values[LAST_TIME] ?? 0);
     values[KEPT] = elapsed > 0 && elapsed < 1000 ? OFFSET_KEPT ** (elapsed / OFFSET_FRAME_MS) : OFFSET_KEPT;
@@ -239,6 +245,12 @@ export class ViewState {
       limits[4] = camera.groundHeightMeters;
       terrainTiltLimitRad(limits);
       if ((values[APPLIED_TILT] ?? 0) > (limits[7] ?? 0)) values[APPLIED_TILT] = limits[7] ?? 0;
+    }
+    // After a jump the limit applies at once; otherwise the tilt it lowers falls at most so far a frame (KB-170).
+    const floor = (values[PREVIOUS_TILT] ?? 0) - MAX_LIMIT_DROP_RAD;
+    if (!snapped && (values[APPLIED_TILT] ?? 0) < floor) {
+      values[APPLIED_TILT] = (values[WANTED_TILT] ?? 0) < floor ? (values[WANTED_TILT] ?? 0) : floor;
+      if (ground) clears(this, camera, values, APPLIED_TILT, ground);
     }
     // A limit leaves an offset that eases back; while it holds, the tilt is not easing (KB-095).
     this.clamped = (values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0);

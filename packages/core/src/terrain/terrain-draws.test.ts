@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import { MERCATOR_ROOT, NORTH_CAP, quadtreeTileKey, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import { previousLevel, TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel } from './terrain-draws.js';
+import type { HeightGrid } from './heightmap.js';
+import {
+  previousLevel,
+  TERRAIN_LEVEL_OFFSET,
+  terrainErrorsBySurfaceLevel,
+  terrainHeightRange,
+  type TerrainLayer,
+} from './terrain-draws.js';
+import type { TerrainHeights } from './terrain-heights.js';
 import type { TerrainSource } from './terrain-source.js';
 
 const source = {
@@ -60,5 +68,40 @@ describe('previousLevel', () => {
     expect(previousLevel({ ...tile(NORTH_CAP, 7, 18, 5), span: 2 }, shown)).toBe(5);
     shown.set(quadtreeTileKey(NORTH_CAP, 9, 22, 4), 7);
     expect(previousLevel({ ...tile(NORTH_CAP, 8, 10, 2), span: 2 }, shown)).toBe(7);
+  });
+});
+
+describe('terrainHeightRange', () => {
+  it('counts the error of a mesh that samples only every fourth vertex of a fine grid (KB-097)', () => {
+    // One terrain tile of 256 cells, flat but for a 1,000 m spike on a vertex between the mesh's samples: a surface
+    // tile two levels deeper shows a quarter of it (64 cells) through 16 segments, so its mesh never reaches the spike.
+    const cells = 256;
+    const heightsMeters = new Float32Array((cells + 1) ** 2);
+    heightsMeters[2 * (cells + 1) + 2] = 1000;
+    const grid: HeightGrid = { cells, heightsMeters, minMeters: 0, maxMeters: 1000, errorMeters: 0 };
+    const source = { tiling: WEB_MERCATOR_TILING, minLevel: 0, maxLevel: 0 } as TerrainSource;
+    const layer = {
+      source,
+      loader: { peekHandle: (level: number) => (level === 0 ? 7 : -1) },
+      gridErrorMeters: Float64Array.of(10),
+    } as unknown as TerrainLayer;
+    const heights = { grid: (handle: number) => (handle === 7 ? grid : undefined) } as unknown as TerrainHeights;
+    const mercatorLat = (y: number): number => Math.atan(Math.sinh(Math.PI * (1 - 2 * y)));
+    const surface: QuadtreeTile = {
+      key: quadtreeTileKey(MERCATOR_ROOT, TERRAIN_LEVEL_OFFSET, 0, 0),
+      root: MERCATOR_ROOT,
+      level: TERRAIN_LEVEL_OFFSET,
+      x: 0,
+      y: 0,
+      span: 1,
+      westRad: -Math.PI,
+      eastRad: -Math.PI / 2,
+      northRad: mercatorLat(0),
+      southRad: mercatorLat(0.25),
+    };
+    const out = new Float64Array(4);
+    expect(terrainHeightRange(layer, heights, surface, out)).toBe(true);
+    // What finer surface levels may add covers the spike the mesh skips, so the selection refines the tile.
+    expect(out[2]).toBeGreaterThanOrEqual(1000);
   });
 });

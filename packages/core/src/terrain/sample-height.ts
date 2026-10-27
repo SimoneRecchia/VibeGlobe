@@ -113,3 +113,43 @@ function include(grid: HeightGrid, x: number, y: number, at: Float64Array): void
   if (height < (at[4] ?? 0)) at[4] = height;
   if (height > (at[5] ?? 0)) at[5] = height;
 }
+
+/** {@link samplingErrorMeters} of each grid, by power-of-two stride (index 1 for 2, 2 for 4, …), NaN until measured. */
+const samplingErrors = new WeakMap<HeightGrid, Float64Array>();
+
+/**
+ * How far a grid's surface lies from a mesh that samples only every `stride`-th vertex of it, meters (KB-097): a
+ * surface tile whose part of the grid has more cells than its segments shows the grid only at its vertices, cell
+ * triangles split as {@link sampleHeightInto} splits them. Measured over the whole grid once per stride (a power of
+ * two, at most the grid's cells), then read from a cache; 0 for a stride of 1.
+ */
+export function samplingErrorMeters(grid: HeightGrid, stride: number): number {
+  const cells = grid.cells;
+  const index = Math.round(Math.log2(stride < cells ? stride : cells));
+  if (!(index >= 1)) return 0;
+  const step = 2 ** index;
+  let cached = samplingErrors.get(grid);
+  if (!cached) samplingErrors.set(grid, (cached = new Float64Array(16).fill(Number.NaN)));
+  const known = cached[index] ?? Number.NaN;
+  if (known === known) return known;
+  const side = cells + 1;
+  const h = grid.heightsMeters;
+  let worst = 0;
+  for (let row0 = 0; row0 < cells; row0 += step)
+    for (let col0 = 0; col0 < cells; col0 += step) {
+      const nw = h[row0 * side + col0] ?? 0;
+      const ne = h[row0 * side + col0 + step] ?? 0;
+      const sw = h[(row0 + step) * side + col0] ?? 0;
+      const se = h[(row0 + step) * side + col0 + step] ?? 0;
+      for (let r = 0; r <= step; r++)
+        for (let c = 0; c <= step; c++) {
+          const fx = c / step;
+          const fy = r / step;
+          const mesh = fx >= fy ? nw + (ne - nw) * fx + (se - ne) * fy : nw + (se - sw) * fx + (sw - nw) * fy;
+          const error = Math.abs((h[(row0 + r) * side + col0 + c] ?? 0) - mesh);
+          if (error > worst) worst = error;
+        }
+    }
+  cached[index] = worst;
+  return worst;
+}

@@ -52,12 +52,16 @@ function isBackground(image: PNG, x: number, y: number): boolean {
 
 /**
  * The fixture cone's height-to-base ratio on screen: the slope of its east flank, rows per column, fitted over every
- * row from below the tip to just above the horizon (the first row drawn all across) so rounding averages out. The east
- * flank only: the west flank shows KB-097.
+ * row from below the tip to just above the horizon (the first row drawn all across) so rounding averages out; and how
+ * far each flank's silhouette strays from its fitted line at most, pixels (KB-097: a ledge on the west flank).
  */
-function coneRatio(image: PNG): { topRow: number; horizonRow: number; ratio: number } {
+function coneRatio(image: PNG): { topRow: number; horizonRow: number; ratio: number; ledgePx: number } {
   const eastEdge = (y: number): number => {
     for (let x = image.width - 1; x >= 0; x--) if (!isBackground(image, x, y)) return x;
+    return -1;
+  };
+  const westEdge = (y: number): number => {
+    for (let x = 0; x < image.width; x++) if (!isBackground(image, x, y)) return x;
     return -1;
   };
   let topRow = 0;
@@ -75,7 +79,26 @@ function coneRatio(image: PNG): { topRow: number; horizonRow: number; ratio: num
     covariance += ((rows[i] ?? 0) - meanY) * ((xs[i] ?? 0) - meanX);
     variance += ((xs[i] ?? 0) - meanX) ** 2;
   }
-  return { topRow, horizonRow, ratio: covariance / variance };
+  return {
+    topRow,
+    horizonRow,
+    ratio: covariance / variance,
+    ledgePx: Math.max(straying(rows, xs), straying(rows, rows.map(westEdge))),
+  };
+}
+
+/** The largest distance in columns between a flank's silhouette and the line fitted through it (column on row). */
+function straying(rows: readonly number[], xs: readonly number[]): number {
+  const meanY = rows.reduce((a, b) => a + b, 0) / rows.length;
+  const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+  let covariance = 0;
+  let variance = 0;
+  for (let i = 0; i < rows.length; i++) {
+    covariance += ((rows[i] ?? 0) - meanY) * ((xs[i] ?? 0) - meanX);
+    variance += ((rows[i] ?? 0) - meanY) ** 2;
+  }
+  const slope = covariance / variance;
+  return Math.max(...rows.map((y, i) => Math.abs((xs[i] ?? 0) - (meanX + slope * (y - meanY)))));
 }
 
 for (const backend of BACKENDS) {
@@ -101,8 +124,10 @@ for (const backend of BACKENDS) {
         expect(camera.tiltDeg).toBeCloseTo(83, 6);
         expect(camera.rangeMeters / 1500).toBeCloseTo(1, 1);
         const image = await canvasImage(page);
-        const { topRow, horizonRow, ratio } = coneRatio(image);
+        const { topRow, horizonRow, ratio, ledgePx } = coneRatio(image);
         expect(topRow, `the tip shows at ${latitudeDeg}°`).toBeGreaterThan(10);
+        // Both flanks straight: no ledge where the mesh skipped the grid's vertices (KB-097).
+        expect(ledgePx, `the flanks are straight at ${latitudeDeg}°`).toBeLessThan(3);
         expect(horizonRow - topRow, `the tip stands above the horizon at ${latitudeDeg}°`).toBeGreaterThan(15);
         ratios.push(ratio);
       }

@@ -1,5 +1,5 @@
 import { PbfWriter } from 'pbf';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { decodeGlyphs, GlyphStore, glyphRanges, glyphUrl, parseSpriteIndex, spriteUrls, type Glyph } from './glyphs.js';
 import { lineAnchors, placeGlyphsAlongLine } from './line-labels.js';
 import { brunnel, localizedName, localizedTextField, placePriority, roadClass, roadDrawOrder } from './osm.js';
@@ -7,7 +7,7 @@ import { CrossTileSymbolIndex, placeSymbols, SymbolFader, type SymbolCandidate }
 import { DEFAULT_SHAPING, shapeText } from './text-shaping.js';
 import { StyleLayer } from './style-layer.js';
 import type { FrameView } from '@vibeglobe/core';
-import type { GlyphSource } from './glyph-source.js';
+import { GlyphSource } from './glyph-source.js';
 import { LabelPlacer } from './label-placer.js';
 import { BUCKET_EXTENT } from './layout-tile.js';
 import type { VectorAtlas } from './vector-target.js';
@@ -319,5 +319,49 @@ describe('label placement cost during camera motion (KB-210)', () => {
     };
     placer.frame([source], { widthPx: 800, heightPx: 600 } as FrameView, 2, 0);
     expect(needed).toEqual(['here']);
+  });
+});
+
+describe('glyph ranges that fail on the way (TG-04)', () => {
+  it('requests a range again after a server or network failure, while a missing range (404) stays empty', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers: (Response | Error)[] = [new Response('fail', { status: 500 }), new Error('reset')];
+      const asked: string[] = [];
+      const fetchImpl = ((url: string) => {
+        asked.push(url);
+        const answer = answers.shift() ?? new Response(null, { status: 404 });
+        return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+      }) as typeof fetch;
+      let changes = 0;
+      const source = new GlyphSource(
+        'https://g.test/{fontstack}/{range}.pbf',
+        fetchImpl,
+        () => changes++,
+        {},
+        undefined,
+      );
+      const font = ['Noto Sans Regular'];
+      source.need(font, 'Via');
+      await vi.advanceTimersByTimeAsync(0);
+      // The 500 is not taken as an empty range: the labels wait, and the range is asked for again later.
+      expect(source.ready(font, 'Via')).toBe(false);
+      source.need(font, 'Via');
+      expect(asked).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(changes).toBeGreaterThan(0);
+      source.need(font, 'Via');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(asked).toHaveLength(2);
+      expect(source.ready(font, 'Via')).toBe(false);
+      await vi.advanceTimersByTimeAsync(5_000);
+      source.need(font, 'Via');
+      await vi.advanceTimersByTimeAsync(0);
+      // A 404: the font has no such range; it is not asked for again.
+      expect(asked).toHaveLength(3);
+      expect(source.ready(font, 'Via')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

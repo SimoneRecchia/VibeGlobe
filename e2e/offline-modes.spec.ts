@@ -20,6 +20,8 @@ import {
 
 test.use({ viewport: { width: 320, height: 240 } });
 test.beforeEach(() => test.setTimeout(240_000));
+// Routes still fetching when a test ends must not fail the run outside any test (KB-213).
+test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
 
 const ROME_BOUNDS = { westDeg: 11, southDeg: 40.9, eastDeg: 14, northDeg: 42.9 };
 const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 7 };

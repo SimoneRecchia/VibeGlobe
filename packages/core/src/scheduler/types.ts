@@ -13,6 +13,11 @@ export interface TileRequest {
   url: string;
   /** Index of the host the URL points to, for per-host concurrency (F089). */
   hostIndex: number;
+  /**
+   * Fetch a fresh copy past the HTTP cache (TG-04): for a retry of bytes that did not decode, which the browser may
+   * have stored with the server's validators, so a revalidation would return them again.
+   */
+  reload?: boolean;
 }
 
 /** Time limits of one request (F092), in milliseconds. */

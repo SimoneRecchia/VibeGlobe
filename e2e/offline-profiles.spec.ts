@@ -17,6 +17,8 @@ import {
 import { tilePng } from './support/sources.ts';
 
 test.beforeEach(() => test.setTimeout(180_000));
+// Routes still fetching when a test ends must not fail the run outside any test (KB-213).
+test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
 
 const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 };
 const PAN = [12.5, 14, 15.5];

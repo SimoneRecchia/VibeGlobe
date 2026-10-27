@@ -49,10 +49,12 @@ const OFFSET_FRAME_MS = 1000 / 60;
 const MIN_TILT_OFFSET_RAD = (0.05 * Math.PI) / 180;
 const MIN_FACTOR_OFFSET = 1e-4;
 /**
- * The most the terrain limit lowers the tilt in one frame, radians (KB-170): a fast descent onto a flank would drop it
- * by several degrees a frame; the collision's lift keeps the eye its clearance above the ground meanwhile (F146).
+ * The most the terrain limit lowers the tilt in one frame, radians, and the relief the tilt carries (KB-170): a fast
+ * descent onto a flank would drop both by a jump; the collision's lift keeps the eye its clearance above the ground
+ * meanwhile (F146).
  */
 const MAX_LIMIT_DROP_RAD = (4 * Math.PI) / 180;
+const MAX_RELIEF_DROP = 0.06;
 
 /** Slots of {@link ViewState}'s values: doubles in an array, as a double field may be boxed (ADR 0018). */
 const GROUND_ZOOM = 0;
@@ -82,6 +84,8 @@ const CAP_KEEP = 14;
 const POLICY_CAP = 15;
 /** 1 for the frame after the tilt policy's availability changed, so the controls see it in the next one (F625). */
 const POLICY_FLIP = 16;
+/** The most a limit moves the tilt this frame, radians (KB-170): see {@link writeStep}. */
+const STEP = 17;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -92,7 +96,7 @@ const POLICY_FLIP = 16;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1, Number.NaN, 0);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1, Number.NaN, 0, 0);
   /**
    * The tilt policy the controls set (F625, `NavigationApi.tiltPolicy`): `[0]` the distance from the eye to the point
    * looked at beyond which the view is flat, meters (0: no policy, the zoom curves' tilt), `[1]` the distance within
@@ -240,14 +244,15 @@ export class ViewState {
     if ((values[WANTED_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[POLICY_CAP] ?? 0;
     values[PREVIOUS_TILT] = values[APPLIED_TILT] ?? 0;
     values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
+    writeStep(values);
     if (clearanceMeters > 0 && ground) this.probeTerrainLimit(camera, ground);
     else if (clearanceMeters > 0) {
       limits[4] = camera.groundHeightMeters;
       terrainTiltLimitRad(limits);
       if ((values[APPLIED_TILT] ?? 0) > (limits[7] ?? 0)) values[APPLIED_TILT] = limits[7] ?? 0;
     }
-    // After a jump the limit applies at once; otherwise the tilt it lowers falls at most so far a frame (KB-170).
-    const floor = (values[PREVIOUS_TILT] ?? 0) - MAX_LIMIT_DROP_RAD;
+    // After a jump the limit applies at once; otherwise the tilt it lowers falls at most a step a frame (KB-170).
+    const floor = (values[PREVIOUS_TILT] ?? 0) - (values[STEP] ?? 0);
     if (!snapped && (values[APPLIED_TILT] ?? 0) < floor) {
       values[APPLIED_TILT] = (values[WANTED_TILT] ?? 0) < floor ? (values[WANTED_TILT] ?? 0) : floor;
       if (ground) clears(this, camera, values, APPLIED_TILT, ground);
@@ -270,12 +275,14 @@ export class ViewState {
     if (clears(this, camera, values, WANTED_TILT, ground)) return;
     values[LOW_TILT] = 0;
     // Under the terrain even looking straight down: the target is below the surface (after a jump, before the frame
-    // lifts it), which no tilt mends, so the tilt stands (KB-104): the wanted one, or, while a limit held the previous
-    // frame lower, no higher than that frame's, so a zoom that reaches this point does not jump up (KB-153).
+    // lifts it), which no tilt mends, so the lift alone keeps the eye clear and the tilt is the wanted one (KB-104);
+    // while a limit held the previous frame lower, it climbs back to it a step a frame, so a zoom that reaches this
+    // point neither jumps up (KB-153) nor stays lowered (KB-170).
     if (!clears(this, camera, values, LOW_TILT, ground)) {
       const wanted = values[WANTED_TILT] ?? 0;
-      const previous = values[PREVIOUS_TILT] ?? 0;
-      values[APPLIED_TILT] = this.clamped && previous < wanted ? previous : wanted;
+      values[HIGH_TILT] = (values[PREVIOUS_TILT] ?? 0) + (values[STEP] ?? 0);
+      const held = this.clamped && (values[HIGH_TILT] ?? 0) < wanted;
+      values[APPLIED_TILT] = held ? (values[HIGH_TILT] ?? 0) : wanted;
       clears(this, camera, values, APPLIED_TILT, ground);
       return;
     }
@@ -410,6 +417,23 @@ function clears(state: ViewState, camera: Camera, values: Float64Array, slot: nu
   state.update(camera);
   ground.probeGround(camera);
   return camera.eyeGeodetic.heightMeters - camera.groundHeightMeters >= (limits[5] ?? 0);
+}
+
+/**
+ * The most a terrain limit moves the tilt this frame from the previous one, into `values[STEP]` (KB-170): at most
+ * {@link MAX_LIMIT_DROP_RAD}, and less where the relief, which follows the tilt by a smootherstep over 0°–30°, would
+ * change by more than {@link MAX_RELIEF_DROP}.
+ */
+function writeStep(values: Float64Array): void {
+  values[STEP] = (values[PREVIOUS_TILT] ?? 0) / RELIEF_TILT_RAD;
+  if ((values[STEP] ?? 0) > 1) values[STEP] = 1;
+  const x = values[STEP] ?? 0;
+  // The relief's change over a full step, by the smootherstep's slope 30 x² (1 − x)².
+  values[STEP] = ((30 * x * x * (1 - x) * (1 - x)) / RELIEF_TILT_RAD) * MAX_LIMIT_DROP_RAD;
+  values[STEP] =
+    (values[STEP] ?? 0) > MAX_RELIEF_DROP
+      ? (MAX_LIMIT_DROP_RAD * MAX_RELIEF_DROP) / (values[STEP] ?? 1)
+      : MAX_LIMIT_DROP_RAD;
 }
 
 /** Shrinks the offset in `values[slot]` by one frame's share, ending it below `floor`. */

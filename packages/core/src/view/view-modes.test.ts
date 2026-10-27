@@ -247,7 +247,7 @@ describe('temporary tilt clamps (F165, F166)', () => {
     expect(camera.pose.tiltRad / DEG).toBeCloseTo(55, 9);
   });
 
-  it('holds the tilt a limit lowered when even a vertical view stops clearing, instead of jumping back up (KB-153)', () => {
+  it('climbs back from the tilt a limit lowered by at most 4° a frame when even a vertical view stops clearing, instead of jumping back up (KB-153, KB-170)', () => {
     const view = new ViewState(DEFAULT_VIEW_CURVES);
     view.chooseTilt(55 * DEG);
     const camera = new Camera();
@@ -266,7 +266,8 @@ describe('temporary tilt clamps (F165, F166)', () => {
     // Then the ground rises above even a vertical view's eye.
     const above = { probeGround: (c: Camera): void => void (c.groundHeightMeters = c.eyeGeodetic.heightMeters + 50) };
     view.applyTilt(camera, 2, above);
-    expect(camera.pose.tiltRad / DEG).toBeCloseTo(limited, 6);
+    expect(camera.pose.tiltRad / DEG).toBeGreaterThan(limited);
+    expect(camera.pose.tiltRad / DEG - limited).toBeLessThanOrEqual(4 + 1e-9);
   });
 
   it('lowers the tilt under the terrain limit by at most 4° a frame (KB-170)', () => {
@@ -286,13 +287,26 @@ describe('temporary tilt clamps (F165, F166)', () => {
         void (c.groundHeightMeters = c.eyeGeodetic.heightMeters - 1880 * Math.cos(c.pose.tiltRad) + 1700),
     };
     let previous = 45;
-    for (let frame = 0; frame < 12; frame++) {
+    let relief = view.morph.factors[1] ?? 0;
+    for (let frame = 0; frame < 16; frame++) {
       view.applyTilt(camera, 2, flank);
       const tilt = camera.pose.tiltRad / DEG;
       expect(previous - tilt, `frame ${frame}`).toBeLessThanOrEqual(4 + 1e-9);
+      expect(relief - (view.morph.factors[1] ?? 0), `frame ${frame}`).toBeLessThan(0.065);
       previous = tilt;
+      relief = view.morph.factors[1] ?? 0;
     }
     expect(previous).toBeLessThan(26);
+    // Then the target sinks under the flank (a movement writes it onto the ellipsoid): no tilt clears, the lift keeps
+    // the eye clear, and the tilt climbs back to the chosen 45° a step a frame instead of staying lowered.
+    const under = { probeGround: (c: Camera): void => void (c.groundHeightMeters = c.eyeGeodetic.heightMeters + 50) };
+    for (let frame = 0; frame < 30; frame++) {
+      view.applyTilt(camera, 2, under);
+      const tilt = camera.pose.tiltRad / DEG;
+      expect(tilt - previous, `frame ${frame}`).toBeLessThanOrEqual(4 + 1e-9);
+      previous = tilt;
+    }
+    expect(previous).toBeCloseTo(45, 3);
   });
 });
 

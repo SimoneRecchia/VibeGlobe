@@ -480,7 +480,9 @@ for (const backend of BACKENDS) {
       expect(Math.max(...heights.slice(1).map((h, i) => Math.abs(h / (heights[i] ?? h) - 1)))).toBeLessThan(0.12);
       expect(Math.max(...report.samples.map((sample) => sample[2]))).toBeGreaterThan(0.99);
       if (mode === '2D-locked') expect(Math.max(...tilts)).toBe(0);
-      if (mode === 'manual-tilt') expect(tilts.at(-1)).toBeCloseTo(45, 6);
+      // The chosen tilt returns at street level, to the terrain limit's probe resolution (0.005°): the eye settles at
+      // the clearance above the flank.
+      if (mode === 'manual-tilt') expect(tilts.at(-1)).toBeCloseTo(45, 2);
       // The temporal glitch detector: no holes, no pops, no frame-to-frame jump of the picture.
       expect([report.holes, report.dark, report.pops]).toEqual([0, 0, 0]);
       console.log(

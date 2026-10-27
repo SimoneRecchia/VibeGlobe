@@ -2,7 +2,7 @@
 // playground stays as it is: the tests import the package's sources through the Vite dev server and use the engine
 // through its public API only (docs/parallel-tracks.md).
 import { resolve } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { CDPSession, Page } from '@playwright/test';
 import type * as GisModule from '@vibeglobe/gis';
 import type * as LayersModule from '@vibeglobe/layers';
 import type * as UiModule from '@vibeglobe/ui';
@@ -143,9 +143,17 @@ export async function recordCamera(
   });
 }
 
+/**
+ * One CDP session per page for touches (KB-207): opening one per touch took long enough on a busy CI page that the two
+ * taps of a double tap arrived further apart than the tools' double-tap interval.
+ */
+const touchSessions = new WeakMap<Page, Promise<CDPSession>>();
+
 /** Touches a point with a real touch sequence (Chromium's touch events through CDP): a tap, or a drag by `dxPx`. */
 export async function touch(page: Page, xPx: number, yPx: number, dxPx = 0, holdMs = 0): Promise<void> {
-  const session = await page.context().newCDPSession(page);
+  let pending = touchSessions.get(page);
+  if (!pending) touchSessions.set(page, (pending = page.context().newCDPSession(page)));
+  const session = await pending;
   const point = (x: number): { x: number; y: number }[] => [{ x, y: yPx }];
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(xPx) });
   if (holdMs > 0) await page.waitForTimeout(holdMs);
@@ -153,5 +161,4 @@ export async function touch(page: Page, xPx: number, yPx: number, dxPx = 0, hold
   for (let i = 1; i <= steps; i++)
     await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: point(xPx + (dxPx * i) / steps) });
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await session.detach();
 }

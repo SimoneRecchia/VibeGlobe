@@ -20,6 +20,15 @@ interface WorkerScope {
 }
 
 const scope = globalThis as unknown as WorkerScope;
-const host = createTaskHost(TASKS, (message, transfer) => scope.postMessage(message, transfer));
+// A task module that failed to load stays failed in this worker's module map (TG-04): an uncaught error makes the pool
+// replace the worker, whose new module map loads it again.
+const host = createTaskHost(
+  TASKS,
+  (message, transfer) => scope.postMessage(message, transfer),
+  () =>
+    setTimeout(() => {
+      throw new Error('task module unavailable');
+    }, 0),
+);
 scope.onmessage = (event) => host.receive(event.data);
 host.announce();

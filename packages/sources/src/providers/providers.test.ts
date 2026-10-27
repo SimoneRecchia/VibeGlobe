@@ -221,6 +221,14 @@ describe('openStreetMapImagery (F263–F267)', () => {
     expect(() => openStreetMapImagery({ appName: 'App', appUrl: 'not a url', warn: () => undefined })).toThrow(
       /identify itself/,
     );
+    // Without a `warn` sink nothing is logged when sources are created: the profile carries the warning, which the
+    // engine logs once per instance however many sources use it (KB-PT-07).
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const first = openStreetMapImagery({ appName: 'Demo', appUrl: 'https://demo.test/' });
+    openStreetMapImagery({ appName: 'Demo', appUrl: 'https://demo.test/', id: 'osm-2' });
+    expect(consoleWarn).not.toHaveBeenCalled();
+    consoleWarn.mockRestore();
+    expect(first.profile.warning).toMatch(/unsuitable for production/);
     const warnings: string[] = [];
     const source = openStreetMapImagery({
       appName: 'Demo',

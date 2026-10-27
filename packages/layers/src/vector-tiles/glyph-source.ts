@@ -20,6 +20,9 @@ import type { VectorTileTarget } from './vector-target.js';
 /** The font stack name of locally drawn glyphs. */
 export const LOCAL_FONT_STACK = 'local';
 
+/** A glyph range that failed on the way is requested again after this long. */
+const GLYPH_RETRY_MS = 5_000;
+
 /** An icon of the sprite: its pixels and the pixel ratio they were drawn for. */
 export interface SpriteImage {
   readonly icon: SpriteIcon;
@@ -61,12 +64,18 @@ export class GlyphSource {
       this.pending.add(url);
       this.requested.push(url);
       void this.fetchImpl(url)
-        .then(async (response) => (response.ok ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0)))
-        .catch(() => new Uint8Array(0))
+        .then(async (response) => {
+          // A missing range (404 and the like) has no glyphs; a server error is retried like a network failure.
+          if (response.status >= 500) throw new Error(`glyph range answered ${String(response.status)}`);
+          return response.ok ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0);
+        })
         .then((bytes) => {
           this.store.add(fontStack, start, decodeGlyphs(bytes));
           this.onChange();
-        });
+        })
+        // A range that failed on the way is not kept as empty: the labels wait for it, and it is requested again
+        // later (TG-04).
+        .catch(() => setTimeout(() => this.retry(url), GLYPH_RETRY_MS));
     }
   }
 
@@ -92,6 +101,12 @@ export class GlyphSource {
       );
     }
     return true;
+  }
+
+  /** Lets a failed range be requested again by the next labels that need it. */
+  private retry(url: string): void {
+    this.pending.delete(url);
+    this.onChange();
   }
 
   /** An icon of the sprite, once loaded. */

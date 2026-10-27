@@ -3828,7 +3828,7 @@
         "Stop the camera and assert full detail is reached and transitions cross-fade without popping",
         "Assert the coarsening never leaves black pixels"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F289",
@@ -3889,7 +3889,7 @@
         "Run zoom and flight scenarios and assert coarse levels come from the package and fine levels from the network",
         "Assert frame times stay within budget and zero black pixels appear"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F294",
@@ -3902,7 +3902,7 @@
         "Run a long flight and assert intermediate views come from the package with zero black pixels and frame times within budget",
         "Assert detail beyond the package arrives from the network after the camera settles"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F295",
@@ -3915,7 +3915,7 @@
         "Assert the first complete frame arrives within 1 s on the LAN setup",
         "Assert health checks target only the LAN endpoints and the engine never waits on unreachable internet hosts"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F296",
@@ -3990,7 +3990,7 @@
         "Assert the finest level requested during the flight is lower on the slow link and that both runs keep frame times within budget with zero black pixels",
         "Assert the arrival view refines to full detail on both links"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F302",
@@ -4159,7 +4159,7 @@
         "Assert no request is retried endlessly and every failed request backs off",
         "Assert the suite runs in CI"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F316",
@@ -4954,7 +4954,7 @@
         "Verify each chunk becomes visible within one frame of being added",
         "Verify frame time stays within the target throughout and no full layer rebuild occurs (instrumentation counters)"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F373",
@@ -4991,7 +4991,7 @@
         "Verify the main thread has no long task above 50 ms during loading",
         "Pan and zoom for 60 seconds and verify the engine stays responsive, RAM and GPU memory stay within budget, and no crash occurs"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F376",
@@ -5202,7 +5202,7 @@
         "Verify by frame differencing that atmosphere brightness and color change continuously with no jumps",
         "Verify gradients show no visible 8-bit banding (dithering or equivalent), measured on screenshots"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F393",
@@ -5265,7 +5265,7 @@
         "Pan slowly while recording frames and verify no edge shimmer by temporal glitch detection",
         "Verify the anti-aliasing cost stays within the per-frame GPU budget"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F398",
@@ -6477,7 +6477,7 @@
         "Follow the documented procedure on each device to run the performance suite",
         "Assert the results are written to the benchmark results folder with device, browser, backend, commit and date"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F492",
@@ -6490,7 +6490,7 @@
         "Assert p95 frame time at most 16.7 ms and average frame rate 60 fps in every scenario",
         "Record the results in the benchmark history"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F493",
@@ -6502,7 +6502,7 @@
         "Drive pinch, two-finger pan, rotate and tilt gestures by hand and record frame times",
         "Assert the frame rate never drops below 30 fps and record how close each scenario is to 60 fps"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F494",
@@ -6514,7 +6514,7 @@
         "Analyze every frame for background, black or empty pixels outside the sky",
         "Assert the count is zero in every frame after the base has loaded"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F495",
@@ -6527,7 +6527,7 @@
         "Measure the time from navigation start to the first frame with no empty pixels",
         "Assert the median and p95 are at most 1 second"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F496",
@@ -6551,7 +6551,7 @@
         "Analyze frames for vertex jitter",
         "Assert no jitter is detected and a manual visual check confirms it"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F498",
@@ -6563,7 +6563,7 @@
         "Sample GPU and RAM use from the engine's counters and browser memory measurements every second",
         "Assert neither ever exceeds its configured budget"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F499",
@@ -6587,7 +6587,7 @@
         "Drop and restore the network during a flight in hybrid mode",
         "Assert no blank frames, no stutter beyond the frame budget, and detail refines again after the network returns"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F501",
@@ -6599,7 +6599,7 @@
         "Compare each measured value with its budget in docs/plan",
         "Assert every budget is met and the results are committed to the benchmark history"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F502",
@@ -6649,7 +6649,7 @@
         "Assert the end-to-end and visual suites pass and frame-rate targets hold",
         "Record device, OS, browser, GPU and results in the release's matrix report"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F506",
@@ -6673,7 +6673,7 @@
         "Pan, pinch-zoom, rotate and tilt and assert the globe responds",
         "Record frame rate and any limitations in the release's matrix report"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F508",
@@ -6686,7 +6686,7 @@
         "Assert every feature check passes on all four combinations",
         "Assert the hardware and OS matrix run covers the same feature checks and passes"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F509",
@@ -6698,7 +6698,7 @@
         "Sample memory, GPU resources and frame times throughout",
         "Assert no crash or console error, no upward memory trend beyond tolerance, and p95 frame time stable within the target"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F510",
@@ -6746,7 +6746,7 @@
         "Assert every target is listed in the suite and none crashes, hangs past its time limit or throws an uncaught error",
         "Assert the job runs in CI and saves any failing input as a regression fixture"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F514",
@@ -6758,7 +6758,7 @@
         "Assert the canvas resolution, text and controls update within one frame and screenshots match the new density's baseline",
         "Assert no blank frame occurs"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F515",
@@ -6782,7 +6782,7 @@
         "Assert the view renders correctly, connectivity is re-evaluated and pending requests are retried",
         "Simulate the same sequence with page lifecycle freeze and resume events in Playwright and assert the same"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F517",
@@ -7224,7 +7224,7 @@
         "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the MPL-2.0 license",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F571",
@@ -7236,7 +7236,7 @@
         "Query the repository through the GitHub API and confirm it is public and its detected license is MPL-2.0",
         "Confirm the public repository shows the license, the README licensing section, the contributing guide, the security policy and the code of conduct, and that private vulnerability reporting is enabled"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F572",

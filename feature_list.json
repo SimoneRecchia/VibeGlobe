@@ -3978,7 +3978,7 @@
         "Assert the engine's bandwidth estimate (also shown in the debug overlay) converges within 20% of the throttled throughput within 10 s",
         "Repeat in Chromium, Firefox and WebKit and assert the estimate does not depend on the Network Information API"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F301",

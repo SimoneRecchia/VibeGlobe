@@ -4967,7 +4967,7 @@
         "Record every frame and verify clusters split and merge with animated transitions, without pops or flicker, by frame differencing",
         "Verify clustering is computed in a worker and clicking a cluster zooms to its extent"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F374",

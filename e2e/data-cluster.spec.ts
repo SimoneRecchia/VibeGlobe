@@ -1,7 +1,8 @@
 // Clustering (M10, F373): 100,000 points clustered in a worker; cluster counts add up to the points at every zoom from
 // the globe to the street, and a click on a cluster fits the view to its points.
 import { expect, test } from '@playwright/test';
-import { openGlobe, waitForIdle } from './support/globe.ts';
+import type { PNG } from 'pngjs';
+import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
 
 test.use({ viewport: { width: 480, height: 360 } });
 
@@ -82,3 +83,53 @@ test('100,000 points cluster in a worker, counts add up at every zoom, and a cli
   const after = await page.evaluate((item) => window.vibeglobePlayground?.globe.geoToScreen(item), target.item);
   expect(after && after.xPx > 0 && after.xPx < 480 && after.yPx > 0 && after.yPx < 360).toBe(true);
 });
+
+/** Pixels whose color changed by more than a hint between two frames. */
+function changedPixels(a: PNG, b: PNG): number {
+  let count = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    const delta =
+      Math.abs((a.data[i] ?? 0) - (b.data[i] ?? 0)) +
+      Math.abs((a.data[i + 1] ?? 0) - (b.data[i + 1] ?? 0)) +
+      Math.abs((a.data[i + 2] ?? 0) - (b.data[i + 2] ?? 0));
+    if (delta > 30) count++;
+  }
+  return count;
+}
+
+for (const backend of ['webgpu', 'webgl2'] as const)
+  test(`clusters split and merge across zoom levels without a pop, frame by frame, on ${backend} (F373)`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // A fixed engine step per frame: the split and merge animations advance the same on every machine.
+    await openGlobe(
+      page,
+      `backend=${backend}&scenario=data-cluster&lon=12.5&lat=41.9&zoom=5.99&clockStepMs=16.666666666666668`,
+    );
+    await page.waitForFunction(() => window.vibeglobeCluster !== undefined);
+    await page.evaluate(() => window.vibeglobeCluster?.layer.loaded);
+    for (const [from, to] of [
+      [5.99, 6.01],
+      [6.01, 5.99],
+      [7.99, 8.01],
+      [8.01, 7.99],
+    ] as const) {
+      await page.evaluate((zoom) => window.vibeglobePlayground?.globe.jumpTo({ zoom }), from);
+      await waitForIdle(page);
+      let previous = await canvasImage(page);
+      // Across the level by a fiftieth of a zoom level: the map itself barely changes, the clusters split or merge.
+      await page.evaluate((zoom) => window.vibeglobePlayground?.globe.jumpTo({ zoom }), to);
+      const changes: number[] = [];
+      for (let frame = 0; frame < 30; frame++) {
+        const image = await canvasImage(page);
+        changes.push(changedPixels(previous, image));
+        previous = image;
+      }
+      const total = changes.reduce((sum, change) => sum + change, 0);
+      console.log(`[cluster] ${backend} ${from} → ${to}: ${changes.join(',')}`);
+      // The transition shows, spread over frames: no frame carries most of it, as a pop would.
+      expect(total, `${from} → ${to}`).toBeGreaterThan(5000);
+      expect(Math.max(...changes) / total, `${from} → ${to}`).toBeLessThan(0.4);
+    }
+  });

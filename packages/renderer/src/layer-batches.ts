@@ -313,8 +313,6 @@ export class LayerBatches implements LayerRenderTarget {
     }
     // Label fields arrived: the labels waiting for them are rewritten; the atlas started over: labels are rebuilt.
     if (this.labels) this.waits.settle(this.labels, this.rewriteWaiting, this.rebuildLabels);
-    // Labels still waiting for their fields are content to come: the engine does not go idle before it is drawn.
-    if (this.labels?.generating) this.contentReady?.();
     const batches = this.batchList;
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
@@ -326,6 +324,9 @@ export class LayerBatches implements LayerRenderTarget {
       mesh.visible = batch.visible;
       if (batch.visible) placeTile(mesh, batch.arrays.origin, view);
     }
+    // Labels still waiting for their fields, those the rebuilds above asked for included, are content to come: the
+    // engine does not go idle before it is drawn (KB-203).
+    if (this.labels?.generating) this.contentReady?.();
     // After the rebuilds, which may have created materials.
     for (let i = 0; i < this.materialList.length; i++) {
       const material = this.materialList[i];

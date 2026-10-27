@@ -4855,7 +4855,7 @@
         "Verify every frame shows each line fully visible on the terrain with no gaps where it would be hidden and no segment detached from the surface",
         "Verify behavior stays correct during terrain level changes and geomorphing"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F365",

@@ -31,4 +31,17 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     expect(satellite?.slice(-orthophotos.layers.length)).toEqual(orthophotos.layers.map((l) => l.id));
     expect(preset.sources.map((s) => s.id)).toContain('basemap-at-orthofoto');
   });
+
+  it('asks for no orthophoto tile from far away, and counts white tiles as no data (KB-215)', async () => {
+    const { layers } = await europeOrthophotos();
+    // Over Évora (7.91° W, 38.57° N): level 6 is the satellite composite's, level 12 the orthophoto's.
+    const portugal = layers.find((l) => l.id === 'pt-dgt-ortos2025')?.sources[0];
+    expect(portugal?.request(tile(6, 30, 24), out)).toBe('noData');
+    expect(portugal?.request(tile(12, 1958, 1573), out)).toMatchObject({ url: expect.stringContaining('ortos2025') });
+    for (const layer of layers) {
+      const source = layer.sources[0];
+      expect(source?.minLevel).toBe(12);
+      expect(source?.blankTile?.rgb).toEqual([255, 255, 255]);
+    }
+  });
 });

@@ -55,7 +55,7 @@
         }
       },
       "minZoom": 5,
-      "maxZoom": 13,
+      "maxZoom": 11,
       "encoding": "jpeg",
       "quality": 85,
       "colorStretch": {
@@ -63,7 +63,11 @@
         "gamma": 2,
         "noDataReflectance": [135, 245, 372]
       },
-      "bytesPerTile": 20000,
+      "bytesPerTile": {
+        "5": 20000,
+        "10": 25400,
+        "11": 24300
+      },
       "downloadBytesPerFile": 570000000,
       "outputs": {
         "static": true,
@@ -85,14 +89,13 @@
         "extension": "webp"
       },
       "minZoom": 5,
-      "maxZoom": 12,
+      "maxZoom": 11,
       "seaMaxZoom": 8,
       "encoding": "terrarium",
       "bytesPerTile": {
         "5": 120000,
         "8": 110000,
-        "10": 95000,
-        "12": 80000
+        "10": 95000
       },
       "seaBytesPerTile": 1500,
       "downloadBytesPerFile": 1,
@@ -114,15 +117,13 @@
         "extension": "pbf"
       },
       "minZoom": 5,
-      "maxZoom": 14,
+      "maxZoom": 11,
       "seaMaxZoom": 8,
       "encoding": "mvt",
       "bytesPerTile": {
         "5": 120000,
         "8": 70000,
-        "10": 35000,
-        "12": 20000,
-        "14": 12000
+        "10": 35000
       },
       "seaBytesPerTile": 300,
       "downloadBytesPerFile": 1,

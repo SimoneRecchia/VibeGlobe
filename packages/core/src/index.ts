@@ -33,6 +33,7 @@ export type {
   QualitySettings,
   RendererQuality,
 } from './globe/quality-types.js';
+export type { NavigationModeSettings } from './globe/navigation-types.js';
 export type {
   BackendName,
   DepthPath,

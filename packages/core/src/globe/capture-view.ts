@@ -70,8 +70,8 @@ async function captureViewAt(host: CaptureViewHost, size: CaptureSize): Promise<
   if (largest > host.maxTextureSize())
     throw new GlobeError(
       'invalid-option',
-      `captureView: ${size.widthPx} × ${size.heightPx} needs a ${Math.ceil(largest)} px drawing buffer, larger than ` +
-        `this GPU's ${host.maxTextureSize()} px`,
+      `captureView: ${size.widthPx} × ${size.heightPx} needs a ${Math.ceil(largest)} px buffer, over this GPU's ` +
+        `${host.maxTextureSize()} px`,
     );
   host.selectFor(Math.max(pixelRatio, host.livePixelRatio()));
   try {

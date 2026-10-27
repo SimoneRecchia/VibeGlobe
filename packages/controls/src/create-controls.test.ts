@@ -426,4 +426,16 @@ describe('navigation mode', () => {
     expect(northUp.camera.navigation.navigationMode).toBe('north-up');
     expect(() => createControls({ navigationMode: 'trackball' as 'free' })).toThrow(GlobeError);
   });
+
+  it("hands the 'north-up' latitude limit to the engine (85° by default) and changes it at runtime (KB-217)", () => {
+    const h = controlsHarness();
+    expect(h.controls.northUpMaxLatitudeDeg).toBe(85);
+    expect(h.camera.navigation.northUpMaxLatitudeDeg).toBe(85);
+    h.controls.setNorthUpMaxLatitude(80);
+    expect(h.controls.northUpMaxLatitudeDeg).toBe(80);
+    expect(h.camera.navigation.northUpMaxLatitudeDeg).toBe(80);
+    expect(() => h.controls.setNorthUpMaxLatitude(90)).toThrow(GlobeError);
+    expect(controlsHarness({ northUpMaxLatitudeDeg: 70 }).camera.navigation.northUpMaxLatitudeDeg).toBe(70);
+    expect(() => createControls({ northUpMaxLatitudeDeg: 0 })).toThrow(GlobeError);
+  });
 });

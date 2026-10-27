@@ -60,7 +60,7 @@ test.describe('navigation modes', () => {
     expect(Math.abs((await camera(page)).headingDeg)).toBeLessThan(0.5);
   });
 
-  test("'north-up' holds the heading, turns about the polar axis and stops at the pole without a flip", async ({
+  test("'north-up' holds the heading, turns about the polar axis and goes no further toward the pole than its limit", async ({
     page,
   }) => {
     await openGlobe(page, 'backend=webgl2&lon=0&lat=88&zoom=1');
@@ -69,7 +69,8 @@ test.describe('navigation modes', () => {
     const { from, to } = await overThePole(page);
     const state = await drag(page, from, to);
     expect(state.headingDeg).toBe(0);
-    expect(state.latitudeDeg).toBeCloseTo(89.9, 9);
+    // Already beyond the limit (85° by default, KB-217): it stays at its own latitude, no flip, no snap back to 85°.
+    expect(state.latitudeDeg).toBeCloseTo(88, 9);
     expect(Math.abs(state.longitudeDeg)).toBeLessThan(1e-6);
     // A horizontal drag turns about the polar axis: longitude changes, latitude and heading stay.
     await openGlobe(page, 'backend=webgl2&lon=0&lat=40&zoom=3&navigationMode=north-up');

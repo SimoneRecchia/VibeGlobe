@@ -9,6 +9,7 @@ import {
   coverageTest,
   WEB_MERCATOR_TILING,
   type ImageryLayerOptions,
+  type PolarCapColors,
   type ImagerySource,
   type TerrainSource,
   type TileRectangleRad,
@@ -21,6 +22,7 @@ import {
   ESA_WORLDCOVER,
   MAPTERHORN,
   COPERNICUS_GLO30,
+  NASA_GIBS_BLUE_MARBLE,
   OPENFREEMAP,
   type ExcludedSource,
   type PresetSourceRecord,
@@ -28,6 +30,8 @@ import {
 } from './sources.js';
 import type { OrthophotoLayers } from './orthophotos.js';
 import { composeStyle, type HillshadeSource, type StyleJson, type StyleSelection } from './styles.js';
+import { gibsBlueMarble } from './gibs.js';
+import { POLITICAL_COLORS } from './political-style.js';
 
 /** The offline engine, as far as the preset uses it (`createOffline()` of `@vibeglobe/offline`). */
 export interface OfflineWrapper {
@@ -68,7 +72,7 @@ export interface EuropeOpenOptions {
   readonly orthophotos?: OrthophotoLayers;
   /**
    * The deepest level of the package's vector tiles and terrain on land (the `maxZoom` of `europe-vectors` and
-   * `europe-terrain` in its pipeline configuration; 14 and 12 by default, as in `europe.json`).
+   * `europe-terrain` in its pipeline configuration; 11 by default, as in `europe.json`).
    */
   readonly packageLevels?: { readonly vectors?: number; readonly terrain?: number };
 }
@@ -84,6 +88,12 @@ export interface BaseMap {
   readonly imagery: readonly ImageryLayerOptions[];
   /** The vector style parts drawn over the imagery. */
   readonly style: StyleSelection;
+  /**
+   * The polar caps' fill beyond 85.05° (`Globe.setPolarCapColors`) where no imagery covers them: the political map's
+   * water in the north (all sea there) and its land in the south (Antarctica), so Map and Relief look the same up to
+   * the poles. Undefined for Satellite and Hybrid, whose Blue Marble covers the caps.
+   */
+  readonly polarCapColors?: PolarCapColors;
 }
 
 /** An overlay, shown over any base map. */
@@ -157,6 +167,7 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           id: ESA_WORLDCOVER.id,
           // Never fetched: the tiles come from the package, the URL only names them.
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
+          minLevel: ESA_WORLDCOVER.minLevel,
           maxLevel: ESA_WORLDCOVER.maxLevel,
           attribution: ESA_WORLDCOVER.attribution,
         }),
@@ -165,6 +176,8 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
       ),
     );
   satellite.push(...added('bottom'));
+  // The whole world below the package's levels and outside it, and the polar caps: NASA's Blue Marble.
+  if (use(NASA_GIBS_BLUE_MARBLE)) satellite.push(wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite'));
   return satellite.length > 0 ? [{ id: 'satellite', sources: satellite }] : [];
 }
 
@@ -199,8 +212,16 @@ function mapTypes(
     { id: 'satellite', name: 'Satellite', imagery, style: {} },
     { id: 'hybrid', name: 'Hybrid', imagery, style: vectors ? { labels: true, roads: true } : {} },
   ];
-  if (vectors) baseMaps.push({ id: 'map', name: 'Map', imagery: [], style: { map: true } });
-  if (terrain) baseMaps.push({ id: 'relief', name: 'Relief', imagery: [], style: { hillshade: true } });
+  const polarCapColors = { north: POLITICAL_COLORS.water, south: POLITICAL_COLORS.land };
+  if (vectors) baseMaps.push({ id: 'map', name: 'Map', imagery: [], style: { map: true }, polarCapColors });
+  if (terrain)
+    baseMaps.push({
+      id: 'relief',
+      name: 'Relief',
+      imagery: [],
+      style: vectors ? { map: true, hillshade: true } : { hillshade: true },
+      polarCapColors,
+    });
   const overlays: Overlay[] = [];
   if (vectors)
     overlays.push(
@@ -251,7 +272,7 @@ function packageUrls(build: Build, mode: PresetMode): (url: string) => string {
     tiles: 'overlap',
   });
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
-  const levels = { pbf: build.options.packageLevels?.vectors ?? 14, webp: build.options.packageLevels?.terrain ?? 12 };
+  const levels = { pbf: build.options.packageLevels?.vectors ?? 11, webp: build.options.packageLevels?.terrain ?? 11 };
   const terrainOrigin = MAPTERHORN.url?.replace(/\{z\}.*/, '') ?? '';
   return (url) => {
     const tile = TILE_PATH.exec(url);

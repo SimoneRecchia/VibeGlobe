@@ -13,6 +13,7 @@ import type { DecodedTile } from '../scheduler/types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { TileMeshData } from '../surface/surface-mesh.js';
 import type { GlobeError } from './errors.js';
+import type { NavigationModeSettings } from './navigation-types.js';
 import type { MorphFrame } from '../view/morph.js';
 import type { AtmosphereSettings, QualitySettings, RendererQuality } from './quality-types.js';
 import type { ViewCurvesInit } from '../view/curves.js';
@@ -274,7 +275,7 @@ export interface RendererBackend {
 export type RendererFactory = (container: unknown, events: RendererEvents) => Promise<RendererBackend>;
 
 /** Intents an input plug-in sends to the engine (ADR 0009). */
-export interface NavigationApi {
+export interface NavigationApi extends NavigationModeSettings {
   /** Starts a pan: returns the geodetic point under the pixel, or undefined when the pixel is off the globe. */
   grab(point: ScreenPoint): GeoPosition | undefined;
   /** Moves the camera so the grabbed position lies under `point`. */
@@ -298,12 +299,6 @@ export interface NavigationApi {
    * cause 'inertia' instead of 'user' (F200). The controls set it around their inertia step.
    */
   coasting: boolean;
-  /**
-   * How a drag moves the camera: 'free' (the default) turns the globe as a trackball, so the grabbed point stays under
-   * the cursor over the poles and the heading turns with it; 'north-up' holds the heading, horizontal drags turning
-   * about the polar axis and vertical ones changing latitude, and stops at the poles. Any other value acts as 'free'.
-   */
-  navigationMode?: 'free' | 'north-up';
   /** The engine clock's time, milliseconds: inertia and held keys run on it (F179, F181). */
   readonly timeMs: number;
   /** Writes {@link NavigationApi.timeMs} to `out[0]`: per-frame code reads it without a returned double (F064). */

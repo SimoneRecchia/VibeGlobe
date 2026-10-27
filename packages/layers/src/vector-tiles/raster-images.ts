@@ -2,8 +2,8 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * Images of raster-like style layers (F445, ADR 0133), made on the CPU and drawn as textured tile squares: hillshade
- * shading from a raster-dem tile, and heatmap densities of a tile's points colored by `heatmap-color`. Both are straight
- * sRGB RGBA, top row first.
+ * shading and color relief (hypsometric tint) from a raster-dem tile, and heatmap densities of a tile's points colored by
+ * `heatmap-color`. All are straight sRGB RGBA, top row first.
  */
 import type { StyleColor, StyleLayer } from './style-layer.js';
 import type { RasterImage } from './vector-target.js';
@@ -88,6 +88,36 @@ export function hillshadeImage(
       data[o + 2] = mixRgb(2);
       data[o + 3] = alpha * 255;
     }
+  }
+  return { width: size, height: size, data };
+}
+
+/** Steps of the elevation ramp a color-relief image reads its colors from, between the tile's lowest and highest. */
+const RELIEF_STEPS = 256;
+
+/**
+ * Color relief of a DEM tile: each pixel colored by `color-relief-color` at its elevation (`["elevation"]`, meters),
+ * read from a ramp over the tile's range of heights; `color-relief-opacity` is the draw's.
+ */
+export function colorReliefImage(heights: Float32Array, size: number, layer: StyleLayer, zoom: number): RasterImage {
+  let low = Infinity;
+  let high = -Infinity;
+  for (const h of heights) {
+    if (h < low) low = h;
+    if (h > high) high = h;
+  }
+  const span = high > low ? high - low : 1;
+  const ramp = Array.from({ length: RELIEF_STEPS }, (_, i) =>
+    color255(
+      layer.paint('color-relief-color', zoom, undefined, undefined, {
+        elevation: low + (span * i) / (RELIEF_STEPS - 1),
+      }),
+    ),
+  );
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    const c = ramp[Math.round((((heights[i] ?? low) - low) / span) * (RELIEF_STEPS - 1))] ?? [0, 0, 0, 0];
+    data.set([c[0], c[1], c[2], (c[3] ?? 0) * 255], i * 4);
   }
   return { width: size, height: size, data };
 }

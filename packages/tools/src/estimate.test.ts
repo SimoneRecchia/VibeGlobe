@@ -23,22 +23,22 @@ describe('the Europe package and its estimate (F614, F615)', () => {
       else expect(zoom.sea).toBeGreaterThan(0);
     }
     // Land roughly quadruples per zoom.
-    const z12 = zooms.find((z) => z.z === 12)?.land ?? 0;
-    const z13 = zooms.find((z) => z.z === 13)?.land ?? 0;
-    expect(z13 / z12).toBeGreaterThan(3.8);
-    expect(z13 / z12).toBeLessThan(4.2);
+    const z10 = zooms.find((z) => z.z === 10)?.land ?? 0;
+    const z11 = zooms.find((z) => z.z === 11)?.land ?? 0;
+    expect(z11 / z10).toBeGreaterThan(3.8);
+    expect(z11 / z10).toBeLessThan(4.2);
   });
 
   it('prints per zoom the land and sea tiles and cumulative gigabytes, measured sizes replacing configured ones', () => {
-    const measured = { 'europe-satellite': { 12: { land: 30_000 }, 13: { land: 28_000 } } };
+    const measured = { 'europe-satellite': { 10: { land: 30_000 }, 11: { land: 28_000 } } };
     const estimate = estimateBuild(europe, { sample: false, datasets: ['europe-satellite'], measured });
     const zooms = estimate.datasets[0]?.zooms ?? [];
-    const z13 = zooms.find((z) => z.z === 13);
-    expect(z13?.measured).toBe(true);
-    expect(z13?.bytes).toBe((z13?.land ?? 0) * 28_000);
+    const z11 = zooms.find((z) => z.z === 11);
+    expect(z11?.measured).toBe(true);
+    expect(z11?.bytes).toBe((z11?.land ?? 0) * 28_000);
     const text = formatEstimate(estimate);
     expect(text).toMatch(/zoom\s+land tiles\s+sea tiles\s+tiles\s+size\s+cumulative\s+sizes/);
-    expect(text).toMatch(/z13\s+[\d,]+\s+0\s+[\d,]+\s+[\d.]+ GB\s+[\d.]+ GB\s+measured/);
+    expect(text).toMatch(/z11\s+[\d,]+\s+0\s+[\d,]+\s+[\d.]+ GB\s+[\d.]+ GB\s+measured/);
     expect(text).toMatch(/z8\s+[\d,]+\s+[\d,]+\s+[\d,]+\s+[\d.]+ [kMG]B\s+[\d.]+ GB\s+configured/);
   });
 });

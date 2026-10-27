@@ -11,6 +11,7 @@ import {
   resolveControlsOptions,
   type ResolvedControlsOptions,
   validNavigationMode,
+  validNorthUpLatitude,
 } from './options.js';
 import { TouchGestures } from './touch-gestures.js';
 import { WheelInput } from './wheel-input.js';
@@ -40,6 +41,13 @@ export interface NavigationControls extends ControlsFactory {
    * stops at the poles). Anything else throws a GlobeError ('invalid-option').
    */
   setNavigationMode(mode: NavigationMode): void;
+  /** The 'north-up' latitude limit now, degrees (the `northUpMaxLatitudeDeg` option, then the setter below). */
+  readonly northUpMaxLatitudeDeg: number;
+  /**
+   * Sets the highest latitude a 'north-up' camera looks at, degrees from 1 to 89.9, from the next input on; anything
+   * else throws a GlobeError ('invalid-option').
+   */
+  setNorthUpMaxLatitude(deg: number): void;
 }
 
 /**
@@ -52,10 +60,12 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   let globe: ConnectedGlobe | undefined;
   let current: Attached | undefined;
   let mode = resolved.navigationMode;
+  let maxLatitudeDeg = resolved.northUpMaxLatitudeDeg;
   let navigationApi: NavigationApi | undefined;
   const factory = (element: unknown, navigation: NavigationApi): Controls => {
     navigationApi = navigation;
     navigation.navigationMode = mode;
+    navigation.northUpMaxLatitudeDeg = maxLatitudeDeg;
     const attached = attach(element as HTMLElement, navigation, resolved, globe);
     current = attached;
     return {
@@ -81,8 +91,14 @@ export function createControls(options?: ControlsOptions): NavigationControls {
       mode = validNavigationMode(next);
       if (navigationApi) navigationApi.navigationMode = mode;
     },
+    northUpMaxLatitudeDeg: maxLatitudeDeg,
+    setNorthUpMaxLatitude(deg: number) {
+      maxLatitudeDeg = validNorthUpLatitude(deg);
+      if (navigationApi) navigationApi.northUpMaxLatitudeDeg = maxLatitudeDeg;
+    },
   });
-  // A getter: Object.assign would copy the mode once.
+  // Getters: Object.assign would copy the values once.
+  Object.defineProperty(controls, 'northUpMaxLatitudeDeg', { get: () => maxLatitudeDeg, enumerable: true });
   return Object.defineProperty(controls, 'navigationMode', { get: () => mode, enumerable: true });
 }
 

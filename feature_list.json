@@ -7510,6 +7510,50 @@
         "In the browser, a free drag over the pole keeps the grabbed point under the cursor and turns the heading to south, the compass turns it back; a north-up drag stops at 89.9° with heading 0 and a horizontal one turns about the axis; a north-up flick coasts"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F621",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's Map is a political map like Google Maps' (neutral land, blue water, country and region borders, place names; no land cover, land use or buildings), with roads as a separate overlay off by default, and Relief is that map over a light tint by elevation (a MapLibre `color-relief` layer, drawn by `@vibeglobe/layers`) and a hillshade; both from OpenFreeMap's tiles and the same terrain.",
+      "steps": [
+        "Unit-test the composed Map and Relief styles, the roads overlay, and the `color-relief` colors by elevation",
+        "In the browser, Map shows no land-cover, land-use, building or road layer until Roads is on, and Relief adds the tint and the hillshade"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F622",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's satellite chain: NASA's Blue Marble from GIBS in EPSG:4326 at the lowest levels and over the polar caps, the package's ESA WorldCover composite from level 5 to 11, then the orthophotos from level 12, each white tile counting as no data; the caps look like the surface around them in every base map (Blue Marble in Satellite and Hybrid, the map's own colors in Map and Relief).",
+      "steps": [
+        "Unit-test the chain's sources and levels, Blue Marble's request over the north cap, and the orthophotos' level 12 start and blank tiles",
+        "In the browser, the north cap shows the map's water in Map and Relief and Blue Marble in Satellite"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F623",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "'north-up' navigation stops the latitude of the point looked at at a configurable limit (`createControls({ northUpMaxLatitudeDeg })`, `controls.setNorthUpMaxLatitude`, default 85°), without a rotation about the pole or a jump; a camera already beyond it stays where it is; 'free' is unchanged.",
+      "steps": [
+        "Unit-test the stop at the default and at a custom limit, a start beyond the limit, and the option and setter",
+        "In the browser, a north-up drag over the pole holds the heading and the camera's latitude, with no flip"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F624",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "Panning a far view stays sharp: the first source of an imagery chain that starts at level 0 pins its low levels in memory even when the chain's first source starts deeper, so a view never seen shows the pinned levels at once, and at 3000 km above the ground a second lap around the world shows every tile at its own level.",
+      "steps": [
+        "Unit-test which source of a chain is pinned",
+        "In the browser, a far jump with a slow server shows the pinned levels in the next frames, and a second lap at 3000 km has no tile below its own level"
+      ],
+      "status": "passing"
     }
   ]
 }

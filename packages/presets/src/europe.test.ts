@@ -47,6 +47,7 @@ describe('europeOpen (F613)', () => {
     // Every source with its licence, exact attribution and the day its terms were read.
     expect(preset.sources.map((s) => s.id)).toEqual([
       'europe-satellite',
+      'nasa-gibs-blue-marble',
       'europe-terrain',
       'copernicus-glo30',
       'openfreemap',
@@ -54,13 +55,15 @@ describe('europeOpen (F613)', () => {
     for (const s of preset.sources) {
       expect(s.license).not.toBe('');
       expect(s.attribution[0]?.text).not.toBe('');
-      expect(s.termsReadDate).toBe('2026-10-26');
+      expect(s.termsReadDate).toBe(s.id === 'nasa-gibs-blue-marble' ? '2026-10-27' : '2026-10-26');
     }
     expect(preset.excluded.map((s) => s.id)).toContain('pnoa');
-    // Satellite: the package's composite, from the package only; terrain: the package, then online.
+    // Satellite: the package's composite, from the package only, then NASA's Blue Marble; terrain: the package, then
+    // online.
     const satellite = preset.baseMaps[0]?.imagery[0]?.sources ?? [];
-    expect(satellite.map((s) => s.id)).toEqual(['europe-satellite']);
+    expect(satellite.map((s) => s.id)).toEqual(['europe-satellite', 'nasa-gibs-blue-marble']);
     expect(offline.tiers.get('europe-satellite')).toBe('package');
+    expect(offline.tiers.get('nasa-gibs-blue-marble')).toBe('network');
     expect(offline.tiers.get('europe-terrain')).toBe('all');
     // Online terrain covers land only: a tile over the Alps is asked for, one over the open sea is not.
     expect(preset.terrain?.request(ALPS, out)).toMatchObject({ url: 'https://tiles.mapterhorn.com/8/135/90.webp' });
@@ -98,8 +101,8 @@ describe('europeOpen (F613)', () => {
     expect(preset.terrain?.maxLevel).toBe(12);
     expect(preset.baseMaps.map((b) => b.id)).toEqual(['satellite', 'hybrid', 'relief']);
     expect(preset.overlays.map((o) => o.id)).toEqual(['terrain']);
-    expect(preset.baseMaps[0]?.imagery[0]?.sources.map((s) => s.id)).toEqual(['customer']);
-    expect(preset.sources.map((s) => s.id)).toEqual(['customer', 'europe-terrain']);
+    expect(preset.baseMaps[0]?.imagery[0]?.sources.map((s) => s.id)).toEqual(['customer', 'nasa-gibs-blue-marble']);
+    expect(preset.sources.map((s) => s.id)).toEqual(['customer', 'nasa-gibs-blue-marble', 'europe-terrain']);
     expect(() => europeOpen({ packageManifestUrl: 'https://app.test/manifest.json' })).toThrow(/offline engine/);
     expect(
       europeOpen({ onlineMaxLevel: { openfreemap: 10 } }).styleFor(STYLE, 'map', [])?.sources['openmaptiles'],
@@ -125,12 +128,12 @@ describe('europeOpen (F613)', () => {
     expect(hybrid('https://tiles.openfreemap.org/fonts/Noto/0-255.pbf')).toBe(
       'https://tiles.openfreemap.org/fonts/Noto/0-255.pbf',
     );
-    // The hillshade: the package's terrain up to level 12, Mapterhorn beyond.
-    expect(hybrid('https://tiles.mapterhorn.com/12/2160/1440.webp')).toBe(
-      'https://app.test/maps/europe/europe-terrain/12/2160/1440.webp',
+    // The hillshade: the package's terrain up to level 11 (the owner's package level, 2026-10-27), Mapterhorn beyond.
+    expect(hybrid('https://tiles.mapterhorn.com/11/1080/720.webp')).toBe(
+      'https://app.test/maps/europe/europe-terrain/11/1080/720.webp',
     );
-    expect(hybrid('https://tiles.mapterhorn.com/13/4320/2880.webp')).toBe(
-      'https://tiles.mapterhorn.com/13/4320/2880.webp',
+    expect(hybrid('https://tiles.mapterhorn.com/12/2160/1440.webp')).toBe(
+      'https://tiles.mapterhorn.com/12/2160/1440.webp',
     );
     // Offline: every file from the package and its mirror of the style's files; online: every file unchanged.
     const offline = preset.transformUrl('offline');
@@ -141,7 +144,7 @@ describe('europeOpen (F613)', () => {
     expect(preset.transformUrl('online')(vectors(12, 2160, 1440))).toBe(vectors(12, 2160, 1440));
   });
 
-  it('composes one style per selection: the whole map, overlays without a background, relief with its hillshade', () => {
+  it('composes one style per selection: a political map, overlays without a background, relief under the map (KB-216)', () => {
     const preset = europeOpen();
     const ids = (
       baseId: 'satellite' | 'hybrid' | 'map' | 'relief',
@@ -149,12 +152,59 @@ describe('europeOpen (F613)', () => {
     ) => preset.styleFor(STYLE, baseId, overlays)?.layers.map((l) => l.id);
     expect(ids('satellite')).toBeUndefined();
     expect(ids('hybrid')).toEqual(['road', 'road-name', 'border', 'city']);
-    expect(ids('map')).toEqual(STYLE.layers.map((l) => l.id));
-    expect(ids('relief', ['labels'])).toEqual(['europe-relief-background', 'europe-hillshade', 'border', 'city']);
+    // Map: neutral land, water, borders and names on the style's data, no land cover or buildings; roads off unless
+    // their overlay is on, then below the borders and names.
+    const political = [
+      'political-land',
+      'political-water',
+      'political-rivers',
+      'political-region-borders',
+      'political-country-borders',
+      'political-water-names',
+      'political-villages',
+      'political-towns',
+      'political-cities',
+      'political-regions',
+      'political-countries',
+    ];
+    expect(ids('map')).toEqual(political);
+    expect(ids('map', ['roads', 'labels'])).toEqual([
+      ...political.slice(0, 3),
+      'road',
+      'road-name',
+      ...political.slice(3),
+    ]);
+    // Relief: the political map over a light tint by elevation and a hillshade, under its water.
+    expect(ids('relief')).toEqual(['political-land', 'europe-relief-tint', 'europe-hillshade', ...political.slice(1)]);
     expect(ids('satellite', ['buildings'])).toEqual(['europe-buildings-3d']);
     expect(preset.styleFor(STYLE, 'relief', [])?.sources['europe-hillshade']).toMatchObject({
       type: 'raster-dem',
       encoding: 'terrarium',
     });
+    // Without vector tiles the relief stands on the land color alone.
+    expect(
+      europeOpen({ exclude: ['openfreemap'] })
+        .styleFor(STYLE, 'relief', [])
+        ?.layers.map((l) => l.id),
+    ).toEqual(['europe-relief-background', 'europe-relief-tint', 'europe-hillshade']);
+  });
+
+  it("fills the polar caps like the surface around them: Blue Marble in Satellite and Hybrid, the map's colors in Map and Relief (KB-214)", () => {
+    const preset = europeOpen();
+    // A geographic tile within the north cap (level 3, the row nearest the pole, 90° W to 67.5° W) is asked of NASA's
+    // Blue Marble, latitude first as WMS 1.3.0 wants in EPSG:4326.
+    const blueMarble = preset.baseMaps[0]?.imagery[0]?.sources.at(-1);
+    expect(blueMarble?.tiling.crs).toBe('EPSG:4326');
+    expect(blueMarble?.request(tile(3, 4, 0), out)).toMatchObject({
+      url: expect.stringContaining('LAYERS=BlueMarble_ShadedRelief_Bathymetry'),
+    });
+    expect((blueMarble?.request(tile(3, 4, 0), out) as { url: string }).url).toMatch(
+      /BBOX=67\.50+,-90\.0+,90\.0+,-67\.50+$/,
+    );
+    expect(blueMarble?.maxLevel).toBe(7);
+    for (const id of ['satellite', 'hybrid'])
+      expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toBeUndefined();
+    for (const id of ['map', 'relief'])
+      expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toEqual({ north: '#a9cfe8', south: '#f2efe9' });
   });
 });

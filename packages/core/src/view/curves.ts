@@ -52,7 +52,7 @@ function range(name: string, given: Partial<GroundZoomRange> | undefined, fallba
   if (!Number.isFinite(startGroundZoom) || !Number.isFinite(endGroundZoom) || startGroundZoom >= endGroundZoom)
     throw new GlobeError(
       'invalid-option',
-      `viewCurves.${name}: startGroundZoom must be a finite number below endGroundZoom (got ${String(startGroundZoom)} and ${String(endGroundZoom)})`,
+      `viewCurves.${name}: startGroundZoom must be finite, below endGroundZoom (got ${String(startGroundZoom)} and ${String(endGroundZoom)})`,
     );
   return Object.freeze({ startGroundZoom, endGroundZoom });
 }
@@ -70,11 +70,11 @@ export function validateViewCurves(init: ViewCurvesInit | undefined): ViewCurves
   const tilt = range('tilt', init.tilt, DEFAULT_VIEW_CURVES.tilt);
   const autoTiltDeg = init.autoTiltDeg ?? DEFAULT_VIEW_CURVES.autoTiltDeg;
   if (!(autoTiltDeg >= AUTO_TILT_RANGE_DEG[0] && autoTiltDeg <= AUTO_TILT_RANGE_DEG[1]))
-    throw new GlobeError('invalid-option', `viewCurves.autoTiltDeg must be within 45–60° (got ${String(autoTiltDeg)})`);
+    throw new GlobeError('invalid-option', `viewCurves.autoTiltDeg must be 45–60° (got ${String(autoTiltDeg)})`);
   if (tilt.startGroundZoom < morph.endGroundZoom)
     throw new GlobeError(
       'invalid-option',
-      `viewCurves: the tilt band (from ${String(tilt.startGroundZoom)}) must start after the morph band ends (${String(morph.endGroundZoom)})`,
+      `viewCurves: the tilt band (${String(tilt.startGroundZoom)}) must start after the morph band (${String(morph.endGroundZoom)})`,
     );
   return Object.freeze({ morph, relief, tilt, autoTiltDeg });
 }

@@ -27,8 +27,11 @@ export interface PresetSourceRecord {
   /** The levels the source serves online (`maxLevel` is the default of `onlineMaxLevel`). */
   readonly minLevel: number;
   readonly maxLevel: number;
-  /** Where it has data: Europe's land (online sources), or Europe's land and sea (the package). */
-  readonly coverage: 'europe-land' | 'europe';
+  /**
+   * Where it has data: Europe's land (online sources), Europe's land and sea (the package), or the whole world (NASA's
+   * Blue Marble: the lowest levels and the polar caps).
+   */
+  readonly coverage: 'europe-land' | 'europe' | 'world';
   /** The online endpoint, as a tile URL template or a style URL; absent for package-only sources. */
   readonly url?: string;
 }
@@ -61,7 +64,36 @@ export const OPENFREEMAP: PresetSourceRecord = {
   url: 'https://tiles.openfreemap.org/styles/liberty',
 };
 
-/** ESA WorldCover 2021 Sentinel-2 composite, 10 m: the satellite layer of the app's package. */
+/**
+ * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326: the satellite layer's lowest levels,
+ * everywhere the package has no tile, and the polar caps. Its native levels end at 7 (about 600 m a pixel); the engine
+ * magnifies it beyond.
+ */
+export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
+  id: 'nasa-gibs-blue-marble',
+  name: 'NASA Blue Marble, shaded relief and bathymetry (GIBS, EPSG:4326)',
+  kind: 'imagery',
+  tiers: 'network',
+  license: 'NASA Earth science data: no restrictions on use (CC0 for NASA-produced data); acknowledgement requested',
+  termsUrl: 'https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api',
+  termsReadDate: '2026-10-27',
+  attribution: [
+    {
+      text: "Imagery: NASA Blue Marble, from NASA's Global Imagery Browse Services (GIBS), part of NASA's ESDIS",
+      url: 'https://www.earthdata.nasa.gov/gibs',
+    },
+  ],
+  minLevel: 0,
+  maxLevel: 7,
+  coverage: 'world',
+  url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
+};
+
+/**
+ * ESA WorldCover 2021 Sentinel-2 composite, 10 m: the satellite layer of the app's package, from level 5 (below it the
+ * Blue Marble shows the whole world) to the package's level, 11 by the owner's decision (2026-10-27); the engine
+ * magnifies its deepest tiles beyond.
+ */
 export const ESA_WORLDCOVER: PresetSourceRecord = {
   id: 'europe-satellite',
   name: 'ESA WorldCover 2021 Sentinel-2 composite, 10 m',
@@ -76,8 +108,8 @@ export const ESA_WORLDCOVER: PresetSourceRecord = {
       url: 'https://esa-worldcover.org',
     },
   ],
-  minLevel: 0,
-  maxLevel: 14,
+  minLevel: 5,
+  maxLevel: 11,
   coverage: 'europe',
 };
 
@@ -136,6 +168,7 @@ const NATURAL_EARTH: PresetSourceRecord = {
 
 /** Every included source. */
 export const EUROPE_SOURCES: readonly PresetSourceRecord[] = [
+  NASA_GIBS_BLUE_MARBLE,
   ESA_WORLDCOVER,
   OPENFREEMAP,
   MAPTERHORN,
@@ -153,6 +186,14 @@ const ENDPOINT = 'licence verified, but its Web Mercator (EPSG:3857) endpoint or
  * `@vibeglobe/presets/orthophotos`.
  */
 export const EXCLUDED_SOURCES: readonly ExcludedSource[] = [
+  {
+    id: 'terrascope-worldcover-s2-tcc',
+    name: 'Terrascope WMTS, ESA WorldCover 2021 S2 true colour (esa-worldcover-s2rgbnir-10m-2021-v2_tcc)',
+    reason:
+      "Terrascope's documentation (read 2026-10-27) offers its data and services free of charge for research and " +
+      'education and says commercial use may entail costs; its terms of use, which VITO may change at any time and ' +
+      'which name no licence for the WMTS, could not be read in full (host blocked): commercial use not confirmed',
+  },
   { id: 'ign-bd-ortho', name: 'IGN BD ORTHO (France)', reason: `${CREDIT}Etalab 2.0 asks for the update date` },
   { id: 'pnoa', name: 'PNOA Máxima Actualidad (Spain)', reason: `${CREDIT}it names each image's year, which varies` },
   { id: 'pdok-luchtfoto', name: 'PDOK Luchtfoto (Netherlands)', reason: `${CREDIT}no fixed text is given` },

@@ -205,8 +205,15 @@ export function isOpaque(entry: StackEntry): boolean {
  */
 export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: number): number[] {
   const sources = entries.flatMap((entry) => entry.sources);
-  // Only the first source of a chain pins a base: the later ones serve finer levels or stand in (F247).
-  const heads = entries.flatMap((entry) => entry.sources.map((_, index) => index === 0));
+  // One source of a chain pins a base, the later ones serving finer levels or standing in (F247): the first that has
+  // level 0, so a chain over a world source from a source that starts deeper pins the world's low levels (KB-218).
+  const heads = entries.flatMap((entry) => {
+    const base = Math.max(
+      0,
+      entry.sources.findIndex((source) => !source.minLevel),
+    );
+    return entry.sources.map((_, index) => index === base);
+  });
   const levels = sources.map(() => -1);
   let used = 0;
   for (let level = 0; level <= 25; level++) {

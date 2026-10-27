@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { encodeMvt } from '../__fixtures__/mvt-writer.js';
 import { encodeGeoJsonTile, geojsonShapes } from './geojson-tiles.js';
 import { layoutVectorTile } from './layout-tile.js';
-import { decodeDem, heatmapImage, hillshadeImage } from './raster-images.js';
+import { colorReliefImage, decodeDem, heatmapImage, hillshadeImage } from './raster-images.js';
 import { StyleLayer } from './style-layer.js';
 import { meshPaint } from './vector-paint.js';
 
@@ -34,6 +34,19 @@ describe('raster, hillshade and heatmap images (F445)', () => {
     expect(litRed).toBeGreaterThan(200);
     expect(shadedRed).toBeLessThan(50);
     expect(shadedAlpha).toBeGreaterThan(100);
+  });
+
+  it('colors each pixel of a DEM tile by color-relief-color at its elevation (KB-216)', () => {
+    const relief = layer({
+      type: 'color-relief',
+      paint: { 'color-relief-color': ['interpolate', ['linear'], ['elevation'], 0, '#00ff00', 2000, '#ff0000'] },
+    });
+    const image = colorReliefImage(Float32Array.of(0, 1000, 2000, 2000), 2, relief, 8);
+    const at = (i: number) => [...image.data.slice(i * 4, i * 4 + 4)];
+    expect(at(0)).toEqual([0, 255, 0, 255]);
+    expect(at(1)[0]).toBeGreaterThan(120);
+    expect(at(1)[1]).toBeGreaterThan(120);
+    expect(at(2)).toEqual([255, 0, 0, 255]);
   });
 
   it('sums Gaussian kernels into densities colored by heatmap-color', () => {

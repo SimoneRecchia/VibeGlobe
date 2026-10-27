@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
+import { northUpLimitRad } from '../camera/anchor.js';
 import { validateViewCurves, type ViewCurvesInit } from '../view/curves.js';
 import type { ViewState } from '../view/view-state.js';
 import type { Emitter } from './emitter.js';
@@ -61,8 +62,7 @@ export class ViewControl {
         host.assertAlive();
         if (host.waiting()) return;
         host.userInput(this.coasting ? 'inertia' : 'user');
-        if (dragCamera(host.cam, host.view, anchor, point, this.navigation.navigationMode === 'north-up'))
-          host.requestRender();
+        if (dragCamera(host.cam, host.view, anchor, point, this.northUp())) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
         host.assertAlive();
@@ -72,8 +72,7 @@ export class ViewControl {
           host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
             ? host.limitZoom(deltaZoom)
             : deltaZoom;
-        if (zoomCamera(host.cam, host.view, point, allowed, this.navigation.navigationMode === 'north-up'))
-          host.requestRender();
+        if (zoomCamera(host.cam, host.view, point, allowed, this.northUp())) host.requestRender();
       },
       requestUpdate: () => {
         this.updateRequested = true;
@@ -145,6 +144,12 @@ export class ViewControl {
     const requested = this.updateRequested;
     this.updateRequested = false;
     return requested;
+  }
+
+  /** Whether drags and zooms hold north up; if so, writes their latitude limit (`NavigationApi.northUpMaxLatitudeDeg`). */
+  private northUp(): boolean {
+    northUpLimitRad[0] = (this.navigation.northUpMaxLatitudeDeg ?? 85) * RAD;
+    return this.navigation.navigationMode === 'north-up';
   }
 
   /** See `NavigationApi.orbit`: invalid input is ignored. */

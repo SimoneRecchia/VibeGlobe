@@ -42,7 +42,7 @@ import { BUCKET_EXTENT } from './layout-tile.js';
 export type { VectorTileLayer, VectorTilesOptions } from './vector-tile-api.js';
 
 /** Style layer types drawn as textured tile squares (F445). */
-const RASTER_TYPES = new Set(['raster', 'hillshade', 'heatmap']);
+const RASTER_TYPES = new Set(['raster', 'hillshade', 'color-relief', 'heatmap']);
 
 /** A source of the style, resolved (TileJSON read). */
 interface ResolvedSource extends SourceInfo {

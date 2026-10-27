@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Raster, hillshade and heatmap style layers (F445, ADR 0133): textured tile squares that follow the globe, the morph
+ * Raster, hillshade, color-relief and heatmap style layers (F445, ADR 0133): textured tile squares that follow the globe, the morph
  * and the terrain like the background. Raster and raster-dem tiles are requested through the transport and decoded on
  * the main thread (an image decode, then its pixels); hillshade shading and heatmap densities are drawn into images on
  * the CPU (`raster-images.ts`). A tile not loaded yet is drawn by its nearest ready ancestor, clipped to its square.
@@ -10,7 +10,7 @@ import type { AbortHandle, TileTransport, TransportResult } from '@vibeglobe/cor
 import type { TileGrounds } from './drape.js';
 import { tileOrigin } from './globe-vertices.js';
 import type { Bucket } from './layout-tile.js';
-import { decodeDem, heatmapImage, hillshadeImage, type HeatmapPoint } from './raster-images.js';
+import { colorReliefImage, decodeDem, heatmapImage, hillshadeImage, type HeatmapPoint } from './raster-images.js';
 import type { StyleLayer } from './style-layer.js';
 import { tileUrl, type SourceInfo } from './style-sources.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
@@ -220,6 +220,16 @@ export class RasterLayers {
       const key = `hillshade|${version}`;
       const image = this.kept(key) ? undefined : hillshadeImage(entry.heights, entry.image.width, tile, layer, tile.z);
       return this.mesh(key, tile, image, [{ color: [0, 0, 0, 1], params: [0, 1, 0, 0] }]);
+    }
+    if (layer.type === 'color-relief') {
+      if (entry.heights === undefined) return undefined;
+      const key = `color-relief|${version}`;
+      const image = this.kept(key) ? undefined : colorReliefImage(entry.heights, entry.image.width, layer, tile.z);
+      const paint = [zoomA, zoomA + 1].map((z) => ({
+        color: [0, 0, 0, Number(layer.paint('color-relief-opacity', z) ?? 1)],
+        params: [0, 1, 0, 0],
+      }));
+      return this.mesh(key, tile, image, paint);
     }
     const paint = [zoomA, zoomA + 1].map((z) => {
       const p = (name: string, fallback: number) => Number(layer.paint(name, z) ?? fallback);

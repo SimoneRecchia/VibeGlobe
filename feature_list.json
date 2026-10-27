@@ -4954,7 +4954,7 @@
         "Verify each chunk becomes visible within one frame of being added",
         "Verify frame time stays within the target throughout and no full layer rebuild occurs (instrumentation counters)"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F373",
@@ -4991,7 +4991,7 @@
         "Verify the main thread has no long task above 50 ms during loading",
         "Pan and zoom for 60 seconds and verify the engine stays responsive, RAM and GPU memory stay within budget, and no crash occurs"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F376",

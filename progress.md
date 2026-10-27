@@ -39,64 +39,87 @@ Two problems found integrating the engine in an application. (1) KB-211, the Nor
 
 A map of Europe in the style of Google Earth from free sources that may be redistributed commercially, for hybrid use: the application's offline package up to a chosen level, with online detail on land beyond it. Engine gaps filled: polygon coverage areas of imagery and terrain sources (F610), package-only and network-only sources (F611), vector style credits shown with the imagery's (F612). Source chains (F247) and Terrarium terrain were already supported. New package `@vibeglobe/presets` with `europeOpen` (F613, ADR 0182; the national orthophotos are left out until their terms can be read, open question 34). Also the pipeline configuration `europe.json` with a Natural Earth land mask and a separate sea level (F614), `estimate` with land and sea counts and `--measure` (F615), the guide `docs/guides/europe-preset.md` (F616), and the playground's `?preset=europe` selector (F617). One pull request, which the owner merges.
 
-## Handoff for Wednesday 28 October (written 2026-10-25, before the 22:00 Europe/Rome stop)
+## Handoff (written 2026-10-27, before an account change)
 
-The owner uses the engine in the first consumer on Monday and Tuesday and restarts the main session on Wednesday for
-two weeks of hardening. Branch `claude/wizardly-archimedes-up4ww2`; everything is merged into `main` (pull requests
-#26 to #47, squash merges; #41 is superseded by #43 for the owner to close).
+The owner continues from another account. Branch `claude/wizardly-archimedes-up4ww2` is restarted from `main` after
+each merge; everything is merged into `main`: pull requests #26 to #58 (squash merges; #41 superseded by #43, to
+close). Since the last handoff (2026-10-25) four targeted owner requests came from integrating the engine in the first
+consumer (an application with wind and solar farms on the globe), each one pull request:
 
-**State.** `npm run status`: 449 passing, 80 failing, 33 pending (owner steps), 22 superseded, 79.9% of the active
-entries. M1, M2, M3 and M9 are complete. In M4–M14 every failing entry is in `docs/hardening-backlog.md`; F329 (the
-M8 acceptance) is passing since the full CI runs of 2026-10-25 showed every M8 network spec green. M15 (hardening
-and release) is 10 of 53.
+- #55 (F610–F617): the Europe preset `@vibeglobe/presets` (`europeOpen`): Satellite, Hybrid, Map, Relief and overlays
+  from free sources that allow commercial use, ADR 0182 with every source's terms; `europe.json` for the offline
+  package; guide `docs/guides/europe-preset.md`.
+- #56 (F618–F620, KB-209–KB-211): source areas as GeoJSON clipped per pixel and `blankTile`; faster drags over vector
+  roads; eleven national and regional orthophotos (`@vibeglobe/presets/orthophotos`); polar caps as a continuous disc
+  with `polarCapColors`; navigation modes 'free' and 'north-up'.
+- #57 (F621–F624, KB-214–KB-218): political Map and Relief with an elevation tint (`color-relief` in
+  `@vibeglobe/layers`); satellite chain NASA Blue Marble (GIBS, EPSG:4326, fills the caps) → package WorldCover (z5–z11)
+  → orthophotos from z12 (white tiles are no data); Terrascope left out (question 35); package to z11 (owner); the
+  WorldCover package size table in the guide (z10 0.58 GB, z11 2.20 GB, z12 7.93 GB, z13 27.0 GB); north-up latitude
+  limit (85° by default); a chain's world source pinned so far views are sharp at once.
+- #58 (F625–F627, KB-219): the controls' tilt policy (`tiltPolicy`, `setTiltPolicy`, `tiltAvailable`; opt-in, on in
+  the showcase); terrain clearance hardening (terrain under and ahead of the eye loads first); the preset's roads by
+  class from levels 6/9/11/13/14, names from 13; `ModelSetLayer` (instanced copies of one model, a placeholder beyond
+  `visibleBelowMeters`, nothing out of view; `?scenario=wind-farm`, guide `docs/guides/models.md`). The core bundle
+  budget is 65 KB (owner, 2026-10-27); core is at 64.38 KB.
 
-**Done on 2026-10-25.** KB-202, the owner's trackpad feedback (a flick on a zoomed-out globe stopped dead, a drag off
-the disc froze): glides now turn the globe about the screen center like a virtual trackball, drags off the disc keep
-turning it, the release velocity follows the finger at the lift; trackpad sequences at 120 and 60 Hz are unit and
-browser tests. The playground's showcase (owner request): the default page shows every `@vibeglobe/ui` control, a
-settings panel, demo data, the local sample builds and a help overlay; every page shows the default controls
-(`?ui=0` hides them); tests see the bare engine (`apps/playground/CLAUDE.md`). Pre-release 0.1.0: the release commit `04f9286` on `main` (#47), not published; the tag `v0.1.0` is the
-owner's to push (this session can push only its branch: `git tag -a v0.1.0 04f9286 -m "Release v0.1.0" && git push
-origin v0.1.0`); `npm run release:pack` rebuilds the tarballs (`release-0.1.0/README.md`), and
-`docs/guides/cube-quickstart.md` installs them in a Nuxt 3 or Vue 3 application. Also: ADR 0046 decision 5 (retry
-rounds back once a source is stable, question 33), KB-171 fixed (label placement slices), KB-199/KB-200/KB-201. From
-the last full CI run on `main`: KB-204 (a tile failing for good with HTTP 500 got a second round when another tile's
-retry succeeded just after it; it now waits for the source to be stable), KB-205 (F179's release waited for the page
-to handle the last move and read as a hold; F180's two-finger lift the same), F273 measures warm pans, F106 gets 10 minutes on software GPUs.
+**State.** `npm run status`: 467 passing, 80 failing, 33 pending (owner steps), 22 superseded, 80.5% of the 580
+active entries. M1, M2, M3 and M9 are complete; in M4–M14 every failing entry is in `docs/hardening-backlog.md`; M15
+is 10 of 53. `npm run status` names F137 (M4) next.
 
-**Open bugs** (`docs/known-bugs.md`): KB-180 (black wedges near the poles on the owner's Mac, partly fixed) and KB-181
-(a short crack at level 14 in `terrain-alps`), both waiting for the owner's exact views; KB-110 (F137's crack sweep
-pops once in CI's software GPU); KB-097 and KB-170 (M5 relief and tilt in the descent onto a flank); TG-01 (a device
-loss after the camera moved keeps the old view), TG-04 (a whole vector view can stay missing after chaos, partly
-fixed), TG-06 (WebGPU engines destroyed during a fast start-up stay alive in a 1000-cycle run); KB-PT-07 (the
-OpenStreetMap warning per source, core side fixed). KB-203 (the engine went idle before some data-layer labels were drawn, on CI; the visual spec captures a settled view meanwhile). KB-206 (F474 once counted a tile requested twice; not reproduced), KB-207 (two steps of F438's input-only walk-through flaky on CI), KB-208 (F081 on WebGPU once past its 120 s timeout). KB-097, KB-110 and KB-170 may stay open until the hardening weeks
-(ADR 0046).
+**Open problems from the first consumer** (what the next session should pick up first):
 
-**The full suite on CI.** Not yet green in one run: each full run on 2026-10-25 surfaced one to five different tests that
-fail their first attempt on CI's software GPU and pass on retry (CI fails a job on any flaky test, ADR 0012). Fixed
-today: F091 (KB-204, an engine bug), F179 and F180 (KB-205), F273, F106, F150, F448, F078 (known-bug status format).
-Still flaky and recorded: KB-206 (F474), KB-207 (F438), KB-208 (F081), and F510's raster chaos once on `main` before
-KB-204 (10 of 10 since in CI's image). The last full run on `main` (40224392533, commit `c1b92f4`) passed every job except shard 7, where F081 (KB-208) timed out once and passed on retry; the isolated measurements, F510 included, passed. First job on Wednesday: dispatch
-`ci.yml` on `main`, fix what it reports the same way (reproduce in CI's image, `CLAUDE.md`), until one run is green.
+1. KB-219, the camera entering the terrain while zooming: not reproduced on the fixture terrain (every movement keeps
+   the eye 10 m above the drawn surface); hardened only. Question 36 asks the owner for the view, terrain and device.
+2. The national orthophotos: each service's real minimum level, and which ones still answer white or empty tiles, could
+   not be checked (the providers' hosts are blocked in the cloud environment); all start at level 12 meanwhile.
+   Question 34 (c).
+3. ESA WorldCover online from Terrascope: excluded until VITO confirms free use from a commercial product (question 35).
+4. Progressive roads: measured only on the fixture tiles (a z12 tile holds 41 roads), where a drag's main-thread time
+   barely moves (z12 with roads p50 5.2 → 5.1 ms). Measure again on OpenFreeMap's real tiles (z8 and z12, with and
+   without roads) once its host is reachable or on the owner's machine.
+5. The tilt policy is opt-in: on by default it would change every existing view. The owner decides whether
+   `createControls()` should turn it on by default (then the end-to-end specs that tilt by API at high altitude need
+   updating, logged in `docs/test-changes.md`).
+6. Models: the renderer reads them with three.js's `GLTFLoader`; meshopt and Draco work once the application gives the
+   decoders (`docs/guides/models.md`), KTX2 textures do not yet; hook request C (2) of `docs/parallel-tracks.md`
+   (meshes built from `@vibeglobe/models`' `ModelDescription`) is still open.
+7. The WebGPU variants of F146 and F147 time out on the cloud container's software GPU: check them in the next full CI
+   run.
+
+**Open bugs** (`docs/known-bugs.md`, all "Open"): KB-219 (above); KB-180 and KB-181 (terrain near the poles and a crack
+at level 14, waiting for the owner's exact views); KB-110 (F137's crack sweep pops once on CI's software GPU); KB-097
+and KB-170 (M5 relief and tilt in the descent onto a flank); KB-203, KB-206, KB-207, KB-208, KB-212 and KB-213 (flaky
+or unreproduced on CI, M15 hardening); TG-01, TG-04 and TG-06 (track G). KB-097, KB-110 and KB-170 may stay open until
+the hardening weeks (ADR 0046).
+
+**The full suite on CI.** Not run on `main` since #53 (the last full run, 40224392533, passed every job but one F081
+retry). First job: dispatch `ci.yml` on `main` (eight shards), and fix what it reports by reproducing it in CI's image
+(`CLAUDE.md`), until one run is green.
 
 **Hardening backlog in priority order** (`docs/hardening-backlog.md` has every entry with what remains):
 
-1. What the first consumer will hit first: any issue the owner brings back from Monday and Tuesday, then KB-180 and
-   KB-181 (terrain near the poles and cracks on real GPUs), F137 and F148 (crack sweep, KB-110).
+1. The first consumer's open problems above, then KB-180 and KB-181, F137 and F148 (crack sweep, KB-110).
 2. The globe-to-street zoom: F167 and F157 (KB-097, KB-170).
-3. Data layers on real GPUs and terrain: F363 to F366 (clamping, draping, morph), F351 to F354, F361, F371 to F375
-   and F389 (formats, streaming, clustering, 100,000 points at the target frame rate), F379.
-4. Vector tiles and 3D Tiles: F440, F444, F445, F451, F452, F455 (visual baselines and performance), F463, F470.
+3. Data layers on real GPUs and terrain: F363 to F366 (clamping, draping, morph), F351 to F354, F361 (hook C (2)),
+   F371 to F375 and F389, F379.
+4. Vector tiles and 3D Tiles: F440, F444, F445, F451, F452, F455, F463, F470.
 5. Atmosphere and anti-aliasing on real GPUs: F391, F392, F394, F397.
-6. Adaptive loading and network modes: F286 to F288, F293 to F295, F300, F301, F315, then F329 (acceptance).
+6. Adaptive loading and network modes: F286 to F288, F293 to F295, F300, F301, F315, then F329.
 7. M15: TG-01, TG-04, TG-06 and the remaining M15 entries (cross-browser F504, soak, chaos, fuzzing, the WebGL2 CPU
    p95 of `drag-200/400/800` on the owner's Mac, the release).
 
-**Open owner questions** (`docs/open-questions.md`): the `v0.1.0` tag above; 13 (legal review of the README licensing text), 16
-(`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment for publishing). The 33
-pending entries wait for owner steps listed there (reference tablet, the owner's Mac runs, the Milan sample, keys).
+**Open owner questions** (`docs/open-questions.md`): 13 (legal review of the README licensing text), 16
+(`GOOGLE_MAPS_API_KEY` as a CI secret), 17 (the npm token and the `npm-release` environment), 34 (orthophoto evidence,
+credits, per-service levels), 35 (Terrascope), 36 (KB-219's reproduction); the `v0.1.0` tag of the pre-release commit
+`04f9286` is the owner's to push (`npm run release:pack` rebuilds the 0.1.0 tarballs, `release-0.1.0/README.md`). The 33 pending entries wait for the owner steps listed there.
 
-**Start on Wednesday.** Read this, run `./init.sh`, check the last full CI run on `main`, ask the owner for the first consumer's findings, then follow the backlog order above.
+**Cloud environment.** The network policy blocks the providers' hosts (OpenFreeMap, Mapterhorn, GIBS, Terrascope, the
+orthophoto services): tests route them to fixtures. Allowing them under the environment's network access settings
+would let a session check the orthophotos and measure the roads on real tiles.
+
+**Start of the next session.** Read this, run `./init.sh`, dispatch the full CI run on `main`, ask the owner for the
+first consumer's newest findings and the answers to questions 34–36, then follow the order above.
 
 ## Track I, space background (2026-10-25, branch `claude/vibrant-wright-9kiyj6`)
 

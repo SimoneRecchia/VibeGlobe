@@ -4880,7 +4880,7 @@
         "Record every frame and verify each primitive's screen position matches the morphed map position under it within 1 pixel",
         "Verify there is no frame where layers and map are out of sync on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F367",

@@ -8,13 +8,14 @@
 export { createControls } from './create-controls.js';
 export type { NavigationControls } from './create-controls.js';
 export type { ConnectedGlobe } from './camera-port.js';
-export { DEFAULT_CONTROLS_OPTIONS, resolveControlsOptions } from './options.js';
+export { DEFAULT_CONTROLS_OPTIONS, DEFAULT_TILT_POLICY, resolveControlsOptions } from './options.js';
 export type {
   ControlsOptions,
   GestureSwitches,
   InertiaSettings,
   KeyboardSettings,
   ResolvedControlsOptions,
+  TiltPolicy,
   TouchSettings,
   WheelSettings,
 } from './options.js';

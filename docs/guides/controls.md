@@ -61,6 +61,31 @@ In both modes inertia, zoom to the cursor, tilt and rotation gestures, and the c
 
 In the playground, `?navigationMode=north-up` starts in that mode and the "Navigation mode" selector (the settings panel on the showcase page) switches it.
 
+## Tilt policy
+
+By default the engine's zoom curves tilt the view near street level (Auto mode), and any tilt can be chosen at any
+distance. The tilt policy (F625) ties the tilt to the distance from the camera to the point it looks at instead (the
+height above the ground when looking straight down):
+
+```ts
+const controls = createControls({ tiltPolicy: true }); // 20,000 m, 2,000 m, 60°
+controls.setTiltPolicy({ lock2DAboveMeters: 20_000, autoTiltBelowMeters: 2_000, autoTiltMaxDeg: 60 });
+controls.onTiltAvailabilityChange((available) => (button3d.disabled = !available));
+```
+
+| Field                 | Default  | Effect                                                                                                                                                                                            |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lock2DAboveMeters`   | 20,000 m | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. `tiltAvailable` is false and the UI's 3D button is disabled. |
+| `autoTiltBelowMeters` | 2,000 m  | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.     |
+| `autoTiltMaxDeg`      | 60°      | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                       |
+
+A tilt chosen by hand below the lock stays at every distance until it is changed, or until the camera passes the lock:
+over the last halving of the distance before the lock (10 to 20 km by default) the allowed tilt falls continuously to
+0°, and beyond the lock the view returns to Auto. `setTiltPolicy(false)` (or `null`) turns the policy off; invalid
+values throw a `GlobeError` (`invalid-option`). The UI's 2D / 3D / Auto toggle takes the controls as its `tilt` option
+(`new ViewModeControl({ tilt: controls })`, or `addAllControls(ui, { tilt: controls })`). In the playground,
+`?tiltPolicy=1` turns the policy on; the showcase page has it on.
+
 ## Key map
 
 The keys work while the map has focus (Tab reaches it; a focus ring shows when it is reached from the keyboard). Keys typed into other elements of the page never move the map, and keys with Ctrl, Alt or Meta are left to the browser.

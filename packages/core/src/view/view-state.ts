@@ -23,6 +23,7 @@ const anchor = new Float64Array(2);
 const factors = new Float64Array(2);
 const tiltStep = new Float64Array(4);
 const limits = new Float64Array(8);
+const policyStep = new Float64Array(4);
 
 /** Probes the surface under the camera's eye: sets `camera.groundHeightMeters` to the height the frame draws there. */
 export interface GroundProbe {
@@ -72,6 +73,10 @@ const TILT_CAP = 12;
 const PREVIOUS_TILT = 13;
 /** The share of the curve's morph the polar caps leave (KB-211): 0 where the view reaches a cap, else 1. */
 const CAP_KEEP = 14;
+/** The tilt policy's cap this frame, radians (F625): 0 beyond its lock, NaN without a policy. */
+const POLICY_CAP = 15;
+/** 1 for the frame after the tilt policy's availability changed, so the controls see it in the next one (F625). */
+const POLICY_FLIP = 16;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -82,7 +87,14 @@ const CAP_KEEP = 14;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1, Number.NaN, 0);
+  /**
+   * The tilt policy the controls set (F625, `NavigationApi.tiltPolicy`): `[0]` the distance from the eye to the point
+   * looked at beyond which the view is flat, meters (0: no policy, the zoom curves' tilt), `[1]` the distance within
+   * which the automatic tilt rises, reaching `[2]` (radians) at a quarter of it. `[3]` is written each frame: 1 while
+   * the camera may tilt, 0 beyond the lock.
+   */
+  readonly tiltPolicy = Float64Array.of(0, 0, 0, 1);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -119,7 +131,8 @@ export class ViewState {
     return (
       ((this.values[TILT_OFFSET] ?? 0) !== 0 && !this.clamped) ||
       (this.values[MORPH_OFFSET] ?? 0) !== 0 ||
-      (this.values[RELIEF_OFFSET] ?? 0) !== 0
+      (this.values[RELIEF_OFFSET] ?? 0) !== 0 ||
+      this.values[POLICY_FLIP] === 1
     );
   }
 
@@ -142,7 +155,8 @@ export class ViewState {
       this.mode = 'manual';
       // Within the maximum tilt of the constraints (F210).
       const cap = this.values[TILT_CAP] ?? Number.NaN;
-      const tilt = (this.curves.autoTiltDeg * Math.PI) / 180;
+      const tilt =
+        (this.tiltPolicy[0] ?? 0) > 0 ? (this.tiltPolicy[2] ?? 0) : (this.curves.autoTiltDeg * Math.PI) / 180;
       this.chosen[0] = cap === cap && tilt > cap ? cap : tilt;
     } else this.mode = mode;
     this.easeTiltFromApplied();
@@ -190,6 +204,11 @@ export class ViewState {
   applyTilt(camera: Camera, clearanceMeters: number, ground?: GroundProbe): void {
     this.computeCurves(camera);
     const values = this.values;
+    // Once a frame, whether the tilt policy lets the camera tilt (F625); a change keeps one more frame coming.
+    const lock = this.tiltPolicy[0] ?? 0;
+    const allowed = lock > 0 && camera.pose.rangeMeters > lock ? 0 : 1;
+    values[POLICY_FLIP] = this.tiltPolicy[3] === allowed ? 0 : 1;
+    this.tiltPolicy[3] = allowed;
     this.computeTarget();
     const target = values[TARGET_TILT] ?? 0;
     if (this.snap) values[TILT_OFFSET] = 0;
@@ -212,6 +231,7 @@ export class ViewState {
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
     if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
     if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
+    if ((values[WANTED_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[POLICY_CAP] ?? 0;
     values[PREVIOUS_TILT] = values[APPLIED_TILT] ?? 0;
     values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
     if (clearanceMeters > 0 && ground) this.probeTerrainLimit(camera, ground);
@@ -274,6 +294,7 @@ export class ViewState {
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
     if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
     if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
+    if ((values[WANTED_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[POLICY_CAP] ?? 0;
     // Never above the tilt the camera has: a terrain clamp holding it lower stays.
     if ((values[WANTED_TILT] ?? 0) > camera.pose.tiltRad && this.clamped) return;
     camera.pose.tiltRad = values[WANTED_TILT] ?? 0;
@@ -314,6 +335,30 @@ export class ViewState {
     this.values[TILT_OFFSET] = (this.values[APPLIED_TILT] ?? 0) - (this.values[TARGET_TILT] ?? 0);
   }
 
+  /**
+   * The tilt policy at the camera's distance to the point looked at (F625): the automatic tilt rises from 0 at
+   * `tiltPolicy[1]` to `tiltPolicy[2]` at a quarter of it, and the cap falls from 90° at half the lock distance to 0 at
+   * the lock, each eased in the distance's logarithm, so neither jumps.
+   */
+  private applyPolicy(camera: Camera): void {
+    const policy = this.tiltPolicy;
+    const lock = policy[0] ?? 0;
+    if (!(lock > 0)) {
+      this.values[POLICY_CAP] = Number.NaN;
+      return;
+    }
+    const range = camera.pose.rangeMeters;
+    policyStep[0] = 0;
+    policyStep[1] = 2;
+    policyStep[2] = Math.log2((policy[1] ?? 0) / range);
+    smootherstepInto(policyStep);
+    this.values[AUTO_TILT] = (policyStep[3] ?? 0) * (policy[2] ?? 0);
+    policyStep[1] = 1;
+    policyStep[2] = Math.log2(lock / range);
+    smootherstepInto(policyStep);
+    this.values[POLICY_CAP] = (policyStep[3] ?? 0) * (Math.PI / 2);
+  }
+
   /** The ground zoom at the screen center and the Auto curves there, into `curveValues` and `values`. */
   private computeCurves(camera: Camera): void {
     // groundZoomForRange written out: a double returned from a call is boxed (ADR 0018).
@@ -337,6 +382,7 @@ export class ViewState {
     this.values[CAP_KEEP] = capStep[3] ?? 1;
     curveValues[CURVE_MORPH] = (curveValues[CURVE_MORPH] ?? 0) * (capStep[3] ?? 1);
     this.values[AUTO_TILT] = curveValues[2] ?? 0;
+    this.applyPolicy(camera);
     this.morph.factors[0] = (curveValues[CURVE_MORPH] ?? 0) + (this.values[MORPH_OFFSET] ?? 0);
   }
 }

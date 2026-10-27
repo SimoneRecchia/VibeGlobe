@@ -25,9 +25,9 @@ function language(params: URLSearchParams): string {
 }
 
 /** The default controls of every page. */
-async function addPageControls(ui: Ui): Promise<void> {
+async function addPageControls(ui: Ui, navigation?: NavigationControls): Promise<void> {
   const { CompassControl, HomeControl, TiltControl, ViewModeControl, ZoomControl } = await import('@vibeglobe/ui');
-  ui.add(new ViewModeControl({ position: 'top-left' }));
+  ui.add(new ViewModeControl({ position: 'top-left', ...(navigation ? { tilt: navigation } : {}) }));
   ui.add(new ZoomControl());
   ui.add(new CompassControl());
   ui.add(new TiltControl());
@@ -35,11 +35,21 @@ async function addPageControls(ui: Ui): Promise<void> {
 }
 
 /** Every control and tool of the package, the settings and the help. */
-async function addShowcaseControls(globe: Globe, ui: Ui, layers: GlobeLayers, hooks: ShowcaseHooks): Promise<void> {
+async function addShowcaseControls(
+  globe: Globe,
+  ui: Ui,
+  layers: GlobeLayers,
+  hooks: ShowcaseHooks,
+  navigation?: NavigationControls,
+): Promise<void> {
   const m = await import('@vibeglobe/ui');
   const { MinimapControl } = await import('@vibeglobe/ui/minimap');
   const { demoGeocoder } = await import('./showcase-data.js');
-  m.addAllControls(ui, { geocoder: demoGeocoder, layers: { dataLayers: layers } });
+  m.addAllControls(ui, {
+    geocoder: demoGeocoder,
+    layers: { dataLayers: layers },
+    ...(navigation ? { tilt: navigation } : {}),
+  });
   // The readout with the elevation under the pointer, from the terrain drawn.
   ui.replace(
     new m.CoordinateReadoutControl({
@@ -111,8 +121,8 @@ export async function showPageUi(
       theme: params.get('theme') === 'dark' ? 'dark' : 'light',
       ...(layers ? { layers } : {}),
     });
-    if (showcase && layers) await addShowcaseControls(globe, ui, layers, hooks);
-    else await addPageControls(ui);
+    if (showcase && layers) await addShowcaseControls(globe, ui, layers, hooks, navigation);
+    else await addPageControls(ui, navigation);
   }
   const shown: ShowcaseHandle = Object.assign(handle, { ui, layers });
   window.vibeglobeShowcase = shown;

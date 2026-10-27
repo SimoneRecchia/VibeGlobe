@@ -65,7 +65,7 @@
   },
   "packages": {
     "core": {
-      "bundleGzipKB": 64,
+      "bundleGzipKB": 65,
       "memoryScenario": "frame-loop",
       "jsHeapMB": 32
     },

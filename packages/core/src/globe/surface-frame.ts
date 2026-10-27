@@ -25,7 +25,7 @@ import { validStack } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
 import type { ElevationSample } from '../terrain/terrain-heights.js';
 import { validatePosition } from './validation.js';
-import { liftMeters } from '../terrain/collision.js';
+import { liftMeters, shortfallMeters } from '../terrain/collision.js';
 import { displayedHeightMeters } from '../terrain/displayed-height.js';
 import { TERRAIN_LEVEL_OFFSET, terrainErrorsBySurfaceLevel, terrainHeightRange } from '../terrain/terrain-draws.js';
 import type {
@@ -65,6 +65,12 @@ const MAX_LEVEL = 25;
 
 /** A lift change smaller than this, meters, is rounding, not motion (KB-089). */
 const LIFT_SETTLED_METERS = 1e-3;
+/** The eye looks this many frames ahead along its motion for terrain to load (KB-219): a second at 60 Hz. */
+const AHEAD_FRAMES = 60;
+/** Below this height above the drawn ground the eye's own finest terrain is loaded (KB-219), meters. */
+const LOAD_BELOW_METERS = 5000;
+/** The priority of those loads: the first of the visible tiles (ADR 0007), as the eye's safety depends on them. */
+const AHEAD_PRIORITY = 1024;
 
 /** The sample `terrainHeightRad` writes. */
 const terrainSample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
@@ -105,7 +111,12 @@ export class SurfaceFrame {
   /** A synchronous elevation query's position in radians, in an array so passing it boxes nothing (ADR 0018). */
   private readonly queryRad = new Float64Array(2);
   /** The finest resident terrain under the eye at the drawn scale, from {@link probeGround}. */
-  private readonly probed = new Float64Array(1);
+  /**
+   * The finest resident height under the eye and its drawn scale (probeGround), then the last frame's eye
+   * (radians), its finest terrain level and height (meters)
+   * and the eye's shortfall below that height, for {@link SurfaceFrame.keepAboveTerrain}.
+   */
+  private readonly probed = new Float64Array(7);
   /** The finest resident terrain under the eye, each frame. */
   private readonly eyeGround: ElevationSample = { heightMeters: 0, level: -1, noData: true };
   /** Engine time of the frame being prepared, in an array so passing it boxes nothing (ADR 0018). */
@@ -208,6 +219,7 @@ export class SurfaceFrame {
     const scale = (factors[1] ?? 1) * (1 - m + m * (factors[2] ?? 1) * (this.queryRad[1] ?? 1));
     camera.groundHeightMeters = (drawn === drawn ? drawn : finest) * scale;
     this.probed[0] = finest * scale;
+    this.probed[1] = scale;
   }
 
   /**
@@ -224,9 +236,33 @@ export class SurfaceFrame {
     const eye = camera.eyeGeodetic;
     const lift = pose.targetHeightMeters;
     this.probeGround(camera);
-    const finest = this.probed[0] ?? 0;
+    const probed = this.probed;
+    const finest = probed[0] ?? 0;
     const surface = camera.groundHeightMeters;
-    const next = liftMeters(lift, eye.heightMeters - lift, surface, finest, this.clearanceMeters);
+    // Along the eye's way (KB-219): the finest terrain under the eye and a second ahead at this frame's motion is
+    // loaded, so it is in memory by the time the eye gets there. A step over 0.01 rad (60 km) is a jump, not motion.
+    const dLon = eye.longitudeRad - (probed[2] ?? 0);
+    const dLat = eye.latitudeRad - (probed[3] ?? 0);
+    const moving = dLon < 0.01 && dLon > -0.01 && dLat < 0.01 && dLat > -0.01;
+    probed[2] = eye.longitudeRad;
+    probed[3] = eye.latitudeRad;
+    if (eye.heightMeters - surface < LOAD_BELOW_METERS) {
+      heights.wantFinest(eye.longitudeRad, eye.latitudeRad, AHEAD_PRIORITY);
+      if (moving)
+        heights.wantFinest(
+          eye.longitudeRad + AHEAD_FRAMES * dLon,
+          eye.latitudeRad + AHEAD_FRAMES * dLat,
+          AHEAD_PRIORITY,
+        );
+    }
+    // The eye's shortfall is its own, not the lift's: a movement or input writes the target back onto the ellipsoid
+    // each frame, and a catch-up of the lift restarted every frame (KB-219).
+    const level = this.eyeGround.level;
+    const risen = level !== probed[4] && moving ? finest - (probed[5] ?? 0) : 0;
+    probed[6] = shortfallMeters(probed[6] ?? 0, risen);
+    probed[4] = level;
+    probed[5] = finest;
+    const next = liftMeters(eye.heightMeters - lift, surface, finest - (probed[6] ?? 0), this.clearanceMeters);
     imagery.chargeTerrainMs(imagery.now() - start);
     // Under a millimeter the lift has settled: rounding alone would keep moving the eye, and drawing, forever.
     const change = next - lift;

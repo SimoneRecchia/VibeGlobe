@@ -439,3 +439,44 @@ describe('navigation mode', () => {
     expect(() => createControls({ northUpMaxLatitudeDeg: 0 })).toThrow(GlobeError);
   });
 });
+
+describe('the tilt policy (F625)', () => {
+  it('is off by default, takes the defaults or some of them, and validates them', () => {
+    expect(createControls().tiltPolicy).toBeNull();
+    expect(createControls({ tiltPolicy: true }).tiltPolicy).toEqual({
+      lock2DAboveMeters: 20_000,
+      autoTiltBelowMeters: 2_000,
+      autoTiltMaxDeg: 60,
+    });
+    const h = controlsHarness({ tiltPolicy: { autoTiltMaxDeg: 45 } });
+    expect([...(h.camera.navigation.tiltPolicy ?? [])]).toEqual([20_000, 2_000, (45 * Math.PI) / 180, 1]);
+    h.controls.setTiltPolicy(null);
+    expect(h.camera.navigation.tiltPolicy?.[0]).toBe(0);
+    for (const bad of [{ autoTiltBelowMeters: 30_000 }, { lock2DAboveMeters: -1 }, { autoTiltMaxDeg: 95 }])
+      expect(() => h.controls.setTiltPolicy(bad)).toThrow(GlobeError);
+  });
+
+  it('beyond the lock: tilt gestures only turn, a hand-chosen tilt ends, and listeners hear the change', () => {
+    const h = controlsHarness({ tiltPolicy: true });
+    const heard: boolean[] = [];
+    h.controls.onTiltAvailabilityChange((available) => heard.push(available));
+    const globe = h.globe as unknown as { viewMode: string };
+    globe.viewMode = 'manual';
+    // The engine reports the camera beyond the lock.
+    const policy = h.camera.navigation.tiltPolicy ?? new Float64Array(4);
+    policy[3] = 0;
+    h.pointer('pointerdown', { x: 400, y: 300, t: 0, button: 2 });
+    h.pointer('pointermove', { x: 600, y: 150, t: 500, button: 2 });
+    h.frame();
+    h.pointer('pointerup', { x: 600, y: 150, t: 600, button: 2 });
+    h.run(1000);
+    expect(h.camera.headingDeg).toBe(45);
+    expect(h.camera.tiltDeg).toBe(0);
+    expect(h.controls.tiltAvailable).toBe(false);
+    expect(globe.viewMode).toBe('auto');
+    policy[3] = 1;
+    h.frame();
+    expect(h.controls.tiltAvailable).toBe(true);
+    expect(heard).toEqual([false, true]);
+  });
+});

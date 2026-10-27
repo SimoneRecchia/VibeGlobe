@@ -6,6 +6,7 @@ import { CompassControl } from './controls/compass.js';
 import { CoordinateReadoutControl } from './controls/readout.js';
 import { DebugToggleControl } from './controls/debug-toggle.js';
 import { SearchControl, type Geocoder } from './controls/search.js';
+import { ViewModeControl } from './controls/view-mode.js';
 import { ZoomControl } from './controls/zoom.js';
 import { addDefaultControls } from './defaults.js';
 import { createUi, type ControlContext, type Ui, type UiControl } from './ui.js';
@@ -268,5 +269,26 @@ describe('controls', () => {
     input.dispatchEvent(new Event('input'));
     expect(container.querySelector('[role="status"]')?.textContent).toBe('Type coordinates, for example 45.4642, 9.19');
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(0);
+  });
+});
+
+describe('the 2D / 3D / Auto toggle with a tilt policy (F625)', () => {
+  it('disables 3D while the controls say the camera may not tilt, and enables it again', () => {
+    const { container, ui } = setup();
+    let notify: ((available: boolean) => void) | undefined;
+    const tilt = {
+      tiltAvailable: false,
+      onTiltAvailabilityChange(listener: (available: boolean) => void) {
+        notify = listener;
+        return () => (notify = undefined);
+      },
+    };
+    ui.add(new ViewModeControl({ tilt }));
+    expect(button(container, 'view-3d').disabled).toBe(true);
+    expect(button(container, 'view-2d').disabled).toBe(false);
+    notify?.(true);
+    expect(button(container, 'view-3d').disabled).toBe(false);
+    ui.remove('view-mode');
+    expect(notify).toBeUndefined();
   });
 });

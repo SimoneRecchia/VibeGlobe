@@ -7554,6 +7554,39 @@
         "In the browser, a far jump with a slow server shows the pinned levels in the next frames, and a second lap at 3000 km has no tile below its own level"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F625",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "An optional tilt policy of the controls (`createControls({ tiltPolicy })`, `controls.setTiltPolicy({ lock2DAboveMeters, autoTiltBelowMeters, autoTiltMaxDeg })`, defaults 20,000 m, 2,000 m and 60°), by the distance from the eye to the point looked at: beyond the lock the tilt is 0° and neither gestures nor the API tilt it, and `tiltAvailable` with `onTiltAvailabilityChange` disables the UI's 3D button; within `autoTiltBelowMeters` the tilt rises continuously to `autoTiltMaxDeg` and falls back rising; a tilt chosen by hand below the lock stays until changed or until the camera passes the lock, falling continuously before it.",
+      "steps": [
+        "Unit-test the automatic tilt and the lock by distance, a hand-chosen tilt below and past the lock, the 3D mode, the option, setter, availability events and blocked tilt gestures, and the UI's disabled 3D button",
+        "In the browser, with `?tiltPolicy=1`, far away an API tilt leaves the view flat and 3D is disabled; zooming to street level and back the tilt rises to 60° and returns to 0° with no step above 3° per frame"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F626",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's roads appear by class with the level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest from 14, and road names from 13, in the Roads overlay and in Hybrid.",
+      "steps": [
+        "Unit-test the composed road layers' levels and filters by class at each level",
+        "Measure the frame time of a drag at levels 8 and 12 with and without roads, before and after"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F627",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "Model sets (`ModelSetLayer` of `@vibeglobe/layers/models`): many copies of one glTF model loaded once, each of its meshes one instanced draw for the copies in view nearer than `visibleBelowMeters` (default 3,000 m), a placeholder of constant size on screen beyond, nothing for copies out of view or behind the globe; copies picked, highlighted and moved like features; a models guide with the limits of a light model and an example of 2,000 turbines.",
+      "steps": [
+        "Unit-test that the layer loads its model once with every copy's pose and pick id, highlights, moves, hides and removes copies, and validates its options",
+        "In the browser, 2,000 turbines cost at most 4 draw calls near the farm and 1 from 14 km (placeholders, only those in view), nothing looking elsewhere, and a copy picks as its feature"
+      ],
+      "status": "passing"
     }
   ]
 }

@@ -10,9 +10,12 @@ import {
   type ControlsOptions,
   resolveControlsOptions,
   type ResolvedControlsOptions,
+  type TiltPolicy,
   validNavigationMode,
   validNorthUpLatitude,
+  validTiltPolicy,
 } from './options.js';
+import { TiltPolicyState } from './tilt-policy.js';
 import { TouchGestures } from './touch-gestures.js';
 import { WheelInput } from './wheel-input.js';
 import { ZoomBox } from './zoom-box.js';
@@ -48,6 +51,20 @@ export interface NavigationControls extends ControlsFactory {
    * else throws a GlobeError ('invalid-option').
    */
   setNorthUpMaxLatitude(deg: number): void;
+  /** The tilt policy in force (F625), or null for none: the `tiltPolicy` option, then {@link NavigationControls.setTiltPolicy}. */
+  readonly tiltPolicy: TiltPolicy | null;
+  /**
+   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m
+   * and 60°), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
+   * `autoTiltBelowMeters` the tilt rises by itself to `autoTiltMaxDeg`; both change continuously with the distance. A
+   * tilt chosen by hand below the lock stays until changed or until the camera passes the lock. Invalid input throws a
+   * GlobeError ('invalid-option').
+   */
+  setTiltPolicy(policy: boolean | Partial<TiltPolicy> | null): void;
+  /** False while the tilt policy keeps the view flat (beyond its lock): a 3D button should be disabled then. */
+  readonly tiltAvailable: boolean;
+  /** Calls `listener` with {@link NavigationControls.tiltAvailable} each time it changes; returns the unsubscribe. */
+  onTiltAvailabilityChange(listener: (available: boolean) => void): () => void;
 }
 
 /**
@@ -62,14 +79,19 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   let mode = resolved.navigationMode;
   let maxLatitudeDeg = resolved.northUpMaxLatitudeDeg;
   let navigationApi: NavigationApi | undefined;
+  const tilt = new TiltPolicyState(resolved.tiltPolicy);
   const factory = (element: unknown, navigation: NavigationApi): Controls => {
     navigationApi = navigation;
     navigation.navigationMode = mode;
     navigation.northUpMaxLatitudeDeg = maxLatitudeDeg;
+    tilt.write(navigation);
     const attached = attach(element as HTMLElement, navigation, resolved, globe);
     current = attached;
     return {
-      update: attached.update,
+      update() {
+        tilt.check(navigationApi, globe);
+        attached.update();
+      },
       interrupt: attached.interrupt,
       destroy() {
         attached.destroy();
@@ -96,7 +118,17 @@ export function createControls(options?: ControlsOptions): NavigationControls {
       maxLatitudeDeg = validNorthUpLatitude(deg);
       if (navigationApi) navigationApi.northUpMaxLatitudeDeg = maxLatitudeDeg;
     },
+    tiltPolicy: tilt.policy,
+    setTiltPolicy(next: boolean | Partial<TiltPolicy> | null) {
+      tilt.policy = validTiltPolicy(next, resolved.maxTiltDeg);
+      tilt.write(navigationApi);
+      navigationApi?.requestUpdate();
+    },
+    tiltAvailable: true,
+    onTiltAvailabilityChange: (listener: (available: boolean) => void) => tilt.listen(listener),
   });
+  Object.defineProperty(controls, 'tiltPolicy', { get: () => tilt.policy, enumerable: true });
+  Object.defineProperty(controls, 'tiltAvailable', { get: () => tilt.available, enumerable: true });
   // Getters: Object.assign would copy the values once.
   Object.defineProperty(controls, 'northUpMaxLatitudeDeg', { get: () => maxLatitudeDeg, enumerable: true });
   return Object.defineProperty(controls, 'navigationMode', { get: () => mode, enumerable: true });

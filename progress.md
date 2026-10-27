@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-10-27: tilt policy, terrain clearance, progressive roads and model sets (targeted owner request)
+
+Requests from integrating the engine in an application with wind and solar farms. (1) F625: an optional tilt policy of
+the controls by the distance to the point looked at (`tiltPolicy`, `setTiltPolicy`; 20,000 m lock, automatic tilt
+from 2,000 m to 60° at 500 m), applied by the engine each frame so API tilts are capped too; `tiltAvailable` and
+`onTiltAvailabilityChange` disable the UI's 3D button; the playground's showcase has it on (`?tiltPolicy=1`
+elsewhere). Off by default: on, it would change every existing view the end-to-end suite encodes. (2) KB-219, the camera entering the terrain, was not reproduced on the fixture terrain in any movement (open question
+36); hardened as asked: the terrain under and ahead of the eye loads first, and the smooth rise to late terrain is
+kept by the eye across movement frames. The core budget went from 64 to 65 KB (owner). (3) F626: the preset's roads by class from levels 6, 9, 11, 13
+and 14, names from 13. On the fixture tiles (OpenFreeMap is not reachable here; the fixture z12 tiles hold 41 roads)
+a drag's main-thread time per frame barely moves: z8 with roads p50 3.5 → 4.0 ms, z12 with roads 5.2 → 5.1 ms. (4)
+F627: `ModelSetLayer`, one model for many copies, instanced, the model within `visibleBelowMeters` (3,000 m) and a
+placeholder beyond, nothing out of view; 2,000 turbines cost 4 draws near the farm and 1 from 14 km
+(`?scenario=wind-farm`), and a models guide (`docs/guides/models.md`). The WebGPU variants of F146 and F147 time out
+on this container's software GPU and were left to CI.
+
 ## 2026-10-27: Europe preset styles, satellite chain and north-up limit (targeted owner request)
 
 Problems the owner found with the Europe preset in an application, fixed as KB-214 to KB-218 with regression tests

@@ -7,7 +7,7 @@ import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/
  * toggle for their keys, and the fit the zoom box uses. Rotation, the clock and the applied camera come through
  * `NavigationApi` itself.
  */
-export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' | 'fitBounds'>> & {
+export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' | 'fitBounds' | 'viewMode'>> & {
   /** The home command (F194), used by the Home key when the engine has it. */
   goHome?(): unknown;
   /** The view-mode toggle (F163), used by the 2, 3 and A keys when the engine has it. */
@@ -237,6 +237,8 @@ export class CameraPort {
    * the new values become the chosen ones. The tilt is clamped to [0, maxTiltDeg].
    */
   rotate(deltaHeadingDeg: number, deltaTiltDeg: number, maxTiltDeg: number): void {
+    // Beyond the tilt policy's lock the view stays flat (F625): gestures and keys turn it but do not tilt it.
+    if (this.navigation.tiltPolicy?.[3] === 0) deltaTiltDeg = 0;
     if (deltaHeadingDeg === 0 && deltaTiltDeg === 0) return;
     const tilt = this.navigation.tiltDeg;
     const clamped = Math.min(Math.max(tilt + deltaTiltDeg, 0), maxTiltDeg) - tilt;

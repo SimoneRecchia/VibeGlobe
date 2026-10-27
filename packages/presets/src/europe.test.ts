@@ -1,5 +1,6 @@
 import type { TileSource } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
+import { featureFilter, type FilterSpecification } from '@maplibre/maplibre-gl-style-spec';
 import { describe, expect, it } from 'vitest';
 import { europeOpen, type OfflineWrapper } from './europe.js';
 import type { StyleJson } from './styles.js';
@@ -206,5 +207,30 @@ describe('europeOpen (F613)', () => {
       expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toBeUndefined();
     for (const id of ['map', 'relief'])
       expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toEqual({ north: '#a9cfe8', south: '#f2efe9' });
+  });
+
+  it('shows roads by class from their levels, motorways from 6 to the rest from 14, and road names from 13 (F626)', () => {
+    const style = europeOpen().styleFor(STYLE, 'map', ['roads']);
+    const road = style?.layers.find((l) => l.id === 'road');
+    const names = style?.layers.find((l) => l.id === 'road-name');
+    expect(road?.['minzoom']).toBe(6);
+    expect(names?.['minzoom']).toBe(13);
+    const filter = featureFilter(road?.['filter'] as FilterSpecification, 'layers.road.filter');
+    const shown = (zoom: number) =>
+      ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service', 'path', 'rail'].filter((kind) =>
+        filter.filter({ zoom }, { type: 2, properties: { class: kind } } as never),
+      );
+    expect(shown(6)).toEqual(['motorway']);
+    expect(shown(8)).toEqual(['motorway']);
+    expect(shown(9)).toEqual(['motorway', 'trunk', 'primary']);
+    expect(shown(11)).toEqual(['motorway', 'trunk', 'primary', 'secondary', 'tertiary']);
+    expect(shown(13)).toEqual(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor']);
+    expect(shown(14)).toHaveLength(9);
+    // Hybrid's roads follow the same levels.
+    expect(
+      europeOpen()
+        .styleFor(STYLE, 'hybrid', [])
+        ?.layers.find((l) => l.id === 'road')?.['minzoom'],
+    ).toBe(6);
   });
 });

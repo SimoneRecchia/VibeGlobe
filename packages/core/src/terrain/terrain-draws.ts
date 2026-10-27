@@ -20,7 +20,7 @@ import {
 import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import { MERCATOR_ROOT, NORTH_CAP, quadtreeTileKey, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import { gridRangeInto } from './sample-height.js';
+import { gridRangeInto, samplingErrorMeters } from './sample-height.js';
 import type { TerrainHeights } from './terrain-heights.js';
 import type { TerrainSource } from './terrain-source.js';
 
@@ -350,7 +350,10 @@ export function terrainHeightRange(
       // What finer levels may add: the level's bound, or more where the grid's measured error exceeds its share of it.
       const bound = layer.gridErrorMeters[current] ?? 0;
       const measured = bound / GRID_ERROR_FACTOR + (grid.errorMeters ?? 0);
-      out[2] = measured > bound ? measured : bound;
+      // A tile whose part holds more cells than its mesh has segments shows only every few vertices (KB-097): what it
+      // skips is error finer levels remove too.
+      const stride = ((part[1] ?? 1) - (part[0] ?? 0)) * (grid.cells / TILE_SEGMENTS);
+      out[2] = (measured > bound ? measured : bound) + samplingErrorMeters(grid, stride);
       // At the source's finest level, the surface refines until it samples each vertex of this grid (ADR 0028); below
       // it, finer terrain is still to come and the selection's own limit applies.
       const sampled = Math.log2(grid.cells / TILE_SEGMENTS);

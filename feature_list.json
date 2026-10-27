@@ -2158,7 +2158,7 @@
         "Assert its screen-space height-to-base ratio is identical at each latitude within tolerance",
         "Assert the vertical scale interpolates continuously between the ellipsoid and plane values during the morph"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F158",

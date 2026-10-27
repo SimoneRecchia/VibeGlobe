@@ -3803,7 +3803,7 @@
         "Record frames during the final descent and arrival and assert zero black pixels and no popping (frame-difference analysis)",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F287",

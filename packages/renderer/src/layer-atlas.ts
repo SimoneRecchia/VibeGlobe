@@ -37,7 +37,8 @@ function createCanvas(): { canvas: OffscreenCanvas | HTMLCanvasElement; context:
  * When full it starts over and the batches using it rebuild.
  */
 export class LayerAtlas {
-  readonly texture: Texture;
+  /** Replaced by `renew` after a device loss. */
+  texture: Texture;
   private readonly context: Canvas2D;
   private readonly entries = new Map<string, AtlasEntry>();
   private readonly images = new Map<string, AtlasImage>();
@@ -117,8 +118,23 @@ export class LayerAtlas {
     this.texture.needsUpdate = true;
   }
 
+  /**
+   * After a device loss: a new texture of the same canvas, uploaded at its next use. The lost renderer listens to the
+   * old one, and a renderer already disposed no longer removes its listener, so keeping it kept that renderer (KB-222).
+   */
+  renew(): void {
+    this.texture = renewed(this.texture);
+  }
+
   /** Releases the atlas texture. */
   dispose(): void {
     this.texture.dispose();
   }
+}
+
+/** A copy of `texture` without its listeners, uploaded at its next use. */
+export function renewed<T extends Texture>(texture: T): T {
+  const copy = texture.clone();
+  copy.needsUpdate = true;
+  return copy;
 }

@@ -3803,7 +3803,7 @@
         "Record frames during the final descent and arrival and assert zero black pixels and no popping (frame-difference analysis)",
         "Repeat on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F287",
@@ -3978,7 +3978,7 @@
         "Assert the engine's bandwidth estimate (also shown in the debug overlay) converges within 20% of the throttled throughput within 10 s",
         "Repeat in Chromium, Firefox and WebKit and assert the estimate does not depend on the Network Information API"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F301",
@@ -4855,7 +4855,7 @@
         "Verify every frame shows each line fully visible on the terrain with no gaps where it would be hidden and no segment detached from the surface",
         "Verify behavior stays correct during terrain level changes and geomorphing"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F365",
@@ -4880,7 +4880,7 @@
         "Record every frame and verify each primitive's screen position matches the morphed map position under it within 1 pixel",
         "Verify there is no frame where layers and map are out of sync on WebGPU and forced WebGL2"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F367",
@@ -4967,7 +4967,7 @@
         "Record every frame and verify clusters split and merge with animated transitions, without pops or flicker, by frame differencing",
         "Verify clustering is computed in a worker and clicking a cluster zooms to its extent"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F374",

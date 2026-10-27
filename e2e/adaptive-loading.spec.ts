@@ -155,49 +155,51 @@ test.describe('what loads ahead and at which detail (F285–F288)', () => {
     expect(outside('smooth').length).toBeGreaterThan(0);
   });
 
-  test('a flight loads its destination at the arrival levels at once and arrives complete, without black pixels or popping (F286)', async ({
-    page,
-  }) => {
-    test.setTimeout(240_000);
-    const session = await fixtureSession(page, [{ latencyMs: 100 }]);
-    await openGlobe(page, `session=${session}&imagery=world&lon=9.19&lat=45.46&zoom=9`);
-    await waitForStreaming(page);
-    const before = (await requestLog(page, session)).length;
-    await page.evaluate(() => {
-      document.body.dataset['scenario'] = 'flying';
-      void window.vibeglobePlayground?.globe
-        .flyTo({ longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 9 }, { durationMs: 8000 })
-        .then(() => (document.body.dataset['scenario'] = 'done'));
+  // On WebGPU and on forced WebGL2 (F286 step 4).
+  for (const backend of ['webgpu', 'webgl2'] as const)
+    test(`a flight loads its destination at the arrival levels at once and arrives complete, without black pixels or popping, on ${backend} (F286)`, async ({
+      page,
+    }) => {
+      test.setTimeout(240_000);
+      const session = await fixtureSession(page, [{ latencyMs: 100 }]);
+      await openGlobe(page, `session=${session}&backend=${backend}&imagery=world&lon=9.19&lat=45.46&zoom=9`);
+      await waitForStreaming(page);
+      const before = (await requestLog(page, session)).length;
+      await page.evaluate(() => {
+        document.body.dataset['scenario'] = 'flying';
+        void window.vibeglobePlayground?.globe
+          .flyTo({ longitudeDeg: 139.7, latitudeDeg: 35.7, zoom: 9 }, { durationMs: 8000 })
+          .then(() => (document.body.dataset['scenario'] = 'done'));
+      });
+      await page.waitForTimeout(1500);
+      const early = (await requestLog(page, session)).slice(before).map(keyOf);
+      // The final descent and the arrival: every captured frame complete.
+      const frames: PNG[] = [];
+      while ((await page.evaluate(() => document.body.dataset['scenario'])) !== 'done') {
+        frames.push(await canvasImage(page));
+        for (const frame of frames.slice(-1)) expect(blackPixels(frame)).toBe(0);
+      }
+      const arrival = await canvasImage(page);
+      await waitForIdle(page);
+      const settled = await canvasImage(page);
+      const arrivalTiles = await page.evaluate(() =>
+        (window.vibeglobePlayground?.globe.surfaceTiles() ?? [])
+          .filter((t) => t.root === 'mercator' && t.imageryLevel !== null)
+          .map((t) => {
+            const level = t.imageryLevel ?? 0;
+            const shift = 2 ** (t.level - level);
+            return `${level}/${Math.floor(t.x / shift)}/${Math.floor(t.y / shift)}`;
+          }),
+      );
+      const requestedEarly = arrivalTiles.filter((key) => early.includes(key));
+      console.log(
+        `[adaptive] F286: ${requestedEarly.length}/${new Set(arrivalTiles).size} arrival tiles requested in the first 1.5 s`,
+      );
+      expect(requestedEarly.length / arrivalTiles.length).toBeGreaterThan(0.8);
+      expect(blackPixels(arrival)).toBe(0);
+      // Preloaded, the arrival view does not change once the camera stops: no tile pops in.
+      expect(changed(arrival, settled)).toBeLessThan(0.02);
     });
-    await page.waitForTimeout(1500);
-    const early = (await requestLog(page, session)).slice(before).map(keyOf);
-    // The final descent and the arrival: every captured frame complete.
-    const frames: PNG[] = [];
-    while ((await page.evaluate(() => document.body.dataset['scenario'])) !== 'done') {
-      frames.push(await canvasImage(page));
-      for (const frame of frames.slice(-1)) expect(blackPixels(frame)).toBe(0);
-    }
-    const arrival = await canvasImage(page);
-    await waitForIdle(page);
-    const settled = await canvasImage(page);
-    const arrivalTiles = await page.evaluate(() =>
-      (window.vibeglobePlayground?.globe.surfaceTiles() ?? [])
-        .filter((t) => t.root === 'mercator' && t.imageryLevel !== null)
-        .map((t) => {
-          const level = t.imageryLevel ?? 0;
-          const shift = 2 ** (t.level - level);
-          return `${level}/${Math.floor(t.x / shift)}/${Math.floor(t.y / shift)}`;
-        }),
-    );
-    const requestedEarly = arrivalTiles.filter((key) => early.includes(key));
-    console.log(
-      `[adaptive] F286: ${requestedEarly.length}/${new Set(arrivalTiles).size} arrival tiles requested in the first 1.5 s`,
-    );
-    expect(requestedEarly.length / arrivalTiles.length).toBeGreaterThan(0.8);
-    expect(blackPixels(arrival)).toBe(0);
-    // Preloaded, the arrival view does not change once the camera stops: no tile pops in.
-    expect(changed(arrival, settled)).toBeLessThan(0.02);
-  });
 
   test('along a flight it loads what will be visible, at the detail the moving camera shows (F287)', async ({
     page,

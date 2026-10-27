@@ -129,10 +129,11 @@ function compileProperty(
   return { expression: compiled.value as unknown as Compiled };
 }
 
-/** Values some paint expressions read besides the zoom: `heatmap-density` and `line-progress` (0–1). */
+/** Values some paint expressions read besides the zoom: `heatmap-density`, `line-progress` (0–1), `elevation` (m). */
 export interface ExpressionGlobals {
   readonly heatmapDensity?: number;
   readonly lineProgress?: number;
+  readonly elevation?: number;
 }
 
 /** A compiled style layer. Runtime changes go through `VectorStyle`, which reports them to the renderer. */

@@ -2,7 +2,7 @@ import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import type { ImagerySource } from './imagery-source.js';
-import { sourceProblem, validStack } from './imagery-stack.js';
+import { pinnedLevels, sourceProblem, stackEntries, validStack } from './imagery-stack.js';
 
 const valid: ImagerySource = {
   id: 'valid',
@@ -48,4 +48,16 @@ describe('source metadata validation (F220)', () => {
       expect(entries.length + refused.length).toBeGreaterThanOrEqual(2);
     },
   );
+});
+
+describe('the pinned base (F084, KB-218)', () => {
+  it("pins the low levels of a chain's first source with level 0, not of one that starts deeper", () => {
+    const deeper = { ...valid, id: 'package', minLevel: 5 };
+    const world = { ...valid, id: 'world' };
+    const levels = pinnedLevels(stackEntries([{ sources: [deeper, world] }]), 512 * 1024 * 1024);
+    expect(levels[0]).toBe(-1);
+    expect(levels[1]).toBeGreaterThanOrEqual(3);
+    // A chain whose first source has level 0 pins that one, as before.
+    expect(pinnedLevels(stackEntries([{ sources: [world, deeper] }]), 512 * 1024 * 1024)[1]).toBe(-1);
+  });
 });

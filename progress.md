@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-10-27: Europe preset styles, satellite chain and north-up limit (targeted owner request)
+
+Problems the owner found with the Europe preset in an application, fixed as KB-214 to KB-218 with regression tests
+(F621–F624). Map is a political map (neutral land, water, borders, names; roads an overlay off by default); Relief is
+that map over a `color-relief` tint, now drawn by `@vibeglobe/layers`, and the hillshade. The satellite chain is NASA's
+Blue Marble from GIBS (EPSG:4326, up to level 7, filling the polar caps), the package's WorldCover from 5 to 11, then
+the orthophotos from level 12, whose white tiles count as no data; Map and Relief give the caps their own colors.
+Terrascope's WorldCover WMTS is left out: its terms do not clearly allow free commercial use (open question 35). The
+first source of a chain that starts at level 0 is now the pinned base, so far views are sharp at once; a second lap
+at 3000 km has no blurry tile. 'north-up' stops at a configurable latitude, 85° by default. The package goes to
+level 11 (owner), and the guide has the WorldCover package's size per deepest level, measured on real tiles of six
+areas: 0.58, 2.20, 7.93 and 27.0 GB for levels 10 to 13. Not done, as the hosts are blocked here: each orthophoto
+service's real minimum level and which ones stay broken (open question 34 (c)); no service was removed. The core
+bundle is 4 bytes under its 64 KB budget after trimming messages.
+
 ## 2026-10-26: polar caps and navigation modes (targeted owner request)
 
 Two problems found integrating the engine in an application. (1) KB-211, the North Pole showed as a light-blue crescent beside striped tiles: every view mode flattens into the Web Mercator plane once zoomed in (ADR 0008), and the plane cannot show the caps beyond 85.05° (a band ending at the pole, nothing beyond it, stretched wedge tiles), while caps without a geographic source showed the equirectangular base image's stretched polar rows. A view that reaches a cap now stays a globe, and such caps show a fill color (`polarCapColors`, `setPolarCapColors`; F619). (2) Navigation modes 'free' (default, trackball over the poles, heading turns) and 'north-up' (heading held, stops at 89.9°) through `createControls({ navigationMode })` and `controls.setNavigationMode` (F620, ADR 0009 update), with a playground selector and a section in `docs/guides/controls.md`. Pushed to the same pull request as the earlier requests of the day (#56), which the owner merges.

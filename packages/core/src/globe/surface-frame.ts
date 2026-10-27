@@ -472,6 +472,6 @@ export class SurfaceFrame {
 function tileErrorMessage(event: TileErrorEvent): string {
   const tile = `${event.sourceId}: tile ${event.level}/${event.x}/${event.y}`;
   return event.reason === 'cors'
-    ? `${event.sourceId}: tiles are blocked by CORS: the server answers without Access-Control-Allow-Origin, so the browser cannot use them as textures; the source's tiles count as unavailable (first: tile ${event.level}/${event.x}/${event.y})`
+    ? `${event.sourceId}: tiles are blocked by CORS: the server sends no Access-Control-Allow-Origin, so the browser cannot use them as textures: they count as unavailable (first: tile ${event.level}/${event.x}/${event.y})`
     : `${tile} ${event.reason}`;
 }

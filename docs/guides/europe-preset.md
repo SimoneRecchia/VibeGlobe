@@ -17,16 +17,21 @@ the packages as a test (`scripts/integration/europe-preset-guide.test.ts`).
 
 ## Map types and sources
 
-| Map type or overlay | Drawn from                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------- |
-| Satellite           | ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0), from the package only; your own sources |
-| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                              |
-| Map                 | OpenFreeMap's Liberty style (OpenMapTiles schema, OpenStreetMap data, ODbL)                         |
-| Relief              | A hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                       |
-| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                          |
-| Roads               | OpenFreeMap: roads and their names                                                                  |
-| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                           |
-| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it        |
+| Map type or overlay | Drawn from                                                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Satellite           | NASA's Blue Marble (GIBS, EPSG:4326) at the lowest levels and over the poles, then the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package, then your own sources and the orthophotos |
+| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                        |
+| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                             |
+| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                          |
+| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                    |
+| Roads               | OpenFreeMap: roads and their names; off by default, on Map as on Satellite                                                                                                                                    |
+| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                     |
+| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                  |
+
+The polar caps beyond Web Mercator's 85.05° look like the surface around them: Blue Marble fills them in Satellite and
+Hybrid, and Map and Relief give `polarCapColors` (their water in the north, their land in the south), which the
+application passes to `globe.setPolarCapColors` when it switches base map. The imagery layers can be switched only on a
+globe created with imagery, so a globe that starts on Map or Relief is created with the satellite layers hidden.
 
 Low levels use Natural Earth (public domain, the base image) wherever nothing else is drawn. `preset.sources` lists
 every source in use with its terms, and `preset.excluded` the sources left out with the reason. Eleven national
@@ -93,8 +98,9 @@ globe is created, so turning 3D terrain on or off creates the globe again (the p
 ## Online only
 
 Without `packageManifestUrl` the preset needs no offline engine and reads only the network: OpenFreeMap's vector
-tiles everywhere and Mapterhorn's terrain over land. Satellite then shows only the application's own sources (no free
-satellite imagery of Europe could be verified for online use), and Natural Earth elsewhere.
+tiles everywhere and Mapterhorn's terrain over land. Satellite then shows NASA's Blue Marble up to its level 7, magnified
+beyond it, and the application's own sources and orthophotos over it: no free detailed satellite imagery of Europe
+could be verified for online use (ESA WorldCover's Terrascope service was left out, ADR 0182).
 
 ```ts
 import { europeOpen } from '@vibeglobe/presets';
@@ -201,7 +207,9 @@ Google's tiles are never packaged or cached persistently (the Google profile, [A
 
 `@vibeglobe/presets/orthophotos` adds the open orthophoto services whose terms were verified (ADR 0182): basemap.at,
 SWISSIMAGE, ČÚZK, DGT Portugal and seven German Länder. Each is a layer of its own, clipped per pixel to its country's or
-Land's borders (Natural Earth, loaded on demand), above the satellite composite; outside them the composite shows.
+Land's borders (Natural Earth, loaded on demand), above the satellite composite; outside them the composite shows. Each
+starts at level 12 (`ORTHOPHOTO_MIN_LEVEL`), as the services answer far views with white images, and a white tile counts
+as no data, so the composite shows through it.
 
 ```ts
 import { europeOpen } from '@vibeglobe/presets';
@@ -220,14 +228,15 @@ left out, with why, are `preset.excluded`.
 The deepest level asked for online, by area and source, with the default options (`onlineMaxLevel` lowers them).
 Beyond it the deepest tile is magnified.
 
-| Area                                                                                                                                                          | Satellite                                                                              | Map, labels, roads, buildings                       | Terrain and relief                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Land in Europe                                                                                                                                                | none online; the package up to 13 (WorldCover)                                         | 14 (OpenFreeMap; the package first up to its level) | 17 (Mapterhorn, where it holds them; the package first up to 12) |
-| Sea in Europe                                                                                                                                                 | none online; the package up to 8                                                       | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
-| Outside Europe                                                                                                                                                | none (Natural Earth)                                                                   | 14 (OpenFreeMap)                                    | none                                                             |
-| Austria, Switzerland, Czechia, mainland Portugal, Niedersachsen, NRW, Thüringen, Brandenburg, Berlin, Mecklenburg-Vorpommern, Sachsen-Anhalt, Rheinland-Pfalz | with `europeOrthophotos()`: 19 or 20, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
+| Area                                                                                                                                                          | Satellite                                                                                         | Map, labels, roads, buildings                       | Terrain and relief                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| Land in Europe                                                                                                                                                | Blue Marble to 7 online; the package's WorldCover from 5 to 11                                    | 14 (OpenFreeMap; the package first up to 11)        | 17 (Mapterhorn, where it holds them; the package first up to 11) |
+| Sea in Europe                                                                                                                                                 | Blue Marble to 7 online; the package up to 8                                                      | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
+| Outside Europe                                                                                                                                                | Blue Marble to 7                                                                                  | 14 (OpenFreeMap)                                    | none                                                             |
+| Austria, Switzerland, Czechia, mainland Portugal, Niedersachsen, NRW, Thüringen, Brandenburg, Berlin, Mecklenburg-Vorpommern, Sachsen-Anhalt, Rheinland-Pfalz | with `europeOrthophotos()`: from 12 to 19 or 20, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
 
-Mapterhorn's tiles are asked for down to level 17; where it holds no deeper tile, its deepest one is magnified. OpenFreeMap's vector tiles stop at level 14 and are
+Every source is asked for up to its own deepest level, and beyond it its deepest tile is magnified without a stop: the
+preset sets no zoom limit. Mapterhorn's tiles are asked for down to level 17; where it holds no deeper tile, its deepest one is magnified. OpenFreeMap's vector tiles stop at level 14 and are
 overzoomed beyond.
 
 ## Building the package
@@ -237,7 +246,7 @@ preset, with the same ids (`europe-satellite`, `europe-terrain`, `europe-vectors
 
 - `region` is Europe's bounding box (32° W to 45° E, 27° N to 72° N) and `land` the Natural Earth 1:50m land mask of
   Europe (`regions/europe-land.geojson`, made by `scripts/europe-land.ts`);
-- each dataset's `minZoom` and `maxZoom` set the levels on land and `seaMaxZoom` the deepest level over the sea (8):
+- each dataset's `minZoom` and `maxZoom` set the levels on land (5 to 11, the owner's choice of 2026-10-27) and `seaMaxZoom` the deepest level over the sea (8):
   above it only tiles touching land are counted and built;
 - `bytesPerTile` and `seaBytesPerTile` are the sizes the estimate uses where nothing was measured.
 
@@ -263,26 +272,21 @@ entry per archive with its `sourceId` (`europe-satellite`, `europe-terrain`) and
 cumulative gigabytes per dataset without downloading anything. With `--measure` it first reads the real tile sizes on
 the configuration's sample areas (`sampleArea` on land, `seaSampleArea` at sea): a sample build for the imagery, a few
 tiles per level from the archives for vectors and terrain. Rows it could not measure say `configured`. The output for
-`europe.json` (2026-10-26; the archive hosts were not reachable from the build machine, so vectors and terrain use the
-configured sizes):
+`europe.json` without `--measure` (2026-10-27; its satellite sizes are the averages measured below, the vector and
+terrain sizes configured, as the archive hosts were not reachable from the build machine):
 
 ```text
-Measuring tile sizes on the sample areas (only their tiles are read)…
-  europe-terrain: not measured (fetch failed); sizes configured
-  europe-vectors: not measured (fetch failed); sizes configured
 Estimate (nothing has been downloaded):
   europe-satellite [region]
     zoom     land tiles     sea tiles         tiles          size    cumulative         sizes
     z5               37            19            56      787.5 kB       0.00 GB    configured
     z6              118            92           210        2.6 MB       0.00 GB    configured
-    z7              374           438           812       12.4 MB       0.02 GB      measured
-    z8            1,308         1,827         3,135       30.6 MB       0.05 GB      measured
-    z9            4,662             0         4,662       93.2 MB       0.14 GB    configured
-    z10          17,398             0        17,398      549.2 MB       0.69 GB      measured
-    z11          66,781             0        66,781        1.9 GB       2.63 GB      measured
-    z12         260,558             0       260,558        6.7 GB       9.34 GB      measured
-    z13       1,028,226             0     1,028,226       22.3 GB      31.63 GB      measured
-    total: 1,381,838 tiles, 63.3 GB written; download 8532 files, 2.4 TB
+    z7              374           438           812        8.6 MB       0.01 GB    configured
+    z8            1,308         1,827         3,135       37.8 MB       0.05 GB    configured
+    z9            4,662             0         4,662      118.4 MB       0.17 GB    configured
+    z10          17,398             0        17,398      441.9 MB       0.61 GB    configured
+    z11          66,781             0        66,781        1.6 GB       2.23 GB    configured
+    total: 93,054 tiles, 4.5 GB written; download 8532 files, 2.4 TB
   europe-terrain [region]
     zoom     land tiles     sea tiles         tiles          size    cumulative         sizes
     z5               37            19            56        4.5 MB       0.00 GB    configured
@@ -292,8 +296,7 @@ Estimate (nothing has been downloaded):
     z9            4,662             0         4,662      512.8 MB       0.72 GB    configured
     z10          17,398             0        17,398        1.7 GB       2.37 GB    configured
     z11          66,781             0        66,781        6.3 GB       8.72 GB    configured
-    z12         260,558             0       260,558       20.8 GB      29.56 GB    configured
-    total: 353,612 tiles, 59.1 GB written; download 0 files, 0 B
+    total: 93,054 tiles, 17.4 GB written; download 0 files, 0 B
   europe-vectors [region]
     zoom     land tiles     sea tiles         tiles          size    cumulative         sizes
     z5               37            19            56        4.4 MB       0.00 GB    configured
@@ -303,11 +306,8 @@ Estimate (nothing has been downloaded):
     z9            4,662             0         4,662      326.3 MB       0.46 GB    configured
     z10          17,398             0        17,398      608.9 MB       1.07 GB    configured
     z11          66,781             0        66,781        2.3 GB       3.41 GB    configured
-    z12         260,558             0       260,558        5.2 GB       8.62 GB    configured
-    z13       1,028,226             0     1,028,226       20.6 GB      29.19 GB    configured
-    z14       4,083,365             0     4,083,365       49.0 GB      78.19 GB    configured
-    total: 5,465,203 tiles, 156.4 GB written; download 0 files, 0 B
-Totals: 7,200,653 tiles, output 278.8 GB, download 2.4 TB
+    total: 93,054 tiles, 6.8 GB written; download 0 files, 0 B
+Totals: 279,162 tiles, output 28.7 GB, download 2.4 TB
 Estimated cost: 0.00 USD (requester-pays transfer and requests; prices read 2026-10-21)
 ```
 
@@ -315,6 +315,24 @@ The cumulative column is the size of one copy (the static folder); `written` cou
 package together. The imagery's download is the Sentinel-2 source files it reads from, with range requests, so far
 less than their full size is transferred. Lower a dataset's `maxZoom` to trade detail for size: each level is about
 four times the one before it.
+
+### The WorldCover package by its deepest level
+
+The satellite package's size if built to each level from 10 to 13, on land (the sea stops at 8), from real WorldCover
+tiles measured on 2026-10-27: the tiles of six land areas (the Alps around Mont Blanc, the Beauce, Paris, the Po
+valley, the Spanish Meseta, a Swedish forest; about 30 tiles per area and level) built by the pipeline and averaged.
+Levels 5 to 9 add about 0.14 GB. One copy, in decimal gigabytes.
+
+| Deepest level | Land tiles at that level | Average tile | That level | Package (levels 5 to it) |
+| ------------- | ------------------------ | ------------ | ---------- | ------------------------ |
+| 10            | 17,398                   | 25.4 kB      | 0.44 GB    | 0.58 GB                  |
+| 11 (default)  | 66,781                   | 24.3 kB      | 1.62 GB    | 2.20 GB                  |
+| 12            | 260,558                  | 22.0 kB      | 5.72 GB    | 7.93 GB                  |
+| 13            | 1,028,226                | 18.6 kB      | 19.09 GB   | 27.0 GB                  |
+
+Tiles get smaller with depth (the composite's 10 m pixels are smoother at level 13), and they vary with the landscape:
+an Alpine tile at level 10 weighs 31.6 kB, a field in the Beauce 21.0 kB. `europe.json` uses these averages as its
+`bytesPerTile`.
 
 ## Hosting the package
 

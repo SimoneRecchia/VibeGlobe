@@ -89,8 +89,7 @@ class ImageryLayersController implements ImageryLayers {
   /** See {@link ImageryLayers.add}. */
   add(input: ImageryLayerInput, index?: number): void {
     const imagery = this.frame.imagery;
-    if (!imagery)
-      throw new GlobeError('invalid-option', 'Imagery layers can be added once the globe has started with workers');
+    if (!imagery) throw new GlobeError('invalid-option', 'Imagery layers need a started globe with workers');
     let problem = '';
     const [entry] = validStack([input], (message) => (problem = message));
     if (!entry) throw new GlobeError('invalid-option', problem || 'The imagery layer has no source');

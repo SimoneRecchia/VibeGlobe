@@ -2,9 +2,11 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * The vector styles of the Europe preset's map types, derived from one OpenStreetMap style in the OpenMapTiles schema
- * (OpenFreeMap's): the full style for the Map, its labels and borders, roads and buildings as overlays, and a hillshade
- * of the terrain for Relief. One composed style per selection, so the tiles shared by its parts load once.
+ * (OpenFreeMap's): a political map of its data for the Map (`political-style.ts`), its labels and borders, roads and
+ * buildings as overlays, and for Relief the political map over a light hypsometric tint and a hillshade of the terrain.
+ * One composed style per selection, so the tiles shared by its parts load once.
  */
+import { POLITICAL_COLORS, politicalParts } from './political-style.js';
 
 /** A MapLibre style, as far as the preset reads and writes it. */
 export interface StyleJson {
@@ -27,7 +29,7 @@ export interface StyleLayerJson {
 
 /** The parts of a composed style. */
 export interface StyleSelection {
-  /** The whole map style (Map), drawn over everything below it. */
+  /** The political map (Map, and Relief's base): neutral land, water, borders and names, drawn over everything below. */
   readonly map?: boolean;
   /** Place, water and peak names, and borders. */
   readonly labels?: boolean;
@@ -35,7 +37,7 @@ export interface StyleSelection {
   readonly roads?: boolean;
   /** Buildings, extruded to their heights. */
   readonly buildings?: boolean;
-  /** A hillshade of the terrain (Relief). */
+  /** A light hypsometric tint and a hillshade of the terrain (Relief). */
   readonly hillshade?: boolean;
 }
 
@@ -84,45 +86,96 @@ function overlayLayers(style: StyleJson, selection: StyleSelection): StyleLayerJ
   return out;
 }
 
+/** The relief: a light tint by elevation (lowlands green, uplands tan, high mountains pale) and a hillshade. */
+function reliefLayers(): StyleLayerJson[] {
+  return [
+    {
+      id: 'europe-relief-tint',
+      type: 'color-relief',
+      source: HILLSHADE_SOURCE,
+      paint: {
+        'color-relief-opacity': 0.55,
+        'color-relief-color': [
+          'interpolate',
+          ['linear'],
+          ['elevation'],
+          0,
+          '#d5e6c1',
+          300,
+          '#e4ecc5',
+          800,
+          '#ede3bf',
+          1500,
+          '#e0cba3',
+          2500,
+          '#d6c2a8',
+          3500,
+          '#ece6df',
+          4500,
+          '#ffffff',
+        ],
+      },
+    },
+    {
+      id: 'europe-hillshade',
+      type: 'hillshade',
+      source: HILLSHADE_SOURCE,
+      paint: { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#473b24' },
+    },
+  ];
+}
+
+/** The raster-dem source of the relief. */
+function reliefSource(hillshade: HillshadeSource): Readonly<Record<string, unknown>> {
+  return {
+    type: 'raster-dem',
+    tiles: hillshade.tiles,
+    encoding: 'terrarium',
+    tileSize: hillshade.tileSize,
+    maxzoom: hillshade.maxzoom,
+    attribution: hillshade.attribution,
+  };
+}
+
+/** The layers of a selection, bottom first: the political map's parts around the relief and the overlays. */
+function selectionLayers(style: StyleJson, selection: StyleSelection, relief: boolean): StyleLayerJson[] {
+  const political = selection.map === true ? politicalParts(style) : undefined;
+  if (selection.map === true && political === undefined) return [...(relief ? reliefLayers() : []), ...style.layers];
+  if (political === undefined) {
+    const background = {
+      id: 'europe-relief-background',
+      type: 'background',
+      paint: { 'background-color': POLITICAL_COLORS.land },
+    };
+    return [...(relief ? [background, ...reliefLayers()] : []), ...overlayLayers(style, selection)];
+  }
+  // The political map's own names and borders replace the style's labels overlay.
+  const overlays = overlayLayers(style, { ...selection, labels: false });
+  return [
+    ...political.background,
+    ...(relief ? reliefLayers() : []),
+    ...political.water,
+    ...overlays.filter((l) => l.type !== 'fill-extrusion'),
+    ...political.borders,
+    ...overlays.filter((l) => l.type === 'fill-extrusion'),
+    ...political.labels,
+  ];
+}
+
 /**
- * The style of a selection: the whole map, or its overlays over the imagery below (no background), with a hillshade
- * first when asked for; undefined when nothing is selected.
+ * The style of a selection: the political map, or the overlays over the imagery below (no background), with the
+ * relief under the map's water, roads, borders and names when asked for; undefined when nothing is selected.
  */
 export function composeStyle(
   style: StyleJson,
   selection: StyleSelection,
   hillshade?: HillshadeSource,
 ): StyleJson | undefined {
-  const layers: StyleLayerJson[] = [];
-  const sources: Record<string, Readonly<Record<string, unknown>>> = {};
-  if (selection.hillshade === true && hillshade !== undefined) {
-    sources[HILLSHADE_SOURCE] = {
-      type: 'raster-dem',
-      tiles: hillshade.tiles,
-      encoding: 'terrarium',
-      tileSize: hillshade.tileSize,
-      maxzoom: hillshade.maxzoom,
-      attribution: hillshade.attribution,
-    };
-    if (selection.map !== true)
-      layers.push({ id: 'europe-relief-background', type: 'background', paint: { 'background-color': '#f2efe9' } });
-    layers.push({
-      id: 'europe-hillshade',
-      type: 'hillshade',
-      source: HILLSHADE_SOURCE,
-      paint: { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#473b24' },
-    });
-  }
-  const own = selection.map === true ? [...style.layers] : overlayLayers(style, selection);
-  // The hillshade sits above the map's background and land cover, below its lines and labels.
-  if (selection.map === true && layers.length > 0) {
-    const firstLine = own.findIndex((l) => l.type === 'line' || l.type === 'symbol');
-    const at = firstLine < 0 ? own.length : firstLine;
-    own.splice(at, 0, ...layers.filter((l) => l.type === 'hillshade'));
-    layers.length = 0;
-  }
-  layers.push(...own);
+  const relief = selection.hillshade === true && hillshade !== undefined;
+  const layers = selectionLayers(style, selection, relief);
   if (layers.length === 0) return undefined;
+  const sources: Record<string, Readonly<Record<string, unknown>>> = {};
+  if (relief) sources[HILLSHADE_SOURCE] = reliefSource(hillshade);
   for (const layer of layers)
     if (layer.source !== undefined && layer.source !== HILLSHADE_SOURCE) {
       const source = style.sources[layer.source];

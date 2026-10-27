@@ -29,6 +29,13 @@ export interface OrthophotoRecord extends PresetSourceRecord {
   readonly limits?: string;
 }
 
+/**
+ * The level an orthophoto starts at: above it a service's tiles cover a country in a few pixels, and many answer them
+ * blank (a scale limit, white outside their data), which showed as white silhouettes from far away (KB-215). Below it
+ * the satellite composite shows.
+ */
+export const ORTHOPHOTO_MIN_LEVEL = 12;
+
 /** A record of the shape every orthophoto shares. */
 function ortho(
   record: Omit<OrthophotoRecord, 'kind' | 'tiers' | 'termsReadDate' | 'minLevel' | 'coverage' | 'url'>,
@@ -38,7 +45,7 @@ function ortho(
     kind: 'imagery',
     tiers: 'network',
     termsReadDate: TERMS_READ_DATE,
-    minLevel: 0,
+    minLevel: ORTHOPHOTO_MIN_LEVEL,
     coverage: 'europe-land',
     url: record.service.url,
   };
@@ -207,12 +214,16 @@ async function areaOf(record: OrthophotoRecord): Promise<GeoJsonArea> {
   return { type: 'MultiPolygon', coordinates };
 }
 
-/** The engine source of a record, clipped to its area. */
+/** White filler a service sends where it has no data counts as no data, so the layer below shows (KB-215). */
+const WHITE = [255, 255, 255] as const;
+
+/** The engine source of a record, clipped to its area, from its first level, white tiles counted as no data. */
 async function sourceOf(record: OrthophotoRecord, maxLevel: number): Promise<ImagerySource> {
   const area = await areaOf(record);
   const common = { id: record.id, maxLevel, attribution: record.attribution, area };
-  if (record.service.kind === 'xyz') return xyzImagery({ ...common, url: record.service.url });
-  return wmsImagery({
+  if (record.service.kind === 'xyz')
+    return xyzImagery({ ...common, url: record.service.url, minLevel: record.minLevel, blankTile: WHITE });
+  const source = await wmsImagery({
     ...common,
     url: record.service.url,
     layers: [record.service.layer],
@@ -221,6 +232,13 @@ async function sourceOf(record: OrthophotoRecord, maxLevel: number): Promise<Ima
     // Orthophotos carry no labels to keep whole across tile edges.
     gutterPx: 0,
   });
+  return {
+    ...source,
+    minLevel: record.minLevel,
+    blankTile: { rgb: WHITE },
+    request: (coord, out, pixelRatio) =>
+      coord.level < record.minLevel ? 'noData' : source.request(coord, out, pixelRatio),
+  };
 }
 
 /**

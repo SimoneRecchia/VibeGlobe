@@ -1,11 +1,16 @@
 import { fc, test } from '@fast-check/vitest';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { geodeticToEcef } from '../geodesy/ecef.js';
-import { ANCHOR_NORTH_UP, ANCHOR_TRACKBALL, NORTH_UP_LIMIT_RAD, solveAnchor } from './anchor.js';
+import { ANCHOR_NORTH_UP, ANCHOR_TRACKBALL, northUpLimitRad, solveAnchor } from './anchor.js';
 import { Camera } from './camera.js';
 import { projectToScreen } from './projection.js';
 
 const DEG = Math.PI / 180;
+
+// The engine writes the 'north-up' latitude limit before each drag and zoom (NavigationApi.northUpMaxLatitudeDeg).
+beforeEach(() => {
+  northUpLimitRad[0] = 85 * DEG;
+});
 
 function camera(lonDeg: number, latDeg: number, range: number, headingDeg = 0): Camera {
   const c = new Camera();
@@ -102,6 +107,37 @@ describe('navigation modes: free and north-up drags', () => {
     expect(c.pose.targetLatitudeRad / DEG).toBeGreaterThan(45);
   });
 
+  /** A north-up drag from a point poleward of the target away from it; the target latitudes, degrees. */
+  function dragPoleward(latitude: number): number[] {
+    const c = camera(30, latitude, 8e6);
+    const from: [number, number] = latitude > 0 ? [500, 150] : [500, 650];
+    const to: [number, number] = latitude > 0 ? [500, 750] : [500, 50];
+    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+    expect(c.pickEllipsoid(from[0], from[1], hit)).toBe(true);
+    const anchor = Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0);
+    const latitudes: number[] = [];
+    for (let i = 1; i <= 40; i++) {
+      const t = i / 40;
+      solveAnchor(c, anchor, Float64Array.of(from[0], from[1] + (to[1] - from[1]) * t), undefined, undefined, 2);
+      latitudes.push(c.pose.targetLatitudeRad / DEG);
+      expect(c.pose.headingRad).toBe(0);
+    }
+    return latitudes;
+  }
+
+  it('north-up stops the target at its latitude limit (85° by default, configurable), never spinning about the pole (KB-217)', () => {
+    expect(Math.max(...dragPoleward(70))).toBeCloseTo(85, 9);
+    northUpLimitRad[0] = 75 * DEG;
+    try {
+      expect(Math.min(...dragPoleward(-60))).toBeCloseTo(-75, 9);
+      // A target already beyond the limit (a jump there) goes no further toward the pole, and does not snap back.
+      const beyond = dragPoleward(80);
+      expect(beyond.every((value) => value <= 80 + 1e-9 && value > 79.99)).toBe(true);
+    } finally {
+      northUpLimitRad[0] = 85 * DEG;
+    }
+  });
+
   it('north-up: dragging over the pole stops the camera there, without a jump or a flip', () => {
     for (const latitude of [80, -80]) {
       const c = camera(30, latitude, 8e6);
@@ -123,7 +159,7 @@ describe('navigation modes: free and north-up drags', () => {
       // Monotonic toward the pole, ending at the limit: no flip back, no step larger than the drag's.
       const sign = Math.sign(latitude);
       expect(latitudes.every((value, i) => i === 0 || sign * (value - (latitudes[i - 1] ?? 0)) >= -1e-12)).toBe(true);
-      expect(Math.abs(latitudes.at(-1) ?? 0)).toBeCloseTo(NORTH_UP_LIMIT_RAD, 12);
+      expect(Math.abs(latitudes.at(-1) ?? 0)).toBeCloseTo(northUpLimitRad[0] ?? 0, 12);
     }
   });
 });

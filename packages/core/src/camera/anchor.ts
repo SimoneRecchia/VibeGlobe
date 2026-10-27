@@ -23,14 +23,16 @@ const RIGID_TOLERANCE_PX = 1e-5;
 export const ANCHOR_HOLD_HEADING = 0;
 /** A 'free' drag: on the globe the camera rotates rigidly about the Earth's center, turning the heading (trackball). */
 export const ANCHOR_TRACKBALL = 1;
-/** A 'north-up' drag or zoom: the heading never changes, and the target stops at {@link NORTH_UP_LIMIT_RAD}. */
+/** A 'north-up' drag or zoom: the heading never changes, and the target stops at {@link northUpLimitRad}. */
 export const ANCHOR_NORTH_UP = 2;
-/** How close to a pole a 'north-up' target goes, radians (89.9°): there the heading-held drag stops. */
-export const NORTH_UP_LIMIT_RAD = (89.9 * Math.PI) / 180;
-/** The target latitude Gauss–Newton may reach otherwise, radians: just short of a pole. */
+/**
+ * `[0]`: the highest latitude a 'north-up' target reaches, radians (`NavigationApi.northUpMaxLatitudeDeg`, 85° by
+ * default; each drag and zoom writes it): there the heading-held drag stops, short of the poles, where turning about the polar axis would spin the
+ * view. A target already beyond it stays where it is. `[1]`: the limit of the running solve, the pole's otherwise.
+ */
+export const northUpLimitRad = new Float64Array(2);
+/** The target latitude Gauss–Newton may reach otherwise (`northUpLimitRad[1]` of other solves), radians. */
 const POLE_LIMIT_RAD = Math.PI / 2 - 1e-9;
-/** True while a 'north-up' solve runs: Gauss–Newton then stops at {@link NORTH_UP_LIMIT_RAD}. */
-let northUpSolve = false;
 /** Set when Gauss–Newton stopped because its target passed its latitude limit. */
 let passedLimit = false;
 
@@ -99,6 +101,7 @@ export function solveAnchor(
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
+  northUpLimitRad[1] = POLE_LIMIT_RAD;
   // A 'free' drag on the globe rotates rigidly first (a trackball); on the flattening or flat map it holds the heading.
   if (mode === ANCHOR_TRACKBALL && !(solveMorph && (solveMorph.factors[0] ?? 0) > 0)) {
     if (rotateToPixel(camera)) return true;
@@ -107,8 +110,9 @@ export function solveAnchor(
   }
   // 'North-up' never rotates rigidly, which would turn the heading: past its limit the target stops there.
   const northUp = mode === ANCHOR_NORTH_UP;
-  northUpSolve = northUp;
   passedLimit = false;
+  // A target beyond the limit (a jump there) goes no further toward the pole, without a snap back to the limit.
+  if (northUp) northUpLimitRad[1] = Math.max(Math.abs(start[1] ?? 0), northUpLimitRad[0] ?? 0);
   return (
     gaussNewton(camera) ||
     (guess !== undefined && retryFrom(camera, guess)) ||
@@ -128,7 +132,7 @@ function restoreStart(camera: Camera): void {
  */
 function holdAtLimit(camera: Camera): boolean {
   // Past the limit, the target's latitude is nonzero.
-  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * NORTH_UP_LIMIT_RAD;
+  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * (northUpLimitRad[1] ?? 0);
   return residual(camera, r0);
 }
 
@@ -187,7 +191,7 @@ function gaussNewton(camera: Camera): boolean {
     // Wrapping is a call with a double argument: only when the step leaves [-π, π).
     pose.targetLongitudeRad = nextLon >= -Math.PI && nextLon < Math.PI ? nextLon : wrapLongitudeRad(nextLon);
     pose.targetLatitudeRad = lat - dLat;
-    const limit = northUpSolve ? NORTH_UP_LIMIT_RAD : POLE_LIMIT_RAD;
+    const limit = northUpLimitRad[1] ?? 0;
     if (pose.targetLatitudeRad > limit || pose.targetLatitudeRad < -limit) {
       passedLimit = true;
       return false;

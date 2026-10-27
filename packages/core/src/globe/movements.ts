@@ -176,7 +176,7 @@ export class Movements {
       }
       rate = options?.degreesPerSecond ?? 10;
       if (typeof rate !== 'number' || !Number.isFinite(rate))
-        throw new GlobeError('invalid-option', `degreesPerSecond must be a finite number, got ${String(rate)}`);
+        throw new GlobeError('invalid-option', `degreesPerSecond must be finite, got ${String(rate)}`);
       validSignal(options?.signal);
     } catch (error) {
       return rejected(error);
@@ -244,7 +244,7 @@ export class Movements {
       const valid = validateBounds(bounds);
       const padding = options?.paddingPx ?? 0;
       if (typeof padding !== 'number' || !(padding >= 0) || 2 * padding >= Math.min(camera.widthPx, camera.heightPx))
-        throw new GlobeError('invalid-option', `paddingPx must leave part of the viewport, got ${String(padding)}`);
+        throw new GlobeError('invalid-option', `paddingPx must leave part of the view, got ${String(padding)}`);
       if (options?.movement !== undefined && options.movement !== 'fly' && options.movement !== 'ease')
         throw new GlobeError('invalid-option', `movement must be 'fly' or 'ease', got ${String(options.movement)}`);
       const include = options?.include ?? [];
@@ -461,7 +461,7 @@ function validDuration(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     throw new GlobeError(
       'invalid-option',
-      `A movement's durationMs must be a finite number of 0 or more, got ${String(value)}`,
+      `A movement's durationMs must be finite and 0 or more, got ${String(value)}`,
     );
   return value;
 }

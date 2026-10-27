@@ -118,6 +118,12 @@ export interface ControlsOptions {
    * `setNavigationMode`.
    */
   readonly navigationMode?: NavigationMode;
+  /**
+   * 'north-up' only: the highest latitude of the point the camera looks at, degrees, from 1 to 89.9 (default 85).
+   * Drags and zooms stop there, short of the pole, where turning about the polar axis would spin the view. Changed at
+   * runtime with `setNorthUpMaxLatitude`.
+   */
+  readonly northUpMaxLatitudeDeg?: number;
 }
 
 /** Options with every default filled in. */
@@ -133,6 +139,7 @@ export interface ResolvedControlsOptions {
   readonly zoomAnimationMs: number;
   readonly reducedMotion: 'system' | 'reduce' | 'no-preference';
   readonly navigationMode: NavigationMode;
+  readonly northUpMaxLatitudeDeg: number;
 }
 
 /** The defaults: ADR 0009's starting values. */
@@ -178,6 +185,7 @@ export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
   zoomAnimationMs: 120,
   reducedMotion: 'system',
   navigationMode: 'free',
+  northUpMaxLatitudeDeg: 85,
 };
 
 function invalid(name: string, rule: string): GlobeError {
@@ -245,7 +253,13 @@ export function resolveControlsOptions(options: ControlsOptions = {}): ResolvedC
     zoomAnimationMs: scalar('zoomAnimationMs', options.zoomAnimationMs, d.zoomAnimationMs, 1, 10_000),
     reducedMotion,
     navigationMode: validNavigationMode(options.navigationMode ?? d.navigationMode),
+    northUpMaxLatitudeDeg: validNorthUpLatitude(options.northUpMaxLatitudeDeg ?? d.northUpMaxLatitudeDeg),
   };
+}
+
+/** A 'north-up' latitude limit, degrees from 1 to 89.9, or a GlobeError ('invalid-option') for anything else. */
+export function validNorthUpLatitude(deg: unknown): number {
+  return scalar('northUpMaxLatitudeDeg', deg as number, 85, 1, 89.9);
 }
 
 /** A navigation mode, or a GlobeError ('invalid-option') for anything else. */

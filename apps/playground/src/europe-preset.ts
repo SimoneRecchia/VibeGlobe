@@ -19,12 +19,22 @@ const preset = enabled
   : undefined;
 const startOverlays = (params.get('presetOverlays') ?? '').split(',').filter((id) => id !== '') as Overlay['id'][];
 
-/** The globe's options of the preset: its 3D terrain when asked for, and the workers its sources decode with. */
-export const europeLayers: Pick<GlobeOptions, 'terrain' | 'workers'> =
+const startBase = (params.get('presetBase') ?? 'satellite') as BaseMap['id'];
+
+/**
+ * The globe's options of the preset: the start base map's imagery (layers are added and removed at runtime on a globe
+ * started with imagery), its 3D terrain when asked for, and the workers its sources decode with.
+ */
+export const europeLayers: Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers'> =
   preset === undefined
     ? {}
     : {
         workers: createWorkers(),
+        // A start on Map or Relief starts the satellite layers hidden, so the globe can show them later.
+        imagery:
+          (preset.baseMaps.find((b) => b.id === startBase)?.imagery.length ?? 0)
+            ? (preset.baseMaps.find((b) => b.id === startBase)?.imagery ?? [])
+            : (preset.baseMaps[0]?.imagery ?? []).map((layer) => ({ ...layer, visible: false })),
         ...(startOverlays.includes('terrain') && preset.terrain ? { terrain: preset.terrain } : {}),
       };
 
@@ -46,7 +56,7 @@ export async function showEuropePreset(globe: Globe, container: HTMLElement): Pr
   const style = (await (await fetch(styleUrl)).json()) as StyleJson;
   let vectors: VectorTileLayer | undefined;
   const hooks = {
-    base: (params.get('presetBase') ?? 'satellite') as BaseMap['id'],
+    base: startBase,
     overlays: startOverlays,
     async select(base: BaseMap['id'], overlays: readonly Overlay['id'][]): Promise<void> {
       if (overlays.includes('terrain') !== hooks.overlays.includes('terrain')) {
@@ -59,6 +69,10 @@ export async function showEuropePreset(globe: Globe, container: HTMLElement): Pr
       }
       hooks.base = base;
       hooks.overlays = [...overlays];
+      // Map and Relief fill the polar caps with their own colors; Satellite and Hybrid's Blue Marble covers them.
+      globe.setPolarCapColors(
+        preset.baseMaps.find((b) => b.id === base)?.polarCapColors ?? { north: '#78a9cd', south: '#f2f3f7' },
+      );
       // The base map's imagery layers, by id: Satellite and Hybrid share theirs.
       const wanted = preset.baseMaps.find((b) => b.id === base)?.imagery ?? [];
       for (const layer of globe.imageryLayers.list())

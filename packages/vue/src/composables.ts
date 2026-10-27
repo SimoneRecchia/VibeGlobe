@@ -1,5 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { NavigationControls } from '@vibeglobe/controls';
 import type { CameraState, Globe } from '@vibeglobe/core';
 import {
   inject,
@@ -12,7 +13,7 @@ import {
   type Ref,
   type ShallowRef,
 } from 'vue';
-import { GLOBE_KEY } from './context.js';
+import { CONTROLS_KEY, GLOBE_KEY } from './context.js';
 
 /**
  * The engine of the enclosing globe component: undefined on the server, before the engine starts and after it
@@ -23,16 +24,19 @@ export function useGlobe(): Readonly<ShallowRef<Globe | undefined>> {
 }
 
 /**
- * Calls `subscribe` with each engine the ref takes, and the function it returns when the engine changes or the
+ * Calls `subscribe` with each value the ref takes (an engine, controls), and the function it returns when the value changes or the
  * calling scope ends.
  */
-function onEachGlobe(globe: Readonly<Ref<Globe | undefined>>, subscribe: (engine: Globe) => () => void): void {
+function onEachValue<T extends object>(
+  source: Readonly<Ref<T | undefined>>,
+  subscribe: (value: T) => () => void,
+): void {
   let stop: (() => void) | undefined;
   watch(
-    globe,
-    (engine) => {
+    source,
+    (value) => {
       stop?.();
-      stop = engine ? subscribe(engine) : undefined;
+      stop = value ? subscribe(value) : undefined;
     },
     { immediate: true },
   );
@@ -83,7 +87,7 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     camera.reliefFactor = from.reliefFactor;
     camera.phase = from.phase;
   };
-  onEachGlobe(globe, (engine) => {
+  onEachValue(globe, (engine) => {
     copy(engine.camera);
     return engine.on('camera-change', copy);
   });
@@ -97,7 +101,7 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
  */
 export function useLoading(globe: Readonly<Ref<Globe | undefined>> = useGlobe()): Readonly<Ref<boolean>> {
   const loading = shallowRef(true);
-  onEachGlobe(globe, (engine) => {
+  onEachValue(globe, (engine) => {
     loading.value = true;
     const stops = [
       engine.on('camera-change', () => (loading.value = true)),
@@ -119,9 +123,42 @@ export type ViewMode = CameraState['viewMode'];
  */
 export function useViewMode(globe: Readonly<Ref<Globe | undefined>> = useGlobe()): Readonly<Ref<ViewMode>> {
   const mode = shallowRef<ViewMode>('auto');
-  onEachGlobe(globe, (engine) => {
+  onEachValue(globe, (engine) => {
     mode.value = engine.viewMode;
     return engine.on('view-mode-change', ({ mode: next }) => (mode.value = next));
   });
   return readonly(mode);
+}
+
+/**
+ * The navigation controls of the enclosing globe component (its `controls` prop): undefined on the server, before the
+ * engine starts, after it unmounts and when the prop is false. Call it in a component rendered inside the globe
+ * component's default slot; outside, read the component's exposed `controls`.
+ */
+export function useControls(): Readonly<ShallowRef<NavigationControls | undefined>> {
+  return inject(CONTROLS_KEY, shallowRef(undefined));
+}
+
+/**
+ * Whether the view may tilt now (F625): false while the controls' tilt policy keeps it flat, beyond its lock
+ * distance, so an application's 3D button can be disabled; true without controls or without a policy. Follows
+ * `NavigationControls.onTiltAvailabilityChange`.
+ * @param controls - the controls; by default those of the enclosing globe component ({@link useControls})
+ */
+export function useTiltAvailable(
+  controls: Readonly<Ref<NavigationControls | undefined>> = useControls(),
+): Readonly<Ref<boolean>> {
+  const available = shallowRef(true);
+  watch(
+    controls,
+    (current) => {
+      if (current === undefined) available.value = true;
+    },
+    { immediate: true },
+  );
+  onEachValue(controls, (current) => {
+    available.value = current.tiltAvailable;
+    return current.onTiltAvailabilityChange((next) => (available.value = next));
+  });
+  return readonly(available);
 }

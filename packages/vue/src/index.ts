@@ -8,7 +8,7 @@
  * @module @vibeglobe/vue
  */
 export { VibeGlobe } from './vibe-globe.js';
-export { useCamera, useGlobe, useLoading, useViewMode } from './composables.js';
+export { useCamera, useControls, useGlobe, useLoading, useTiltAvailable, useViewMode } from './composables.js';
 export type { ViewMode } from './composables.js';
 export type { GlobeClickEvent, GlobeExtraOptions } from './globe-config.js';
 export { VibeControl, VibeDataLayer, VibeImageryLayer, VibeMarker } from './children.js';

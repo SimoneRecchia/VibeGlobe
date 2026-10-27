@@ -7587,6 +7587,28 @@
         "In the browser, 2,000 turbines cost at most 4 draw calls near the farm and 1 from 14 km (placeholders, only those in view), nothing looking elsewhere, and a copy picks as its feature"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F628",
+      "milestone": 14,
+      "section": "Architecture guidance",
+      "description": "The Vue component's `controls` prop takes `boolean | ControlsOptions` (`@vibeglobe/controls`: the tilt policy of F625, the navigation mode and its latitude limit), the running `NavigationControls` are exposed with the engine (`expose({ globe, extras, controls })`) and injected for the slot's components (`useControls`), and `useTiltAvailable` follows `onTiltAvailabilityChange` so an application can disable its 3D button.",
+      "steps": [
+        "Unit-test that the options reach `createControls`, the exposed controls are the engine's, false starts none and true the defaults, and `useTiltAvailable` follows the controls' availability and is true without controls",
+        "In the browser, on the Vue example with a tilt policy, the application's 3D button is disabled beyond the policy's lock and enabled near the ground; without the option it stays enabled"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F629",
+      "milestone": 14,
+      "section": "Architecture guidance",
+      "description": "The Vue component's `gltf` prop passes a glTF loader factory (`gltfLoader` of `@vibeglobe/renderer/gltf`) to `createRenderer`, so models and model sets (F627) draw in a Vue application.",
+      "steps": [
+        "Unit-test that the prop reaches `createRenderer` and that without it the renderer gets no loader",
+        "In the browser, on the Vue example, a model set added through the component's data layers loads and draws, with no warning about models"
+      ],
+      "status": "passing"
     }
   ]
 }

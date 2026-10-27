@@ -1,8 +1,8 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { NavigationControls } from '@vibeglobe/controls';
+import type { ControlsOptions, NavigationControls } from '@vibeglobe/controls';
 import type { GeoPosition, Globe, GlobeOptions, ImagerySource, ScreenPoint, ViewInit } from '@vibeglobe/core';
-import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
+import { createRenderer, type BackendChoice, type RendererOptions } from '@vibeglobe/renderer';
 import { createWorkers } from '@vibeglobe/worker';
 
 /** Engine options the component passes through unchanged (everything it does not build itself). */
@@ -15,7 +15,10 @@ export type GlobeExtraOptions = Omit<
 export interface GlobeConfig {
   readonly baseImageryUrl: string;
   readonly backend: BackendChoice;
-  readonly controls: boolean;
+  /** Navigation: off (false), the defaults (true) or these options (F625's tilt policy, the navigation mode…). */
+  readonly controls: boolean | ControlsOptions;
+  /** The glTF loader for models and model sets (F627), passed to the renderer. */
+  readonly gltf?: RendererOptions['gltf'] | undefined;
   readonly view: ViewInit;
   readonly imagery?: readonly ImagerySource[] | undefined;
   readonly workers?: GlobeOptions['workers'];
@@ -36,7 +39,7 @@ export function globeOptions(
   return {
     ...config.options,
     container,
-    renderer: createRenderer({ backend: config.backend }),
+    renderer: createRenderer({ backend: config.backend, ...(config.gltf ? { gltf: config.gltf } : {}) }),
     ...(controls ? { controls } : {}),
     baseImageryUrl: config.baseImageryUrl,
     view: config.view,
@@ -104,4 +107,10 @@ export function changedView(camera: Globe['camera'], view: ViewInit, previous?: 
     if (wanted !== undefined && Math.abs(wanted - current) > 1e-9) changed[field] = wanted;
   }
   return Object.keys(changed).length > 0 ? changed : undefined;
+}
+
+/** The controls a configuration asks for: none for false, the defaults for true, else these options. */
+export function controlsOptions(controls: boolean | ControlsOptions): ControlsOptions | undefined | false {
+  if (controls === false) return false;
+  return controls === true ? undefined : controls;
 }

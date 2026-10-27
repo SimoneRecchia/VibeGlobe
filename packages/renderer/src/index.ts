@@ -7,6 +7,7 @@
  */
 export { createRenderer } from './create-renderer.js';
 export type { RendererOptions } from './create-renderer.js';
+export type { GltfLoader, GltfLoaderFactory } from './layer-models.js';
 export type { BackendChoice, DepthChoice } from './three-backend.js';
 export type { ThreeExtensionContext } from './extensions.js';
 export { runGpuProbes } from './run-gpu-probes.js';

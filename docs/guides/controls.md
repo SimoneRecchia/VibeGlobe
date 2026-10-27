@@ -84,7 +84,8 @@ over the last halving of the distance before the lock (10 to 20 km by default) t
 0°, and beyond the lock the view returns to Auto. `setTiltPolicy(false)` (or `null`) turns the policy off; invalid
 values throw a `GlobeError` (`invalid-option`). The UI's 2D / 3D / Auto toggle takes the controls as its `tilt` option
 (`new ViewModeControl({ tilt: controls })`, or `addAllControls(ui, { tilt: controls })`). In the playground,
-`?tiltPolicy=1` turns the policy on; the showcase page has it on.
+`?tiltPolicy=1` turns the policy on; the showcase page has it on. In Vue, `VibeGlobe`'s `controls` prop takes the same
+options (`:controls="{ tiltPolicy: true }"`), and `useTiltAvailable()` returns the availability as a ref.
 
 ## Key map
 

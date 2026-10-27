@@ -1,5 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { NavigationControls } from '@vibeglobe/controls';
 import type { Globe } from '@vibeglobe/core';
 import type { GlobeLayers } from '@vibeglobe/layers';
 import type { Ui } from '@vibeglobe/ui';
@@ -18,3 +19,6 @@ export interface GlobeExtras {
 
 /** The extras of the nearest enclosing globe component. */
 export const EXTRAS_KEY: InjectionKey<GlobeExtras> = Symbol('vibeglobe-extras');
+
+/** The navigation controls of the nearest enclosing globe component, undefined without controls or before start. */
+export const CONTROLS_KEY: InjectionKey<ShallowRef<NavigationControls | undefined>> = Symbol('vibeglobe-controls');

@@ -136,7 +136,12 @@ hydration, so no `<ClientOnly>` is needed. Load it only on the page that shows t
 </template>
 ```
 
-Mouse, trackpad, touch and keyboard navigation are on by default (`:controls="false"` turns them off). Quantized-mesh
+Mouse, trackpad, touch and keyboard navigation are on by default (`:controls="false"` turns them off). The `controls`
+prop also takes the options of `createControls`, for example `:controls="{ tiltPolicy: true, northUpMaxLatitudeDeg: 85
+}"` (F628); the running controls are exposed as `controls` next to `globe`, and `useTiltAvailable()` in a child of the
+component (or `useTiltAvailable(globeRef.value.controls)` outside it) tells when the tilt policy keeps the view flat, to
+disable a 3D button. Models and model sets need the renderer's glTF loader: `:gltf="gltfLoader"` with `gltfLoader` from
+`@vibeglobe/renderer/gltf` (F629). Quantized-mesh
 terrain reads its `layer.json` first: create it with `await quantizedMeshTerrain({ id: 'terrain', url:
 'https://tiles.example.com/qm/layer.json' })` before the component renders, for example in a parent's `onMounted`.
 

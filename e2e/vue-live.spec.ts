@@ -292,3 +292,42 @@ test('the composables follow a flight and the view mode, within the frame budget
     .toBe(true);
   expect(result.camera[0]).toBeCloseTo(-74, 6);
 });
+
+test('controls options reach the engine: with a tilt policy the 3D button is disabled while the view is locked flat (F628)', async ({
+  page,
+}) => {
+  const available = (): Promise<string | null> =>
+    page.locator('.tilt-3d').getAttribute('data-available', { timeout: 10_000 });
+  await openExample(page, 'live.html?backend=webgl2&tiltPolicy=1');
+  // Zoom 5 puts the eye far beyond the policy's 20,000 m lock: no tilt, the button disabled.
+  await expect.poll(available).toBe('false');
+  await expect(page.locator('.tilt-3d')).toBeDisabled();
+  // Close to the ground the view may tilt again.
+  await set(page, { view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 14 } });
+  await expect.poll(available).toBe('true');
+  await expect(page.locator('.tilt-3d')).toBeEnabled();
+  // Without the option the default controls have no policy: the button stays enabled at any distance.
+  await openExample(page, 'live.html?backend=webgl2');
+  await expect.poll(available).toBe('true');
+});
+
+test('the gltf prop gives the renderer its glTF loader: a model set loads and draws (F629)', async ({ page }) => {
+  const warnings: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'warning' || message.type() === 'error') warnings.push(message.text());
+  });
+  await openExample(page, 'live.html?backend=webgl2');
+  await set(page, { view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 15 } });
+  await idle(page);
+  const before = await page.evaluate(() => window.adapterExample?.globes()[0]?.rendererStats().drawCalls ?? 0);
+  const added = await page.evaluate(() =>
+    (
+      window as unknown as { adapterExampleLive: { addModels(lon: number, lat: number): Promise<string> } }
+    ).adapterExampleLive.addModels(12.5, 41.9),
+  );
+  expect(added).toBe('ok');
+  await idle(page);
+  const after = await page.evaluate(() => window.adapterExample?.globes()[0]?.rendererStats().drawCalls ?? 0);
+  expect(after).toBeGreaterThan(before);
+  expect(warnings.filter((text) => text.includes('model'))).toEqual([]);
+});

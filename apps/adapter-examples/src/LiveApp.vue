@@ -3,7 +3,9 @@
 // UI controls (F476), driven by the end-to-end specs through `window.adapterExample.live`.
 import type { Globe } from '@vibeglobe/core';
 import type { Feature } from '@vibeglobe/layers';
+import { ModelSetLayer } from '@vibeglobe/layers/models';
 import { createOffline } from '@vibeglobe/offline';
+import { gltfLoader } from '@vibeglobe/renderer/gltf';
 import { xyzImagery } from '@vibeglobe/sources';
 import { ScaleBarControl, ZoomControl } from '@vibeglobe/ui';
 import {
@@ -20,7 +22,8 @@ import {
 } from '@vibeglobe/vue';
 import { nextTick, reactive, ref, shallowRef } from 'vue';
 import CameraReadout from './CameraReadout.vue';
-import { backend, BASE_IMAGERY_URL, fixtureTiles, type ExampleEvent } from './hooks.js';
+import { backend, BASE_IMAGERY_URL, fixtureTiles, params, type ExampleEvent } from './hooks.js';
+import TiltButton from './TiltButton.vue';
 
 const offline = createOffline({ store: 'memory' });
 const imagery = [
@@ -45,6 +48,8 @@ const zoomControl = shallowRef(new ZoomControl());
 const scaleControl = new ScaleBarControl();
 const first = shallowRef<{ globe: Globe | undefined; extras: GlobeExtras }>();
 const events: ExampleEvent[] = [];
+// `?tiltPolicy=1` starts the controls with F625's tilt policy (F628); without it, the default controls.
+const controls = params.get('tiltPolicy') === '1' ? { tiltPolicy: true } : true;
 
 const live = {
   offline,
@@ -74,6 +79,18 @@ const live = {
   replaceZoomControl() {
     zoomControl.value = new ZoomControl({ position: 'top-left' });
   },
+  /** Adds a model set of three turbines near a position, through the `gltf` prop's loader (F629). */
+  async addModels(longitudeDeg: number, latitudeDeg: number): Promise<string> {
+    const layers = await first.value?.extras.layers();
+    if (!layers) return 'no layers';
+    const models = [-0.003, 0, 0.003].map((offset, i) => ({
+      id: `turbine-${String(i)}`,
+      position: { longitudeDeg: longitudeDeg + offset, latitudeDeg },
+    }));
+    const set = layers.stack.add(new ModelSetLayer({ id: 'turbines', url: '/models/turbine.gltf', models }));
+    await set.ready;
+    return 'ok';
+  },
 };
 (window as unknown as { adapterExampleLive: typeof live }).adapterExampleLive = live;
 window.adapterExample = {
@@ -102,9 +119,12 @@ window.adapterExample = {
       :offline="offline"
       :network-mode="networkMode"
       :quality-preset="qualityPreset"
+      :controls="controls"
+      :gltf="gltfLoader"
       @ready="events.push({ source: 'first', type: 'ready', payload: $event })"
     >
       <CameraReadout />
+      <TiltButton />
       <VibeDataLayer
         v-if="children.points"
         id="points"

@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { createControls } from '@vibeglobe/controls';
+import { createControls, type ControlsOptions, type NavigationControls } from '@vibeglobe/controls';
 import {
   createGlobe,
   type CameraState,
@@ -12,7 +12,7 @@ import {
   type ViewInit,
   type WorkerEndpointFactory,
 } from '@vibeglobe/core';
-import type { BackendChoice } from '@vibeglobe/renderer';
+import type { BackendChoice, RendererOptions } from '@vibeglobe/renderer';
 import {
   defineComponent,
   h,
@@ -26,10 +26,11 @@ import {
   type ShallowRef,
   type VNode,
 } from 'vue';
-import { EXTRAS_KEY, GLOBE_KEY } from './context.js';
+import { CONTROLS_KEY, EXTRAS_KEY, GLOBE_KEY } from './context.js';
 import { globeExtras } from './extras.js';
 import {
   changedView,
+  controlsOptions,
   globeOptions,
   watchClicks,
   type GlobeClickEvent,
@@ -83,6 +84,7 @@ function startGlobe(
   element: HTMLElement,
   config: GlobeConfig,
   globe: ShallowRef<Globe | undefined>,
+  controlsRef: ShallowRef<NavigationControls | undefined>,
   ready: ShallowRef<boolean>,
   emit: GlobeEmit,
   view: () => ViewInit,
@@ -93,7 +95,9 @@ function startGlobe(
     quality: () => QualityPresetChoice | undefined;
   },
 ): (() => void)[] {
-  const controls = config.controls ? createControls() : undefined;
+  const options = controlsOptions(config.controls);
+  const controls = options === false ? undefined : createControls(options);
+  controlsRef.value = controls;
   const engine = createGlobe(globeOptions(element, config, controls));
   // Rotation, tilt and the engine clock of the controls need the globe (the M6 input track's hook 5).
   controls?.connect(engine);
@@ -135,6 +139,18 @@ function startGlobe(
   ];
 }
 
+/** The camera fields the component's props set. */
+function viewOf(
+  props: Readonly<Record<'longitudeDeg' | 'latitudeDeg' | 'zoom' | 'headingDeg' | 'tiltDeg', number | undefined>>,
+): ViewInit {
+  const fields: Record<string, number> = {};
+  for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
+    const value = props[key];
+    if (value !== undefined) fields[key] = value;
+  }
+  return fields;
+}
+
 /**
  * The globe component. On the server and before mount it renders only its `placeholder` slot; the engine starts in
  * `onMounted`, so importing and server-rendering it never touches the browser or the GPU. Camera props update the
@@ -153,8 +169,17 @@ export const VibeGlobe = defineComponent({
     imagery: { type: Array as PropType<readonly ImagerySource[]>, default: undefined },
     /** 'auto' (WebGPU, falling back to WebGL2), 'webgpu' or 'webgl2'. Read when the engine starts. */
     backend: { type: String as PropType<BackendChoice>, default: 'auto' },
-    /** Mouse, touch and keyboard navigation. Read when the engine starts. */
-    controls: { type: Boolean, default: true },
+    /**
+     * Mouse, touch and keyboard navigation: false for none, true for the defaults, or the options of `createControls`
+     * (`@vibeglobe/controls`: the tilt policy of F625, the navigation mode and its latitude limit…). Read when the
+     * engine starts; the running controls are exposed as `controls` and change through their setters.
+     */
+    controls: { type: [Boolean, Object] as PropType<boolean | ControlsOptions>, default: true },
+    /**
+     * The glTF loader for models and model sets (F627), as `createRenderer` takes it: `gltfLoader` from
+     * `@vibeglobe/renderer/gltf`. Without it the renderer draws no models. Read when the engine starts.
+     */
+    gltf: { type: Function as PropType<NonNullable<RendererOptions['gltf']>>, default: undefined },
     /** The workers that decode tiles; by default the engine's bundled workers when imagery is set. */
     workers: { type: Object as PropType<WorkerEndpointFactory>, default: undefined },
     /** Further engine options (resolution scale, memory budgets, logging). Read when the engine starts. */
@@ -193,32 +218,37 @@ export const VibeGlobe = defineComponent({
   setup(props, { emit, slots, expose }) {
     const container = shallowRef<HTMLElement>();
     const globe = shallowRef<Globe>();
+    const controls = shallowRef<NavigationControls>();
     const ready = shallowRef(false);
     provide(GLOBE_KEY, globe);
+    provide(CONTROLS_KEY, controls);
     const extras = globeExtras(
       () => globe.value,
       () => container.value,
     );
     provide(EXTRAS_KEY, extras);
-    expose({ globe, extras });
-    const view = (): ViewInit => {
-      const fields: Record<string, number> = {};
-      for (const key of ['longitudeDeg', 'latitudeDeg', 'zoom', 'headingDeg', 'tiltDeg'] as const) {
-        const value = props[key];
-        if (value !== undefined) fields[key] = value;
-      }
-      return fields;
-    };
+    expose({ globe, extras, controls });
+    const view = (): ViewInit => viewOf(props);
     let stops: (() => void)[] = [];
 
     onMounted(() => {
       const element = container.value;
       if (!element) return;
-      stops = startGlobe(element, { ...props, view: view() }, globe, ready, emit, view, () => props.viewMode, {
-        layers: () => props.layers,
-        network: () => [props.offline, props.networkMode] as const,
-        quality: () => props.qualityPreset,
-      });
+      stops = startGlobe(
+        element,
+        { ...props, view: view() },
+        globe,
+        controls,
+        ready,
+        emit,
+        view,
+        () => props.viewMode,
+        {
+          layers: () => props.layers,
+          network: () => [props.offline, props.networkMode] as const,
+          quality: () => props.qualityPreset,
+        },
+      );
     });
 
     onBeforeUnmount(() => {
@@ -227,6 +257,7 @@ export const VibeGlobe = defineComponent({
       extras.release();
       globe.value?.destroy();
       globe.value = undefined;
+      controls.value = undefined;
     });
 
     return () =>

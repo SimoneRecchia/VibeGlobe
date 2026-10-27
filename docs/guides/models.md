@@ -5,7 +5,8 @@ title: 3D models
 # 3D models
 
 glTF 2.0 models stand on the globe in two ways, both from `@vibeglobe/layers/models` and both needing the renderer's
-glTF loader (`createRenderer({ gltf })` with `gltfLoader` from `@vibeglobe/renderer/gltf`):
+glTF loader (`createRenderer({ gltf })` with `gltfLoader` from `@vibeglobe/renderer/gltf`; in Vue, the `gltf` prop of
+`VibeGlobe`):
 
 - `ModelLayer`: a few models, each its own file, pose and draw (F361, F379–F382), draggable;
 - `ModelSetLayer`: many copies of one model, such as the turbines of a wind farm or the panels of a solar park (F627),

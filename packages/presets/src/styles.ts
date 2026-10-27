@@ -45,6 +45,34 @@ export interface StyleSelection {
 const LABEL_LAYERS = new Set(['place', 'water_name', 'mountain_peak', 'boundary', 'aerodrome_label']);
 const ROAD_LAYERS = new Set(['transportation', 'transportation_name']);
 
+/**
+ * The road classes (OpenMapTiles `class`) shown from each level (F626): motorways from 6, trunk and primary roads from
+ * 9, secondary and tertiary from 11, minor roads from 13 and everything else (service roads, tracks, paths, railways)
+ * from 14; road names from 13.
+ */
+const ROAD_CLASS_BY_LEVEL: readonly (readonly [number, readonly string[]])[] = [
+  [6, ['motorway']],
+  [9, ['motorway', 'trunk', 'primary']],
+  [11, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary']],
+  [13, ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor']],
+];
+const FIRST_ROAD_LEVEL = 6;
+const ALL_ROADS_LEVEL = 14;
+const ROAD_NAMES_LEVEL = 13;
+
+/** A road layer of the style that shows each class only from its level, and road names only from 13 (F626). */
+function progressiveRoads(layer: StyleLayerJson): StyleLayerJson {
+  const minzoom = typeof layer['minzoom'] === 'number' ? layer['minzoom'] : 0;
+  if (layer['source-layer'] === 'transportation_name')
+    return { ...layer, minzoom: Math.max(minzoom, ROAD_NAMES_LEVEL) };
+  const classes = (list: readonly string[]): unknown[] => ['match', ['get', 'class'], [...list], true, false];
+  const byLevel: unknown[] = ['step', ['zoom'], classes(ROAD_CLASS_BY_LEVEL[0]?.[1] ?? [])];
+  for (const [level, list] of ROAD_CLASS_BY_LEVEL.slice(1)) byLevel.push(level, classes(list));
+  byLevel.push(ALL_ROADS_LEVEL, true);
+  const filter = layer['filter'] === undefined ? byLevel : ['all', layer['filter'], byLevel];
+  return { ...layer, minzoom: Math.max(minzoom, FIRST_ROAD_LEVEL), filter };
+}
+
 /** The terrain tiles of the hillshade. */
 export interface HillshadeSource {
   readonly tiles: readonly string[];
@@ -63,7 +91,7 @@ function overlayLayers(style: StyleJson, selection: StyleSelection): StyleLayerJ
       (selection.labels === true && LABEL_LAYERS.has(sourceLayer)) ||
       (selection.roads === true && ROAD_LAYERS.has(sourceLayer)) ||
       (selection.buildings === true && sourceLayer === 'building' && layer.type === 'fill-extrusion');
-    if (wanted) out.push(layer);
+    if (wanted) out.push(ROAD_LAYERS.has(sourceLayer) ? progressiveRoads(layer) : layer);
   }
   if (selection.buildings === true && !out.some((l) => l.type === 'fill-extrusion')) {
     // A style without extruded buildings: extrude OpenMapTiles' footprints to their heights.

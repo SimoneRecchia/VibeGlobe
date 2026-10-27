@@ -1,7 +1,15 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { enuFrame, morphPointInto, type FrameView, type ModelPose, type ModelRenderer } from '@vibeglobe/core';
+import {
+  enuFrame,
+  morphPointInto,
+  type FrameView,
+  type ModelPose,
+  type ModelRenderer,
+  type ModelSetOptions,
+} from '@vibeglobe/core';
 import { projectLayerPoint } from '@vibeglobe/core/layers';
+import { ModelSet } from './model-sets.js';
 import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
 import {
   Box3,
@@ -87,6 +95,9 @@ export class LayerModels implements ModelRenderer {
   private readonly models = new Map<number, Model>();
   /** The models again, walked by index each frame, which allocates nothing (F064). */
   private readonly modelList: Model[] = [];
+  /** Sets of copies of one model, instanced (F627), by id; ids are shared with the models. */
+  private readonly sets = new Map<number, ModelSet>();
+  private readonly setList: ModelSet[] = [];
   /** The glTF loader, created on the first model; none unless the application gave `createRenderer` one. */
   private loader: GltfLoader | undefined;
   /** Set from `createRenderer({ gltf })`. */
@@ -97,13 +108,7 @@ export class LayerModels implements ModelRenderer {
 
   /** See {@link ModelRenderer}. */
   async load(source: { readonly url?: string; readonly data?: ArrayBuffer }): Promise<number> {
-    if (!this.loaderFactory)
-      throw new Error(
-        "Models need the glTF loader: createRenderer({ gltf: gltfLoader }) from '@vibeglobe/renderer/gltf'",
-      );
-    const loader = (this.loader ??= await this.loaderFactory());
-    const gltf = source.data ? await loader.parseAsync(source.data, '') : await loader.loadAsync(source.url ?? '');
-    const root = gltf.scene;
+    const root = await this.loadScene(source);
     root.matrixAutoUpdate = false;
     root.frustumCulled = false;
     root.traverse((object) => (object.frustumCulled = false));
@@ -125,10 +130,45 @@ export class LayerModels implements ModelRenderer {
     this.modelList.push(model);
     root.traverse((object) => {
       const mesh = object as Partial<Mesh>;
-      if (mesh.isMesh && mesh.material) mesh.material = unlit(mesh.material as Material, highlight);
+      if (mesh.isMesh && mesh.material)
+        mesh.material = unlit(mesh.material as Material, highlight as unknown as Node<'vec4'>);
     });
     this.scene.add(root);
     return id;
+  }
+
+  /** Loads a glTF file's scene with the application's loader. */
+  private async loadScene(source: { readonly url?: string; readonly data?: ArrayBuffer }): Promise<Object3D> {
+    if (!this.loaderFactory)
+      throw new Error(
+        "Models need the glTF loader: createRenderer({ gltf: gltfLoader }) from '@vibeglobe/renderer/gltf'",
+      );
+    const loader = (this.loader ??= await this.loaderFactory());
+    const gltf = source.data ? await loader.parseAsync(source.data, '') : await loader.loadAsync(source.url ?? '');
+    return gltf.scene;
+  }
+
+  /** See {@link ModelRenderer}: one model for many copies, each of its meshes one instanced draw (F627). */
+  async loadSet(
+    source: { readonly url?: string; readonly data?: ArrayBuffer },
+    options: ModelSetOptions,
+  ): Promise<number> {
+    const set = new ModelSet(await this.loadScene(source), options, unlit);
+    const id = this.nextId++;
+    this.sets.set(id, set);
+    this.setList.push(set);
+    this.scene.add(set.group);
+    return id;
+  }
+
+  /** See {@link ModelRenderer}. */
+  setInstances(id: number, poses: readonly ModelPose[], pickIds: readonly number[]): void {
+    this.sets.get(id)?.setInstances(poses, pickIds);
+  }
+
+  /** See {@link ModelRenderer}. */
+  setInstanceHighlight(id: number, index: number, rgba: readonly [number, number, number, number] | undefined): void {
+    this.sets.get(id)?.setHighlight(index, rgba);
   }
 
   /** See {@link ModelRenderer}. */
@@ -152,6 +192,8 @@ export class LayerModels implements ModelRenderer {
   setVisible(id: number, visible: boolean): void {
     const model = this.models.get(id);
     if (model) model.visible = visible;
+    const set = this.sets.get(id);
+    if (set) set.visible = visible;
   }
 
   /**
@@ -180,11 +222,24 @@ export class LayerModels implements ModelRenderer {
         bestRatio = ratio;
       }
     }
+    // Then the copies of the sets: the nearest pick of each set, the first set's that hits.
+    for (const set of this.setList) {
+      if (best !== 0 || !set.visible) continue;
+      const index = set.indexAt(view, xPx, yPx);
+      best = index < 0 ? 0 : (set.pickIds[index] ?? 0);
+    }
     return best;
   }
 
   /** See {@link ModelRenderer}. */
   remove(id: number): void {
+    const set = this.sets.get(id);
+    if (set) {
+      this.scene.remove(set.group);
+      set.dispose();
+      this.sets.delete(id);
+      this.setList.splice(this.setList.indexOf(set), 1);
+    }
     const model = this.models.get(id);
     if (!model) return;
     this.scene.remove(model.root);
@@ -201,6 +256,7 @@ export class LayerModels implements ModelRenderer {
       model.root.visible = model.visible && model.pose !== undefined;
       if (model.pose) place(model, model.pose, view);
     }
+    for (let i = 0; i < this.setList.length; i++) this.setList[i]?.place(view);
   }
 
   /** Meshes and geometry bytes held by the models, for the resource counters (F385). */
@@ -213,12 +269,17 @@ export class LayerModels implements ModelRenderer {
         held.meshes += 1;
         held.bytes += geometryBytes(geometry);
       });
+    for (const set of this.setList) {
+      const parts = set.held();
+      held.meshes += parts.meshes;
+      for (const geometry of parts.geometries) held.bytes += geometryBytes(geometry);
+    }
     return held;
   }
 
   /** Removes every model. */
   dispose(): void {
-    for (const id of [...this.models.keys()]) this.remove(id);
+    for (const id of [...this.models.keys(), ...this.sets.keys()]) this.remove(id);
   }
 }
 
@@ -230,14 +291,14 @@ const LIGHT = vec3(0.3, 0.8, 0.5).normalize();
  * opacity, shaded by a fixed light from above the eye so volumes read (ADR 0037), and blended toward the model's
  * highlight color (selection, F381). Lit, image-based PBR is M11's.
  */
-function unlit(material: Material, highlight: { value: Vector4 }): MeshBasicNodeMaterial {
+function unlit(material: Material, highlight: Node<'vec4'>): MeshBasicNodeMaterial {
   const standard = material as Partial<MeshStandardMaterial>;
   const unlitMaterial = new MeshBasicNodeMaterial();
   const tint = standard.color ?? { r: 1, g: 1, b: 1 };
   const factor = vec4(tint.r, tint.g, tint.b, standard.opacity ?? 1);
   const base: Node<'vec4'> = standard.map ? factor.mul(texture(standard.map, uv())) : factor;
   const shade = max(normalView.dot(LIGHT), 0).mul(0.6).add(0.4);
-  const blend = highlight as unknown as Node<'vec4'>;
+  const blend = highlight;
   unlitMaterial.colorNode = vec4(mix(base.xyz.mul(shade), blend.xyz, blend.w), base.w);
   unlitMaterial.transparent = material.transparent;
   unlitMaterial.side = material.side;

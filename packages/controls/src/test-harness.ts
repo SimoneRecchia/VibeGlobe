@@ -101,6 +101,8 @@ export class FlatCamera {
       },
       requestUpdate: () => void this.requests++,
       interruptMovement: () => void this.movementInterruptions++,
+      // The engine's tilt policy array (F625): the tests write `[3]` as the engine would.
+      tiltPolicy: new Float64Array(4),
       orbit: (deltaHeadingDeg, deltaTiltDeg) => {
         this.jumps++;
         this.headingDeg = (((this.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;
@@ -312,6 +314,10 @@ function fakeGlobe(camera: FlatCamera) {
     },
     get camera(): CameraState {
       return { headingDeg: camera.headingDeg, tiltDeg: camera.tiltDeg } as CameraState;
+    },
+    viewMode: 'auto' as 'auto' | '2d' | 'manual',
+    setViewMode(mode: '2d' | '3d' | 'auto'): void {
+      this.viewMode = mode === '3d' ? 'manual' : mode;
     },
     jumpTo(view: ViewInit): CameraMovement {
       camera.jumps++;

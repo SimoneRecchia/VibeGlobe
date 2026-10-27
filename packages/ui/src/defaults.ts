@@ -13,7 +13,7 @@ import { HomeControl } from './controls/home.js';
 import { LayerSwitcherControl, type LayerSwitcherOptions } from './controls/layer-switcher.js';
 import { ScaleBarControl } from './controls/scale-bar.js';
 import { TiltControl } from './controls/tilt.js';
-import { ViewModeControl } from './controls/view-mode.js';
+import { ViewModeControl, type ViewModeControlOptions } from './controls/view-mode.js';
 import type { Ui } from './ui.js';
 
 /** Options of {@link addDefaultControls}. */
@@ -24,6 +24,8 @@ export interface DefaultControlsOptions {
   readonly geocoder?: Geocoder;
   /** The layer switcher's overlays, names and data layers. */
   readonly layers?: LayerSwitcherOptions;
+  /** Whether the camera may tilt now (F625): the 2D / 3D / Auto toggle disables 3D while it says no. */
+  readonly tilt?: ViewModeControlOptions['tilt'];
 }
 
 /**
@@ -48,7 +50,7 @@ export function addDefaultControls(ui: Ui, options: DefaultControlsOptions = {})
  */
 export function addAllControls(ui: Ui, options: DefaultControlsOptions = {}): void {
   ui.add(new SearchControl(options.geocoder === undefined ? {} : { geocoder: options.geocoder }));
-  ui.add(new ViewModeControl({ position: 'top-left' }));
+  ui.add(new ViewModeControl({ position: 'top-left', ...(options.tilt ? { tilt: options.tilt } : {}) }));
   ui.add(new ZoomControl());
   ui.add(new CompassControl());
   ui.add(new TiltControl());

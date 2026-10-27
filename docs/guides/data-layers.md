@@ -63,7 +63,8 @@ Kinds: `point` (`circle-*` properties), `marker` (`icon-*`, with images register
 `globe.layerTarget()?.addImage(name, canvasOrImage)`), `label` (`text-*`), `polyline` (`line-*`), `polygon` (`fill-*`,
 and `fill-extrusion-height` and `-base` for volumes) and `circle` (a center, `radiusMeters` and optionally
 `minorRadiusMeters` and `rotationDeg`, drawn as the geodesic shape on the ellipsoid). glTF models are features of a
-`ModelLayer` from `@vibeglobe/layers/models` (they need the renderer's glTF loader, `@vibeglobe/renderer/gltf`).
+`ModelLayer` from `@vibeglobe/layers/models` (they need the renderer's glTF loader, `@vibeglobe/renderer/gltf`);
+many copies of one model are a `ModelSetLayer`, drawn instanced near the camera ([models guide](models.md)).
 
 ## Placement
 

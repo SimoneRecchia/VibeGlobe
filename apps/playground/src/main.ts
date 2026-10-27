@@ -411,8 +411,12 @@ if (params.get('experiment') === 'gpu-probes') {
   });
 } else if (app && canvas) {
   const scenario = params.get('scenario');
-  // `?navigationMode=free|north-up` picks how a drag moves the camera at start (the selectors change it at runtime).
-  const navigation = createControls(params.get('navigationMode') === 'north-up' ? { navigationMode: 'north-up' } : {});
+  // `?navigationMode=free|north-up` picks how a drag moves the camera at start (the selectors change it at runtime);
+  // `?tiltPolicy=1` turns the tilt policy on with its defaults (F625), as the showcase page does.
+  const navigation = createControls({
+    ...(params.get('navigationMode') === 'north-up' ? { navigationMode: 'north-up' } : {}),
+    ...(params.get('tiltPolicy') === '1' || (SHOWCASE && params.get('tiltPolicy') !== '0') ? { tiltPolicy: true } : {}),
+  });
   const globe = startGlobe(app, canvas, viewFromUrl(), backend, navigation);
   // Navigation start is the page's time origin: this is the time to the first complete frame (F546).
   // A failed start records no time (the error reaches the status line and the error event, not a rejection here).
@@ -433,6 +437,9 @@ if (params.get('experiment') === 'gpu-probes') {
       m.showPageUi(globe, app, params, { showcase: SHOWCASE, ui: PAGE_UI, navigation }),
     );
   // `?layers=demo`: data layers drawn by the renderer (M10), loaded only when asked for.
+  // `?scenario=wind-farm`: 2,000 instanced turbines of one model set (F627), loaded only when asked for.
+  if (scenario === 'wind-farm')
+    void globe.ready.then(async () => (await import('./wind-farm.js')).showWindFarm(globe, params));
   if (params.get('layers') === 'demo')
     void globe.ready.then(async () => (await import('./layers-demo.js')).showLayersDemo(globe));
   // `?scenario=3dtiles-*`: 3D Tiles through the render extension (M13, track E), loaded only when asked for.

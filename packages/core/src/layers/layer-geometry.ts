@@ -133,6 +133,9 @@ function requestingModels(
     ...(models.setPickId ? { setPickId: models.setPickId.bind(models) } : {}),
     ...(models.setHighlight ? { setHighlight: after(models.setHighlight.bind(models)) } : {}),
     ...(models.setVisible ? { setVisible: after(models.setVisible.bind(models)) } : {}),
+    ...(models.loadSet ? { loadSet: after(models.loadSet.bind(models)) } : {}),
+    ...(models.setInstances ? { setInstances: after(models.setInstances.bind(models)) } : {}),
+    ...(models.setInstanceHighlight ? { setInstanceHighlight: after(models.setInstanceHighlight.bind(models)) } : {}),
   };
 }
 

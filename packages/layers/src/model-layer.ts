@@ -205,3 +205,6 @@ function poseOf(feature: ModelFeature, position: GeoPosition): ModelPose {
     ...(feature.scale === undefined ? {} : { scale: feature.scale }),
   };
 }
+
+export { ModelSetLayer } from './model-set-layer.js';
+export type { ModelSetItem, ModelSetLayerOptions } from './model-set-layer.js';

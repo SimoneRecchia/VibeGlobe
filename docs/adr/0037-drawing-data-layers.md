@@ -54,3 +54,7 @@ Option 2.
 - glTF models load with three.js's glTF loader, which shows images embedded in a model's buffers through `blob:` image
   URLs: a page with a strict Content Security Policy that loads such models adds `blob:` to `img-src`. They are images,
   not code, so F100's rule (no generated code) holds; models with external or `data:` images need nothing more.
+
+## Update 2026-10-27: model sets
+
+Many copies of one model (wind turbines, solar panels; F627) are a `ModelSetLayer` (`@vibeglobe/layers/models`): the renderer loads the file once (`ModelRenderer.loadSet`), and each mesh of the model becomes one three.js `InstancedMesh` for all the copies, with each mesh's transform within the model kept and a per-copy highlight as an instanced attribute. Each frame the renderer places every copy relative to the eye as a single model is placed, and culls it on the CPU against the frustum's sides and, on the globe, the horizon; the copies in view nearer than `visibleBelowMeters` (3,000 m by default) fill the model's instanced meshes, the farther ones an instanced octahedron of constant size on screen, so a set costs one draw per mesh and one for the placeholders whatever its size, and nothing out of view. Picking tests the bounding sphere of each copy drawn, as for single models. Instancing, not merging the copies into one mesh, so copies move, hide and highlight without a rebuild.

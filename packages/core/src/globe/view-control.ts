@@ -91,6 +91,9 @@ export class ViewControl {
       },
       // How a drag moves the camera: set by the controls, read by each drag and zoom below.
       navigationMode: 'free',
+      get tiltPolicy() {
+        return host.view.tiltPolicy;
+      },
       get timeMs() {
         return host.timeMs();
       },

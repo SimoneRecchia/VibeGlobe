@@ -15,4 +15,11 @@ export interface NavigationModeSettings {
    * controls validate it): drags and zooms stop there, short of the pole, where the view would spin about it.
    */
   northUpMaxLatitudeDeg?: number;
+  /**
+   * The tilt policy (F625), which the controls write: `[0]` the distance from the eye to the point looked at beyond
+   * which the view is flat and cannot tilt, meters (0, the default: no policy), `[1]` the distance within which the
+   * automatic tilt rises, reaching `[2]` (radians) at a quarter of it. The engine writes `[3]` each frame: 1 while the
+   * camera may tilt, 0 beyond the lock.
+   */
+  readonly tiltPolicy?: Float64Array;
 }

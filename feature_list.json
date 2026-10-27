@@ -3828,7 +3828,7 @@
         "Stop the camera and assert full detail is reached and transitions cross-fade without popping",
         "Assert the coarsening never leaves black pixels"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F289",
@@ -3889,7 +3889,7 @@
         "Run zoom and flight scenarios and assert coarse levels come from the package and fine levels from the network",
         "Assert frame times stay within budget and zero black pixels appear"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F294",
@@ -3902,7 +3902,7 @@
         "Run a long flight and assert intermediate views come from the package with zero black pixels and frame times within budget",
         "Assert detail beyond the package arrives from the network after the camera settles"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F295",
@@ -3915,7 +3915,7 @@
         "Assert the first complete frame arrives within 1 s on the LAN setup",
         "Assert health checks target only the LAN endpoints and the engine never waits on unreachable internet hosts"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F296",
@@ -3990,7 +3990,7 @@
         "Assert the finest level requested during the flight is lower on the slow link and that both runs keep frame times within budget with zero black pixels",
         "Assert the arrival view refines to full detail on both links"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F302",
@@ -4159,7 +4159,7 @@
         "Assert no request is retried endlessly and every failed request backs off",
         "Assert the suite runs in CI"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F316",
@@ -4954,7 +4954,7 @@
         "Verify each chunk becomes visible within one frame of being added",
         "Verify frame time stays within the target throughout and no full layer rebuild occurs (instrumentation counters)"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F373",
@@ -4991,7 +4991,7 @@
         "Verify the main thread has no long task above 50 ms during loading",
         "Pan and zoom for 60 seconds and verify the engine stays responsive, RAM and GPU memory stay within budget, and no crash occurs"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F376",
@@ -5202,7 +5202,7 @@
         "Verify by frame differencing that atmosphere brightness and color change continuously with no jumps",
         "Verify gradients show no visible 8-bit banding (dithering or equivalent), measured on screenshots"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F393",
@@ -5265,7 +5265,7 @@
         "Pan slowly while recording frames and verify no edge shimmer by temporal glitch detection",
         "Verify the anti-aliasing cost stays within the per-frame GPU budget"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F398",
@@ -6698,7 +6698,7 @@
         "Sample memory, GPU resources and frame times throughout",
         "Assert no crash or console error, no upward memory trend beyond tolerance, and p95 frame time stable within the target"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F510",
@@ -6758,7 +6758,7 @@
         "Assert the canvas resolution, text and controls update within one frame and screenshots match the new density's baseline",
         "Assert no blank frame occurs"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F515",
@@ -6782,7 +6782,7 @@
         "Assert the view renders correctly, connectivity is re-evaluated and pending requests are retried",
         "Simulate the same sequence with page lifecycle freeze and resume events in Playwright and assert the same"
       ],
-      "status": "failing"
+      "status": "pending"
     },
     {
       "id": "F517",

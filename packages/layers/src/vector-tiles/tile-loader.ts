@@ -139,6 +139,8 @@ export class VectorTileLoader {
       entry.priority = w.priority;
       entry.usedAtFrame = this.frame;
       if (entry.state === 'failed' && now >= entry.retryAtMs) entry.state = 'queued';
+      // Not due yet (the frame may come a moment early by this clock): a frame is asked for when it is (TG-04).
+      else if (entry.state === 'failed') this.armRetry(entry.retryAtMs - now);
     }
     for (const key of keep) {
       const entry = this.entries.get(key);
@@ -283,10 +285,20 @@ export class VectorTileLoader {
     entry.state = 'failed';
     entry.retryAtMs = (this.options.now?.() ?? Date.now()) + RETRY_MS;
     clearTimeout(this.retryTimer);
-    this.retryTimer = setTimeout(() => {
-      this.retryTimer = undefined;
-      if (!this.disposed) this.options.onReady();
-    }, RETRY_MS);
+    this.retryTimer = undefined;
+    this.armRetry(RETRY_MS);
+  }
+
+  /** Asks for a frame in `delayMs`, unless one is already asked for. */
+  private armRetry(delayMs: number): void {
+    if (this.retryTimer !== undefined || this.disposed) return;
+    this.retryTimer = setTimeout(
+      () => {
+        this.retryTimer = undefined;
+        if (!this.disposed) this.options.onReady();
+      },
+      Math.max(1, delayMs),
+    );
   }
 
   private layout(entry: Entry): void {

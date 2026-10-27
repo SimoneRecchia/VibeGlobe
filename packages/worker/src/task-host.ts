@@ -27,8 +27,11 @@ interface TaskHost {
   receive(data: unknown): void;
 }
 
-/** Creates the message handling of a worker that runs the tasks of `table` and replies through `post`. */
-export function createTaskHost(table: TaskTable, post: PostToMain): TaskHost {
+/**
+ * Creates the message handling of a worker that runs the tasks of `table` and replies through `post`. `onBroken` is
+ * called after a task's module failed to load, which this worker can never load again: the worker should be replaced.
+ */
+export function createTaskHost(table: TaskTable, post: PostToMain, onBroken?: () => void): TaskHost {
   const running = new Set<number>();
   const cancelled = new Set<number>();
 
@@ -41,6 +44,7 @@ export function createTaskHost(table: TaskTable, post: PostToMain): TaskHost {
       post({ kind: 'reply', id, ok: true, output: result.output }, [...result.transfer]);
     } catch (error) {
       post({ kind: 'reply', id, ok: false, error: serializeTaskError(error) }, []);
+      if ((error as { code?: unknown }).code === 'module-unavailable') onBroken?.();
     } finally {
       running.delete(id);
       cancelled.delete(id);

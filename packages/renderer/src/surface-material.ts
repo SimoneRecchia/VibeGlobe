@@ -10,6 +10,7 @@ import {
   MeshBasicNodeMaterial,
   Vector4,
   type Material,
+  type Mesh,
   type Node,
   type Object3D,
   type Texture,
@@ -77,7 +78,7 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
  * Forgets every texture a surface mesh's draw state names (TG-01): after a device loss they belong to the lost
  * renderer, whose texture system listens to them, so a mesh not drawn again would keep that renderer alive.
  */
-export function clearSurfaceDraw(draw: SurfaceDraw): void {
+function clearSurfaceDraw(draw: SurfaceDraw): void {
   draw.texture = undefined;
   draw.fromTexture = undefined;
   draw.heights = undefined;
@@ -87,6 +88,12 @@ export function clearSurfaceDraw(draw: SurfaceDraw): void {
   draw.overlay1 = undefined;
   draw.overlayFrom0 = undefined;
   draw.overlayFrom1 = undefined;
+}
+
+/** Frees a surface mesh's geometry and forgets its textures when its renderer is lost (TG-01). */
+export function releaseForRecovery(entry: { readonly mesh: Mesh; readonly draw: SurfaceDraw }): void {
+  entry.mesh.geometry.dispose();
+  clearSurfaceDraw(entry.draw);
 }
 
 /** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */

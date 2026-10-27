@@ -39,7 +39,12 @@ export type TaskErrorCode =
   | 'cancelled'
   | 'unknown-task'
   /** The input decodes, but holds no data (a tile of the source's blank color, F618). */
-  | 'no-data';
+  | 'no-data'
+  /**
+   * The module of a lazily loaded task failed to load: the worker cannot load it again (browsers keep a failed
+   * dynamic import), so it asks to be replaced (TG-04).
+   */
+  | 'module-unavailable';
 
 /** A typed task failure; its `code` crosses the thread boundary and becomes the pool error's `taskCode`. */
 export class TaskError extends Error {

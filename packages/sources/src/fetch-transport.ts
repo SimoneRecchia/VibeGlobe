@@ -97,13 +97,7 @@ export function fetchTransport(
         const auth = pending instanceof Promise ? await pending : pending;
         if (controller.signal.aborted) throw new DOMException('aborted', 'AbortError');
         const merged = headers || auth ? { ...headers, ...auth } : undefined;
-        const response = await fetchImpl(url, {
-          signal: controller.signal,
-          mode: 'cors',
-          credentials: extras.credentials ?? 'omit',
-          ...(request.reload === true ? { cache: 'reload' as const } : {}),
-          ...(merged ? { headers: merged } : {}),
-        });
+        const response = await fetchImpl(url, fetchInit(controller.signal, request, extras, merged));
         clearTimeout(firstByte);
         if ((response.status === 401 || response.status === 403) && auth && !renewed && (await credentials.renew())) {
           await attempt(true);
@@ -123,6 +117,22 @@ export function fetchTransport(
         if (!settled) controller.abort();
       };
     },
+  };
+}
+
+/** The `fetch` options of a tile request: CORS, the source's credentials mode, a reload past the cache (TG-04). */
+function fetchInit(
+  signal: AbortSignal,
+  request: TileRequest,
+  extras: FetchTransportExtras,
+  headers: Record<string, string> | undefined,
+): RequestInit {
+  return {
+    signal,
+    mode: 'cors',
+    credentials: extras.credentials ?? 'omit',
+    ...(request.reload === true ? { cache: 'reload' as const } : {}),
+    ...(headers ? { headers } : {}),
   };
 }
 

@@ -130,12 +130,11 @@ export class ToneMatcher {
   readonly #sources = new Map<number, number>();
   /** Per key: summed means and count of this frame's draws. */
   readonly #sums = new Float64Array(KEYS * 4);
-  readonly #gains = new Float32Array(KEYS * 3).fill(1);
+  /** The gains applied, by key: a chain's (F249), then those matched to the imagery below (F633, weakened, F638). */
+  readonly #gains = new Float32Array((KEYS + BELOW_KEYS) * 3).fill(1);
   /** Per key of a layer matched to the imagery below: its own and the reference's coverage-weighted sums. */
   readonly #below = new Float64Array(BELOW_KEYS * 7);
   readonly #belowGains = new Float32Array(BELOW_KEYS * 3).fill(1);
-  /** The gains applied: those measured, weakened by their layer's strength at this frame's zoom (F638). */
-  readonly #belowApplied = new Float32Array(BELOW_KEYS * 3).fill(1);
   /** The world base image's color grid, once measured. */
   #base: Float32Array | undefined;
 
@@ -290,7 +289,6 @@ export class ToneMatcher {
     gainKey = -1,
   ): void {
     const sums = this.#below;
-    const gain = this.gainArray(gainKey);
     const g = this.gainAt(gainKey);
     const o = ownAt * 4;
     const r = referenceAt * 4;
@@ -315,7 +313,7 @@ export class ToneMatcher {
         for (let c = 0; c < 3; c++) {
           sums[key * 7 + c] = (sums[key * 7 + c] ?? 0) + alpha * (own[at + c] ?? 0);
           sums[key * 7 + 3 + c] =
-            (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (gain?.[g + c] ?? 1);
+            (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (g < 0 ? 1 : (this.#gains[g + c] ?? 1));
         }
         sums[key * 7 + 6] = (sums[key * 7 + 6] ?? 0) + alpha;
       }
@@ -330,30 +328,25 @@ export class ToneMatcher {
   private belowGains(strengths?: Float32Array): void {
     const sums = this.#below;
     for (let key = 0; key < BELOW_KEYS; key++) {
-      const strength = strengths?.[Math.floor(key / 8)] ?? 1;
+      const strength = strengths?.[key >> 3] ?? 1;
       for (let c = 0; c < 3; c++) {
         if ((sums[key * 7 + 6] ?? 0) > 0) {
           const own = sums[key * 7 + c] ?? 0;
           const wanted = sums[key * 7 + 3 + c] ?? 0;
           this.#belowGains[key * 3 + c] = own > 1e-3 ? Math.min(MAX_GAIN, Math.max(1, wanted / own)) : 1;
         }
-        this.#belowApplied[key * 3 + c] = (this.#belowGains[key * 3 + c] ?? 1) ** strength;
+        this.#gains[(KEYS + key) * 3 + c] = (this.#belowGains[key * 3 + c] ?? 1) ** strength;
       }
     }
   }
 
   /**
-   * The array holding a key's sRGB gains, or undefined where none applies; they start at {@link ToneMatcher.gainAt}.
-   * No view of them is made: the frame loop allocates nothing (F064).
+   * Where a key's gains start in the gains, negative where none applies: no view of them is made, so the frame loop allocates
+   * nothing (F064).
    */
-  private gainArray(key: number): Float32Array | undefined {
-    if (key >= TONE_BELOW && key - TONE_BELOW < BELOW_KEYS) return this.#belowApplied;
-    return key >= 0 && key < KEYS ? this.#gains : undefined;
-  }
-
-  /** Where a key's gains start in {@link ToneMatcher.gainArray}'s array. */
   private gainAt(key: number): number {
-    return (key >= TONE_BELOW ? key - TONE_BELOW : key) * 3;
+    const below = key - TONE_BELOW;
+    return (below < 0 ? key < KEYS : below < BELOW_KEYS) ? (below < 0 ? key : KEYS + below) * 3 : -1;
   }
 
   /**
@@ -373,8 +366,7 @@ export class ToneMatcher {
   }
 
   private gainInto(key: number, out: Float32Array | number[], at: number): void {
-    const gain = this.gainArray(key);
     const g = this.gainAt(key);
-    for (let c = 0; c < 3; c++) out[at + c] = gain ? (gain[g + c] ?? 1) ** SRGB_GAMMA : 1;
+    for (let c = 0; c < 3; c++) out[at + c] = g < 0 ? 1 : (this.#gains[g + c] ?? 1) ** SRGB_GAMMA;
   }
 }

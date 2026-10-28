@@ -70,10 +70,14 @@ export class TileTable {
   /** {@link TileTable.findInside}'s key, in an array so passing it boxes nothing (ADR 0018). */
   private readonly key = new Float64Array(1);
 
-  /** `rootTilesX` of the source's tiling scheme; tiles at or above `pinnedLevel` are pinned. */
+  /**
+   * `rootTilesX` of the source's tiling scheme; tiles at or above `pinnedLevel` are pinned, those `isPinned` accepts when
+   * it is given (a source that starts deeper, F634).
+   */
   constructor(
     private readonly rootTilesX: number,
     private readonly pinnedLevel: number,
+    private readonly isPinned?: (level: number, x: number, y: number) => boolean,
   ) {}
 
   /** The record of a tile, if it exists. */
@@ -111,7 +115,7 @@ export class TileTable {
       retries: 0,
       consumer: NO_SLOT,
       task: -1,
-      pinned: level <= this.pinnedLevel,
+      pinned: level <= this.pinnedLevel && (this.isPinned?.(level, x, y) ?? true),
       availabilityUnknown: false,
       rounds: 0,
       roundSuccesses: 0,

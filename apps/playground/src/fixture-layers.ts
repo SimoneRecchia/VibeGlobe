@@ -76,14 +76,29 @@ export function overlayLayers(
       maxLevel: 18,
       // `?overlayCoverage=italy` limits the overlays to a box around Italy (F254).
       ...(params.get('overlayCoverage') === 'italy' ? { coverage: [italy] } : {}),
-      // `?overlayArea=triangle` limits them to a triangle over Italy as GeoJSON, clipped per pixel (F618, KB-209).
-      ...(params.get('overlayArea') === 'triangle' ? { area: TRIANGLE } : {}),
+      // `?overlayArea=triangle` limits them to a triangle over Italy as GeoJSON, clipped per pixel (F618, KB-209);
+      // `triangle-key` keys their white out of it instead, and `?overlayFeather=` fades the border (KB-231).
+      ...overlayArea(params),
       // `?overlayBlank=rrggbb`: tiles of that color only count as no data (F618).
       ...(params.get('overlayBlank') ? { blankTile: `#${params.get('overlayBlank') ?? ''}` } : {}),
       ...credits(params, `overlay-${pattern}`, pattern),
     });
     return { sources: [source], opacity: Number(opacity), blend: blend as ImageryBlend };
   });
+}
+
+/** The overlays' area options (F618, KB-231). */
+function overlayArea(params: URLSearchParams): Pick<XyzImageryOptions, 'area'> {
+  const featherPx = Number(params.get('overlayFeather') ?? 0);
+  const polygons = [TRIANGLE.coordinates.map((ring) => ring.map(([lon, lat]) => [lon, lat] as const))];
+  switch (params.get('overlayArea')) {
+    case 'triangle':
+      return { area: featherPx > 0 ? { polygons, tiles: 'clip', featherPx } : TRIANGLE };
+    case 'triangle-key':
+      return { area: { polygons, keyOutside: { rgb: [255, 255, 255] }, featherPx } };
+    default:
+      return {};
+  }
 }
 
 /**

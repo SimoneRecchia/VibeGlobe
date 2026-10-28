@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { CreditProfile } from '../imagery/credits.js';
+import { shownOpacity } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
 import type { ImageryRuntime } from './imagery-runtime.js';
 import { extensionCredits } from './runtime-credits.js';
@@ -34,7 +35,7 @@ export function refuseDisplayOnly(
   if (terrain?.profile?.displayOnly === true) throw refusal(api, terrain);
   if (reads === 'terrain') return;
   for (const layer of runtime.stack) {
-    if (!layer.entry.visible || layer.entry.opacity <= 0) continue;
+    if (!layer.entry.visible || shownOpacity(layer.entry) <= 0) continue;
     for (const { source } of layer.chain) if (source.profile?.displayOnly === true) throw refusal(api, source);
   }
 }

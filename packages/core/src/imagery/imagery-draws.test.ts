@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Camera } from '../camera/camera.js';
 import { MERCATOR_ROOT, quadtreeTileBounds, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
-import { DrawList, drawOnBaseImage } from './draw-list.js';
+import { DrawList, drawOnBaseImage, TONE_BELOW } from './draw-list.js';
 import { drawImagery, type ImageryLayer, type StackLayer } from './imagery-draws.js';
 import type { StackEntry } from './imagery-stack.js';
 import { ARRIVING, type ImageryLoader } from './imagery-loader.hot.js';
@@ -130,6 +130,56 @@ describe('drawImagery', () => {
     expect([list.overlays[1]?.textures[0], list.overlays[1]?.blends[0], list.overlays[1]?.opacities[0]]).toEqual([
       13, 0, 0.5,
     ]);
+  });
+
+  it("marks the draws of layers that match the imagery below, base and overlay, and records the imagery under each draw's own (F633)", () => {
+    const base = fakeLayer({ 9: 10 });
+    const overlay = fakeLayer({ 9: 12 });
+    const surface = tile(9, 300, 170);
+    const list = drawStack(
+      [
+        stacked([base.layer], { id: 'base', harmonize: 'below' }),
+        stacked([overlay.layer], { id: 'overlay', transparent: true, harmonize: 'below' }),
+      ],
+      surface,
+    );
+    expect(list.toneSources[0]).toBe(TONE_BELOW);
+    expect(list.overlays[0]?.toneSources[0]).toBe(TONE_BELOW + 8);
+    // Under the lowest layer's tile, the base image with its UV transform.
+    expect(list.textures[0]).toBe(10);
+    expect(list.below.textures[0]).toBe(-1);
+    expect(list.below.uvTransforms[2]).toBeCloseTo((surface.westRad + Math.PI) / (2 * Math.PI), 6);
+    // Under an opaque layer over another, the lower layer's tile and tone source.
+    const covering = fakeLayer({ 9: 14 });
+    const stacked2 = drawStack(
+      [stacked([base.layer], { id: 'base' }), stacked([covering.layer], { id: 'top', harmonize: 'below' })],
+      surface,
+    );
+    expect([stacked2.textures[0], stacked2.below.textures[0], stacked2.toneSources[0]]).toEqual([
+      14,
+      10,
+      TONE_BELOW + 8,
+    ]);
+    // A layer that matches its chain only, or nothing, marks its overlays as before.
+    const single = drawStack(
+      [stacked([base.layer]), stacked([overlay.layer], { id: 'overlay', transparent: true })],
+      surface,
+    );
+    expect(single.overlays[0]?.toneSources[0]).toBe(-1);
+  });
+
+  it('draws a Web Mercator source with rows linear in latitude through a latitude v, from its ancestor too (KB-232)', () => {
+    const { layer } = fakeLayer({ 4: 42 });
+    const rows = { ...layer, source: { ...layer.source, latitudeRows: true } as ImagerySource };
+    const surface = tile(9, 300, 170);
+    const list = draw(rows, surface);
+    expect([list.textures[0], list.geographic[0]]).toEqual([42, 1]);
+    // The level 4 tile's latitudes, and the surface tile's place between them as a fraction of latitude.
+    const lat = (y: number): number => Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 16)));
+    const north = lat(Math.floor(170 / 32));
+    const south = lat(Math.floor(170 / 32) + 1);
+    expect(list.uvTransforms[1]).toBeCloseTo((surface.northRad - surface.southRad) / (north - south), 6);
+    expect(list.uvTransforms[3]).toBeCloseTo((north - surface.northRad) / (north - south), 6);
   });
 
   it('requests nothing for a hidden layer and leaves its overlay slot empty (F245)', () => {

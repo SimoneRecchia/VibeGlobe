@@ -5,6 +5,7 @@
     "packages/*/src/index.ts",
     "packages/core/src/decoders.ts",
     "packages/core/src/geodesy.ts",
+    "packages/core/src/coverage.ts",
     "packages/core/src/layers.ts",
     "packages/core/src/diagnostics.ts",
     "packages/ui/src/minimap.ts",

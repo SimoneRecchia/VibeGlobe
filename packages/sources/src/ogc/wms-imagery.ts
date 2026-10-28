@@ -238,7 +238,7 @@ export async function wmsImagery(options: WmsImageryOptions): Promise<DescribedI
   const bbox = bboxWriter(crs, version, gutterPx / sizePx);
   const coverage = layerCoverage(options, capabilities);
   const tiling = tilingOfCrs(crs) === 'mercator' ? WEB_MERCATOR_TILING : GEOGRAPHIC_TILING;
-  const area = sourceArea(options.area, tiling);
+  const area = sourceArea(options.area, tiling, sizePx);
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const source: DescribedImagerySource = {
     id: options.id,

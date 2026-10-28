@@ -65,9 +65,9 @@ export const OPENFREEMAP: PresetSourceRecord = {
 };
 
 /**
- * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326: the satellite layer's lowest levels,
- * everywhere the package has no tile, and the polar caps. Its native levels end at 7 (about 600 m a pixel); the engine
- * magnifies it beyond.
+ * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326, one image per Web Mercator tile
+ * (KB-232): the satellite layer below the package, past the far levels: the sea, and the land outside Europe. Level 8
+ * (about 430 m a pixel at 45° N) is the first finer than its data; the engine magnifies it beyond.
  */
 export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
   id: 'nasa-gibs-blue-marble',
@@ -84,7 +84,7 @@ export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
     },
   ],
   minLevel: 0,
-  maxLevel: 7,
+  maxLevel: 8,
   coverage: 'world',
   url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
 };
@@ -112,6 +112,13 @@ export const ESA_WORLDCOVER: PresetSourceRecord = {
   maxLevel: 11,
   coverage: 'europe',
 };
+
+/**
+ * The color the package gives WorldCover's water, sea and lakes alike: the pipeline's `noDataReflectance` (135, 245,
+ * 372 out of 3000, `europe.json`) through its stretch `255 × (r / 3000) ^ (1 / 2)`. The preset keys it out over the
+ * sea so the Blue Marble shows there (KB-231).
+ */
+export const WORLDCOVER_WATER_RGB: readonly [number, number, number] = [54, 73, 90];
 
 /** Mapterhorn's Terrarium tiles (Copernicus GLO-30 in Europe up to level 12, national models beyond). */
 export const MAPTERHORN: PresetSourceRecord = {

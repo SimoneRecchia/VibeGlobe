@@ -304,8 +304,8 @@ export class ThreeBackend implements RendererBackend {
     if (!this.imagery) return;
     const texture = createBaseTexture(this.imagery, this.anisotropy ?? this.capabilities.maxAnisotropy);
     this.imageryTexture?.dispose();
-    // The polar caps' fills are sampled like the base image (KB-211).
-    this.imageryTexture = this.tileTextures.caps.rebuild(texture, this.renderer);
+    // The polar caps' fills are sampled like the base image (KB-211); tones are matched to it (F633).
+    this.imageryTexture = this.tileTextures.setBase(texture, this.imagery, this.renderer);
     this.material?.dispose();
     // A new renderer may have another depth path: the atmosphere is built again with the material it shades.
     this.atmosphere.rebuild(this.depthPath);

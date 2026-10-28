@@ -80,6 +80,12 @@ export interface ImagerySource extends TileSource {
    * through them, so the layer is composed like a translucent one (F242, ADR 0038).
    */
   readonly transparent?: boolean;
+  /**
+   * The tiles, cut on Web Mercator's grid, have rows linear in latitude: a WMS in EPSG:4326 asked for each Web Mercator
+   * tile's extent, drawn without a warp and without the coarse ancestors a geographic tiling shows across its edges
+   * (KB-232).
+   */
+  readonly latitudeRows?: boolean;
   /** How the bytes are decoded in the worker pool: browser image formats, or KTX2 (ADR 0020). */
   readonly decoder: 'image' | 'ktx2';
   /**
@@ -143,4 +149,29 @@ export function inCoverage(coverage: readonly TileRectangleRad[] | undefined, ex
     }
   }
   return false;
+}
+
+const coveredExtent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
+const coveredCoord: TileCoord = { root: 0, level: 0, x: 0, y: 0 };
+
+/**
+ * The tiles of a source at `level` within its coverage (all of them without one): their count, each one passed to
+ * `visit` (F634). Used once per source, at start, not per frame.
+ */
+export function coveredTiles(source: TileSource, level: number, visit?: (x: number, y: number) => void): number {
+  const { tiling, coverage } = source;
+  const n = 2 ** level;
+  let count = 0;
+  coveredCoord.level = level;
+  for (let y = 0; y < tiling.rootTilesY * n; y++)
+    for (let x = 0; x < tiling.rootTilesX * n; x++) {
+      if (coverage) {
+        coveredCoord.x = x;
+        coveredCoord.y = y;
+        if (!inCoverage(coverage, tiling.tileExtent(coveredCoord, coveredExtent))) continue;
+      }
+      count++;
+      visit?.(x, y);
+    }
+  return count;
 }

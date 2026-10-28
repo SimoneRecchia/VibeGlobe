@@ -1,4 +1,4 @@
-import { coverageArea, coverageTest } from '@vibeglobe/core';
+import { coverageArea, coverageTest } from '@vibeglobe/core/coverage';
 import { describe, expect, it } from 'vitest';
 import { COUNTRY_CODES, countryBorders } from './countries.js';
 

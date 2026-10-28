@@ -8,9 +8,11 @@
  *
  * @packageDocumentation
  */
-import type { GeoJsonArea, ImageryLayerOptions, ImagerySource } from '@vibeglobe/core';
+import { type GeoJsonArea, type ImageryLayerOptions, type ImagerySource } from '@vibeglobe/core';
+import { coverageArea } from '@vibeglobe/core/coverage';
 import { wmsImagery, xyzImagery } from '@vibeglobe/sources';
 import { countryBorders } from './countries.js';
+import { onlineFade, type EuropeOpenOptions } from './europe.js';
 import { TERMS_READ_DATE, type PresetSourceRecord } from './sources.js';
 
 /** How an orthophoto service is reached: an XYZ template, or a WMS GetMap URL and layer (both in EPSG:3857). */
@@ -214,13 +216,22 @@ async function areaOf(record: OrthophotoRecord): Promise<GeoJsonArea> {
   return { type: 'MultiPolygon', coordinates };
 }
 
+/** The fade at an orthophoto's border, in pixels of its tiles (F636). */
+const BORDER_FEATHER_PX = 8;
+
 /** White filler a service sends where it has no data counts as no data, so the layer below shows (KB-215). */
 const WHITE = [255, 255, 255] as const;
 
 /** The engine source of a record, clipped to its area, from its first level, white tiles counted as no data. */
 async function sourceOf(record: OrthophotoRecord, maxLevel: number): Promise<ImagerySource> {
   const area = await areaOf(record);
-  const common = { id: record.id, maxLevel, attribution: record.attribution, area };
+  // A soft border, so the orthophoto fades into the imagery below over a few pixels (F636).
+  const common = {
+    id: record.id,
+    maxLevel,
+    attribution: record.attribution,
+    area: { ...coverageArea(area), featherPx: BORDER_FEATHER_PX },
+  };
   if (record.service.kind === 'xyz')
     return xyzImagery({ ...common, url: record.service.url, minLevel: record.minLevel, blankTile: WHITE });
   const source = await wmsImagery({
@@ -250,5 +261,29 @@ export async function europeOrthophotos(options: EuropeOrthophotosOptions = {}):
   const sources = await Promise.all(
     records.map((r) => sourceOf(r, Math.min(options.onlineMaxLevel?.[r.id] ?? r.maxLevel, r.maxLevel))),
   );
-  return { layers: sources.map((source) => ({ id: source.id, sources: [source] })), sources: records };
+  // Each fades in with the zoom over the WorldCover package's last level and matches its tones (F636, F633).
+  const fadeIn = onlineFade();
+  return {
+    layers: sources.map((source) => ({ id: source.id, sources: [source], harmonize: 'below' as const, fadeIn })),
+    sources: records,
+  };
+}
+
+/**
+ * The preset's options with every online source it offers turned on (F637): the national and regional orthophotos
+ * (loaded here, with their borders) on top of the options given. `europeOpen(await withAllOnlineSources({ ... }))`.
+ */
+export async function withAllOnlineSources(
+  options: EuropeOpenOptions = {},
+  orthophotos: EuropeOrthophotosOptions = {},
+): Promise<EuropeOpenOptions> {
+  return {
+    ...options,
+    orthophotos:
+      options.orthophotos ??
+      (await europeOrthophotos({
+        ...orthophotos,
+        ...(options.onlineMaxLevel ? { onlineMaxLevel: options.onlineMaxLevel } : {}),
+      })),
+  };
 }

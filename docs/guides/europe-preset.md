@@ -17,16 +17,16 @@ the packages as a test (`scripts/integration/europe-preset-guide.test.ts`).
 
 ## Map types and sources
 
-| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Satellite           | NASA's Blue Marble (GIBS, EPSG:4326) at the lowest levels and over the poles, then the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package, then your own sources and the orthophotos                                                                                   |
-| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                          |
-| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                               |
-| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                            |
-| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                      |
-| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13 |
-| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                       |
-| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                    |
+| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Satellite           | By zoom: the globe's base image (Natural Earth) far away, NASA's Blue Marble (GIBS, one image per Web Mercator tile) fading in, the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package fading in on Europe's land, then your online sources and the orthophotos above the package's level 11 (below) |
+| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                                                        |
+| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                                                             |
+| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                                                          |
+| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                                                    |
+| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13                               |
+| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                                                     |
+| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                                                  |
 
 The polar caps beyond Web Mercator's 85.05° look like the surface around them: Blue Marble fills them in Satellite and
 Hybrid, and Map and Relief give `polarCapColors` (their water in the north, their land in the south), which the
@@ -38,6 +38,74 @@ every source in use with its terms, and `preset.excluded` the sources left out w
 and regional orthophotos with verified terms come with `@vibeglobe/presets/orthophotos` (below); IGN BD ORTHO, PNOA,
 PDOK and others wait for their exact credit or endpoint ([open question 34](../open-questions.md)). An application whose
 own review allows them adds them with `addSources`.
+
+## Satellite by zoom
+
+Satellite and Hybrid change by zoom with no block, hard edge or jump of color or sharpness (F636). Each layer fades
+in over the whole view at once (`fadeIn`, F635), and the layers above the Blue Marble match its tones where they cover
+it (`harmonize: 'below'`, F633):
+
+| Levels (zoom at the center) | Europe's land                                           | Sea, polar regions, land outside Europe |
+| --------------------------- | ------------------------------------------------------- | --------------------------------------- |
+| 0–4 (zoom below 3.5)        | The globe's base image (`baseImageryUrl`)               | The base image                          |
+| 4.5–5 (zoom 3.5–4)          | The Blue Marble fading in over the base image           | The same                                |
+| 5–6 (zoom 4–5)              | The package's WorldCover fading in over the Blue Marble | The Blue Marble                         |
+| 6–11                        | WorldCover (to its level 11, 10 m data)                 | The Blue Marble (to its level 8)        |
+| 12–13 (zoom 11–12)          | Your online sources fading in over WorldCover           | The Blue Marble, magnified              |
+| 13 and beyond               | Each online source to its own deepest level             | The Blue Marble, magnified              |
+
+- **Far away** the globe shows its own base image, the one the application passes as `baseImageryUrl`: the guides use
+  Natural Earth I with shaded relief and water (`apps/playground/public/imagery/natural-earth-4096.jpg`, public
+  domain). It is local, so the far view is the same offline, in hybrid and online. `farLevels` (default 4) moves the
+  first switch: `farLevels: 5` shows the base image to level 5.
+- **The Blue Marble** (NASA, 500 m) covers what the package does not: the sea at every level, the land outside
+  Europe (Turkey, North Africa), the polar regions. GIBS serves it in EPSG:4326 only; the preset asks for one image per
+  Web Mercator tile, drawn with its rows linear in latitude, as geographic tiles were drawn far coarser along their
+  edges (KB-232). Beyond Web Mercator's
+  85.05° the caps take Natural Earth's colors (`polarCapColors`).
+- **The package's WorldCover** shows Europe's land only: its tiles' flat no-data water (RGB 54, 73, 90) is
+  transparent everywhere, and its land outside Europe fades out over 12 tile pixels at Europe's border, so the sea is
+  the Blue Marble inside the package's box as outside it (KB-231, KB-233).
+- **Above level 11** the tiles come from the online sources the application adds: `orthophotos` (each within its
+  country's or region's borders, from level 12) and `addSources` with `minLevel` above 11, each asked for up to its
+  own deepest level (`onlineMaxLevel` only lowers it). They fade in over level 12 to 13 and match the tones below.
+- **Without online sources** nothing is finer than the package's level 11 on land and the Blue Marble's level 8 over
+  the sea: beyond them the deepest tile is magnified with linear filtering, smooth and without blocks, but blurrier
+  the closer the view (about 76 m a pixel of WorldCover at 45° N, so from level 14 a pixel of data covers 8 or more
+  of the screen).
+- **Loading** never shows a hole: the base image is under everything, the Blue Marble's lowest levels and the
+  package's level 5 within Europe are pinned and load first (F634), and a tile still loading shows its ancestor.
+
+To turn on every online source of the preset, add the orthophotos with `withAllOnlineSources`:
+
+```ts
+import { createGlobe } from '@vibeglobe/core';
+import { createOffline } from '@vibeglobe/offline';
+import { europeOpen } from '@vibeglobe/presets';
+import { withAllOnlineSources } from '@vibeglobe/presets/orthophotos';
+import { createWorkers } from '@vibeglobe/worker';
+
+const preset = europeOpen(
+  await withAllOnlineSources({
+    packageManifestUrl: '/maps/europe/manifest.json',
+    offline: createOffline({ mode: 'hybrid' }),
+    farLevels: 4, // the base image to level 4 (the default)
+  }),
+);
+const satellite = preset.baseMaps.find((b) => b.id === 'satellite');
+const globe = createGlobe({
+  container,
+  renderer,
+  workers: createWorkers(),
+  baseImageryUrl: '/assets/natural-earth-4096.jpg',
+  imagery: satellite?.imagery ?? [],
+  ...(satellite?.polarCapColors ? { polarCapColors: satellite.polarCapColors } : {}),
+});
+```
+
+A provider of your own for the levels above the package (with its key, never committed) joins with `addSources`,
+`minLevel: 12` and its own `maxLevel`. Italy has no free orthophoto whose terms allow commercial use and
+redistribution online yet (ADR 0182, open question 38): without one, Italy shows the package's level 11 magnified.
 
 ## Hybrid: the package plus online detail
 
@@ -98,7 +166,7 @@ globe is created, so turning 3D terrain on or off creates the globe again (the p
 ## Online only
 
 Without `packageManifestUrl` the preset needs no offline engine and reads only the network: OpenFreeMap's vector
-tiles everywhere and Mapterhorn's terrain over land. Satellite then shows NASA's Blue Marble up to its level 7, magnified
+tiles everywhere and Mapterhorn's terrain over land. Satellite then shows NASA's Blue Marble up to its level 8, magnified
 beyond it, and the application's own sources and orthophotos over it: no free detailed satellite imagery of Europe
 could be verified for online use (ESA WorldCover's Terrascope service was left out, ADR 0182).
 
@@ -230,9 +298,9 @@ Beyond it the deepest tile is magnified.
 
 | Area                                                                                                                                                          | Satellite                                                                                         | Map, labels, roads, buildings                       | Terrain and relief                                               |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Land in Europe                                                                                                                                                | Blue Marble to 7 online; the package's WorldCover from 5 to 11                                    | 14 (OpenFreeMap; the package first up to 11)        | 17 (Mapterhorn, where it holds them; the package first up to 11) |
-| Sea in Europe                                                                                                                                                 | Blue Marble to 7 online; the package up to 8                                                      | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
-| Outside Europe                                                                                                                                                | Blue Marble to 7                                                                                  | 14 (OpenFreeMap)                                    | none                                                             |
+| Land in Europe                                                                                                                                                | Blue Marble to 8 online; the package's WorldCover from 5 to 11                                    | 14 (OpenFreeMap; the package first up to 11)        | 17 (Mapterhorn, where it holds them; the package first up to 11) |
+| Sea in Europe                                                                                                                                                 | Blue Marble to 8 online                                                                           | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
+| Outside Europe                                                                                                                                                | Blue Marble to 8                                                                                  | 14 (OpenFreeMap)                                    | none                                                             |
 | Austria, Switzerland, Czechia, mainland Portugal, Niedersachsen, NRW, Thüringen, Brandenburg, Berlin, Mecklenburg-Vorpommern, Sachsen-Anhalt, Rheinland-Pfalz | with `europeOrthophotos()`: from 12 to 19 or 20, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
 
 Every source is asked for up to its own deepest level, and beyond it its deepest tile is magnified without a stop: the

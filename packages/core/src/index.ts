@@ -45,6 +45,7 @@ export type {
   FrameCapture,
   FrameView,
   TileDrawLayer,
+  TileDrawOverlay,
   TileDrawList,
   GeoPosition,
   Globe,
@@ -82,6 +83,8 @@ export type {
   CameraConstraints,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
+export { BASE_TEXTURE as BASE_TEXTURE_HANDLE, TONE_BELOW } from './imagery/draw-list.js';
+export type { TileDrawBelow } from './imagery/draw-list.js';
 export type { NavigationMode } from './globe/view-control.js';
 export type { PolarCapColors } from './globe/polar-caps.js';
 export { MorphFrame, morphPointInto } from './view/morph.js';
@@ -130,11 +133,11 @@ export type { TileCoord, TileKey } from './tiling/tile-key.js';
 export { GEOGRAPHIC_TILING, WEB_MERCATOR_TILING } from './tiling/tiling-scheme.js';
 export type { TileRectangleRad, TilingScheme } from './tiling/tiling-scheme.js';
 export { inCoverage, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH } from './imagery/imagery-source.js';
-export { coverageArea, coverageTest } from './imagery/coverage-area.js';
 export type {
   CoverageArea,
   CoverageTest,
   GeoJsonArea,
+  KeyColor,
   PolygonDeg,
   RingDeg,
   TileMask,
@@ -144,6 +147,8 @@ export type { RenderExtension, RenderExtensionContext } from './globe/render-ext
 export type { Attribution, Credit, CreditProfile } from './imagery/credits.js';
 export type {
   ImageryBlend,
+  Harmonize,
+  ZoomFade,
   ImageryLayerChanges,
   ImageryLayerInput,
   ImageryLayerOptions,

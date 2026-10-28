@@ -21,6 +21,11 @@
       "source": "./src/geodesy.ts",
       "default": "./dist/geodesy.js"
     },
+    "./coverage": {
+      "types": "./dist/coverage.d.ts",
+      "source": "./src/coverage.ts",
+      "default": "./dist/coverage.js"
+    },
     "./layers": {
       "types": "./dist/layers.d.ts",
       "source": "./src/layers.ts",

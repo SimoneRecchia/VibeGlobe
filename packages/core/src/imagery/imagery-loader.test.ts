@@ -413,6 +413,19 @@ describe('ImageryLoader', () => {
     for (const handle of [100, 101, 102, 103, 104]) expect(residency.isPinned(handle)).toBe(true);
   });
 
+  it('pins the first level of a source that starts deeper, only the tiles within its coverage (F634)', () => {
+    // Level 3 from a coverage of one level-3 tile's quarter (Europe, about 0°–20° E, 41°–55° N): one tile pinned.
+    const coverage = [{ westRad: 0.01, southRad: 0.72, eastRad: 0.34, northRad: 0.96 }];
+    const { transport, loader, ok, runFrame } = setUp(32, { pinnedLevel: 3, source: { minLevel: 3, coverage } });
+    runFrame([[6, 33, 22]]);
+    expect(transport.started).toEqual([url(3, 4, 2)]);
+    transport.answer(url(3, 4, 2), ok);
+    runFrame([[6, 33, 22]]);
+    expect(loader.pinnedComplete).toBe(true);
+    runFrame([[6, 33, 22]]);
+    expect(transport.started).toContain(url(6, 33, 22));
+  });
+
   it('reports a corrupt tile once and requests it again only as the source health check; its ancestor stays drawn (F112, ADR 0046)', () => {
     const { transport, errors, timers, runFrame } = setUp();
     runFrame([

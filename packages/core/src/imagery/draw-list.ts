@@ -6,6 +6,35 @@ import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.ho
 /** Texture handle of a draw that samples the world base image (`GlobeOptions.baseImageryUrl`). */
 export const BASE_TEXTURE = -1;
 
+/**
+ * Tone sources from this number up (`TileDrawList.toneSources`, and the overlay slots' alike) are of a layer that
+ * matches the imagery below it (`harmonize: 'below'`, F633): `TONE_BELOW` plus `layer × 8 + index in its chain`.
+ */
+export const TONE_BELOW = 512;
+
+/**
+ * The imagery under each draw's own (`TileDrawList.below`, F633), the reference of a layer that matches the imagery
+ * below it: the next layer down's texture (or {@link BASE_TEXTURE} for the world base image), its UV transforms (four
+ * per draw) and tone source.
+ */
+export interface TileDrawBelow {
+  readonly textures: Int32Array;
+  readonly uvTransforms: Float32Array;
+  readonly toneSources: Int16Array;
+}
+
+// The renderer's view of the draws, with tone matching to the imagery below (F633).
+declare module '../globe/types.js' {
+  interface TileDrawList {
+    /** The imagery under each draw's own (F633). */
+    readonly below?: TileDrawBelow;
+  }
+  interface TileDrawOverlay {
+    /** The source of each draw's overlay for tone matching, as `TileDrawList.toneSources` (F633). */
+    readonly toneSources?: Int16Array;
+  }
+}
+
 /** One layer's per-draw arrays, the levels included (what {@link ImageryFades} reads and writes). */
 export class DrawLayer implements TileDrawLayer {
   textures: Int32Array;
@@ -99,9 +128,12 @@ export class DrawList implements TileDrawList {
   private imagery: DrawLayer;
   terrain: DrawLayer;
   overlays: OverlaySlot[];
+  /** The imagery under each draw's own, with its UV transform and tone source (F633). */
+  below: TileDrawBelow;
 
   constructor(capacity = 256) {
     this.meshKeys = new Float64Array(capacity);
+    this.below = belowArrays(capacity);
     this.imagery = new DrawLayer(capacity);
     this.terrain = new DrawLayer(capacity);
     this.overlays = [];
@@ -159,6 +191,7 @@ export class DrawList implements TileDrawList {
     let capacity = this.meshKeys.length;
     while (capacity < count) capacity *= 2;
     this.meshKeys = new Float64Array(capacity);
+    this.below = belowArrays(capacity);
     this.imagery = new DrawLayer(capacity);
     this.terrain = new DrawLayer(capacity);
     for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays[slot] = new OverlaySlot(capacity);
@@ -166,6 +199,15 @@ export class DrawList implements TileDrawList {
 }
 
 const IDENTITY = new Float64Array([1, 1, 0, 0]);
+
+/** The per-draw arrays of the imagery under each draw's own (F633). */
+function belowArrays(capacity: number): TileDrawBelow {
+  return {
+    textures: new Int32Array(capacity),
+    uvTransforms: new Float32Array(capacity * 4),
+    toneSources: new Int16Array(capacity),
+  };
+}
 
 /** Draws the first `count` tiles on the ellipsoid: no terrain heights (filled in when a terrain source has some). */
 export function drawWithoutTerrain(list: DrawList, count: number): void {
@@ -189,6 +231,8 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     list.geographic[index] = 1;
     list.imageryLevels[index] = -1;
     list.toneSources[index] = -1;
+    list.below.textures[index] = texture;
+    list.below.toneSources[index] = -1;
     list.fromTextures[index] = texture;
     list.fromGeographic[index] = 1;
     list.fades[index] = 1;
@@ -201,6 +245,9 @@ export function drawOnBaseImage(list: DrawList, tiles: readonly QuadtreeTile[], 
     list.uvTransforms[at + 1] = (tile.northRad - tile.southRad) / Math.PI;
     list.uvTransforms[at + 2] = (tile.westRad + Math.PI) / (2 * Math.PI);
     list.uvTransforms[at + 3] = (Math.PI / 2 - tile.northRad) / Math.PI;
-    for (let c = 0; c < 4; c++) list.fromUvTransforms[at + c] = list.uvTransforms[at + c] ?? 0;
+    for (let c = 0; c < 4; c++) {
+      list.fromUvTransforms[at + c] = list.uvTransforms[at + c] ?? 0;
+      list.below.uvTransforms[at + c] = list.uvTransforms[at + c] ?? 0;
+    }
   }
 }

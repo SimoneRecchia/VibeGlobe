@@ -7,16 +7,99 @@
  * OpenMapTiles schema); `&presetExclude=<id>,…` leaves sources out. 3D terrain is chosen when the globe is created, so
  * switching it reloads the page. Hooks in `window.vibeglobeEuropePreset`.
  */
-import type { Globe, GlobeOptions } from '@vibeglobe/core';
+import type { Globe, GlobeOptions, TileSource } from '@vibeglobe/core';
 import type { VectorTileLayer } from '@vibeglobe/layers/vector-tiles';
-import { type BaseMap, europeOpen, type Overlay, type StyleJson } from '@vibeglobe/presets';
+import {
+  type AddedSource,
+  type BaseMap,
+  europeOpen,
+  type EuropeOpenOptions,
+  type Overlay,
+  type StyleJson,
+} from '@vibeglobe/presets';
+import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 
 const params = new URLSearchParams(location.search);
 const enabled = params.get('preset') === 'europe';
-const preset = enabled
-  ? europeOpen({ exclude: (params.get('presetExclude') ?? '').split(',').filter((id) => id !== '') })
-  : undefined;
+const exclude = (params.get('presetExclude') ?? '').split(',').filter((id) => id !== '');
+const fixtures = params.get('presetFixtures');
+const preset = enabled ? europeOpen(fixtures ? fixtureOptions(fixtures) : { exclude }) : undefined;
+
+/**
+ * `&presetFixtures=<session>`: the preset with a package, every source's tiles from the fixture server's `earth`
+ * patterns (F636): the Blue Marble as `earth`, the package's WorldCover as `earth-package`, and an online source of the
+ * app's own over central Italy (11° to 15° E, 40° to 44° N) from level 12 to 16 as `earth-fine`. No outside host.
+ */
+function fixtureOptions(session: string): EuropeOpenOptions {
+  const patterns: Readonly<Record<string, string>> = {
+    'nasa-gibs-blue-marble': 'earth/mercator-latitude',
+    'europe-satellite': 'earth-package/mercator',
+  };
+  const far = params.get('presetFarLevels');
+  return {
+    ...(far === null ? {} : { farLevels: Number(far) }),
+    exclude: [...exclude, 'openfreemap', 'europe-terrain'],
+    packageManifestUrl: `${location.origin}/fixture-tiles/${session}/manifest.json`,
+    offline: {
+      source<S extends TileSource>(source: S): S {
+        const pattern = patterns[source.id];
+        if (!pattern) return source;
+        return {
+          ...source,
+          request(coord, out, pixelRatio) {
+            const request = source.request(coord, out, pixelRatio);
+            if (typeof request === 'object')
+              request.url = `${location.origin}/fixture-tiles/${session}/${pattern}/${String(coord.level)}/${String(coord.x)}/${String(coord.y)}.png`;
+            return request;
+          },
+        };
+      },
+    },
+    addSources: [fineSource(session)],
+  };
+}
+
+/** The fixture's online source of the app's own over central Italy, from level 12 to 16 (F636). */
+function fineSource(session: string): AddedSource {
+  const source = xyzImagery({
+    id: 'fine',
+    url: `${location.origin}/fixture-tiles/${session}/earth-fine/mercator/{z}/{x}/{y}.png`,
+    minLevel: 12,
+    maxLevel: 16,
+    area: {
+      polygons: [
+        [
+          [
+            [11, 40],
+            [15, 40],
+            [15, 44],
+            [11, 44],
+            [11, 40],
+          ],
+        ],
+      ],
+      featherPx: 12,
+      tiles: 'clip',
+    },
+  });
+  return {
+    source,
+    record: {
+      id: 'fine',
+      name: 'Fixture orthophoto',
+      kind: 'imagery',
+      tiers: 'network',
+      license: 'Test fixture',
+      termsUrl: location.origin,
+      termsReadDate: '2026-10-28',
+      attribution: [{ text: 'Fixture' }],
+      minLevel: 12,
+      maxLevel: 16,
+      coverage: 'europe-land',
+    },
+  };
+}
 const startOverlays = (params.get('presetOverlays') ?? '').split(',').filter((id) => id !== '') as Overlay['id'][];
 
 const startBase = (params.get('presetBase') ?? 'satellite') as BaseMap['id'];
@@ -69,7 +152,7 @@ export async function showEuropePreset(globe: Globe, container: HTMLElement): Pr
       }
       hooks.base = base;
       hooks.overlays = [...overlays];
-      // Map and Relief fill the polar caps with their own colors; Satellite and Hybrid's Blue Marble covers them.
+      // Each base map fills the polar caps with its own colors: Natural Earth's in Satellite and Hybrid.
       globe.setPolarCapColors(
         preset.baseMaps.find((b) => b.id === base)?.polarCapColors ?? { north: '#78a9cd', south: '#f2f3f7' },
       );

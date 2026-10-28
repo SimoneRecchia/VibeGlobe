@@ -59,17 +59,21 @@ describe('europeOpen (F613)', () => {
       expect(s.termsReadDate).toBe(s.id === 'nasa-gibs-blue-marble' ? '2026-10-27' : '2026-10-26');
     }
     expect(preset.excluded.map((s) => s.id)).toContain('pnoa');
-    // Satellite: the package's composite, from the package only, then NASA's Blue Marble; terrain: the package, then
-    // online.
-    const satellite = preset.baseMaps[0]?.imagery[0]?.sources ?? [];
-    expect(satellite.map((s) => s.id)).toEqual(['europe-satellite', 'nasa-gibs-blue-marble']);
+    // Satellite: NASA's Blue Marble as the base layer, the package's composite above it, from the package only, with
+    // its water keyed out outside Europe's land (KB-231); terrain: the package, then online.
+    const [base, composite] = preset.baseMaps[0]?.imagery ?? [];
+    expect(base?.sources.map((s) => s.id)).toEqual(['nasa-gibs-blue-marble']);
+    const satellite = composite?.sources ?? [];
+    expect(satellite.map((s) => s.id)).toEqual(['europe-satellite']);
     expect(offline.tiers.get('europe-satellite')).toBe('package');
     expect(offline.tiers.get('nasa-gibs-blue-marble')).toBe('network');
     expect(offline.tiers.get('europe-terrain')).toBe('all');
     // Online terrain covers land only: a tile over the Alps is asked for, one over the open sea is not.
     expect(preset.terrain?.request(ALPS, out)).toMatchObject({ url: 'https://tiles.mapterhorn.com/8/135/90.webp' });
     expect(preset.terrain?.request(SEA, out)).toBe('noData');
-    expect(satellite[0]?.request(SEA, out)).not.toBe('noData');
+    // The package's satellite tiles are asked for on Europe's land only: the open sea is the Blue Marble's (F636).
+    expect(satellite[0]?.request(SEA, out)).toBe('noData');
+    expect(satellite[0]?.request(ALPS, out)).not.toBe('noData');
     expect(preset.packageManifestUrl).toBe('https://app.test/maps/europe/manifest.json');
     expect(preset.styleUrl('offline')).toBe('https://app.test/maps/europe/openfreemap/styles/liberty');
     expect(preset.styleUrl('online')).toBe('https://tiles.openfreemap.org/styles/liberty');
@@ -102,7 +106,10 @@ describe('europeOpen (F613)', () => {
     expect(preset.terrain?.maxLevel).toBe(12);
     expect(preset.baseMaps.map((b) => b.id)).toEqual(['satellite', 'hybrid', 'relief']);
     expect(preset.overlays.map((o) => o.id)).toEqual(['terrain']);
-    expect(preset.baseMaps[0]?.imagery[0]?.sources.map((s) => s.id)).toEqual(['customer', 'nasa-gibs-blue-marble']);
+    expect(preset.baseMaps[0]?.imagery.map((layer) => layer.sources.map((s) => s.id))).toEqual([
+      ['nasa-gibs-blue-marble'],
+      ['customer'],
+    ]);
     expect(preset.sources.map((s) => s.id)).toEqual(['customer', 'nasa-gibs-blue-marble', 'europe-terrain']);
     expect(() => europeOpen({ packageManifestUrl: 'https://app.test/manifest.json' })).toThrow(/offline engine/);
     expect(
@@ -110,6 +117,74 @@ describe('europeOpen (F613)', () => {
     ).toMatchObject({
       maxzoom: 10,
     });
+  });
+
+  it("keys the package's water out with a soft edge over the sea, so the Blue Marble shows there at every level (KB-231)", () => {
+    const preset = europeOpen({
+      packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
+      offline: fakeOffline(),
+    });
+    const worldCover = preset.baseMaps[0]?.imagery[1]?.sources[0];
+    expect(worldCover?.transparent).toBe(true);
+    // Over the open sea every pixel is masked, with a soft edge at the land; deep inside France (level 8, about 2° E,
+    // 46.5° N) the water's pixels are keyed out too, where the land's simplified outline reaches over a coast or a
+    // lake (F636), and the others stay.
+    expect(worldCover?.tileMask?.(SEA)).toMatchObject({ featherPx: 12, key: { rgb: [54, 73, 90], everywhere: true } });
+    expect(worldCover?.tileMask?.(SEA)?.ringEnds.length).toBe(0);
+    expect(worldCover?.tileMask?.(tile(8, 129, 90))).toMatchObject({ key: { rgb: [54, 73, 90], everywhere: true } });
+    expect(Array.from(worldCover?.tileMask?.(tile(8, 129, 90))?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+  });
+
+  it('hands the levels above the package to the online sources an app adds, and magnifies level 11 without them (F632)', () => {
+    const fine = xyzImagery({ id: 'fine', url: 'https://fine.test/{z}/{x}/{y}.jpg', minLevel: 12, maxLevel: 19 });
+    const record = {
+      id: 'fine',
+      name: 'Fine imagery',
+      kind: 'imagery' as const,
+      tiers: 'network' as const,
+      license: 'CC BY 4.0',
+      termsUrl: 'https://fine.test/terms',
+      termsReadDate: '2026-10-28',
+      attribution: [{ text: '© Fine' }],
+      minLevel: 12,
+      maxLevel: 19,
+      coverage: 'europe-land' as const,
+    };
+    const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json' };
+    const preset = europeOpen({ ...manifest, offline: fakeOffline(), addSources: [{ source: fine, record }] });
+    const imagery = preset.baseMaps[0]?.imagery ?? [];
+    expect(imagery.map((layer) => layer.id)).toEqual(['satellite-base', 'satellite', 'satellite-online']);
+    const worldCover = imagery[1]?.sources[0];
+    const first = imagery[2]?.sources[0];
+    // The package serves up to its level 11, the added source from 12, in a layer of its own above, to its own
+    // deepest level, fading in over level 12 to 13 (F636) and matching the tones below it (F633).
+    expect(first?.request(tile(11, 1080, 720), out)).toBe('noData');
+    expect(worldCover?.request(tile(11, 1080, 720), out)).not.toBe('noData');
+    expect(first?.request(tile(13, 4320, 2880), out)).toMatchObject({ url: 'https://fine.test/13/4320/2880.jpg' });
+    expect(first?.maxLevel).toBe(19);
+    expect(worldCover?.request(tile(13, 4320, 2880), out)).toBe('noData');
+    expect(imagery[2]).toMatchObject({ harmonize: 'below', fadeIn: { fromZoom: 11, toZoom: 12 } });
+    // Without it, nothing serves above level 11: the engine draws the package's level 11 tiles magnified.
+    const alone = europeOpen({ ...manifest, offline: fakeOffline() }).baseMaps[0]?.imagery ?? [];
+    expect(alone.map((layer) => layer.sources.map((s) => s.maxLevel))).toEqual([[8], [11]]);
+  });
+
+  it('shows the base image far away, then fades the Blue Marble and the package in by zoom, with configurable far levels (F636)', () => {
+    const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json', offline: fakeOffline() };
+    const layers = europeOpen(manifest).baseMaps[0]?.imagery ?? [];
+    // Levels 0–4: the globe's base image alone; the Blue Marble over level 4.5 to 5, WorldCover over 5 to 6.
+    expect(layers.map((l) => [l.id, l.fadeIn, l.harmonize])).toEqual([
+      ['satellite-base', { fromZoom: 3.5, toZoom: 4 }, false],
+      ['satellite', { fromZoom: 4, toZoom: 5 }, 'below'],
+    ]);
+    // The Blue Marble keeps every level, so the coarser tiles near the horizon have it too.
+    expect(layers[0]?.sources[0]?.minLevel).toBe(0);
+    const farther = europeOpen({ ...manifest, farLevels: 6 }).baseMaps[0]?.imagery ?? [];
+    expect(farther.map((l) => l.fadeIn)).toEqual([
+      { fromZoom: 5.5, toZoom: 6 },
+      { fromZoom: 6, toZoom: 7 },
+    ]);
+    expect(farther[1]?.sources[0]?.minLevel).toBe(7);
   });
 
   it('reads vector and hillshade tiles from the package up to its levels and over the sea, online beyond on land', () => {
@@ -190,21 +265,20 @@ describe('europeOpen (F613)', () => {
     ).toEqual(['europe-relief-background', 'europe-relief-tint', 'europe-hillshade']);
   });
 
-  it("fills the polar caps like the surface around them: Blue Marble in Satellite and Hybrid, the map's colors in Map and Relief (KB-214)", () => {
+  it("fills the polar caps like the surface around them: Natural Earth's colors in Satellite and Hybrid, the map's colors in Map and Relief (KB-214)", () => {
     const preset = europeOpen();
-    // A geographic tile within the north cap (level 3, the row nearest the pole, 90° W to 67.5° W) is asked of NASA's
-    // Blue Marble, latitude first as WMS 1.3.0 wants in EPSG:4326.
+    // NASA's Blue Marble from GIBS's EPSG:4326 WMS, one image per Web Mercator tile (KB-232), to its level 8.
     const blueMarble = preset.baseMaps[0]?.imagery[0]?.sources.at(-1);
-    expect(blueMarble?.tiling.crs).toBe('EPSG:4326');
-    expect(blueMarble?.request(tile(3, 4, 0), out)).toMatchObject({
-      url: expect.stringContaining('LAYERS=BlueMarble_ShadedRelief_Bathymetry'),
-    });
-    expect((blueMarble?.request(tile(3, 4, 0), out) as { url: string }).url).toMatch(
-      /BBOX=67\.50+,-90\.0+,90\.0+,-67\.50+$/,
+    expect(blueMarble?.tiling.crs).toBe('EPSG:3857');
+    expect(blueMarble?.maxLevel).toBe(8);
+    // A level 6 tile across 45° N (0° to 5.6° E, 41° to 45.1° N) is asked for at its own extent, latitude first, its
+    // rows linear in latitude.
+    expect(blueMarble?.latitudeRows).toBe(true);
+    expect((blueMarble?.request(tile(6, 32, 23), out) as { url: string }).url).toMatch(
+      /LAYERS=BlueMarble_ShadedRelief_Bathymetry.*CRS=EPSG%3A4326.*BBOX=40\.979\d*,0,45\.089\d*,5\.625$/,
     );
-    expect(blueMarble?.maxLevel).toBe(7);
     for (const id of ['satellite', 'hybrid'])
-      expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toBeUndefined();
+      expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toEqual({ north: '#7aacd0', south: '#eef1f6' });
     for (const id of ['map', 'relief'])
       expect(preset.baseMaps.find((b) => b.id === id)?.polarCapColors).toEqual({ north: '#a9cfe8', south: '#f2efe9' });
   });

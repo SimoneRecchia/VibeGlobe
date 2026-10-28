@@ -23,7 +23,7 @@ import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/typ
 import type { TileErrorReason } from '../globe/types.js';
 import type { Observability } from '../diagnostics/observability.js';
 import { WorkerTaskError, type WorkerPool, type WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
-import { LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type TileSource } from './imagery-source.js';
+import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type TileSource } from './imagery-source.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import {
   DEAD,
@@ -199,6 +199,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly hosts = new Map<string, number>();
   private readonly removeClient: () => void;
   private readonly pinnedTotal: number;
+  /** The pinned tiles, level, column and row each (F084, F634). */
+  private readonly pinnedTiles: Int32Array;
   private readonly hostOptions: HostOptions;
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
@@ -240,12 +242,28 @@ export class ImageryLoader implements NetworkPoolClient {
   levelShift = 0;
 
   constructor(private readonly options: ImageryLoaderOptions) {
-    const { tiling } = options.source;
-    this.table = new TileTable(tiling.rootTilesX, options.pinnedLevel);
-    let total = 0;
-    for (let level = 0; level <= options.pinnedLevel; level++)
-      total += tiling.rootTilesX * tiling.rootTilesY * 4 ** level;
-    this.pinnedTotal = total;
+    const { tiling, minLevel } = options.source;
+    // The pinned tiles: every tile of levels 0 to the pinned level, or of a source that starts deeper, those of its
+    // first levels within its coverage (F634).
+    const pinned: number[] = [];
+    const keys = new Set<string>();
+    for (let level = Math.max(0, minLevel); level <= options.pinnedLevel; level++) {
+      const pin = (x: number, y: number): void => {
+        pinned.push(level, x, y);
+        keys.add(`${String(level)}/${String(x)}/${String(y)}`);
+      };
+      if (minLevel > 0) coveredTiles(options.source, level, pin);
+      else
+        for (let y = 0; y < tiling.rootTilesY * 2 ** level; y++)
+          for (let x = 0; x < tiling.rootTilesX * 2 ** level; x++) pin(x, y);
+    }
+    this.pinnedTiles = Int32Array.from(pinned);
+    this.table = new TileTable(
+      tiling.rootTilesX,
+      options.pinnedLevel,
+      minLevel > 0 ? (level, x, y) => keys.has(`${String(level)}/${String(x)}/${String(y)}`) : undefined,
+    );
+    this.pinnedTotal = pinned.length / 3;
     const { maxRequestsPerHost, multiplexed, maxRequestsPerSecond } = options.source;
     this.hostOptions = {
       ...(maxRequestsPerHost === undefined ? {} : { maxInFlight: maxRequestsPerHost }),
@@ -292,10 +310,10 @@ export class ImageryLoader implements NetworkPoolClient {
     this.flags = this.options.source.loadingFlags?.() ?? LOAD_ALL;
     this.ringCount = 0;
     // The pinned base is always wanted, ahead of every visible tile (ADR 0007 class 0).
-    const { rootTilesX, rootTilesY } = this.options.source.tiling;
-    for (let level = 0; level <= this.options.pinnedLevel; level++) {
-      const n = 2 ** level;
-      for (let y = 0; y < rootTilesY * n; y++) for (let x = 0; x < rootTilesX * n; x++) this.want(level, x, y, level);
+    const pinned = this.pinnedTiles;
+    for (let i = 0; i < pinned.length; i += 3) {
+      const level = pinned[i] ?? 0;
+      this.want(level, pinned[i + 1] ?? 0, pinned[i + 2] ?? 0, level);
     }
   }
 

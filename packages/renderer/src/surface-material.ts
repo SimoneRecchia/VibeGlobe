@@ -67,6 +67,8 @@ export interface SurfaceDraw {
    * 1), the fades as the base imagery's (1 only the slot's own imagery); (from set 0, from set 1, 0, 0).
    */
   readonly overlayFades: Matrix4;
+  /** The overlay slots' tone gains (F633), linear rgb: slot 0 in column 0, slot 1 in column 1. */
+  readonly overlayTones: Matrix4;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -130,6 +132,7 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     overlayFrom0: undefined,
     overlayFrom1: undefined,
     overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
+    overlayTones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0),
   };
   object.userData['surfaceDraw'] = draw;
   // The textures are read from the draw state at each draw, never kept: a mesh not drawn after a device loss kept the
@@ -237,6 +240,9 @@ function overlaySlots(
   const blends = column(overlays, 3);
   const fadeLooks = column(fades, 2);
   const fromSet = column(fades, 3);
+  const tones = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayTones);
+  // The slots' tone gains (F633).
+  const gains = [column(tones, 0).xyz, column(tones, 1).xyz];
   const slots = [0, 1].map((slot) => {
     const own = placeholderLike(placeholder);
     const fromOwn = placeholderLike(placeholder);
@@ -255,10 +261,11 @@ function overlaySlots(
       fade: slot === 0 ? fadeLooks.z : fadeLooks.w,
       opacity: slot === 0 ? looks.z : looks.w,
       blend: slot === 0 ? blends.x : blends.y,
+      gain: gains[slot] ?? vec3(1),
     };
   });
   return (color) => {
-    for (const { node: own, fromNode, hasFrom, fade, opacity, blend } of slots) {
+    for (const { node: own, fromNode, hasFrom, fade, opacity, blend, gain } of slots) {
       If(opacity.greaterThan(0), () => {
         // The slot's imagery cross-fades from what it showed, or fades in from nothing (KB-155); like the base
         // imagery's, only fading draws sample the second texture.
@@ -270,7 +277,7 @@ function overlaySlots(
           });
           node.assign(mix(from, node, fade));
         });
-        const over = node.xyz;
+        const over = node.xyz.mul(gain);
         const multiplied = color.xyz.mul(over);
         const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
         const blended = select(blend.lessThan(0.5), over, select(blend.lessThan(1.5), multiplied, screened));
@@ -429,7 +436,7 @@ function applyOverlays(
   draw: SurfaceDraw,
   draws: TileDrawList,
   i: number,
-  textures: { get(handle: number): Texture | undefined },
+  textures: { get(handle: number): Texture | undefined; readonly tones?: ToneMatcher },
 ): void {
   const o = draw.overlays.elements;
   const f = draw.overlayFades.elements;
@@ -451,6 +458,13 @@ function applyOverlays(
     f[10 + slot] = shown ? fade : 1;
     f[12 + slot] = from ? 1 : 0;
     for (let c = 0; c < 4; c++) f[slot * 4 + c] = overlay?.fromUvTransforms[i * 4 + c] ?? 0;
+  }
+  // The slots' tone gains (F633).
+  const gains = draw.overlayTones.elements;
+  gains.fill(1);
+  for (let slot = 0; slot < 2; slot++) {
+    const overlay = draws.overlays[slot];
+    if (overlay) textures.tones?.applyOverlay(overlay, i, gains, slot * 4);
   }
 }
 

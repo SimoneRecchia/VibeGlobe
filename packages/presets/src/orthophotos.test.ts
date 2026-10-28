@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { europeOpen } from './europe.js';
-import { EUROPE_ORTHOPHOTOS, europeOrthophotos } from './orthophotos.js';
+import { EUROPE_ORTHOPHOTOS, europeOrthophotos, withAllOnlineSources } from './orthophotos.js';
 import { EXCLUDED_SOURCES } from './sources.js';
 
 const out = { url: '', hostIndex: 0 };
@@ -43,5 +43,17 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
       expect(source?.minLevel).toBe(12);
       expect(source?.blankTile?.rgb).toEqual([255, 255, 255]);
     }
+  });
+
+  it('fades the orthophotos in over the last package level, matching its tones, with soft borders, all on with one option (F636, F637)', async () => {
+    const { layers } = await europeOrthophotos();
+    for (const layer of layers) {
+      expect(layer).toMatchObject({ harmonize: 'below', fadeIn: { fromZoom: 11, toZoom: 12 } });
+      // Every service up to its own deepest level, none cut by a default.
+      expect(layer.sources[0]?.maxLevel).toBe(EUROPE_ORTHOPHOTOS.find((r) => r.id === layer.id)?.maxLevel);
+    }
+    const options = await withAllOnlineSources({ farLevels: 4 });
+    expect(options.farLevels).toBe(4);
+    expect(options.orthophotos?.layers.map((l) => l.id)).toEqual(EUROPE_ORTHOPHOTOS.map((r) => r.id));
   });
 });

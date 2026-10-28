@@ -53,22 +53,29 @@ export async function camera(page: Page): Promise<CameraState> {
 }
 
 /**
- * Waits until no frame was drawn for 1.5 s (inertia and animations are over): software GPUs in CI draw a frame in up
- * to about half a second.
+ * Waits until no frame was drawn for 1.5 s (inertia and animations are over) and none is pending: software GPUs in CI
+ * draw a frame in up to about half a second, but the first after an input can take longer, so a frame the engine
+ * requested is awaited too (it is drawn in the animation frame of a callback registered after it).
  */
 export async function settle(page: Page): Promise<void> {
   await page.evaluate(
     () =>
       new Promise<void>((resolveSettled) => {
         const globe = window.controlsHarness?.globe;
-        let timer = setTimeout(done, 1500);
+        let timer = setTimeout(quiet, 1500);
         const off = globe?.on('frame', () => {
           clearTimeout(timer);
-          timer = setTimeout(done, 1500);
+          timer = setTimeout(quiet, 1500);
         });
-        function done(): void {
-          off?.();
-          resolveSettled();
+        function quiet(): void {
+          const last = globe?.frameNumber;
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              if (globe?.frameNumber !== last) return;
+              off?.();
+              resolveSettled();
+            }),
+          );
         }
       }),
   );

@@ -26,7 +26,7 @@ export interface TileDrawBelow {
 }
 
 /** Layers whose tone matching strength a frame carries (`TileDrawBelow.strengths`): tone sources count 8 per layer. */
-export const TONE_LAYERS = 8;
+const TONE_LAYERS = 8;
 
 // The renderer's view of the draws, with tone matching to the imagery below (F633).
 declare module '../globe/types.js' {

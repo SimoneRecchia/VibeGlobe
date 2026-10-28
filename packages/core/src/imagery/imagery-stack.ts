@@ -217,7 +217,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
 /** A layer's fade by zoom, checked: throws `RangeError` unless both zooms are finite and in order. */
 function zoomFade({ fromZoom, toZoom }: ZoomFade, name: string): ZoomFade {
   if (!(Number.isFinite(fromZoom) && Number.isFinite(toZoom) && fromZoom < toZoom))
-    throw new RangeError(`A layer's ${name} needs finite zooms with fromZoom below toZoom`);
+    throw new RangeError(`${name}: finite fromZoom < toZoom`);
   return { fromZoom, toZoom };
 }
 
@@ -260,15 +260,18 @@ export function fadeByZoom(entries: readonly { readonly entry: StackEntry }[], c
   const zoom = mercatorZoomFromGroundZoom(ground, camera.pose.targetLatitudeRad);
   let changed = false;
   for (const { entry } of entries) {
-    const tone = entry.harmonizeFade;
-    entry.toneStrength = tone ? Math.min(1, Math.max(0, (tone.toZoom - zoom) / (tone.toZoom - tone.fromZoom))) : 1;
-    const fade = entry.fadeIn;
+    entry.toneStrength = 1 - ramp(entry.harmonizeFade, zoom, 0);
     const before = entry.zoomOpacity ?? 1;
-    const after = fade ? Math.min(1, Math.max(0, (zoom - fade.fromZoom) / (fade.toZoom - fade.fromZoom))) : 1;
+    const after = ramp(entry.fadeIn, zoom, 1);
     entry.zoomOpacity = after;
     if (before <= 0 !== after <= 0 || before >= 1 !== after >= 1) changed = true;
   }
   return changed;
+}
+
+/** Where `zoom` lies across a fade, 0 to 1; `absent` without one. */
+function ramp(fade: ZoomFade | undefined, zoom: number, absent: number): number {
+  return fade ? Math.min(1, Math.max(0, (zoom - fade.fromZoom) / (fade.toZoom - fade.fromZoom))) : absent;
 }
 
 /** The deepest first level of a source that still pins its tiles within its coverage (F634). */

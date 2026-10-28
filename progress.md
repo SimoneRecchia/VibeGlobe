@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-10-28: Europe preset Satellite tones, the package's box, the sea, terrain 404s (targeted owner request)
+
+Five defects the owner saw in an application with `europeOpen()` Satellite and the package, fixed with tests (F638–F640,
+KB-234–KB-238; F636 superseded). (1) The blue-gray land from level 5 to 14 was WorldCover and the online sources
+matched to the darker Blue Marble at every zoom: a layer's tone match now fades out by zoom (`harmonizeFade`, the
+measured gain to the power of a strength 1 → 0, gone by level 9) and never darkens; the online sources and the
+orthophotos are never matched. (2) The edge at European Turkey: WorldCover now covers the package's whole box with a
+soft edge, its level 8 tiles magnified where deeper levels hold Europe's land only. (3) The tone jump at zoom 3.5–5
+and (4) the blotchy, striped sea beyond level 8 were the Blue Marble: with a package it is left out, and the sea is
+the base image at every level (online only, the Blue Marble stays). (5) Terrain asks for no tile below one its loader
+knows missing: one 404 a tile of the first missing level remains, which the browser logs itself
+(`onlineMaxLevel: { 'europe-terrain': 13 }` removes them). `e2e/europe-zoom-phases.spec.ts` now expects WorldCover's
+own tone from zoom 8 and zooms 3 to 9 in steps of 0.1; views before and after at the report's zooms, on a Blue Marble
+stand-in (`earth-marble`), show the cast, the jump and the sea's blotches gone.
+
 ## 2026-10-28: Europe preset Satellite by zoom, tones across layers, Italian orthophotos (targeted owner request)
 
 Problems the owner saw in an application with `europeOpen()` Satellite, fixed with tests (F630–F637, KB-231–KB-233). Far away

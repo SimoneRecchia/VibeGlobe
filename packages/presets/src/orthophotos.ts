@@ -261,10 +261,10 @@ export async function europeOrthophotos(options: EuropeOrthophotosOptions = {}):
   const sources = await Promise.all(
     records.map((r) => sourceOf(r, Math.min(options.onlineMaxLevel?.[r.id] ?? r.maxLevel, r.maxLevel))),
   );
-  // Each fades in with the zoom over the WorldCover package's last level and matches its tones (F636, F633).
+  // Each fades in with the zoom over the WorldCover package's last level, in its own colors (F636, F638).
   const fadeIn = onlineFade();
   return {
-    layers: sources.map((source) => ({ id: source.id, sources: [source], harmonize: 'below' as const, fadeIn })),
+    layers: sources.map((source) => ({ id: source.id, sources: [source], harmonize: false, fadeIn })),
     sources: records,
   };
 }

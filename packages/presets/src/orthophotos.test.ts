@@ -45,10 +45,10 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     }
   });
 
-  it('fades the orthophotos in over the last package level, matching its tones, with soft borders, all on with one option (F636, F637)', async () => {
+  it('fades the orthophotos in over the last package level, in their own colors, with soft borders, all on with one option (F636, F637, F638)', async () => {
     const { layers } = await europeOrthophotos();
     for (const layer of layers) {
-      expect(layer).toMatchObject({ harmonize: 'below', fadeIn: { fromZoom: 11, toZoom: 12 } });
+      expect(layer).toMatchObject({ harmonize: false, fadeIn: { fromZoom: 11, toZoom: 12 } });
       // Every service up to its own deepest level, none cut by a default.
       expect(layer.sources[0]?.maxLevel).toBe(EUROPE_ORTHOPHOTOS.find((r) => r.id === layer.id)?.maxLevel);
     }

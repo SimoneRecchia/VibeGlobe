@@ -1,12 +1,14 @@
-// The Europe preset's Satellite from level 0 to 16 (F636, F633, F635): over Italy's land, its coast and the open sea,
-// every source from the fixture server's `earth` patterns, which all show the playground's Natural Earth base image in
-// their own tones (`scripts/fixtures/tiles/earth.ts`). With the layers fading in by zoom and matching the tones below
-// them, each settled frame looks like the base image alone at the same view: no block of another color or sharpness,
-// no hard edge between sources. While the zoom moves, no frame jumps from the one before, and no pixel of the globe is
-// black or transparent. The frames of each step are attached to the test's report.
+// The Europe preset's Satellite from level 0 to 16 (F636, F633, F635, F638, F639): over Italy's land, its coast and the
+// open sea, every source from the fixture server's `earth` patterns, which all show the playground's Natural Earth base
+// image in their own tones (`scripts/fixtures/tiles/earth.ts`). Far away the package's land matches the base image's
+// tones; from zoom 8 it shows in its own tone, never darkened, and the sea stays the base image's at every zoom. So
+// each settled frame looks like the base image alone at the same view, its land in the tone expected at that zoom: no
+// block of another color or sharpness, no hard edge between sources. While the zoom moves, no frame jumps from the
+// one before, and no pixel of the globe is black or transparent. The frames of each step are attached to the report.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { EARTH_TONES } from '../scripts/fixtures/tiles/earth.ts';
 import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
 
 test.use({ viewport: { width: 320, height: 240 } });
@@ -33,6 +35,44 @@ const MAX_BLOCK_DIFFERENCE = 20;
  */
 const MAX_MEAN_STEP_DIFFERENCE = 12;
 const MAX_BLOCK_STEP_DIFFERENCE = 80;
+
+/**
+ * The tone of the land over the base image's in a settled frame, by zoom (F638): the package's matched to the base
+ * image up to zoom 5, its own from zoom 8 to 11, then the online source's (the base image's own colors). Undefined while
+ * the package's matching fades out.
+ */
+function landTone(zoom: number): readonly [number, number, number] | undefined {
+  if (zoom <= 5 || zoom >= 12) return [1, 1, 1];
+  if (zoom >= 8) return EARTH_TONES['earth-package'];
+  return undefined;
+}
+
+/**
+ * The frame expected of the sources at a zoom: the base image alone with its land in a tone. Its water, and the
+ * shallow water of its coasts, shows in either: the base image's where the package has no tile (its sea above level
+ * 8, F639), the package's own where a tile of land reaches it.
+ */
+function withLandTone(image: PNG, frame: PNG, tone: readonly [number, number, number]): PNG {
+  const expected = new PNG({ width: image.width, height: image.height });
+  image.data.copy(expected.data);
+  for (let at = 0; at < expected.data.length; at += 4) {
+    const [r = 0, g = 0, b = 0] = image.data.subarray(at, at + 3);
+    const toned = [r, g, b].map((value, c) => Math.round(value * (tone[c] ?? 1)));
+    let keep = false;
+    if (b - r > 15) {
+      let toBase = 0;
+      let toToned = 0;
+      for (let c = 0; c < 3; c++) {
+        const shown = frame.data[at + c] ?? 0;
+        toBase += Math.abs(shown - (image.data[at + c] ?? 0));
+        toToned += Math.abs(shown - (toned[c] ?? 0));
+      }
+      keep = toBase <= toToned;
+    }
+    if (!keep) for (let c = 0; c < 3; c++) expected.data[at + c] = toned[c] ?? 0;
+  }
+  return expected;
+}
 
 /** Waits until the globe is idle with no imagery tile queued, loading, decoding or waiting for its upload. */
 async function settle(page: Page): Promise<void> {
@@ -157,22 +197,24 @@ for (const site of SITES)
       await settle(page);
       const reference = await canvasImage(page);
       await showLayers(page, true);
-      const difference = largestBlockDifference(frame, reference, onGlobe);
+      await attach(testInfo, `${site.name}-zoom-${String(zoom)}.png`, frame);
+      await attach(testInfo, `${site.name}-zoom-${String(zoom)}-base-image.png`, reference);
+      const tone = landTone(zoom);
+      const difference = largestBlockDifference(frame, withLandTone(reference, frame, tone ?? [1, 1, 1]), onGlobe);
       differences.push(`${String(zoom)}: ${difference.toFixed(1)}`);
-      expect(difference, `block difference from the base image at zoom ${String(zoom)}`).toBeLessThanOrEqual(
-        MAX_BLOCK_DIFFERENCE,
-      );
+      if (tone)
+        expect(difference, `block difference from the base image at zoom ${String(zoom)}`).toBeLessThanOrEqual(
+          MAX_BLOCK_DIFFERENCE,
+        );
       console.log(
         `${site.name} zoom ${String(zoom)}: largest block difference from the base image ${difference.toFixed(1)}`,
       );
-      await attach(testInfo, `${site.name}-zoom-${String(zoom)}.png`, frame);
-      await attach(testInfo, `${site.name}-zoom-${String(zoom)}-base-image.png`, reference);
     }
     console.log(differences.join(', '));
     // Zooming through the switches without waiting for tiles: each frame like the one before, with no hole.
     const jumps: string[] = [];
     for (const [from, to] of [
-      [3, 6],
+      [3, 9],
       [10, 13],
     ] as const) {
       let previous: PNG | undefined;

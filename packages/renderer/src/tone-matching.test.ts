@@ -76,4 +76,38 @@ describe('tone matching (F249)', () => {
     tones.applyOverlay(overlay, 0, gains, 0);
     expect(gains[0]).toBeCloseTo(2 ** 2.2, 4);
   });
+
+  it('never darkens a layer to the imagery under it and weakens its gain by its strength at the zoom (F638)', () => {
+    const tones = new ToneMatcher();
+    const whole = Float32Array.of(1, 1, 0, 0);
+    tones.measureBase(undefined, new Float32Array(256 * 128 * 4).fill(0.3));
+    tones.measure(1, undefined, Float32Array.of(0.6, 0.6, 0.6));
+    tones.measure(2, undefined, Float32Array.of(0.15, 0.15, 0.15));
+    const frame = (texture: number, strength: number): TileDrawList =>
+      ({
+        count: 1,
+        textures: Int32Array.of(texture),
+        fromTextures: Int32Array.of(texture),
+        toneSources: Int16Array.of(TONE_BELOW),
+        uvTransforms: whole,
+        below: {
+          textures: Int32Array.of(-1),
+          uvTransforms: Float32Array.of(0.01, 0.01, 0.5, 0.25),
+          toneSources: Int16Array.of(-1),
+          strengths: Float32Array.of(strength, 1, 1, 1, 1, 1, 1, 1),
+        },
+        overlays: [],
+      }) as unknown as TileDrawList;
+    const out = new Float32Array(16);
+    // Brighter than the base image under it: left as it is, not darkened.
+    const bright = frame(1, 1);
+    tones.frame(bright);
+    tones.apply(bright, 0, out);
+    expect(Array.from(out.slice(0, 3))).toEqual([1, 1, 1]);
+    // Darker: brightened by 2 at full strength, by its square root at half strength.
+    const dark = frame(2, 0.5);
+    tones.frame(dark);
+    tones.apply(dark, 0, out);
+    expect(out[0]).toBeCloseTo(Math.SQRT2 ** 2.2, 4);
+  });
 });

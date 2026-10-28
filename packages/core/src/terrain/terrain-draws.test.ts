@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
-import { MERCATOR_ROOT, NORTH_CAP, quadtreeTileKey, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import type { HeightGrid } from './heightmap.js';
 import {
+  MERCATOR_ROOT,
+  NORTH_CAP,
+  quadtreeTileBounds,
+  quadtreeTileKey,
+  type QuadtreeTile,
+} from '../surface/surface-quadtree.hot.js';
+import type { HeightGrid } from './heightmap.js';
+import { Camera } from '../camera/camera.js';
+import { DrawList } from '../imagery/draw-list.js';
+import type { ImageryLoader } from '../imagery/imagery-loader.hot.js';
+import {
+  drawTerrain,
   previousLevel,
+  ShownLevels,
   TERRAIN_LEVEL_OFFSET,
   terrainErrorsBySurfaceLevel,
   terrainHeightRange,
@@ -103,5 +114,51 @@ describe('terrainHeightRange', () => {
     expect(terrainHeightRange(layer, heights, surface, out)).toBe(true);
     // What finer surface levels may add covers the spike the mesh skips, so the selection refines the tile.
     expect(out[2]).toBeGreaterThanOrEqual(1000);
+  });
+});
+
+const surfaceTile = (level: number, x: number, y: number): QuadtreeTile =>
+  quadtreeTileBounds(MERCATOR_ROOT, level, x, y, 1, {
+    key: 0,
+    root: 0,
+    level: 0,
+    x: 0,
+    y: 0,
+    span: 1,
+    westRad: 0,
+    southRad: 0,
+    eastRad: 0,
+    northRad: 0,
+  });
+
+describe('drawTerrain', () => {
+  it('asks for no terrain tile below one known missing: an empty level of the service costs no request (F640)', () => {
+    const wanted: number[] = [];
+    // The service has levels 0 to 13 here: level 14 answered 404, so 15 to 17 cannot exist.
+    const loader = {
+      want: (level: number) => {
+        wanted.push(level);
+        return -1;
+      },
+      readyHandle: () => -1,
+      unavailable: (level: number) => level === 14,
+      markDrawn: () => undefined,
+    } as unknown as ImageryLoader;
+    const terrain = { ...source, maxLevel: 17 } as TerrainSource;
+    const layer: TerrainLayer = {
+      source: terrain,
+      loader,
+      shown: new ShownLevels(),
+      gridErrorMeters: new Float64Array(18),
+    };
+    const level = 17 + TERRAIN_LEVEL_OFFSET;
+    const tile = surfaceTile(level, 2 ** (level - 1), 2 ** (level - 1));
+    const camera = new Camera();
+    camera.widthPx = 800;
+    camera.heightPx = 600;
+    camera.update();
+    drawTerrain(new DrawList(1), [tile], 1, layer, camera);
+    expect(Math.max(...wanted)).toBe(13);
+    expect(wanted).toContain(0);
   });
 });

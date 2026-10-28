@@ -22,6 +22,11 @@ export const LOCAL_FONT_STACK = 'local';
 
 /** A glyph range that failed on the way is requested again after this long. */
 const GLYPH_RETRY_MS = 5_000;
+/**
+ * Answers that do not decode before a range is kept as what decoded (KB-226): a server answering a range it does not
+ * have with a page (a 200 that is not a glyph file) leaves its characters to the local font instead of a wait forever.
+ */
+const DAMAGED_ROUNDS = 5;
 
 /** An icon of the sprite: its pixels and the pixel ratio they were drawn for. */
 export interface SpriteImage {
@@ -37,8 +42,8 @@ export class GlyphSource {
   /** Glyph range URLs requested so far (tests: F448). */
   readonly requested: string[] = [];
   private readonly pending = new Set<string>();
-  /** Ranges whose last bytes did not decode: fetched again past the HTTP cache, which may hold them (KB-226). */
-  private readonly damaged = new Set<string>();
+  /** Answers of a range that did not decode: fetched again past the HTTP cache, which may hold them (KB-226). */
+  private readonly damaged = new Map<string, number>();
   /** Ranges requested and not arrived, those waiting to be requested again included. */
   private readonly unsettled = new Set<string>();
   private readonly localTried = new Set<number>();
@@ -75,14 +80,17 @@ export class GlyphSource {
       this.requested.push(url);
       void this.fetchImpl(url, this.damaged.has(url) ? { cache: 'reload' } : undefined)
         .then(async (response) => {
-          // A missing range (404 and the like) has no glyphs; a server error is retried like a network failure.
+          // A missing range (404 and the like, or a page a server answers in its place) has no glyphs; a server
+          // error is retried like a network failure.
           if (response.status >= 500) throw new Error(`glyph range answered ${String(response.status)}`);
-          return response.ok ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0);
+          const page = response.headers.get('content-type')?.includes('text/html') === true;
+          return response.ok && !page ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0);
         })
         .then((bytes) => {
           const range = decodeGlyphRange(bytes);
-          if (!range.intact) {
-            this.damaged.add(url);
+          const damaged = range.intact ? 0 : (this.damaged.get(url) ?? 0) + 1;
+          if (damaged > 0 && damaged < DAMAGED_ROUNDS) {
+            this.damaged.set(url, damaged);
             throw new Error('glyph range damaged on the way');
           }
           this.damaged.delete(url);

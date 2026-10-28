@@ -397,6 +397,13 @@ describe('glyph ranges that fail on the way (TG-04)', () => {
       expect(asked.map((init) => init?.cache)).toEqual([undefined, 'reload', 'reload']);
       expect([source.ready(font, 'Via'), source.loading]).toEqual([true, 0]);
       expect(source.resolve(86, font)).toBeDefined();
+      // A range answered damaged five times is kept as what decoded: its characters fall to the local font.
+      bodies.push(corrupted, corrupted, corrupted, corrupted, corrupted);
+      for (let i = 0; i < 5; i++) {
+        source.need(font, 'Ж');
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+      expect([source.ready(font, 'Ж'), source.loading]).toEqual([true, 0]);
     } finally {
       vi.useRealTimers();
     }

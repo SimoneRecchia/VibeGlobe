@@ -130,7 +130,8 @@ export class ToneMatcher {
   readonly #sources = new Map<number, number>();
   /** Per key: summed means and count of this frame's draws. */
   readonly #sums = new Float64Array(KEYS * 4);
-  readonly #gains = new Float32Array(KEYS * 3).fill(1);
+  /** The gains applied, by key: a chain's (F249), then those matched to the imagery below (F633, weakened, F638). */
+  readonly #gains = new Float32Array((KEYS + BELOW_KEYS) * 3).fill(1);
   /** Per key of a layer matched to the imagery below: its own and the reference's coverage-weighted sums. */
   readonly #below = new Float64Array(BELOW_KEYS * 7);
   readonly #belowGains = new Float32Array(BELOW_KEYS * 3).fill(1);
@@ -209,7 +210,7 @@ export class ToneMatcher {
       }
     }
     // The lowest layers' gains first: an overlay is compared with the layer below as that layer shows, its gain applied.
-    this.belowGains();
+    this.belowGains(draws.below?.strengths);
     for (const overlay of draws.overlays)
       for (let i = 0; i < draws.count; i++) {
         const key = overlay.toneSources?.[i] ?? -1;
@@ -220,7 +221,7 @@ export class ToneMatcher {
         if (below >= 0 && imageOf && !this.#grids.has(below)) this.measure(below, imageOf(below));
         this.compareWithBelow(draws, overlay, i, key - TONE_BELOW, handle);
       }
-    this.belowGains();
+    this.belowGains(draws.below?.strengths);
   }
 
   /** Remembers the key a texture is drawn as and measures it on first use. */
@@ -242,8 +243,8 @@ export class ToneMatcher {
     if (below >= 0) {
       const grid = this.#grids.get(below);
       if (grid) {
-        const gain = this.gainOf(draws.below?.toneSources[i] ?? -1);
-        this.accumulate(key, own, draws.uvTransforms, i, grid, CELLS, CELLS, belowUv, i, gain);
+        const belowKey = draws.below?.toneSources[i] ?? -1;
+        this.accumulate(key, own, draws.uvTransforms, i, grid, CELLS, CELLS, belowUv, i, belowKey);
       }
     } else if (below === BASE_TEXTURE_HANDLE && this.#base)
       this.accumulate(key, own, draws.uvTransforms, i, this.#base, BASE_COLUMNS, BASE_ROWS, belowUv, i);
@@ -264,8 +265,7 @@ export class ToneMatcher {
       const grid = this.#grids.get(below);
       if (!grid) return;
       const belowKey = draws.toneSources[i] ?? -1;
-      const gain = this.gainOf(belowKey);
-      this.accumulate(key, own, overlay.uvTransforms, i, grid, CELLS, CELLS, draws.uvTransforms, i, gain);
+      this.accumulate(key, own, overlay.uvTransforms, i, grid, CELLS, CELLS, draws.uvTransforms, i, belowKey);
     } else if (below === BASE_TEXTURE_HANDLE && this.#base) {
       // The world base image (the polar caps' fills, -2 and -3, are no reference).
       this.accumulate(key, own, overlay.uvTransforms, i, this.#base, BASE_COLUMNS, BASE_ROWS, draws.uvTransforms, i);
@@ -286,9 +286,10 @@ export class ToneMatcher {
     rows: number,
     referenceUv: Float32Array,
     referenceAt: number,
-    gain?: Float32Array,
+    gainKey = -1,
   ): void {
     const sums = this.#below;
+    const g = this.gainAt(gainKey);
     const o = ownAt * 4;
     const r = referenceAt * 4;
     for (let y = 0; y < CELLS; y++)
@@ -311,31 +312,41 @@ export class ToneMatcher {
         );
         for (let c = 0; c < 3; c++) {
           sums[key * 7 + c] = (sums[key * 7 + c] ?? 0) + alpha * (own[at + c] ?? 0);
-          sums[key * 7 + 3 + c] = (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (gain?.[c] ?? 1);
+          sums[key * 7 + 3 + c] =
+            (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (g < 0 ? 1 : (this.#gains[g + c] ?? 1));
         }
         sums[key * 7 + 6] = (sums[key * 7 + 6] ?? 0) + alpha;
       }
   }
 
   /** Sets the gains of the keys matched to the imagery below from this frame's sums; others keep theirs. */
-  private belowGains(): void {
+  /**
+   * Sets the gains of the keys matched to the imagery below from this frame's sums (others keep theirs), never below 1:
+   * a layer is brightened toward the imagery below, never darkened by it (F638). Each applies weakened by its layer's
+   * strength at this frame's zoom, from `strengths` (1 without).
+   */
+  private belowGains(strengths?: Float32Array): void {
     const sums = this.#below;
     for (let key = 0; key < BELOW_KEYS; key++) {
-      if ((sums[key * 7 + 6] ?? 0) <= 0) continue;
+      const strength = strengths?.[key >> 3] ?? 1;
       for (let c = 0; c < 3; c++) {
-        const own = sums[key * 7 + c] ?? 0;
-        const wanted = sums[key * 7 + 3 + c] ?? 0;
-        this.#belowGains[key * 3 + c] = own > 1e-3 ? Math.min(MAX_GAIN, Math.max(MIN_GAIN, wanted / own)) : 1;
+        if ((sums[key * 7 + 6] ?? 0) > 0) {
+          const own = sums[key * 7 + c] ?? 0;
+          const wanted = sums[key * 7 + 3 + c] ?? 0;
+          this.#belowGains[key * 3 + c] = own > 1e-3 ? Math.min(MAX_GAIN, Math.max(1, wanted / own)) : 1;
+        }
+        this.#gains[(KEYS + key) * 3 + c] = (this.#belowGains[key * 3 + c] ?? 1) ** strength;
       }
     }
   }
 
-  /** The sRGB gains of a key, or undefined where none applies. */
-  private gainOf(key: number): Float32Array | undefined {
-    if (key >= TONE_BELOW && key - TONE_BELOW < BELOW_KEYS)
-      return this.#belowGains.subarray((key - TONE_BELOW) * 3, (key - TONE_BELOW) * 3 + 3);
-    if (key >= 0 && key < KEYS) return this.#gains.subarray(key * 3, key * 3 + 3);
-    return undefined;
+  /**
+   * Where a key's gains start in the gains, negative where none applies: no view of them is made, so the frame loop allocates
+   * nothing (F064).
+   */
+  private gainAt(key: number): number {
+    const below = key - TONE_BELOW;
+    return (below < 0 ? key < KEYS : below < BELOW_KEYS) ? (below < 0 ? key : KEYS + below) * 3 : -1;
   }
 
   /**
@@ -355,7 +366,7 @@ export class ToneMatcher {
   }
 
   private gainInto(key: number, out: Float32Array | number[], at: number): void {
-    const gain = this.gainOf(key);
-    for (let c = 0; c < 3; c++) out[at + c] = gain ? (gain[c] ?? 1) ** SRGB_GAMMA : 1;
+    const g = this.gainAt(key);
+    for (let c = 0; c < 3; c++) out[at + c] = g < 0 ? 1 : (this.#gains[g + c] ?? 1) ** SRGB_GAMMA;
   }
 }

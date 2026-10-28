@@ -459,12 +459,12 @@ function applyOverlays(
     f[12 + slot] = from ? 1 : 0;
     for (let c = 0; c < 4; c++) f[slot * 4 + c] = overlay?.fromUvTransforms[i * 4 + c] ?? 0;
   }
-  // The slots' tone gains (F633).
+  // The slots' tone gains (F633), 1 where a slot matches nothing (written one by one: the frame loop allocates nothing).
   const gains = draw.overlayTones.elements;
-  gains.fill(1);
   for (let slot = 0; slot < 2; slot++) {
     const overlay = draws.overlays[slot];
-    if (overlay) textures.tones?.applyOverlay(overlay, i, gains, slot * 4);
+    if (overlay && (overlay.toneSources?.[i] ?? -1) >= 0) textures.tones?.applyOverlay(overlay, i, gains, slot * 4);
+    else for (let c = 0; c < 3; c++) gains[slot * 4 + c] = 1;
   }
 }
 

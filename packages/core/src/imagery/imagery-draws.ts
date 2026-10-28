@@ -76,6 +76,8 @@ export function drawImagery(
   let center: QuadtreeTile | undefined;
   let centerDistance = Infinity;
   fadeByZoom(layers, camera);
+  const strengths = list.below.strengths;
+  for (let layer = 0; layer < strengths.length; layer++) strengths[layer] = layers[layer]?.entry.toneStrength ?? 1;
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;

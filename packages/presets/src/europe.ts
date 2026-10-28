@@ -184,12 +184,25 @@ function levelFade(fromLevel: number, toLevel: number): { readonly fromZoom: num
 /** The deepest level of the package's WorldCover: above it, the online sources (F632). */
 const PACKAGE_IMAGERY_LEVEL = ESA_WORLDCOVER.maxLevel;
 
+/** The package's box, as `europe.json`'s region: every level of its imagery up to `seaMaxZoom` covers it, land and sea. */
+const PACKAGE_BOX = [
+  [
+    [-32, 27],
+    [45, 27],
+    [45, 72],
+    [-32, 72],
+    [-32, 27],
+  ],
+] as const;
+
 /**
- * Satellite, by zoom (F636): the globe's base image (Natural Earth) at the far levels; NASA's Blue Marble fading in over
- * it, then below everything (the sea, the polar caps, the land outside Europe); above it the package's WorldCover,
- * fading in on Europe's land with its water keyed out with a soft edge (KB-231), with the app's sources that also serve
- * the package's levels; above the package's levels the app's finer online sources, fading in over a level. The layers
- * above the Blue Marble match its tones where they cover it (`harmonize: 'below'`, F633).
+ * Satellite, by zoom (F636, F639). With a package: the globe's base image (Natural Earth) at the far levels and, below
+ * everything at every level, over the sea and the polar caps; the package's WorldCover fading in over it within the
+ * package's box, its flat water transparent everywhere, its edges soft; where the package holds Europe's land only
+ * (from level 9) its level 8 tiles magnified elsewhere, so Turkey's or Morocco's land keeps the same source; above the
+ * package's levels the app's finer online sources, fading in over a level. WorldCover's tones match the base image's
+ * at the lowest levels, fading to its own by level 9, never darkened (F638); the online sources keep their own. Online
+ * only, NASA's Blue Marble fades in over the base image instead.
  */
 function satelliteLayers(build: Build): ImageryLayerOptions[] {
   const { options, wrap, use } = build;
@@ -210,10 +223,9 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
           minLevel: Math.max(ESA_WORLDCOVER.minLevel, far + 1),
           maxLevel: ESA_WORLDCOVER.maxLevel,
-          // Europe's land with a soft edge; the package's flat water is no imagery: transparent everywhere, inland
-          // too, where the land's simplified outline reaches over the sea (F636).
+          // The package's box with a soft edge; its flat water is no imagery: transparent everywhere (F636).
           area: {
-            polygons: EUROPE_LAND,
+            polygons: [PACKAGE_BOX],
             tiles: 'clip',
             featherPx: FEATHER_PX,
             keyEverywhere: { rgb: WORLDCOVER_WATER_RGB, tolerance: WATER_TOLERANCE },
@@ -227,7 +239,7 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
   satellite.push(...added('bottom', false));
   const online = [...added('top', true), ...added('bottom', true)];
   const layers: ImageryLayerOptions[] = [];
-  if (use(NASA_GIBS_BLUE_MARBLE))
+  if (!build.packaged && use(NASA_GIBS_BLUE_MARBLE))
     layers.push({
       id: 'satellite-base',
       sources: [wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite')],
@@ -236,9 +248,16 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
       fadeIn: levelFade(far + 0.5, far + 1),
     });
   if (satellite.length > 0)
-    layers.push({ id: 'satellite', sources: satellite, harmonize: 'below', fadeIn: levelFade(far + 1, far + 2) });
+    layers.push({
+      id: 'satellite',
+      sources: satellite,
+      harmonize: 'below',
+      harmonizeFade: levelFade(far + 2, far + 5),
+      fadeIn: levelFade(far + 1, far + 2),
+    });
+  // Finer imagery keeps its own colors (F638).
   if (online.length > 0)
-    layers.push({ id: 'satellite-online', sources: online, harmonize: 'below', fadeIn: onlineFade() });
+    layers.push({ id: 'satellite-online', sources: online, harmonize: false, fadeIn: onlineFade() });
   return layers;
 }
 

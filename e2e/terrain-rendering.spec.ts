@@ -162,7 +162,10 @@ for (const backend of BACKENDS) {
     test(`peaks behind the horizon and at the screen edge never disappear or flicker while panning on ${backend} (F142)`, async ({
       page,
     }) => {
-      // From the loaded view: what pans in must never disappear or flicker, streaming at the start is F139's.
+      // From the loaded view: what pans in must never disappear or flicker, streaming at the start is F139's. Loading
+      // the view to the horizon and 78 captured frames take 1.3 to 2.6 min on CI's software GPU, twice that on a slow
+      // runner.
+      test.setTimeout(480_000);
       const report = await record(
         page,
         `backend=${backend}&scenario=terrain-horizon-peaks&imagery=smooth`,

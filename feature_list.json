@@ -7685,7 +7685,7 @@
         "Unit-test the layers, fades, tones, keys and levels the preset builds, with configurable far levels",
         "In the browser, with every source from fixtures drawn from the base image in other tones, zoom from level 0 to 16 over Italy's land, its coast and the sea: every settled frame within a block difference of 20 from the base image alone, every step of 0.1 levels within the motion's own difference, no black or transparent pixel, the frames saved"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F637",
@@ -7695,6 +7695,39 @@
       "steps": [
         "Unit-test that the options keep the ones given and add every orthophoto layer",
         "Document it with Cube's options in the preset's guide"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F638",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`europeOpen()` Satellite matches the package's tones to the imagery below only at the far levels: the match fades out with the zoom (`harmonizeFade`, gone by level 9) and never darkens a layer, so WorldCover shows its own colors from level 9; the online sources and the orthophotos are never matched.",
+      "steps": [
+        "Unit-test the match's strength by zoom, the renderer's gain never below 1 and weakened by the strength, and the preset's settings",
+        "In the browser, with every source from fixtures drawn from the base image in other tones, zoom from level 0 to 16 over Italy's land, its coast and the sea: every settled frame within a block difference of 20 from the base image alone up to zoom 5 and from the base image with its land in the package's tone from zoom 8 to 11, every step of 0.1 levels from zoom 3 to 9 within the motion's own difference, no black or transparent pixel",
+        "Capture views before and after at the zooms of the owner's report (Europe at zoom 3.5 to 5, Thrace and Gibraltar at 7, Turin at 9, 11 and 14, the Ligurian Sea at 10, Genoa at 11, an orthophoto at 13): no blue-gray cast, no tone jump"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F639",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "With its offline package, `europeOpen()` Satellite draws WorldCover over the package's whole box with a soft edge and its water keyed out, its level 8 tiles magnified where deeper levels hold Europe's land only, so no edge cuts the land outside Europe (European Turkey); the sea is the globe's base image at every level, uniform beyond level 8; NASA's Blue Marble is used only without a package.",
+      "steps": [
+        "Unit-test the layers the preset builds with and without a package, the package's area and its keyed water",
+        "In the browser, zoom over the sea from level 7 to 16: every settled frame matches the base image alone"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F640",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "Terrain asks for no tile below one its loader knows missing, so a service whose data ends at a shallower level in an area (Mapterhorn beyond level 13 over parts of Italy) costs one 404 a tile of its first missing level instead of one a level.",
+      "steps": [
+        "Unit-test that with a level known missing no deeper tile is wanted, and the tiles above it are"
       ],
       "status": "passing"
     }

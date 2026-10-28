@@ -151,3 +151,29 @@ Proposal, once a service passes: a record in `EUROPE_ORTHOPHOTOS` (`@vibeglobe/p
 region with a soft border, from level 12 to its own deepest (19 for 20 cm), fading in over level 12 to 13 above the
 package's WorldCover with its tones matched (F636). Without coverage the package's level 11 shows, magnified with
 linear filtering. Open question 38 asks the owner to allow the hosts and to decide on self-hosted AGEA tiles.
+
+## Amendment, 2026-10-28: tones matched only far away, the package over its box, no Blue Marble with a package
+
+The owner found, in an application with the package (KB-234 to KB-238): a blue-gray cast on the land from level 5 to
+14, as WorldCover was matched to the Blue Marble's darker tones even where the Blue Marble was a magnified 500 m
+image; a hard edge at European Turkey, outside the land mask; a jump of tone between level 4.5 and 6 from the light
+base image to the darker Blue Marble; a blotchy, striped sea beyond level 8, the Blue Marble magnified; and 404s of
+Mapterhorn beyond its data. With a package Satellite is now:
+
+| Levels (zoom at the center) | Land                                                                      | Sea                       |
+| --------------------------- | ------------------------------------------------------------------------- | ------------------------- |
+| 0–5 (zoom < 4)              | The base image                                                            | The base image            |
+| 5–6 (zoom 4–5)              | WorldCover fading in over the package's box, in the base image's tones    | The base image            |
+| 6–9 (zoom 5–8)              | WorldCover, the match fading out by zoom (`harmonizeFade`, F638)          | The base image            |
+| 9 and beyond                | WorldCover in its own colors, then the online sources in their own (F638) | The base image, magnified |
+
+- A layer's tone match takes a strength from the zoom, 1 to 0 over `harmonizeFade`, and the gain applied is the
+  measured one to that power. A gain matched to the layer below never darkens (it is at least 1): data of a layer's
+  own is not dimmed to a coarser image under it.
+- WorldCover covers the package's box with a 12-pixel soft edge, its water keyed out; where the package holds Europe's
+  land only (from level 9) its level 8 tiles are magnified, so Turkey's or Morocco's land has no edge (F639).
+- The Blue Marble is left out with a package: the base image is the far view and the sea at every level, smooth when
+  magnified. Online only, it fades in over level 4.5 to 5 in its own colors, as before.
+- The online sources and orthophotos are not matched (`harmonize: false`): their colors are their own.
+- Terrain is asked for no deeper than a tile its loader knows missing (F640): a service whose data ends at a shallower
+  level costs one 404 a tile of its first missing level, not one a level.

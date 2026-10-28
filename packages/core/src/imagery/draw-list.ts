@@ -21,7 +21,12 @@ export interface TileDrawBelow {
   readonly textures: Int32Array;
   readonly uvTransforms: Float32Array;
   readonly toneSources: Int16Array;
+  /** By layer (the tone source's `layer`), the strength of its matching at this frame's zoom, 0 to 1 (F638). */
+  readonly strengths: Float32Array;
 }
+
+/** Layers whose tone matching strength a frame carries (`TileDrawBelow.strengths`): tone sources count 8 per layer. */
+const TONE_LAYERS = 8;
 
 // The renderer's view of the draws, with tone matching to the imagery below (F633).
 declare module '../globe/types.js' {
@@ -206,6 +211,7 @@ function belowArrays(capacity: number): TileDrawBelow {
     textures: new Int32Array(capacity),
     uvTransforms: new Float32Array(capacity * 4),
     toneSources: new Int16Array(capacity),
+    strengths: new Float32Array(TONE_LAYERS).fill(1),
   };
 }
 

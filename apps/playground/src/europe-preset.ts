@@ -28,12 +28,12 @@ const preset = enabled ? europeOpen(fixtures ? fixtureOptions(fixtures) : { excl
 
 /**
  * `&presetFixtures=<session>`: the preset with a package, every source's tiles from the fixture server's `earth`
- * patterns (F636): the Blue Marble as `earth`, the package's WorldCover as `earth-package`, and an online source of the
+ * patterns (F636): the Blue Marble as `earth-marble`, the package's WorldCover as `earth-package`, and an online source of the
  * app's own over central Italy (11° to 15° E, 40° to 44° N) from level 12 to 16 as `earth-fine`. No outside host.
  */
 function fixtureOptions(session: string): EuropeOpenOptions {
   const patterns: Readonly<Record<string, string>> = {
-    'nasa-gibs-blue-marble': 'earth/mercator-latitude',
+    'nasa-gibs-blue-marble': 'earth-marble/mercator-latitude',
     'europe-satellite': 'earth-package/mercator',
   };
   const far = params.get('presetFarLevels');

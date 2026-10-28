@@ -19,7 +19,7 @@ export type FixtureScheme = 'mercator' | 'geographic' | 'mercator-latitude';
  * `holes` the `world` colors with every other `checker` cell transparent (F242); `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
  * `toned` the `smooth` field darker and warmer, scaled by {@link TONE_SCALE}, a source of another tone (F249);
  * `red`, `green`, `blue`, `shade` and `white` one color everywhere ({@link SOLID_COLORS}); `earth`, `earth-package`
- * and `earth-fine` the playground's Natural Earth base image in three tones (`earth.ts`, F636).
+ * and `earth-fine` the playground's Natural Earth base image in their tones (`earth.ts`, F636).
  */
 export type FixturePattern =
   | 'world'

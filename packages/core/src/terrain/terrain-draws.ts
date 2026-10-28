@@ -272,15 +272,20 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number, 
     return -1;
   }
   const wanted = mapping[MAPPING_LEVEL] ?? 0;
+  const missing = missingLevel(layer, wanted);
   let arriving = false;
   for (let current = wanted; current >= source.minLevel; current--) {
     const x = mapping[MAPPING_X] ?? 0;
     const y = mapping[MAPPING_Y] ?? 0;
     // Every ancestor is wanted, not every second as imagery's (ADR 0006 §3): terrain tiles are small, and the tile
-    // whose metadata declares the availability of the deeper levels must load (F128).
-    const handle = !arriving
-      ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
-      : layer.loader.readyHandle(current, x, y);
+    // whose metadata declares the availability of the deeper levels must load (F128). Below a tile known missing,
+    // none exists: never asked for, so a service's empty levels cost no request (F640).
+    const handle =
+      current >= missing
+        ? -1
+        : !arriving
+          ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance)
+          : layer.loader.readyHandle(current, x, y);
     if (handle >= 0)
       return shown >= 0 && current > shown + MAX_TERRAIN_MORPH_LEVELS
         ? limitAdvance(layer, shown, current, handle)
@@ -289,6 +294,21 @@ function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number, 
     if (current > source.minLevel) mapAncestor(mapping, 0, 1);
   }
   return -1;
+}
+
+/**
+ * The shallowest level of the terrain tile in `mapping` (at `wanted`) and its ancestors that is known missing, or
+ * Infinity: in a pyramid, no tile below a missing one exists (F640). Leaves `mapping` as it was. Allocates nothing.
+ */
+function missingLevel(layer: TerrainLayer, wanted: number): number {
+  seedMapping.set(mapping);
+  let missing = Infinity;
+  for (let current = wanted; current > layer.source.minLevel; current--) {
+    if (layer.loader.unavailable(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0)) missing = current;
+    mapAncestor(mapping, 0, 1);
+  }
+  mapping.set(seedMapping);
+  return missing;
 }
 
 /**

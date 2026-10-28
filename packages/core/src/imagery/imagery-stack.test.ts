@@ -99,3 +99,24 @@ describe('fading a layer in with the zoom (F635)', () => {
     expect(() => stackEntries([{ sources: [valid], fadeIn: { fromZoom: 5, toZoom: 5 } }])).toThrow(RangeError);
   });
 });
+
+describe('matching tones only at the lowest levels (F638)', () => {
+  it('matches fully up to the first zoom, partly up to the second, then not at all', () => {
+    const [entry] = stackEntries([
+      { id: 'cover', sources: [valid], harmonize: 'below', harmonizeFade: { fromZoom: 5, toZoom: 8 } },
+    ]);
+    if (!entry) throw new Error('no layer');
+    const camera = new Camera();
+    camera.heightPx = 600;
+    const at = (zoom: number): number | undefined => {
+      camera.pose.targetLatitudeRad = 0;
+      camera.pose.rangeMeters = rangeForGroundZoom(zoom, camera.heightPx, camera.fovYRad);
+      fadeByZoom([{ entry }], camera);
+      return entry.toneStrength;
+    };
+    expect(at(4)).toBe(1);
+    expect(at(6.5)).toBeCloseTo(0.5, 6);
+    expect(at(12)).toBe(0);
+    expect(() => stackEntries([{ sources: [valid], harmonizeFade: { fromZoom: 8, toZoom: 5 } }])).toThrow(RangeError);
+  });
+});

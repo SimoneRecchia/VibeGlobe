@@ -37,6 +37,12 @@ export interface CoverageArea {
    * the lakes inside the area stay (the Europe preset's WorldCover, KB-231).
    */
   readonly keyOutside?: KeyColor;
+  /**
+   * Pixels of this color are transparent everywhere, inside the area too, fading out over a second tolerance so the
+   * noise of lossy tiles around them goes too; with `clip`, the pixels outside the area go as well (F636). For a fill
+   * that is never real imagery, such as a package's no-data water, where the area's outline does not follow the coast.
+   */
+  readonly keyEverywhere?: KeyColor;
 }
 
 /** A color the decoder matches per pixel: sRGB channels and the largest difference per channel (JPEG noise). */
@@ -56,8 +62,16 @@ export interface TileMask {
   readonly ringEnds: Uint32Array;
   /** The border's fade, in pixels of the tile, inward ({@link CoverageArea.featherPx}). */
   readonly featherPx?: number;
-  /** When set, only pixels of this color are masked; the others stay ({@link CoverageArea.keyOutside}). */
-  readonly key?: { readonly rgb: readonly [number, number, number]; readonly tolerance: number };
+  /**
+   * When set, only pixels of this color are masked; the others stay ({@link CoverageArea.keyOutside}). With
+   * `everywhere`, the pixels of this color are transparent inside the outline too, and the others are masked by it
+   * ({@link CoverageArea.keyEverywhere}).
+   */
+  readonly key?: {
+    readonly rgb: readonly [number, number, number];
+    readonly tolerance: number;
+    readonly everywhere?: boolean;
+  };
 }
 
 /** A GeoJSON geometry, feature or feature collection of polygons, the form country borders come in. */
@@ -234,25 +248,36 @@ function tileMask(
   return { points, ringEnds };
 }
 
+/** A tile's own outline, for the mask of a tile wholly inside an area keyed everywhere. */
+const WHOLE_TILE = Float64Array.of(0, 0, 1, 0, 1, 1, 0, 1);
+const WHOLE_TILE_END = Uint32Array.of(4);
+
 /** Prepares an area for tile tests: done once per source, the tests themselves allocate nothing. */
 export function coverageTest(area: CoverageArea): CoverageTest {
   const polygons = area.polygons.map(prepare);
   const overlap = area.tiles === 'overlap' || area.tiles === 'clip';
   const clip = area.tiles === 'clip';
-  const key = area.keyOutside && { rgb: area.keyOutside.rgb, tolerance: area.keyOutside.tolerance ?? 8 };
+  const everywhere = area.keyEverywhere && {
+    rgb: area.keyEverywhere.rgb,
+    tolerance: area.keyEverywhere.tolerance ?? 8,
+    everywhere: true,
+  };
+  const key =
+    everywhere ?? (area.keyOutside && { rgb: area.keyOutside.rgb, tolerance: area.keyOutside.tolerance ?? 8 });
   const featherPx = Math.max(0, area.featherPx ?? 0);
   return {
     rectangles: polygons.map((p) => ({ westRad: p.west, southRad: p.south, eastRad: p.east, northRad: p.north })),
     covers(extent: TileRectangleRad): boolean {
-      if (key) return true;
+      if (key && !everywhere) return true;
       for (const polygon of polygons)
         if (overlap ? rectangleOverlaps(polygon, extent) : rectangleInside(polygon, extent)) return true;
       return false;
     },
     mask(extent: TileRectangleRad, mercator: boolean, tileSizePx = 256): TileMask | undefined {
       if (!clip && !key) return undefined;
+      // A key everywhere masks the tiles wholly inside the area too: with the whole tile as their outline.
       const outline = tileMask(polygons, extent, mercator, featherPx / tileSizePx);
-      if (!outline) return undefined;
+      if (!outline) return everywhere ? { points: WHOLE_TILE, ringEnds: WHOLE_TILE_END, key: everywhere } : undefined;
       return { ...outline, ...(featherPx > 0 ? { featherPx } : {}), ...(key ? { key } : {}) };
     },
   };

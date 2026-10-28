@@ -80,4 +80,23 @@ describe('coverage areas (polygon coverage of a source)', () => {
     expect(keyed.mask(rect(15, 46, 17, 49), true)?.ringEnds.length).toBe(2);
     expect(keyed.mask(rect(10.5, 46.5, 11.5, 47.5), true)).toBeUndefined();
   });
+
+  it('keys a color everywhere, the tiles wholly inside too, and clips outside the area with its feather (F636, KB-233)', () => {
+    const area = coverageTest({
+      polygons: [COUNTRY],
+      tiles: 'clip',
+      featherPx: 8,
+      keyEverywhere: { rgb: [54, 73, 90], tolerance: 16 },
+    });
+    const key = { rgb: [54, 73, 90], tolerance: 16, everywhere: true };
+    // Clipped: only tiles touching the area are asked for.
+    expect(area.covers(rect(30, 30, 31, 31))).toBe(false);
+    // A tile wholly inside, beyond the feather's reach, is keyed over its whole extent, with no fade at its edges.
+    const inside = area.mask(rect(10.5, 46.5, 11.5, 47.5), true);
+    expect(inside?.key).toEqual(key);
+    expect(Array.from(inside?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    expect(inside?.featherPx).toBeUndefined();
+    // Across the border: the area's outline with its feather, and the key.
+    expect(area.mask(rect(15, 46, 17, 49), true)).toMatchObject({ featherPx: 8, key });
+  });
 });

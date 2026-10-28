@@ -9,7 +9,7 @@ import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
-import { pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
+import { fadeByZoom, pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import type { DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
@@ -378,6 +378,7 @@ export class ImageryRuntime {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const layer of this.layers) layer.loader.beginFrame();
+    if (fadeByZoom(this.stack, camera)) this.stackChanged();
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
     if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
     if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);

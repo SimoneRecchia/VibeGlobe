@@ -108,6 +108,15 @@ export class TileTextures {
 
   constructor(private readonly anisotropy: () => number) {}
 
+  /**
+   * Takes a new world base image: the polar caps' fills are made again with its texture, and the tones of layers
+   * matched to the imagery below are measured against its image (F633). Returns the texture.
+   */
+  setBase(texture: Texture, image: unknown, renderer: Parameters<PolarCapTextures['rebuild']>[1]): Texture {
+    this.tones.measureBase(image);
+    return this.caps.rebuild(texture, renderer);
+  }
+
   /** Number of textures held. */
   get size(): number {
     return this.count;

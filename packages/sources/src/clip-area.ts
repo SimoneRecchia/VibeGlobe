@@ -2,8 +2,6 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   type CoverageArea,
-  coverageArea,
-  coverageTest,
   type CoverageTest,
   type GeoJsonArea,
   type ImagerySource,
@@ -11,6 +9,7 @@ import {
   type TileRectangleRad,
   type TilingScheme,
 } from '@vibeglobe/core';
+import { coverageArea, coverageTest } from '@vibeglobe/core/coverage';
 
 /** A source's `area` option, prepared: its tile test and, when clipped per pixel, its tile masks (F618). */
 export interface SourceArea {
@@ -33,7 +32,7 @@ export function sourceArea(
   if (!input) return undefined;
   const area = coverageArea(input);
   const test = coverageTest(area);
-  if (area.tiles !== 'clip' && !area.keyOutside) return { test, clip: false };
+  if (area.tiles !== 'clip' && !area.keyOutside && !area.keyEverywhere) return { test, clip: false };
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const mercator = tiling.crs === 'EPSG:3857';
   return {

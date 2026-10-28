@@ -2,7 +2,6 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   type CoverageArea,
-  coverageTest,
   GEOGRAPHIC_TILING,
   heightmapGeometricErrorMeters,
   inCoverage,
@@ -16,6 +15,7 @@ import {
   type TimeoutsMs,
   type VerticalDatum,
 } from '@vibeglobe/core';
+import { coverageTest } from '@vibeglobe/core/coverage';
 import { fetchTransport } from './fetch-transport.js';
 import { type Attribution, CUSTOM_PROFILE, type DescribedSource, type ProviderProfile } from './metadata.js';
 

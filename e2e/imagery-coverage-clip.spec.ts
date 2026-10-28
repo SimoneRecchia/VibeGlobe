@@ -72,7 +72,7 @@ test.describe('coverage clipped per pixel (F618, KB-209)', () => {
     // The sharp border: white inside (left), blue outside (right), at most two pixels between.
     const sharp = await middleRow(page);
     expect(sharp.replace(/^w+/, '').replace(/b+$/, '').length).toBeLessThanOrEqual(2);
-    await openGlobe(page, `backend=webgl2&${view}&overlayArea=triangle&overlayFeather=16`);
+    await openGlobe(page, `backend=webgl2&${view}&overlayArea=triangle&overlayFeather=32`);
     await waitForImagery(page);
     const feathered = await middleRow(page);
     console.log(`[clip] sharp ${sharp}\n[clip] feathered ${feathered}`);

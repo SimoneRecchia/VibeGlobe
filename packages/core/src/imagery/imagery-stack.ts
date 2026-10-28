@@ -1,7 +1,9 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { rgba8Bytes } from '../cache/byte-size.js';
-import { LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
+import type { Camera } from '../camera/camera.js';
+import { groundZoomForRange, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
+import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
 /** How a layer combines with the layers below it (F246). */
 export type ImageryBlend = 'normal' | 'multiply' | 'screen';
@@ -25,10 +27,27 @@ export interface ImageryLayerOptions {
   /**
    * Matches the tones of the chain's sources (F249, ADR 0044): a later source's colors are scaled toward the first
    * source's where both show, so neither a switch nor a boundary between them shows (default true; false shows the
-   * sources' own colors).
+   * sources' own colors). `'below'` matches every source of the layer to the imagery under it instead, measured where
+   * both show on the same tiles: the opaque layer below for a transparent layer, the world base image for the lowest
+   * opaque layer, so the layers' tones follow one another across levels and borders (F633).
    */
-  readonly harmonize?: boolean;
+  readonly harmonize?: Harmonize;
+  /**
+   * Fades the layer in with the camera's zoom (F635): hidden up to `fromZoom` (no tile requested), its opacity growing
+   * linearly to full at `toZoom`, the same over the whole view, so a layer replaces the one below without a boundary at
+   * the tiles' edges or a step between levels. Absent: shown at every zoom.
+   */
+  readonly fadeIn?: ZoomFade;
 }
+
+/** A fade with the camera's Mercator zoom (`ImageryLayerOptions.fadeIn`, F635). */
+export interface ZoomFade {
+  readonly fromZoom: number;
+  readonly toZoom: number;
+}
+
+/** How a layer matches tones (`ImageryLayerOptions.harmonize`). */
+export type Harmonize = boolean | 'below';
 
 /** A layer of `GlobeOptions.imagery`: a single source, or a layer with a chain of sources and its look. */
 export type ImageryLayerInput = ImagerySource | ImageryLayerOptions;
@@ -59,8 +78,8 @@ export interface ImageryLayerState {
   readonly opacity: number;
   readonly visible: boolean;
   readonly blend: ImageryBlend;
-  /** Whether the chain's tones are matched (F249). */
-  readonly harmonize: boolean;
+  /** How the layer's tones are matched (F249, F633). */
+  readonly harmonize: Harmonize;
   /** The layer's sources in priority order (F220). */
   readonly sources: readonly ImagerySourceInfo[];
 }
@@ -101,7 +120,7 @@ export interface ImageryLayerChanges {
   readonly opacity?: number;
   readonly visible?: boolean;
   readonly blend?: ImageryBlend;
-  readonly harmonize?: boolean;
+  readonly harmonize?: Harmonize;
 }
 
 /**
@@ -137,7 +156,10 @@ export interface StackEntry {
   opacity: number;
   visible: boolean;
   blend: ImageryBlend;
-  harmonize: boolean;
+  harmonize: Harmonize;
+  fadeIn?: ZoomFade;
+  /** The share of its opacity the layer shows at the frame's zoom (its `fadeIn`), set each frame (F635). */
+  zoomOpacity?: number;
 }
 
 function isSource(input: ImageryLayerInput): input is ImagerySource {
@@ -156,6 +178,7 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
         visible: true,
         blend: 'normal',
         harmonize: true,
+        zoomOpacity: 1,
       };
     const first = input.sources[0];
     if (!first) throw new RangeError('An imagery layer needs at least one source');
@@ -167,8 +190,15 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
       visible: true,
       blend: 'normal',
       harmonize: true,
+      zoomOpacity: 1,
     };
     applyChanges(entry, input);
+    if (input.fadeIn) {
+      const { fromZoom, toZoom } = input.fadeIn;
+      if (!(Number.isFinite(fromZoom) && Number.isFinite(toZoom) && fromZoom < toZoom))
+        throw new RangeError(`A layer's fadeIn needs finite zooms with fromZoom below toZoom`);
+      entry.fadeIn = { fromZoom, toZoom };
+    }
     return entry;
   });
   const ids = new Set<string>();
@@ -182,7 +212,11 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
 /** Applies changes to a layer; throws `RangeError` for an opacity outside 0–1 or an unknown blend mode. */
 export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): void {
   const { opacity, visible, blend, harmonize } = changes;
-  if (harmonize !== undefined) entry.harmonize = harmonize;
+  if (harmonize !== undefined) {
+    if (harmonize !== true && harmonize !== false && harmonize !== 'below')
+      throw new RangeError(`Unknown harmonize value "${String(harmonize)}"`);
+    entry.harmonize = harmonize;
+  }
   if (opacity !== undefined) {
     if (!(opacity >= 0 && opacity <= 1)) throw new RangeError(`Opacity ${String(opacity)} is not between 0 and 1`);
     entry.opacity = opacity;
@@ -196,17 +230,46 @@ export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): v
 
 /** True when a layer covers what is below it where it has a tile: fully opaque and blended normally. */
 export function isOpaque(entry: StackEntry): boolean {
-  return entry.opacity >= 1 && entry.blend === 'normal' && !entry.transparent;
+  return shownOpacity(entry) >= 1 && entry.blend === 'normal' && !entry.transparent;
+}
+
+/** The opacity a layer shows with at this frame's zoom: its own times its zoom fade's (F635). */
+export function shownOpacity(entry: StackEntry): number {
+  return entry.opacity * (entry.zoomOpacity ?? 1);
 }
 
 /**
- * The deepest pinned level of each source, coarse first across sources: levels 0..N whose cumulative GPU size keeps
- * the sum over every base source within 1/8 of the GPU budget (M3 plan §3, risk 8).
+ * Sets each layer's share of its opacity at the camera's Mercator zoom (F635). Returns true when a layer was shown,
+ * hidden, or turned opaque or translucent by it: the draws then change layers at once, with no cross-fade from what
+ * they showed, which was already the same imagery. Allocates nothing.
+ */
+export function fadeByZoom(entries: readonly { readonly entry: StackEntry }[], camera: Camera): boolean {
+  const ground = groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
+  const zoom = mercatorZoomFromGroundZoom(ground, camera.pose.targetLatitudeRad);
+  let changed = false;
+  for (const { entry } of entries) {
+    const fade = entry.fadeIn;
+    const before = entry.zoomOpacity ?? 1;
+    const after = fade ? Math.min(1, Math.max(0, (zoom - fade.fromZoom) / (fade.toZoom - fade.fromZoom))) : 1;
+    entry.zoomOpacity = after;
+    if (before <= 0 !== after <= 0 || before >= 1 !== after >= 1) changed = true;
+  }
+  return changed;
+}
+
+/** The deepest first level of a source that still pins its tiles within its coverage (F634). */
+const MAX_PINNED_START = 8;
+
+/**
+ * The deepest pinned level of each source: levels from the source's first up to N, a level per source in turn, whose
+ * cumulative GPU size keeps the sum over every base source within 1/8 of the GPU budget (M3 plan §3, risk 8). A source
+ * that starts deeper than level 0 pins from its first level, only the tiles within its coverage (F634).
  */
 export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: number): number[] {
   const sources = entries.flatMap((entry) => entry.sources);
   // One source of a chain pins a base, the later ones serving finer levels or standing in (F247): the first that has
-  // level 0, so a chain over a world source from a source that starts deeper pins the world's low levels (KB-218).
+  // level 0, so a chain over a world source from a source that starts deeper pins the world's low levels (KB-218); in
+  // a chain without one, its first source, from its first level (F634).
   const heads = entries.flatMap((entry) => {
     const base = Math.max(
       0,
@@ -214,13 +277,20 @@ export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: num
     );
     return entry.sources.map((_, index) => index === base);
   });
-  const levels = sources.map(() => -1);
+  // A source starting deeper than this pins nothing: its first level has too many tiles to count, let alone pin.
+  const levels = sources.map((source) => (source.minLevel > MAX_PINNED_START ? -2 : Math.max(0, source.minLevel) - 1));
+  const firsts = [...levels];
   let used = 0;
-  for (let level = 0; level <= 25; level++) {
+  // A level per source in turn, each from its own first, coarse first: every layer gets its lowest levels.
+  for (let round = 0; round <= 25; round++) {
     let added = false;
     for (const [index, source] of sources.entries()) {
-      if (!heads[index] || levels[index] !== level - 1) continue;
-      const tiles = source.tiling.rootTilesX * source.tiling.rootTilesY * 4 ** level;
+      const level = (levels[index] ?? -2) + 1;
+      if (!heads[index] || (firsts[index] ?? -2) < -1 || level - 1 - (firsts[index] ?? 0) !== round) continue;
+      const tiles =
+        (firsts[index] ?? -1) < 0
+          ? source.tiling.rootTilesX * source.tiling.rootTilesY * 4 ** level
+          : coveredTiles(source, level);
       const bytes = tiles * rgba8Bytes(source.tileSizePx, source.tileSizePx);
       if (used + bytes > gpuBudgetBytes / 8) continue;
       used += bytes;
@@ -229,7 +299,7 @@ export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: num
     }
     if (!added) break;
   }
-  return levels;
+  return levels.map((level, index) => (level === firsts[index] || level < 0 ? -1 : level));
 }
 
 /** The reference systems of the engine's tiling schemes (Web Mercator XYZ and the two-root geographic pyramid). */

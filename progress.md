@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-10-28: Europe preset Satellite by zoom, tones across layers, Italian orthophotos (targeted owner request)
+
+Problems the owner saw in Cube with `europeOpen()` Satellite, fixed with tests (F630–F637, KB-231–KB-233). Far away
+(levels 0–4, `farLevels`) the globe's base image shows again, as before #57; NASA's Blue Marble fades in over half a
+level (`fadeIn` by zoom, F635), then the package's WorldCover over a level on Europe's land, its flat no-data water
+keyed out everywhere and its land outside Europe faded out over 12 pixels (KB-231, KB-233); above level 11 the app's
+online sources and the orthophotos fade in over a level, each to its own deepest level. Layers match the tones of the
+imagery below them, measured cell by cell where both show (`harmonize: 'below'`, F633). The pixelated rows were the
+Blue Marble drawn as EPSG:4326 tiles: a Mercator tile across 45° N showed level 1 (KB-232); it is now one WMS image
+per Mercator tile with rows linear in latitude. A chain starting deeper than level 0 pins its first level within its
+coverage, a level per layer in turn (F634). `e2e/europe-zoom-phases.spec.ts` zooms 0 to 16 over Italy's land, coast
+and sea on fixtures drawn from the base image in three tones: every settled frame within a block difference of 20
+of the base image alone (13.7 at most), steps of 0.1 level as smooth as the base image's own motion, no hole. The
+core's polygon areas moved to `@vibeglobe/core/coverage` to keep the main entry within its 65 KB budget. Research:
+no Italian orthophoto passes the criterion online yet (`docs/research/italy-orthophotos.md`, ADR 0182, open question
+38).
+
 ## 2026-10-27: tilt policy, terrain clearance, progressive roads and model sets (targeted owner request)
 
 Requests from integrating the engine in an application with wind and solar farms. (1) F625: an optional tilt policy of

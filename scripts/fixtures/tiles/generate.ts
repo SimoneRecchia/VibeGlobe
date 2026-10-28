@@ -2,9 +2,13 @@
 // 0015). Every channel stays at 40 or more and alpha at 255 (except the `holes` pattern's transparent cells), so neither
 // the black test nor the transparent-pixel sentinel of the scenario detectors can match fixture imagery.
 import { PNG } from 'pngjs';
+import { earthPixel } from './earth.ts';
 
-/** The tiling schemes the fixture server cuts (EPSG:3857 XYZ and the two-root geographic pyramid). */
-export type FixtureScheme = 'mercator' | 'geographic';
+/**
+ * The tiling schemes the fixture server cuts: EPSG:3857 XYZ, the two-root geographic pyramid, and EPSG:3857 tiles with
+ * rows linear in latitude (a WMS asked in EPSG:4326 for each Web Mercator tile, KB-232).
+ */
+export type FixtureScheme = 'mercator' | 'geographic' | 'mercator-latitude';
 
 /**
  * Patterns: `world` a smooth color field with grid lines that follow the level (continuous across tiles and levels);
@@ -14,7 +18,8 @@ export type FixtureScheme = 'mercator' | 'geographic';
  * light stripes, the worst case for aliasing (F107); `patches` each tile one color of {@link PATCH_COLORS} (F108);
  * `holes` the `world` colors with every other `checker` cell transparent (F242); `checker` a checkerboard of 1/4096 of the Web Mercator world, the same at every level and tile size (F240, F241);
  * `toned` the `smooth` field darker and warmer, scaled by {@link TONE_SCALE}, a source of another tone (F249);
- * `red`, `green`, `blue`, `shade` and `white` one color everywhere ({@link SOLID_COLORS}).
+ * `red`, `green`, `blue`, `shade` and `white` one color everywhere ({@link SOLID_COLORS}); `earth`, `earth-package`
+ * and `earth-fine` the playground's Natural Earth base image in three tones (`earth.ts`, F636).
  */
 export type FixturePattern =
   | 'world'
@@ -30,7 +35,10 @@ export type FixturePattern =
   | 'red'
   | 'green'
   | 'blue'
-  | 'shade';
+  | 'shade'
+  | 'earth'
+  | 'earth-package'
+  | 'earth-fine';
 
 /** The single colors of the `red`, `green`, `blue` and `shade` (a flat hillshade) patterns: layer stacking (F243–F246). */
 export const SOLID_COLORS: Readonly<Record<string, readonly [number, number, number]>> = {
@@ -81,9 +89,11 @@ const MIN_CHANNEL = 40;
 /** The longitude and latitude (radians) of a point of a tile, `u` and `v` from 0 to 1 across it (v from the north). */
 export function fixturePosition(tile: FixtureTile, u: number, v: number): { lonRad: number; latRad: number } {
   const n = 2 ** tile.level;
-  if (tile.scheme === 'mercator') {
+  if (tile.scheme === 'mercator' || tile.scheme === 'mercator-latitude') {
     const lonRad = -Math.PI + (2 * Math.PI * (tile.x + u)) / n;
-    const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * (tile.y + v)) / n)));
+    const latAt = (row: number): number => Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / n)));
+    const latRad =
+      tile.scheme === 'mercator' ? latAt(tile.y + v) : latAt(tile.y) + (latAt(tile.y + 1) - latAt(tile.y)) * v;
     return { lonRad, latRad: Math.max(-MAX_LAT, Math.min(MAX_LAT, latRad)) };
   }
   const lonRad = -Math.PI + (Math.PI * (tile.x + u)) / n;
@@ -153,9 +163,11 @@ export function renderTile(tile: FixtureTile): Uint8Array {
         } else color = dark ? [60, 70, 90] : [230, 220, 200];
       } else if (tile.pattern === 'patches') {
         color = [...(PATCH_COLORS[(tile.x + 3 * tile.y) % PATCH_COLORS.length] ?? [128, 128, 128])];
-      } else if (tile.pattern === 'smooth' || tile.pattern === 'toned') {
+      } else if (tile.pattern === 'smooth' || tile.pattern === 'toned' || tile.pattern.startsWith('earth')) {
         const { lonRad, latRad } = fixturePosition(tile, u, v);
-        color = worldColor(lonRad, latRad);
+        color = tile.pattern.startsWith('earth')
+          ? earthPixel(tile.pattern, lonRad, latRad)
+          : worldColor(lonRad, latRad);
         if (tile.pattern === 'toned') color = toned(color);
       } else {
         const { lonRad, latRad } = fixturePosition(tile, u, v);

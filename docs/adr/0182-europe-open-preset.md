@@ -104,3 +104,50 @@ Europe's land (a coverage area's `keyOutside`), fading over 12 tile pixels (`fea
 Marble at every level; WorldCover keeps its coastline and lakes. Above the package's level 11 the chain takes finer
 online sources only when the app adds them (`orthophotos`, `addSources` from level 12); without them level 11 is
 magnified (F632).
+
+## Amendment, 2026-10-28: Satellite by zoom phases (supersedes the base-layer part of #57)
+
+The owner asked for a far view like before #57, a linear transition by zoom without blocks, edges or jumps of color
+or sharpness, and online detail beyond the package (F636). Satellite is now, from far to near:
+
+| Levels (zoom at the center) | Shown                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 0–4 (zoom < 3.5)            | The globe's base image (`baseImageryUrl`, Natural Earth `NE1_50M_SR_W` in the guides), offline included |
+| 4.5–5 (zoom 3.5–4)          | NASA's Blue Marble fading in over it, the same over the whole view (`fadeIn`, F635)                     |
+| 5–6 (zoom 4–5)              | The package's WorldCover fading in on Europe's land, its tones matched to the Blue Marble's (F633)      |
+| 6–11                        | WorldCover on Europe's land; the Blue Marble on the sea, the polar regions and the land outside Europe  |
+| 12–13 (zoom 11–12)          | The app's online sources (`addSources` from level 12, `orthophotos`) fading in, tones matched           |
+| 13 and beyond               | Each online source to its own deepest level; elsewhere the deepest tile magnified with linear filtering |
+
+`farLevels` (default 4) moves the first switch. This reverses #57's choice of the Blue Marble as the pinned base at the
+lowest levels: the base image is local, sharp at those levels and the same offline and online. The Blue Marble is
+asked of GIBS's EPSG:4326 WMS one image per Web Mercator tile, which the engine draws with rows linear in latitude
+(`latitudeRows`, KB-232): as geographic tiles, a Mercator tile across a
+geographic tile's edge showed a far coarser ancestor, up to 32 times along 45° N. Its levels end at 8 (about 430 m a
+pixel at 45° N). Beyond 85.05° the caps take Natural Earth's colors. The package's water is keyed out everywhere, its
+land clipped to Europe's with a 12-pixel fade (`keyEverywhere`, F636): with the water kept inside Europe's land
+(KB-231's first fix), its simplified outline showed dark strips where it reaches over the sea. The Blue Marble keeps
+its own colors (`harmonize: false`): one gain cannot bring both its sea and its land to the base image's, so the
+switch is a cross-fade over half a level. Pinned levels now include the first level of a layer that starts deeper
+(WorldCover's level 5 within Europe), a level per layer in turn (F634).
+
+## Amendment, 2026-10-28: Italian orthophotos
+
+The owner asked for free satellite imagery to levels 15–16 over Italy, Piemonte first, usable commercially and
+redistributable. The research (`docs/research/italy-orthophotos.md`, all provider hosts blocked, terms read through
+search quotes of the providers' pages) found none that passes for online use:
+
+- Piemonte: AGEA 2015–2024 on `opengis.csi.it` (records: all rights reserved or terms unknown), ICE 2009–2011
+  (conflicting CC BY versions, no licence in the owner's record), Torino 2023 (terms unknown): fail.
+- Italy: the Geoportale Nazionale's orthophotos are excluded from its CC BY 4.0 (MASE FAQ): fail (`it-pcn`, as
+  before). AGEA's 2022–2024 national imagery (20 cm) is reported CC BY 4.0 since 2026-08-26 but has no tile service:
+  a candidate for an app-hosted package once AGEA's legal notes are read. Copernicus VHR, EOX s2cloudless, Esri, Google
+  and Bing fail on their terms; Terrascope's 10 m gives no detail beyond level 13–14.
+- Regions: Lombardia, Veneto, Valle d'Aosta, Sardegna, Toscana, Trentino's AGEA imagery and the others listed fail on
+  AGEA's institutional terms or unstated licences. Emilia-Romagna's own 2022–2026 flights and Alto Adige 2023 state
+  CC BY 4.0; their Web Mercator support (Emilia-Romagna), fixed credit (both) and CORS remain to be read at source.
+
+Proposal, once a service passes: a record in `EUROPE_ORTHOPHOTOS` (`@vibeglobe/presets/orthophotos`), clipped to its
+region with a soft border, from level 12 to its own deepest (19 for 20 cm), fading in over level 12 to 13 above the
+package's WorldCover with its tones matched (F636). Without coverage the package's level 11 shows, magnified with
+linear filtering. Open question 38 asks the owner to allow the hosts and to decide on self-hosted AGEA tiles.

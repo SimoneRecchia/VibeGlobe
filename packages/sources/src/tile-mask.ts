@@ -7,6 +7,7 @@
  * @packageDocumentation
  */
 import type { TileMask } from '@vibeglobe/core';
+import { bleedTransparentEdges } from './reproject/edge-bleed.js';
 
 /** A color that, filling a whole tile, means no data: sRGB channels and the tolerance per channel. */
 export interface BlankColor {
@@ -27,7 +28,7 @@ export function isBlank(rgba: Uint8ClampedArray, { rgb, tolerance }: BlankColor)
  * feathered mask fades from transparent at the border to opaque `featherPx` inside it; a keyed mask applies only to
  * pixels of its color (KB-231).
  */
-export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask): ImageBitmap | null {
+export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask): ImageBitmap | RgbaTile | null {
   if (typeof OffscreenCanvas !== 'function') return image;
   const { width, height } = image;
   const canvas = new OffscreenCanvas(width, height);
@@ -46,12 +47,23 @@ export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask
   } else {
     const inside = insideAlpha(mask, width, height);
     if (!inside) return image;
-    const pixels = context.getImageData(0, 0, width, height);
-    applyAlpha(pixels.data, inside, mask.key);
-    context.putImageData(pixels, 0, 0);
+    const data = new Uint8Array(context.getImageData(0, 0, width, height).data.buffer);
+    applyAlpha(data, inside, mask.key);
+    // The pixels made transparent take their visible neighbors' color, so filtering shows no dark fringe along the
+    // border; a canvas would drop the color of transparent pixels, so the pixels themselves are the tile (F636).
+    bleedTransparentEdges(data, width, height);
+    image.close();
+    return { data, width, height };
   }
   image.close();
   return canvas.transferToImageBitmap();
+}
+
+/** A masked tile's pixels, RGBA8 with straight alpha, rows from the north (the renderer's RGBA image). */
+export interface RgbaTile {
+  readonly data: Uint8Array;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** Adds the mask's rings to the context's path, in pixels, shifted by `offsetPx` on both axes. */
@@ -109,10 +121,24 @@ function insideAlpha(mask: TileMask, width: number, height: number): Uint8Clampe
   return alpha;
 }
 
-/** Scales each pixel's alpha by its inside value; with a key, only the pixels of the key's color. */
-function applyAlpha(rgba: Uint8ClampedArray, inside: Uint8ClampedArray, key: TileMask['key']): void {
+/**
+ * Scales each pixel's alpha by its inside value; with a key, only the pixels of the key's color; with a key everywhere,
+ * every pixel, those of the key's color made transparent, fading back in up to twice its tolerance (F636).
+ */
+function applyAlpha(rgba: Uint8Array, inside: Uint8ClampedArray, key: TileMask['key']): void {
   for (let i = 0; i < inside.length; i++) {
     const at = i * 4;
+    if (key?.everywhere) {
+      const { rgb, tolerance } = key;
+      const distance = Math.max(
+        Math.abs((rgba[at] ?? 0) - rgb[0]),
+        Math.abs((rgba[at + 1] ?? 0) - rgb[1]),
+        Math.abs((rgba[at + 2] ?? 0) - rgb[2]),
+      );
+      const kept = Math.min(1, Math.max(0, (distance - tolerance) / Math.max(1, tolerance)));
+      rgba[at + 3] = Math.round(((rgba[at + 3] ?? 0) * (inside[i] ?? 0) * kept) / 255);
+      continue;
+    }
     if (key) {
       const { rgb, tolerance } = key;
       if (

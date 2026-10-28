@@ -4,7 +4,7 @@ import type { Camera } from '../camera/camera.js';
 import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
-import { MAX_OVERLAYS, type DrawList } from './draw-list.js';
+import { MAX_OVERLAYS, TONE_BELOW, type DrawList } from './draw-list.js';
 import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
@@ -19,7 +19,7 @@ import {
   mapMercator,
 } from './imagery-mapping.hot.js';
 import { inCoverage, type ImagerySource } from './imagery-source.js';
-import { BLEND_CODES, isOpaque, type StackEntry } from './imagery-stack.js';
+import { BLEND_CODES, fadeByZoom, isOpaque, shownOpacity, type StackEntry } from './imagery-stack.js';
 import type { VisibleSources } from './credits.js';
 
 /** Where `mapping` keeps the handle of the tile it maps to, after the mapping's own seven numbers. */
@@ -52,8 +52,10 @@ function mapped(slot: number): number {
 }
 const centerEcef = new Float64Array(3);
 const screen = new Float64Array(2);
-/** Overlays found for a draw, top first: handle, geographic, opacity, blend and the four UV numbers each. */
-const found = new Float64Array(MAX_OVERLAYS * 9);
+/** Numbers kept per overlay found: handle, geographic, opacity, blend, the four UV numbers, level and tone source. */
+const FOUND = 10;
+/** Overlays found for a draw, top first. */
+const found = new Float64Array(MAX_OVERLAYS * FOUND);
 
 /**
  * Textures the surface tiles of a frame with the imagery stack (M3 plan §2.5, ADR 0038). For each drawn tile and
@@ -73,6 +75,7 @@ export function drawImagery(
 ): void {
   let center: QuadtreeTile | undefined;
   let centerDistance = Infinity;
+  fadeByZoom(layers, camera);
   for (let index = 0; index < count; index++) {
     const tile = tiles[index];
     if (!tile) continue;
@@ -82,12 +85,17 @@ export function drawImagery(
       center = tile;
     }
     let based = false;
+    let below = false;
     let overlays = 0;
     for (let layer = layers.length - 1; layer >= 0; layer--) {
       const entry = layers[layer];
-      if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
+      if (!entry || !entry.entry.visible || shownOpacity(entry.entry) <= 0) continue;
       const chosen = wantChain(entry.chain, tile, distance);
-      if (based) continue;
+      if (based) {
+        // The first layer down with a tile under the draw's own: the reference of tone matching to the imagery below.
+        if (!below && chosen >= 0) below = writeBelow(list, index, tile, entry, layer, chosen);
+        continue;
+      }
       if (chosen < 0) {
         // A layer whose sources cover none of this tile takes no slot, so several clipped layers (one per country)
         // leave the slots to the ones that have data here (F618).
@@ -97,27 +105,19 @@ export function drawImagery(
       const drawn = entry.chain[chosen];
       const handle = mapped(MAPPING_HANDLE);
       drawn?.loader.markDrawn(handle);
-      const geographic = drawn?.source.tiling.crs === 'EPSG:3857' ? 0 : 1;
+      const geographic = drawn?.source.tiling.crs === 'EPSG:3857' && !latitudeRows(drawn.source, tile) ? 0 : 1;
       if (isOpaque(entry.entry)) {
         based = true;
         visible?.mark(drawn?.index ?? 0);
         const credit = drawn?.loader.attributionOf(handle);
         if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
         // Tone matching between the chain's sources (F249): which one this draw shows.
-        list.toneSources[index] = entry.entry.harmonize && entry.chain.length > 1 ? layer * 8 + chosen : -1;
-        list.textures[index] = handle;
-        list.geographic[index] = geographic;
-        list.imageryLevels[index] = mapped(MAPPING_LEVEL);
-        const at = index * 4;
-        list.uvTransforms[at] = mapped(MAPPING_SCALE_U);
-        list.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
-        list.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
-        list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
+        writeBase(list, index, handle, geographic, toneSource(entry, layer, chosen));
       } else if (overlays < MAX_OVERLAYS) {
         visible?.mark(drawn?.index ?? 0);
         const credit = drawn?.loader.attributionOf(handle);
         if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
-        overlays = addOverlay(entry, overlays, handle, geographic);
+        overlays = addOverlay(entry, overlays, handle, geographic, toneSource(entry, layer, chosen));
       }
     }
     writeOverlays(list, index, overlays);
@@ -126,11 +126,58 @@ export function drawImagery(
   if (center && !hazed(center)) prefetchStack(layers, center, centerDistance);
 }
 
+/**
+ * For a source whose Web Mercator tiles have rows linear in latitude (`ImagerySource.latitudeRows`, KB-232): the
+ * mapping's v scale and offset in latitude, and true; false for any other source.
+ */
+function latitudeRows(source: ImagerySource | undefined, tile: QuadtreeTile): boolean {
+  if (!source?.latitudeRows) return false;
+  const rows = 2 ** mapped(MAPPING_LEVEL);
+  const north = Math.atan(Math.sinh(Math.PI * (1 - (2 * mapped(MAPPING_Y)) / rows)));
+  const south = Math.atan(Math.sinh(Math.PI * (1 - (2 * (mapped(MAPPING_Y) + 1)) / rows)));
+  mapping[MAPPING_SCALE_V] = (tile.northRad - tile.southRad) / (north - south);
+  mapping[MAPPING_OFFSET_V] = (north - tile.northRad) / (north - south);
+  return true;
+}
+
+/** Writes the tile in `mapping` as draw `index`'s own imagery. */
+function writeBase(list: DrawList, index: number, handle: number, geographic: number, tone: number): void {
+  list.toneSources[index] = tone;
+  list.textures[index] = handle;
+  list.geographic[index] = geographic;
+  list.imageryLevels[index] = mapped(MAPPING_LEVEL);
+  const at = index * 4;
+  list.uvTransforms[at] = mapped(MAPPING_SCALE_U);
+  list.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
+  list.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
+  list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
+}
+
+/** Records the tile in `mapping`, of `layer`'s source `chosen`, as the imagery under draw `index`'s own (F633). */
+function writeBelow(
+  list: DrawList,
+  index: number,
+  tile: QuadtreeTile,
+  entry: StackLayer,
+  layer: number,
+  chosen: number,
+): boolean {
+  latitudeRows(entry.chain[chosen]?.source, tile);
+  list.below.textures[index] = mapped(MAPPING_HANDLE);
+  list.below.toneSources[index] = toneSource(entry, layer, chosen);
+  const at = index * 4;
+  list.below.uvTransforms[at] = mapped(MAPPING_SCALE_U);
+  list.below.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
+  list.below.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
+  list.below.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
+  return true;
+}
+
 /** Prefetches the children of the center tile from each visible layer, from the first source of its chain that has it. */
 function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distance: number): void {
   for (let layer = 0; layer < layers.length; layer++) {
     const entry = layers[layer];
-    if (!entry || !entry.entry.visible || entry.entry.opacity <= 0) continue;
+    if (!entry || !entry.entry.visible || shownOpacity(entry.entry) <= 0) continue;
     // The source the tile comes from: the first of the chain that has it.
     const chain = entry.chain;
     let source = 0;
@@ -140,18 +187,29 @@ function prefetchStack(layers: readonly StackLayer[], tile: QuadtreeTile, distan
   }
 }
 
+/**
+ * The tone source of a draw of `layer`'s source `chosen` (F249, F633): its place in the chain where the layer matches its
+ * chain, offset by {@link TONE_BELOW} where it matches the imagery below, -1 where it matches nothing.
+ */
+function toneSource(entry: StackLayer, layer: number, chosen: number): number {
+  const { harmonize } = entry.entry;
+  if (harmonize === 'below') return TONE_BELOW + layer * 8 + chosen;
+  return harmonize && entry.chain.length > 1 ? layer * 8 + chosen : -1;
+}
+
 /** Adds a layer's tile in `mapping` to the overlays found for a draw; returns their count. */
-function addOverlay(layer: StackLayer, overlays: number, handle: number, geographic: number): number {
-  const at = overlays * 9;
+function addOverlay(layer: StackLayer, overlays: number, handle: number, geographic: number, tone: number): number {
+  const at = overlays * FOUND;
   found[at] = handle;
   found[at + 1] = geographic;
-  found[at + 2] = layer.entry.opacity;
+  found[at + 2] = shownOpacity(layer.entry);
   found[at + 3] = BLEND_CODES[layer.entry.blend];
   found[at + 4] = mapped(MAPPING_SCALE_U);
   found[at + 5] = mapped(MAPPING_SCALE_V);
   found[at + 6] = mapped(MAPPING_OFFSET_U);
   found[at + 7] = mapped(MAPPING_OFFSET_V);
   found[at + 8] = mapped(MAPPING_LEVEL);
+  found[at + 9] = tone;
   return overlays + 1;
 }
 
@@ -161,9 +219,10 @@ function addOverlay(layer: StackLayer, overlays: number, handle: number, geograp
  */
 function keepSlot(layer: StackLayer, overlays: number): number {
   if (isOpaque(layer.entry) || overlays >= MAX_OVERLAYS) return overlays;
-  found[overlays * 9] = -1;
-  found[overlays * 9 + 2] = 0;
-  found[overlays * 9 + 8] = -1;
+  found[overlays * FOUND] = -1;
+  found[overlays * FOUND + 2] = 0;
+  found[overlays * FOUND + 8] = -1;
+  found[overlays * FOUND + 9] = -1;
   return overlays + 1;
 }
 
@@ -176,11 +235,13 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
       overlay.opacities[index] = 0;
       overlay.textures[index] = -1;
       overlay.levels[index] = -1;
+      overlay.toneSources[index] = -1;
       continue;
     }
-    const at = (overlays - 1 - slot) * 9;
+    const at = (overlays - 1 - slot) * FOUND;
     overlay.textures[index] = found[at] ?? -1;
     overlay.levels[index] = found[at + 8] ?? -1;
+    overlay.toneSources[index] = found[at + 9] ?? -1;
     overlay.geographic[index] = found[at + 1] ?? 0;
     overlay.opacities[index] = found[at + 2] ?? 0;
     overlay.blends[index] = found[at + 3] ?? 0;
@@ -361,7 +422,7 @@ export function preloadImagery(stack: readonly StackLayer[], tiles: readonly Qua
     if (!tile) continue;
     for (let s = 0; s < stack.length; s++) {
       const layer = stack[s];
-      if (!layer || !layer.entry.visible || layer.entry.opacity <= 0) continue;
+      if (!layer || !layer.entry.visible || shownOpacity(layer.entry) <= 0) continue;
       for (let k = 0; k < layer.chain.length; k++) {
         const source = layer.chain[k];
         if (!source || !hasTile(source, tile)) continue;

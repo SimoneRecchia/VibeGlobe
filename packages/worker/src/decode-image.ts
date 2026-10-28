@@ -5,7 +5,7 @@
  * decoded with fixed options so neither renderer backend converts anything at upload. A tile across its source's
  * border is masked to the source's area, and a tile of the source's blank color is answered as no data (F618).
  */
-import { maskTile } from '@vibeglobe/sources/tile-mask';
+import { maskTile, type RgbaTile } from '@vibeglobe/sources/tile-mask';
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
 /** Input of `decode-image`: encoded bytes (transferred to the worker) and their declared content type. */
@@ -21,7 +21,8 @@ export interface DecodeImageInput {
 
 /** Output of `decode-image`; its shape is core's `DecodedTile`, with the bitmap transferred. */
 export interface DecodedImage {
-  readonly image: ImageBitmap;
+  /** The bitmap, or the pixels of a tile masked per pixel (straight alpha, F636). */
+  readonly image: ImageBitmap | RgbaTile;
   readonly widthPx: number;
   readonly heightPx: number;
   /** Bytes of the texture on the GPU as RGBA8 with a full mip chain, from {@link rgba8MipChainBytes}. */
@@ -81,7 +82,7 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
   if (typeof createImageBitmap !== 'function')
     throw new TaskError('unsupported', 'createImageBitmap is not available in this context');
   if (context.isCancelled()) throw cancelledError();
-  let image: ImageBitmap;
+  let image: ImageBitmap | RgbaTile;
   try {
     image = await createImageBitmap(new Blob([bytes], { type: contentType }), DECODE_OPTIONS);
   } catch (error) {
@@ -94,7 +95,7 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
     throw cancelledError();
   }
   if (parsed.mask || parsed.blank) {
-    const masked = maskTile(image, parsed.blank, parsed.mask);
+    const masked = maskTile(image as ImageBitmap, parsed.blank, parsed.mask);
     if (!masked) throw new TaskError('no-data', 'a blank tile');
     image = masked;
   }
@@ -104,5 +105,5 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
     heightPx: image.height,
     gpuBytes: rgba8MipChainBytes(image.width, image.height),
   };
-  return { output, transfer: [image] };
+  return { output, transfer: ['data' in image ? image.data.buffer : image] };
 }

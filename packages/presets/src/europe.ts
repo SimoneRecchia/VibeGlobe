@@ -6,7 +6,6 @@
  * own and the sea; online detail on land loads beyond it, tile by tile.
  */
 import {
-  coverageTest,
   WEB_MERCATOR_TILING,
   type ImageryLayerOptions,
   type PolarCapColors,
@@ -15,6 +14,7 @@ import {
   type TileRectangleRad,
   type TileSource,
 } from '@vibeglobe/core';
+import { coverageTest } from '@vibeglobe/core/coverage';
 import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
 import { EUROPE_BOUNDS, EUROPE_LAND } from './europe-land.js';
 import {
@@ -76,6 +76,12 @@ export interface EuropeOpenOptions {
    * `europe-terrain` in its pipeline configuration; 11 by default, as in `europe.json`).
    */
   readonly packageLevels?: { readonly vectors?: number; readonly terrain?: number };
+  /**
+   * The far levels, 0 to this one (4 by default), that show the globe's base image (`GlobeOptions.baseImageryUrl`,
+   * Natural Earth in the guides) in Satellite and Hybrid: NASA's Blue Marble fades in over the next half level, the
+   * package's WorldCover over the level after (F636).
+   */
+  readonly farLevels?: number;
 }
 
 /** Where the map's vector style and hillshade read their files from. */
@@ -92,7 +98,8 @@ export interface BaseMap {
   /**
    * The polar caps' fill beyond 85.05° (`Globe.setPolarCapColors`) where no imagery covers them: the political map's
    * water in the north (all sea there) and its land in the south (Antarctica), so Map and Relief look the same up to
-   * the poles. Undefined for Satellite and Hybrid, whose Blue Marble covers the caps.
+   * the poles; Natural Earth's for Satellite and Hybrid, whose base image shows at the far levels (the Blue Marble
+   * covers the caps nearer, F636).
    */
   readonly polarCapColors?: PolarCapColors;
 }
@@ -160,18 +167,40 @@ interface Build {
 const FEATHER_PX = 12;
 
 /**
- * Satellite, two layers (KB-231). Below, NASA's Blue Marble everywhere: the whole world at the lowest levels, the sea at
- * every level, and the land outside Europe. Above, the app's sources first (national orthophotos are layers of their
- * own above), then the package's WorldCover, whose water is keyed out outside Europe's land with a soft edge: the sea
- * shows the Blue Marble at every level, with WorldCover's own coastline and its lakes on land.
+ * How far a pixel of the package's JPEG tiles may be from its water color and still be keyed out, per channel: the
+ * key fades back in up to twice this, so the compression's noise around the coast goes too, while the darkest land
+ * (forest, about RGB 98, 110, 94) stays.
+ */
+const WATER_TOLERANCE = 16;
+
+/**
+ * A layer's fade with the zoom from imagery levels (F636): the Mercator zoom shows tiles of 256 pixels of about one level
+ * more at the screen's center (the zoom counts tiles of 512 pixels), so level `from` starts at zoom `from - 1`.
+ */
+function levelFade(fromLevel: number, toLevel: number): { readonly fromZoom: number; readonly toZoom: number } {
+  return { fromZoom: fromLevel - 1, toZoom: toLevel - 1 };
+}
+
+/** The deepest level of the package's WorldCover: above it, the online sources (F632). */
+const PACKAGE_IMAGERY_LEVEL = ESA_WORLDCOVER.maxLevel;
+
+/**
+ * Satellite, by zoom (F636): the globe's base image (Natural Earth) at the far levels; NASA's Blue Marble fading in over
+ * it, then below everything (the sea, the polar caps, the land outside Europe); above it the package's WorldCover,
+ * fading in on Europe's land with its water keyed out with a soft edge (KB-231), with the app's sources that also serve
+ * the package's levels; above the package's levels the app's finer online sources, fading in over a level. The layers
+ * above the Blue Marble match its tones where they cover it (`harmonize: 'below'`, F633).
  */
 function satelliteLayers(build: Build): ImageryLayerOptions[] {
   const { options, wrap, use } = build;
-  const added = (position: 'top' | 'bottom') =>
-    (options.addSources ?? [])
-      .filter((a) => (a.position ?? 'top') === position && use(a.record))
+  const far = options.farLevels ?? 4;
+  // `use` lists a source's terms: each added source is asked once.
+  const used = (options.addSources ?? []).filter((a) => use(a.record));
+  const added = (position: 'top' | 'bottom', online: boolean) =>
+    used
+      .filter((a) => (a.position ?? 'top') === position && a.source.minLevel > PACKAGE_IMAGERY_LEVEL === online)
       .map((a) => wrap(a.source, 'network', 'satellite'));
-  const satellite: ImagerySource[] = [...added('top')];
+  const satellite: ImagerySource[] = [...added('top', false)];
   if (build.packaged && use(ESA_WORLDCOVER))
     satellite.push(
       wrap(
@@ -179,20 +208,43 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           id: ESA_WORLDCOVER.id,
           // Never fetched: the tiles come from the package, the URL only names them.
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
-          minLevel: ESA_WORLDCOVER.minLevel,
+          minLevel: Math.max(ESA_WORLDCOVER.minLevel, far + 1),
           maxLevel: ESA_WORLDCOVER.maxLevel,
-          area: { polygons: EUROPE_LAND, keyOutside: { rgb: WORLDCOVER_WATER_RGB }, featherPx: FEATHER_PX },
+          // Europe's land with a soft edge; the package's flat water is no imagery: transparent everywhere, inland
+          // too, where the land's simplified outline reaches over the sea (F636).
+          area: {
+            polygons: EUROPE_LAND,
+            tiles: 'clip',
+            featherPx: FEATHER_PX,
+            keyEverywhere: { rgb: WORLDCOVER_WATER_RGB, tolerance: WATER_TOLERANCE },
+          },
           attribution: ESA_WORLDCOVER.attribution,
         }),
         'package',
         'satellite',
       ),
     );
-  satellite.push(...added('bottom'));
-  const base = use(NASA_GIBS_BLUE_MARBLE)
-    ? [{ id: 'satellite-base', sources: [wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite')] }]
-    : [];
-  return [...base, ...(satellite.length > 0 ? [{ id: 'satellite', sources: satellite }] : [])];
+  satellite.push(...added('bottom', false));
+  const online = [...added('top', true), ...added('bottom', true)];
+  const layers: ImageryLayerOptions[] = [];
+  if (use(NASA_GIBS_BLUE_MARBLE))
+    layers.push({
+      id: 'satellite-base',
+      sources: [wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite')],
+      // Its colors stay its own: one gain cannot bring both its sea and its land to the base image's (F636).
+      harmonize: false,
+      fadeIn: levelFade(far + 0.5, far + 1),
+    });
+  if (satellite.length > 0)
+    layers.push({ id: 'satellite', sources: satellite, harmonize: 'below', fadeIn: levelFade(far + 1, far + 2) });
+  if (online.length > 0)
+    layers.push({ id: 'satellite-online', sources: online, harmonize: 'below', fadeIn: onlineFade() });
+  return layers;
+}
+
+/** The fade-in of the online sources above the package's levels, over the level after its last (F636). */
+export function onlineFade(): { readonly fromZoom: number; readonly toZoom: number } {
+  return levelFade(PACKAGE_IMAGERY_LEVEL + 1, PACKAGE_IMAGERY_LEVEL + 2);
 }
 
 /** Terrain: the package's extract first, then online on land up to the online level. */
@@ -216,15 +268,29 @@ function terrainSource(build: Build): TerrainSource | undefined {
   );
 }
 
+/**
+ * Natural Earth's colors beyond 85.05° (the mean of its rows there in `NE1_50M_SR_W`): the polar caps of Satellite and
+ * Hybrid at the far levels, where the globe's base image shows (F636).
+ */
+export const NATURAL_EARTH_CAPS = { north: '#7aacd0', south: '#eef1f6' } as const;
+
 /** The base maps and overlays the included sources allow. */
 function mapTypes(
   imagery: readonly ImageryLayerOptions[],
   vectors: boolean,
   terrain: boolean,
 ): { baseMaps: BaseMap[]; overlays: Overlay[] } {
+  // At the far levels the base image's polar caps show: Natural Earth's colors there (F636).
+  const naturalCaps = NATURAL_EARTH_CAPS;
   const baseMaps: BaseMap[] = [
-    { id: 'satellite', name: 'Satellite', imagery, style: {} },
-    { id: 'hybrid', name: 'Hybrid', imagery, style: vectors ? { labels: true, roads: true } : {} },
+    { id: 'satellite', name: 'Satellite', imagery, style: {}, polarCapColors: naturalCaps },
+    {
+      id: 'hybrid',
+      name: 'Hybrid',
+      imagery,
+      style: vectors ? { labels: true, roads: true } : {},
+      polarCapColors: naturalCaps,
+    },
   ];
   const polarCapColors = { north: POLITICAL_COLORS.water, south: POLITICAL_COLORS.land };
   if (vectors) baseMaps.push({ id: 'map', name: 'Map', imagery: [], style: { map: true }, polarCapColors });

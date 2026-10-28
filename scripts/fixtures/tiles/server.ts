@@ -21,8 +21,10 @@ import {
   type FixturePattern,
   type FixtureScheme,
   type FixtureTile,
+  SOLID_COLORS,
 } from './generate.ts';
 import { encodeUtmPng, parseUtmRequest } from './utm.ts';
+import { EARTH_TONES } from './earth.ts';
 
 /** A fault applied to the tiles it matches (all given conditions must hold); the first matching rule applies. */
 export interface FaultRule {
@@ -115,14 +117,11 @@ const PATTERNS: readonly string[] = [
   'patches',
   'checker',
   'holes',
-  'red',
-  'green',
-  'blue',
-  'shade',
-  'white',
+  ...Object.keys(SOLID_COLORS),
+  ...Object.keys(EARTH_TONES),
 ];
 // `mercator-tms`: the Web Mercator tiles with TMS rows, counted from the south (F229).
-const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms'];
+const SCHEMES: readonly string[] = ['mercator', 'geographic', 'mercator-tms', 'mercator-latitude'];
 const TILE_PATH =
   /^\/fixture-tiles\/([\w-]+)\/([\w-]+)\/([\w-]+)\/(\d+)\/(\d+)\/(\d+)(?:@2x)?\.(png|jpg|webp|avif|etc1s\.ktx2|uastc\.ktx2|terrarium\.png|terrain-rgb\.png|terrain|f32|rgb24)$/;
 const LAYER_PATH = /^\/fixture-tiles\/([\w-]+)\/terrain\/([\w-]+)\/layer\.json$/;

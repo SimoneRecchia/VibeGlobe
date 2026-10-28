@@ -23,3 +23,19 @@ Option 1. Core marks each draw with its layer and chain position (`TileDrawList.
 - Means exist only for images a 2D canvas can draw (`ImageBitmap`, image and canvas elements); compressed (KTX2) tiles keep gain 1.
 - Matching is global per source and view, not local: a source whose tone varies across the view is matched on average.
 - `e2e/imagery-tone-matching.spec.ts` checks the boundary, the switch and the raw colors against the `toned` fixture pattern.
+
+## Amendment, 2026-10-28: matching the imagery below (F633)
+
+The Europe preset needs a layer's tones to follow the layer under it (the package's WorldCover over the Blue Marble,
+the online orthophotos over both), which a chain cannot do: the package's water must be transparent. `harmonize:
+'below'` matches every source of a layer to the imagery under it instead of to its chain's first source. Matching
+over the whole view would compare unlike content (a land layer against land and sea), so each draw is compared where
+both show: each tile's colors are kept on a 4 × 4 grid (not one mean), and for every cell of the surface tile the
+layer's color and the color under it are summed, weighted by the layer's own alpha (keyed water and clipped borders
+count for nothing). Under a translucent layer the reference is the draw's opaque imagery (with its own gain); under
+an opaque one, the next layer down with a tile there (core's `belowTextures`), or the world base image, measured once
+on a 256 × 128 grid. The gains stay per source and per view, clamped to ×0.5–×2, as before. The overlay slots' gains
+travel in free numbers of the draw's matrices (one of them, the overlay fades' last element, read as 0 in the shader
+on both backends, so `tones` column 2's y holds it). Tiles masked per pixel reach the renderer as RGBA pixels rather
+than a bitmap (a canvas drops the color of transparent pixels, which drew a dark fringe), and their grids are taken
+from those pixels.

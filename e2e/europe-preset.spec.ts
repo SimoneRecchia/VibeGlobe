@@ -117,7 +117,7 @@ test('Map is a political map with roads only on request, Relief adds a tint and 
   };
   const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - (b[i] ?? 0)) <= 6);
   expect(near(await north(), [0xa9, 0xcf, 0xe8])).toBe(true);
-  // Satellite: NASA's Blue Marble (here the routed red tiles) fills the cap.
+  // Satellite: Natural Earth's colors fill the cap, those of the base image shown far away (F636).
   await page.getByRole('radio', { name: 'Satellite' }).check();
-  await expect.poll(async () => near(await north(), [255, 0, 0])).toBe(true);
+  await expect.poll(async () => near(await north(), [0x7a, 0xac, 0xd0])).toBe(true);
 });

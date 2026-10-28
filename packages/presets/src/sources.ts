@@ -65,9 +65,9 @@ export const OPENFREEMAP: PresetSourceRecord = {
 };
 
 /**
- * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326: the satellite layer's lowest levels,
- * everywhere the package has no tile, and the polar caps. Its native levels end at 7 (about 600 m a pixel); the engine
- * magnifies it beyond.
+ * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326, one image per Web Mercator tile
+ * (KB-232): the satellite layer below the package, past the far levels: the sea, and the land outside Europe. Level 8
+ * (about 430 m a pixel at 45° N) is the first finer than its data; the engine magnifies it beyond.
  */
 export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
   id: 'nasa-gibs-blue-marble',
@@ -84,7 +84,7 @@ export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
     },
   ],
   minLevel: 0,
-  maxLevel: 7,
+  maxLevel: 8,
   coverage: 'world',
   url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
 };

@@ -56,9 +56,7 @@ export interface SurfaceDraw {
   overlay1: Texture | undefined;
   /**
    * The overlays' numbers, by column: the two UV transforms; (geographic 0, geographic 1, opacity 0, opacity 1);
-   * (blend 0, blend 1, then slot 0's tone gain r and g), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2
-   * screen). The rest of the slots' tone gains (F633) sit in free numbers: slot 0's b in `overlayFades` column 3's z, slot
-   * 1's r in `tones` column 2's y, its g and b in `tones` columns 0 and 1's w.
+   * (blend 0, blend 1, 0, 0), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2 screen).
    */
   readonly overlays: Matrix4;
   /** The imagery each overlay slot cross-fades from (KB-155); unset where it fades in from nothing. */
@@ -69,6 +67,8 @@ export interface SurfaceDraw {
    * 1), the fades as the base imagery's (1 only the slot's own imagery); (from set 0, from set 1, 0, 0).
    */
   readonly overlayFades: Matrix4;
+  /** The overlay slots' tone gains (F633), linear rgb: slot 0 in column 0, slot 1 in column 1. */
+  readonly overlayTones: Matrix4;
 }
 
 /** The draw state of a surface mesh, created with the mesh. */
@@ -132,6 +132,7 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
     overlayFrom0: undefined,
     overlayFrom1: undefined,
     overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
+    overlayTones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0),
   };
   object.userData['surfaceDraw'] = draw;
   // The textures are read from the draw state at each draw, never kept: a mesh not drawn after a device loss kept the
@@ -232,7 +233,6 @@ function overlaySlots(
   material: MeshBasicNodeMaterial,
   placeholder: Texture,
   tileUv: Node<'vec3'>,
-  tones: Node<'mat4'>,
 ): (color: Node<'vec4'>) => void {
   const overlays = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlays);
   const fades = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayFades);
@@ -240,8 +240,9 @@ function overlaySlots(
   const blends = column(overlays, 3);
   const fadeLooks = column(fades, 2);
   const fromSet = column(fades, 3);
-  // The slots' tone gains (F633), packed into free numbers: see `SurfaceDraw.overlays`.
-  const gains = [vec3(blends.z, blends.w, fromSet.z), vec3(column(tones, 2).y, column(tones, 0).w, column(tones, 1).w)];
+  const tones = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayTones);
+  // The slots' tone gains (F633).
+  const gains = [column(tones, 0).xyz, column(tones, 1).xyz];
   const slots = [0, 1].map((slot) => {
     const own = placeholderLike(placeholder);
     const fromOwn = placeholderLike(placeholder);
@@ -342,7 +343,7 @@ export function createSurfaceMaterial(
   // space (gamma 2, close to sRGB): a linear-light mix would change dark pixels several times faster than bright ones.
   // Only fading draws sample the second texture (fade is uniform per draw, so the branch is too): on a software
   // rasterizer the extra fetch costs about half a frame.
-  const composeOverlays = overlaySlots(material, placeholder, tileUv, tones);
+  const composeOverlays = overlaySlots(material, placeholder, tileUv);
   material.colorNode = Fn(() => {
     // Each imagery with its source's tone gain (F249): 1 unless the layer matches its chain's tones.
     const color = map.mul(vec4(column(tones, 0).xyz, 1)).toVar();
@@ -458,25 +459,14 @@ function applyOverlays(
     f[12 + slot] = from ? 1 : 0;
     for (let c = 0; c < 4; c++) f[slot * 4 + c] = overlay?.fromUvTransforms[i * 4 + c] ?? 0;
   }
-  // The slots' tone gains (F633), in the free numbers the shader reads them from.
-  const gains = OVERLAY_GAINS;
+  // The slots' tone gains (F633).
+  const gains = draw.overlayTones.elements;
   gains.fill(1);
-  const tones = textures.tones;
   for (let slot = 0; slot < 2; slot++) {
     const overlay = draws.overlays[slot];
-    if (overlay) tones?.applyOverlay(overlay, i, gains, slot * 3);
+    if (overlay) textures.tones?.applyOverlay(overlay, i, gains, slot * 4);
   }
-  const t = draw.tones.elements;
-  o[14] = gains[0] ?? 1;
-  o[15] = gains[1] ?? 1;
-  f[14] = gains[2] ?? 1;
-  t[9] = gains[3] ?? 1;
-  t[3] = gains[4] ?? 1;
-  t[7] = gains[5] ?? 1;
 }
-
-/** The two overlay slots' linear tone gains of the draw being applied, reused for every draw. */
-const OVERLAY_GAINS = new Float32Array(6);
 
 /**
  * Sets the morph uniforms of a surface material for a frame (ADR 0008): the morph and relief factors, σ and the

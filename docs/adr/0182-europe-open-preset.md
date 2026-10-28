@@ -95,7 +95,7 @@ Problems the owner found with the preset in an application, and decisions:
 
 ## Amendment, 2026-10-28: the Blue Marble as a base layer, the package's water keyed out
 
-In Cube the package's WorldCover drew rectangles of another color and sharpness: its no-data water (RGB 54, 73, 90)
+In an application the package's WorldCover drew rectangles of another color and sharpness: its no-data water (RGB 54, 73, 90)
 inside the package's box against the Blue Marble outside, and from level 9, where the package holds only Europe's land,
 the sea and the land outside Europe on a magnified Blue Marble beside sharp land (KB-231). Tone matching (ADR 0044)
 cannot fix it: the water is one flat color, not a tone. Satellite is now two layers: the Blue Marble below, everywhere,

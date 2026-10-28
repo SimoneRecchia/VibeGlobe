@@ -2,7 +2,7 @@
 
 ## 2026-10-28: Europe preset Satellite by zoom, tones across layers, Italian orthophotos (targeted owner request)
 
-Problems the owner saw in Cube with `europeOpen()` Satellite, fixed with tests (F630–F637, KB-231–KB-233). Far away
+Problems the owner saw in an application with `europeOpen()` Satellite, fixed with tests (F630–F637, KB-231–KB-233). Far away
 (levels 0–4, `farLevels`) the globe's base image shows again, as before #57; NASA's Blue Marble fades in over half a
 level (`fadeIn` by zoom, F635), then the package's WorldCover over a level on Europe's land, its flat no-data water
 keyed out everywhere and its land outside Europe faded out over 12 pixels (KB-231, KB-233); above level 11 the app's

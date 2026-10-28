@@ -12,6 +12,8 @@ test('the first idle after the data layers start already shows every label on we
   });
   for (let run = 0; run < 2; run++) {
     await openGlobe(page, 'backend=webgpu&scenario=data-labels&viewMode=2d&lon=18.5&lat=43.8&zoom=5');
+    // The scenario's module loads after the globe is ready: the engine may go idle before it adds the layers (KB-229).
+    await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
     await waitForIdle(page);
     const first = await captureCanvas(page);
     // Nothing changes afterwards: the view keeps drawing nothing new over the next idles.

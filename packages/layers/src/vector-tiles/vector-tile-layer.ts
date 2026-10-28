@@ -79,6 +79,7 @@ class Runtime implements VectorTileLayer {
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
   private placer: LabelPlacer | undefined;
+  private glyphs: GlyphSource | undefined;
   private readonly grounds: TileGrounds;
   private rasters: RasterLayers | undefined;
   private msLastFrame = 0;
@@ -150,7 +151,7 @@ class Runtime implements VectorTileLayer {
   loadingTiles(): number {
     let n = 0;
     for (const source of this.sources.values()) n += source.loader.loading;
-    return n + (this.rasters?.loading() ?? 0);
+    return n + (this.rasters?.loading() ?? 0) + (this.glyphs?.loading ?? 0);
   }
 
   requestLog(source?: string): readonly string[] {
@@ -186,6 +187,7 @@ class Runtime implements VectorTileLayer {
       this.options.localFontFamily,
     );
     void glyphs.loadSprite(this.style.sprite, globalThis.devicePixelRatio ?? 1);
+    this.glyphs = glyphs;
     this.placer = new LabelPlacer(this.globe, glyphs, target.atlas, (source, id) =>
       this.featureStates.get(`${source}|${id}`),
     );

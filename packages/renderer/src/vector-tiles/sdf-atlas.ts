@@ -7,6 +7,7 @@
  * kinds. When the atlas is full it starts over with a new `generation`: callers add their entries again.
  */
 import { DataTexture, LinearFilter, RedFormat, RGBAFormat, UnsignedByteType } from 'three/webgpu';
+import { renewed } from '../layer-atlas.js';
 
 /** A packed entry, in texels. */
 export interface AtlasRect {
@@ -21,7 +22,8 @@ const PADDING = 1;
 
 /** A shelf-packed RGBA atlas texture of SDF glyphs and icons. */
 export class SdfAtlas {
-  readonly texture: DataTexture;
+  /** Replaced by `renew` after a device loss. */
+  texture: DataTexture;
   /** Increases each time the atlas starts over (it was full). */
   generation = 0;
   private readonly data: Uint8Array;
@@ -72,6 +74,11 @@ export class SdfAtlas {
         pixels[i * 4 + 3] ?? 0,
       ];
     });
+  }
+
+  /** After a device loss: a new texture of the same texels, without the lost renderer's listener (KB-222). */
+  renew(): void {
+    this.texture = renewed(this.texture);
   }
 
   /** Frees the texture. */

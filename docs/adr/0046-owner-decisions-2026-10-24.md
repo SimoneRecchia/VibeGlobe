@@ -25,5 +25,5 @@ Four questions stood between the milestones M4–M14 and the Monday 26 October t
 
 - A tile that is really corrupt costs at most 3 extra requests per session, each after a health check succeeded, and 3 more after each network fault the source recovers from (decision 5); a tile corrupted in transit loads once the faults stop.
 - Under long flapping faults, tiles out of rounds load again once the source is stable (decision 5): a stable network never leaves a tile on its ancestor.
-- F395's replacement is testable on CI's software GPU, where the measured reduction is small but the fogged tiles' levels are deterministic.
+- F395's replacement is testable on CI's software GPU, where the measured reduction is small but the fogged tiles' levels are deterministic. Measured reduction (2026-10-28, KB-225): at ten times a clear day's haze, the most the API allows, 16.3% fewer requests on WebGL2 and 11.0% on WebGPU; at eight times it was 5–8%, within the run-to-run spread.
 - M4, M5 and M10 close with their hardening bugs recorded; the hardening weeks pick them up first.

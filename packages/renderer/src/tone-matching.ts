@@ -314,7 +314,8 @@ export class ToneMatcher {
         );
         for (let c = 0; c < 3; c++) {
           sums[key * 7 + c] = (sums[key * 7 + c] ?? 0) + alpha * (own[at + c] ?? 0);
-          sums[key * 7 + 3 + c] = (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (gain?.[g + c] ?? 1);
+          sums[key * 7 + 3 + c] =
+            (sums[key * 7 + 3 + c] ?? 0) + alpha * (reference[ref + c] ?? 0) * (gain?.[g + c] ?? 1);
         }
         sums[key * 7 + 6] = (sums[key * 7 + 6] ?? 0) + alpha;
       }

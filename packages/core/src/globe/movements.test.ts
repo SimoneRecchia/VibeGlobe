@@ -120,6 +120,19 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
     globe.destroy();
   });
 
+  it('a view mode chosen while a tilt eases wins: the ease does not choose its tilt again afterwards (KB-207)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 14 });
+    const tilt = globe.tiltTo(30, { durationMs: 1000 });
+    ticks(5);
+    expect(globe.viewMode).toBe('manual');
+    globe.setViewMode('2d');
+    ticks(120);
+    expect(globe.viewMode).toBe('2d');
+    expect(globe.camera.tiltDeg).toBeCloseTo(0, 6);
+    expect(await tilt).not.toBe('completed');
+    globe.destroy();
+  });
+
   it('announces a jump with the three events in one go, settled as completed, the next frame at the target (F197)', async () => {
     const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
     const events: string[] = [];

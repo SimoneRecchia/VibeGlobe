@@ -316,6 +316,14 @@ export class Movements {
   }
 
   /**
+   * A view mode chosen meanwhile takes over the tilt: a running movement that eases the tilt is interrupted, else its
+   * next frame would choose its tilt again and switch the mode back to manual (KB-207). Others go on.
+   */
+  interruptTilt(): void {
+    if (this.running?.animator.animatesTilt) this.interrupt();
+  }
+
+  /**
    * Called by the navigation intents: user input takes over (F202) and is announced with its cause, 'user' or the
    * controls' 'inertia'; a change of cause ends one movement and starts the next.
    */

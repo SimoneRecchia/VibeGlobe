@@ -149,16 +149,22 @@ export async function recordCamera(
  */
 const touchSessions = new WeakMap<Page, Promise<CDPSession>>();
 
-/** Touches a point with a real touch sequence (Chromium's touch events through CDP): a tap, or a drag by `dxPx`. */
-export async function touch(page: Page, xPx: number, yPx: number, dxPx = 0, holdMs = 0): Promise<void> {
+/**
+ * Touches a point with a real touch sequence (Chromium's touch events through CDP): a tap, or a drag by `dxPx`.
+ * `atS` gives a tap its own event times (seconds since 1970, the lift 50 ms after the touch), however long the page
+ * takes to handle them: the two taps of a double tap timed when sent arrived further apart than the tools' interval on a
+ * busy page (KB-207).
+ */
+export async function touch(page: Page, xPx: number, yPx: number, dxPx = 0, holdMs = 0, atS?: number): Promise<void> {
   let pending = touchSessions.get(page);
   if (!pending) touchSessions.set(page, (pending = page.context().newCDPSession(page)));
   const session = await pending;
   const point = (x: number): { x: number; y: number }[] => [{ x, y: yPx }];
-  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(xPx) });
+  const time = (offsetS: number) => (atS === undefined ? {} : { timestamp: atS + offsetS });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(xPx), ...time(0) });
   if (holdMs > 0) await page.waitForTimeout(holdMs);
   const steps = dxPx === 0 ? 0 : 10;
   for (let i = 1; i <= steps; i++)
     await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: point(xPx + (dxPx * i) / steps) });
-  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], ...time(0.05) });
 }

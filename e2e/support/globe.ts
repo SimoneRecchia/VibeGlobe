@@ -45,7 +45,7 @@ declare global {
         backend?: 'auto' | 'webgpu' | 'webgl2',
       ): { globe: Globe; canvas: HTMLCanvasElement; unmount(): void };
       workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
-      recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
+      recordScenario(name: string, darkBelow?: number, settleTiles?: boolean): Promise<ScenarioReport>;
       checkFrame(darkBelow?: number): Promise<ScenarioReport>;
       showHud(on: boolean): void;
       loggedLevels(): string[];

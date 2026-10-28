@@ -373,11 +373,11 @@ describe('glyph ranges that fail on the way (TG-04)', () => {
       // A damaged width (field 3, 10 → 11): the glyph's bitmap no longer matches its size.
       const width = whole.findIndex((byte, i) => byte === 0x18 && whole[i + 1] === 10);
       corrupted[width + 1] = 11;
-      const bodies = [whole.subarray(0, Math.floor(whole.length / 2)), corrupted, whole];
+      const bodies = [whole.slice(0, Math.floor(whole.length / 2)), corrupted, Uint8Array.from(whole)];
       const asked: (RequestInit | undefined)[] = [];
       const fetchImpl = ((_url: string, init?: RequestInit) => {
         asked.push(init);
-        return Promise.resolve(new Response(bodies.shift() ?? whole));
+        return Promise.resolve(new Response(bodies.shift() ?? Uint8Array.from(whole)));
       }) as typeof fetch;
       const source = new GlyphSource(
         'https://g.test/{fontstack}/{range}.pbf',

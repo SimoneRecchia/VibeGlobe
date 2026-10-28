@@ -18,13 +18,13 @@ describe('LayerBatches.restore', () => {
 
   it('gives the atlas a new texture of the same image, so the lost renderer listening to the old one is not kept (KB-222)', () => {
     vi.stubGlobal('OffscreenCanvas', StubCanvas);
-    const batches = new LayerBatches(new Scene(), 'native');
+    const batches = new LayerBatches(new Scene(), 'reversed-z');
     const atlas = (batches as unknown as { atlas: { texture: Texture } }).atlas;
     const lost = atlas.texture;
     // A disposed renderer no longer removes the listener it added: the texture holding it must not be kept.
     const listener = (): void => undefined;
     lost.addEventListener('dispose', listener);
-    batches.restore('native');
+    batches.restore('reversed-z');
     expect(atlas.texture).not.toBe(lost);
     expect(atlas.texture.hasEventListener('dispose', listener)).toBe(false);
     expect(atlas.texture.image).toBe(lost.image);

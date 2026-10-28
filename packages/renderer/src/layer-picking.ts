@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { type FrameView, type LayerGround } from '@vibeglobe/core';
 import { projectLayerPoint } from '@vibeglobe/core/layers';
+import { nearPoints } from './layer-pick-grid.js';
 import { valueOf, type BatchContents } from './layer-geometry.js';
 
 /** How far from a feature's drawn shape a pointer still picks it, CSS pixels. */
@@ -158,17 +159,22 @@ export function pickAt<B extends BatchContents & { readonly visible: boolean; re
   for (const batch of batches) {
     if (!batch.visible || batch.order < bestOrder) continue;
     const ground = groundOf(batch);
-    for (let feature = 0; feature < batch.count; feature++) {
+    const consider = (feature: number, distance: number): void => {
+      if (distance > TOLERANCE_PX) return;
       const id = valueOf(batch, 'pickId', feature);
-      if (id === 0 || valueOf(batch, 'visible', feature) <= 0) continue;
-      const distance = featureDistance(batch, feature, view, xPx, yPx, ground);
-      if (distance > TOLERANCE_PX) continue;
+      if (id === 0 || valueOf(batch, 'visible', feature) <= 0) return;
       if (batch.order > bestOrder || distance < bestDistance) {
         bestId = id;
         bestOrder = batch.order;
         bestDistance = distance;
       }
-    }
+    };
+    // Points, markers and labels through their screen grid, projected once per view (F379); shapes one by one.
+    if (batch.kind !== 'polyline' && batch.kind !== 'polygon' && batch.kind !== 'circle')
+      nearPoints(batch, view, ground, xPx, yPx, TOLERANCE_PX, consider);
+    else
+      for (let feature = 0; feature < batch.count; feature++)
+        consider(feature, featureDistance(batch, feature, view, xPx, yPx, ground));
   }
   return bestId;
 }

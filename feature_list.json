@@ -5040,7 +5040,7 @@
         "Verify the hover style is applied and removed in the next frame",
         "Verify hover picking on a 100,000-point layer stays within the per-frame budget"
       ],
-      "status": "failing"
+      "status": "passing"
     },
     {
       "id": "F380",

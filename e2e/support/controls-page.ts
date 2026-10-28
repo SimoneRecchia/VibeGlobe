@@ -84,17 +84,32 @@ if (viewMode === '2d' || viewMode === '3d' || viewMode === 'auto') globe.setView
 
 /** Pointers down, by id, in canvas pixels. */
 const down = new Map<number, ScreenPoint>();
+/** The time of each pointer's latest event, and the midpoint when all of them last reported the same event. */
+const reportedMs = new Map<number, number>();
+let together: ScreenPoint | null = null;
 const track = (event: PointerEvent): void => {
   const rect = canvas.getBoundingClientRect();
-  if (event.type === 'pointerup' || event.type === 'pointercancel') down.delete(event.pointerId);
-  else if (event.type === 'pointerdown' || down.has(event.pointerId)) {
+  if (event.type === 'pointerup' || event.type === 'pointercancel') {
+    down.delete(event.pointerId);
+    reportedMs.delete(event.pointerId);
+  } else if (event.type === 'pointerdown' || down.has(event.pointerId)) {
     down.set(event.pointerId, { xPx: event.clientX - rect.left, yPx: event.clientY - rect.top });
+    reportedMs.set(event.pointerId, event.timeStamp);
   }
+  // The browser sends each finger's move of one touch event on its own, with that event's time: a frame between them
+  // would read half a two-finger move, which the engine waits out (KB-183), so the midpoint follows whole events only.
+  const times = [...reportedMs.values()];
+  if (times.every((time) => time === times[0])) together = midpoint();
+  // A lift of one finger of several lifted together: none is read until the others' lifts or moves.
+  if (event.type === 'pointerup' && times.some((time) => time < event.timeStamp)) together = null;
 };
 for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
   container.addEventListener(type, track as EventListener, { capture: true });
 }
 function pointer(): ScreenPoint | null {
+  return down.size === 0 ? null : together;
+}
+function midpoint(): ScreenPoint | null {
   if (down.size === 0) return null;
   let x = 0;
   let y = 0;

@@ -20,7 +20,12 @@ const BACKENDS = ['webgl2', 'webgpu'] as const;
 /** A small canvas: software GPUs draw it fast enough for touch events to arrive at a finger's pace. */
 const SIZE = 'size=320x240';
 
-/** Moves fingers from `from` to `to` in `steps` events about 16 ms apart; returns the last positions. */
+/**
+ * Moves fingers from `from` to `to` in `steps` events 16 ms apart by the events' own times, and with `release` lifts
+ * them 16 ms after the last; returns the last positions. The times are given, however long the page took to handle
+ * each event: on a busy software GPU moves timed when sent arrived with pauses that read as a slow drag, and a lift as
+ * a hold, which rightly do not coast (KB-205, KB-224).
+ */
 async function glide(
   touch: Touch,
   from: readonly TouchPoint[],
@@ -29,6 +34,7 @@ async function glide(
   page: { waitForTimeout(ms: number): Promise<void> },
   release = false,
 ): Promise<TouchPoint[]> {
+  const startS = Date.now() / 1000;
   let at: TouchPoint[] = [...from];
   for (let i = 1; i <= steps; i++) {
     const s = i / steps;
@@ -37,17 +43,10 @@ async function glide(
       x: p.x + ((to[k]?.x ?? p.x) - p.x) * s,
       y: p.y + ((to[k]?.y ?? p.y) - p.y) * s,
     }));
-    if (release && i === steps) {
-      // The lift 16 ms after the last move by the events' own times, however long the page took to handle that move:
-      // on a busy software GPU a lift timed when sent read as a hold (KB-205).
-      const sentS = Date.now() / 1000;
-      await touch.move(at, sentS);
-      await touch.end([], sentS + 0.016);
-      return at;
-    }
-    await touch.move(at);
+    await touch.move(at, startS + i * 0.016);
     await page.waitForTimeout(16);
   }
+  if (release) await touch.end([], startS + (steps + 1) * 0.016);
   return at;
 }
 
@@ -66,8 +65,7 @@ for (const backend of BACKENDS) {
     const grabbed = await positionAt(page, mid(start));
     await record(page, [grabbed as GeoPosition]);
     await touch.start(start);
-    const end = await glide(touch, start, [{ id: 1, x: 200, y: 140 }], 12, page);
-    await touch.end();
+    const end = await glide(touch, start, [{ id: 1, x: 200, y: 140 }], 12, page, true);
     await settle(page);
     const recorded = await frames(page);
     expect(
@@ -103,8 +101,8 @@ for (const backend of BACKENDS) {
       ],
       12,
       page,
+      true,
     );
-    await touch.end();
     await settle(page);
     const recorded = await frames(page);
     expect(maxDrift(recorded, () => mid(from))).toBeLessThan(1);
@@ -239,8 +237,8 @@ test('pinch stays anchored at the finger midpoint in the 2D view, the tilted 3D 
       ],
       12,
       page,
+      true,
     );
-    await touch.end();
     await settle(page);
     expect(
       maxDrift(await frames(page), () => mid(from)),
@@ -267,8 +265,8 @@ test('a two-finger vertical drag tilts, and pinch, twist and pan do not (F185)',
     ],
     10,
     page,
+    true,
   );
-  await touch.end();
   await settle(page);
   const tilted = await camera(page);
   expect(tilted.tiltDeg).toBeGreaterThan(10);
@@ -287,8 +285,7 @@ test('a two-finger vertical drag tilts, and pinch, twist and pan do not (F185)',
     ],
   ]) {
     await touch.start(from);
-    await glide(touch, from, to, 10, page);
-    await touch.end();
+    await glide(touch, from, to, 10, page, true);
     await settle(page);
     expect((await camera(page)).tiltDeg).toBeCloseTo(tilted.tiltDeg, 6);
   }

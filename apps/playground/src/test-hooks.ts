@@ -42,10 +42,9 @@ interface PlaygroundTestHooks {
   workerTask(task: string, input: unknown, transfer: Transferable[]): Promise<string>;
   /**
    * Plays a frame-stepped scenario (`zoom-orbit-to-street`, `pole-orbit`, `antimeridian-pan`) on the first globe,
-   * drawing and checking every frame in the page (`src/scenario-harness.ts`); `settleTiles` lets the imagery each view
-   * asks for load before the next view (KB-230).
+   * drawing and checking every frame in the page (`src/scenario-harness.ts`).
    */
-  recordScenario(name: string, darkBelow?: number, settleTiles?: boolean): Promise<ScenarioReport>;
+  recordScenario(name: string, darkBelow?: number): Promise<ScenarioReport>;
   /** Draws a frame now and counts its holes and, with `darkBelow`, its dark pixels inside the globe (F106). */
   checkFrame(darkBelow?: number): Promise<ScenarioReport>;
   /** Shows or hides the performance HUD (F119). */
@@ -142,9 +141,9 @@ export function exposeTestHooks(
     clearLog: () => void (parts.logEntries.length = 0),
     geodesicDistanceMeters: (from, to) =>
       geodesicInverse(from.longitudeDeg, from.latitudeDeg, to.longitudeDeg, to.latitudeDeg).distanceMeters,
-    async recordScenario(name, darkBelow, settleTiles) {
+    async recordScenario(name, darkBelow) {
       const { recordScenario } = await import('./scenario-harness.js');
-      return recordScenario(globe, globeSize(), name, darkBelow, settleTiles);
+      return recordScenario(globe, globeSize(), name, darkBelow);
     },
     async checkFrame(darkBelow) {
       const { checkFrame, emptyReport } = await import('./scenario-harness.js');

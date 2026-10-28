@@ -131,7 +131,7 @@ async function fly(page: Page, backend: string, fogAwareDetail: boolean, haze: n
     });
     return globe?.imageryStats()?.requested ?? 0;
   });
-  const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('tilted-flight', 0, true));
+  const report = await page.evaluate(() => window.vibeglobePlayground?.recordScenario('tilted-flight', 0));
   if (!report) throw new Error('no report');
   await waitForIdle(page);
   const { stats, entries, eyes } = await page.evaluate(() => ({

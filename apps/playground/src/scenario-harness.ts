@@ -404,7 +404,6 @@ export async function recordScenario(
   view: CssSize,
   name: string,
   darkBelow = 0,
-  settleTiles = false,
 ): Promise<ScenarioReport> {
   const scenario = SCENARIOS[name];
   if (!scenario) throw new Error(`no frame-stepped scenario "${name}"`);
@@ -422,9 +421,6 @@ export async function recordScenario(
       if (next) {
         globe.jumpTo(next);
         stillSince = frame + 1;
-        // With `settleTiles`, the tiles each view asks for load before the next: the requests then follow the views
-        // and the selection alone, not how many arrive while a slow page draws a frame (KB-230).
-        if (settleTiles) await settleImagery(globe);
       }
       const capture = await globe.captureFrame();
       checkFrame(globe, capture, view, report, frame, darkBelow);
@@ -457,18 +453,6 @@ export async function recordScenario(
     globe.requestRender();
   }
   return report;
-}
-
-/** Draws frames until no imagery tile is queued, loading, decoding or waiting for upload (at most 10 s). */
-async function settleImagery(globe: Globe): Promise<void> {
-  const deadline = performance.now() + 10_000;
-  for (;;) {
-    await globe.captureFrame();
-    const stats = globe.imageryStats();
-    const pending = stats ? stats.queued + stats.loading + stats.decoding + stats.uploadsPending : 0;
-    if (pending === 0 || performance.now() > deadline) return;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
 }
 
 /**

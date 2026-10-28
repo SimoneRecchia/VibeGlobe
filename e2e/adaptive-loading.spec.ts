@@ -431,8 +431,11 @@ test.describe('the measured link (F300–F303)', () => {
           }
           if (perHost !== 'adaptive') continue;
           const log = (await requestLog(page, session)).filter((r) => r.endMs !== undefined);
-          // Most requests in flight at once, after the link was measured (the first six responses).
-          const measured = log.slice(6);
+          // Most requests in flight at once, after the link was measured: among the requests started once six
+          // responses had ended. The seventh and later requests by start could begin before that, while the engine still
+          // had no estimate and no limit, and stay in flight on a busy page (KB-228).
+          const sixthEndMs = log.map((r) => r.endMs ?? 0).sort((a, b) => a - b)[5] ?? Number.POSITIVE_INFINITY;
+          const measured = log.filter((r) => r.startMs >= sixthEndMs);
           mostAdaptive = Math.max(
             mostAdaptive,
             ...measured.map((r) => measured.filter((o) => o.startMs <= r.startMs && (o.endMs ?? 0) > r.startMs).length),

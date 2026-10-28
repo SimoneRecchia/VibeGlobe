@@ -364,4 +364,48 @@ describe('glyph ranges that fail on the way (TG-04)', () => {
       vi.useRealTimers();
     }
   });
+
+  it('requests a range again, past the HTTP cache, when its bytes arrive truncated or corrupted (KB-226)', async () => {
+    vi.useFakeTimers();
+    try {
+      const whole = glyphPbf('Noto Sans Regular', [86, 105, 97]);
+      const corrupted = Uint8Array.from(whole);
+      // A damaged width (field 3, 10 → 11): the glyph's bitmap no longer matches its size.
+      const width = whole.findIndex((byte, i) => byte === 0x18 && whole[i + 1] === 10);
+      corrupted[width + 1] = 11;
+      const bodies = [whole.slice(0, Math.floor(whole.length / 2)), corrupted, Uint8Array.from(whole)];
+      const asked: (RequestInit | undefined)[] = [];
+      const fetchImpl = ((_url: string, init?: RequestInit) => {
+        asked.push(init);
+        return Promise.resolve(new Response(bodies.shift() ?? Uint8Array.from(whole)));
+      }) as typeof fetch;
+      const source = new GlyphSource(
+        'https://g.test/{fontstack}/{range}.pbf',
+        fetchImpl,
+        () => undefined,
+        {},
+        undefined,
+      );
+      const font = ['Noto Sans Regular'];
+      for (let i = 0; i < 3; i++) {
+        source.need(font, 'Via');
+        await vi.advanceTimersByTimeAsync(0);
+        // Bytes that do not decode are not taken as the range: the labels wait for it, and it counts as loading.
+        if (i < 2) expect([source.ready(font, 'Via'), source.loading]).toEqual([false, 1]);
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+      expect(asked.map((init) => init?.cache)).toEqual([undefined, 'reload', 'reload']);
+      expect([source.ready(font, 'Via'), source.loading]).toEqual([true, 0]);
+      expect(source.resolve(86, font)).toBeDefined();
+      // A range answered damaged five times is kept as what decoded: its characters fall to the local font.
+      bodies.push(corrupted, corrupted, corrupted, corrupted, corrupted);
+      for (let i = 0; i < 5; i++) {
+        source.need(font, 'Ж');
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+      expect([source.ready(font, 'Ж'), source.loading]).toEqual([true, 0]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

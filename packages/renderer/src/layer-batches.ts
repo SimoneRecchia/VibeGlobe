@@ -336,7 +336,10 @@ export class LayerBatches implements LayerRenderTarget {
     }
   }
 
-  /** After a device loss: new materials for the new renderer, and every mesh rebuilt from the CPU copies. */
+  /**
+   * After a device loss: new materials for the new renderer, every mesh rebuilt from the CPU copies, and the atlases in
+   * new textures, the old ones carrying the lost renderer's listeners (KB-222).
+   */
   restore(depthPath: DepthPath): void {
     this.depthPath = depthPath;
     for (const batch of this.batches.values()) {
@@ -346,6 +349,7 @@ export class LayerBatches implements LayerRenderTarget {
     for (const material of this.materials.values()) material.dispose();
     this.materials.clear();
     this.materialList.length = 0;
+    for (const atlas of [this.atlas, this.labels?.atlas]) atlas?.renew();
   }
 
   /** Releases every batch and material. */

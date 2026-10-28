@@ -40,7 +40,10 @@ export interface VectorTileLayer {
   ): void;
   /** The labels the last frame placed, with their screen boxes (F449). */
   placedLabels(): readonly PlacedLabel[];
-  /** Tiles requested or being laid out and not ready yet, over every source (tests wait for 0). */
+  /**
+   * Tiles requested or being laid out and not ready yet, over every source, and glyph ranges labels wait for (tests
+   * wait for 0).
+   */
   loadingTiles(): number;
   /** Every tile URL requested so far, per source (tests: F442, F450). */
   requestLog(source?: string): readonly string[];

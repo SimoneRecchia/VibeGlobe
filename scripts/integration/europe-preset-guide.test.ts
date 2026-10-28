@@ -70,7 +70,7 @@ it(
     for (const dataset of ['europe-satellite', 'europe-terrain', 'europe-vectors'])
       expect(GUIDE).toContain(`  ${dataset} [region]`);
     expect(GUIDE).toMatch(/zoom\s+land tiles\s+sea tiles\s+tiles\s+size\s+cumulative\s+sizes/);
-    expect(EXAMPLES.length).toBe(5);
+    expect(EXAMPLES.length).toBe(6);
     expect(typeErrors(EXAMPLES)).toEqual([]);
   },
 );

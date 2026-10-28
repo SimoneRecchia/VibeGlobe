@@ -38,9 +38,9 @@ function samplerContext(): OffscreenCanvasRenderingContext2D | CanvasRenderingCo
 /** Cells of a tile's color grid per side: its mean colors are kept per cell, so a part of a tile can be compared. */
 const CELLS = 4;
 /** The world base image's color grid, columns: fine enough for the tiles of the lowest levels a layer starts at. */
-export const BASE_COLUMNS = 256;
+const BASE_COLUMNS = 256;
 /** The world base image's color grid, rows. */
-export const BASE_ROWS = 128;
+const BASE_ROWS = 128;
 /** Tone keys of layers that match the imagery below (64 layers × chain positions, as the chain keys). */
 const BELOW_KEYS = 64;
 

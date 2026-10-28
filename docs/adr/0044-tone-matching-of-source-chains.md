@@ -33,9 +33,9 @@ over the whole view would compare unlike content (a land layer against land and 
 both show: each tile's colors are kept on a 4 × 4 grid (not one mean), and for every cell of the surface tile the
 layer's color and the color under it are summed, weighted by the layer's own alpha (keyed water and clipped borders
 count for nothing). Under a translucent layer the reference is the draw's opaque imagery (with its own gain); under
-an opaque one, the next layer down with a tile there (core's `belowTextures`), or the world base image, measured once
+an opaque one, the next layer down with a tile there (core's `below`), or the world base image, measured once
 on a 256 × 128 grid. The gains stay per source and per view, clamped to ×0.5–×2, as before. The overlay slots' gains
-travel in free numbers of the draw's matrices (one of them, the overlay fades' last element, read as 0 in the shader
-on both backends, so `tones` column 2's y holds it). Tiles masked per pixel reach the renderer as RGBA pixels rather
+travel in a matrix of their own per draw (packed into free numbers of the other matrices, one of them read as 0 by
+the shader on both backends and broke the multiply blend, F246). Tiles masked per pixel reach the renderer as RGBA pixels rather
 than a bitmap (a canvas drops the color of transparent pixels, which drew a dark fringe), and their grids are taken
 from those pixels.

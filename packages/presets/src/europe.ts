@@ -272,7 +272,7 @@ function terrainSource(build: Build): TerrainSource | undefined {
  * Natural Earth's colors beyond 85.05° (the mean of its rows there in `NE1_50M_SR_W`): the polar caps of Satellite and
  * Hybrid at the far levels, where the globe's base image shows (F636).
  */
-export const NATURAL_EARTH_CAPS = { north: '#7aacd0', south: '#eef1f6' } as const;
+const NATURAL_EARTH_CAPS = { north: '#7aacd0', south: '#eef1f6' } as const;
 
 /** The base maps and overlays the included sources allow. */
 function mapTypes(

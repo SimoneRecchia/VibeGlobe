@@ -79,23 +79,27 @@ it (`harmonize: 'below'`, F633):
 To turn on every online source of the preset, add the orthophotos with `withAllOnlineSources`:
 
 ```ts
+import { createGlobe } from '@vibeglobe/core';
+import { createOffline } from '@vibeglobe/offline';
 import { europeOpen } from '@vibeglobe/presets';
 import { withAllOnlineSources } from '@vibeglobe/presets/orthophotos';
+import { createWorkers } from '@vibeglobe/worker';
 
 const preset = europeOpen(
   await withAllOnlineSources({
     packageManifestUrl: '/maps/europe/manifest.json',
-    offline, // createOffline() of @vibeglobe/offline
-    farLevels: 4,
+    offline: createOffline({ mode: 'hybrid' }),
+    farLevels: 4, // the base image to level 4 (the default)
   }),
 );
+const satellite = preset.baseMaps.find((b) => b.id === 'satellite');
 const globe = createGlobe({
   container,
   renderer,
-  workers,
+  workers: createWorkers(),
   baseImageryUrl: '/assets/natural-earth-4096.jpg',
-  polarCapColors: preset.baseMaps[0]?.polarCapColors,
-  imagery: preset.baseMaps[0]?.imagery,
+  imagery: satellite?.imagery ?? [],
+  ...(satellite?.polarCapColors ? { polarCapColors: satellite.polarCapColors } : {}),
 });
 ```
 

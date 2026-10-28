@@ -17,16 +17,16 @@ the packages as a test (`scripts/integration/europe-preset-guide.test.ts`).
 
 ## Map types and sources
 
-| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Satellite           | NASA's Blue Marble (GIBS, EPSG:4326) at the lowest levels and over the poles, then the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package, then your own sources and the orthophotos                                                                                   |
-| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                          |
-| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                               |
-| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                            |
-| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                      |
-| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13 |
-| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                       |
-| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                    |
+| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Satellite           | Two layers: NASA's Blue Marble (GIBS, EPSG:4326) below, everywhere; above it your own sources, then the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package on Europe's land, its water keyed out with a soft edge so the sea is always the Blue Marble; the orthophotos on top |
+| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                                  |
+| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                                       |
+| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                                    |
+| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                              |
+| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13         |
+| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                               |
+| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                            |
 
 The polar caps beyond Web Mercator's 85.05° look like the surface around them: Blue Marble fills them in Satellite and
 Hybrid, and Map and Relief give `polarCapColors` (their water in the north, their land in the south), which the
@@ -38,6 +38,26 @@ every source in use with its terms, and `preset.excluded` the sources left out w
 and regional orthophotos with verified terms come with `@vibeglobe/presets/orthophotos` (below); IGN BD ORTHO, PNOA,
 PDOK and others wait for their exact credit or endpoint ([open question 34](../open-questions.md)). An application whose
 own review allows them adds them with `addSources`.
+
+## The sea and the edges of the package
+
+The package's WorldCover tiles show water as one flat dark color (RGB 54, 73, 90, its no-data reflectance), and from
+level 9 it holds only Europe's land. Drawn as the base, that showed rectangles of another color and sharpness at the
+package's box and coasts (KB-231). The Blue Marble is therefore a base layer of its own, and WorldCover an overlay
+whose pixels of that water color are transparent outside Europe's land (`keyOutside`), fading over 12 tile pixels at
+the land's border (`featherPx`): the sea, Turkey and North Africa show the Blue Marble at every level, the land of
+Europe WorldCover from level 5, with WorldCover's own coastline and its lakes. The Blue Marble starts at level 0, so
+its lowest levels load first and the whole globe is covered before any finer tile arrives; beyond its level 7
+(about 600 m a pixel) it is magnified, so the sea is softer than the land beside it from about level 9.
+
+## Above the package's levels
+
+The package's WorldCover stops at level 11 (about 76 m a pixel at 45° N; 10 m data). The satellite layer is a chain:
+each tile comes from the first source that has it, so above level 11 the tiles come from finer online sources when
+the application adds them, from level 12: `orthophotos` (national and regional orthophotos, each within its
+borders) and `addSources` (a provider of the application's own, with `minLevel: 12` to keep the package's composite
+below it). Without them, nothing serves above level 11 and the package's level 11 tiles are magnified, as are the
+Blue Marble's level 7 tiles over the sea and outside Europe.
 
 ## Hybrid: the package plus online detail
 

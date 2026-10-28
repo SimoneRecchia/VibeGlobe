@@ -113,6 +113,13 @@ export const ESA_WORLDCOVER: PresetSourceRecord = {
   coverage: 'europe',
 };
 
+/**
+ * The color the package gives WorldCover's water, sea and lakes alike: the pipeline's `noDataReflectance` (135, 245,
+ * 372 out of 3000, `europe.json`) through its stretch `255 × (r / 3000) ^ (1 / 2)`. The preset keys it out over the
+ * sea so the Blue Marble shows there (KB-231).
+ */
+export const WORLDCOVER_WATER_RGB: readonly [number, number, number] = [54, 73, 90];
+
 /** Mapterhorn's Terrarium tiles (Copernicus GLO-30 in Europe up to level 12, national models beyond). */
 export const MAPTERHORN: PresetSourceRecord = {
   id: 'europe-terrain',

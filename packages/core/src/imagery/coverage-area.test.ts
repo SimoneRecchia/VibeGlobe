@@ -62,4 +62,22 @@ describe('coverage areas (polygon coverage of a source)', () => {
     // The other modes never mask.
     expect(coverageTest({ polygons: [COUNTRY], tiles: 'overlap' }).mask(rect(15, 46, 17, 49), false)).toBeUndefined();
   });
+
+  it('masks the tiles a feather reaches inside the border, and keys a color outside the area on every tile (KB-231)', () => {
+    // A tile of 1° wholly inside, its east edge 1/256 of a tile from the border at 16° E (15°–15.996° E).
+    const near = rect(14.996, 47, 15.996, 48);
+    const sharp = coverageTest({ polygons: [COUNTRY], tiles: 'clip' });
+    expect(sharp.mask(near, false)).toBeUndefined();
+    // With a feather of 8 pixels on a 256-pixel tile, the border lies within its reach: the tile is masked.
+    const feathered = coverageTest({ polygons: [COUNTRY], tiles: 'clip', featherPx: 8 });
+    expect(feathered.mask(near, false, 256)?.featherPx).toBe(8);
+    expect(feathered.mask(rect(13.5, 46.5, 14.5, 47.5), false, 256)).toBeUndefined();
+    // A keyed area asks for every tile, inside or not; a tile wholly outside gets an empty outline and the key.
+    const keyed = coverageTest({ polygons: [COUNTRY], keyOutside: { rgb: [54, 73, 90] } });
+    expect(keyed.covers(rect(30, 30, 31, 31))).toBe(true);
+    const outside = keyed.mask(rect(30, 30, 31, 31), true);
+    expect([outside?.ringEnds.length, outside?.key]).toEqual([0, { rgb: [54, 73, 90], tolerance: 8 }]);
+    expect(keyed.mask(rect(15, 46, 17, 49), true)?.ringEnds.length).toBe(2);
+    expect(keyed.mask(rect(10.5, 46.5, 11.5, 47.5), true)).toBeUndefined();
+  });
 });

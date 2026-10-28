@@ -24,6 +24,7 @@ import {
   COPERNICUS_GLO30,
   NASA_GIBS_BLUE_MARBLE,
   OPENFREEMAP,
+  WORLDCOVER_WATER_RGB,
   type ExcludedSource,
   type PresetSourceRecord,
   type SourceTiers,
@@ -152,7 +153,18 @@ interface Build {
   use(record: PresetSourceRecord): boolean;
 }
 
-/** Satellite: the app's sources first (national orthophotos within their borders), the package's composite below. */
+/**
+ * The fade, in pixels of a tile, from the Blue Marble to WorldCover at the edge of Europe's land and of the water keyed
+ * out over the sea (KB-231): a few screen pixels at every level, so no border shows between the sources.
+ */
+const FEATHER_PX = 12;
+
+/**
+ * Satellite, two layers (KB-231). Below, NASA's Blue Marble everywhere: the whole world at the lowest levels, the sea at
+ * every level, and the land outside Europe. Above, the app's sources first (national orthophotos are layers of their
+ * own above), then the package's WorldCover, whose water is keyed out outside Europe's land with a soft edge: the sea
+ * shows the Blue Marble at every level, with WorldCover's own coastline and its lakes on land.
+ */
 function satelliteLayers(build: Build): ImageryLayerOptions[] {
   const { options, wrap, use } = build;
   const added = (position: 'top' | 'bottom') =>
@@ -169,6 +181,7 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
           minLevel: ESA_WORLDCOVER.minLevel,
           maxLevel: ESA_WORLDCOVER.maxLevel,
+          area: { polygons: EUROPE_LAND, keyOutside: { rgb: WORLDCOVER_WATER_RGB }, featherPx: FEATHER_PX },
           attribution: ESA_WORLDCOVER.attribution,
         }),
         'package',
@@ -176,9 +189,10 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
       ),
     );
   satellite.push(...added('bottom'));
-  // The whole world below the package's levels and outside it, and the polar caps: NASA's Blue Marble.
-  if (use(NASA_GIBS_BLUE_MARBLE)) satellite.push(wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite'));
-  return satellite.length > 0 ? [{ id: 'satellite', sources: satellite }] : [];
+  const base = use(NASA_GIBS_BLUE_MARBLE)
+    ? [{ id: 'satellite-base', sources: [wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite')] }]
+    : [];
+  return [...base, ...(satellite.length > 0 ? [{ id: 'satellite', sources: satellite }] : [])];
 }
 
 /** Terrain: the package's extract first, then online on land up to the online level. */

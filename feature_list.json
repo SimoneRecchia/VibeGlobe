@@ -7609,6 +7609,39 @@
         "In the browser, on the Vue example, a model set added through the component's data layers loads and draws, with no warning about models"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F630",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "A coverage area can fade its border over a number of tile pixels (`featherPx`) and, with `keyOutside`, make transparent outside it only the pixels of one color (a package's no-data water), keeping the others, so a source blends into the layer below without a visible edge.",
+      "steps": [
+        "Unit-test that a feather masks the tiles it reaches inside the border and that a keyed area masks every tile it requests, with the key color",
+        "In the browser, a feathered clipped overlay fades over several pixels at its border, and a keyed overlay turns transparent only the pixels of the key color outside its area"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F631",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`europeOpen()` Satellite shows NASA's Blue Marble as a base layer everywhere and the package's WorldCover above it with its water keyed out outside Europe's land and a soft edge, so the sea and the land outside Europe look the same inside and outside the package at every level, with no rectangles of different color or sharpness.",
+      "steps": [
+        "Unit-test the two layers, the key color and feather of the package's source, a sea tile wholly keyed and a tile inside the land unmasked",
+        "In the browser, the keyed area's e2e (F630) shows the sea pixels of the key color replaced by the layer below"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F632",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "Above the offline package's last level (11), `europeOpen()`'s satellite chain hands each tile to the finer online sources the app adds (`addSources`, `orthophotos`); without them the package's level 11 is drawn magnified, as documented in the preset's guide.",
+      "steps": [
+        "Unit-test that an added source serving from level 12 answers above the package's level and that without it only the package's level 11 source is in the chain",
+        "Document the switch level and what shows without online sources in the europeOpen guide"
+      ],
+      "status": "passing"
     }
   ]
 }

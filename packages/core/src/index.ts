@@ -135,6 +135,7 @@ export type {
   CoverageArea,
   CoverageTest,
   GeoJsonArea,
+  KeyColor,
   PolygonDeg,
   RingDeg,
   TileMask,

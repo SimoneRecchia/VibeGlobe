@@ -92,3 +92,15 @@ Problems the owner found with the preset in an application, and decisions:
 - **Package levels (owner):** the package goes to level 11 on land and 8 over the sea, for every dataset (`europe.json`). Online, every source is asked for up to its own deepest level and magnified beyond it: the preset sets no zoom limit.
 - **Map and Relief:** Map is a political map composed from OpenFreeMap's tiles (neutral land, blue water, country and region borders, place names), without land cover, land use or buildings; roads are their own overlay, off by default. Relief is the same map over a light tint by elevation (`color-relief`) and the hillshade. Their caps take the map's own colors.
 - **Orthophotos:** every service starts at level 12 (`ORTHOPHOTO_MIN_LEVEL`), since they answer far views with white images, and a white tile counts as no data. The minimum per service and which services still answer badly could not be checked, as their hosts are blocked here: open question 34 (c). No service was removed.
+
+## Amendment, 2026-10-28: the Blue Marble as a base layer, the package's water keyed out
+
+In Cube the package's WorldCover drew rectangles of another color and sharpness: its no-data water (RGB 54, 73, 90)
+inside the package's box against the Blue Marble outside, and from level 9, where the package holds only Europe's land,
+the sea and the land outside Europe on a magnified Blue Marble beside sharp land (KB-231). Tone matching (ADR 0044)
+cannot fix it: the water is one flat color, not a tone. Satellite is now two layers: the Blue Marble below, everywhere,
+and above it the app's sources and the package's WorldCover, whose pixels of the water color are transparent outside
+Europe's land (a coverage area's `keyOutside`), fading over 12 tile pixels (`featherPx`, F630). The sea is the Blue
+Marble at every level; WorldCover keeps its coastline and lakes. Above the package's level 11 the chain takes finer
+online sources only when the app adds them (`orthophotos`, `addSources` from level 12); without them level 11 is
+magnified (F632).

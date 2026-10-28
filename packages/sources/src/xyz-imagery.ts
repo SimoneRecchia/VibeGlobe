@@ -111,7 +111,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
   const maxLevel = options.maxLevel ?? 19;
   const subdomains = options.subdomains ?? [];
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
-  const area = sourceArea(options.area, tiling);
+  const area = sourceArea(options.area, tiling, options.tileSizePx ?? 256);
   const blank = blankColor(options.blankTile);
   return {
     id: options.id,

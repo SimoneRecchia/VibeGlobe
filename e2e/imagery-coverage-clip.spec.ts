@@ -48,4 +48,49 @@ test.describe('coverage clipped per pixel (F618, KB-209)', () => {
     await waitForImagery(page);
     expect(isBlue(await colorAt(page, 0, 0))).toBe(true);
   });
+
+  /** The pixels of the canvas's middle row, from left to right, classified white, blue or between. */
+  async function middleRow(page: Page): Promise<string> {
+    const image = await canvasImage(page);
+    const y = Math.floor(image.height / 2);
+    let row = '';
+    for (let x = 0; x < image.width; x++) {
+      const at = (y * image.width + x) * 4;
+      const rgb = [image.data[at] ?? 0, image.data[at + 1] ?? 0, image.data[at + 2] ?? 0];
+      row += isWhite(rgb) ? 'w' : isBlue(rgb) ? 'b' : '-';
+    }
+    return row;
+  }
+
+  test('a feathered border fades from the layer below to the source over its width, with no edge at tile seams (KB-231)', async ({
+    page,
+  }) => {
+    const session = await fixtureSession(page);
+    const view = `imagery=blue&overlays=white&session=${session}&lon=12&lat=43.5&zoom=6`;
+    await openGlobe(page, `backend=webgl2&${view}&overlayArea=triangle`);
+    await waitForImagery(page);
+    // The sharp border: white inside (left), blue outside (right), at most two pixels between.
+    const sharp = await middleRow(page);
+    expect(sharp.replace(/^w+/, '').replace(/b+$/, '').length).toBeLessThanOrEqual(2);
+    await openGlobe(page, `backend=webgl2&${view}&overlayArea=triangle&overlayFeather=16`);
+    await waitForImagery(page);
+    const feathered = await middleRow(page);
+    console.log(`[clip] sharp ${sharp}\n[clip] feathered ${feathered}`);
+    // White, then a fade of several pixels, then blue: one transition only, none at the overlay's tile seams.
+    expect(feathered).toMatch(/^w+-{6,}b+$/);
+  });
+
+  test('a keyed area makes the pixels of the key color transparent outside it only (KB-231)', async ({ page }) => {
+    const session = await fixtureSession(page);
+    await openGlobe(
+      page,
+      `backend=webgl2&imagery=blue&overlays=white&overlayArea=triangle-key&session=${session}&lon=12&lat=43.5&zoom=6`,
+    );
+    await waitForImagery(page);
+    // The white overlay is keyed out outside the triangle (the layer below shows), kept inside it.
+    expect(isWhite(await colorAt(page, 11.5, 43))).toBe(true);
+    expect(isBlue(await colorAt(page, 12.5, 44))).toBe(true);
+    expect(isBlue(await colorAt(page, 13.5, 44.3))).toBe(true);
+    expect(isWhite(await colorAt(page, 10.8, 43.6))).toBe(true);
+  });
 });

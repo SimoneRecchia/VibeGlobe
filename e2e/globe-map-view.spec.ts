@@ -276,13 +276,21 @@ for (const backend of BACKENDS) {
         ['2D', '2d', 0],
         ['Auto', 'auto', 0],
       ] as const) {
+        // The tilt of every engine frame, recorded by the engine's frame event: sampled from the test, two frames could
+        // run between two samples on a busy page and read as one step of twice the size (KB-227).
+        await page.evaluate(() => {
+          const globe = window.vibeglobePlayground?.globe;
+          const tilts: number[] = [];
+          (window as unknown as { frameTilts: number[] }).frameTilts = tilts;
+          globe?.on('frame', () => tilts.push(globe.camera.tiltDeg));
+        });
         await page.locator('#view-modes button', { hasText: label }).click();
-        let previous = (await cameraAfterFrame(page)).tiltDeg;
-        for (let i = 0; i < 40; i++) {
-          const camera = await cameraAfterFrame(page);
-          expect(Math.abs(camera.tiltDeg - previous)).toBeLessThan(15);
-          previous = camera.tiltDeg;
-        }
+        for (let i = 0; i < 41; i++) await cameraAfterFrame(page);
+        const tilts = await page.evaluate(() => (window as unknown as { frameTilts: number[] }).frameTilts.splice(0));
+        // A tilt that changes eases over many frames (from 2D, Auto keeps 0°); once it ends the engine draws no more.
+        expect(tilts.length).toBeGreaterThan(label === 'Auto' ? 0 : 10);
+        for (let i = 1; i < tilts.length; i++)
+          expect(Math.abs((tilts[i] ?? 0) - (tilts[i - 1] ?? 0)), `frame ${String(i)}`).toBeLessThan(15);
         const camera = await cameraAfterFrame(page);
         expect([camera.viewMode, camera.tiltDeg]).toEqual([mode, tilt]);
         if (label === '3D') expect(camera.chosenTiltDeg).toBeCloseTo(50, 9);

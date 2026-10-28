@@ -71,27 +71,40 @@ function readGlyph(pbf: PbfReader, end: number): Glyph {
  * @returns the glyphs by code point; an empty map when the bytes are not a glyph file. Never throws.
  */
 export function decodeGlyphs(bytes: Uint8Array): Map<number, Glyph> {
+  return decodeGlyphRange(bytes).glyphs;
+}
+
+/**
+ * Decodes a glyph range file; `intact` is false when the bytes were cut or damaged on the way (the decoding failed,
+ * a message runs past the end, or a glyph's bitmap does not match its size): its glyphs are then only those that
+ * decoded, and the range should be fetched again (KB-226).
+ */
+export function decodeGlyphRange(bytes: Uint8Array): { glyphs: Map<number, Glyph>; intact: boolean } {
   const glyphs = new Map<number, Glyph>();
+  let intact = true;
   try {
     const pbf = new PbfReader(bytes);
     pbf.readFields((tag) => {
       if (tag !== 1) return;
       const stackEnd = pbf.readVarint() + pbf.pos;
+      if (stackEnd > bytes.length) intact = false;
       pbf.readFields(
         (field) => {
           if (field !== 3) return;
           const glyph = readGlyph(pbf, pbf.readVarint() + pbf.pos);
           const expected = (glyph.width > 0 ? glyph.width + 6 : 0) * (glyph.height > 0 ? glyph.height + 6 : 0);
           if (glyph.bitmap.length === expected || glyph.bitmap.length === 0) glyphs.set(glyph.id, glyph);
+          else intact = false;
         },
         undefined,
-        stackEnd,
+        Math.min(stackEnd, bytes.length),
       );
     }, undefined);
   } catch {
     glyphs.clear();
+    intact = false;
   }
-  return glyphs;
+  return { glyphs, intact };
 }
 
 /** Glyphs loaded so far, per font stack name (`'Open Sans Regular,Arial Unicode MS Regular'`). */

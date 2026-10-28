@@ -7,7 +7,7 @@
  * the device pixel ratio (`@2x` from ratio 1.5 on), its icons cut out as RGBA.
  */
 import {
-  decodeGlyphs,
+  decodeGlyphRange,
   glyphUrl,
   GlyphStore,
   parseSpriteIndex,
@@ -22,6 +22,11 @@ export const LOCAL_FONT_STACK = 'local';
 
 /** A glyph range that failed on the way is requested again after this long. */
 const GLYPH_RETRY_MS = 5_000;
+/**
+ * Answers that do not decode before a range is kept as what decoded (KB-226): a server answering a range it does not
+ * have with a page (a 200 that is not a glyph file) leaves its characters to the local font instead of a wait forever.
+ */
+const DAMAGED_ROUNDS = 5;
 
 /** An icon of the sprite: its pixels and the pixel ratio they were drawn for. */
 export interface SpriteImage {
@@ -37,6 +42,10 @@ export class GlyphSource {
   /** Glyph range URLs requested so far (tests: F448). */
   readonly requested: string[] = [];
   private readonly pending = new Set<string>();
+  /** Answers of a range that did not decode: fetched again past the HTTP cache, which may hold them (KB-226). */
+  private readonly damaged = new Map<string, number>();
+  /** Ranges requested and not arrived, those waiting to be requested again included. */
+  private readonly unsettled = new Set<string>();
   private readonly localTried = new Set<number>();
   private icons = new Map<string, SpriteImage>();
   /** The pixel ratio of the sprite loaded (1 or 2). */
@@ -50,6 +59,11 @@ export class GlyphSource {
     private readonly localFontFamily: string | undefined,
   ) {}
 
+  /** Glyph ranges requested and not arrived yet, those that failed and wait to be requested again included. */
+  get loading(): number {
+    return this.unsettled.size;
+  }
+
   /** The glyph of a code point from the first font stack that has it, then the local font. */
   resolve(code: number, fontStack: readonly string[]): { glyph: Glyph; fontStack: string } | undefined {
     return this.store.resolve(code, [fontStack, [LOCAL_FONT_STACK]]);
@@ -62,19 +76,30 @@ export class GlyphSource {
       const url = new URL(glyphUrl(this.glyphs, fontStack, start), globalThis.location?.href).href;
       if (this.pending.has(url)) continue;
       this.pending.add(url);
+      this.unsettled.add(url);
       this.requested.push(url);
-      void this.fetchImpl(url)
+      void this.fetchImpl(url, this.damaged.has(url) ? { cache: 'reload' } : undefined)
         .then(async (response) => {
-          // A missing range (404 and the like) has no glyphs; a server error is retried like a network failure.
+          // A missing range (404 and the like, or a page a server answers in its place) has no glyphs; a server
+          // error is retried like a network failure.
           if (response.status >= 500) throw new Error(`glyph range answered ${String(response.status)}`);
-          return response.ok ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0);
+          const page = response.headers.get('content-type')?.includes('text/html') === true;
+          return response.ok && !page ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(0);
         })
         .then((bytes) => {
-          this.store.add(fontStack, start, decodeGlyphs(bytes));
+          const range = decodeGlyphRange(bytes);
+          const damaged = range.intact ? 0 : (this.damaged.get(url) ?? 0) + 1;
+          if (damaged > 0 && damaged < DAMAGED_ROUNDS) {
+            this.damaged.set(url, damaged);
+            throw new Error('glyph range damaged on the way');
+          }
+          this.damaged.delete(url);
+          this.unsettled.delete(url);
+          this.store.add(fontStack, start, range.glyphs);
           this.onChange();
         })
-        // A range that failed on the way is not kept as empty: the labels wait for it, and it is requested again
-        // later (TG-04).
+        // A range that failed on the way, or whose bytes were cut or damaged, is not kept as empty: the labels wait
+        // for it, and it is requested again later (TG-04, KB-226).
         .catch(() => setTimeout(() => this.retry(url), GLYPH_RETRY_MS));
     }
   }
@@ -106,6 +131,7 @@ export class GlyphSource {
   /** Lets a failed range be requested again by the next labels that need it. */
   private retry(url: string): void {
     this.pending.delete(url);
+    this.unsettled.delete(url);
     this.onChange();
   }
 

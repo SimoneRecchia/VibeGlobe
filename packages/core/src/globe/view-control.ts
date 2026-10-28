@@ -37,6 +37,8 @@ export interface ViewHost {
   zoomLimited(): boolean;
   /** Stops a running API movement (KB-127). */
   interruptMovement(): void;
+  /** Interrupts the running movement if it eases the tilt: a view mode chosen meanwhile takes over (KB-207). */
+  interruptTilt(): void;
 }
 
 /**
@@ -123,6 +125,7 @@ export class ViewControl {
     const view = this.host.view;
     const before = view.mode;
     view.setMode(mode);
+    this.host.interruptTilt();
     if (view.mode !== before) this.host.emitter.emit('view-mode-change', { mode: view.mode });
     this.host.requestRender();
   }

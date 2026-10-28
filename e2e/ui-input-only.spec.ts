@@ -30,8 +30,10 @@ async function place(page: Page, input: Input, xPx: number, yPx: number, finish 
     if (finish) await page.mouse.dblclick(xPx, yPx);
     else await page.mouse.click(xPx, yPx);
   } else if (input === 'touch') {
-    await touch(page, xPx, yPx);
-    if (finish) await touch(page, xPx, yPx);
+    // A finishing double tap: the second tap 150 ms after the first by the events' own times (KB-207).
+    const atS = finish ? Date.now() / 1000 : undefined;
+    await touch(page, xPx, yPx, 0, 0, atS);
+    if (atS !== undefined) await touch(page, xPx, yPx, 0, 0, atS + 0.15);
   } else {
     await moveCursor(page, xPx, yPx);
     await page.keyboard.press('Enter');

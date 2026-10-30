@@ -6,6 +6,7 @@
  * buildings as overlays, and for Relief the political map over a light hypsometric tint and a hillshade of the terrain.
  * One composed style per selection, so the tiles shared by its parts load once.
  */
+import { labelOverlays, landscapeLayers } from './landscape-style.js';
 import { POLITICAL_COLORS, politicalParts } from './political-style.js';
 
 /** A MapLibre style, as far as the preset reads and writes it. */
@@ -37,8 +38,20 @@ export interface StyleSelection {
   readonly roads?: boolean;
   /** Buildings, extruded to their heights. */
   readonly buildings?: boolean;
-  /** A light hypsometric tint and a hillshade of the terrain (Relief). */
+  /** A light hypsometric tint and a hillshade of the terrain (Relief); a lighter hillshade alone on the Landscape. */
   readonly hillshade?: boolean;
+  /** The Landscape map (F644): land by its cover, light blue water. */
+  readonly landscape?: boolean;
+  /** The app's land cover image is under the Landscape map far away: its land color fades in from level 7 to 8. */
+  readonly landCoverImage?: boolean;
+  /** Country borders, and region borders from level 5 (F645); over imagery and the Landscape. */
+  readonly borders?: boolean;
+  /** Country names (F645); over imagery and the Landscape. */
+  readonly countries?: boolean;
+  /** Ocean and sea names (F645); over imagery and the Landscape. */
+  readonly seas?: boolean;
+  /** Names in this language where the tiles have it (`name:<language>`, such as `it`), else Latin or local (F645). */
+  readonly language?: string | undefined;
 }
 
 /** OpenMapTiles source layers of each overlay. */
@@ -153,6 +166,31 @@ function reliefLayers(): StyleLayerJson[] {
   ];
 }
 
+/** The Landscape's hillshade: lighter than the Relief's, with no tint. */
+const LANDSCAPE_HILLSHADE: StyleLayerJson = {
+  id: 'landscape-hillshade',
+  type: 'hillshade',
+  source: HILLSHADE_SOURCE,
+  paint: {
+    'hillshade-exaggeration': 0.2,
+    'hillshade-shadow-color': '#6d7d73',
+    'hillshade-highlight-color': '#ffffff',
+  },
+};
+
+/** The Landscape bottom first: land, roads, borders, buildings, then names on top. */
+function landscapeSelection(style: StyleJson, selection: StyleSelection, relief: boolean): StyleLayerJson[] {
+  const overlays = overlayLayers(style, selection);
+  const labels = labelOverlays(style, selection, false);
+  return [
+    ...landscapeLayers(style, selection.landCoverImage === true, relief ? LANDSCAPE_HILLSHADE : undefined),
+    ...overlays.filter((l) => l.type !== 'fill-extrusion'),
+    ...labels.filter((l) => l.type === 'line'),
+    ...overlays.filter((l) => l.type === 'fill-extrusion'),
+    ...labels.filter((l) => l.type !== 'line'),
+  ];
+}
+
 /** The raster-dem source of the relief. */
 function reliefSource(hillshade: HillshadeSource): Readonly<Record<string, unknown>> {
   return {
@@ -167,7 +205,8 @@ function reliefSource(hillshade: HillshadeSource): Readonly<Record<string, unkno
 
 /** The layers of a selection, bottom first: the political map's parts around the relief and the overlays. */
 function selectionLayers(style: StyleJson, selection: StyleSelection, relief: boolean): StyleLayerJson[] {
-  const political = selection.map === true ? politicalParts(style) : undefined;
+  if (selection.landscape === true) return landscapeSelection(style, selection, relief);
+  const political = selection.map === true ? politicalParts(style, selection.language) : undefined;
   if (selection.map === true && political === undefined) return [...(relief ? reliefLayers() : []), ...style.layers];
   if (political === undefined) {
     const background = {
@@ -175,7 +214,11 @@ function selectionLayers(style: StyleJson, selection: StyleSelection, relief: bo
       type: 'background',
       paint: { 'background-color': POLITICAL_COLORS.land },
     };
-    return [...(relief ? [background, ...reliefLayers()] : []), ...overlayLayers(style, selection)];
+    return [
+      ...(relief ? [background, ...reliefLayers()] : []),
+      ...overlayLayers(style, selection),
+      ...labelOverlays(style, selection, !relief),
+    ];
   }
   // The political map's own names and borders replace the style's labels overlay.
   const overlays = overlayLayers(style, { ...selection, labels: false });

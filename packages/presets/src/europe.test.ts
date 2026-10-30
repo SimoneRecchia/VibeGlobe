@@ -43,8 +43,16 @@ describe('europeOpen (F613)', () => {
   it('builds every map type from free sources with their terms, online sources on land and the sea from the package', () => {
     const offline = fakeOffline();
     const preset = europeOpen({ packageManifestUrl: 'https://app.test/maps/europe/manifest.json', offline });
-    expect(preset.baseMaps.map((b) => b.id)).toEqual(['satellite', 'hybrid', 'map', 'relief']);
-    expect(preset.overlays.map((o) => o.id)).toEqual(['labels', 'roads', 'buildings', 'terrain']);
+    expect(preset.baseMaps.map((b) => b.id)).toEqual(['satellite', 'hybrid', 'map', 'landscape', 'relief']);
+    expect(preset.overlays.map((o) => o.id)).toEqual([
+      'labels',
+      'roads',
+      'buildings',
+      'borders',
+      'countries',
+      'seas',
+      'terrain',
+    ]);
     // Every source with its licence, exact attribution and the day its terms were read.
     expect(preset.sources.map((s) => s.id)).toEqual([
       'europe-satellite',

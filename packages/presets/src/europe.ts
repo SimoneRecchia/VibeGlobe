@@ -32,6 +32,7 @@ import {
 import type { OrthophotoLayers } from './orthophotos.js';
 import { composeStyle, type HillshadeSource, type StyleJson, type StyleSelection } from './styles.js';
 import { gibsBlueMarble } from './gibs.js';
+import { LANDSCAPE_COLORS } from './landscape-style.js';
 import { POLITICAL_COLORS } from './political-style.js';
 
 /** The offline engine, as far as the preset uses it (`createOffline()` of `@vibeglobe/offline`). */
@@ -82,6 +83,12 @@ export interface EuropeOpenOptions {
    * package's WorldCover over the level after (F636).
    */
   readonly farLevels?: number;
+  /**
+   * The Landscape map's land cover far away (F644), where the vector tiles hold none (below level 7): an image source
+   * of the app's, in the Landscape's colors, with its terms. The guide shows how to make one from NASA's MODIS land
+   * cover (public domain) with `singleImage` of `@vibeglobe/sources`. Without it the land is one color there.
+   */
+  readonly landCover?: AddedSource;
 }
 
 /** Where the map's vector style and hillshade read their files from. */
@@ -89,7 +96,7 @@ export type PresetMode = 'online' | 'hybrid' | 'offline';
 
 /** A base map type. */
 export interface BaseMap {
-  readonly id: 'satellite' | 'hybrid' | 'map' | 'relief';
+  readonly id: 'satellite' | 'hybrid' | 'map' | 'landscape' | 'relief';
   readonly name: string;
   /** The imagery layers (`Globe.imageryLayers.set`). */
   readonly imagery: readonly ImageryLayerOptions[];
@@ -106,7 +113,7 @@ export interface BaseMap {
 
 /** An overlay, shown over any base map. */
 export interface Overlay {
-  readonly id: 'labels' | 'roads' | 'buildings' | 'terrain';
+  readonly id: 'labels' | 'roads' | 'buildings' | 'terrain' | 'borders' | 'countries' | 'seas';
   readonly name: string;
   /** The vector style parts it adds; none for 3D terrain. */
   readonly style: StyleSelection;
@@ -135,9 +142,15 @@ export interface EuropePreset {
   transformUrl(mode: PresetMode): (url: string) => string;
   /**
    * The style of a base map with overlays, from the loaded style JSON ({@link EuropePreset.styleUrl}); undefined when
-   * the selection draws no vector layer.
+   * the selection draws no vector layer. Names are in `language` where the tiles have it (such as `it`), else in their
+   * Latin or local name (F645).
    */
-  styleFor(style: StyleJson, baseId: BaseMap['id'], overlayIds: readonly Overlay['id'][]): StyleJson | undefined;
+  styleFor(
+    style: StyleJson,
+    baseId: BaseMap['id'],
+    overlayIds: readonly Overlay['id'][],
+    language?: string,
+  ): StyleJson | undefined;
 }
 
 const LAND = { polygons: EUROPE_LAND, tiles: 'overlap' as const };
@@ -298,6 +311,7 @@ function mapTypes(
   imagery: readonly ImageryLayerOptions[],
   vectors: boolean,
   terrain: boolean,
+  landCover: ImageryLayerOptions | undefined,
 ): { baseMaps: BaseMap[]; overlays: Overlay[] } {
   // At the far levels the base image's polar caps show: Natural Earth's colors there (F636).
   const naturalCaps = NATURAL_EARTH_CAPS;
@@ -312,7 +326,17 @@ function mapTypes(
     },
   ];
   const polarCapColors = { north: POLITICAL_COLORS.water, south: POLITICAL_COLORS.land };
-  if (vectors) baseMaps.push({ id: 'map', name: 'Map', imagery: [], style: { map: true }, polarCapColors });
+  if (vectors)
+    baseMaps.push(
+      { id: 'map', name: 'Map', imagery: [], style: { map: true }, polarCapColors },
+      {
+        id: 'landscape',
+        name: 'Landscape',
+        imagery: landCover ? [landCover] : [],
+        style: { landscape: true, hillshade: terrain, landCoverImage: landCover !== undefined },
+        polarCapColors: { north: LANDSCAPE_COLORS.water, south: LANDSCAPE_COLORS.ice },
+      },
+    );
   if (terrain)
     baseMaps.push({
       id: 'relief',
@@ -327,6 +351,9 @@ function mapTypes(
       { id: 'labels', name: 'Labels and borders', style: { labels: true } },
       { id: 'roads', name: 'Roads', style: { roads: true } },
       { id: 'buildings', name: '3D buildings', style: { buildings: true } },
+      { id: 'borders', name: 'Borders', style: { borders: true } },
+      { id: 'countries', name: 'Country names', style: { countries: true } },
+      { id: 'seas', name: 'Sea names', style: { seas: true } },
     );
   if (terrain) overlays.push({ id: 'terrain', name: '3D terrain', style: {} });
   return { baseMaps, overlays };
@@ -425,7 +452,12 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
         attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
       }
     : undefined;
-  const { baseMaps, overlays } = mapTypes(imagery, vectors, terrain !== undefined);
+  const cover = options.landCover;
+  const landCover =
+    cover && build.use(cover.record)
+      ? { id: 'landscape-land-cover', sources: [cover.source], harmonize: false }
+      : undefined;
+  const { baseMaps, overlays } = mapTypes(imagery, vectors, terrain !== undefined, landCover);
   return {
     baseMaps,
     overlays,
@@ -436,12 +468,12 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
     styleUrl: (mode) =>
       mode === 'offline' && packaged ? `${build.packageBase}openfreemap/styles/liberty` : (OPENFREEMAP.url ?? ''),
     transformUrl: (mode) => packageUrls(build, mode),
-    styleFor(style, baseId, overlayIds) {
+    styleFor(style, baseId, overlayIds, language) {
       const parts = [
         baseMaps.find((b) => b.id === baseId)?.style,
         ...overlayIds.map((id) => overlays.find((o) => o.id === id)?.style),
       ];
-      const selection: StyleSelection = Object.assign({}, ...parts.filter((p) => p !== undefined));
+      const selection: StyleSelection = Object.assign({ language }, ...parts.filter((p) => p !== undefined));
       return selectionStyle(style, selection, hillshade, levelOf(options, OPENFREEMAP));
     },
   };

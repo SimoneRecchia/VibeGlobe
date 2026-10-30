@@ -31,6 +31,12 @@ export interface SpaceBackgroundOptions {
   readonly timeMs?: number;
   /** Fades the background out under the atmosphere's daytime sky near the ground (default true). */
   readonly fade?: boolean;
+  /**
+   * The halo around the globe seen from space, 0–4 (default 0, none): a soft blue glow beyond the limb, brightest at
+   * the edge and fading over a few hundred kilometers, as virtual globes draw it over the atmosphere's thin physical
+   * sky (F643). 1 is a virtual globe's; with sun lighting on it shows only on the day side.
+   */
+  readonly glow?: number;
 }
 
 /** What {@link addSpaceBackground} takes: the options, and where the star catalog is hosted. */
@@ -66,9 +72,11 @@ export type SpaceBackgroundGlobe = Pick<
 type Settings = SpaceBackground['options'];
 
 function validate(options: SpaceBackgroundOptions): void {
-  const { brightness, timeMs } = options;
+  const { brightness, glow, timeMs } = options;
   if (brightness !== undefined && !(brightness >= 0 && brightness <= 8))
     throw new GlobeError('invalid-option', `brightness must be 0 to 8, got ${String(brightness)}`);
+  if (glow !== undefined && !(glow >= 0 && glow <= 4))
+    throw new GlobeError('invalid-option', `glow must be 0 to 4, got ${String(glow)}`);
   if (timeMs !== undefined && !Number.isFinite(timeMs))
     throw new GlobeError('invalid-option', `timeMs must be a finite number, got ${String(timeMs)}`);
 }
@@ -95,6 +103,7 @@ class SkyState {
       milkyWay: true,
       brightness: 1,
       fade: true,
+      glow: 0,
       timeMs: undefined,
       ...options,
     };
@@ -124,6 +133,10 @@ class SkyState {
     u.milkyWay.value = this.settings.milkyWay ? 1 : 0;
     u.visibility.value = this.visibility;
     u.brightness.value = this.settings.brightness;
+    u.glow.value = this.settings.glow;
+    u.sunLit.value = sky.sunLighting ? 1 : 0;
+    this.galacticOf(view.eyeEcef, 0.001, u.eyeKm.value);
+    this.galacticOf(this.sun, 1, u.sun.value);
     u.pixelRatio.value = view.pixelRatio;
     u.bufferPx.value.set(Math.max(1, view.widthPx * view.pixelRatio), Math.max(1, view.heightPx * view.pixelRatio));
     u.celestialToClip.value.fromArray(celestialToClip(view.view, view.projection, this.celestial, this.clip));
@@ -153,9 +166,15 @@ class SkyState {
   ): void {
     const e = this.scratch;
     for (let i = 0; i < 3; i++) e[i] = (v[i * 4] ?? 0) * x + (v[i * 4 + 1] ?? 0) * y + (v[i * 4 + 2] ?? 0) * z;
+    this.galacticOf(e, 1, out);
+  }
+
+  /** An ECEF vector in galactic axes, times `scale`. */
+  private galacticOf(e: ArrayLike<number>, scale: number, out: { set(x: number, y: number, z: number): void }): void {
     const g = this.galactic;
     const at = (row: number): number =>
-      (g[row * 3] ?? 0) * (e[0] ?? 0) + (g[row * 3 + 1] ?? 0) * (e[1] ?? 0) + (g[row * 3 + 2] ?? 0) * (e[2] ?? 0);
+      ((g[row * 3] ?? 0) * (e[0] ?? 0) + (g[row * 3 + 1] ?? 0) * (e[1] ?? 0) + (g[row * 3 + 2] ?? 0) * (e[2] ?? 0)) *
+      scale;
     out.set(at(0), at(1), at(2));
   }
 }
@@ -207,7 +226,8 @@ function spaceExtension(state: SkyState, catalogUrl: string, context: RenderExte
  * procedural Milky Way behind the globe, fixed in the celestial frame, so every camera move, globe spin or tilt turns
  * the sky with it, and rotated by Greenwich sidereal time from the engine's date and time. Stars are crisp at any pixel
  * ratio and do not shimmer; the background fades out under the atmosphere's daytime sky near the ground and shows
- * again at night or from space. Off unless added; call once the globe is ready (`Globe.addRenderExtension`).
+ * again at night or from space; a halo around the globe seen from space if asked (`glow`). Off unless added; call once
+ * the globe is ready (`Globe.addRenderExtension`).
  */
 export function addSpaceBackground(globe: SpaceBackgroundGlobe, init: SpaceBackgroundInit = {}): SpaceBackground {
   const { catalogUrl = DEFAULT_CATALOG_URL(), ...options } = init;

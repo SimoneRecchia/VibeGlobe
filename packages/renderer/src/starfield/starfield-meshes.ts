@@ -2,7 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // The space background's meshes (ADR 0181): one sprite of four vertices per catalog star, sized and lit in the vertex
 // stage by `starSprite`'s rule, and a full-screen backdrop that draws the Milky Way procedurally in galactic
-// coordinates. Both sit at the far end of the depth range like the atmosphere's sky and draw only where no surface
+// coordinates, and the halo around the globe (F643). Both sit at the far end of the depth range like the atmosphere's sky and draw only where no surface
 // wrote depth. Both add their light to what is behind them (one-one blending); the backdrop also adds the background's
 // opacity to the alpha channel, so over a transparent canvas space is black where it shows, and over the atmosphere's
 // opaque sky the light simply adds. Loaded on demand: nothing touches three.js at import time.
@@ -21,6 +21,7 @@ import {
   floor,
   fract,
   hash,
+  length,
   log,
   max,
   min,
@@ -72,6 +73,13 @@ export interface StarfieldUniforms {
   readonly rayCenter: { value: Vector3 };
   readonly rayX: { value: Vector3 };
   readonly rayY: { value: Vector3 };
+  /** The halo's strength, 0 none (`SpaceBackgroundOptions.glow`). */
+  readonly glow: { value: number };
+  /** The eye's position from the globe's center, km, and the direction to the Sun, galactic axes. */
+  readonly eyeKm: { value: Vector3 };
+  readonly sun: { value: Vector3 };
+  /** 1 while the atmosphere's sun lighting is on: the halo shows on the day side only. */
+  readonly sunLit: { value: number };
 }
 
 /** Both meshes and their uniforms. */
@@ -86,6 +94,11 @@ export interface StarfieldMeshes {
 const RENDER_ORDER = -1_000_000;
 /** The Milky Way's brightness at its brightest, linear. */
 const MILKY_WAY_INTENSITY = 0.045;
+/** The halo's sphere: the WGS84 semi-major axis, km, as the atmosphere's. */
+const GLOBE_RADIUS_KM = 6378.137;
+/** The halo's bright edge and its wide soft part fall by e over these heights above the limb, km. */
+const GLOW_EDGE_KM = 60;
+const GLOW_SOFT_KM = 320;
 
 function n<T extends 'float' | 'vec2' | 'vec3' | 'mat4'>(value: unknown): Node<T> {
   return value as Node<T>;
@@ -219,13 +232,32 @@ const milkyWayColor = Fn(([direction]: [Vec3Node]) => {
   return color;
 });
 
+/**
+ * The halo's light along a direction (F643): the height above the globe where the ray passes closest to its center
+ * sets it, brightest at the limb and whitish there, deeper blue farther out; dark on the night side while sun
+ * lighting is on. Rays that hit the globe are hidden by its surface.
+ */
+function glowColor(direction: Vec3Node, u: StarfieldUniforms): Vec3Node {
+  const eye = n<'vec3'>(u.eyeKm);
+  const closest = eye.add(direction.mul(max(dot(eye, direction).negate(), 0)));
+  const heightKm = max(length(closest).sub(GLOBE_RADIUS_KM), 0);
+  const light = exp(heightKm.div(-GLOW_EDGE_KM))
+    .mul(0.45)
+    .add(exp(heightKm.div(-GLOW_SOFT_KM)).mul(0.55));
+  const day = mix(float(1), smoothstep(-0.2, 0.3, dot(normalize(closest), n<'vec3'>(u.sun))), n<'float'>(u.sunLit));
+  const tint = mix(vec3(0.4, 0.65, 1), vec3(0.1, 0.3, 0.95), smoothstep(0, GLOW_SOFT_KM, heightKm));
+  return tint.mul(light.mul(day).mul(n<'float'>(u.glow)).mul(0.5));
+}
+
 function milkyWayMaterial(u: StarfieldUniforms, depthPath: DepthPath): MeshBasicNodeMaterial {
   const material = backgroundMaterial(depthPath);
   const ndc = positionGeometry.xy;
   const ray = varying(n<'vec3'>(u.rayCenter).add(n<'vec3'>(u.rayX).mul(ndc.x)).add(n<'vec3'>(u.rayY).mul(ndc.y)));
   material.vertexNode = vec4(ndc, 0, 1);
   const visibility = n<'float'>(u.visibility);
-  material.colorNode = vec4(milkyWayColor(normalize(ray)).mul(visibility.mul(n<'float'>(u.milkyWay))), visibility);
+  const direction = normalize(ray);
+  const light = milkyWayColor(direction).mul(n<'float'>(u.milkyWay)).add(glowColor(direction, u));
+  material.colorNode = vec4(light.mul(visibility), visibility);
   return material;
 }
 
@@ -250,6 +282,10 @@ export function createStarfieldMeshes(catalog: StarCatalog, depthPath: DepthPath
     rayCenter: uniform(new Vector3(0, 0, -1)),
     rayX: uniform(new Vector3(1, 0, 0)),
     rayY: uniform(new Vector3(0, 1, 0)),
+    glow: uniform(0),
+    eyeKm: uniform(new Vector3(0, 0, 20_000)),
+    sun: uniform(new Vector3(0, 0, 1)),
+    sunLit: uniform(0),
   } as unknown as StarfieldUniforms;
   const stars = placeOnce(new Mesh(starGeometry(catalog), starMaterial(uniforms, depthPath)), 'starfield-stars');
   const triangle = new BufferGeometry();

@@ -101,7 +101,7 @@ const INK = {
     border: '#ffffff',
     region: 'rgba(255, 255, 255, 0.7)',
     text: '#ffffff',
-    sea: '#d8ecfa',
+    sea: '#ffffff',
     halo: 'rgba(0, 0, 0, 0.6)',
   },
 } as const;

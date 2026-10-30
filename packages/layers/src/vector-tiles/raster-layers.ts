@@ -50,6 +50,10 @@ interface ImageEntry {
 interface MeshEntry {
   readonly mesh: VectorMesh;
   usedAtFrame: number;
+  /** The terrain version its ground heights follow, refreshed in place (KB-242). */
+  groundVersion: number;
+  readonly tileXY: Float32Array;
+  readonly ground: Float32Array;
 }
 
 async function decodeImage(bytes: ArrayBuffer): Promise<RasterImage | undefined> {
@@ -184,6 +188,11 @@ export class RasterLayers {
     const existing = this.meshes.get(key);
     if (existing !== undefined) {
       existing.usedAtFrame = this.frame;
+      const grounds = this.context.grounds;
+      if (existing.groundVersion !== grounds.version && grounds.active && grounds.canDrape) {
+        existing.groundVersion = grounds.version;
+        existing.mesh.update({ ground: grounds.heights(tile, existing.tileXY, existing.ground) });
+      }
       return existing.mesh;
     }
     if (image === undefined) return undefined;
@@ -206,7 +215,13 @@ export class RasterLayers {
       ground,
       image,
     });
-    this.meshes.set(key, { mesh, usedAtFrame: this.frame });
+    this.meshes.set(key, {
+      mesh,
+      usedAtFrame: this.frame,
+      groundVersion: this.context.grounds.version,
+      tileXY: geometry.data.tile,
+      ground: geometry.data.ground,
+    });
     return mesh;
   }
 
@@ -214,7 +229,8 @@ export class RasterLayers {
     const entry = this.images.get(`${sourceId}|${tileKey(tile)}`);
     if (entry?.image === undefined) return undefined;
     entry.usedAtFrame = this.frame;
-    const version = `${layer.id}|${tileKey(tile)}|${zoomA}|${paintVersion}|${this.context.grounds.version}`;
+    // The terrain refreshes a kept mesh's ground in place: neither its image nor its texture is made again (KB-242).
+    const version = `${layer.id}|${tileKey(tile)}|${paintVersion}`;
     if (layer.type === 'hillshade') {
       if (entry.heights === undefined) return undefined;
       const key = `hillshade|${version}`;
@@ -223,7 +239,7 @@ export class RasterLayers {
     }
     if (layer.type === 'color-relief') {
       if (entry.heights === undefined) return undefined;
-      const key = `color-relief|${version}`;
+      const key = `color-relief|${version}|${zoomA}`;
       const image = this.kept(key) ? undefined : colorReliefImage(entry.heights, entry.image.width, layer, tile.z);
       const paint = [zoomA, zoomA + 1].map((z) => ({
         color: [0, 0, 0, Number(layer.paint('color-relief-opacity', z) ?? 1)],
@@ -243,7 +259,7 @@ export class RasterLayers {
         ],
       };
     });
-    return this.mesh(`raster|${version}`, tile, entry.image, paint);
+    return this.mesh(`raster|${version}|${zoomA}`, tile, entry.image, paint);
   }
 
   /**
@@ -265,7 +281,7 @@ export class RasterLayers {
       }
     if (!parts.some((p) => p.dx === 0 && p.dy === 0)) return undefined;
     const zoomQ = Math.round(zoom / HEATMAP_ZOOM_STEP) * HEATMAP_ZOOM_STEP;
-    const key = `heatmap|${layer.id}|${tileKey(tile)}|${zoomQ}|${paintVersion}|${this.context.grounds.version}|${parts.length}`;
+    const key = `heatmap|${layer.id}|${tileKey(tile)}|${zoomQ}|${paintVersion}|${parts.length}`;
     const image = this.kept(key) ? undefined : this.heatmap(layer, parts, tile, zoomQ);
     const opacity = Number(layer.paint('heatmap-opacity', zoom) ?? 1);
     const paint = { color: [0, 0, 0, opacity], params: [0, 1, 0, 0] };

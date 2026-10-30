@@ -97,7 +97,13 @@ export function landscapeLayers(
 /** The ink of the overlays: dark on a map, light on imagery. */
 const INK = {
   map: { border: '#5d5864', region: '#9b96a1', text: '#2f2c33', sea: '#3d7ea6', halo: '#ffffff' },
-  imagery: { border: '#f4f1ea', region: '#d9d4cc', text: '#ffffff', sea: '#d8ecfa', halo: 'rgba(0, 0, 0, 0.6)' },
+  imagery: {
+    border: '#ffffff',
+    region: 'rgba(255, 255, 255, 0.7)',
+    text: '#ffffff',
+    sea: '#ffffff',
+    halo: 'rgba(0, 0, 0, 0.6)',
+  },
 } as const;
 
 /**
@@ -108,7 +114,6 @@ export function labelOverlays(style: StyleJson, selection: StyleSelection, onIma
   const source = vectorSourceOf(style);
   if (source === undefined) return [];
   const ink = onImagery ? INK.imagery : INK.map;
-  const font = fontOf(style);
   const layers: StyleLayerJson[] = [];
   if (selection.borders === true)
     layers.push(
@@ -130,7 +135,7 @@ export function labelOverlays(style: StyleJson, selection: StyleSelection, onIma
   if (selection.seas === true)
     layers.push(
       nameLayer('overlay-sea-names', source, 'water_name', ['ocean', 'sea'], {
-        font,
+        font: fontOf(style, 'Italic'),
         size: zoomed([2, 10, 8, 14]),
         color: ink.sea,
         minzoom: 2,
@@ -141,7 +146,7 @@ export function labelOverlays(style: StyleJson, selection: StyleSelection, onIma
   if (selection.countries === true)
     layers.push(
       nameLayer('overlay-country-names', source, 'place', ['country'], {
-        font,
+        font: fontOf(style, 'Bold'),
         size: zoomed([1, 10, 6, 16]),
         color: ink.text,
         minzoom: 1,

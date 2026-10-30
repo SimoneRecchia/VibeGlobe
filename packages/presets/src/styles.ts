@@ -166,11 +166,15 @@ function reliefLayers(): StyleLayerJson[] {
   ];
 }
 
-/** The Landscape's hillshade: lighter than the Relief's, with no tint. */
+/**
+ * The Landscape's hillshade: lighter than the Relief's, with no tint, and only far away (KB-242): nearer, the 3D
+ * terrain shows the relief, and a tilted view would shade hundreds of DEM tiles on the CPU.
+ */
 const LANDSCAPE_HILLSHADE: StyleLayerJson = {
   id: 'landscape-hillshade',
   type: 'hillshade',
   source: HILLSHADE_SOURCE,
+  maxzoom: 11,
   paint: {
     'hillshade-exaggeration': 0.2,
     'hillshade-shadow-color': '#6d7d73',

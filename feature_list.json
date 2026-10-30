@@ -7785,6 +7785,17 @@
         "In the browser, each overlay on and off over Satellite and Landscape, region borders appearing from level 5, names in Italian"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F646",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "The camera constraints take a farthest range (`maxRangeMeters`, 1 to 6 × 10⁷ m): a far limit that is the same at every latitude, held by input and movements like the zoom limits, so a drag toward a pole never moves the camera in as `minZoom` (a Web Mercator zoom) does at high latitudes; an out-of-range value is a GlobeError ('invalid-option').",
+      "steps": [
+        "Unit-test that zooming out stops at the range and that dragging toward a pole keeps it while the Web Mercator zoom falls, and the validation",
+        "In the browser, in an application with the constraint, drag the globe past the north pole at the farthest view: the globe keeps its size"
+      ],
+      "status": "passing"
     }
   ]
 }

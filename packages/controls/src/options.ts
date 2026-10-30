@@ -37,6 +37,12 @@ export interface TiltPolicy {
   readonly autoTiltBelowMeters: number;
   /** The automatic tilt reached at a quarter of `autoTiltBelowMeters`, degrees (default 60), at most `maxTiltDeg`. */
   readonly autoTiltMaxDeg: number;
+  /**
+   * Within this distance the policy no longer caps the tilt, meters (default half the lock), below the lock: from the
+   * lock to here the largest tilt rises continuously from 0° to 90° (F641), so a far start of this range lets the
+   * view tilt more and more while zooming in. The camera's `maxTiltDeg` reports the cap with the engine's own limits.
+   */
+  readonly fullTiltBelowMeters: number;
 }
 
 /** Inertia time constants (ADR 0009 §6): the remaining motion decays as e^(−t/τ). */
@@ -138,7 +144,7 @@ export interface ControlsOptions {
    */
   readonly northUpMaxLatitudeDeg?: number;
   /**
-   * The tilt policy (F625): `true` for the defaults (20,000 m, 2,000 m, 60°), an object for some of them, omitted or
+   * The tilt policy (F625): `true` for the defaults (20,000 m, 2,000 m, 60°, 10,000 m), an object for some of them, omitted or
    * `false` for none (the engine's zoom curves tilt the view). Changed at runtime with `setTiltPolicy`.
    */
   readonly tiltPolicy?: boolean | Partial<TiltPolicy>;
@@ -167,6 +173,7 @@ export const DEFAULT_TILT_POLICY: TiltPolicy = Object.freeze({
   lock2DAboveMeters: 20_000,
   autoTiltBelowMeters: 2_000,
   autoTiltMaxDeg: 60,
+  fullTiltBelowMeters: 10_000,
 });
 
 /** The defaults: ADR 0009's starting values. */
@@ -300,7 +307,7 @@ export function validNavigationMode(mode: unknown): NavigationMode {
 /**
  * A tilt policy with its defaults filled in (`true` for all of them), null for `false` or `null`, or a GlobeError
  * ('invalid-option'): the lock from 1 m to 40,000 km, the automatic tilt's distance below it, its tilt from 1° to
- * `maxTiltDeg`.
+ * `maxTiltDeg`, and the distance where the cap ends below the lock (half of it when omitted).
  */
 export function validTiltPolicy(policy: unknown, maxTiltDeg = 89): TiltPolicy | null {
   if (policy === false || policy === null) return null;
@@ -312,5 +319,12 @@ export function validTiltPolicy(policy: unknown, maxTiltDeg = 89): TiltPolicy | 
   const below = scalar('tiltPolicy.autoTiltBelowMeters', input.autoTiltBelowMeters, d.autoTiltBelowMeters, 0, lock);
   if (below <= 0 || below >= lock) throw invalid('tiltPolicy.autoTiltBelowMeters', 'above 0 and below the lock');
   const tilt = scalar('tiltPolicy.autoTiltMaxDeg', input.autoTiltMaxDeg, d.autoTiltMaxDeg, 1, maxTiltDeg);
-  return Object.freeze({ lock2DAboveMeters: lock, autoTiltBelowMeters: below, autoTiltMaxDeg: tilt });
+  const full = scalar('tiltPolicy.fullTiltBelowMeters', input.fullTiltBelowMeters, lock / 2, 0, lock);
+  if (full <= 0 || full >= lock) throw invalid('tiltPolicy.fullTiltBelowMeters', 'above 0 and below the lock');
+  return Object.freeze({
+    lock2DAboveMeters: lock,
+    autoTiltBelowMeters: below,
+    autoTiltMaxDeg: tilt,
+    fullTiltBelowMeters: full,
+  });
 }

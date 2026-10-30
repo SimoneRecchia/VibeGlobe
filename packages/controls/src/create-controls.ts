@@ -13,7 +13,6 @@ import {
   type TiltPolicy,
   validNavigationMode,
   validNorthUpLatitude,
-  validTiltPolicy,
 } from './options.js';
 import { TiltPolicyState } from './tilt-policy.js';
 import { TouchGestures } from './touch-gestures.js';
@@ -54,8 +53,8 @@ export interface NavigationControls extends ControlsFactory {
   /** The tilt policy in force (F625), or null for none: the `tiltPolicy` option, then {@link NavigationControls.setTiltPolicy}. */
   readonly tiltPolicy: TiltPolicy | null;
   /**
-   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m
-   * and 60°), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
+   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m,
+   * 60° and half the lock), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
    * `autoTiltBelowMeters` the tilt rises by itself to `autoTiltMaxDeg`; both change continuously with the distance. A
    * tilt chosen by hand below the lock stays until changed or until the camera passes the lock. Invalid input throws a
    * GlobeError ('invalid-option').
@@ -63,6 +62,12 @@ export interface NavigationControls extends ControlsFactory {
   setTiltPolicy(policy: boolean | Partial<TiltPolicy> | null): void;
   /** False while the tilt policy keeps the view flat (beyond its lock): a 3D button should be disabled then. */
   readonly tiltAvailable: boolean;
+  /**
+   * The largest tilt the view allows now, degrees (F642): the engine's empty-sky limit, the camera constraints and the
+   * tilt policy's cap, or the tilt terrain clearance holds the camera at while it does, so a tilt slider can show the
+   * reachable range. Read it when the camera changes; 90 before the controls are attached.
+   */
+  readonly maxTiltDeg: number;
   /** Calls `listener` with {@link NavigationControls.tiltAvailable} each time it changes; returns the unsubscribe. */
   onTiltAvailabilityChange(listener: (available: boolean) => void): () => void;
 }
@@ -119,16 +124,14 @@ export function createControls(options?: ControlsOptions): NavigationControls {
       if (navigationApi) navigationApi.northUpMaxLatitudeDeg = maxLatitudeDeg;
     },
     tiltPolicy: tilt.policy,
-    setTiltPolicy(next: boolean | Partial<TiltPolicy> | null) {
-      tilt.policy = validTiltPolicy(next, resolved.maxTiltDeg);
-      tilt.write(navigationApi);
-      navigationApi?.requestUpdate();
-    },
+    setTiltPolicy: (next: boolean | Partial<TiltPolicy> | null) => tilt.set(next, resolved.maxTiltDeg, navigationApi),
     tiltAvailable: true,
+    maxTiltDeg: 90,
     onTiltAvailabilityChange: (listener: (available: boolean) => void) => tilt.listen(listener),
   });
   Object.defineProperty(controls, 'tiltPolicy', { get: () => tilt.policy, enumerable: true });
   Object.defineProperty(controls, 'tiltAvailable', { get: () => tilt.available, enumerable: true });
+  Object.defineProperty(controls, 'maxTiltDeg', { get: () => tilt.maxTiltDeg(navigationApi), enumerable: true });
   // Getters: Object.assign would copy the values once.
   Object.defineProperty(controls, 'northUpMaxLatitudeDeg', { get: () => maxLatitudeDeg, enumerable: true });
   return Object.defineProperty(controls, 'navigationMode', { get: () => mode, enumerable: true });

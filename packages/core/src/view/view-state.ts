@@ -100,10 +100,11 @@ export class ViewState {
   /**
    * The tilt policy the controls set (F625, `NavigationApi.tiltPolicy`): `[0]` the distance from the eye to the point
    * looked at beyond which the view is flat, meters (0: no policy, the zoom curves' tilt), `[1]` the distance within
-   * which the automatic tilt rises, reaching `[2]` (radians) at a quarter of it. `[3]` is written each frame: 1 while
-   * the camera may tilt, 0 beyond the lock.
+   * which the automatic tilt rises, reaching `[2]` (radians) at a quarter of it, `[4]` the octaves from the lock to
+   * where the policy stops capping the tilt (F641; 0: one). Written each frame: `[3]` 1 while the camera may tilt, 0
+   * beyond the lock, and `[5]` the largest tilt the frame allowed, radians (F642).
    */
-  readonly tiltPolicy = Float64Array.of(0, 0, 0, 1);
+  readonly tiltPolicy = Float64Array.of(0, 0, 0, 1, 0, 0);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -166,7 +167,8 @@ export class ViewState {
       const cap = this.values[TILT_CAP] ?? Number.NaN;
       const tilt =
         (this.tiltPolicy[0] ?? 0) > 0 ? (this.tiltPolicy[2] ?? 0) : (this.curves.autoTiltDeg * Math.PI) / 180;
-      this.chosen[0] = cap === cap && tilt > cap ? cap : tilt;
+      // A NaN cap (none) compares false.
+      this.chosen[0] = tilt > cap ? cap : tilt;
     } else this.mode = mode;
     this.easeTiltFromApplied();
   }
@@ -175,14 +177,14 @@ export class ViewState {
   chooseTilt(tiltRad: number): void {
     this.mode = 'manual';
     const cap = this.values[TILT_CAP] ?? Number.NaN;
-    this.chosen[0] = cap === cap && tiltRad > cap ? cap : tiltRad;
+    this.chosen[0] = tiltRad > cap ? cap : tiltRad;
     this.snap = true;
   }
 
   /** Sets the maximum tilt of the camera constraints (F210), radians, or NaN for none; a chosen tilt above it drops. */
   setMaxTilt(maxTiltRad: number): void {
     this.values[TILT_CAP] = maxTiltRad;
-    if (maxTiltRad === maxTiltRad && (this.chosen[0] ?? 0) > maxTiltRad) this.chosen[0] = maxTiltRad;
+    if ((this.chosen[0] ?? 0) > maxTiltRad) this.chosen[0] = maxTiltRad;
   }
 
   /**
@@ -230,18 +232,8 @@ export class ViewState {
     decay(values, MORPH_OFFSET, MIN_FACTOR_OFFSET);
     decay(values, RELIEF_OFFSET, MIN_FACTOR_OFFSET);
     this.snap = false;
-    limits[0] = camera.pose.rangeMeters;
-    limits[1] = camera.pose.targetHeightMeters;
-    limits[2] = camera.fovYRad;
-    limits[3] = this.morph.factors[0] ?? 0;
     limits[5] = clearanceMeters;
-    skyTiltLimitRad(limits);
-    // The tilt the mode wants, at least 0° and at most the sky limit.
-    values[WANTED_TILT] = target + (values[TILT_OFFSET] ?? 0);
-    if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
-    if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
-    if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
-    if ((values[WANTED_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[POLICY_CAP] ?? 0;
+    this.wantTilt(camera, this.tiltPolicy, 5);
     values[PREVIOUS_TILT] = values[APPLIED_TILT] ?? 0;
     values[APPLIED_TILT] = values[WANTED_TILT] ?? 0;
     writeStep(values);
@@ -259,6 +251,9 @@ export class ViewState {
     }
     // A limit leaves an offset that eases back; while it holds, the tilt is not easing (KB-095).
     this.clamped = (values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0);
+    // Terrain clearance holding the tilt lower is the most a tilt slider can reach now (F642).
+    if (this.clamped && (values[APPLIED_TILT] ?? 0) < (this.tiltPolicy[5] ?? 0))
+      this.tiltPolicy[5] = values[APPLIED_TILT] ?? 0;
     if ((values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0))
       values[TILT_OFFSET] = (values[APPLIED_TILT] ?? 0) - target;
     camera.pose.tiltRad = values[APPLIED_TILT] ?? 0;
@@ -304,20 +299,31 @@ export class ViewState {
     this.computeCurves(camera);
     this.computeTarget();
     const values = this.values;
+    // The bracket's slot is free between frames: the largest tilt stays the last frame's.
+    this.wantTilt(camera, values, HIGH_TILT);
+    // Never above the tilt the camera has: a terrain clamp holding it lower stays.
+    if ((values[WANTED_TILT] ?? 0) > camera.pose.tiltRad && this.clamped) return;
+    camera.pose.tiltRad = values[WANTED_TILT] ?? 0;
+    camera.update();
+  }
+
+  /**
+   * The largest tilt at the camera's range into `out[slot]` (the sky limit, at most the constraints' and the policy's
+   * caps), and the tilt the mode wants with its offset, from 0° to it, into `values[WANTED_TILT]`.
+   */
+  private wantTilt(camera: Camera, out: Float64Array, slot: number): void {
+    const values = this.values;
     limits[0] = camera.pose.rangeMeters;
     limits[1] = camera.pose.targetHeightMeters;
     limits[2] = camera.fovYRad;
     limits[3] = this.morph.factors[0] ?? 0;
     skyTiltLimitRad(limits);
+    out[slot] = limits[6] ?? 0;
+    if ((out[slot] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) out[slot] = values[TILT_CAP] ?? 0;
+    if ((out[slot] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) out[slot] = values[POLICY_CAP] ?? 0;
     values[WANTED_TILT] = (values[TARGET_TILT] ?? 0) + (values[TILT_OFFSET] ?? 0);
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
-    if ((values[WANTED_TILT] ?? 0) > (limits[6] ?? 0)) values[WANTED_TILT] = limits[6] ?? 0;
-    if ((values[WANTED_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[TILT_CAP] ?? 0;
-    if ((values[WANTED_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[WANTED_TILT] = values[POLICY_CAP] ?? 0;
-    // Never above the tilt the camera has: a terrain clamp holding it lower stays.
-    if ((values[WANTED_TILT] ?? 0) > camera.pose.tiltRad && this.clamped) return;
-    camera.pose.tiltRad = values[WANTED_TILT] ?? 0;
-    camera.update();
+    if ((values[WANTED_TILT] ?? 0) > (out[slot] ?? 0)) values[WANTED_TILT] = out[slot] ?? 0;
   }
 
   /** Recomputes the state from the camera's pose and viewport (after {@link Camera.update}). */
@@ -356,8 +362,8 @@ export class ViewState {
 
   /**
    * The tilt policy at the camera's distance to the point looked at (F625): the automatic tilt rises from 0 at
-   * `tiltPolicy[1]` to `tiltPolicy[2]` at a quarter of it, and the cap falls from 90° at half the lock distance to 0 at
-   * the lock, each eased in the distance's logarithm, so neither jumps.
+   * `tiltPolicy[1]` to `tiltPolicy[2]` at a quarter of it, and the cap falls from 90° `tiltPolicy[4]` octaves within
+   * the lock (one when 0, F641) to 0 at the lock, each eased in the distance's logarithm, so neither jumps.
    */
   private applyPolicy(camera: Camera): void {
     const policy = this.tiltPolicy;
@@ -372,7 +378,7 @@ export class ViewState {
     policyStep[2] = Math.log2((policy[1] ?? 0) / range);
     smootherstepInto(policyStep);
     this.values[AUTO_TILT] = (policyStep[3] ?? 0) * (policy[2] ?? 0);
-    policyStep[1] = 1;
+    policyStep[1] = policy[4] || 1;
     policyStep[2] = Math.log2(lock / range);
     smootherstepInto(policyStep);
     this.values[POLICY_CAP] = (policyStep[3] ?? 0) * (Math.PI / 2);

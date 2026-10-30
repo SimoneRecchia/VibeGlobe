@@ -2,7 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { NavigationApi } from '@vibeglobe/core';
 import type { ConnectedGlobe } from './camera-port.js';
-import type { TiltPolicy } from './options.js';
+import { validTiltPolicy, type TiltPolicy } from './options.js';
 
 /**
  * The controls' side of the tilt policy (F625): the engine applies it each frame from `NavigationApi.tiltPolicy`; the
@@ -16,6 +16,18 @@ export class TiltPolicyState {
 
   constructor(public policy: TiltPolicy | null) {}
 
+  /** Sets the policy, validated with the largest tilt input asks for, writes it and asks the engine for a frame. */
+  set(next: unknown, maxTiltDeg: number, navigation: NavigationApi | undefined): void {
+    this.policy = validTiltPolicy(next, maxTiltDeg);
+    this.write(navigation);
+    navigation?.requestUpdate();
+  }
+
+  /** The largest tilt the engine's last frame allowed, degrees (F642, `[5]`); 90 before the controls are attached. */
+  maxTiltDeg(navigation: NavigationApi | undefined): number {
+    return ((navigation?.tiltPolicy?.[5] ?? Math.PI / 2) * 180) / Math.PI;
+  }
+
   /** Writes the policy into the engine's array: `[0]` 0 turns it off. */
   write(navigation: NavigationApi | undefined): void {
     const target = navigation?.tiltPolicy;
@@ -24,6 +36,7 @@ export class TiltPolicyState {
     target[1] = this.policy?.autoTiltBelowMeters ?? 0;
     target[2] = ((this.policy?.autoTiltMaxDeg ?? 0) * Math.PI) / 180;
     target[3] = 1;
+    target[4] = this.policy ? Math.log2(this.policy.lock2DAboveMeters / this.policy.fullTiltBelowMeters) : 0;
   }
 
   /** Once per frame: back to the zoom-driven tilt beyond the lock, and the listeners told of a change. */

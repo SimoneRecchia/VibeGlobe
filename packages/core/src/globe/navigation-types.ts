@@ -18,8 +18,9 @@ export interface NavigationModeSettings {
   /**
    * The tilt policy (F625), which the controls write: `[0]` the distance from the eye to the point looked at beyond
    * which the view is flat and cannot tilt, meters (0, the default: no policy), `[1]` the distance within which the
-   * automatic tilt rises, reaching `[2]` (radians) at a quarter of it. The engine writes `[3]` each frame: 1 while the
-   * camera may tilt, 0 beyond the lock.
+   * automatic tilt rises, reaching `[2]` (radians) at a quarter of it, and `[4]` the octaves from the lock to where
+   * the policy stops capping the tilt (F641; 0: one). The engine writes `[3]` each frame, 1 while the camera may tilt
+   * and 0 beyond the lock, and `[5]`, the largest tilt the frame allowed, radians (F642).
    */
   readonly tiltPolicy?: Float64Array;
 }

@@ -223,14 +223,6 @@ export class ImageryRuntime {
     return { source, loader, index };
   }
 
-  /** The lowest handle index no layer and not the terrain uses: removed layers' ranges are reused, so handles stay
-   * within 32 bits however many layers come and go. */
-  freeIndex(): number {
-    let index = 0;
-    while (index === this.terrainIndex || this.byIndex.has(index)) index++;
-    return index;
-  }
-
   /** Forgets a layer's loader: its tiles are released and its requests cancelled (`Globe.imageryLayers.remove`). */
   dropLayer(layer: ImageryLayer): void {
     layer.loader.reload();

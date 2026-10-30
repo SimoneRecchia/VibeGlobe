@@ -188,8 +188,10 @@ describe('NetworkPool coalescing (F095)', () => {
     expect(pool.counters.coalesced).toBe(2);
     expect(pool.isInFlight('src:1/0/0')).toBe(true);
     transport.respond(transport.started[0] as Started, {
-      ...ok(1, 2, 3),
-      attribution: 'A',
+      kind: 'ok',
+      bytes: Uint8Array.of(1, 2, 3).buffer,
+      contentType: 'image/png',
+      attribution: { text: 'A' },
       maxAgeMs: 60,
       cached: true,
     });
@@ -198,7 +200,7 @@ describe('NetworkPool coalescing (F095)', () => {
     expect(second?.kind).toBe('ok');
     if (second?.kind === 'ok') expect([...new Uint8Array(second.bytes)]).toEqual([1, 2, 3]);
     // The copy keeps the result's credit, freshness and cache flag.
-    expect(second).toMatchObject({ attribution: 'A', maxAgeMs: 60, cached: true });
+    expect(second).toMatchObject({ attribution: { text: 'A' }, maxAgeMs: 60, cached: true });
     expect(pool.isInFlight('src:1/0/0')).toBe(false);
     expect(pool.counters).toMatchObject({ started: 2, completed: 1, inFlight: 1 });
   });

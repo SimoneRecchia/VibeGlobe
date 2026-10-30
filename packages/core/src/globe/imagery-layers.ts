@@ -97,8 +97,11 @@ class ImageryLayersController implements ImageryLayers {
       throw new GlobeError('invalid-option', `An imagery layer already has the id "${entry.id}"`);
     const taken = entry.sources.find((source) => imagery.layers.some((layer) => layer.source.id === source.id));
     if (taken) throw new GlobeError('invalid-option', `An imagery source already has the id "${taken.id}"`);
-    const chain = entry.sources.map((source) => imagery.newLayer(source, imagery.freeIndex(), -1));
-    imagery.layers.push(...chain);
+    const chain = entry.sources.map((source) => {
+      const layer = imagery.newLayer(source, freeIndex(imagery), -1);
+      imagery.layers.push(layer);
+      return layer;
+    });
     const at = Math.max(0, Math.min(imagery.stack.length, Math.round(index ?? imagery.stack.length)));
     imagery.stack.splice(at, 0, { entry, chain });
     this.restacked(imagery);
@@ -129,4 +132,14 @@ class ImageryLayersController implements ImageryLayers {
     if (!layer) throw new GlobeError('invalid-option', `No imagery layer has the id "${id}"`);
     return layer;
   }
+}
+
+/**
+ * The lowest texture handle index used by no layer and not the terrain's: removed layers' ranges are reused, so
+ * handles stay within 32 bits however many layers come and go.
+ */
+function freeIndex(imagery: ImageryRuntime): number {
+  let index = 0;
+  while (index === imagery.terrainIndex || imagery.layers.some((layer) => layer.index === index)) index++;
+  return index;
 }

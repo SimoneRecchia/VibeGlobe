@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TerrainLayer } from '../globe/imagery-runtime.js';
+import type { TerrainLayer } from './terrain-draws.js';
 import { GEOGRAPHIC_TILING } from '../tiling/tiling-scheme.js';
 import type { HeightGrid } from './heightmap.js';
 import { TerrainHeights, type ElevationSample } from './terrain-heights.js';

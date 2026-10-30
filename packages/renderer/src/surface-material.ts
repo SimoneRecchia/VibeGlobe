@@ -225,15 +225,16 @@ function placeMorphed(
 
 /**
  * The overlay slots of the surface material (ADR 0038): two textures with their UV transforms, opacities and blend
- * modes from each mesh's {@link SurfaceDraw}. Returns what composes them over a color, in the slots' order; a slot of
- * opacity 0 samples nothing (the opacity is uniform per draw, so the branch is too). Their placeholder textures are
- * disposed with the material.
+ * modes from each mesh's {@link SurfaceDraw}. Returns what composes them over a color, in the slots' order, and returns
+ * the light of the night slots (blend 3, F647), which the atmosphere adds where it is night; a slot of opacity 0
+ * samples nothing (the opacity is uniform per draw, so the branch is too). Their placeholder textures are disposed
+ * with the material.
  */
 function overlaySlots(
   material: MeshBasicNodeMaterial,
   placeholder: Texture,
   tileUv: Node<'vec3'>,
-): (color: Node<'vec4'>) => void {
+): (color: Node<'vec4'>) => Node<'vec3'> {
   const overlays = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlays);
   const fades = uniform(new Matrix4()).onObjectUpdate(({ object }) => surfaceDrawOf(object)?.overlayFades);
   const looks = column(overlays, 2);
@@ -265,6 +266,7 @@ function overlaySlots(
     };
   });
   return (color) => {
+    const night = vec3(0).toVar();
     for (const { node: own, fromNode, hasFrom, fade, opacity, blend, gain } of slots) {
       If(opacity.greaterThan(0), () => {
         // The slot's imagery cross-fades from what it showed, or fades in from nothing (KB-155); like the base
@@ -277,13 +279,19 @@ function overlaySlots(
           });
           node.assign(mix(from, node, fade));
         });
-        const over = node.xyz.mul(gain);
-        const multiplied = color.xyz.mul(over);
-        const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
-        const blended = select(blend.lessThan(0.5), over, select(blend.lessThan(1.5), multiplied, screened));
-        color.assign(vec4(mix(color.xyz, blended, node.w.mul(opacity)), color.w));
+        // A variable, as both branches read it: a node is emitted where it is first used (KB-141).
+        const over = node.xyz.mul(gain).toVar();
+        If(blend.greaterThan(2.5), () => {
+          night.addAssign(over.mul(node.w.mul(opacity)));
+        }).Else(() => {
+          const multiplied = color.xyz.mul(over);
+          const screened = vec3(1).sub(vec3(1).sub(color.xyz).mul(vec3(1).sub(over)));
+          const blended = select(blend.lessThan(0.5), over, select(blend.lessThan(1.5), multiplied, screened));
+          color.assign(vec4(mix(color.xyz, blended, node.w.mul(opacity)), color.w));
+        });
       });
     }
+    return night;
   };
 }
 
@@ -344,19 +352,19 @@ export function createSurfaceMaterial(
   // Only fading draws sample the second texture (fade is uniform per draw, so the branch is too): on a software
   // rasterizer the extra fetch costs about half a frame.
   const composeOverlays = overlaySlots(material, placeholder, tileUv);
+  const { eyeRelative, reliefMeters } = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
   material.colorNode = Fn(() => {
     // Each imagery with its source's tone gain (F249): 1 unless the layer matches its chain's tones.
     const color = map.mul(vec4(column(tones, 0).xyz, 1)).toVar();
     If(fade.lessThan(1), () => {
       color.assign(mix(fromMap.mul(vec4(column(tones, 1).xyz, 1)).sqrt(), color.sqrt(), fade).pow2());
     });
-    composeOverlays(color);
-    return color;
+    const night = composeOverlays(color);
+    if (!atmosphere) return color;
+    // Haze, sun lighting, day and night (F394, F396, F647), slopes shaded by the relief drawn: the uniforms live in
+    // the atmosphere, so a new one needs a new material.
+    return vec4(atmosphere.surfaceColor(color.xyz, eyeRelative, reliefMeters, night), color.w);
   })();
-  const { eyeRelative, reliefMeters } = placeMorphed(material, depthPath, height, params, morphParams, morphAxes);
-  // Haze and sun lighting (F394, F396), slopes shaded by the relief drawn: the uniforms live in the atmosphere, so a
-  // new one needs a new material.
-  atmosphere?.applyToSurface(material, eyeRelative, reliefMeters);
   // Skirts face outward on some edges; drawing both sides keeps every crack filled.
   material.side = DoubleSide;
   return material;

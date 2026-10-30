@@ -25,6 +25,8 @@ const ATMOSPHERE_RULES: Readonly<Record<keyof AtmosphereSettings, Rule>> = {
   sunLighting: true,
   timeMs: [-8.64e15, 8.64e15],
   haze: [0, 10],
+  dayNight: [0, 1],
+  airlight: [0, 1],
 };
 
 /** Validates settings at the API boundary against `rules`; throws 'invalid-option' naming the field. */
@@ -85,6 +87,8 @@ export class EngineQuality {
       sunLighting: false,
       timeMs: DEFAULT_SUN_TIME_MS,
       haze: 1,
+      dayNight: 0,
+      airlight: 1,
       ...validateAtmosphere(initial.atmosphere ?? {}),
     };
     this.applyFog();

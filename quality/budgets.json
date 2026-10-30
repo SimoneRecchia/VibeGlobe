@@ -70,7 +70,7 @@
       "jsHeapMB": 32
     },
     "renderer": {
-      "bundleGzipKB": 40
+      "bundleGzipKB": 40.5
     },
     "sources": {
       "bundleGzipKB": 40

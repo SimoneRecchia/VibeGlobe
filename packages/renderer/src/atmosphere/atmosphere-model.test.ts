@@ -16,7 +16,14 @@ import {
   type AtmosphereQuality,
   type LocalRay,
 } from './atmosphere-model.js';
-import { altitudeAlong, distanceToAltitude, lightDepth, skyRadiance } from './atmosphere-model.js';
+import {
+  altitudeAlong,
+  daylight,
+  distanceToAltitude,
+  lightDepth,
+  skyRadiance,
+  TERMINATOR_HALF_WIDTH,
+} from './atmosphere-model.js';
 
 const R = ATMOSPHERE.radiusKm;
 
@@ -176,6 +183,25 @@ describe('Atmosphere', () => {
     atmosphere.dispose();
   });
 
+  it("follows the real Sun for day and night, the sky's Sun turning toward it as it fades in (F647)", () => {
+    const atmosphere = new Atmosphere('reversed-z');
+    const u = uniformsOf(atmosphere);
+    atmosphere.setOptions({ dayNight: 0.5, airlight: 0.4, timeMs: Date.parse('2024-06-20T20:51:00Z') });
+    atmosphere.update(view);
+    const day = u['daySun']?.value as { x: number; y: number; z: number };
+    const sky = u['sun']?.value as { x: number; y: number; z: number };
+    const up = u['up']?.value as { x: number; y: number; z: number };
+    const angle = (a: typeof up, b: typeof up) => Math.acos(Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z));
+    expect(Math.asin(day.z / Math.hypot(day.x, day.y, day.z)) / (Math.PI / 180)).toBeCloseTo(23.5, 0);
+    expect(angle(up, sky) + angle(sky, day)).toBeCloseTo(angle(up, day), 5);
+    expect(angle(up, sky)).toBeGreaterThan(0);
+    expect([u['dayNight']?.value, u['airlight']?.value, u['lighting']?.value]).toEqual([0.5, 0.4, 0]);
+    atmosphere.setOptions({ dayNight: 0 });
+    atmosphere.update(view);
+    expect(u['sun']?.value).toEqual(u['up']?.value);
+    atmosphere.dispose();
+  });
+
   it('derives the sky rays from the projection: the center ray and one unit of x and y in device coordinates', () => {
     const atmosphere = new Atmosphere('fragment');
     atmosphere.update(view);
@@ -186,5 +212,19 @@ describe('Atmosphere', () => {
     atmosphere.setOptions({ quality: ATMOSPHERE_QUALITY.low });
     expect(u['skySamples']?.value).toBe(ATMOSPHERE_QUALITY.low.skySamples);
     atmosphere.dispose();
+  });
+});
+
+describe('day and night (F647)', () => {
+  it('fades the day into the night over a soft band around the terminator', () => {
+    expect([
+      daylight(1),
+      daylight(TERMINATOR_HALF_WIDTH),
+      daylight(0),
+      daylight(-TERMINATOR_HALF_WIDTH),
+      daylight(-1),
+    ]).toEqual([1, 1, 0.5, 0, 0]);
+    const samples = Array.from({ length: 21 }, (_, i) => daylight(-0.2 + i * 0.02));
+    expect(samples.every((value, i) => i === 0 || value >= (samples[i - 1] ?? 0))).toBe(true);
   });
 });

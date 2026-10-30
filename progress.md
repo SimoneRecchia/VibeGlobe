@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-10-31: day and night like a map application, and a clearer globe from afar (targeted owner request)
+
+From an application's report (F647). `AtmosphereSettings.dayNight` (0 to 1) dims and tints the side away from the Sun
+across a soft terminator about 14° wide and leaves the day side as the imagery shows it; an imagery layer with
+`blend: 'night'` (code 3) is added as light on the night side only, after the lighting, so a city-lights image glows
+over a dark, blue-tinted night. Values between fade it; the sky's Sun turns from behind the eye toward the real one as
+it fades, so the haze never jumps. `airlight` (0 to 1) scales the light the air scatters over the ground: the physical
+amount veils the disk in milky blue from afar. In an application with NASA's Black Marble as Web Mercator tiles 0 to 4,
+`dayNight` faded at a zoom and `airlight` 0.5, the globe showed night and lights at the real time with a soft band, ran
+at 60 fps while turning and crossing the fade's zoom, and kept deep colors by day. The renderer's entry grew to 40.17 KB:
+its budget is 40.5 KB (`docs/test-changes.md`). The guides (space background, sources), ADR 0038 and the packages' notes
+describe it; `CLAUDE.md` gained notes on Playwright runs and local baselines.
+
+## 2026-10-30: vector meshes within a frame budget, paint per layer, halos fading with their text (bugs from an application)
+
+KB-244 and KB-245. Zooming from 3.2 to 6 over a country with the borders overlay stalled the page for 340 ms at level 5,
+where the region borders appear and every tile's mesh was built and draped in one frame, and for about 100 ms at later
+levels, where every mesh was repainted for the new zoom pair. Meshes are now built and repainted within 6 ms per frame,
+one at least, the rest drawn meanwhile by the kept mesh of a tile around or inside them; a mesh whose new zoom pair
+waits is drawn with its own (`VectorDraw.zoomT`). A paint change repaints only its layer and visibility nothing. The
+same zoom runs at 60 fps with no long task. `text-opacity` now fades the halo too. Over imagery the borders are a light
+grey that recedes into the picture. The Landscape's land cover warp on the main thread is a follow-up.
+
 ## 2026-10-30: guides and notes for the day's work (documentation)
 
 The guides cover what the day added: the tilt policy's `fullTiltBelowMeters` and a tilt slider on `controls.maxTiltDeg`

@@ -69,6 +69,33 @@ globe.on('camera-change', () => {
 
 Throttle the handler, or change the option only when it moved by a few hundredths: `setOptions` asks for a frame.
 
+## Day and night, and a clearer globe from afar
+
+These are the atmosphere's settings (`Globe.setAtmosphere`), not the background's, but they shape the same far view.
+
+`dayNight` (0 to 1, default 0) shows day and night as map applications do (F647): the side away from the Sun at the
+atmosphere's `timeMs` is dimmed and tinted deep blue across a soft terminator about 14° wide, and the day side keeps the
+imagery's own colors (unlike `sunLighting`, which also darkens the day side as the Sun gets low). An imagery layer with
+`blend: 'night'` shines on the night side only: a city-lights image such as NASA's Black Marble (public domain, in Web
+Mercator from NASA GIBS as `VIIRS_Black_Marble`). Its light is added on top of the dimmed imagery, so its dark land and
+sea only tint the night. Without the atmosphere (`quality.atmosphere: 'off'`) a night layer draws nothing. Day and night shade the surface's
+imagery only: vector tile layers (a map's water and fills) are not shaded, so use it over imagery.
+
+```ts
+globe.imageryLayers.add({ id: 'night-lights', sources: [nightLights], blend: 'night', harmonize: false });
+globe.setAtmosphere({ dayNight: 1, timeMs: Date.now() }); // update timeMs now and then: the terminator moves
+```
+
+Values between 0 and 1 fade it: an application that wants day and night only from afar animates `dayNight` over a few
+hundred milliseconds when the camera crosses its limit (a fade in time, not a value that follows the zoom, so the globe
+is never left half-dark at a resting zoom), and hides the night layer (`visible: false`) once it reaches 0, so its tiles
+are not requested. While it fades, the Sun the sky's scattering uses turns from behind the eye toward the real one, so
+the haze around the night side turns with it instead of appearing at once at 0.
+
+`airlight` (0 to 1, default 1) scales the light the air scatters toward the eye over the ground. The physical amount
+veils the whole disk in a milky blue from far away, brightest toward the limb; around 0.5 the ground keeps the deeper
+colors of a virtual globe while the thin sky beyond the limb stays as it is. A view like that needs no `glow`.
+
 ## Hosting its asset
 
 The background has one asset, `bsc5-stars.bin` (54 KB): the 9,096 stars of the Yale Bright Star Catalog (public domain;

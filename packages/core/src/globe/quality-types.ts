@@ -38,6 +38,17 @@ export interface AtmosphereSettings {
   readonly timeMs?: number;
   /** Aerosol density relative to a clear day (default 1): more haze hides more of the distance. */
   readonly haze?: number;
+  /**
+   * Day and night as a map application shows them (F647), 0 to 1 (default 0, off): the side away from the Sun at
+   * `timeMs` dimmed and tinted blue across a soft terminator, and imagery layers with `blend: 'night'` shining there.
+   * Values between fade it in or out. Unlike `sunLighting`, the day side keeps the imagery's own brightness.
+   */
+  readonly dayNight?: number;
+  /**
+   * The light the air scatters toward the eye over the ground, relative to the physical amount (default 1, F647): less
+   * keeps the ground's colors from afar as a virtual globe shows them, 0 leaves only the sky around the globe.
+   */
+  readonly airlight?: number;
 }
 
 /** What the renderer applies of {@link QualitySettings}: every field set. */

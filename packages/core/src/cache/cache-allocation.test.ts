@@ -74,13 +74,13 @@ describe('cache frame path allocation (ADR 0018)', () => {
         // Post-order touch, children before parents, and every other tile drawn.
         for (let i = TILES - 1; i >= 0; i--) gpu.touchAt(keys, i, f);
         for (let i = 0; i < TILES; i += 2) gpu.markDrawnAt(keys, i, f);
-        // Tiles arrive, the selection reprioritizes them, and the queue drains within its budget.
+        // Tiles arrive, one again at a new priority, and the queue drains within its budget.
         for (let i = 0; i < ARRIVALS; i++) {
           priorities[i] = 1024 + ((f + i) & 7);
           uploads.enqueueAt(keys, priorities, i, tiles[i] as DecodedTile, (i & 1) === 1);
         }
         priorities[3] = 0.25;
-        uploads.reprioritizeAt(keys, priorities, 3);
+        uploads.enqueueAt(keys, priorities, 3, tiles[3] as DecodedTile, true);
         uploads.removeAt(keys, 5);
         uploads.drain();
         gpu.trim(f, 64, 1);

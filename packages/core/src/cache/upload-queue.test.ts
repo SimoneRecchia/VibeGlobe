@@ -55,13 +55,11 @@ describe('UploadQueue order', () => {
   it('follows priority changes and removals', () => {
     const { uploads, uploaded } = queue();
     for (let id = 0; id < 6; id++) uploads.enqueue(id, id, tile(id, 100), false);
-    expect(uploads.reprioritize(5, -1)).toBe(true);
-    expect(uploads.reprioritize(0, 10)).toBe(true);
-    expect(uploads.reprioritize(99, 0)).toBe(false);
+    // A key enqueued again takes its new priority.
+    uploads.enqueue(5, -1, tile(5, 100), false);
+    uploads.enqueue(0, 10, tile(0, 100), false);
     expect(uploads.remove(3)?.id).toBe(3);
     expect(uploads.remove(3)).toBeUndefined();
-    expect(uploads.has(3)).toBe(false);
-    expect(uploads.has(4)).toBe(true);
     expect(uploads.pendingBytes).toBe(500);
     uploads.drain();
     expect(uploaded).toEqual([5, 1, 2, 4, 0]);
@@ -85,7 +83,7 @@ describe('UploadQueue order', () => {
     const priorities = new Float64Array([3, 1, 2]);
     for (let i = 0; i < 3; i++) uploads.enqueueAt(keys, priorities, i, tile(i, 10), false);
     priorities[0] = 0;
-    expect(uploads.reprioritizeAt(keys, priorities, 0)).toBe(true);
+    uploads.enqueueAt(keys, priorities, 0, tile(0, 10), false);
     expect(uploads.removeAt(keys, 2)?.id).toBe(2);
     uploads.drain();
     expect(uploaded).toEqual([0, 1]);

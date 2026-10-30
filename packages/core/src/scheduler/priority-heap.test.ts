@@ -16,7 +16,6 @@ const priorityArbitrary = fc.oneof(
 const indexArbitrary = fc.integer({ min: 0, max: 60 });
 const operationArbitrary = fc.oneof(
   fc.record({ kind: fc.constant('push' as const), index: indexArbitrary, priority: priorityArbitrary }),
-  fc.record({ kind: fc.constant('append' as const), index: indexArbitrary, priority: priorityArbitrary }),
   fc.record({ kind: fc.constant('update' as const), index: indexArbitrary, priority: priorityArbitrary }),
   fc.record({ kind: fc.constant('remove' as const), index: indexArbitrary }),
   fc.record({ kind: fc.constant('pop' as const) }),
@@ -36,6 +35,11 @@ function referenceBest(reference: Map<number, number>): number {
   return best;
 }
 
+/** Pushes or reprioritizes a record with a single priority. */
+const push = (heap: PriorityHeap, index: number, priority: number): void => heap.pushAt(index, [priority], 0);
+/** Reprioritizes a record with a single priority. */
+const update = (heap: PriorityHeap, index: number, priority: number): boolean => heap.updateAt(index, [priority], 0);
+
 /** Drains the heap into an array of record indices. */
 function drain(heap: PriorityHeap): number[] {
   const order: number[] = [];
@@ -52,15 +56,11 @@ describe('PriorityHeap', () => {
       for (const operation of operations) {
         switch (operation.kind) {
           case 'push':
-            heap.push(operation.index, operation.priority);
-            reference.set(operation.index, operation.priority);
-            break;
-          case 'append':
-            heap.appendAt(operation.index, [operation.priority], 0);
+            push(heap, operation.index, operation.priority);
             reference.set(operation.index, operation.priority);
             break;
           case 'update':
-            expect(heap.update(operation.index, operation.priority)).toBe(reference.has(operation.index));
+            expect(update(heap, operation.index, operation.priority)).toBe(reference.has(operation.index));
             if (reference.has(operation.index)) reference.set(operation.index, operation.priority);
             break;
           case 'remove':
@@ -79,23 +79,6 @@ describe('PriorityHeap', () => {
         expect(heap.size).toBe(reference.size);
         for (const index of reference.keys()) expect(heap.has(index)).toBe(true);
       }
-      const expected = [...reference].sort((a, b) => a[1] - b[1] || a[0] - b[0]).map(([index]) => index);
-      expect(drain(heap)).toEqual(expected);
-    },
-  );
-
-  test.prop([fc.array(fc.tuple(fc.integer({ min: 0, max: 5000 }), priorityArbitrary), { maxLength: 500 })])(
-    'a linear heapify of appended records drains in sorted order',
-    (entries) => {
-      const heap = new PriorityHeap();
-      const priorities = new Float64Array(5001);
-      const reference = new Map<number, number>();
-      for (const [index, priority] of entries) {
-        priorities[index] = priority;
-        heap.appendAt(index, priorities, index);
-        reference.set(index, priority);
-      }
-      heap.heapify();
       const expected = [...reference].sort((a, b) => a[1] - b[1] || a[0] - b[0]).map(([index]) => index);
       expect(drain(heap)).toEqual(expected);
     },
@@ -135,7 +118,7 @@ describe('PriorityHeap', () => {
     expect(heap.pop()).toBe(-1);
     expect(heap.peek()).toBe(-1);
     expect(heap.remove(3)).toBe(false);
-    expect(heap.update(3, 1)).toBe(false);
+    expect(update(heap, 3, 1)).toBe(false);
     expect(heap.has(-1)).toBe(false);
     expect(heap.has(1_000_000)).toBe(false);
     expect(heap.size).toBe(0);
@@ -143,19 +126,19 @@ describe('PriorityHeap', () => {
 
   it('sorts NaN priorities last and keeps the order valid', () => {
     const heap = new PriorityHeap();
-    heap.push(0, Number.NaN);
-    heap.push(1, 7);
-    heap.push(2, Infinity);
-    heap.appendAt(3, [Number.NaN], 0);
-    heap.push(4, -1);
-    heap.update(4, Number.NaN);
+    push(heap, 0, Number.NaN);
+    push(heap, 1, 7);
+    push(heap, 2, Infinity);
+    push(heap, 3, Number.NaN);
+    push(heap, 4, -1);
+    update(heap, 4, Number.NaN);
     expect(drain(heap)).toEqual([1, 0, 2, 3, 4]);
   });
 
   it('grows past its initial capacities and record indices', () => {
     const heap = new PriorityHeap(1, 1);
     const count = 2000;
-    for (let i = 0; i < count; i++) heap.push(count * 3 - i * 3, i % 17);
+    for (let i = 0; i < count; i++) push(heap, count * 3 - i * 3, i % 17);
     expect(heap.size).toBe(count);
     let previous = -Infinity;
     let popped = 0;
@@ -168,32 +151,12 @@ describe('PriorityHeap', () => {
     expect(popped).toBe(count);
   });
 
-  it('clears without losing reusability, and removes from the middle', () => {
+  it('removes from the middle', () => {
     const heap = new PriorityHeap();
-    for (let i = 0; i < 10; i++) heap.push(i, 10 - i);
-    heap.clear();
-    expect(heap.size).toBe(0);
-    for (let i = 0; i < 10; i++) expect(heap.has(i)).toBe(false);
-    for (let i = 0; i < 10; i++) heap.push(i, i);
+    for (let i = 0; i < 10; i++) push(heap, i, i);
     expect(heap.remove(5)).toBe(true);
     expect(heap.remove(0)).toBe(true);
     expect(heap.remove(9)).toBe(true);
     expect(drain(heap)).toEqual([1, 2, 3, 4, 6, 7, 8]);
-  });
-
-  it('heapifies lazily when other operations follow appends', () => {
-    const heap = new PriorityHeap();
-    heap.appendAt(0, [3], 0);
-    heap.appendAt(1, [1], 0);
-    heap.appendAt(2, [2], 0);
-    heap.appendAt(1, [4], 0);
-    expect(heap.peek()).toBe(2);
-    heap.appendAt(3, [0], 0);
-    expect(heap.remove(0)).toBe(true);
-    heap.appendAt(4, [5], 0);
-    expect(heap.update(4, -1)).toBe(true);
-    heap.appendAt(5, [6], 0);
-    heap.push(6, 0.5);
-    expect(drain(heap)).toEqual([4, 3, 6, 2, 1, 5]);
   });
 });

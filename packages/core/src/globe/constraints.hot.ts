@@ -7,6 +7,7 @@
 import type { Camera } from '../camera/camera.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { GlobeError } from './errors.js';
+import { validateBounds } from './fit-bounds.js';
 import type { CameraConstraints } from './types.js';
 
 /** Ground meters per CSS pixel at ground zoom 0 (512 px across the equator, as `camera/zoom.ts`). */
@@ -43,19 +44,7 @@ export function validateConstraints(constraints: unknown): CameraConstraints {
   }
   if (c.minZoom !== undefined && c.maxZoom !== undefined && c.minZoom > c.maxZoom)
     throw new GlobeError('invalid-option', 'constraints.minZoom must not exceed maxZoom');
-  const b = c.bounds;
-  if (
-    b !== undefined &&
-    !(
-      [b.westDeg, b.southDeg, b.eastDeg, b.northDeg].every((v) => typeof v === 'number' && Number.isFinite(v)) &&
-      Math.abs(b.westDeg) <= 180 &&
-      Math.abs(b.eastDeg) <= 180 &&
-      b.southDeg >= -90 &&
-      b.northDeg <= 90 &&
-      b.southDeg <= b.northDeg
-    )
-  )
-    throw new GlobeError('invalid-coordinate', 'constraints.bounds must be valid degrees with southDeg ≤ northDeg');
+  if (c.bounds !== undefined) validateBounds(c.bounds);
   return c;
 }
 
@@ -88,20 +77,14 @@ export class Constraints {
       v[EAST] = constraints.bounds.eastDeg * RAD;
       v[NORTH] = constraints.bounds.northDeg * RAD;
     }
-    this.clamps =
-      constraints.bounds !== undefined ||
-      constraints.minZoom !== undefined ||
-      constraints.maxZoom !== undefined ||
-      constraints.maxRangeMeters !== undefined;
+    // Anything but the tilt limit clamps the pose.
+    this.clamps = v.some((value, slot) => slot !== MAX_TILT && value === value);
     view?.setMaxTilt(this.maxTiltRad);
   }
 
-  /** Whether a minimum or maximum zoom, or a farthest range, is set. */
+  /** Whether a zoom limit, a farthest range or bounds are set: zooms are then limited by {@link limitZoomDelta}. */
   get zoomLimited(): boolean {
-    const min = this.values[MIN_ZOOM] ?? Number.NaN;
-    const max = this.values[MAX_ZOOM] ?? Number.NaN;
-    const far = this.values[FAR] ?? Number.NaN;
-    return min === min || max === max || far === far;
+    return this.clamps;
   }
 
   /** The maximum tilt in radians, NaN when unconstrained: the view state caps applied and chosen tilts with it. */

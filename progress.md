@@ -7,6 +7,8 @@ the same distance at every latitude: with `minZoom` alone a drag toward a pole m
 color-relief meshes no longer follow the terrain's version or the zoom in their keys: the terrain refreshes their
 ground in place, so a tilted Landscape view with terrain went from 14 to 54 fps; its hillshade now stops at zoom 11.
 The preset's names take the style's faces (countries bold, water italic) instead of its first, italic, one.
+The core stays within its budget: the constraints' bounds reuse `validateBounds` (the same check, the same
+'invalid-coordinate' code) instead of a copy of it, which more than pays for the new limit.
 
 ## 2026-10-30: a Landscape map and borders, country and sea names as overlays (targeted owner request)
 

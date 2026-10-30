@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { createControls, type NavigationControls } from '@vibeglobe/controls';
+import { createControls, watchClicks, type GlobeClickEvent, type NavigationControls } from '@vibeglobe/controls';
 import {
   createGlobe,
   type CameraState,
@@ -14,7 +14,6 @@ import {
 import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
-import { watchClicks, type GlobeClickEvent } from './click.js';
 import { ElementUi, UI_ATTRIBUTES } from './ui-layer.js';
 import type { Ui } from '@vibeglobe/ui';
 

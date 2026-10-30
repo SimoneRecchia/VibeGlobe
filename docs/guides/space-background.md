@@ -33,6 +33,7 @@ the playground, `?stars=1` switches it on (`&starCatalog=<url>` hosts the catalo
 | `brightness` | `1`            | Multiplies the stars' light, 0 to 8                                                 |
 | `timeMs`     | the engine's   | The sky's date and time (Unix ms, UTC); unset, it follows `Globe.atmosphere.timeMs` |
 | `fade`       | `true`         | Fades the background out under the atmosphere's daytime sky near the ground         |
+| `glow`       | `0`            | A halo around the globe seen from space, 0 to 4 (F643); 1 is a virtual globe's      |
 | `catalogUrl` | next to module | Where the star catalog is hosted (only at creation, see below)                      |
 
 Every option but `catalogUrl` can change later with `setOptions`; `timeMs: undefined` follows the engine again. Invalid
@@ -46,6 +47,27 @@ date and time (`Globe.setAtmosphere({ timeMs })`, a fixed epoch until the applic
 globe spin or tilt turns the sky with the globe. Stars are drawn as sprites never smaller than 0.75 device pixels, equally
 bright at every pixel ratio and steady as they move. With the atmosphere on, the background shows from space and at
 night and fades out under the daytime sky below 20 km; on a flat map seen from high above it fades out too.
+
+## A halo around the globe
+
+The atmosphere's physical sky is a thin rim seen from space (its air is 80 km deep on a 6,378 km globe). `glow` adds the
+soft blue halo virtual globes draw beyond the limb (F643): the backdrop's light along each ray from the height above
+the globe where the ray passes closest, a bright edge falling by e over 60 km and a wide part over 320 km, whitish at the
+edge and deeper blue farther out. With sun lighting on it shows on the day side only; it fades out near the ground with
+the rest of the background.
+
+Its widths are kilometers, so the nearer the camera, the more of the screen the same halo fills. A page whose farthest
+view shows the halo at its best can fade it with the range:
+
+```ts
+const space = addSpaceBackground(globe, { milkyWay: false, glow: 1 });
+globe.on('camera-change', () => {
+  const share = (globe.camera.rangeMeters - 2_000_000) / 16_000_000; // full at 18,000 km, faint below 4,500 km
+  space.setOptions({ glow: Math.min(1, Math.max(0.15, share)) });
+});
+```
+
+Throttle the handler, or change the option only when it moved by a few hundredths: `setOptions` asks for a frame.
 
 ## Hosting its asset
 

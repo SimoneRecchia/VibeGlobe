@@ -82,4 +82,53 @@ describe('the tilt policy (F625)', () => {
     expect(frame(3_000)).toBeGreaterThan(0);
     expect(frame(3_000)).toBeLessThan(DEFAULT_VIEW_CURVES.autoTiltDeg);
   });
+
+  it('caps the tilt from 0° at the lock to 90° at fullTiltBelowMeters and reports the cap (F641, F642)', () => {
+    const { view, frame } = policyView();
+    // The full tilt at 6,000 m: log2(60,000 / 6,000) octaves within the lock.
+    view.tiltPolicy.set([60_000, 2_000, 60 * DEG, 1, Math.log2(10), 0]);
+    frame(5_000);
+    view.chooseTilt(85 * DEG);
+    const down = ranges(80_000, 3_000).map((r) => {
+      const tilt = frame(r);
+      return { range: r, tilt, cap: (view.tiltPolicy[5] ?? 0) / DEG };
+    });
+    for (const { range, tilt, cap } of down) {
+      // At most the cap; a cap that rises releases the chosen tilt, which eases up behind it.
+      expect(tilt).toBeLessThanOrEqual(cap + 1e-9);
+      expect(tilt).toBeGreaterThan(Math.min(85, cap) - 2);
+      if (range >= 60_000) expect(cap).toBe(0);
+    }
+    const at = (meters: number): number => down.find(({ range }) => range <= meters)?.cap ?? Number.NaN;
+    // Halfway in the logarithm from the lock to the full tilt the cap is part way up, and it is no longer the limit
+    // within 6,000 m, where the empty-sky limit alone holds it below 90°.
+    expect(at(20_000)).toBeGreaterThan(20);
+    expect(at(20_000)).toBeLessThan(70);
+    expect(at(5_000)).toBeGreaterThan(75);
+    const steps = down.slice(1).map(({ cap }, i) => cap - (down[i]?.cap ?? 0));
+    expect(Math.min(...steps)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...steps)).toBeLessThan(3);
+  });
+
+  it('reports the tilt terrain clearance holds the camera at as the largest tilt (F642)', () => {
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    const camera = new Camera();
+    camera.widthPx = 800;
+    camera.heightPx = 600;
+    camera.pose.rangeMeters = 1_000;
+    camera.update();
+    view.chooseTilt(80 * DEG);
+    view.frameTimeMs[0] = 16;
+    // Without terrain the sky limit alone holds the tilt.
+    view.applyTilt(camera, 0);
+    const open = (view.tiltPolicy[5] ?? 0) / DEG;
+    expect(open).toBeGreaterThan(60);
+    // A ridge 400 m above the target under the eye, and 50 m of clearance: the eye stays above 450 m.
+    camera.groundHeightMeters = 400;
+    view.frameTimeMs[0] = 32;
+    view.applyTilt(camera, 50);
+    const held = camera.pose.tiltRad / DEG;
+    expect(held).toBeLessThan(open);
+    expect((view.tiltPolicy[5] ?? 0) / DEG).toBeCloseTo(held, 9);
+  });
 });

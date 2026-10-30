@@ -7730,6 +7730,28 @@
         "Unit-test that with a level known missing no deeper tile is wanted, and the tiles above it are"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F641",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "The tilt policy's cap rises over a range the application chooses (`tiltPolicy.fullTiltBelowMeters`, default half the lock): from 0° at `lock2DAboveMeters` to no cap at `fullTiltBelowMeters`, continuously in the distance's logarithm, so a tilt slider lets the view tilt more and more while zooming in; a value outside 0 and the lock is a GlobeError ('invalid-option').",
+      "steps": [
+        "Unit-test the option's default, setter and validation, and the cap at the lock, part way and within `fullTiltBelowMeters`, rising with no step above 3° for each 2% of distance",
+        "In the browser, in an application with the policy, zoom from beyond the lock to 3 km with a large tilt chosen: the tilt rises with the cap and never steps"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F642",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "`controls.maxTiltDeg` is the largest tilt the view allows now: the empty-sky limit, the camera constraints' `maxTiltDeg` and the tilt policy's cap, or the tilt terrain clearance holds the camera at while it does, so a tilt slider can show the reachable range; the engine writes it each frame into the controls' tilt policy array.",
+      "steps": [
+        "Unit-test that the engine reports the frame's cap, that the applied tilt never exceeds it, that a terrain hold lowers it to the held tilt, and the controls' getter",
+        "In the browser, in an application with the policy, `controls.maxTiltDeg` is 0 beyond the lock and follows the cap while zooming in"
+      ],
+      "status": "passing"
     }
   ]
 }

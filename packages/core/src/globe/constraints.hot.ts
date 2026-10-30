@@ -128,8 +128,9 @@ export class Constraints {
       Math.tan(camera.fovYRad / 2);
     const zoom = Math.log2(toRange / pose.rangeMeters);
     let target = zoom + deltaZoom;
-    if (maxZoom === maxZoom && target > maxZoom) target = Math.max(maxZoom, Math.min(zoom, target));
-    if (minZoom === minZoom && target < minZoom) target = Math.min(minZoom, Math.max(zoom, target));
+    // A NaN bound (none) compares false.
+    if (target > maxZoom) target = Math.max(maxZoom, Math.min(zoom, target));
+    if (target < minZoom) target = Math.min(minZoom, Math.max(zoom, target));
     return target - zoom;
   }
 

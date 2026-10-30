@@ -447,12 +447,28 @@ describe('the tilt policy (F625)', () => {
       lock2DAboveMeters: 20_000,
       autoTiltBelowMeters: 2_000,
       autoTiltMaxDeg: 60,
+      fullTiltBelowMeters: 10_000,
     });
     const h = controlsHarness({ tiltPolicy: { autoTiltMaxDeg: 45 } });
-    expect([...(h.camera.navigation.tiltPolicy ?? [])]).toEqual([20_000, 2_000, (45 * Math.PI) / 180, 1]);
+    // `[4]` is the octaves from the lock to the full tilt (F641); `[5]` the engine's largest tilt (F642).
+    expect([...(h.camera.navigation.tiltPolicy ?? [])]).toEqual([20_000, 2_000, (45 * Math.PI) / 180, 1, 1, 0]);
+    h.controls.setTiltPolicy({ lock2DAboveMeters: 60_000 });
+    expect(h.controls.tiltPolicy?.fullTiltBelowMeters).toBe(30_000);
+    h.controls.setTiltPolicy({ lock2DAboveMeters: 60_000, fullTiltBelowMeters: 7_500 });
+    expect(h.camera.navigation.tiltPolicy?.[4]).toBe(3);
+    const engine = h.camera.navigation.tiltPolicy ?? new Float64Array(6);
+    engine[5] = Math.PI / 6;
+    expect(h.controls.maxTiltDeg).toBeCloseTo(30, 9);
+    expect(createControls().maxTiltDeg).toBe(90);
     h.controls.setTiltPolicy(null);
     expect(h.camera.navigation.tiltPolicy?.[0]).toBe(0);
-    for (const bad of [{ autoTiltBelowMeters: 30_000 }, { lock2DAboveMeters: -1 }, { autoTiltMaxDeg: 95 }])
+    for (const bad of [
+      { autoTiltBelowMeters: 30_000 },
+      { lock2DAboveMeters: -1 },
+      { autoTiltMaxDeg: 95 },
+      { fullTiltBelowMeters: 20_000 },
+      { fullTiltBelowMeters: 0 },
+    ])
       expect(() => h.controls.setTiltPolicy(bad)).toThrow(GlobeError);
   });
 
@@ -463,7 +479,7 @@ describe('the tilt policy (F625)', () => {
     const globe = h.globe as unknown as { viewMode: string };
     globe.viewMode = 'manual';
     // The engine reports the camera beyond the lock.
-    const policy = h.camera.navigation.tiltPolicy ?? new Float64Array(4);
+    const policy = h.camera.navigation.tiltPolicy ?? new Float64Array(6);
     policy[3] = 0;
     h.pointer('pointerdown', { x: 400, y: 300, t: 0, button: 2 });
     h.pointer('pointermove', { x: 600, y: 150, t: 500, button: 2 });

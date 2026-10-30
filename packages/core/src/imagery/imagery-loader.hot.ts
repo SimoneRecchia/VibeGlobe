@@ -514,12 +514,13 @@ export class ImageryLoader implements NetworkPoolClient {
    * tiles drawn stay (a miss of offline-only mode, KB-158).
    */
   reload(missingOnly = false): void {
+    if (missingOnly) {
+      for (const record of this.table.bySlot) if (record.state === NO_DATA) record.state = UNLOADED;
+      this.options.requestFrame();
+      return;
+    }
     const { residency, ram } = this.options.memory;
     for (const record of this.table.bySlot) {
-      if (missingOnly) {
-        if (record.state === NO_DATA) record.state = UNLOADED;
-        continue;
-      }
       const handle = this.options.handleBase + record.slot;
       if (record.state === QUEUED) this.heap.remove(record.slot);
       else this.cancel(record);
@@ -529,6 +530,7 @@ export class ImageryLoader implements NetworkPoolClient {
       record.retries = 0;
       record.rounds = 0;
       record.availabilityUnknown = false;
+      record.settled = false;
     }
     this.active.length = 0;
     this.pinnedSettled = 0;
@@ -723,7 +725,8 @@ export class ImageryLoader implements NetworkPoolClient {
     if (this.destroyed) return;
     record.consumer = NO_SLOT;
     this.observe(record, 'request', result.kind === 'ok' ? 'end' : result.kind === 'aborted' ? 'cancel' : 'fail');
-    if (result.kind === 'ok') {
+    // An empty body is no data (`classifyTransportResult`), decided below like a 404.
+    if (result.kind === 'ok' && result.bytes.byteLength > 0) {
       if (result.cached !== true) this.succeeded();
       if (this.outageDead > 0 && result.cached !== true) this.reviveOutageDead();
       record.attribution = result.attribution;
@@ -947,8 +950,9 @@ export class ImageryLoader implements NetworkPoolClient {
     this.options.onDecoded?.(record.coord, tile);
     tile.slot = record.slot;
     record.state = DECODED;
-    // The pinned base uploads first (class 0 keys are the lowest).
-    this.uploads.enqueue(record.slot, this.table.priorities[record.slot] ?? 0, tile, false);
+    // The pinned base uploads first (class 0 keys are the lowest). Block-compressed tiles (KTX2) have their own cost.
+    const compressed = (tile.image as { kind?: unknown } | null)?.kind === 'compressed';
+    this.uploads.enqueue(record.slot, this.table.priorities[record.slot] ?? 0, tile, compressed);
     this.options.requestFrame();
   }
 
@@ -982,7 +986,13 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Counts a pinned tile once it is resident or known to have no data. */
   private settlePinned(record: TileRecord): void {
-    if (!record.pinned || (record.state !== READY && record.state !== NO_DATA && record.state !== DEAD)) return;
+    if (
+      !record.pinned ||
+      record.settled ||
+      (record.state !== READY && record.state !== NO_DATA && record.state !== DEAD)
+    )
+      return;
+    record.settled = true;
     this.pinnedSettled++;
   }
 

@@ -97,7 +97,7 @@ class ImageryLayersController implements ImageryLayers {
       throw new GlobeError('invalid-option', `An imagery layer already has the id "${entry.id}"`);
     const taken = entry.sources.find((source) => imagery.layers.some((layer) => layer.source.id === source.id));
     if (taken) throw new GlobeError('invalid-option', `An imagery source already has the id "${taken.id}"`);
-    const chain = entry.sources.map((source) => imagery.newLayer(source, imagery.nextIndex++, -1));
+    const chain = entry.sources.map((source) => imagery.newLayer(source, imagery.freeIndex(), -1));
     imagery.layers.push(...chain);
     const at = Math.max(0, Math.min(imagery.stack.length, Math.round(index ?? imagery.stack.length)));
     imagery.stack.splice(at, 0, { entry, chain });

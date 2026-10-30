@@ -13,6 +13,7 @@ import { Camera } from '../camera/camera.js';
 import { DrawList } from '../imagery/draw-list.js';
 import type { ImageryLoader } from '../imagery/imagery-loader.hot.js';
 import {
+  deepenFallbackSkirts,
   drawTerrain,
   previousLevel,
   ShownLevels,
@@ -160,5 +161,25 @@ describe('drawTerrain', () => {
     drawTerrain(new DrawList(1), [tile], 1, layer, camera);
     expect(Math.max(...wanted)).toBe(13);
     expect(wanted).toContain(0);
+  });
+});
+
+describe('deepenFallbackSkirts', () => {
+  it('deepens the skirt of a neighbor across the antimeridian', () => {
+    const level = TERRAIN_LEVEL_OFFSET + 3;
+    const last = 2 ** level - 1;
+    // A draw showing fallback terrain (level 0) at the west edge, its neighbor across 180° and a tile far from both.
+    const tiles = [surfaceTile(level, 0, 5), surfaceTile(level, last, 5), surfaceTile(level, last >> 1, 5)];
+    const list = new DrawList(3);
+    list.terrain.levels.set([0, 3, 3]);
+    list.terrain.textures.set([1, 2, 3]);
+    list.terrain.fades.set([1, 1, 1]);
+    const source = { tiling: WEB_MERCATOR_TILING, minLevel: 0, maxLevel: 12 } as TerrainSource;
+    const layer = { source, loader: { coordOf: () => undefined }, gridErrorMeters: new Float64Array(13).fill(30) };
+    const heights = { grid: () => undefined } as unknown as TerrainHeights;
+    deepenFallbackSkirts(list, tiles, 3, layer as unknown as TerrainLayer, heights);
+    expect(list.terrain.skirtMeters[0]).toBeGreaterThan(0);
+    expect(list.terrain.skirtMeters[1]).toBe(list.terrain.skirtMeters[0]);
+    expect(list.terrain.skirtMeters[2]).toBe(0);
   });
 });

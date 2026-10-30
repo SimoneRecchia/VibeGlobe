@@ -5,6 +5,7 @@ import { rangeForGroundZoom } from '../camera/zoom.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import type { ImagerySource } from './imagery-source.js';
 import {
+  applyChanges,
   fadeByZoom,
   isOpaque,
   pinnedLevels,
@@ -58,6 +59,17 @@ describe('source metadata validation (F220)', () => {
       expect(entries.length + refused.length).toBeGreaterThanOrEqual(2);
     },
   );
+});
+
+describe('layer changes', () => {
+  it('refuses a blend mode that is only an inherited property name', () => {
+    const [entry] = stackEntries([valid]);
+    if (!entry) throw new Error('no entry');
+    for (const blend of ['toString', 'constructor', '__proto__'])
+      expect(() => applyChanges(entry, { blend: blend as 'normal' })).toThrow(/Unknown blend mode/);
+    applyChanges(entry, { blend: 'multiply' });
+    expect(entry.blend).toBe('multiply');
+  });
 });
 
 describe('the pinned base (F084, KB-218)', () => {

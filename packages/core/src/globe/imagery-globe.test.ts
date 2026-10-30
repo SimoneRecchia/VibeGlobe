@@ -315,6 +315,39 @@ describe('imagery layers added and removed at runtime (track A hook 2)', () => {
     );
     globe.destroy();
   });
+
+  it('reuses the texture handles of removed layers, so a layer added after hundreds of swaps still draws', async () => {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source([])],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    const run = async (frames: number): Promise<void> => {
+      for (let frame = 0; frame < frames; frame++) {
+        await settle();
+        renderer.timers.advance(50);
+        renderer.flush();
+      }
+    };
+    await run(5);
+    // A time series animated by swapping layers: 600 swaps would pass 2^31 with fresh handle ranges.
+    for (let i = 0; i < 600; i++) {
+      globe.imageryLayers.add({ ...source([]), id: `frame-${String(i)}` });
+      globe.imageryLayers.remove(`frame-${String(i)}`);
+    }
+    const urls: string[] = [];
+    globe.imageryLayers.add({ ...source(urls), id: 'last' });
+    await run(30);
+    expect(urls.length).toBeGreaterThan(0);
+    const handles = [...renderer.textures.keys()];
+    expect(handles.length).toBeGreaterThan(0);
+    expect(handles.every((handle) => handle >= 0 && handle < 2 ** 31)).toBe(true);
+    globe.destroy();
+  });
 });
 
 describe('flight destination preloading (F286, F285)', () => {

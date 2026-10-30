@@ -187,11 +187,18 @@ describe('NetworkPool coalescing (F095)', () => {
     expect(transport.started).toHaveLength(2);
     expect(pool.counters.coalesced).toBe(2);
     expect(pool.isInFlight('src:1/0/0')).toBe(true);
-    transport.respond(transport.started[0] as Started, ok(1, 2, 3));
+    transport.respond(transport.started[0] as Started, {
+      ...ok(1, 2, 3),
+      attribution: 'A',
+      maxAgeMs: 60,
+      cached: true,
+    });
     time.flush();
     const second = received[1];
     expect(second?.kind).toBe('ok');
     if (second?.kind === 'ok') expect([...new Uint8Array(second.bytes)]).toEqual([1, 2, 3]);
+    // The copy keeps the result's credit, freshness and cache flag.
+    expect(second).toMatchObject({ attribution: 'A', maxAgeMs: 60, cached: true });
     expect(pool.isInFlight('src:1/0/0')).toBe(false);
     expect(pool.counters).toMatchObject({ started: 2, completed: 1, inFlight: 1 });
   });
@@ -259,13 +266,12 @@ describe('NetworkPool cancellation (F090)', () => {
     expect(transport.started).toHaveLength(1);
   });
 
-  it('keeps bytes that arrive while nobody wants them, and starts afresh after an abort', () => {
-    const unclaimed: RequestKey[] = [];
-    const { pool, transport, time, consume } = setup({ onUnclaimedResult: (key) => unclaimed.push(key) });
+  it('drops bytes that arrive while nobody wants them, and starts afresh after an abort', () => {
+    const { pool, transport, time, consume } = setup();
     const host = pool.registerHost('https://a.example');
     pool.release(consume('late', host));
     transport.respond(transport.started[0] as Started, ok(1));
-    expect(unclaimed).toEqual(['late']);
+    expect(pool.counters.completed).toBe(1);
     pool.release(consume('gone', host));
     time.advance(100);
     expect(pool.isInFlight('gone')).toBe(false);
@@ -624,15 +630,18 @@ describe('NetworkPool invariants', () => {
 });
 
 describe('NetworkPool rate limits (F222)', () => {
-  it('starts no more requests per second on a host than its declared rate, and other hosts are not slowed', () => {
+  it('starts no more requests per second in a rate group than its declared rate, and other hosts are not slowed', () => {
     const { pool, transport, consume, time } = setup({ maxInFlight: 100 });
-    const limited = pool.registerHost('https://limited.example', { maxInFlight: 50, maxRequestsPerSecond: 10 });
+    const limited = pool.registerHost('https://limited.example', { maxInFlight: 50 });
     const free = pool.registerHost('https://free.example', { maxInFlight: 50 });
+    const rate = pool.registerRate(10);
     const starts: number[] = [];
     let key = 0;
+    const consumeLimited = (k: string): number =>
+      pool.request(k, { url: k, hostIndex: limited }, transport, () => undefined, undefined, rate);
     // Every 50 ms, try to start whatever is waiting; answer requests at once so slots never run out.
     for (let step = 0; step < 60; step++) {
-      for (let i = 0; i < 4; i++) if (consume(`l${String(key++)}`, limited) !== NO_SLOT) starts.push(time.nowMs);
+      for (let i = 0; i < 4; i++) if (consumeLimited(`l${String(key++)}`) !== NO_SLOT) starts.push(time.nowMs);
       expect(consume(`f${String(key++)}`, free)).not.toBe(NO_SLOT);
       for (const entry of transport.open) transport.respond(entry, ok(1));
       time.advance(50);

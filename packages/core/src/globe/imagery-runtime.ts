@@ -116,7 +116,6 @@ export class ImageryRuntime {
   /** What a new loader shares with the others, the terrain's handle index and the next free one (A2). */
   readonly loaderContext: LoaderContext;
   readonly terrainIndex: number;
-  nextIndex: number;
   /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
   readonly preload = new FlightPreload();
   /** The tiles of the view a flight will show in about a second, loaded instead of the current view's (F287). */
@@ -198,7 +197,6 @@ export class ImageryRuntime {
     const context: LoaderContext = { network: this.network, pool, shared, renderer, callbacks, observability };
     this.loaderContext = context;
     this.terrainIndex = sources.length;
-    this.nextIndex = sources.length + 1;
     this.terrain =
       terrain &&
       this.terrainLayer(
@@ -223,6 +221,14 @@ export class ImageryRuntime {
     this.byIndex.set(index, loader);
     warnOfProfile(this.renderer, source, this.loaderContext.observability);
     return { source, loader, index };
+  }
+
+  /** The lowest handle index no layer and not the terrain uses: removed layers' ranges are reused, so handles stay
+   * within 32 bits however many layers come and go. */
+  freeIndex(): number {
+    let index = 0;
+    while (index === this.terrainIndex || this.byIndex.has(index)) index++;
+    return index;
   }
 
   /** Forgets a layer's loader: its tiles are released and its requests cancelled (`Globe.imageryLayers.remove`). */

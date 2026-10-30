@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FakeTimers } from '../globe/test-renderer.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import type { DecodedTile, TileRequest, TileTransport, TransportResult } from '../scheduler/types.js';
 import { WorkerTaskError, type WorkerPool, type WorkerTaskDone } from '../scheduler/worker-pool-types.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { RamTier } from '../cache/ram-tier.js';
+import { UploadQueue } from '../cache/upload-queue.hot.js';
 import { Residency } from '../cache/residency.hot.js';
 import { ARRIVING, ImageryLoader, VISIBLE_CLASS } from './imagery-loader.hot.js';
 import { imageryDecodeTask, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
@@ -243,6 +244,21 @@ describe('ImageryLoader', () => {
     expect(transport.started).toEqual([url(6, 1, 1)]);
   });
 
+  it('takes an empty success (a 204 or a 200 without a body) for no data, not a corrupt tile', () => {
+    const { timers, transport, loader, errors, tasks } = setUp();
+    loader.beginFrame();
+    loader.want(6, 1, 1, 2);
+    loader.endFrame();
+    transport.answer(url(6, 1, 1), { kind: 'ok', bytes: new ArrayBuffer(0), contentType: 'image/png' });
+    timers.advance(60_000);
+    loader.beginFrame();
+    expect(loader.want(6, 1, 1, 2)).toBe(-1);
+    loader.endFrame();
+    expect(tasks).toHaveLength(0);
+    expect(errors).toEqual([]);
+    expect(transport.started).toEqual([url(6, 1, 1)]);
+  });
+
   it('retries a transient failure after its backoff and then loads the tile (F091)', () => {
     const { timers, transport, loader, uploaded, ok } = setUp();
     const frame = (): void => {
@@ -411,6 +427,57 @@ describe('ImageryLoader', () => {
     transport.answer(url(6, 31, 20), ok);
     runFrame([[6, 31, 20]]);
     for (const handle of [100, 101, 102, 103, 104]) expect(residency.isPinned(handle)).toBe(true);
+  });
+
+  it('counts each pinned tile once, however often it settles again, so the base completes only when all have', () => {
+    const { transport, loader, runFrame } = setUp(32, { pinnedLevel: 1 });
+    const missing = { kind: 'status', status: 404, retryAfterMs: undefined } as const;
+    // One pinned tile has no data, is cleared by an offline-mode miss (KB-158) and answers no data again, five times.
+    for (let round = 0; round < 5; round++) {
+      runFrame([[6, 30, 20]]);
+      transport.answer(url(1, 0, 0), missing);
+      runFrame([[6, 30, 20]]);
+      if (round < 4) loader.reload(true);
+    }
+    expect(transport.started.filter((u) => u === url(1, 0, 0))).toHaveLength(5);
+    // The four others are still loading.
+    expect(transport.open.size).toBe(4);
+    expect(loader.pinnedComplete).toBe(false);
+  });
+
+  it('keeps loading after an offline-mode miss clears the no-data marks (KB-158), with the base drawn', () => {
+    const { transport, loader, ok, runFrame } = setUp(32, { pinnedLevel: 1 });
+    runFrame([[6, 30, 20]]);
+    for (const u of [...transport.open.keys()]) transport.answer(u, ok);
+    runFrame([[6, 30, 20]]);
+    expect(loader.pinnedComplete).toBe(true);
+    runFrame([[6, 30, 20]]);
+    transport.answer(url(6, 30, 20), ok);
+    loader.reload(true);
+    runFrame([[6, 31, 20]]);
+    expect(loader.pinnedComplete).toBe(true);
+    expect(transport.started).toContain(url(6, 31, 20));
+  });
+
+  it('queues block-compressed tiles under the compressed upload cost (ADR 0020 §5)', () => {
+    const compressed: boolean[] = [];
+    const enqueue = vi.spyOn(UploadQueue.prototype, 'enqueue').mockImplementation((_key, _priority, _tile, flag) => {
+      compressed.push(flag);
+      return undefined;
+    });
+    const workers: WorkerPool = {
+      ...fakeWorkers(),
+      run: (_request, done: WorkerTaskDone) => {
+        const image = { kind: 'compressed', target: 'bc7', srgb: true, levels: [] };
+        done({ ok: true, output: { widthPx: 256, heightPx: 256, gpuBytes: 87_381, image } });
+        return 1;
+      },
+    };
+    const { transport, ok, runFrame } = setUp(32, { decoder: 'ktx2', workers });
+    runFrame([[3, 0, 0]]);
+    transport.answer(url(3, 0, 0), ok);
+    enqueue.mockRestore();
+    expect(compressed).toEqual([true]);
   });
 
   it('pins the first level of a source that starts deeper, only the tiles within its coverage (F634)', () => {

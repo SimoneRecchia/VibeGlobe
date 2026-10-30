@@ -7763,6 +7763,28 @@
         "In the browser, with the background's `glow` at 1, a halo shows beyond the limb from space, none with 0, and only on the day side with sun lighting on"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F644",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset has a Landscape map like a virtual globe's map (`landscape`): land in soft greens and whites by its land cover from OpenFreeMap's tiles (forests, open land, fields, rock, sand, ice), light blue water and a light hillshade, with no borders, names or roads; below level 7, where the tiles hold no land cover, an app's land cover image (`landCover`) shows under the water and the land color covers it from level 7 to 8.",
+      "steps": [
+        "Unit-test the Landscape's layers, their levels, the fade over the land cover image and its imagery layer and terms",
+        "In the browser, the Landscape from the whole globe to a city: land cover colors far away from the image and near from the tiles, with no jump between them"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F645",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The Europe preset's borders, country names and sea names are overlays of their own (`borders`, `countries`, `seas`), over Satellite and Landscape alike, dark on the map and light on imagery: country borders at every level and region borders only from level 5, no finer level; country names to level 8; ocean and sea names; `styleFor` names places in a given language where the tiles have it.",
+      "steps": [
+        "Unit-test each overlay's layers, levels, order over the Landscape and on imagery, ink, and the names' language",
+        "In the browser, each overlay on and off over Satellite and Landscape, region borders appearing from level 5, names in Italian"
+      ],
+      "status": "passing"
     }
   ]
 }

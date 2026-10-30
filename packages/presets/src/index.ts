@@ -19,5 +19,6 @@ export type {
 export { EUROPE_BOUNDS, EUROPE_LAND } from './europe-land.js';
 export { EUROPE_SOURCES, EXCLUDED_SOURCES, TERMS_READ_DATE } from './sources.js';
 export type { ExcludedSource, PresetSourceRecord, SourceTiers } from './sources.js';
+export { LANDSCAPE_COLORS } from './landscape-style.js';
 export { composeStyle } from './styles.js';
 export type { HillshadeSource, StyleJson, StyleLayerJson, StyleSelection } from './styles.js';

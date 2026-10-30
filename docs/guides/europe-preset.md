@@ -17,16 +17,20 @@ the packages as a test (`scripts/integration/europe-preset-guide.test.ts`).
 
 ## Map types and sources
 
-| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Satellite           | By zoom: the globe's base image (Natural Earth) far away and over the sea, the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package fading in over the package's box (NASA's Blue Marble from GIBS instead without a package), then your online sources and the orthophotos above the package's level 11 (below) |
-| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                                                                  |
-| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                                                                       |
-| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                                                                    |
-| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                                                              |
-| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13                                         |
-| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                                                               |
-| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                                                            |
+| Map type or overlay | Drawn from                                                                                                                                                                                                                                                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Satellite           | By zoom: the globe's base image (Natural Earth) far away and over the sea, the ESA WorldCover 2021 Sentinel-2 composite (10 m, CC BY 4.0) from the package fading in over the package's box (NASA's Blue Marble from GIBS instead without a package), then your online sources and the orthophotos above the package's level 11 (below)                  |
+| Hybrid              | Satellite with OpenFreeMap's labels, borders and roads                                                                                                                                                                                                                                                                                                   |
+| Map                 | A political map from OpenFreeMap's tiles: neutral land, blue water, country and region borders, place names; no land cover, land use or buildings                                                                                                                                                                                                        |
+| Landscape           | A map like a virtual globe's from OpenFreeMap's tiles: land in soft greens and whites by its cover (forests, open land, fields, rock, sand, ice), light blue water and a light hillshade; no borders, names or roads, which are overlays (F644). Below level 7 the tiles hold no land cover: the app's land cover image shows there (`landCover`, below) |
+| Relief              | Map over a light tint by elevation and a hillshade of the terrain (Mapterhorn, Terrarium WebP tiles)                                                                                                                                                                                                                                                     |
+| Labels and borders  | OpenFreeMap: places, water names, peaks, borders, airports                                                                                                                                                                                                                                                                                               |
+| Roads               | OpenFreeMap: roads and their names, off by default, on Map as on Satellite; each class from its level: motorways from 6, trunk and primary roads from 9, secondary and tertiary from 11, minor roads from 13, the rest (service roads, tracks, paths, railways) from 14, and road names from 13                                                          |
+| Borders             | OpenFreeMap: country borders at every level and region borders from level 5, none finer; dark on Landscape, light on imagery (F645)                                                                                                                                                                                                                      |
+| Country names       | OpenFreeMap: country names to level 8 (F645)                                                                                                                                                                                                                                                                                                             |
+| Sea names           | OpenFreeMap: ocean and sea names (F645)                                                                                                                                                                                                                                                                                                                  |
+| 3D buildings        | OpenFreeMap: building footprints extruded to their height                                                                                                                                                                                                                                                                                                |
+| 3D terrain          | Copernicus GLO-30 in the package (Mapterhorn's extract), Mapterhorn online on land beyond it                                                                                                                                                                                                                                                             |
 
 The polar caps beyond Web Mercator's 85.05° look like the surface around them: Natural Earth's colors fill them in Satellite
 and Hybrid, and Map and Relief give `polarCapColors` (their water in the north, their land in the south), which the
@@ -38,6 +42,24 @@ every source in use with its terms, and `preset.excluded` the sources left out w
 and regional orthophotos with verified terms come with `@vibeglobe/presets/orthophotos` (below); IGN BD ORTHO, PNOA,
 PDOK and others wait for their exact credit or endpoint ([open question 34](../open-questions.md)). An application whose
 own review allows them adds them with `addSources`.
+
+## Landscape and its labels
+
+The Landscape (F644) draws the tiles' land cover from level 7. Farther away the land is one color unless the app passes
+an image of the world's land cover in the Landscape's colors as `landCover`: the land color covers it from level 7 to 8.
+One way to make it, public domain: NASA's MODIS land cover (MCD12Q1, IGBP classes) from GIBS's WMS,
+`LAYERS=MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=8192&HEIGHT=4096`, whose
+PNG holds one exact color per class; map each class to `LANDSCAPE_COLORS` (forests to `forest`, grassland, savanna,
+wetland and shrubland to `grass`, croplands to `field`, open shrubland to `land`, barren to `bare`, urban to `urban`,
+snow to `ice`, water to `water`), resize to 4096 × 2048, blur by a pixel and save as WebP (about 240 KB).
+
+Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -90, 180, 90] }), record }`
+(`singleImage` of `@vibeglobe/sources`, `record` its terms), then ask for a style such as
+`preset.styleFor(json, 'landscape', ['borders', 'countries'], 'it')`.
+
+The borders, country names and sea names overlays (F645) draw over Satellite and Landscape alike, in dark ink on the
+map and light ink on the imagery; Map and Relief keep their own names and borders. `styleFor`'s last argument names
+places in a language where the tiles have it (`name:it`), else in their Latin or local name.
 
 ## Satellite by zoom
 

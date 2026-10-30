@@ -32,13 +32,13 @@ export interface PoliticalParts {
 }
 
 /** The style's vector source in the OpenMapTiles schema: the source of its water or place layers. */
-function vectorSourceOf(style: StyleJson): string | undefined {
+export function vectorSourceOf(style: StyleJson): string | undefined {
   const layer = style.layers.find((l) => l['source-layer'] === 'water' || l['source-layer'] === 'place');
   return layer?.source ?? Object.keys(style.sources).find((id) => style.sources[id]?.['type'] === 'vector');
 }
 
 /** The font of the style's place names, so the glyphs it serves are the ones asked for. */
-function fontOf(style: StyleJson): readonly string[] {
+export function fontOf(style: StyleJson): readonly string[] {
   for (const layer of style.layers) {
     const font = (layer['layout'] as Record<string, unknown> | undefined)?.['text-font'];
     if (layer['source-layer'] === 'place' && Array.isArray(font) && font.every((f) => typeof f === 'string'))
@@ -47,13 +47,25 @@ function fontOf(style: StyleJson): readonly string[] {
   return ['Noto Sans Regular'];
 }
 
-/** A place or water name label. */
-function nameLayer(
+/**
+ * A place or water name label, haloed in white unless `halo` says otherwise, in `language` where the tiles name it so
+ * (`name:<language>`), else in its Latin or local name.
+ */
+export function nameLayer(
   id: string,
   source: string,
   sourceLayer: string,
   classes: readonly string[],
-  options: { font: readonly string[]; size: unknown; color: string; minzoom: number; maxzoom?: number; rank?: number },
+  options: {
+    font: readonly string[];
+    size: unknown;
+    color: string;
+    minzoom: number;
+    maxzoom?: number;
+    rank?: number;
+    halo?: string;
+    language?: string | undefined;
+  },
 ): StyleLayerJson {
   return {
     id,
@@ -64,18 +76,30 @@ function nameLayer(
     ...(options.maxzoom === undefined ? {} : { maxzoom: options.maxzoom }),
     filter: ['match', ['get', 'class'], [...classes], true, false],
     layout: {
-      'text-field': ['coalesce', ['get', 'name'], ['get', 'name:latin']],
+      'text-field': options.language
+        ? ['coalesce', ['get', `name:${options.language}`], ['get', 'name:latin'], ['get', 'name']]
+        : ['coalesce', ['get', 'name'], ['get', 'name:latin']],
       'text-font': [...options.font],
       'text-size': options.size,
       'text-max-width': 8,
       'symbol-sort-key': ['coalesce', ['get', 'rank'], options.rank ?? 10],
     },
-    paint: { 'text-color': options.color, 'text-halo-color': POLITICAL_COLORS.halo, 'text-halo-width': 1.4 },
+    paint: {
+      'text-color': options.color,
+      'text-halo-color': options.halo ?? POLITICAL_COLORS.halo,
+      'text-halo-width': 1.4,
+    },
   };
 }
 
 /** A border line of an administrative level, maritime borders left out. */
-function borderLayer(id: string, source: string, level: number, paint: Record<string, unknown>, minzoom: number) {
+export function borderLayer(
+  id: string,
+  source: string,
+  level: number,
+  paint: Record<string, unknown>,
+  minzoom: number,
+): StyleLayerJson {
   return {
     id,
     type: 'line',
@@ -88,7 +112,8 @@ function borderLayer(id: string, source: string, level: number, paint: Record<st
   };
 }
 
-const zoomed = (stops: number[]): unknown[] => ['interpolate', ['linear'], ['zoom'], ...stops];
+/** A value interpolated linearly by zoom through `stops` (zoom, value, zoom, value, …). */
+export const zoomed = (stops: number[]): unknown[] => ['interpolate', ['linear'], ['zoom'], ...stops];
 
 /** Seas, lakes and rivers. */
 function waterLayers(source: string): StyleLayerJson[] {
@@ -129,7 +154,7 @@ function borderLayers(source: string): StyleLayerJson[] {
 }
 
 /** Water names, then places from villages to countries (the larger drawn last, on top). */
-function nameLayers(source: string, font: readonly string[]): StyleLayerJson[] {
+function nameLayers(source: string, font: readonly string[], language?: string): StyleLayerJson[] {
   const text = POLITICAL_COLORS.text;
   const place = (id: string, classes: string[], size: number[], minzoom: number, rank: number, maxzoom?: number) =>
     nameLayer(id, source, 'place', classes, {
@@ -138,6 +163,7 @@ function nameLayers(source: string, font: readonly string[]): StyleLayerJson[] {
       color: id === 'political-regions' ? '#7a6f80' : text,
       minzoom,
       rank,
+      language,
       ...(maxzoom === undefined ? {} : { maxzoom }),
     });
   return [
@@ -146,6 +172,7 @@ function nameLayers(source: string, font: readonly string[]): StyleLayerJson[] {
       size: zoomed([2, 10, 8, 14]),
       color: POLITICAL_COLORS.waterText,
       minzoom: 2,
+      language,
     }),
     place('political-villages', ['village'], [11, 10, 15, 13], 11, 30),
     place('political-towns', ['town'], [8, 10, 14, 15], 8, 20),
@@ -156,13 +183,13 @@ function nameLayers(source: string, font: readonly string[]): StyleLayerJson[] {
 }
 
 /** The political map's layers on the style's data; undefined when the style has no OpenMapTiles vector source. */
-export function politicalParts(style: StyleJson): PoliticalParts | undefined {
+export function politicalParts(style: StyleJson, language?: string): PoliticalParts | undefined {
   const source = vectorSourceOf(style);
   if (source === undefined) return undefined;
   return {
     background: [{ id: 'political-land', type: 'background', paint: { 'background-color': POLITICAL_COLORS.land } }],
     water: waterLayers(source),
     borders: borderLayers(source),
-    labels: nameLayers(source, fontOf(style)),
+    labels: nameLayers(source, fontOf(style), language),
   };
 }

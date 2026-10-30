@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-30: a Landscape map and borders, country and sea names as overlays (targeted owner request)
+
+A map like a virtual globe's for an application that wants few labels (F644, F645). `landscape` draws OpenFreeMap's
+land cover in soft greens and whites from level 7, light blue water and a light hillshade; farther away an app's land
+cover image (`landCover`, for example NASA's MODIS land cover recolored, the guide says how) shows under the water and
+the land color covers it from level 7 to 8. Borders (countries, regions from level 5), country names and sea names are
+overlays of their own over Satellite and Landscape, dark on the map and light on imagery; `styleFor` takes a language
+for the names. Unit tests cover the layers, levels, fade, order, ink and language; in an application the Landscape
+showed from the whole globe to Rome, with Italian names and no jump at levels 7 to 8. The presets' entry is 44.6 KB of
+its 45.
+
 ## 2026-10-30: a halo around the globe seen from space (targeted owner request)
 
 For a far view in an application's own look (F643): the space background takes `glow` (0 to 4, default 0, so nothing

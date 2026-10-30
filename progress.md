@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-30: the tilt policy's cap over a chosen range, and the largest tilt for a slider (targeted owner request)
+
+For a tilt slider in an application (F641, F642). `tiltPolicy.fullTiltBelowMeters` (default half the lock, as
+before) sets where the policy's cap ends: from 0° at the lock it rises continuously in the distance's logarithm, so
+an application with a far lock tilts more and more while zooming in. `globe.camera.maxTiltDeg` (and the Vue adapter's
+camera) reports the largest tilt the view allows now: the empty-sky limit, the constraints' `maxTiltDeg`, the
+policy's cap, or the tilt terrain clearance holds the camera at while it does. Unit tests cover the option, the cap
+range and the terrain hold; in an application with a lock at 100 km and the full tilt at 5 km, an 80° tilt chosen at
+59 km rose with the cap (3.6° to 74.6° from 59 to 12.5 km) and reached 80° at 8.8 km, and the cap followed a terrain
+hold at 2.6 km.
+
 ## 2026-10-28: Europe preset Satellite tones, the package's box, the sea, terrain 404s (targeted owner request)
 
 Five defects the owner saw in an application with `europeOpen()` Satellite and the package, fixed with tests (F638–F640,

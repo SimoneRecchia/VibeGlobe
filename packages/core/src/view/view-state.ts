@@ -86,6 +86,8 @@ const POLICY_CAP = 15;
 const POLICY_FLIP = 16;
 /** The most a limit moves the tilt this frame, radians (KB-170): see {@link writeStep}. */
 const STEP = 17;
+/** The largest tilt the last frame allowed, radians (F642): the limits, the policy's cap, a terrain hold. */
+const MAX_TILT = 18;
 
 /**
  * The zoom-driven state of one frame (ADR 0008, ADR 0034): the ground zoom at the screen center, the Auto curves'
@@ -96,14 +98,15 @@ const STEP = 17;
 export class ViewState {
   /** The morph of the frame. */
   readonly morph = new MorphFrame();
-  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1, Number.NaN, 0, 0);
+  private readonly values = Float64Array.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Number.NaN, 0, 1, Number.NaN, 0, 0, 0);
   /**
    * The tilt policy the controls set (F625, `NavigationApi.tiltPolicy`): `[0]` the distance from the eye to the point
    * looked at beyond which the view is flat, meters (0: no policy, the zoom curves' tilt), `[1]` the distance within
-   * which the automatic tilt rises, reaching `[2]` (radians) at a quarter of it. `[3]` is written each frame: 1 while
-   * the camera may tilt, 0 beyond the lock.
+   * which the automatic tilt rises, reaching `[2]` (radians) at a quarter of it, `[4]` the distance within which the
+   * policy stops capping the tilt (F641; 0: half the lock). `[3]` is written each frame: 1 while the camera may tilt,
+   * 0 beyond the lock.
    */
-  readonly tiltPolicy = Float64Array.of(0, 0, 0, 1);
+  readonly tiltPolicy = Float64Array.of(0, 0, 0, 1, 0);
   /** The user's chosen tilt, radians: kept apart from the applied one, which clamps never write here (F164). */
   private readonly chosen = new Float64Array(1);
   /** True when a limit lowered the last applied tilt below what the mode wanted. */
@@ -125,6 +128,15 @@ export class ViewState {
   /** The automatic tilt the Auto curves give at this zoom, radians. */
   get autoTiltRad(): number {
     return this.values[AUTO_TILT] ?? 0;
+  }
+
+  /**
+   * The largest tilt the last frame allowed, radians (F642): the empty-sky limit, the camera constraints and the tilt
+   * policy's cap, or the tilt terrain clearance holds the camera at while it does, so a tilt slider can show what is
+   * reachable at this view. 0 before the first frame.
+   */
+  get maxTiltRad(): number {
+    return this.values[MAX_TILT] ?? 0;
   }
 
   /** The tilt the user chose, radians: what manual mode shows wherever no clamp applies. */
@@ -236,6 +248,9 @@ export class ViewState {
     limits[3] = this.morph.factors[0] ?? 0;
     limits[5] = clearanceMeters;
     skyTiltLimitRad(limits);
+    values[MAX_TILT] = limits[6] ?? 0;
+    if ((values[MAX_TILT] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) values[MAX_TILT] = values[TILT_CAP] ?? 0;
+    if ((values[MAX_TILT] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) values[MAX_TILT] = values[POLICY_CAP] ?? 0;
     // The tilt the mode wants, at least 0° and at most the sky limit.
     values[WANTED_TILT] = target + (values[TILT_OFFSET] ?? 0);
     if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
@@ -259,6 +274,9 @@ export class ViewState {
     }
     // A limit leaves an offset that eases back; while it holds, the tilt is not easing (KB-095).
     this.clamped = (values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0);
+    // Terrain clearance holding the tilt lower is the most a tilt slider can reach now (F642).
+    if (this.clamped && (values[APPLIED_TILT] ?? 0) < (values[MAX_TILT] ?? 0))
+      values[MAX_TILT] = values[APPLIED_TILT] ?? 0;
     if ((values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0))
       values[TILT_OFFSET] = (values[APPLIED_TILT] ?? 0) - target;
     camera.pose.tiltRad = values[APPLIED_TILT] ?? 0;
@@ -356,8 +374,8 @@ export class ViewState {
 
   /**
    * The tilt policy at the camera's distance to the point looked at (F625): the automatic tilt rises from 0 at
-   * `tiltPolicy[1]` to `tiltPolicy[2]` at a quarter of it, and the cap falls from 90° at half the lock distance to 0 at
-   * the lock, each eased in the distance's logarithm, so neither jumps.
+   * `tiltPolicy[1]` to `tiltPolicy[2]` at a quarter of it, and the cap falls from 90° at `tiltPolicy[4]` (half the
+   * lock distance when 0, F641) to 0 at the lock, each eased in the distance's logarithm, so neither jumps.
    */
   private applyPolicy(camera: Camera): void {
     const policy = this.tiltPolicy;
@@ -372,7 +390,8 @@ export class ViewState {
     policyStep[2] = Math.log2((policy[1] ?? 0) / range);
     smootherstepInto(policyStep);
     this.values[AUTO_TILT] = (policyStep[3] ?? 0) * (policy[2] ?? 0);
-    policyStep[1] = 1;
+    const full = policy[4] ?? 0;
+    policyStep[1] = full > 0 && full < lock ? Math.log2(lock / full) : 1;
     policyStep[2] = Math.log2(lock / range);
     smootherstepInto(policyStep);
     this.values[POLICY_CAP] = (policyStep[3] ?? 0) * (Math.PI / 2);

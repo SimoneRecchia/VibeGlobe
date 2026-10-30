@@ -54,8 +54,8 @@ export interface NavigationControls extends ControlsFactory {
   /** The tilt policy in force (F625), or null for none: the `tiltPolicy` option, then {@link NavigationControls.setTiltPolicy}. */
   readonly tiltPolicy: TiltPolicy | null;
   /**
-   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m
-   * and 60°), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
+   * Sets the tilt policy (F625): `true` or an object for a policy (missing fields take the defaults, 20,000 m, 2,000 m,
+   * 60° and half the lock), `false` or null for none. Beyond `lock2DAboveMeters` the view is flat and cannot tilt; within
    * `autoTiltBelowMeters` the tilt rises by itself to `autoTiltMaxDeg`; both change continuously with the distance. A
    * tilt chosen by hand below the lock stays until changed or until the camera passes the lock. Invalid input throws a
    * GlobeError ('invalid-option').

@@ -64,6 +64,7 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     viewMode: 'auto' as CameraState['viewMode'],
     chosenTiltDeg: 0,
     chosenHeadingDeg: 0,
+    maxTiltDeg: 0,
     morphFactor: 0,
     reliefFactor: 0,
     phase: 'globe' as CameraState['phase'],
@@ -83,6 +84,7 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     camera.viewMode = from.viewMode;
     camera.chosenTiltDeg = from.chosenTiltDeg;
     camera.chosenHeadingDeg = from.chosenHeadingDeg;
+    camera.maxTiltDeg = from.maxTiltDeg;
     camera.morphFactor = from.morphFactor;
     camera.reliefFactor = from.reliefFactor;
     camera.phase = from.phase;

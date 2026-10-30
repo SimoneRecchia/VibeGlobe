@@ -102,7 +102,7 @@ export class FlatCamera {
       requestUpdate: () => void this.requests++,
       interruptMovement: () => void this.movementInterruptions++,
       // The engine's tilt policy array (F625): the tests write `[3]` as the engine would.
-      tiltPolicy: new Float64Array(4),
+      tiltPolicy: new Float64Array(5),
       orbit: (deltaHeadingDeg, deltaTiltDeg) => {
         this.jumps++;
         this.headingDeg = (((this.headingDeg + deltaHeadingDeg) % 360) + 360) % 360;

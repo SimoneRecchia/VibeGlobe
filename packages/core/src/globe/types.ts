@@ -17,7 +17,10 @@ import type { NavigationModeSettings } from './navigation-types.js';
 import type { MorphFrame } from '../view/morph.js';
 import type { AtmosphereSettings, QualitySettings, RendererQuality } from './quality-types.js';
 import type { ViewCurvesInit } from '../view/curves.js';
-import type { ViewMode, ViewPhase } from '../view/view-state.js';
+import type { ViewMode } from '../view/view-state.js';
+import type { CameraState } from './camera-types.js';
+
+export type { CameraState } from './camera-types.js';
 import type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
 
 export type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
@@ -328,44 +331,6 @@ export interface Controls {
 export type ControlsFactory = ((element: unknown, navigation: NavigationApi) => Controls) & {
   connect?(globe: Globe): void;
 };
-
-/** The camera as the public API reports it: applied values, WGS84 degrees and meters. */
-export interface CameraState {
-  readonly longitudeDeg: number;
-  readonly latitudeDeg: number;
-  /** Web Mercator zoom, continuous. */
-  readonly zoom: number;
-  /** Eye height above the ellipsoid. */
-  readonly altitudeMeters: number;
-  readonly headingDeg: number;
-  readonly tiltDeg: number;
-  /** Roll about the viewing direction (0 for navigation). */
-  readonly rollDeg: number;
-  /** Distance from the eye to the target. */
-  readonly rangeMeters: number;
-  /** The eye's own position (the fields above place the target it looks at). */
-  readonly eyeLongitudeDeg: number;
-  readonly eyeLatitudeDeg: number;
-  /**
-   * Height above the ellipsoid of the surface the last frame showed under the eye: the terrain as drawn, its morph
-   * included (F146, F147); 0 without terrain. `altitudeMeters` minus this is the eye's height above the ground.
-   */
-  readonly groundHeightMeters: number;
-  /** The view mode: the zoom curves drive the tilt ('auto'), it stays 0° ('2d'), or the user chose it ('manual'). */
-  readonly viewMode: ViewMode;
-  /**
-   * The tilt and heading the user chose (F164). `tiltDeg` and `headingDeg` are the applied values: a temporary clamp
-   * (terrain, empty sky; F165, F166) or the Auto curve may lower the tilt, never the choice.
-   */
-  readonly chosenTiltDeg: number;
-  readonly chosenHeadingDeg: number;
-  /** The globe-to-flat morph factor the last frame drew: 0 the globe, 1 the flat map (ADR 0008). */
-  readonly morphFactor: number;
-  /** The share of terrain relief the last frame drew: 0 flat, 1 full height. */
-  readonly reliefFactor: number;
-  /** The phase of the last frame (`PLAN.md`, Map experience). */
-  readonly phase: ViewPhase;
-}
 
 /** Initial camera. A tilt chooses it: the view mode becomes manual (ADR 0034). */
 export interface ViewInit {

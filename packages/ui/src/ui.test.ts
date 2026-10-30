@@ -28,6 +28,7 @@ function fakeGlobe(): Globe & { emit(): void } {
     viewMode: 'auto',
     chosenTiltDeg: 0,
     chosenHeadingDeg: 0,
+    maxTiltDeg: 90,
     morphFactor: 0,
     reliefFactor: 0,
     phase: 'globe',

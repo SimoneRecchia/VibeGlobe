@@ -24,6 +24,7 @@ export class TiltPolicyState {
     target[1] = this.policy?.autoTiltBelowMeters ?? 0;
     target[2] = ((this.policy?.autoTiltMaxDeg ?? 0) * Math.PI) / 180;
     target[3] = 1;
+    target[4] = this.policy?.fullTiltBelowMeters ?? 0;
   }
 
   /** Once per frame: back to the zoom-driven tilt beyond the lock, and the listeners told of a change. */

@@ -8,7 +8,7 @@ import { DEFAULT_SHAPING, shapeText } from './text-shaping.js';
 import { StyleLayer } from './style-layer.js';
 import type { FrameView } from '@vibeglobe/core';
 import { GlyphSource } from './glyph-source.js';
-import { LabelPlacer } from './label-placer.js';
+import { labelColors, LabelPlacer } from './label-placer.js';
 import { BUCKET_EXTENT } from './layout-tile.js';
 import type { VectorAtlas } from './vector-target.js';
 
@@ -407,5 +407,20 @@ describe('glyph ranges that fail on the way (TG-04)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('label opacity (KB-245)', () => {
+  it('fades the halo with the text', () => {
+    const layer = new StyleLayer({
+      id: 'names',
+      type: 'symbol',
+      source: 's',
+      'source-layer': 'place',
+      paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0, 0, 0, 0.6)', 'text-opacity': 0.5 },
+    });
+    const colors = labelColors((name) => layer.paint(name, 5));
+    expect(colors.fill[3]).toBeCloseTo(0.5);
+    expect(colors.halo[3]).toBeCloseTo(0.3);
   });
 });

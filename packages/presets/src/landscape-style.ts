@@ -98,8 +98,8 @@ export function landscapeLayers(
 const INK = {
   map: { border: '#5d5864', region: '#9b96a1', text: '#2f2c33', sea: '#3d7ea6', halo: '#ffffff' },
   imagery: {
-    border: '#ffffff',
-    region: 'rgba(255, 255, 255, 0.7)',
+    border: 'rgba(220, 220, 220, 0.75)',
+    region: 'rgba(200, 200, 200, 0.55)',
     text: '#ffffff',
     sea: '#ffffff',
     halo: 'rgba(0, 0, 0, 0.6)',

@@ -66,6 +66,8 @@ export interface VectorDraw {
   readonly mesh: VectorMesh;
   readonly clip: readonly [number, number, number, number];
   readonly pxPerUnit: number;
+  /** The factor between the mesh's paints A and B when not its layer's: a mesh still painted for another zoom pair. */
+  readonly zoomT?: number;
 }
 
 /** One style layer's draws of a frame. */

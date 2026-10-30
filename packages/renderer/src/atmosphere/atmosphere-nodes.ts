@@ -29,7 +29,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { Vector3, type Node } from 'three/webgpu';
-import { ATMOSPHERE } from './atmosphere-model.js';
+import { ATMOSPHERE, NIGHT_SHADE, TERMINATOR_HALF_WIDTH } from './atmosphere-model.js';
 
 type FloatNode = Node<'float'>;
 type Vec3Node = Node<'vec3'>;
@@ -54,6 +54,11 @@ export interface AtmosphereUniforms {
   readonly haze: { value: number };
   /** 1 shades the surface by the Sun (F396), 0 leaves it as the imagery shows it. */
   readonly lighting: { value: number };
+  /** Day and night's strength, 0 to 1 (F647), and the real Sun it follows, in the sphere's space. */
+  readonly dayNight: { value: number };
+  readonly daySun: { value: Vector3 };
+  /** Scales the light the air scatters toward the eye over the ground (F647). */
+  readonly airlight: { value: number };
   readonly skySamples: { value: number };
   readonly surfaceSamples: { value: number };
   /** 1 adds dithering noise (F392). */
@@ -73,6 +78,9 @@ export function createAtmosphereUniforms(): AtmosphereUniforms {
     rayY: uniform(new Vector3(0, 1, 0)),
     haze: uniform(1.5),
     lighting: uniform(0.5),
+    dayNight: uniform(0),
+    daySun: uniform(new Vector3(0, 0, 1)),
+    airlight: uniform(1),
     skySamples: uniform(16, 'int'),
     surfaceSamples: uniform(8, 'int'),
     dither: uniform(1.5),
@@ -280,8 +288,9 @@ function reliefIncidence(scaled: Vec3Node, fromCenter: Vec3Node, reliefKm: Float
 }
 
 /**
- * A surface color seen through the atmosphere (F394), lit by the Sun when lighting is on (F396): the color times the
- * light reaching it, dimmed by the transmittance to the eye, plus the light the air scatters toward the eye on the way.
+ * A surface color seen through the atmosphere (F394), lit by the Sun when lighting is on (F396) and by day and night
+ * (F647): the color times the light reaching it, dimmed by the transmittance to the eye, plus the light the air
+ * scatters toward the eye on the way (times `airlight`), plus `night`, the light of night imagery, where it is night.
  * `eyeRelative` is the fragment's position relative to the eye in meters, world axes (`eyeRelativePosition`).
  */
 export function surfaceColor(
@@ -289,6 +298,7 @@ export function surfaceColor(
   color: Vec3Node,
   eyeRelative: Vec3Node,
   reliefMeters?: FloatNode,
+  night?: Vec3Node,
 ): Vec3Node {
   return Fn(() => {
     // Variables before the march: a node is assigned where it is first used, and inside the loop it would stay zero
@@ -305,15 +315,17 @@ export function surfaceColor(
     const up = n<'vec3'>(u.up);
     const sun = n<'vec3'>(u.sun);
     const h = max(altitudeAlong(h0, r, dot(dir, up), distance), 0);
-    const sunMu = clamp(
-      r
-        .add(h0)
-        .mul(dot(up, sun))
-        .add(distance.mul(dot(dir, sun)))
-        .div(r.add(h)),
-      -1,
-      1,
-    );
+    const zenithCosine = (toward: Vec3Node) =>
+      clamp(
+        r
+          .add(h0)
+          .mul(dot(up, toward))
+          .add(distance.mul(dot(dir, toward)))
+          .div(r.add(h)),
+        -1,
+        1,
+      );
+    const sunMu = zenithCosine(sun);
     const light = lightDepths(h, r, sunMu);
     const sunlight = exp(
       RAYLEIGH.mul(light.x.mul(ATMOSPHERE.rayleighScaleHeightKm))
@@ -327,8 +339,18 @@ export function surfaceColor(
           0,
         ),
       );
-    const lit = mix(vec3(1), sunlight.mul(1 - NIGHT_AMBIENT).add(NIGHT_AMBIENT), n<'float'>(u.lighting));
-    const seen = color.mul(lit).mul(exp(scattering.depth.negate())).add(toDisplay(scattering.radiance));
+    const dayNight = n<'float'>(u.dayNight);
+    const day = smoothstep(-TERMINATOR_HALF_WIDTH, TERMINATOR_HALF_WIDTH, zenithCosine(n<'vec3'>(u.daySun)));
+    const shade = mix(vec3(...NIGHT_SHADE), vec3(1), day);
+    const lit = mix(vec3(1), sunlight.mul(1 - NIGHT_AMBIENT).add(NIGHT_AMBIENT), n<'float'>(u.lighting)).mul(
+      mix(vec3(1), shade, dayNight),
+    );
+    const glow = night ? night.mul(float(1).sub(day).mul(dayNight)) : vec3(0);
+    const seen = color
+      .mul(lit)
+      .add(glow)
+      .mul(exp(scattering.depth.negate()))
+      .add(toDisplay(scattering.radiance).mul(n<'float'>(u.airlight)));
     return dither(u, seen);
   })() as Vec3Node;
 }

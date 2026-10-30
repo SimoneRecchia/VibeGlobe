@@ -23,6 +23,10 @@ export interface AtmosphereOptions {
   readonly timeMs: number;
   /** Aerosol density relative to a clear day: more haze hides more of the distance. */
   readonly haze: number;
+  /** Day and night's strength, 0 to 1 (F647). */
+  readonly dayNight: number;
+  /** Scales the light the air scatters toward the eye over the ground (F647). */
+  readonly airlight: number;
   readonly quality: AtmosphereQuality;
 }
 
@@ -30,6 +34,8 @@ const DEFAULT_OPTIONS: AtmosphereOptions = {
   sunLighting: false,
   timeMs: Date.UTC(2026, 5, 21, 12),
   haze: 1,
+  dayNight: 0,
+  airlight: 1,
   quality: ATMOSPHERE_QUALITY.high,
 };
 
@@ -180,6 +186,8 @@ export class Atmosphere {
     const u = this.uniforms;
     u.haze.value = this.options.haze;
     u.lighting.value = this.options.sunLighting ? 1 : 0;
+    u.dayNight.value = this.options.dayNight;
+    u.airlight.value = this.options.airlight;
     u.skySamples.value = this.options.quality.skySamples;
     u.surfaceSamples.value = this.options.quality.surfaceSamples;
     u.dither.value = this.options.quality.dither ? 1 : 0;
@@ -195,15 +203,28 @@ export class Atmosphere {
    * relative to the eye in meters, world axes, as the surface's vertex stage computes it (`eyeRelativePosition`), and
    * `reliefMeters` the terrain height it was raised by, whose slopes the Sun shades.
    */
-  surfaceColor(color: Node<'vec3'>, eyeRelative: Node<'vec3'>, reliefMeters?: Node<'float'>): Node<'vec3'> {
-    return surfaceColor(this.uniforms, color, varying(eyeRelative), reliefMeters && varying(reliefMeters));
+  surfaceColor(
+    color: Node<'vec3'>,
+    eyeRelative: Node<'vec3'>,
+    reliefMeters?: Node<'float'>,
+    night?: Node<'vec3'>,
+  ): Node<'vec3'> {
+    return surfaceColor(this.uniforms, color, varying(eyeRelative), reliefMeters && varying(reliefMeters), night);
   }
 
-  /** Applies {@link Atmosphere.surfaceColor} to a material whose color node is set and whose vertices are eye-relative. */
-  applyToSurface(material: NodeMaterial, eyeRelative: Node<'vec3'>, reliefMeters?: Node<'float'>): void {
+  /**
+   * Applies {@link Atmosphere.surfaceColor} to a material whose color node is set and whose vertices are eye-relative;
+   * `night` is the light of its night imagery (F647).
+   */
+  applyToSurface(
+    material: NodeMaterial,
+    eyeRelative: Node<'vec3'>,
+    reliefMeters?: Node<'float'>,
+    night?: Node<'vec3'>,
+  ): void {
     const color = material.colorNode as Node<'vec4'> | null;
     if (!color) return;
-    material.colorNode = vec4(this.surfaceColor(color.xyz, eyeRelative, reliefMeters), color.w);
+    material.colorNode = vec4(this.surfaceColor(color.xyz, eyeRelative, reliefMeters, night), color.w);
   }
 
   /**
@@ -218,21 +239,29 @@ export class Atmosphere {
     u.radiusKm.value = f.radiusM / 1000;
     u.up.value.set(f.up[0] ?? 0, f.up[1] ?? 0, f.up[2] ?? 1);
     u.axisScale.value.set(f.axisScale[0] ?? 1, f.axisScale[1] ?? 1, f.axisScale[2] ?? 1);
-    if (this.options.sunLighting) {
+    const { sunLighting, dayNight } = this.options;
+    if (sunLighting || dayNight > 0) {
       if (this.options.timeMs !== this.sunTimeMs) {
         sunDirectionEcef(this.options.timeMs, this.sunEcef);
         this.sunTimeMs = this.options.timeMs;
       }
       // Normals of the ellipsoid are the sphere's after scaling the Sun by the same axes (ADR 0040).
-      u.sun.value
+      u.daySun.value
         .set(
           (this.sunEcef[0] ?? 0) * (f.axisScale[0] ?? 1),
           (this.sunEcef[1] ?? 0) * (f.axisScale[1] ?? 1),
           (this.sunEcef[2] ?? 0) * (f.axisScale[2] ?? 1),
         )
         .normalize();
+      // Without sun lighting the sky's Sun turns from behind the eye toward the real one as day and night fade in, so
+      // the haze turns with the night instead of jumping when it ends; opposite directions never meet at zero.
+      const share = sunLighting ? 1 : dayNight;
+      const sun = u.sun.value.copy(u.up.value).lerp(u.daySun.value, share);
+      if (sun.lengthSq() < 1e-6) sun.copy(share < 0.5 ? u.up.value : u.daySun.value);
+      sun.normalize();
     } else {
       u.sun.value.copy(u.up.value);
+      u.daySun.value.copy(u.up.value);
     }
     this.setRays(view);
   }

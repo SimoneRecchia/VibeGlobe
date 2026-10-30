@@ -132,6 +132,16 @@ describe('drawImagery', () => {
     ]);
   });
 
+  it('draws a night layer as an overlay with its own blend code (F647)', () => {
+    const base = fakeLayer({ 9: 10 });
+    const lights = fakeLayer({ 9: 14 });
+    const list = drawStack(
+      [stacked([base.layer], { id: 'base' }), stacked([lights.layer], { id: 'lights', blend: 'night' })],
+      tile(9, 300, 170),
+    );
+    expect([list.overlays[0]?.textures[0], list.overlays[0]?.blends[0]]).toEqual([14, 3]);
+  });
+
   it("marks the draws of layers that match the imagery below, base and overlay, and records the imagery under each draw's own (F633)", () => {
     const base = fakeLayer({ 9: 10 });
     const overlay = fakeLayer({ 9: 12 });

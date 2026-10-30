@@ -5,8 +5,12 @@ import type { Camera } from '../camera/camera.js';
 import { groundZoomForRange, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 
-/** How a layer combines with the layers below it (F246). */
-export type ImageryBlend = 'normal' | 'multiply' | 'screen';
+/**
+ * How a layer combines with the layers below it (F246). `'night'` adds the layer as light on the night side of the
+ * atmosphere's day and night (`AtmosphereSettings.dayNight`, F647), a city-lights image for example, and shows nothing
+ * by day or without it.
+ */
+export type ImageryBlend = 'normal' | 'multiply' | 'screen' | 'night';
 
 /**
  * An imagery layer of `GlobeOptions.imagery` (docs/plan/api.md, "Layer composition"): a chain of sources in priority
@@ -151,7 +155,7 @@ export interface ImageryLayers {
 }
 
 /** Blend modes as the renderer's per-draw numbers (`TileDrawOverlay.blends`). */
-export const BLEND_CODES: Readonly<Record<ImageryBlend, number>> = { normal: 0, multiply: 1, screen: 2 };
+export const BLEND_CODES: Readonly<Record<ImageryBlend, number>> = { normal: 0, multiply: 1, screen: 2, night: 3 };
 
 /** A layer normalized from its input: sources and look, the look mutable at runtime. */
 export interface StackEntry {

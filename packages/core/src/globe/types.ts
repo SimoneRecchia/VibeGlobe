@@ -192,7 +192,7 @@ export interface TileDrawLayer {
  */
 export interface TileDrawOverlay extends TileDrawLayer {
   readonly opacities: Float32Array;
-  /** 0 normal, 1 multiply, 2 screen (`BLEND_CODES`). */
+  /** 0 normal, 1 multiply, 2 screen, 3 night (`BLEND_CODES`). */
   readonly blends: Uint8Array;
 }
 

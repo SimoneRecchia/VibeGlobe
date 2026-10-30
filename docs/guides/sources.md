@@ -233,6 +233,10 @@ globe.imageryLayers.set('labels', { visible: false }); // a hidden layer request
 globe.imageryLayers.move('labels', 0); // reorder at runtime
 ```
 
+Blend modes are `normal`, `multiply`, `screen` and `night`: a `night` layer is light added on the night side of the
+atmosphere's day and night (F647, the [space background guide](space-background.md#day-and-night-and-a-clearer-globe-from-afar)
+shows it with a city-lights image). Blended and translucent layers share the two overlay slots of each surface tile.
+
 A source limited to a country or a region gets its `area`: rectangles (`coverage`), polygons, or GeoJSON such as a
 country's borders. Tiles wholly outside the area are never requested. With GeoJSON (or `tiles: 'clip'`), tiles that
 cross the border are requested too, and their pixels outside the area become transparent when they are decoded, so the

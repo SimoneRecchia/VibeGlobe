@@ -204,3 +204,18 @@ export function skyRadiance(
     transmittance: [Math.exp(-(depth[0] ?? 0)), Math.exp(-(depth[1] ?? 0)), Math.exp(-(depth[2] ?? 0))],
   };
 }
+
+/**
+ * Day and night (F647): the cosine of the Sun's zenith angle over which the day fades into the night, either side of
+ * the terminator; ±0.12 makes a soft band about 14° wide, as map applications draw it.
+ */
+export const TERMINATOR_HALF_WIDTH = 0.12;
+
+/** The night side's color factors (linear RGB): the imagery dimmed and tinted toward a deep blue. */
+export const NIGHT_SHADE: readonly [number, number, number] = [0.06, 0.07, 0.14];
+
+/** How much of the day reaches a point whose Sun is at zenith cosine `sunMu`: 1 by day, 0 by night, smooth between. */
+export function daylight(sunMu: number): number {
+  const t = Math.min(1, Math.max(0, (sunMu + TERMINATOR_HALF_WIDTH) / (2 * TERMINATOR_HALF_WIDTH)));
+  return t * t * (3 - 2 * t);
+}

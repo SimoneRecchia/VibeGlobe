@@ -7796,6 +7796,17 @@
         "In the browser, in an application with the constraint, drag the globe past the north pole at the farthest view: the globe keeps its size"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F647",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Day and night as a map application shows them (`AtmosphereSettings.dayNight`, 0 to 1, default 0): the side away from the Sun at the atmosphere's time dimmed and tinted deep blue across a soft terminator about 14° wide, the day side keeping the imagery's own colors, and imagery layers with `blend: 'night'` (a city-lights image) shining on the night side only; values between fade it, the sky's Sun turning from the eye toward the real one so the haze never jumps. `AtmosphereSettings.airlight` (0 to 1, default 1) scales the light the air scatters over the ground, for colors closer to a virtual globe's from afar. Values outside 0 to 1 are a GlobeError ('invalid-option').",
+      "steps": [
+        "Unit-test the settings' defaults and validation, the night blend's code, the terminator's band and the Sun the sky uses while fading",
+        "In the browser, a globe with a night-lights layer: night and lights on the far side of the terminator at the real time, a soft band between, the day side as without it, a fade in and out with no jump, and a less hazy globe with a lower airlight"
+      ],
+      "status": "passing"
     }
   ]
 }

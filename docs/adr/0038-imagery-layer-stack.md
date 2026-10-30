@@ -32,7 +32,9 @@ Option 1, with two overlay slots.
   first, at most two (the two topmost). A layer at opacity 0 or hidden requests no tile; a hidden layer's cached tiles
   stay in the caches, so showing it again draws them on the next frame.
 - **Blending.** In linear light, as the rest of the surface: normal `mix(c, o, a)`, multiply `mix(c, c·o, a)`, screen
-  `mix(c, 1 − (1 − c)(1 − o), a)`, with `a` the layer's opacity times the texel's alpha.
+  `mix(c, 1 − (1 − c)(1 − o), a)`, with `a` the layer's opacity times the texel's alpha. Added 2026-10-31 (F647): night
+  (code 3) leaves `c` alone and adds `o·a` as light after the atmosphere's lighting, times the night share of the
+  fragment (`AtmosphereSettings.dayNight`), so a city-lights layer shows only where the Sun is down.
 - **Chains.** Each source of a chain has its own loader. A tile comes from the first source that has it at the
   surface's level (within its levels and coverage, not missing, not backing off after a failure); while that source's
   tile loads, a resident tile of another source stands in; where no source has it, the first source that covers the

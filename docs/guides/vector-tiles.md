@@ -36,6 +36,15 @@ per-host limits, coalescing and cancellation), laid out in the engine's workers,
 `layer.setFeatureState({ source, id }, state)` sets feature-state for `['feature-state', …]` expressions;
 `layer.setLanguage('it')` shows names as `name:it`, else `name_it`, else `name`.
 
+Prefer these to a new layer. `layer.remove()` and a new `addVectorTiles` download, decode and lay out every tile again:
+a page that rebuilds its layer when a checkbox, a language or a filter changes, or on every refresh of its own data,
+redraws its borders and names every time. Build one style with every optional part in it, hidden with
+`layout.visibility: 'none'`, and switch parts with `setVisibility`; rebuild only when the source itself changes.
+
+A filter's `['zoom']` is the zoom of the tile being laid out, a whole level, not the camera's: a filter that hides
+features below zoom 5 shows them from wherever level-5 tiles are drawn, which can be zoom 4.5. For a limit at a
+fractional zoom use the layer's `minzoom` and `maxzoom`, which follow the camera.
+
 ## Drawing
 
 - Every view's vector tiles are chosen from the surface's tiles and the ground scale on screen (512-pixel tiles).
@@ -55,6 +64,10 @@ per-host limits, coalescing and cancellation), laid out in the engine's workers,
 - Every layer type of the specification draws (ADR 0133): `raster` and `hillshade` (raster and raster-dem sources,
   Terrarium or Mapbox encoding) and `heatmap` as images per tile; `line-gradient` on GeoJSON sources with
   `lineMetrics`; `fill-pattern` from the sprite; `fill-outline-color`.
+- Hillshade and color-relief images are made on the CPU of the main thread, once per DEM tile and paint; as finer
+  terrain arrives their meshes take the new ground in place (KB-242). A tilted view
+  draws many DEM tiles at once: give such layers a `maxzoom` where the 3D terrain already shows the relief (the Europe
+  preset's Landscape stops at 11).
 
 ## Picking
 

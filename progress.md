@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-30: guides and notes for the day's work (documentation)
+
+The guides cover what the day added: the tilt policy's `fullTiltBelowMeters` and a tilt slider on `controls.maxTiltDeg`
+(controls), camera limits with `maxRangeMeters` against `minZoom` (controls), the halo and how to fade it with the
+range (space background), runtime switching instead of new layers, zoom in filters and hillshade cost (vector tiles),
+the Landscape's overlays and their layer ids, hiding a country's name, copying the map's label paint, and a Blue Marble
+base image with its polar caps (Europe preset). `CLAUDE.md` and the packages' notes record the CI size margin, the line
+limit, the preset guide's example count, feature entries that cannot be reworded, squash-only merges, release packing
+and the local PMTiles timeouts; three follow-ups are listed.
+
 ## 2026-10-30: a farthest range for the camera, hillshade over terrain, name faces (targeted owner request)
 
 From an application's report (F646, KB-242, KB-243). `constraints.maxRangeMeters` limits how far the camera goes at

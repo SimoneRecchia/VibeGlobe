@@ -7,6 +7,7 @@ Application data layers: primitives, labels, styling expressions, clustering, pi
 - Single-feature updates patch GPU buffers in place; never rebuild a layer for one feature.
 - Layers draw only through `LayerRenderTarget` (`src/render-target.ts`); tests use `RecordingRenderTarget` (`src/testing.ts`, `@vibeglobe/layers/testing`), which records every upload. three.js never appears here (ADR 0029).
 - Styles are MapLibre Style Specification properties and expressions, compiled by `@maplibre/maplibre-gl-style-spec`; a missing property makes the style engine fall back to the default with a warning, which is slow, so test fixtures carry every property their style reads.
+- Never key something costly by a version that changes all the time: raster-like meshes (hillshade, color-relief, raster, heatmap) once took the terrain's version and the zoom in their cache keys, so every terrain tile remade every hillshade image on the CPU (KB-242). They keep their key and take the new ground in place, as vector meshes do.
 - Owned by the data-layers parallel track (`docs/parallel-tracks.md`): drawing, draping, clamping, terrain picking and glTF are the main session's.
 
 ## Commands

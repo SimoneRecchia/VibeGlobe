@@ -73,19 +73,53 @@ controls.setTiltPolicy({ lock2DAboveMeters: 20_000, autoTiltBelowMeters: 2_000, 
 controls.onTiltAvailabilityChange((available) => (button3d.disabled = !available));
 ```
 
-| Field                 | Default  | Effect                                                                                                                                                                                            |
-| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lock2DAboveMeters`   | 20,000 m | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. `tiltAvailable` is false and the UI's 3D button is disabled. |
-| `autoTiltBelowMeters` | 2,000 m  | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.     |
-| `autoTiltMaxDeg`      | 60°      | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                       |
+| Field                 | Default       | Effect                                                                                                                                                                                            |
+| --------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lock2DAboveMeters`   | 20,000 m      | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. `tiltAvailable` is false and the UI's 3D button is disabled. |
+| `autoTiltBelowMeters` | 2,000 m       | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.     |
+| `autoTiltMaxDeg`      | 60°           | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                       |
+| `fullTiltBelowMeters` | half the lock | Where the policy's cap ends (F641): from 0° at `lock2DAboveMeters` the largest allowed tilt rises continuously in the distance's logarithm to no cap here. Above 0 and below the lock.            |
 
 A tilt chosen by hand below the lock stays at every distance until it is changed, or until the camera passes the lock:
-over the last halving of the distance before the lock (10 to 20 km by default) the allowed tilt falls continuously to
-0°, and beyond the lock the view returns to Auto. `setTiltPolicy(false)` (or `null`) turns the policy off; invalid
+between `fullTiltBelowMeters` and the lock (10 to 20 km by default) the allowed tilt falls continuously to 0°, and beyond
+the lock the view returns to Auto. A far lock with a near `fullTiltBelowMeters` (for example 100 km and 5 km) gives a
+view that is flat at a country's scale and tilts more and more while zooming in: a tilt chosen at 50 km rises with the
+cap instead of jumping. `setTiltPolicy(false)` (or `null`) turns the policy off; invalid
 values throw a `GlobeError` (`invalid-option`). The UI's 2D / 3D / Auto toggle takes the controls as its `tilt` option
 (`new ViewModeControl({ tilt: controls })`, or `addAllControls(ui, { tilt: controls })`). In the playground,
 `?tiltPolicy=1` turns the policy on; the showcase page has it on. In Vue, `VibeGlobe`'s `controls` prop takes the same
 options (`:controls="{ tiltPolicy: true }"`), and `useTiltAvailable()` returns the availability as a ref.
+
+### A tilt slider
+
+`controls.maxTiltDeg` is the largest tilt the view allows now (F642): the empty-sky limit, the constraints'
+`maxTiltDeg`, the policy's cap, or the tilt the terrain clearance holds the camera at while it does (90 before the
+controls are attached). The engine writes it every frame, so a slider reads it with the camera:
+
+```ts
+globe.on('camera-change', () => {
+  slider.max = String(Math.round(controls.maxTiltDeg));
+  slider.value = String(Math.round(globe.camera.tiltDeg));
+});
+slider.oninput = () => globe.jumpTo({ tiltDeg: Number(slider.value) });
+```
+
+`controls.tiltPolicy` keeps two slots for this: `[4]`, the octaves from the lock to the full tilt (the controls write
+it, 0 meaning 1), and `[5]`, the largest tilt of the frame in radians (the engine writes it).
+
+## Camera limits
+
+`globe.setConstraints({ minZoom, maxZoom, maxRangeMeters, maxTiltDeg, bounds })` holds every input and movement within
+the limits (F209–F211, F646); `globe.constraints` reads them back.
+
+- `minZoom` and `maxZoom` are Web Mercator zooms at the latitude of the view's center: the same zoom is a nearer camera
+  at high latitudes. As a far limit on a globe, `minZoom` therefore moves the camera in while the view is dragged
+  toward a pole.
+- `maxRangeMeters` is the farthest the camera's range (eye to target) may be, the same at every latitude: the right far
+  limit for a globe that must never look smaller than a given size. A range of 18,000 km keeps the whole globe filling
+  most of the view at any screen size (the range sets its angular size); a drag past a pole keeps the range while the
+  Web Mercator zoom falls.
+- The zoom keeps its readout meaning: a page that shows labels or markers by zoom still reads `globe.camera.zoom`.
 
 ## Key map
 

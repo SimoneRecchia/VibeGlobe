@@ -58,8 +58,44 @@ Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -
 `preset.styleFor(json, 'landscape', ['borders', 'countries'], 'it')`.
 
 The borders, country names and sea names overlays (F645) draw over Satellite and Landscape alike, in dark ink on the
-map and light ink on the imagery; Map and Relief keep their own names and borders. `styleFor`'s last argument names
-places in a language where the tiles have it (`name:it`), else in their Latin or local name.
+map and white on the imagery (names, sea names and country borders the same white, region borders at 70 %); Map and
+Relief keep their own names and borders. `styleFor`'s last argument names places in a language where the tiles have it
+(`name:it`), else in their Latin or local name. Names take the style's own faces (KB-243): country names its bold font,
+places its regular one, water its italic one.
+
+The Landscape's hillshade is light and stops at zoom 11 (KB-242): nearer, the 3D terrain shows the relief, and a tilted
+view would shade hundreds of DEM tiles on the CPU.
+
+### Switching overlays without reloading tiles
+
+Ask for one style with every overlay a page offers and switch them with the layer's runtime style (see
+[vector tiles](vector-tiles.md#runtime-changes)), not by asking for a new style: a new layer downloads and lays out
+every tile again. The overlays' layers:
+
+| Overlay     | Layers                                                             |
+| ----------- | ------------------------------------------------------------------ |
+| `borders`   | `overlay-region-borders` (from level 5), `overlay-country-borders` |
+| `countries` | `overlay-country-names` (to level 8)                               |
+| `seas`      | `overlay-sea-names`                                                |
+| `roads`     | the style's own `transportation` and `transportation_name` layers  |
+
+Country features carry `iso_a2`. A page that names some countries with labels of its own (a plaque with its figures,
+say) hides the map's name for those, at every zoom, with a filter on `overlay-country-names`:
+`['all', original, ['!', ['in', ['get', 'iso_a2'], ['literal', ['IT', 'ES']]]]]`. Its own label then reads as the
+map's if it copies the paint: Noto Sans Bold, 10 px at zoom 1 rising by 1.2 px a level to 16 px, white with a
+`rgba(0, 0, 0, 0.6)` halo of 1.4 px over imagery, `#2f2c33` with a white halo over the Landscape.
+
+## Another base image
+
+The far levels show the application's base image (`baseImageryUrl`). The guides use Natural Earth; NASA's Blue Marble
+(public domain) gives a virtual globe's colors. GIBS's WMS gives it at 4096 × 2048
+(`LAYERS=BlueMarble_ShadedRelief_Bathymetry&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=4096&HEIGHT=2048`), the layer the
+online Satellite uses nearer, so the tones meet. Its bright shelves look blocky magnified, and with a package the sea
+is the base image at every level: a calmer sea comes from a blur of the sea alone (a mask from
+`BlueMarble_NextGeneration`, whose ocean is one flat dark blue; the sea's colors and the mask blurred alike and divided,
+so the land never bleeds into the coast), brought partway to a deep blue. Satellite's `polarCapColors` are Natural
+Earth's: with another image pass the mean of its rows beyond 85.05° to `globe.setPolarCapColors` (about `#091738` and
+`#eeefef` for the Blue Marble).
 
 ## Satellite by zoom
 

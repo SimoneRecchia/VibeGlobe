@@ -60,32 +60,32 @@ export function hillshadeImage(
   const light = [Math.sin(azimuth) * Math.cos(altitude), Math.cos(azimuth) * Math.cos(altitude), Math.sin(altitude)];
   const cell = pixelMeters(tile.z, tile.y, size);
   const scale = 1 + 2 * exaggeration;
-  const at = (x: number, y: number) =>
-    heights[Math.min(size - 1, Math.max(0, y)) * size + Math.min(size - 1, Math.max(0, x))] ?? 0;
+  const last = size - 1;
+  const [lx, ly, lz] = [light[0] ?? 0, light[1] ?? 0, light[2] ?? 0];
+  const accentAlpha = accent[3] ?? 0;
   const data = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y++) {
+    // Central differences, one-sided at the image's border (no seam of halved slopes along tile edges); rows run south.
+    const row = y * size;
+    const above = (y > 0 ? y - 1 : 0) * size;
+    const below = (y < last ? y + 1 : last) * size;
+    const northCell = ((below - above) / size) * cell;
     for (let x = 0; x < size; x++) {
-      // East and north gradients (image rows run south).
-      // Central differences, one-sided at the image's border (no seam of halved slopes along tile edges).
-      const x0 = Math.max(0, x - 1);
-      const x1 = Math.min(size - 1, x + 1);
-      const y0 = Math.max(0, y - 1);
-      const y1 = Math.min(size - 1, y + 1);
-      const east = ((at(x1, y) - at(x0, y)) / ((x1 - x0) * cell)) * scale;
-      const north = ((at(x, y0) - at(x, y1)) / ((y1 - y0) * cell)) * scale;
-      const length = Math.hypot(east, north, 1);
-      const nz = 1 / length;
-      const lit = (-east * (light[0] ?? 0) - north * (light[1] ?? 0) + (light[2] ?? 0)) / length;
-      const shade = lit - (light[2] ?? 0);
+      const x0 = x > 0 ? x - 1 : 0;
+      const x1 = x < last ? x + 1 : last;
+      const east = (((heights[row + x1] ?? 0) - (heights[row + x0] ?? 0)) / ((x1 - x0) * cell)) * scale;
+      const north = (((heights[above + x] ?? 0) - (heights[below + x] ?? 0)) / northCell) * scale;
+      const length = Math.sqrt(east * east + north * north + 1);
+      const shade = (-east * lx - north * ly + lz) / length - lz;
       const base = shade >= 0 ? highlight : shadow;
       const amount = Math.min(1, Math.abs(shade) * 1.5) * (base[3] ?? 1);
-      const steep = (1 - nz) * 0.3 * (accent[3] ?? 0);
-      const alpha = amount + steep * (1 - amount);
-      const mixRgb = (i: number) => ((base[i] ?? 0) * amount + (accent[i] ?? 0) * steep * (1 - amount)) / (alpha || 1);
-      const o = (y * size + x) * 4;
-      data[o] = mixRgb(0);
-      data[o + 1] = mixRgb(1);
-      data[o + 2] = mixRgb(2);
+      const steep = (1 - 1 / length) * 0.3 * accentAlpha * (1 - amount);
+      const alpha = amount + steep;
+      const over = alpha || 1;
+      const o = (row + x) * 4;
+      data[o] = ((base[0] ?? 0) * amount + (accent[0] ?? 0) * steep) / over;
+      data[o + 1] = ((base[1] ?? 0) * amount + (accent[1] ?? 0) * steep) / over;
+      data[o + 2] = ((base[2] ?? 0) * amount + (accent[2] ?? 0) * steep) / over;
       data[o + 3] = alpha * 255;
     }
   }

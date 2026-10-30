@@ -103,6 +103,29 @@ describe('borders, country and sea names overlays (F645)', () => {
     ]);
     const names = byId(preset.styleFor(STYLE, 'landscape', ['countries'])?.layers, 'overlay-country-names');
     expect(names?.['paint']).toMatchObject({ 'text-color': '#2f2c33', 'text-halo-color': '#ffffff' });
+    // The style's own faces: bold country names, italic sea names, though its first name font is italic (KB-243).
+    const faces: StyleJson = {
+      ...STYLE,
+      layers: [
+        {
+          id: 'other',
+          type: 'symbol',
+          source: 'openmaptiles',
+          'source-layer': 'place',
+          layout: { 'text-font': ['Noto Sans Italic'] },
+        },
+        {
+          id: 'country',
+          type: 'symbol',
+          source: 'openmaptiles',
+          'source-layer': 'place',
+          layout: { 'text-font': ['Noto Sans Bold'] },
+        },
+      ],
+    };
+    const labelled = preset.styleFor(faces, 'landscape', ['countries', 'seas'])?.layers;
+    expect(byId(labelled, 'overlay-country-names')?.['layout']).toMatchObject({ 'text-font': ['Noto Sans Bold'] });
+    expect(byId(labelled, 'overlay-sea-names')?.['layout']).toMatchObject({ 'text-font': ['Noto Sans Italic'] });
     // Names in the app's language where the tiles have it, else Latin or local.
     const italian = byId(preset.styleFor(STYLE, 'satellite', ['countries'], 'it')?.layers, 'overlay-country-names');
     expect(italian?.['layout']).toMatchObject({

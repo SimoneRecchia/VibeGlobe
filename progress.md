@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-30: a farthest range for the camera, hillshade over terrain, name faces (targeted owner request)
+
+From an application's report (F646, KB-242, KB-243). `constraints.maxRangeMeters` limits how far the camera goes at
+the same distance at every latitude: with `minZoom` alone a drag toward a pole moved the camera in. Hillshade and
+color-relief meshes no longer follow the terrain's version or the zoom in their keys: the terrain refreshes their
+ground in place, so a tilted Landscape view with terrain went from 14 to 54 fps; its hillshade now stops at zoom 11.
+The preset's names take the style's faces (countries bold, water italic) instead of its first, italic, one.
+
 ## 2026-10-30: a Landscape map and borders, country and sea names as overlays (targeted owner request)
 
 A map like a virtual globe's for an application that wants few labels (F644, F645). `landscape` draws OpenFreeMap's

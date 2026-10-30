@@ -19,6 +19,7 @@ import type { AtmosphereSettings, QualitySettings, RendererQuality } from './qua
 import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewMode, ViewPhase } from '../view/view-state.js';
 import type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
+import type { CameraConstraints } from './constraint-types.js';
 
 export type { FrameCapture, RendererStats, ResourceCounts } from './renderer-stats.js';
 
@@ -566,13 +567,7 @@ export interface CameraMovement extends Promise<MoveOutcome> {
   cancel(): void;
 }
 
-/** Limits on the camera (F209–F211): zoom range, maximum tilt, and bounds for the view's center. */
-export interface CameraConstraints {
-  readonly minZoom?: number;
-  readonly maxZoom?: number;
-  readonly maxTiltDeg?: number;
-  readonly bounds?: GeoBounds;
-}
+export type { CameraConstraints };
 
 /** A home view (F194): a view, and optionally the view mode to set on the way. */
 export interface HomeView extends ViewInit {

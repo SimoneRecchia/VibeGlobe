@@ -24,6 +24,8 @@ const NORTH = 6;
 /** Scratch: the range limits of this frame. */
 const MIN_RANGE = 7;
 const MAX_RANGE = 8;
+/** The farthest range, meters (F646). */
+const FAR = 9;
 
 /** Throws a GlobeError unless `constraints` are valid; returns them. */
 export function validateConstraints(constraints: unknown): CameraConstraints {
@@ -34,6 +36,7 @@ export function validateConstraints(constraints: unknown): CameraConstraints {
     ['minZoom', c.minZoom, 0, 25],
     ['maxZoom', c.maxZoom, 0, 25],
     ['maxTiltDeg', c.maxTiltDeg, 0, 89],
+    ['maxRangeMeters', c.maxRangeMeters, 1, 6e7],
   ] as const) {
     if (value !== undefined && !(typeof value === 'number' && value >= min && value <= max))
       throw new GlobeError('invalid-option', `constraints.${name} must be a number from ${min} to ${max}`);
@@ -63,7 +66,7 @@ export function validateConstraints(constraints: unknown): CameraConstraints {
 export class Constraints {
   /** The constraints as last set, validated (`Globe.constraints`). */
   settings: CameraConstraints = {};
-  readonly values = new Float64Array(9).fill(Number.NaN);
+  readonly values = new Float64Array(10).fill(Number.NaN);
   /**
    * Whether zoom limits or bounds are set: without, {@link apply} reads nothing (KB-132: a frame's reads of the values
    * allocate whenever the function runs unoptimized).
@@ -78,6 +81,7 @@ export class Constraints {
     v[MIN_ZOOM] = constraints.minZoom ?? Number.NaN;
     v[MAX_ZOOM] = constraints.maxZoom ?? Number.NaN;
     v[MAX_TILT] = constraints.maxTiltDeg === undefined ? Number.NaN : constraints.maxTiltDeg * RAD;
+    v[FAR] = constraints.maxRangeMeters ?? Number.NaN;
     if (constraints.bounds) {
       v[WEST] = constraints.bounds.westDeg * RAD;
       v[SOUTH] = constraints.bounds.southDeg * RAD;
@@ -85,15 +89,19 @@ export class Constraints {
       v[NORTH] = constraints.bounds.northDeg * RAD;
     }
     this.clamps =
-      constraints.bounds !== undefined || constraints.minZoom !== undefined || constraints.maxZoom !== undefined;
+      constraints.bounds !== undefined ||
+      constraints.minZoom !== undefined ||
+      constraints.maxZoom !== undefined ||
+      constraints.maxRangeMeters !== undefined;
     view?.setMaxTilt(this.maxTiltRad);
   }
 
-  /** Whether a minimum or maximum zoom is set. */
+  /** Whether a minimum or maximum zoom, or a farthest range, is set. */
   get zoomLimited(): boolean {
     const min = this.values[MIN_ZOOM] ?? Number.NaN;
     const max = this.values[MAX_ZOOM] ?? Number.NaN;
-    return min === min || max === max;
+    const far = this.values[FAR] ?? Number.NaN;
+    return min === min || max === max || far === far;
   }
 
   /** The maximum tilt in radians, NaN when unconstrained: the view state caps applied and chosen tilts with it. */
@@ -119,14 +127,18 @@ export class Constraints {
    */
   limitZoomDelta(camera: Camera, deltaZoom: number): number {
     const v = this.values;
-    const minZoom = v[MIN_ZOOM] ?? Number.NaN;
+    let minZoom = v[MIN_ZOOM] ?? Number.NaN;
     const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
-    if (minZoom !== minZoom && maxZoom !== maxZoom) return deltaZoom;
+    const far = v[FAR] ?? Number.NaN;
+    if (minZoom !== minZoom && maxZoom !== maxZoom && far !== far) return deltaZoom;
     const pose = camera.pose;
     const toRange =
       ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(pose.targetLatitudeRad)) /
       Math.tan(camera.fovYRad / 2);
     const zoom = Math.log2(toRange / pose.rangeMeters);
+    // The farthest range is a zoom at this latitude (F646); the higher of it and minZoom holds.
+    const farZoom = Math.log2(toRange / far);
+    if (minZoom !== minZoom || farZoom > minZoom) minZoom = farZoom;
     let target = zoom + deltaZoom;
     // A NaN bound (none) compares false.
     if (target > maxZoom) target = Math.max(maxZoom, Math.min(zoom, target));
@@ -149,12 +161,15 @@ export class Constraints {
     }
     const minZoom = v[MIN_ZOOM] ?? Number.NaN;
     const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
-    if (minZoom !== minZoom && maxZoom !== maxZoom) return;
+    const far = v[FAR] ?? Number.NaN;
+    if (minZoom !== minZoom && maxZoom !== maxZoom && far !== far) return;
     // Web Mercator zoom z at latitude φ is ground zoom z − log2(cos φ); range = (h / 2) · m/px / tan(fov / 2).
     const toRange =
       ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(pose.targetLatitudeRad)) /
       Math.tan(camera.fovYRad / 2);
     v[MAX_RANGE] = minZoom === minZoom ? toRange / 2 ** minZoom : Number.POSITIVE_INFINITY;
+    // The farthest range holds at every latitude: a drag toward a pole never moves the camera in (F646).
+    if (far < (v[MAX_RANGE] ?? 0)) v[MAX_RANGE] = far;
     v[MIN_RANGE] = maxZoom === maxZoom ? toRange / 2 ** maxZoom : 0;
     if (pose.rangeMeters > (v[MAX_RANGE] ?? 0)) pose.rangeMeters = v[MAX_RANGE] ?? pose.rangeMeters;
     if (pose.rangeMeters < (v[MIN_RANGE] ?? 0)) pose.rangeMeters = v[MIN_RANGE] ?? pose.rangeMeters;

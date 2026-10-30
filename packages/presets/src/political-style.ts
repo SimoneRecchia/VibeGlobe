@@ -37,14 +37,21 @@ export function vectorSourceOf(style: StyleJson): string | undefined {
   return layer?.source ?? Object.keys(style.sources).find((id) => style.sources[id]?.['type'] === 'vector');
 }
 
-/** The font of the style's place names, so the glyphs it serves are the ones asked for. */
-export function fontOf(style: StyleJson): readonly string[] {
+/** A font of the style's names in a face (`Regular`, `Bold`, `Italic`), so the glyphs it serves are the ones asked for. */
+export type FontFace = 'Regular' | 'Bold' | 'Italic';
+
+/**
+ * The style's name font in `face` (KB-243: the first place layer's font is often its italic one), else its first name
+ * font, else Noto Sans in that face.
+ */
+export function fontOf(style: StyleJson, face: FontFace = 'Regular'): readonly string[] {
+  const fonts: string[][] = [];
   for (const layer of style.layers) {
     const font = (layer['layout'] as Record<string, unknown> | undefined)?.['text-font'];
-    if (layer['source-layer'] === 'place' && Array.isArray(font) && font.every((f) => typeof f === 'string'))
-      return font as string[];
+    const names = layer['source-layer'] === 'place' || layer['source-layer'] === 'water_name';
+    if (names && Array.isArray(font) && font.every((f) => typeof f === 'string')) fonts.push(font as string[]);
   }
-  return ['Noto Sans Regular'];
+  return fonts.find((font) => font.some((name) => name.includes(face))) ?? fonts[0] ?? [`Noto Sans ${face}`];
 }
 
 /**
@@ -154,11 +161,11 @@ function borderLayers(source: string): StyleLayerJson[] {
 }
 
 /** Water names, then places from villages to countries (the larger drawn last, on top). */
-function nameLayers(source: string, font: readonly string[], language?: string): StyleLayerJson[] {
+function nameLayers(source: string, font: (face: FontFace) => readonly string[], language?: string): StyleLayerJson[] {
   const text = POLITICAL_COLORS.text;
   const place = (id: string, classes: string[], size: number[], minzoom: number, rank: number, maxzoom?: number) =>
     nameLayer(id, source, 'place', classes, {
-      font,
+      font: font(id === 'political-countries' ? 'Bold' : 'Regular'),
       size: zoomed(size),
       color: id === 'political-regions' ? '#7a6f80' : text,
       minzoom,
@@ -168,7 +175,7 @@ function nameLayers(source: string, font: readonly string[], language?: string):
     });
   return [
     nameLayer('political-water-names', source, 'water_name', ['ocean', 'sea', 'lake', 'bay', 'strait'], {
-      font,
+      font: font('Italic'),
       size: zoomed([2, 10, 8, 14]),
       color: POLITICAL_COLORS.waterText,
       minzoom: 2,
@@ -190,6 +197,6 @@ export function politicalParts(style: StyleJson, language?: string): PoliticalPa
     background: [{ id: 'political-land', type: 'background', paint: { 'background-color': POLITICAL_COLORS.land } }],
     water: waterLayers(source),
     borders: borderLayers(source),
-    labels: nameLayers(source, fontOf(style), language),
+    labels: nameLayers(source, (face) => fontOf(style, face), language),
   };
 }

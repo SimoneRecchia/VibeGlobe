@@ -397,6 +397,35 @@ describe('camera constraints (F209–F211)', () => {
     globe.destroy();
   });
 
+  it('holds a farthest range at every latitude: zooming out stops there and a drag toward a pole keeps it (F646)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 12, latitudeDeg: 45, zoom: 3 });
+    globe.setConstraints({ maxRangeMeters: 1.8e7 });
+    ticks(1);
+    for (let i = 0; i < 8; i++) {
+      globe.navigation.zoomAt({ xPx: 400, yPx: 300 }, -1);
+      ticks(1);
+    }
+    expect(globe.camera.rangeMeters).toBeCloseTo(1.8e7, -2);
+    const zoomAt45 = globe.camera.zoom;
+    let northmost = 0;
+    let lowestZoom = zoomAt45;
+    for (let i = 0; i < 12; i++) {
+      const anchor = globe.navigation.grab({ xPx: 400, yPx: 300 });
+      if (anchor) globe.navigation.dragTo(anchor, { xPx: 400, yPx: 340 });
+      ticks(1);
+      expect(globe.camera.rangeMeters).toBeCloseTo(1.8e7, -2);
+      northmost = Math.max(northmost, globe.camera.latitudeDeg);
+      lowestZoom = Math.min(lowestZoom, globe.camera.zoom);
+    }
+    expect(northmost).toBeGreaterThan(70);
+    // The Web Mercator zoom falls with the latitude at the same range.
+    expect(lowestZoom).toBeLessThan(zoomAt45 - 1);
+    expect(() => globe.setConstraints({ maxRangeMeters: 0 })).toThrow(
+      expect.objectContaining({ code: 'invalid-option' }),
+    );
+    globe.destroy();
+  });
+
   it('does not pan when zooming at an off-center point beyond the zoom limits (KB-126)', async () => {
     const { globe, ticks } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 12 });
     globe.setConstraints({ minZoom: 5, maxZoom: 12 });

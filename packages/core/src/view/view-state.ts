@@ -250,13 +250,14 @@ export class ViewState {
       if (ground) clears(this, camera, values, APPLIED_TILT, ground);
     }
     // A limit leaves an offset that eases back; while it holds, the tilt is not easing (KB-095).
-    this.clamped = (values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0);
-    // Terrain clearance holding the tilt lower is the most a tilt slider can reach now (F642).
-    if (this.clamped && (values[APPLIED_TILT] ?? 0) < (this.tiltPolicy[5] ?? 0))
-      this.tiltPolicy[5] = values[APPLIED_TILT] ?? 0;
-    if ((values[APPLIED_TILT] ?? 0) < target + (values[TILT_OFFSET] ?? 0))
-      values[TILT_OFFSET] = (values[APPLIED_TILT] ?? 0) - target;
-    camera.pose.tiltRad = values[APPLIED_TILT] ?? 0;
+    const applied = values[APPLIED_TILT] ?? 0;
+    this.clamped = applied < target + (values[TILT_OFFSET] ?? 0);
+    if (this.clamped) {
+      values[TILT_OFFSET] = applied - target;
+      // Terrain clearance holding the tilt lower is the most a tilt slider can reach now (F642).
+      if (applied < (this.tiltPolicy[5] ?? 0)) this.tiltPolicy[5] = applied;
+    }
+    camera.pose.tiltRad = applied;
     camera.update();
   }
 
@@ -318,12 +319,15 @@ export class ViewState {
     limits[2] = camera.fovYRad;
     limits[3] = this.morph.factors[0] ?? 0;
     skyTiltLimitRad(limits);
-    out[slot] = limits[6] ?? 0;
-    if ((out[slot] ?? 0) > (values[TILT_CAP] ?? Number.NaN)) out[slot] = values[TILT_CAP] ?? 0;
-    if ((out[slot] ?? 0) > (values[POLICY_CAP] ?? Number.NaN)) out[slot] = values[POLICY_CAP] ?? 0;
-    values[WANTED_TILT] = (values[TARGET_TILT] ?? 0) + (values[TILT_OFFSET] ?? 0);
-    if ((values[WANTED_TILT] ?? 0) < 0) values[WANTED_TILT] = 0;
-    if ((values[WANTED_TILT] ?? 0) > (out[slot] ?? 0)) values[WANTED_TILT] = out[slot] ?? 0;
+    // Locals, not slots: one read each (NaN caps compare false).
+    let max = limits[6] ?? 0;
+    const cap = values[TILT_CAP] ?? Number.NaN;
+    const policyCap = values[POLICY_CAP] ?? Number.NaN;
+    if (max > cap) max = cap;
+    if (max > policyCap) max = policyCap;
+    const wanted = (values[TARGET_TILT] ?? 0) + (values[TILT_OFFSET] ?? 0);
+    out[slot] = max;
+    values[WANTED_TILT] = wanted < 0 ? 0 : wanted > max ? max : wanted;
   }
 
   /** Recomputes the state from the camera's pose and viewport (after {@link Camera.update}). */

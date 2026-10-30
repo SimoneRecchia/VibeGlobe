@@ -7752,6 +7752,17 @@
         "In the browser, in an application with the policy, `controls.maxTiltDeg` is 0 beyond the lock and follows the cap while zooming in"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F643",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "The space background can draw a halo around the globe seen from space, as virtual globes do (`glow`, 0 to 4, default 0): a soft blue glow beyond the limb, brightest at the edge and fading over a few hundred kilometers, over the atmosphere's thin physical sky; with sun lighting on it shows on the day side only, and it fades out near the ground with the rest of the background; a value outside 0 to 4 is a GlobeError ('invalid-option').",
+      "steps": [
+        "Unit-test the option's default, runtime change and validation",
+        "In the browser, with the background's `glow` at 1, a halo shows beyond the limb from space, none with 0, and only on the day side with sun lighting on"
+      ],
+      "status": "passing"
     }
   ]
 }

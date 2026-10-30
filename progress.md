@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-30: a halo around the globe seen from space (targeted owner request)
+
+For a far view in an application's own look (F643): the space background takes `glow` (0 to 4, default 0, so nothing
+changes for others), a soft blue halo beyond the limb drawn by its full-screen backdrop from the height above the globe
+where each ray passes closest: a bright edge falling by e over 60 km and a wide part over 320 km, whitish at the edge
+and deeper blue farther out, on the day side only while sun lighting is on. The renderer's main entry is unchanged
+(the starfield is its own entry). A unit test covers the option; in an application with the Blue Marble base image,
+`glow: 1` and no Milky Way, the halo showed from 23,000 and 38,000 km, softened over the physical sky's thin rim, and
+followed the terminator with sun lighting on.
+
 ## 2026-10-30: the tilt policy's cap over a chosen range, and the largest tilt for a slider (targeted owner request)
 
 For a tilt slider in an application (F641, F642). `tiltPolicy.fullTiltBelowMeters` (default half the lock, as

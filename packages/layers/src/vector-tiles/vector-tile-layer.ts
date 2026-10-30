@@ -29,7 +29,7 @@ import {
   type TileId,
 } from './tile-pyramid.js';
 import { meshKindOf, zoomBracket, type PaintPart } from './vector-paint.js';
-import { TileMeshCache } from './tile-mesh-cache.js';
+import { DEFERRED, PaintStamps, TileMeshCache, type PaintedMesh } from './tile-mesh-cache.js';
 import { VectorStyle, changeNeedsRelayout, type StyleChange } from './vector-style.js';
 import { attributionCredits, tileUrl, transformedTransport, type SourceInfo } from './style-sources.js';
 import { geojsonTransport } from './geojson-tiles.js';
@@ -53,7 +53,11 @@ interface ResolvedSource extends SourceInfo {
 interface SourceDraw {
   readonly tile: TileId;
   readonly clip: [number, number, number, number];
+  /** The square the draw covers: the tile, or the finer target it stands in for. */
+  readonly region: TileId;
 }
+
+const pxPerUnit = (zoom: number, tile: TileId) => (512 * 2 ** (zoom - tile.z)) / BUCKET_EXTENT;
 
 /** Starts the runtime of a loaded style on a globe: its render extension, and pointer events with `element`. */
 export function startVectorTileLayer(
@@ -74,7 +78,7 @@ class Runtime implements VectorTileLayer {
   private target: VectorTileTarget | undefined;
   private removeExtension: (() => void) | undefined;
   private layoutVersion = 1;
-  private paintVersion = 1;
+  private readonly paints = new PaintStamps();
   private targets: TileId[] = [];
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
@@ -114,7 +118,7 @@ class Runtime implements VectorTileLayer {
   ): void {
     const key = `${feature.source}|${feature.id}`;
     this.featureStates.set(key, { ...this.featureStates.get(key), ...state });
-    this.paintVersion++;
+    this.paints.featureStateChanged();
     this.globe.requestRender();
   }
 
@@ -237,7 +241,7 @@ class Runtime implements VectorTileLayer {
 
   private changed(change: StyleChange): void {
     if (changeNeedsRelayout(change)) this.layoutVersion++;
-    else this.paintVersion++;
+    else this.paints.changed(change);
     if (change.kind === 'order' && this.style.layer(change.layerId) === undefined)
       this.target?.removeLayer(change.layerId);
     this.globe.requestRender();
@@ -283,7 +287,7 @@ class Runtime implements VectorTileLayer {
     const draws = this.sourceDraws(view);
     this.grounds.frame();
     this.rasters?.beginFrame();
-    if (this.meshes) this.meshes.drapePending = false;
+    this.meshes?.beginFrame();
     const fades = this.fader.update(this.globe.timeMs, zoom, this.style.layers);
     let animating = false;
     const layerDraws: VectorLayerDraws[] = [];
@@ -304,7 +308,7 @@ class Runtime implements VectorTileLayer {
     const labels = this.placer?.frame(this.labelSources(fades, draws), view, zoom, this.globe.timeMs);
     target.setLabels(labels?.quads);
     target.draw(layerDraws, view);
-    if (animating || this.meshes?.drapePending === true || labels?.animating === true) context.requestRender();
+    if (animating || this.meshes?.pending === true || labels?.animating === true) context.requestRender();
   }
 
   /** The symbol buckets of the drawn tiles, with their layer's fade. */
@@ -344,7 +348,11 @@ class Runtime implements VectorTileLayer {
       source.loader.update(wanted, retainedTiles(sourceDraws));
       draws.set(
         source.id,
-        sourceDraws.map((d) => ({ tile: d.tile, clip: clipOf(d.tile, d.target) })),
+        sourceDraws.map((d) => ({
+          tile: d.tile,
+          clip: clipOf(d.tile, d.target),
+          region: d.target.z > d.tile.z ? d.target : d.tile,
+        })),
       );
       for (const d of sourceDraws) {
         this.lastDrawn.push({ tile: tileKey(d.tile), target: tileKey(d.target), standIn: d.standIn });
@@ -368,7 +376,7 @@ class Runtime implements VectorTileLayer {
         layer,
         opacity,
         zoom,
-        this.paintVersion,
+        this.paints.of(layer.id),
         this.targets,
         draws.get(layer.source ?? '') ?? [],
       );
@@ -378,13 +386,21 @@ class Runtime implements VectorTileLayer {
     const { zoomA, t } = zoomBracket(zoom);
     const list = [];
     const sourceDraws =
-      source === undefined ? this.targets.map((tile) => ({ tile, clip: clipOf(tile, tile) })) : draws.get(source.id);
+      source === undefined
+        ? this.targets.map((tile) => ({ tile, clip: clipOf(tile, tile), region: tile }))
+        : draws.get(source.id);
     for (const d of sourceDraws ?? []) {
       const from = { sourceId: source?.id ?? '', loaded: source?.loader.get(d.tile), tile: d.tile };
       if (source !== undefined && from.loaded === undefined) continue;
-      const mesh = this.meshes?.get(from, layer, zoomA, this.paintVersion, this.globe.frameNumber, part);
-      if (mesh === undefined) continue;
-      list.push({ mesh, clip: d.clip, pxPerUnit: (512 * 2 ** (zoom - d.tile.z)) / BUCKET_EXTENT });
+      const frame = this.globe.frameNumber;
+      const painted = this.meshes?.get(from, layer, zoomA, this.paints.of(layer.id), frame, part);
+      if (painted === undefined) continue;
+      const zoomT = (m: PaintedMesh) => (m.zoomA === zoomA ? {} : { zoomT: Math.min(1, Math.max(0, zoom - m.zoomA)) });
+      if (painted !== DEFERRED)
+        list.push({ mesh: painted.mesh, clip: d.clip, pxPerUnit: pxPerUnit(zoom, d.tile), ...zoomT(painted) });
+      else
+        for (const s of this.meshes?.standIns(from.sourceId, d.region, layer.id, part, frame) ?? [])
+          list.push({ mesh: s.mesh, clip: clipOf(s.tile, d.region), pxPerUnit: pxPerUnit(zoom, s.tile), ...zoomT(s) });
     }
     const dash = layer.type === 'line' ? layer.paint('line-dasharray', zoom) : undefined;
     const extrusionOpacity =

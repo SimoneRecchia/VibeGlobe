@@ -245,12 +245,7 @@ export class LabelPlacer {
       const size = Number(layer.layout('text-size', zoom, feature)) || 16;
       const state = feature?.id === undefined ? undefined : this.stateOf(layer.source ?? '', feature.id);
       const paint = (name: string) => layer.paint(name, zoom, feature, state);
-      const style = {
-        scale: size / 24,
-        fill: linearColor(paint('text-color'), Number(paint('text-opacity') ?? 1)),
-        halo: linearColor(paint('text-halo-color')),
-        haloWidthPx: Number(paint('text-halo-width') ?? 0),
-      };
+      const style = { scale: size / 24, ...labelColors(paint) };
       const icon = anchor.onLine === undefined ? this.iconQuad(label.icon, screen, layer, zoom, feature) : undefined;
       if (icon === null) continue;
       const glyphs =
@@ -447,5 +442,19 @@ function rotatedGlyph(
     rect,
     corners,
     box: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+  };
+}
+
+/** A label's text and halo colors (straight linear RGBA) and halo width: `text-opacity` fades the halo with the text. */
+export function labelColors(paint: (name: string) => unknown): {
+  fill: [number, number, number, number];
+  halo: [number, number, number, number];
+  haloWidthPx: number;
+} {
+  const opacity = Number(paint('text-opacity') ?? 1);
+  return {
+    fill: linearColor(paint('text-color'), opacity),
+    halo: linearColor(paint('text-halo-color'), opacity),
+    haloWidthPx: Number(paint('text-halo-width') ?? 0),
   };
 }

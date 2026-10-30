@@ -58,8 +58,8 @@ Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -
 `preset.styleFor(json, 'landscape', ['borders', 'countries'], 'it')`.
 
 The borders, country names and sea names overlays (F645) draw over Satellite and Landscape alike, in dark ink on the
-map and white on the imagery (names, sea names and country borders the same white, region borders at 70 %); Map and
-Relief keep their own names and borders. `styleFor`'s last argument names places in a language where the tiles have it
+map and light on the imagery (names and sea names white, country borders a light grey at 75 % that recedes into the
+picture, region borders a fainter grey); Map and Relief keep their own names and borders. `styleFor`'s last argument names places in a language where the tiles have it
 (`name:it`), else in their Latin or local name. Names take the style's own faces (KB-243): country names its bold font,
 places its regular one, water its italic one.
 

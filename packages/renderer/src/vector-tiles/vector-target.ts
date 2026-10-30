@@ -73,6 +73,8 @@ export interface VectorDraw {
   readonly mesh: VectorMesh;
   readonly clip: readonly [number, number, number, number];
   readonly pxPerUnit: number;
+  /** The factor between the mesh's paints A and B when not its layer's: a mesh still painted for another zoom pair. */
+  readonly zoomT?: number;
 }
 
 /** One style layer's draws this frame. */
@@ -195,7 +197,7 @@ export class ThreeVectorTarget {
         if (shared === undefined) setVectorFrame(material, view.morph, view.widthPx, view.heightPx);
         const object = this.object(mesh, material, this.group(layer.layerId));
         const uniforms = object.userData['vectorDraw'] as VectorDrawUniforms;
-        setVectorLayer(uniforms, layer.opacity, layer.zoomT, layer.dash, layer.heightScale);
+        setVectorLayer(uniforms, layer.opacity, draw.zoomT ?? layer.zoomT, layer.dash, layer.heightScale);
         uniforms.clip.set(draw.clip[0], draw.clip[1], draw.clip[2], draw.clip[3]);
         uniforms.tile.set(draw.pxPerUnit, 0, 0, 0);
         placeTile(object, mesh.data, view);

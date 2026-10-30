@@ -29,9 +29,13 @@ per-host limits, coalescing and cancellation), laid out in the engine's workers,
 
 | Change                             | Shows                                                                                   |
 | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| Paint, feature-state               | On the next frame: paint is evaluated per feature and rewritten in place.               |
+| Paint, feature-state               | On the next frame: paint is evaluated per feature and rewritten in place (KB-244).      |
 | Visibility, zoom range             | Cross-fades over 300 ms on the engine clock.                                            |
 | Layout, filter, added layer, order | Within 1 s: the kept tiles are laid out again in the workers, old ones drawn meanwhile. |
+
+A paint change rewrites only its own layer's meshes, and a symbol layer has none (labels evaluate paint every frame):
+changing a label layer's paint costs nothing, so a page can retint or fade names as often as its own state changes.
+Visibility and zoom ranges rewrite no mesh. A feature-state change rewrites every layer's.
 
 `layer.setFeatureState({ source, id }, state)` sets feature-state for `['feature-state', …]` expressions;
 `layer.setLanguage('it')` shows names as `name:it`, else `name_it`, else `name`.
@@ -52,6 +56,9 @@ fractional zoom use the layer's `minzoom` and `maxzoom`, which follow the camera
   nearest ready ancestor is drawn clipped to the missing square.
 - Line widths, dashes, circle radii and text sizes are in CSS pixels on the screen, in every phase and at every tilt;
   paint between two integer zooms is mixed continuously.
+- Meshes are built and repainted within 6 ms of main-thread time per frame, at least one per frame (KB-244): when a
+  zoom level is crossed or a layer appears, the tiles past the budget come in the next frames, and meanwhile the kept
+  mesh of a tile around them (or of its children) is drawn clipped to their square, so nothing goes missing.
 - Fills and lines are draped on terrain: each vertex takes the height of the terrain in memory under it, again when
   finer terrain arrives (within 4 ms of main-thread time per frame). Draped features are drawn 0.3 % of their distance
   nearer the eye than the ground, so they never fight its depth.

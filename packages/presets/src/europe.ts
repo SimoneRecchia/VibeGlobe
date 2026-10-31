@@ -73,10 +73,12 @@ export interface EuropeOpenOptions {
    */
   readonly orthophotos?: OrthophotoLayers;
   /**
-   * The deepest level of the package's vector tiles and terrain on land (the `maxZoom` of `europe-vectors` and
-   * `europe-terrain` in its pipeline configuration; 11 by default, as in `europe.json`).
+   * The deepest level of the package's vector tiles, terrain and satellite imagery on land (the `maxZoom` of
+   * `europe-vectors`, `europe-terrain` and `europe-satellite` in its pipeline configuration; 11 by default, as in
+   * `europe.json`). The imagery built to 13 shows WorldCover's 10 m detail in full where no orthophoto covers the land
+   * (F662); the orthophotos still fade in from level 12, above it.
    */
-  readonly packageLevels?: { readonly vectors?: number; readonly terrain?: number };
+  readonly packageLevels?: { readonly vectors?: number; readonly terrain?: number; readonly imagery?: number };
   /**
    * The far levels, 0 to this one (4 by default), that show the globe's base image (`GlobeOptions.baseImageryUrl`,
    * Natural Earth in the guides) in Satellite and Hybrid: NASA's Blue Marble fades in over the next half level, the
@@ -235,7 +237,7 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           // Never fetched: the tiles come from the package, the URL only names them.
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
           minLevel: Math.max(ESA_WORLDCOVER.minLevel, far + 1),
-          maxLevel: ESA_WORLDCOVER.maxLevel,
+          maxLevel: options.packageLevels?.imagery ?? ESA_WORLDCOVER.maxLevel,
           // The package's box with a soft edge; its flat water is no imagery: transparent everywhere (F636).
           area: {
             polygons: [PACKAGE_BOX],

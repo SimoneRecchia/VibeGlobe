@@ -13,6 +13,8 @@
 import {
   ecefToGeodetic,
   GlobeError,
+  refuseDisplayOnlySource,
+  type CreditProfile,
   type FrameView,
   type GeodeticRad,
   type RenderExtensionContext,
@@ -46,7 +48,6 @@ import {
   worldToEcef,
   type ViewFrame,
 } from './view-frame.js';
-import { refuseDisplayOnly } from './display-only.js';
 import { DecodeCancelled, ModelDecoder } from './model-decoder.js';
 import { gltfParts } from './content-parts.js';
 import { multiply, type Mat4 } from './volumes.js';
@@ -320,6 +321,11 @@ class Tiles3DLoader implements Tiles3DExtension {
     this.cache.add(tile);
   }
 
+  /** The tileset as a source with its provider profile, for the display-only refusal (F323, ADR 0031). */
+  private get profiled(): { id: string; profile?: CreditProfile } {
+    return { id: this.name, ...(this.options.profile ? { profile: this.options.profile } : {}) };
+  }
+
   /** Decodes a GLB with `parse-model`, counting where it ran. */
   private async decode(glb: Uint8Array, job: Job): Promise<unknown> {
     const { model, inWorker } = await this.decoder.decode(glb, job.priority, job);
@@ -341,7 +347,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   }
 
   pick = (xPx: number, yPx: number): Tiles3DPick | undefined => {
-    refuseDisplayOnly('pick', { id: this.name, ...(this.options.profile ? { profile: this.options.profile } : {}) });
+    refuseDisplayOnlySource('pick', this.profiled);
     const view = this.lastView;
     if (!view) return undefined;
     const ray = screenRay(view, xPx, yPx);
@@ -384,7 +390,7 @@ class Tiles3DLoader implements Tiles3DExtension {
   };
 
   tileset = (): Tileset | undefined => {
-    refuseDisplayOnly('tileset', { id: this.name, ...(this.options.profile ? { profile: this.options.profile } : {}) });
+    refuseDisplayOnlySource('tileset', this.profiled);
     return this.root;
   };
 

@@ -6,7 +6,7 @@
  * georeferencing of an EPSG:4326 raster (pixel scale and tie point, pixel-is-area or pixel-is-point).
  */
 import { inflateSync } from 'node:zlib';
-import { decodeLzw } from './lzw.js';
+import { decodeLzw, readTiffValue, TIFF_TYPE_SIZES } from '@vibeglobe/core/decoders';
 
 /** A decoded raster: interleaved samples, georeferenced by the outer corner of its first pixel. */
 export interface Raster {
@@ -27,42 +27,6 @@ export interface Raster {
 
 type Tags = Map<number, number[] | string>;
 
-const TYPE_SIZES: Record<number, number> = {
-  1: 1,
-  2: 1,
-  3: 2,
-  4: 4,
-  5: 8,
-  6: 1,
-  7: 1,
-  8: 2,
-  9: 4,
-  10: 8,
-  11: 4,
-  12: 8,
-};
-
-function readValue(view: DataView, type: number, offset: number, little: boolean): number {
-  switch (type) {
-    case 3:
-      return view.getUint16(offset, little);
-    case 4:
-      return view.getUint32(offset, little);
-    case 8:
-      return view.getInt16(offset, little);
-    case 9:
-      return view.getInt32(offset, little);
-    case 11:
-      return view.getFloat32(offset, little);
-    case 12:
-      return view.getFloat64(offset, little);
-    case 5:
-      return view.getUint32(offset, little) / view.getUint32(offset + 4, little);
-    default:
-      return view.getUint8(offset);
-  }
-}
-
 function readTags(view: DataView, little: boolean): Tags {
   const first = view.getUint32(4, little);
   const count = view.getUint16(first, little);
@@ -72,7 +36,7 @@ function readTags(view: DataView, little: boolean): Tags {
     const tag = view.getUint16(entry, little);
     const type = view.getUint16(entry + 2, little);
     const n = view.getUint32(entry + 4, little);
-    const size = (TYPE_SIZES[type] ?? 1) * n;
+    const size = (TIFF_TYPE_SIZES[type] ?? 1) * n;
     const at = size <= 4 ? entry + 8 : view.getUint32(entry + 8, little);
     if (type === 2) {
       const bytes = new Uint8Array(view.buffer, view.byteOffset + at, n);
@@ -80,7 +44,7 @@ function readTags(view: DataView, little: boolean): Tags {
       continue;
     }
     const values: number[] = [];
-    for (let k = 0; k < n; k++) values.push(readValue(view, type, at + k * (TYPE_SIZES[type] ?? 1), little));
+    for (let k = 0; k < n; k++) values.push(readTiffValue(view, type, at + k * (TIFF_TYPE_SIZES[type] ?? 1), little));
     tags.set(tag, values);
   }
   return tags;

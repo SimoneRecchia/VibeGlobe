@@ -35,3 +35,5 @@ export type { MeasuredGrid } from './terrain/grid-size.js';
 export { readGeoidFile, writeGeoidFile } from './terrain/geoid-file.js';
 export { buildTileMesh } from './surface/surface-mesh.js';
 export { geoidModel } from './terrain/vertical-datum.js';
+export { decodeLzw } from './codecs/lzw.js';
+export { readTiffValue, TIFF_TYPE_SIZES } from './codecs/tiff-values.js';

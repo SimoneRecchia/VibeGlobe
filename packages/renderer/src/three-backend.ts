@@ -293,7 +293,7 @@ export class ThreeBackend implements RendererBackend {
   /** Compiles the surface pipelines before the first frame (ADR 0010 §4); `pipelineCompiles` counts from here. */
   private async warmUpPipelines(material = this.material): Promise<void> {
     const sky = this.atmosphere.skyMaterial;
-    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material]);
+    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material], (r) => r === this.renderer);
     this.counters.resetCompiles();
   }
 

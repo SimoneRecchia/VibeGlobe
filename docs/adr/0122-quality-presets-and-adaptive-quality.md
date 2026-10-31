@@ -65,3 +65,7 @@ Found in the code review of 2026-10-31. Two cases the governor above could not h
 - **A device drawing under 4 frames a second never adapted.** Every frame was longer than the 250 ms gap that restarts
   the measurement, so the window never filled. The gap is now 2 s, and the controller also restarts the measurement on
   the engine's `idle` event, which tells it when the engine stopped drawing on purpose.
+- **Dense screens drew far more pixels than the preset meant.** The resolution scale multiplies the device pixel
+  ratio, so a phone at 3 drew 2.25 pixels per CSS pixel on `medium`, about five times a ratio-1 screen's. Each preset
+  now caps the pixels per CSS pixel (`maxPixelRatio`: low 1, medium 1.5, high 2, ultra none), against the device
+  pixel ratio at the controller's start; at ratio 1 to 1.5 nothing changes.

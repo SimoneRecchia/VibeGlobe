@@ -69,10 +69,18 @@ export interface QualityController {
   destroy(): void;
 }
 
-function resolve(settings: QualitySettings, capabilities: CapabilityProfile | undefined): AppliedQualitySettings {
+function resolve(
+  settings: QualitySettings,
+  capabilities: CapabilityProfile | undefined,
+  pixelRatio: number | undefined,
+): AppliedQualitySettings {
+  const { maxPixelRatio, ...engine } = settings;
   const maxAnisotropy = Math.max(capabilities?.maxAnisotropy ?? 1, 1);
-  const anisotropy = settings.anisotropy === 'max' ? maxAnisotropy : Math.min(settings.anisotropy, maxAnisotropy);
-  return { ...settings, anisotropy };
+  const anisotropy = engine.anisotropy === 'max' ? maxAnisotropy : Math.min(engine.anisotropy, maxAnisotropy);
+  // A dense screen draws no more pixels per CSS pixel than the level allows; the engine gets only its own settings.
+  const densest = (maxPixelRatio ?? Infinity) / (pixelRatio ?? 1);
+  const resolutionScale = Math.round(Math.min(engine.resolutionScale, densest) * 1000) / 1000;
+  return { ...engine, anisotropy, resolutionScale };
 }
 
 function startPreset(
@@ -101,6 +109,8 @@ class Quality implements QualityController {
   private readonly unsubscribe: (() => void)[];
   private readonly now: () => number;
   private readonly governorOptions: GovernorOptions;
+  /** The device pixel ratio at the start, which the levels' `maxPixelRatio` is measured against. */
+  private readonly pixelRatio: number | undefined;
 
   constructor(
     private readonly target: QualityTarget,
@@ -109,10 +119,11 @@ class Quality implements QualityController {
     this.now = options.now ?? (() => globalThis.performance.now());
     this.governorOptions = typeof options.adaptive === 'object' ? options.adaptive : {};
     this.adaptive = options.adaptive !== false;
+    this.pixelRatio = (options.hints ?? browserHints()).pixelRatio;
     ({ preset: this.preset, choice: this.choice } = startPreset(target, options));
     this.ladder = adaptiveLadder(QUALITY_PRESETS[this.preset]);
     this.governor = new FrameTimeGovernor(this.ladder.length, this.governorOptions);
-    this.settings = resolve(QUALITY_PRESETS[this.preset], target.capabilities);
+    this.settings = resolve(QUALITY_PRESETS[this.preset], target.capabilities, this.pixelRatio);
     this.unsubscribe = [
       target.on('frame', () => {
         if (!this.adaptive) return;
@@ -129,7 +140,11 @@ class Quality implements QualityController {
   }
 
   private apply(level: number, reason: QualityChangeReason): void {
-    this.settings = resolve(this.ladder[level] ?? QUALITY_PRESETS[this.preset], this.target.capabilities);
+    this.settings = resolve(
+      this.ladder[level] ?? QUALITY_PRESETS[this.preset],
+      this.target.capabilities,
+      this.pixelRatio,
+    );
     this.target.setResolutionScale(this.settings.resolutionScale);
     this.target.setQualitySettings?.(this.settings);
     this.target.requestRender();

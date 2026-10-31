@@ -58,6 +58,11 @@ The controls are styled only through CSS variables, so an application restyles t
 
 The colours of what controls draw on the map are read when a control creates its map layers (the drawing tools when added, the geolocation marker when first shown), the minimap's on every update: set them before adding the control.
 
+An application with a toolbar of its own drives the drawing tool directly (F660): `DrawingTool` holds the shapes and the
+mode, `DrawLayers` shows them as data layers in the colors it is given, and `DrawInput` turns pointer, touch and
+keyboard input on the map container into the tool's commands. The application's buttons call `tool.setMode('polygon')`,
+`'edit'` or `'none'` and listen to `tool.on('create' | 'change' | 'delete', …)`.
+
 `THEME_VARIABLES` exports the exact values. Both built-in themes meet WCAG 2.1 AA contrast.
 
 ## Translations
@@ -82,3 +87,28 @@ measureDistance(milan, rome).distanceMeters; // Karney's geodesics on WGS84
 ```
 
 Built-in reference systems: EPSG:4326, EPSG:3857, EPSG:32632, EPSG:32633, EPSG:4258 (ETRS89), EPSG:25832, EPSG:25833 and every WGS84 UTM zone (EPSG:326zz, EPSG:327zz); `defineCrs(code, projString)` adds others. Transforms run through proj4js (MIT).
+
+### Panels in rows, and a grid on the ground
+
+`layoutPanels` places identical rectangles, such as the tables of a solar park, in rows inside one or more perimeters
+(F658). Rows run along `rowBearingDeg` and fill from the far side; panels with a `wanted` position (a known real place)
+take the free place nearest to it, the others the next free places, so a list ordered by group (an inverter's tables)
+stays together. `fixed` panels (locked, or being dragged) keep their places and the rest go around them. When the
+perimeters cannot hold every panel at its size, all shrink alike down to `minScale` (default 0.85); panels that still
+find no place come back undefined. A scanline over each row keeps it fast enough to run on every move of a panel.
+
+```ts
+import { gridLines, layoutPanels } from '@vibeglobe/gis';
+
+const field = [
+  { longitudeDeg: 13.0, latitudeDeg: 52.3 },
+  { longitudeDeg: 13.004, latitudeDeg: 52.3 },
+  { longitudeDeg: 13.004, latitudeDeg: 52.302 },
+  { longitudeDeg: 13.0, latitudeDeg: 52.302 },
+];
+const { centers, scale } = layoutPanels({ perimeters: [field], count: 120, widthM: 13.6, depthM: 4.6 });
+// A backdrop grid of 10 m around it: segments to draw as a line layer.
+const lines = gridLines({ center: field[0], halfSizeM: 400, spacingM: 10 });
+```
+
+`gridLines` (F659) returns the segments of a square grid on the ground, turned to a bearing, at most 2000 of them.

@@ -17,6 +17,27 @@ function recorded(): { tool: DrawingTool; events: string[] } {
 }
 
 describe('the drawing tool (F407–F410)', () => {
+  it('loads a saved shape without a create event, refusing one that crosses itself (F660)', () => {
+    const { tool, events } = recorded();
+    const id = tool.addShape('polygon', [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]);
+    expect(id).toBeDefined();
+    expect(tool.shape(id ?? '')?.coordinates).toHaveLength(4);
+    expect(
+      tool.addShape('polygon', [
+        [0, 0],
+        [1, 1],
+        [1, 0],
+        [0, 1],
+      ]),
+    ).toBeUndefined();
+    expect(events).toEqual([]);
+  });
+
   it('draws points, lines and polygons, finishing on a repeated last vertex', () => {
     const { tool, events } = recorded();
     tool.setMode('point');

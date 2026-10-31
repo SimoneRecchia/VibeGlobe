@@ -44,3 +44,19 @@ describe('TileTextures.refilter (KB-288)', () => {
     expect(uploads).toHaveLength(0);
   });
 });
+
+describe('TileTextures with far-apart handles (KB-298)', () => {
+  it('walks only the textures held: handles a layer apart cost nothing between them', () => {
+    const { textures, renderer, setLevel } = setUp(0);
+    // A layer's handles start at its index times 2^22: forty layers reach past 160 million.
+    const handles = [3, 39 * 2 ** 22 + 7];
+    for (const handle of handles) textures.upload(renderer, handle, tile());
+    setLevel(8);
+    textures.refilter();
+    const startMs = performance.now();
+    expect(textures.refilterSome(renderer, 4)).toBe(2);
+    expect(performance.now() - startMs).toBeLessThan(50);
+    textures.clear();
+    expect(textures.size).toBe(0);
+  });
+});

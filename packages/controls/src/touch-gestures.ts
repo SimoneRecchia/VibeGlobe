@@ -205,7 +205,7 @@ export class TouchGestures {
     this.startY[0] = this.y[0] ?? 0;
     this.startY[1] = this.y[1] ?? 0;
     const { gestures } = this.context.options;
-    this.tiltPossible = this.count === 2 && gestures.touchTilt && this.context.port.canRotate;
+    this.tiltPossible = this.count === 2 && gestures.touchTilt;
     this.tilting = false;
     this.zooming = false;
     this.rotating = false;
@@ -329,7 +329,7 @@ export class TouchGestures {
       this.zooming = Math.abs(Math.log2(distance / this.startDistance)) >= pinchThresholdLevels;
       if (this.zooming) this.lastDistance = distance;
     }
-    if (!this.rotating && options.gestures.touchRotate && port.canRotate) {
+    if (!this.rotating && options.gestures.touchRotate) {
       this.rotating = Math.abs(this.unwrappedAngle - this.startAngle) * (distance / 2) >= rotateThresholdPx;
       if (this.rotating) this.lastAngle = this.unwrappedAngle;
     }

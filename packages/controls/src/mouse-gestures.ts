@@ -62,7 +62,7 @@ export class MouseGestures {
     const { gestures } = this.context.options;
     const rotate = press.button === 2 || (press.button === 0 && press.ctrlKey);
     let mode: MouseMode = 'none';
-    if (rotate && gestures.dragRotate && this.context.port.canRotate) mode = 'rotate';
+    if (rotate && gestures.dragRotate) mode = 'rotate';
     else if (press.button === 0 && press.shiftKey && gestures.boxZoom) mode = 'box';
     else if (press.button === 0 && !press.ctrlKey && (gestures.dragPan || gestures.doubleClickZoom)) mode = 'pan';
     if (mode === 'none') return false;

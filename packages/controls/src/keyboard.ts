@@ -113,7 +113,6 @@ export class KeyboardInput {
   /** Turns the heading to north up along the shortest arc, keeping center and tilt. */
   resetNorth(): void {
     const { heading, options, port } = this.context;
-    if (!port.canRotate) return;
     this.context.interrupt();
     heading.start(0, options.zoomAnimationMs * 2);
     port.requestUpdate();
@@ -126,7 +125,7 @@ export class KeyboardInput {
       (this.held.has(plus) ? 1 : 0) - (this.held.has(minus) ? 1 : 0);
     const horizontal = along('ArrowLeft', 'ArrowRight');
     const vertical = along('ArrowDown', 'ArrowUp');
-    const rotate = this.shift && port.canRotate;
+    const rotate = this.shift;
     const panPerMs = (options.keyboard.panViewportsPerS * this.context.heightPx()) / 1000;
     keys.panX.target = rotate ? 0 : horizontal * panPerMs;
     // Up moves the view up the screen (toward the top), so the content moves down.

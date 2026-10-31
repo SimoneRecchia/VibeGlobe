@@ -63,10 +63,10 @@ export class WheelInput {
 
   /** Safari's `gesturechange` at a canvas position; returns whether a frame is needed. */
   gestureChange(scale: number, rotationDeg: number, xPx: number, yPx: number): boolean {
-    const { options, port } = this.context;
+    const { options } = this.context;
     if (!(scale > 0)) return false;
     if (options.gestures.wheelZoom) this.immediate += Math.log2(scale / this.gestureScale);
-    if (options.gestures.touchRotate && port.canRotate) this.headingDeg -= rotationDeg - this.gestureRotationDeg;
+    if (options.gestures.touchRotate) this.headingDeg -= rotationDeg - this.gestureRotationDeg;
     this.gestureScale = scale;
     this.gestureRotationDeg = rotationDeg;
     this.at.xPx = xPx;

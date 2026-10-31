@@ -217,19 +217,9 @@ export class CameraPort {
     if (deltaZoom !== 0) this.navigation.zoomAt(point, deltaZoom);
   }
 
-  /** True when heading and tilt can change (always: `NavigationApi.orbit`). */
-  get canRotate(): boolean {
-    return true;
-  }
-
   /** The applied heading, in degrees. */
   headingDeg(): number {
     return this.navigation.headingDeg;
-  }
-
-  /** The applied tilt in degrees. */
-  tiltDeg(): number {
-    return this.navigation.tiltDeg;
   }
 
   /**

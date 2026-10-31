@@ -25,9 +25,8 @@ export interface NavigationControls extends ControlsFactory {
   /** The settings in use, defaults filled in. */
   readonly options: ResolvedControlsOptions;
   /**
-   * Connects the globe the controls drive, after `createGlobe`: rotation and tilt, and the engine clock for inertia,
-   * need it until the engine's navigation interface carries them (docs/parallel-tracks.md, "M6 input" hooks). Without
-   * it, pan and zoom work and rotate and tilt gestures are off.
+   * Connects the globe the controls drive, after `createGlobe`: the Home and view-mode keys run its commands, and the
+   * tilt policy switches it back to the automatic view mode. Without it every gesture works and those keys do nothing.
    */
   connect(globe: ConnectedGlobe): void;
   /** Zooms in one level about the screen center, animated; rapid calls accumulate (F174). */

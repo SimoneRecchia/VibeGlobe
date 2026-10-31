@@ -222,7 +222,17 @@ until 2027; Norway, Sweden, Lithuania, Hungary, Romania, Bulgaria, the western B
 Russia, the United Kingdom, Ireland, Greece, Cyprus, Malta, Iceland and the small states have no open service; Italy's
 AGEA imagery has no tile service, and Brussels' current licence was not confirmed.
 
-Where no orthophoto covers the land, the package's WorldCover composite (10 m) is the detail: `packageLevels.imagery`
+The owner then fixed (2026-10-31) that the package keeps its weight, level 11 as before, and that the deeper levels
+come online only, through the services' APIs, in online and hybrid use: the orthophotos pass through the offline engine
+as network sources (KB-291). Where no orthophoto covers the land, the package's WorldCover composite (10 m) is the
+detail, an application may still build it deeper at its own cost: `packageLevels.imagery`
 reads it to the level the package was built to (F662), 13 for its full detail at about 27 GB, so zoom 15 shows it
 magnified four times instead of level 11 sixteen times. Each service publishes its own availability; CORS could not be
 checked from here for any of them, and a service that refuses a page's requests leaves the package's imagery in view.
+
+For the land without an orthophoto, two online routes to 10 m imagery were checked and fail: the Copernicus Data Space
+Ecosystem's Sentinel Hub (its Sentinel-2 cloudless mosaics) is free only within 10,000 processing units a month per
+account, a commercial subscription beyond; and the WorldCover composite's own files on AWS cannot be read from a page,
+as its bucket sends no CORS headers (`CORS is not enabled for this bucket`, checked 2026-10-31). Freemium services
+(Esri, Mapbox, Google's Map Tiles API) are free only up to a monthly quota and proprietary: an application that accepts
+their terms adds one with its key through `addSources`, limited to the area it fills.

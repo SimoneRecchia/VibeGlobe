@@ -115,4 +115,17 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
       url: 'https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/14/4742/9327.jpg?api-key=a+b%26c',
     });
   });
+
+  it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {
+    const orthophotos = await europeOrthophotos();
+    const tiers = new Map<string, string | undefined>();
+    const offline = {
+      source<S extends { id: string }>(source: S, options: { tiers?: string }): S {
+        tiers.set(source.id, options.tiers);
+        return source;
+      },
+    };
+    europeOpen({ orthophotos, offline });
+    for (const layer of orthophotos.layers) expect(tiers.get(layer.id ?? ''), layer.id).toBe('network');
+  });
 });

@@ -45,7 +45,7 @@ describe('TileTextures.refilter (KB-288)', () => {
   });
 });
 
-describe('TileTextures with far-apart handles (KB-298)', () => {
+describe('TileTextures with far-apart handles (KB-299)', () => {
   it('walks only the textures held: handles a layer apart cost nothing between them', () => {
     const { textures, renderer, setLevel } = setUp(0);
     // A layer's handles start at its index times 2^22: forty layers reach past 160 million.

@@ -3,15 +3,15 @@
 ## 2026-10-31: a lighter start for weak PCs (owner's request, branch `lighter-engine`)
 
 An application's whole-globe start downloaded 10.7 MB. Five causes are gone, each with a regression test: a vector tile
-layer requests a source's tiles only while one of its visible layers draws at the zoom (KB-291: 6.5 MB of OpenFreeMap
+layer requests a source's tiles only while one of its visible layers draws at the zoom (KB-292: 6.5 MB of OpenFreeMap
 levels 0 to 2 whose layers start at 2 or 3); the terrain's pinned base loads only once relief is drawn, and `ready`
-no longer waits for it (KB-292: about 770 KB of Mapterhorn); a hidden imagery layer loads nothing, pinned base
-included, until shown (KB-293); `singleImage` with `sizePx` (or `bounds` and `maxLevel`) downloads with its first tile
-(KB-294; the Europe guide now passes the land cover's `sizePx`); the worker loads the KTX2 transcoder with
+no longer waits for it (KB-293: about 770 KB of Mapterhorn); a hidden imagery layer loads nothing, pinned base
+included, until shown (KB-294); `singleImage` with `sizePx` (or `bounds` and `maxLevel`) downloads with its first tile
+(KB-295; the Europe guide now passes the land cover's `sizePx`); the worker loads the KTX2 transcoder with
 its first task and Draco without its encoder, and the guides ask Vite and Nuxt applications for ES-module workers,
-whose entry is 16 KB instead of the 457 KB Vite's default format inlines (KB-295); three.js's glTF loader loads with the
-first model (KB-296); the land mask and country borders are stored as polyline text, a quarter of their JSON, and the
-presets entry fell from 44.02 to 27.33 KB gzip (KB-297). Dead antimeridian cutters left the renderer. The style
+whose entry is 16 KB instead of the 457 KB Vite's default format inlines (KB-296); three.js's glTF loader loads with the
+first model (KB-297); the land mask and country borders are stored as polyline text, a quarter of their JSON, and the
+presets entry fell from 44.02 to 27.33 KB gzip (KB-298). Dead antimeridian cutters left the renderer. The style
 specification's 51 KB reference table in the worker's vector-tile chunk is still whole (`latest` gives the layers their
 property specifications); a trimmed table would need a generator kept in step with the pinned version.
 

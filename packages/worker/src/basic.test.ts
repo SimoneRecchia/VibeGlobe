@@ -32,7 +32,7 @@ describe('the basic worker program (ADR 0172, F532)', () => {
     }
   });
 
-  it('loads the KTX2 transcoder only with its first task (KB-295)', () => {
+  it('loads the KTX2 transcoder only with its first task (KB-296)', () => {
     const graph = moduleGraph('./vibeglobe-worker.ts', STATIC_IMPORT);
     expect(graph.has('./decode-terrain.ts')).toBe(true);
     expect(graph.has('./transcode-ktx2.ts')).toBe(false);

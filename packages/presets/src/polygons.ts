@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * The text form of the bundled land mask and country borders (KB-297), a quarter of their JSON: polygons split by commas,
+ * The text form of the bundled land mask and country borders (KB-298), a quarter of their JSON: polygons split by commas,
  * rings by spaces, and each ring's points as the differences from the previous point in thousandths of a degree,
  * longitude then latitude, written as the polyline algorithm writes them (five bits a character, 63 added, 32 when
  * more follow). Points are kept to the thousandth of a degree, as `scripts/europe-land.ts` rounds them.

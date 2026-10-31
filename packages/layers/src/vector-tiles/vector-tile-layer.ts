@@ -342,7 +342,7 @@ class Runtime implements VectorTileLayer {
 
   /**
    * Per source: the tiles to draw for the view's targets, each with its clip, requesting what is missing only while a
-   * visible layer of the source draws at this zoom (KB-291).
+   * visible layer of the source draws at this zoom (KB-292).
    */
   private sourceDraws(view: FrameView, zoom: number): Map<string, readonly SourceDraw[]> {
     const detail = sampledTiles(this.globe, view.widthPx, view.heightPx);

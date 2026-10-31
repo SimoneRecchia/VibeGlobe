@@ -128,7 +128,7 @@ describe('single georeferenced images (F234)', () => {
     for (const attempt of attempts) await expect(attempt).rejects.toBeInstanceOf(SourceConfigError);
   });
 
-  it('downloads nothing until its first tile when its size or its levels are given (KB-294)', async () => {
+  it('downloads nothing until its first tile when its size or its levels are given (KB-295)', async () => {
     const spec = SPECS[0] as GeoImageSpec;
     const url = 'https://images.test/lazy.png';
     let fetches = 0;

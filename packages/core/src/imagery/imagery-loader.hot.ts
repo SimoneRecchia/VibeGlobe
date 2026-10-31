@@ -207,7 +207,7 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
   private pinnedSettled = 0;
-  /** False while the base is not drawn (a hidden layer, a flat relief): nothing loads or waits for it (KB-292, KB-293). */
+  /** False while the base is not drawn (a hidden layer, a flat relief): nothing loads or waits for it (KB-293, KB-294). */
   private pinnedWanted = true;
   /**
    * Tiles dead from transient failures or corrupt bytes with rounds left (`retries` -1): they get a fresh round after

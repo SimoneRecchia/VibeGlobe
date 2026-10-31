@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EUROPE_LAND } from './europe-land.js';
 import { decodePolygons, encodePolygons } from './polygons.js';
 
-describe('the bundled polygons (KB-297)', () => {
+describe('the bundled polygons (KB-298)', () => {
   it('store the land mask in under a third of its JSON, and read every point back exactly', () => {
     const source = readFileSync(new URL('./europe-land.ts', import.meta.url), 'utf8');
     expect(source.length).toBeLessThan(JSON.stringify(EUROPE_LAND).length / 3);

@@ -56,7 +56,7 @@ function recording(urls: string[]): TileTransport {
 
 const SOURCE: SourceInfo = { templates: ['t/{z}/{x}/{y}.pbf'], scheme: 'xyz', coverage: { minzoom: 0, maxzoom: 14 } };
 
-describe('vector tile requests (KB-291)', () => {
+describe('vector tile requests (KB-292)', () => {
   it('requests no tile while none of a source’s visible layers draws at the zoom, and loads them once one does', () => {
     const start = () => {
       const urls: string[] = [];

@@ -34,7 +34,7 @@ export interface SingleImageOptions {
   readonly worldFile?: string;
   /**
    * The image's size, pixels; read from the image's header when omitted. Given, or with `bounds` and `maxLevel`, the
-   * image downloads with the first tile, so a source never shown costs nothing (KB-294).
+   * image downloads with the first tile, so a source never shown costs nothing (KB-295).
    */
   readonly sizePx?: readonly [widthPx: number, heightPx: number];
   /**

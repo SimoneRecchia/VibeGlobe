@@ -101,7 +101,7 @@ function isRgba(image: unknown): image is RgbaImage {
 export class TileTextures {
   /**
    * The textures by handle. A map, not an array: handles are a layer's index times 2^22 plus a slot, so an array would
-   * be hundreds of millions of holes long, and walking it froze the view for a second (KB-298).
+   * be hundreds of millions of holes long, and walking it froze the view for a second (KB-299).
    */
   private readonly entries = new Map<number, Entry>();
   private count = 0;

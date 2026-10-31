@@ -122,7 +122,7 @@ export class ImageryRuntime {
   readonly ahead = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
-  /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281, KB-292). */
+  /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281, KB-293). */
   relief = true;
   private readonly byIndex = new Map<number, ImageryLoader>();
   /** The terrain layer, when the engine has a terrain source (M4). */

@@ -20,7 +20,7 @@ const vectorTask = lazyTable('vector', () => import('@vibeglobe/sources/vector')
 export const BASIC_TASKS: TaskTable = Object.freeze({
   'decode-image': decodeImage,
   'decode-terrain': decodeTerrain,
-  // Its JavaScript loads with the first KTX2 tile, as its WebAssembly does (KB-295).
+  // Its JavaScript loads with the first KTX2 tile, as its WebAssembly does (KB-296).
   'transcode-ktx2': lazyTable('ktx2', () =>
     import('./transcode-ktx2.js').then((module) => ({ 'transcode-ktx2': module.transcodeKtx2 })),
   )('transcode-ktx2'),

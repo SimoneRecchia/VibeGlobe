@@ -182,7 +182,7 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
-  it("loads not even the terrain's pinned base while the relief is flat, and is ready without it (KB-292)", async () => {
+  it("loads not even the terrain's pinned base while the relief is flat, and is ready without it (KB-293)", async () => {
     const urls: string[] = [];
     const flatRelief = { ...GLOBE_WITH_RELIEF, relief: { startGroundZoom: 98, endGroundZoom: 99 } };
     const { globe, run } = await terrainGlobe(terrain(urls), 30, terrainWorkers(), undefined, flatRelief);

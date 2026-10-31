@@ -316,7 +316,7 @@ describe('imagery layers added and removed at runtime (track A hook 2)', () => {
     globe.destroy();
   });
 
-  it('loads nothing for a hidden layer, not even its pinned base, until it is shown (KB-293)', async () => {
+  it('loads nothing for a hidden layer, not even its pinned base, until it is shown (KB-294)', async () => {
     const urls: string[] = [];
     const hidden: string[] = [];
     const { renderer, factory } = fakeRenderer();

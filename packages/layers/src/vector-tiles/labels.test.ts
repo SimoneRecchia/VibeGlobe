@@ -322,6 +322,19 @@ describe('label placement cost during camera motion (KB-210)', () => {
   });
 });
 
+describe('a sprite that fails to load', () => {
+  it('stops holding labels back for their icons once it has failed, so their text draws alone', async () => {
+    const fetchImpl = (() => Promise.reject(new Error('offline'))) as typeof fetch;
+    const source = new GlyphSource(undefined, fetchImpl, () => undefined, {}, undefined);
+    expect(source.spriteLoading).toBe(false);
+    const loading = source.loadSprite('https://s.test/sprite', 1);
+    expect(source.spriteLoading).toBe(true);
+    await loading;
+    expect(source.spriteLoading).toBe(false);
+    expect(source.icon('bus')).toBeUndefined();
+  });
+});
+
 describe('glyph ranges that fail on the way (TG-04)', () => {
   it('requests a range again after a server or network failure, while a missing range (404) stays empty', async () => {
     vi.useFakeTimers();

@@ -232,7 +232,8 @@ export class ClusterLayer extends DataLayer {
       this.#pending = undefined;
     }
     if (this.#job !== undefined) this.#continueApply(this.#job, frame.nowMs);
-    this.#animate(frame.nowMs);
+    // The transitions start once the last slice is in: before, they would end at once and pop (F375).
+    if (this.#job === undefined) this.#animate(frame.nowMs);
   }
 
   #request(zoom: number): void {

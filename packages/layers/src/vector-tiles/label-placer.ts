@@ -279,8 +279,8 @@ export class LabelPlacer {
 
   /**
    * The quad of a point label's sprite icon, centered on its anchor at `icon-size` in CSS pixels (the sprite's own
-   * pixel ratio taken out, so the 2x sheet draws at the same size, F448); undefined without an icon, null while the
-   * sprite loads.
+   * pixel ratio taken out, so the 2x sheet draws at the same size, F448); undefined without an icon (none named, or
+   * none in a sprite that loaded or failed: the text draws alone), null while the sprite loads.
    */
   private iconQuad(
     name: string | undefined,
@@ -291,7 +291,7 @@ export class LabelPlacer {
   ): GlyphQuad | null | undefined {
     if (name === undefined) return undefined;
     const image = this.glyphs.icon(name);
-    if (image === undefined) return null;
+    if (image === undefined) return this.glyphs.spriteLoading ? null : undefined;
     const key = `icon|${name}|${image.icon.pixelRatio}`;
     const rect = this.atlas.get(key) ?? this.atlas.addRgba(key, image.pixels, image.width, image.height);
     if (rect === undefined) return null;

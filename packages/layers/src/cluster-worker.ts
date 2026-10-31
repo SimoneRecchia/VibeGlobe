@@ -55,13 +55,14 @@ const TIMERS = {
  */
 export function workerClusterEngine(workers: WorkerEndpointFactory): ClusterEngine {
   const id = ++nextId;
-  let lease: WorkerPoolLease | undefined = acquireWorkerPool(
-    { ...workers, url: `${workers.url}#cluster`, maxWorkers: 1 },
-    { timers: TIMERS, maxWorkers: 1 },
-  );
+  // Taken on the first task and released by `destroy`: a layer detached and attached again loads a new index.
+  let lease: WorkerPoolLease | undefined;
   const run = <T>(name: string, input: object, transfer: readonly object[] = []): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      if (!lease) return reject(new Error('the cluster engine was destroyed'));
+      lease ??= acquireWorkerPool(
+        { ...workers, url: `${workers.url}#cluster`, maxWorkers: 1 },
+        { timers: TIMERS, maxWorkers: 1 },
+      );
       lease.pool.run({ task: name, input: { id, ...input }, transfer }, (outcome) =>
         outcome.ok ? resolve(outcome.output as T) : reject(new Error(outcome.error.message)),
       );
@@ -76,11 +77,10 @@ export function workerClusterEngine(workers: WorkerEndpointFactory): ClusterEngi
     expansionZoom: (clusterId: number) => run<number>('cluster-expansion', { clusterId }),
     leaves: (clusterId: number) => run<readonly number[]>('cluster-leaves', { clusterId }),
     destroy() {
-      if (!lease) return;
-      void run('cluster-destroy', {}).finally(() => {
-        lease?.release();
-        lease = undefined;
-      });
+      const held = lease;
+      if (!held) return;
+      lease = undefined;
+      held.pool.run({ task: 'cluster-destroy', input: { id } }, () => held.release());
     },
   };
 }

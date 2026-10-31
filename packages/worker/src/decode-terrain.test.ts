@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
-import { decodeTerrain, gunzip } from './decode-terrain.js';
+import { decodeTerrain } from './decode-terrain.js';
+import { gunzip } from './mesh-terrain.js';
 import { TaskError, type TaskContext } from './protocol.js';
 
 describe('gunzip', () => {

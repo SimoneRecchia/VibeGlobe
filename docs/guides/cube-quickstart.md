@@ -61,7 +61,8 @@ come from the public registry; nothing needs credentials. With TypeScript, also 
 ## 3. Host the assets
 
 The application serves everything itself (VibeGlobe runs no servers). With Nuxt or Vite, the worker program and the
-KTX2 transcoder are emitted into the build automatically (Nuxt puts them under `/_nuxt/`). Only the base image, shown
+KTX2 transcoder are emitted into the build automatically (Nuxt puts them under `/_nuxt/`); set
+`vite: { worker: { format: 'es' } }` in `nuxt.config.ts`, so the worker loads its decoders only when a tile needs them. Only the base image, shown
 before any tile arrives, is yours: copy `apps/playground/public/imagery/natural-earth-4096.jpg` from the repository
 (Natural Earth, public domain) to `public/static/vibeglobe/fallback-base.jpg`.
 

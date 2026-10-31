@@ -122,7 +122,7 @@ export class ImageryRuntime {
   readonly ahead = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
-  /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281). */
+  /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281, KB-292). */
   relief = true;
   private readonly byIndex = new Map<number, ImageryLoader>();
   /** The terrain layer, when the engine has a terrain source (M4). */
@@ -377,7 +377,7 @@ export class ImageryRuntime {
   ): void {
     this.frame++;
     this.residency.startFrame(this.frame);
-    for (const layer of this.layers) layer.loader.beginFrame();
+    for (const { entry, chain } of this.stack) for (const layer of chain) layer.loader.beginFrame(entry.visible);
     if (fadeByZoom(this.stack, camera)) this.stackChanged();
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
     if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
@@ -391,7 +391,7 @@ export class ImageryRuntime {
     const host = this.renderer.host;
     let terrainStart = terrain ? host.now() : 0;
     if (terrain) {
-      terrain.loader.beginFrame();
+      terrain.loader.beginFrame(this.relief);
       if (this.relief) drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       recordShownTerrain(list, tiles, count, terrain);

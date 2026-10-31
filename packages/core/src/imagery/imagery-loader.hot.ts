@@ -207,6 +207,8 @@ export class ImageryLoader implements NetworkPoolClient {
   /** The source's rate group in the network pool, -1 without a declared rate. */
   private readonly rateIndex: number;
   private pinnedSettled = 0;
+  /** False while the base is not drawn (a hidden layer, a flat relief): nothing loads or waits for it (KB-292, KB-293). */
+  private pinnedWanted = true;
   /**
    * Tiles dead from transient failures or corrupt bytes with rounds left (`retries` -1): they get a fresh round after
    * the source's next network success, which a health check of one of them asks for when nothing else loads (ADR 0046).
@@ -294,7 +296,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** True once every pinned tile is on the GPU or known to have no data: refinement may begin (F084). */
   get pinnedComplete(): boolean {
-    return this.pinnedSettled >= this.pinnedTotal;
+    return !this.pinnedWanted || this.pinnedSettled >= this.pinnedTotal;
   }
 
   /**
@@ -306,16 +308,20 @@ export class ImageryLoader implements NetworkPoolClient {
     return this.heap.size > 0 || this.active.length > held || this.uploads.size > 0;
   }
 
-  /** Starts a frame: tiles not wanted again from now on leave the queue at {@link ImageryLoader.endFrame}. */
-  beginFrame(): void {
+  /**
+   * Starts a frame: tiles not wanted again from now on leave the queue at {@link ImageryLoader.endFrame}. The pinned
+   * base is wanted ahead of every visible tile (ADR 0007 class 0) while `pinned`, its layer drawn.
+   */
+  beginFrame(pinned = true): void {
     this.frame++;
     this.flags = this.options.source.loadingFlags?.() ?? LOAD_ALL;
     this.ringCount = 0;
-    // The pinned base is always wanted, ahead of every visible tile (ADR 0007 class 0).
-    const pinned = this.pinnedTiles;
-    for (let i = 0; i < pinned.length; i += 3) {
-      const level = pinned[i] ?? 0;
-      this.want(level, pinned[i + 1] ?? 0, pinned[i + 2] ?? 0, level);
+    this.pinnedWanted = pinned;
+    if (!pinned) return;
+    const tiles = this.pinnedTiles;
+    for (let i = 0; i < tiles.length; i += 3) {
+      const level = tiles[i] ?? 0;
+      this.want(level, tiles[i + 1] ?? 0, tiles[i + 2] ?? 0, level);
     }
   }
 

@@ -9,7 +9,7 @@ import type { SourceInfo } from './style-sources.js';
 function fakeGlobe(zoom: number) {
   let extension: RenderExtension | undefined;
   const camera = { zoom, reliefFactor: 0, morphFactor: 0 };
-  const surface = [];
+  const surface: { root: string; level: number; x: number; y: number }[] = [];
   for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) surface.push({ root: 'mercator', level: 2, x, y });
   const context = {
     renderer: {},

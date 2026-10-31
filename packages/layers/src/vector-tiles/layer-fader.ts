@@ -48,12 +48,4 @@ export class LayerFader {
       return current !== undefined && current !== target;
     });
   }
-
-  /**
-   * The zoom range in which a layer's tiles must be kept loaded: the style range widened so that a fading layer still
-   * has its data while it fades out.
-   */
-  static loadRange(layer: StyleLayer, marginZoom = 1): { minzoom: number; maxzoom: number } {
-    return { minzoom: Math.max(0, layer.minzoom - marginZoom), maxzoom: layer.maxzoom + marginZoom };
-  }
 }

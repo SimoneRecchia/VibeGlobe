@@ -1,6 +1,7 @@
 // A fixed-tilt solar table: 24 modules in two rows of twelve in portrait (2P × 12, each 2,278 × 1,134 mm), tilted 20°
 // toward −Z (the model's front: heading 180 faces south), its lower edge 0.65 m above the ground, on five pairs of
-// steel posts with rafters, two purlins and braces. Two meshes: the modules' glass (one quad, a repeated module
+// steel posts with rafters, two purlins and braces. The posts reach 5 m below the base, so a table standing level on a
+// slope (a model set's footprint, F663) meets the lower ground with each post; on flat ground they are buried. Two meshes: the modules' glass (one quad, a repeated module
 // texture) and the frame and structure (a small color atlas). Original geometry; no third-party data.
 import { Image, MeshBuilder, add, cross, scale, sub, type NodeSpec, type Vec3 } from './glb.ts';
 
@@ -13,6 +14,8 @@ const PITCH_S = 2.298;
 const WIDTH = COLUMNS * PITCH_X;
 const SLOPE = ROWS * PITCH_S;
 const LOW_EDGE = 0.65;
+/** How far below the base the posts reach, meters. */
+const POST_DEPTH = 5;
 const THICKNESS = 0.04;
 const tilt = (TILT_DEG * Math.PI) / 180;
 const DEPTH = SLOPE * Math.cos(tilt);
@@ -86,10 +89,10 @@ function structure(): MeshBuilder {
   return mesh;
 }
 
-/** A post from below the ground to the rafter at `s` up the slope; returns its top. */
+/** A post from {@link POST_DEPTH} below the base to the rafter at `s` up the slope; returns its top. */
 function post(mesh: MeshBuilder, x: number, s: number): Vec3 {
   const top = at(x, s, -0.23);
-  beam(mesh, [top[0], -0.3, top[2]], top, [0, 0, 1], 0.12, 0.12);
+  beam(mesh, [top[0], -POST_DEPTH, top[2]], top, [0, 0, 1], 0.12, 0.12);
   return top;
 }
 

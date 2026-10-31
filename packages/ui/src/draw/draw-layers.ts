@@ -12,6 +12,8 @@ import { toFeature, type DrawnShape, type LonLat } from './geometry.js';
 export interface DrawColors {
   readonly shape: string;
   readonly handle: string;
+  /** The fill's opacity inside a polygon, 0 to 1 (default 0.25): lower keeps what lies under it readable. */
+  readonly fillOpacity?: number;
 }
 
 /** An edit handle: a vertex of a shape, or the midpoint of one of its edges. */
@@ -36,14 +38,14 @@ export class DrawLayers {
     layers: GlobeLayers,
     module: typeof import('@vibeglobe/layers'),
     prefix: string,
-    { shape: COLOR, handle: HANDLE_FILL }: DrawColors,
+    { shape: COLOR, handle: HANDLE_FILL, fillOpacity = 0.25 }: DrawColors,
   ) {
     this.#layers = layers;
     const { stack } = layers;
     this.#fills = stack.add(
       module.polygonLayer({
         id: `${prefix}-fills`,
-        style: { 'fill-color': COLOR, 'fill-opacity': 0.25, 'fill-outline-color': COLOR },
+        style: { 'fill-color': COLOR, 'fill-opacity': fillOpacity, 'fill-outline-color': COLOR },
       }),
     );
     this.#lines = stack.add(

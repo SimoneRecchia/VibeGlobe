@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-31: flights without freezes, level tables, panels read from aerial images (an application's map of devices)
+
+An application flying to a device over detailed terrain froze twice for most of a second: the adaptive quality
+stepped, the anisotropy changed and every imagery texture was made again in one task (KB-288); the tiles are now made
+again four a frame. Model sets take a `footprint` (F663): each copy stands level at the highest ground under its
+corners, and the playground's solar table has posts 5 m deep that meet a slope. `detectPanels` in `@vibeglobe/gis`
+(F664) finds the solar tables in a top-down capture of an area with image arithmetic: blue (or, for black modules,
+dark) pixels, the bearing of the sharpest stripes, rows and tables along them; about a tenth of a second for two
+million pixels, checked on a real orthophoto of Prenzlau. The drawing tool found a polygon's first vertex and its
+handles on the ellipsoid while the shapes lie on the terrain (KB-289), and draped polygons and lines sank into the
+coarser terrain mesh from a few kilometers (KB-290). `DrawColors.fillOpacity` (F665) lightens a drawn area's fill.
+
 ## 2026-10-31: panels laid out in rows, and a grid on the ground (an application's editor)
 
 F658 and F659 in `@vibeglobe/gis`, pure functions for an application's editor of solar parks. `layoutPanels` places

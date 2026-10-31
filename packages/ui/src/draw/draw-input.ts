@@ -8,7 +8,7 @@
  * The keyboard drives a cursor over the map: arrows move it, Enter places or picks, Delete deletes, Escape cancels.
  */
 import type { Globe } from '@vibeglobe/core';
-import { insideRing, segmentDistanceSquared, type LonLat, type ScreenXY } from './geometry.js';
+import { groundScreen, insideRing, segmentDistanceSquared, type LonLat, type ScreenXY } from './geometry.js';
 import type { DrawingTool } from './drawing-tool.js';
 import type { Handle } from './draw-layers.js';
 
@@ -262,7 +262,7 @@ export class DrawInput {
   }
 
   #screen(position: LonLat): ScreenXY | undefined {
-    return this.#globe.geoToScreen({ longitudeDeg: position[0], latitudeDeg: position[1] });
+    return groundScreen(this.#globe, position);
   }
 
   readonly #onKey = (event: KeyboardEvent): void => {

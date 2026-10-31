@@ -112,6 +112,18 @@ globe.on('camera-change', () => {
 });
 ```
 
+A table or a row of modules is long: on a slope its center's ground buries one end. `footprint: { widthMeters,
+depthMeters }` (F663) is the rectangle a copy covers, its width across its heading and its depth along it, scaled
+with the copy: each copy then stands level at the highest ground under its four corners and its center. Give the
+model legs that reach below its base, and each meets the lower ground on its own; the playground's solar table has
+posts 5 m deep, buried on flat ground.
+
+```ts
+const field = stack.add(
+  new ModelSetLayer({ url: '/models/solar-table.glb', models: tables, ground: globe, footprint: { widthMeters: 13.9, depthMeters: 4.4 } }),
+);
+```
+
 `markerPosition(id, aboveMeters, reliefFactor)` is the position to hand `geoToScreen` for a point `aboveMeters` over
 a copy's foot: the relief scales the foot's height, not the model, so its height is the foot's plus `aboveMeters`
 divided by the relief. On a flat relief (0), where no height shows, it is the foot. Pass the frame's

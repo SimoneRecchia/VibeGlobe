@@ -26,10 +26,16 @@ import { eyeRelativePosition, morphedEyeRelative, writeFragmentDepth } from './e
 export type LayerShape = 'flat' | 'solid' | 'quad' | 'line';
 
 /**
- * The share of its distance by which a layer vertex is pulled toward the eye: features on the ground draw over the
- * surface they lie on without fighting its depth (2 m at 10 km), and stay hidden behind relief and the globe.
+ * The share of its distance by which a layer vertex is pulled toward the eye: extruded volumes stand on the surface
+ * without fighting its depth (2 m at 10 km).
  */
 const DEPTH_PULL = 2e-4;
+/**
+ * Flat features and lines lie on the terrain at its heights, but the terrain is drawn with a mesh coarser than them,
+ * within the level of detail's screen error: they are pulled by about that error (20 m at 10 km, KB-290), so the drawn
+ * ground never covers them, and stay hidden behind relief and the globe.
+ */
+const GROUND_DEPTH_PULL = 2e-3;
 /**
  * Screen-sized quads (points, markers, labels) span pixels around their anchor where the curved surface lies nearer
  * than the anchor: they are pulled further (30 m at 10 km, 60 km at the whole globe's distance), still far less than
@@ -77,7 +83,7 @@ export function createLayerMaterial(
   const height = attribute('layerHeight', 'float');
   const color = attribute('layerColor', 'vec4');
   const corner = attribute('layerCorner', 'vec4');
-  const pull = shape === 'quad' ? QUAD_DEPTH_PULL : DEPTH_PULL;
+  const pull = shape === 'quad' ? QUAD_DEPTH_PULL : shape === 'solid' ? DEPTH_PULL : GROUND_DEPTH_PULL;
   const here = endpoint(positionGeometry, normal, plane, height, morphParams, morphAxes, pull);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const clip = cameraProjectionMatrix.mul(viewPosition).toVar();

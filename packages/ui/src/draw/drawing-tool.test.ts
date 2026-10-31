@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { measureShape } from '../controls/measure.js';
 import { DrawingTool, type DrawEvents } from './drawing-tool.js';
-import { ringSelfIntersects, type LonLat } from './geometry.js';
+import { groundScreen, ringSelfIntersects, type LonLat } from './geometry.js';
 
 /** A tool and the events it emitted, by name. */
 function recorded(): { tool: DrawingTool; events: string[] } {
@@ -178,5 +178,27 @@ describe('measurement (F411)', () => {
     ]);
     expect(square.areaSquareMeters / 1e6).toBeCloseTo(12_308.8, 0);
     expect(square.bearingDeg).toBeUndefined();
+  });
+});
+
+describe('drawn positions on screen (KB-289)', () => {
+  /** A projection that shows height as a shift up the screen, over ground 30 m high. */
+  const globe = (relief: number, readable = true) => ({
+    camera: { reliefFactor: relief },
+    elevationAt: () => {
+      if (!readable) throw new Error('display only');
+      return { heightMeters: 30 };
+    },
+    geoToScreen: (p: { longitudeDeg: number; latitudeDeg: number; heightMeters?: number }) => ({
+      xPx: p.longitudeDeg * 100,
+      yPx: p.latitudeDeg * 100 - (p.heightMeters ?? 0),
+    }),
+  });
+
+  it('finds a vertex where the ground shows it, its height times the relief, not on the ellipsoid', () => {
+    expect(groundScreen(globe(1), [1, 2])).toEqual({ xPx: 100, yPx: 170 });
+    expect(groundScreen(globe(0.5), [1, 2])).toEqual({ xPx: 100, yPx: 185 });
+    expect(groundScreen(globe(0), [1, 2])).toEqual({ xPx: 100, yPx: 200 });
+    expect(groundScreen(globe(1, false), [1, 2])).toEqual({ xPx: 100, yPx: 200 });
   });
 });

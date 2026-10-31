@@ -100,6 +100,8 @@ export class TileTextures {
   private count = 0;
   private bytes = 0;
   private compressed = 0;
+  /** The next handle {@link refilterSome} checks, or -1 while every texture has the current anisotropy. */
+  private refilterFrom = -1;
 
   /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
   readonly tones = new ToneMatcher();
@@ -179,22 +181,38 @@ export class TileTextures {
   }
 
   /**
-   * Gives every texture held the current anisotropy (F398: a quality preset changed it): those with another level are
-   * created and uploaded again from their kept images, as after a device loss, and `base` (the world image) is
-   * filtered again. Height grids are not filtered so.
+   * Gives every texture held the current anisotropy (F398: a quality preset changed it). `base` (the world image) is
+   * filtered again now; the tiles are made again from their kept images a few a frame by {@link refilterSome}, since
+   * creating and uploading every tile in one task froze the view for most of a second while the adaptive quality
+   * stepped (KB-288). Height grids are not filtered so.
    */
-  refilter(renderer: WebGPURenderer, base?: Texture): void {
+  refilter(base?: Texture): void {
     const level = this.anisotropy();
     if (base && base.anisotropy !== level) {
       base.anisotropy = level;
       base.needsUpdate = true;
     }
-    for (const entry of this.entries) {
+    this.refilterFrom = 0;
+  }
+
+  /**
+   * Makes again, with the current anisotropy, up to `count` tile textures that have another one; a frame calls it
+   * until every texture has the level. Returns how many it made.
+   */
+  refilterSome(renderer: WebGPURenderer, count: number): number {
+    if (this.refilterFrom < 0) return 0;
+    const level = this.anisotropy();
+    let made = 0;
+    for (; this.refilterFrom < this.entries.length && made < count; this.refilterFrom++) {
+      const entry = this.entries[this.refilterFrom];
       if (!entry || isHeights(entry.tile.image) || entry.texture.anisotropy === level) continue;
       entry.texture.dispose();
       entry.texture = this.create(entry.tile);
       renderer.initTexture(entry.texture);
+      made++;
     }
+    if (this.refilterFrom >= this.entries.length) this.refilterFrom = -1;
+    return made;
   }
 
   /** Releases everything. */

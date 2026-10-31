@@ -6,6 +6,7 @@
  * road (upright on screen), runs collision in priority order (higher style layers, then `symbol-sort-key`), fades
  * labels in and out on the engine clock, and writes the quads of the visible glyphs for the target's text material.
  */
+import { LabelAnchorCache } from './label-anchor-cache.js';
 import { geodeticToEcef, type ElevationSample, type FrameView, type GeoPosition } from '@vibeglobe/core';
 import { tileToLonLat } from './globe-vertices.js';
 import { GlyphSource } from './glyph-source.js';
@@ -110,8 +111,6 @@ function shapingOptions(
   };
 }
 
-/** Anchor sets kept before those of tiles the frame did not draw are dropped (the view left them). */
-const MAX_ANCHOR_SETS = 256;
 /** Text shapings kept before they start over. */
 const MAX_SHAPINGS = 8192;
 
@@ -119,9 +118,7 @@ const MAX_SHAPINGS = 8192;
 export class LabelPlacer {
   private readonly index = new CrossTileSymbolIndex();
   private readonly fader = new SymbolFader();
-  private readonly anchors = new Map<string, LabelAnchor[]>();
-  /** The anchor sets the current frame read. */
-  private readonly usedAnchors = new Set<string>();
+  private readonly anchors = new LabelAnchorCache<LabelAnchor[]>();
   private readonly shapings = new Map<string, Shaping>();
   private readonly quads = new QuadWriter();
   private placedLabels: PlacedLabel[] = [];
@@ -149,12 +146,6 @@ export class LabelPlacer {
     return this.placedLabels;
   }
 
-  /** Forgets everything (the style's layout changed). */
-  reset(): void {
-    this.anchors.clear();
-    this.shapings.clear();
-  }
-
   /** Places the frame's labels; returns their quads and whether a fade is running. */
   frame(
     sources: readonly LabelSource[],
@@ -164,9 +155,9 @@ export class LabelPlacer {
   ): { quads: LabelQuads; animating: boolean } {
     const candidates: Candidate[] = [];
     const morph = this.view.camera.morphFactor;
-    this.usedAnchors.clear();
+    this.anchors.beginFrame();
     for (const source of sources) for (const c of this.candidates(source, view, zoom, morph)) candidates.push(c);
-    if (this.anchors.size > MAX_ANCHOR_SETS) this.dropUnusedAnchors();
+    this.anchors.endFrame(this.index);
     const viewport = { minX: 0, minY: 0, maxX: view.widthPx, maxY: view.heightPx };
     const { placed } = placeSymbols(candidates, viewport);
     const opacities = this.fader.update(nowMs, placed);
@@ -196,21 +187,6 @@ export class LabelPlacer {
     return { quads: this.quads.result(), animating };
   }
 
-  /**
-   * Forgets the anchors of the tiles this frame did not read, and their labels in the cross-tile index: they hold the
-   * tiles' line geometry, which would otherwise stay for the session.
-   */
-  private dropUnusedAnchors(): void {
-    const usedTiles = new Set<string>();
-    for (const key of this.usedAnchors) usedTiles.add(key.slice(0, key.lastIndexOf('|')));
-    for (const key of [...this.anchors.keys()]) {
-      if (this.usedAnchors.has(key)) continue;
-      this.anchors.delete(key);
-      const tile = key.slice(0, key.lastIndexOf('|'));
-      if (!usedTiles.has(tile)) this.index.removeTile(tile);
-    }
-  }
-
   private shaping(source: LabelSource, label: number, zoom: number, onLine: boolean): Shaping | undefined {
     const { layer, bucket } = source;
     const l = bucket.labels?.[label];
@@ -232,7 +208,6 @@ export class LabelPlacer {
 
   private anchorsOf(source: LabelSource): LabelAnchor[] | undefined {
     const key = `${source.tile.z}/${source.tile.x}/${source.tile.y}|${source.layer.id}|${source.version}`;
-    this.usedAnchors.add(key);
     let list = this.anchors.get(key);
     if (list !== undefined) return list;
     let ready = true;

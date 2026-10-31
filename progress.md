@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-10-31: code review for bugs, less code and weak devices (owner's request)
+
+The owner asked for every package to be reviewed for bugs and dead weight, and for the engine to run on weak
+machines. Four reviews in fresh contexts covered core, renderer and controls, layers and sources, and the other
+packages; each finding was checked against its callers and fixed with a failing regression test first. 35 bugs are
+fixed (KB-246 to KB-280), among them: imagery layers swapped at runtime overflowing their texture handles after about
+510 swaps; an offline-mode miss stopping every tile beyond the pinned base; empty 204 answers taken for corrupt tiles;
+data layers drawn in build order instead of their own; vector meshes, anti-aliasing passes, model textures and late
+IndexedDB connections never freed; a drag stuck after a lost pointer capture; labels past the 1024th hidden in their
+first pass; a worker cluster index dead after a detach; GeoTIFF tag and DEFLATE bombs; captive portal pages stored in
+packages. For weak devices: adaptive quality now recovers on 60 Hz screens, adapts under 4 fps and caps each preset's
+pixels per CSS pixel (ADR 0122 amendment); the sky is drawn after the globe's tiles, so it no longer ray-marches under
+them; queued tiles are dropped from the queue alone instead of a scan of every tile the session ever saw; label caches
+and GeoJSON tiling no longer grow or cost quadratically; WebGL2's vertex array cleanup no longer splits every key.
+Less code: dead members of the priority heap, the upload queue, the network pool (per-host rates, unclaimed results)
+and the controls (a rotation switch always on) are gone, the surface draw state holds its nine textures in one array,
+and the Vue and web component adapters share one click watcher. The core's main entry is 64.79 KB, the renderer's
+40.32 KB. Items needing more than a small fix are listed in `docs/follow-ups.md`.
+
 ## 2026-10-31: day and night like a map application, and a clearer globe from afar (targeted owner request)
 
 From an application's report (F647). `AtmosphereSettings.dayNight` (0 to 1) dims and tints the side away from the Sun

@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-31: the open questions answered, and a lighter first download for the playground (owner's request)
+
+The owner asked the agent to answer the questions still open itself and do what follows (ADR 0183). Most needed no
+change: the licensing texts are the standard ones, the Google key and Terrascope stay out, a release pushes to `main`
+as built, the orthophoto rules stand, KB-219 is closed as fixed, and the agent's earlier decisions are confirmed. Open
+question 37 took option (b): fog-aware detail must request fewer tiles whose center lies in full fog (6 against 73 on
+WebGL2, 8 against 76 on WebGPU), the total only logged, which ends KB-230's CI failures; F574 is superseded by F657.
+The playground's page loaded the Europe preset, the Mont Blanc builds, a consumer's adapters and the render experiment
+on every visit; they now load only on the pages that use them, and the first download fell from 153 KB to 104 KB gzip.
+
 ## 2026-10-31: a second look at the code added since the review (owner's request)
 
 The changes merged since the code review (#80 to #83) were read again for waste on weak machines. Two per-frame costs

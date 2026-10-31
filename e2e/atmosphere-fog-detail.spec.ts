@@ -1,8 +1,10 @@
-// Fog-aware detail (F574, which replaced F395 by the owner's decision of 2026-10-24, ADR 0046): the same tilted flight
-// with the fog drawn, once loading coarser tiles where the fog hides the ground and once at full detail
-// (`QualitySettings.fogAwareDetail`). Every tile request of the fog-aware run is recorded with the eye of its frame: none
-// is a tile whose parent lies entirely inside full fog (the selection never refines such a tile). The fog-aware run
-// requests fewer tiles, the fogged band near the horizon looks the same, and neither run has a black or empty pixel.
+// Fog-aware detail (F657, which replaced F574 by the decision on open question 37, ADR 0183; F574 had replaced F395,
+// ADR 0046): the same tilted flight with the fog drawn, once loading coarser tiles where the fog hides the ground and
+// once at full detail (`QualitySettings.fogAwareDetail`). Every tile request of both runs is recorded with the eye of
+// its frame: none of the fog-aware run is a tile whose parent lies entirely inside full fog (the selection never refines
+// such a tile), and it requests fewer tiles whose center lies in full fog. The fogged band near the horizon looks the
+// same, and neither run has a black or empty pixel. The total count is logged only: it follows how many tiles arrive
+// while a slow runner draws each frame, not the fog (KB-230).
 import { expect, test, type Page } from '@playwright/test';
 import { surfaceVisibility } from '@vibeglobe/core';
 import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
@@ -60,6 +62,13 @@ function visibility(eye: [number, number, number], point: [number, number, numbe
     },
     HAZE,
   );
+}
+
+/** Whether the ground at a tile's center lies in full fog seen from `eye`: the fog hides most of the tile. */
+function centerFogged(level: number, x: number, y: number, eye: Eye): boolean {
+  const b = bounds(level, x, y);
+  const center = ecef((b.west + b.east) / 2, (b.south + b.north) / 2, 0);
+  return visibility(ecef(eye.lon * DEG, eye.lat * DEG, eye.altitudeMeters), center) < FULL_FOG;
 }
 
 /** The bounds of a Web Mercator tile, radians. */
@@ -184,6 +193,8 @@ for (const backend of ['webgpu', 'webgl2'] as const)
     const fullInFog = full.requests.filter(
       (r) => r.level > 0 && entirelyFogged(r.level - 1, r.x >> 1, r.y >> 1, r.eye),
     );
+    // Requests of tiles the fog hides for the most part: where fog-aware detail saves its requests.
+    const fogged = (run: Run): number => run.requests.filter((r) => centerFogged(r.level, r.x, r.y, r.eye)).length;
     // The fogged band: the rows between the horizon's sky and the near ground, the upper third of the frame.
     let difference = 0;
     let count = 0;
@@ -197,13 +208,15 @@ for (const backend of ['webgpu', 'webgl2'] as const)
     console.log(
       `[fog-detail] ${backend}: ${aware.requested} vs ${full.requested} tiles requested (${(saved * 100).toFixed(1)}% fewer), ` +
         `${aware.requests.length} requests recorded, inside full fog ${inFog.length} (${inFog.map((r) => `${r.level}/${r.x}/${r.y} p${r.priority}`).join(' ')}; full detail ${fullInFog.length}), ` +
+        `${fogged(aware)} vs ${fogged(full)} tiles mostly in fog, ` +
         `GPU ${aware.gpuBytes} vs ${full.gpuBytes} bytes, fogged band mean difference ${(difference / count).toFixed(2)}`,
     );
     // The record covers the run's requests, and the full-detail run shows the check finds fogged requests.
     expect(aware.requests.length).toBeGreaterThan(aware.requested * 0.9);
+    expect(full.requests.length).toBeGreaterThan(full.requested * 0.9);
     expect(fullInFog.length).toBeGreaterThan(0);
     expect(inFog.map((r) => `${r.level}/${r.x}/${r.y}`)).toEqual([]);
-    expect(saved).toBeGreaterThan(0);
+    expect(fogged(aware)).toBeLessThan(fogged(full));
     expect(difference / count).toBeLessThan(2);
     expect([aware.holes, aware.dark, full.holes, full.dark]).toEqual([0, 0, 0, 0]);
   });

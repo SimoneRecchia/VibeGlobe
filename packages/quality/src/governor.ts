@@ -14,11 +14,18 @@ export interface GovernorOptions {
   readonly reactionMs?: number;
   /** How long the median must stay under the raise threshold before raising one step (default 3000). */
   readonly stableMs?: number;
+  /**
+   * How long frames must hold the target (median within 5 % over it) before a raise is tried anyway (default 12000): a
+   * 60 Hz screen never draws faster than the 60 fps target, so the raise threshold alone would keep quality lowered
+   * for good after one slow spell. A tried raise that makes frames slow is undone and backs off like any other.
+   */
+  readonly probeMs?: number;
   /** Shortest time between two changes of level, in either direction (default 2000). */
   readonly minChangeIntervalMs?: number;
   /**
-   * A gap between frames longer than this (the engine idled, the tab was hidden) restarts the measurement instead of
-   * counting as a slow frame (default 250).
+   * A gap between frames longer than this (the tab was hidden) restarts the measurement instead of counting as a slow
+   * frame (default 2000): long enough that a weak device drawing 1 to 4 frames a second is measured and adapts. The
+   * engine idling restarts it too ({@link FrameTimeGovernor.idle}).
    */
   readonly idleGapMs?: number;
 }
@@ -31,8 +38,9 @@ export const GOVERNOR_DEFAULTS: Readonly<Required<GovernorOptions>> = Object.fre
   raiseBelow: 0.75,
   reactionMs: 500,
   stableMs: 3000,
+  probeMs: 12_000,
   minChangeIntervalMs: 2000,
-  idleGapMs: 250,
+  idleGapMs: 2000,
 });
 
 /** A change of level the governor decided. */
@@ -60,6 +68,7 @@ export class FrameTimeGovernor {
   private lastFrameAtMs: number | undefined;
   private overSinceMs: number | undefined;
   private underSinceMs: number | undefined;
+  private holdingSinceMs: number | undefined;
   private lastChangeAtMs = -Infinity;
   private lastRaiseAtMs = -Infinity;
   /** The level the last raise left, until another lowering: lowering back to it undoes the raise. */
@@ -94,12 +103,18 @@ export class FrameTimeGovernor {
     if (nowMs !== undefined) this.lastChangeAtMs = nowMs;
   }
 
+  /** The engine stopped drawing because nothing changes: the next frame after it is no slow frame. */
+  idle(): void {
+    this.restart();
+  }
+
   private restart(): void {
     this.count = 0;
     this.next = 0;
     this.lastFrameAtMs = undefined;
     this.overSinceMs = undefined;
     this.underSinceMs = undefined;
+    this.holdingSinceMs = undefined;
   }
 
   /** The median of the window, or NaN before it is full. */
@@ -139,15 +154,19 @@ export class FrameTimeGovernor {
     const { targetFrameMs, lowerAbove, raiseBelow, reactionMs, minChangeIntervalMs } = this.options;
     const over = median > targetFrameMs * lowerAbove;
     const under = median < targetFrameMs * raiseBelow;
+    const holding = median <= targetFrameMs * 1.05;
     this.overSinceMs = over ? (this.overSinceMs ?? nowMs) : undefined;
     this.underSinceMs = under ? (this.underSinceMs ?? nowMs) : undefined;
+    this.holdingSinceMs = holding ? (this.holdingSinceMs ?? nowMs) : undefined;
     if (nowMs - this.lastChangeAtMs < minChangeIntervalMs) return undefined;
     if (over && this.currentLevel < this.levels - 1 && nowMs - (this.overSinceMs ?? nowMs) >= reactionMs) {
       if (this.raisedFrom === this.currentLevel + 1) this.raiseBackoff = Math.min(this.raiseBackoff * 2, 8);
       this.raisedFrom = undefined;
       return this.change(this.currentLevel + 1, 'lower', median, nowMs);
     }
-    if (under && this.currentLevel > 0 && nowMs - (this.underSinceMs ?? nowMs) >= this.raiseWaitMs) {
+    const stable = under && nowMs - (this.underSinceMs ?? nowMs) >= this.raiseWaitMs;
+    const probe = holding && nowMs - (this.holdingSinceMs ?? nowMs) >= this.options.probeMs * this.raiseBackoff;
+    if ((stable || probe) && this.currentLevel > 0) {
       this.lastRaiseAtMs = nowMs;
       this.raisedFrom = this.currentLevel;
       return this.change(this.currentLevel - 1, 'raise', median, nowMs);

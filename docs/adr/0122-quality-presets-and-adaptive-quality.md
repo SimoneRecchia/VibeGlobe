@@ -52,3 +52,16 @@ Option 2, in `@vibeglobe/quality`:
 - Verified in Node by `governor.test.ts` (reaction, step-by-step recovery, a 5-minute load hovering at the
   threshold, backoff), `startup.test.ts` (emulated and reference profiles), `quality.test.ts` (runtime switching,
   override, adaptation through the resolution scale) and in Chromium by `e2e/quality.spec.ts`.
+
+## Amendment 2026-10-31: weak devices and 60 Hz screens
+
+Found in the code review of 2026-10-31. Two cases the governor above could not handle:
+
+- **A 60 Hz screen never raised quality again.** The display never draws faster than the 60 fps target, so the
+  median never got under target × 0.75 and one slow spell (tiles arriving) left quality lowered for the session. The
+  governor now also tries a raise once frames hold the target (median at most 5 % over it) for `probeMs` (12 s). A
+  tried raise that makes frames slow is undone, and the undo doubles the next try's wait like any other (up to 8×), so
+  a device at its limit tries at most every 96 s.
+- **A device drawing under 4 frames a second never adapted.** Every frame was longer than the 250 ms gap that restarts
+  the measurement, so the window never filled. The gap is now 2 s, and the controller also restarts the measurement on
+  the engine's `idle` event, which tells it when the engine stopped drawing on purpose.

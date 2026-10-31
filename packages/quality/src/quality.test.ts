@@ -18,7 +18,9 @@ function fakeGlobe(capabilities: QualityTarget['capabilities'], withHook = true)
   const state = { clockMs: 0, scales: [] as number[], settings: [] as AppliedQualitySettings[], renders: 0 };
   const target: QualityTarget = {
     capabilities,
-    on: (_event, handler) => {
+    on: (event, handler) => {
+      // Frames only: the stand-in never idles.
+      if (event !== 'frame') return () => undefined;
       const h = (): void => handler({ frameNumber: 0 });
       handlers.add(h);
       return () => handlers.delete(h);

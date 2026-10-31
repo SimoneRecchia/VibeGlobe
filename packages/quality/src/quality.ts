@@ -22,7 +22,7 @@ export interface AppliedQualitySettings extends QualitySettings {
  */
 export interface QualityTarget {
   readonly capabilities: CapabilityProfile | undefined;
-  on(event: 'frame', handler: (payload: { readonly frameNumber: number }) => void): () => void;
+  on(event: 'frame' | 'idle', handler: (payload: { readonly frameNumber: number }) => void): () => void;
   setResolutionScale(scale: number): void;
   requestRender(): void;
   setQualitySettings?(settings: AppliedQualitySettings): void;
@@ -98,7 +98,7 @@ class Quality implements QualityController {
   private ladder: QualitySettings[];
   private governor: FrameTimeGovernor;
   private readonly handlers = new Set<(change: QualityChange) => void>();
-  private readonly unsubscribe: () => void;
+  private readonly unsubscribe: (() => void)[];
   private readonly now: () => number;
   private readonly governorOptions: GovernorOptions;
 
@@ -113,11 +113,14 @@ class Quality implements QualityController {
     this.ladder = adaptiveLadder(QUALITY_PRESETS[this.preset]);
     this.governor = new FrameTimeGovernor(this.ladder.length, this.governorOptions);
     this.settings = resolve(QUALITY_PRESETS[this.preset], target.capabilities);
-    this.unsubscribe = target.on('frame', () => {
-      if (!this.adaptive) return;
-      const decision = this.governor.frame(this.now());
-      if (decision) this.apply(decision.level, decision.direction);
-    });
+    this.unsubscribe = [
+      target.on('frame', () => {
+        if (!this.adaptive) return;
+        const decision = this.governor.frame(this.now());
+        if (decision) this.apply(decision.level, decision.direction);
+      }),
+      target.on('idle', () => this.governor.idle()),
+    ];
     this.apply(0, 'start');
   }
 
@@ -158,7 +161,7 @@ class Quality implements QualityController {
   }
 
   destroy(): void {
-    this.unsubscribe();
+    for (const stop of this.unsubscribe) stop();
     this.handlers.clear();
   }
 }

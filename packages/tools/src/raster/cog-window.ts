@@ -7,6 +7,7 @@
  * absent (no data).
  */
 import type { BBoxDeg } from '../tiles/mercator.js';
+import { TIFF_TYPE_SIZES } from '@vibeglobe/core/decoders';
 
 /** Bytes read with the first request; COG headers (every IFD, before the image data) fit in it. */
 const HEADER_BYTES = 1 << 20;
@@ -19,8 +20,6 @@ interface Entry {
   count: number;
   value: Uint8Array;
 }
-
-const SIZES: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8 };
 
 async function range(fetchImpl: Fetch, url: string, start: number, length: number): Promise<Uint8Array> {
   const response = await fetchImpl(url, { headers: { range: `bytes=${start}-${start + length - 1}` } });
@@ -56,7 +55,7 @@ function parseIfds(header: Uint8Array): Map<number, Entry>[] {
 
 /** The values of an entry (numbers), read from the header or with one more range request. */
 async function values(entry: Entry, header: Uint8Array, fetchImpl: Fetch, url: string): Promise<number[]> {
-  const size = SIZES[entry.type] ?? 1;
+  const size = TIFF_TYPE_SIZES[entry.type] ?? 1;
   const bytes = entry.count * size;
   const offset = new DataView(entry.value.buffer, entry.value.byteOffset, 4).getUint32(0, true);
   const data =
@@ -89,7 +88,7 @@ export function writeTiledTiff(tags: Tag[], tiles: (Uint8Array | undefined)[]): 
   );
   const ifdBytes = 2 + all.length * 12 + 4;
   const extraBytes = all.reduce((n, [, type, vals]) => {
-    const size = vals.length * (SIZES[type] ?? 1);
+    const size = vals.length * (TIFF_TYPE_SIZES[type] ?? 1);
     return n + (size > 4 ? size + (size % 2) : 0);
   }, 0);
   let dataAt = 8 + ifdBytes + extraBytes;
@@ -109,7 +108,7 @@ export function writeTiledTiff(tags: Tag[], tiles: (Uint8Array | undefined)[]): 
   all.forEach(([tag, type, vals], i) => {
     const written = tag === 324 ? offsets : vals;
     const e = 10 + i * 12;
-    const size = SIZES[type] ?? 1;
+    const size = TIFF_TYPE_SIZES[type] ?? 1;
     view.setUint16(e, tag, true);
     view.setUint16(e + 2, type, true);
     view.setUint32(e + 4, written.length, true);

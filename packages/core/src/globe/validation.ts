@@ -182,18 +182,9 @@ const TERRAIN_DECODERS: readonly string[] = ['terrarium', 'terrain-rgb', 'quanti
  */
 function validateTerrain(terrain: unknown, workers: unknown): void {
   if (terrain === undefined) return;
-  const source = terrain as Partial<Record<string, unknown>> | null;
-  if (
-    source === null ||
-    typeof source !== 'object' ||
-    typeof source['id'] !== 'string' ||
-    typeof source['request'] !== 'function' ||
-    typeof source['transport'] !== 'object' ||
-    typeof source['tiling'] !== 'object' ||
-    typeof source['geometricErrorMeters'] !== 'function'
-  ) {
+  const source = terrain as Partial<Record<string, unknown>>;
+  if (!isImagerySource(terrain) || typeof source['geometricErrorMeters'] !== 'function')
     throw new GlobeError('invalid-option', `terrain must be a terrain source, got ${describeInput(terrain)}`);
-  }
   const id = source['id'];
   const decoder = source['decoder'] as Partial<Record<string, unknown>> | null | undefined;
   if (typeof decoder !== 'object' || decoder === null || !TERRAIN_DECODERS.includes(decoder['kind'] as string))
@@ -244,13 +235,6 @@ export function validateHandler(event: unknown, handler: unknown): void {
   }
 }
 
-/** Throws a typed GlobeError naming `name` unless `value` is a finite number. */
-function requireFinite(name: string, value: unknown): void {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new GlobeError('invalid-coordinate', `${name} must be a finite number, got ${describeInput(value)}`);
-  }
-}
-
 /** Validates a WGS84 position given to a query; throws a typed GlobeError. */
 export function validatePosition(position: unknown): void {
   if (position === null || typeof position !== 'object') {
@@ -259,10 +243,10 @@ export function validatePosition(position: unknown): void {
   // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144). The checks
   // are inline: a double passed to a call the compiler does not inline is boxed, which a loaded machine shows.
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  if (typeof longitudeDeg !== 'number' || !Number.isFinite(longitudeDeg)) requireFinite('longitudeDeg', longitudeDeg);
-  if (typeof latitudeDeg !== 'number' || !Number.isFinite(latitudeDeg)) requireFinite('latitudeDeg', latitudeDeg);
+  if (typeof longitudeDeg !== 'number' || !Number.isFinite(longitudeDeg)) finite(longitudeDeg, 'longitudeDeg');
+  if (typeof latitudeDeg !== 'number' || !Number.isFinite(latitudeDeg)) finite(latitudeDeg, 'latitudeDeg');
   if (heightMeters != null && (typeof heightMeters !== 'number' || !Number.isFinite(heightMeters)))
-    requireFinite('heightMeters', heightMeters);
+    finite(heightMeters, 'heightMeters');
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',

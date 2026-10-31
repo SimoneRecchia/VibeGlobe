@@ -244,3 +244,17 @@ export type {
   ModelSetJoint,
   ModelSetOptions,
 } from './layers/models.js';
+export type {
+  AtlasRect,
+  LabelQuads,
+  RasterImage,
+  RasterizedGlyph,
+  VectorAtlas,
+  VectorDraw,
+  VectorLayerDraws,
+  VectorMesh,
+  VectorMeshData,
+  VectorMeshKind,
+  VectorMeshUpdate,
+  VectorTileTarget,
+} from './layers/vector-tile-target.js';

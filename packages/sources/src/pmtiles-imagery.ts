@@ -1,12 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import {
-  type TerrainSource,
-  WEB_MERCATOR_TILING,
-  type TileCoord,
-  type TileRectangleRad,
-  type TileRequest,
-} from '@vibeglobe/core';
+import type { TerrainSource } from '@vibeglobe/core';
 import { PMTiles, TileType, type Header, type RangeResponse, type Source } from 'pmtiles';
 import { archiveTransport, fetchRange, HttpStatusError, NetworkError, tileOfUrl } from './archive-transport.js';
 import {
@@ -17,9 +11,11 @@ import {
   type ProviderProfile,
   SourceConfigError,
 } from './metadata.js';
-import { coverageOf, inLevelsAndCoverage } from './tiling.js';
+import { coverageOf } from './tiling.js';
 import {
+  archiveImagery,
   type ArchiveTerrainOptions,
+  htmlAttribution,
   terrainFromArchive,
   vectorFromArchive,
   type VectorTileSource,
@@ -72,15 +68,6 @@ function byteSource(options: PmtilesImageryOptions, init: RequestInit): Source {
       data: await fetchRange(fetchImpl, archive, offset, length, signal ? { ...init, signal } : init),
     }),
   };
-}
-
-/** The attribution recorded in the archive's JSON metadata (`attribution`, possibly HTML with a link). */
-function recordedAttribution(metadata: unknown): Attribution[] {
-  const raw = (metadata as { attribution?: unknown } | null)?.attribution;
-  if (typeof raw !== 'string' || raw.length === 0) return [];
-  const link = /href="([^"]+)"/.exec(raw)?.[1];
-  const text = raw.replace(/<[^>]*>/g, '').trim();
-  return text.length === 0 ? [] : [link === undefined ? { text } : { text, url: link }];
 }
 
 /** What an archive may hold: raster images for imagery, anything for terrain and vector tiles (F328). */
@@ -138,42 +125,30 @@ export async function pmtilesArchive(
     metadata = undefined;
   }
   const contentType = CONTENT_TYPES[header.tileType] ?? 'application/octet-stream';
-  const coverage = coverageOf(header.minLon, header.minLat, header.maxLon, header.maxLat);
-  const base = typeof options.archive === 'string' ? options.archive : `blob-archive://${options.id}`;
-  const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
-  const source: DescribedImagerySource = {
-    id: options.id,
-    tiling: WEB_MERCATOR_TILING,
-    minLevel: header.minZoom,
-    maxLevel: header.maxZoom,
-    tileSizePx: 256,
-    pixelRatio: 1,
-    ...(coverage ? { coverage: [coverage] } : {}),
-    decoder: 'image',
-    maxRequestsPerHost: options.maxRequestsPerHost ?? 6,
-    attribution: options.attribution ?? recordedAttribution(metadata),
-    profile: options.profile ?? CUSTOM_PROFILE,
-    transportRequired: true,
-    transport: archiveTransport(async (url, signal) => {
-      const tile = tileOfUrl(url);
-      if (!tile) return undefined;
-      try {
-        const found = await archive.getZxy(tile.z, tile.x, tile.y, signal);
-        return found ? { bytes: found.data, contentType } : undefined;
-      } catch (error) {
-        // The library caches failed directory reads: start over so a retry after a server error can succeed.
-        if (error instanceof HttpStatusError || error instanceof NetworkError) archive = new PMTiles(bytes);
-        throw error;
-      }
-    }),
-    request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
-      if (!inLevelsAndCoverage(source, coord, extent)) return 'noData';
-      out.url = `${base}#${coord.level}/${coord.x}/${coord.y}`;
-      out.hostIndex = 0;
-      return out;
+  return archiveImagery(
+    {
+      id: options.id,
+      minLevel: header.minZoom,
+      maxLevel: header.maxZoom,
+      coverage: coverageOf(header.minLon, header.minLat, header.maxLon, header.maxLat),
+      maxRequestsPerHost: options.maxRequestsPerHost ?? 6,
+      attribution: options.attribution ?? htmlAttribution((metadata as { attribution?: unknown } | null)?.attribution),
+      profile: options.profile ?? CUSTOM_PROFILE,
+      transport: archiveTransport(async (url, signal) => {
+        const tile = tileOfUrl(url);
+        if (!tile) return undefined;
+        try {
+          const found = await archive.getZxy(tile.z, tile.x, tile.y, signal);
+          return found ? { bytes: found.data, contentType } : undefined;
+        } catch (error) {
+          // The library caches failed directory reads: start over so a retry after a server error can succeed.
+          if (error instanceof HttpStatusError || error instanceof NetworkError) archive = new PMTiles(bytes);
+          throw error;
+        }
+      }),
     },
-  };
-  return source;
+    typeof options.archive === 'string' ? options.archive : `blob-archive://${options.id}`,
+  );
 }
 
 /** Terrain tiles (Terrarium, Terrain-RGB or quantized-mesh) from a PMTiles archive (F328). */

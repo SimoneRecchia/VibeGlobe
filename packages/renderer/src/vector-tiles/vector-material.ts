@@ -42,9 +42,9 @@ import {
   type Texture,
 } from 'three/webgpu';
 import { morphedEyeRelative, writeFragmentDepth } from '../eye-relative.js';
+import type { VectorMeshKind } from '@vibeglobe/core';
 
-/** What a vector tile mesh draws. */
-export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle' | 'raster';
+export type { VectorMeshKind };
 
 /** Per-draw values, kept in `object.userData.vectorDraw` and read per object by the materials. */
 export interface VectorDrawUniforms {
@@ -115,17 +115,17 @@ export function createUniforms(): Uniforms {
  * endpoint from its Mercator offsets. Ground heights scale with the relief factor (as the terrain does); heights above
  * the ground (buildings) do not, and scale by k(φ) on the plane (F458).
  */
-export function placed(
+function placed(
   offset: Node<'vec3'>,
   normal: Node<'vec3'>,
   plane: Node<'vec4'>,
-  ground: Node<'float'>,
   above: Node<'float'>,
   u: Uniforms,
   pull: number,
 ): Node<'vec3'> {
   const sigma = u.morphParams.z;
-  const height = ground.mul(u.morphParams.y).add(above);
+  // On the terrain under the vertex (draping) as the relief draws it.
+  const height = attribute('vtGround', 'float').mul(u.morphParams.y).add(above);
   const globe = offset.add(normal.mul(height));
   const planeLocal = vec3(plane.x.mul(sigma), plane.y.mul(sigma), height.mul(plane.w).mul(sigma));
   return morphedEyeRelative(globe, u.morphAxes.mul(planeLocal), u.morphParams.x).mul(1 - pull);
@@ -174,9 +174,9 @@ export function finish(
   return material;
 }
 
-/** The terrain height under the vertex (draping). */
-export function ground(): Node<'float'> {
-  return attribute('vtGround', 'float');
+/** {@link placed} for a tile mesh's own vertex: its position, normal and plane attributes. */
+export function tilePlaced(u: Uniforms, pull: number, above: Node<'float'> = float(0)): Node<'vec3'> {
+  return placed(positionGeometry, attribute('tileNormal', 'vec3'), attribute('tilePlane', 'vec4'), above, u, pull);
 }
 
 /** The sprite atlas fills read their patterns from (F445): the texture and its size in texels. */
@@ -203,15 +203,7 @@ function patternColor(u: Uniforms, atlas: PatternAtlas): Node<'vec4'> {
 }
 
 function fillMaterial(u: Uniforms, depthPath: DepthPath, atlas?: PatternAtlas): MeshBasicNodeMaterial {
-  const here = placed(
-    positionGeometry,
-    attribute('tileNormal', 'vec3'),
-    attribute('tilePlane', 'vec4'),
-    ground(),
-    float(0),
-    u,
-    DEPTH_PULL,
-  );
+  const here = tilePlaced(u, DEPTH_PULL);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const material = new MeshBasicNodeMaterial();
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
@@ -226,13 +218,11 @@ function fillMaterial(u: Uniforms, depthPath: DepthPath, atlas?: PatternAtlas): 
 }
 
 function lineMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial {
-  const normal = attribute('tileNormal', 'vec3');
-  const here = placed(positionGeometry, normal, attribute('tilePlane', 'vec4'), ground(), float(0), u, DEPTH_PULL);
+  const here = tilePlaced(u, DEPTH_PULL);
   const side = placed(
     attribute('vtSidePosition', 'vec3'),
     attribute('vtSideNormal', 'vec3'),
     attribute('vtSidePlane', 'vec4'),
-    ground(),
     float(0),
     u,
     DEPTH_PULL,
@@ -283,15 +273,7 @@ function dashMask(u: Uniforms, distanceUnits: Node<'float'>, halfWidth: Node<'fl
 function extrusionMaterial(u: Uniforms, depthPath: DepthPath, solid: boolean): MeshBasicNodeMaterial {
   // Buildings grow from the ground as their layer fades in (F457): the layer's height scale.
   const above = attribute('vtHeight', 'float').mul(u.layer.z);
-  const here = placed(
-    positionGeometry,
-    attribute('tileNormal', 'vec3'),
-    attribute('tilePlane', 'vec4'),
-    ground(),
-    above,
-    u,
-    0,
-  );
+  const here = tilePlaced(u, 0, above);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const material = new MeshBasicNodeMaterial();
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
@@ -314,15 +296,7 @@ function extrusionMaterial(u: Uniforms, depthPath: DepthPath, solid: boolean): M
 }
 
 function circleMaterial(u: Uniforms, depthPath: DepthPath): MeshBasicNodeMaterial {
-  const here = placed(
-    positionGeometry,
-    attribute('tileNormal', 'vec3'),
-    attribute('tilePlane', 'vec4'),
-    ground(),
-    float(0),
-    u,
-    CIRCLE_DEPTH_PULL,
-  );
+  const here = tilePlaced(u, CIRCLE_DEPTH_PULL);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const clip = cameraProjectionMatrix.mul(viewPosition).toVar();
   const corner = attribute('vtCorner', 'vec2');

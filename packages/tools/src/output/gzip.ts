@@ -1,8 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** Deterministic gzip: a fixed header (mtime 0, OS byte 255) around raw DEFLATE, the same on every platform. */
-import { deflateRawSync, gunzipSync } from 'node:zlib';
-import { crc32 } from '../encode/png.js';
+import { crc32, deflateRawSync, gunzipSync } from 'node:zlib';
 
 /** Gzips bytes deterministically. */
 export function gzip(bytes: Uint8Array): Uint8Array {

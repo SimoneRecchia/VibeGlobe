@@ -7,7 +7,7 @@
  * code of the GeoKeys. Every byte is untrusted: sizes are bounded, and anything malformed throws an `Error`.
  */
 import { unzlibSync } from 'fflate';
-import { decodeLzw } from './lzw.js';
+import { decodeLzw, readTiffValue, TIFF_TYPE_SIZES } from '@vibeglobe/core/decoders';
 
 /** A decoded 8-bit raster with its georeference: box in the units of its system, west, south, east, north. */
 export interface TiffRaster {
@@ -27,42 +27,6 @@ const MAX_BYTES = 512 * 1024 * 1024;
 const MAX_TAGS = 4096;
 const MAX_VALUES = 1 << 20;
 
-const TYPE_SIZES: Readonly<Record<number, number>> = {
-  1: 1,
-  2: 1,
-  3: 2,
-  4: 4,
-  5: 8,
-  6: 1,
-  7: 1,
-  8: 2,
-  9: 4,
-  10: 8,
-  11: 4,
-  12: 8,
-};
-
-function readValue(view: DataView, type: number, offset: number, little: boolean): number {
-  switch (type) {
-    case 3:
-      return view.getUint16(offset, little);
-    case 4:
-      return view.getUint32(offset, little);
-    case 8:
-      return view.getInt16(offset, little);
-    case 9:
-      return view.getInt32(offset, little);
-    case 11:
-      return view.getFloat32(offset, little);
-    case 12:
-      return view.getFloat64(offset, little);
-    case 5:
-      return view.getUint32(offset, little) / view.getUint32(offset + 4, little);
-    default:
-      return view.getUint8(offset);
-  }
-}
-
 function readTags(view: DataView, little: boolean): Tags {
   const first = view.getUint32(4, little);
   const count = view.getUint16(first, little);
@@ -78,10 +42,10 @@ function readTags(view: DataView, little: boolean): Tags {
     if (type === 2) continue;
     values += n;
     if (values > MAX_VALUES) throw new Error(`tag ${String(tag)} brings the tags to too many values`);
-    const size = (TYPE_SIZES[type] ?? 1) * n;
+    const size = (TIFF_TYPE_SIZES[type] ?? 1) * n;
     const at = size <= 4 ? entry + 8 : view.getUint32(entry + 8, little);
     const read: number[] = [];
-    for (let k = 0; k < n; k++) read.push(readValue(view, type, at + k * (TYPE_SIZES[type] ?? 1), little));
+    for (let k = 0; k < n; k++) read.push(readTiffValue(view, type, at + k * (TIFF_TYPE_SIZES[type] ?? 1), little));
     tags.set(tag, read);
   }
   return tags;

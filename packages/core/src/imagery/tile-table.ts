@@ -4,6 +4,7 @@ import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import type { Attribution } from './credits.js';
 import { NO_SLOT } from '../scheduler/network-pool.js';
 import { MAX_TILE_LEVEL, packTileKey, type TileCoord } from '../tiling/tile-key.js';
+import { grownArray } from '../collections/typed-arrays.js';
 
 /** Not wanted, or wanted and not yet queued (M3 plan §3's tile states). */
 export const UNLOADED = 0;
@@ -128,9 +129,9 @@ export class TileTable {
     this.bySlot.push(record);
     this.records.set(packTileKey(record.coord, this.rootTilesX, 1), record);
     if (slot >= this.priorities.length) {
-      this.priorities = grown(this.priorities);
-      this.eligibleAt = grown(this.eligibleAt);
-      this.wantedSince = grown(this.wantedSince);
+      this.priorities = grownArray(this.priorities, this.priorities.length * 2);
+      this.eligibleAt = grownArray(this.eligibleAt, this.eligibleAt.length * 2);
+      this.wantedSince = grownArray(this.wantedSince, this.wantedSince.length * 2);
     }
     return record;
   }
@@ -139,9 +140,3 @@ export class TileTable {
 /** 2^level and 4^level by level, for {@link TileTable.findInside}. */
 const POWERS_OF_TWO = Float64Array.from({ length: MAX_TILE_LEVEL + 1 }, (_, level) => 2 ** level);
 const POWERS_OF_FOUR = Float64Array.from({ length: MAX_TILE_LEVEL + 1 }, (_, level) => 4 ** level);
-
-function grown(array: Float64Array<ArrayBuffer>): Float64Array<ArrayBuffer> {
-  const next = new Float64Array(array.length * 2);
-  next.set(array);
-  return next;
-}

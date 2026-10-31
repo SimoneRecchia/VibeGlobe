@@ -112,27 +112,22 @@ export function applyView(camera: Camera, view: ValidView, keepRange = false): v
     return;
   }
   const groundZoom = groundZoomFromMercatorZoom(view.zoom, pose.targetLatitudeRad);
-  pose.rangeMeters = clampRange(camera, rangeForGroundZoom(groundZoom, camera.heightPx, camera.fovYRad));
-}
-
-/** Clamps a range so the eye stays at least {@link MIN_EYE_HEIGHT_METERS} above the ellipsoid. */
-function clampRange(camera: Camera, rangeMeters: number): number {
-  // No floor on the cosine beyond rounding: at the steepest allowed tilt (89°) the range must reach about 29 m (KB-015).
-  const cosTilt = Math.max(Math.cos(camera.pose.tiltRad), 1e-9);
-  // A micrometer of margin keeps float rounding from ever reporting the eye below the minimum.
-  const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - Math.min(camera.pose.targetHeightMeters, 0)) / cosTilt;
-  return Math.min(MAX_RANGE_METERS, Math.max(minimum, rangeMeters));
+  pose.rangeMeters = rangeForGroundZoom(groundZoom, camera.heightPx, camera.fovYRad);
+  clampPoseRange(camera);
 }
 
 /**
- * {@link clampRange} applied to the pose's own range, for per-frame code: the range never crosses a call boundary as
- * an argument, and no Math.max or Math.min call boxes it (ADR 0018).
+ * Clamps the pose's range so the eye stays at least {@link MIN_EYE_HEIGHT_METERS} above the ellipsoid, for per-frame
+ * code too: the range never crosses a call boundary as an argument, and no Math.max or Math.min call boxes it (ADR
+ * 0018).
  */
 export function clampPoseRange(camera: Camera): void {
   const pose = camera.pose;
   const cos = Math.cos(pose.tiltRad);
+  // No floor on the cosine beyond rounding: at the steepest allowed tilt (89°) the range must reach about 29 m (KB-015).
   const cosTilt = cos > 1e-9 ? cos : 1e-9;
   const below = pose.targetHeightMeters < 0 ? pose.targetHeightMeters : 0;
+  // A micrometer of margin keeps float rounding from ever reporting the eye below the minimum.
   const minimum = (MIN_EYE_HEIGHT_METERS + 1e-6 - below) / cosTilt;
   const range = pose.rangeMeters;
   pose.rangeMeters = range < minimum ? minimum : range > MAX_RANGE_METERS ? MAX_RANGE_METERS : range;
@@ -140,14 +135,8 @@ export function clampPoseRange(camera: Camera): void {
 
 /** The current view as validated fields, the base for partial updates. */
 export function currentView(camera: Camera): ValidView {
-  const state = readCameraState(camera);
-  return {
-    longitudeDeg: state.longitudeDeg,
-    latitudeDeg: state.latitudeDeg,
-    zoom: state.zoom,
-    headingDeg: state.headingDeg,
-    tiltDeg: state.tiltDeg,
-  };
+  const { longitudeDeg, latitudeDeg, zoom, headingDeg, tiltDeg } = readCameraState(camera);
+  return { longitudeDeg, latitudeDeg, zoom, headingDeg, tiltDeg };
 }
 
 /** The camera state of a view requested before the viewport has a size: range and altitude are not known yet. */

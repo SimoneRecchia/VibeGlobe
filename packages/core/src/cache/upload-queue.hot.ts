@@ -9,6 +9,7 @@
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import type { DecodedTile } from '../scheduler/types.js';
 import { UploadCostModel } from './upload-cost.js';
+import { grownArray } from '../collections/typed-arrays.js';
 
 /** Per-frame upload limits (ADR 0007 §Uploads, `docs/plan/quality.md`). */
 export interface UploadBudget {
@@ -329,28 +330,14 @@ export class UploadQueue<T extends DecodedTile> {
   private grow(): void {
     const capacity = this.keys.length;
     const grown = capacity * 2;
-    this.keys = grownFloat64(this.keys, grown);
-    this.priorities = grownFloat64(this.priorities, grown);
-    this.sequences = grownFloat64(this.sequences, grown);
-    const compressed = new Uint8Array(grown);
-    compressed.set(this.compressed);
-    this.compressed = compressed;
-    this.heapIndex = grownInt32(this.heapIndex, grown);
-    this.freeNext = grownInt32(this.freeNext, grown);
-    this.heap = grownInt32(this.heap, grown);
+    this.keys = grownArray(this.keys, grown);
+    this.priorities = grownArray(this.priorities, grown);
+    this.sequences = grownArray(this.sequences, grown);
+    this.compressed = grownArray(this.compressed, grown);
+    this.heapIndex = grownArray(this.heapIndex, grown);
+    this.freeNext = grownArray(this.freeNext, grown);
+    this.heap = grownArray(this.heap, grown);
     for (let slot = capacity; slot < grown; slot++) this.tiles.push(undefined);
     this.chainFree(capacity, grown);
   }
-}
-
-function grownFloat64(source: Float64Array, length: number): Float64Array {
-  const copy = new Float64Array(length);
-  copy.set(source);
-  return copy;
-}
-
-function grownInt32(source: Int32Array, length: number): Int32Array {
-  const copy = new Int32Array(length);
-  copy.set(source);
-  return copy;
 }

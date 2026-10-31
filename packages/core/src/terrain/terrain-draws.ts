@@ -154,12 +154,17 @@ export function recordShownTerrain(
   layer.shown.swap();
 }
 
+/** Maps a surface tile onto its terrain level in `mapping`; false where the source has no tile for it. */
+function mapTerrain(source: TerrainLayer['source'], tile: QuadtreeTile): boolean {
+  const level = terrainLevelOf(tile.level, source);
+  if (source.tiling.crs !== 'EPSG:3857') return mapGeographic(tile, level, mapping, 0);
+  return tile.root === MERCATOR_ROOT ? mapMercator(tile, level, mapping, 0) : mapCapToMercatorEdge(tile, level);
+}
+
 /** Copies a mapping's scale and offset into {@link transform}. */
 function writeTransform(from: Float64Array): void {
-  transform[0] = from[MAPPING_SCALE_U] ?? 1;
-  transform[1] = from[MAPPING_SCALE_V] ?? 1;
-  transform[2] = from[MAPPING_OFFSET_U] ?? 0;
-  transform[3] = from[MAPPING_OFFSET_V] ?? 0;
+  // Scale u, scale v, offset u and offset v follow each other in a mapping as in a transform.
+  for (let c = 0; c < 4; c++) transform[c] = from[MAPPING_SCALE_U + c] ?? (c < 2 ? 1 : 0);
 }
 
 /**
@@ -265,14 +270,7 @@ function mapCapToMercatorEdge(tile: QuadtreeTile, level: number): boolean {
  */
 function wantTerrain(layer: TerrainLayer, tile: QuadtreeTile, distance: number, shown: number): number {
   const source = layer.source;
-  const level = terrainLevelOf(tile.level, source);
-  if (source.tiling.crs === 'EPSG:3857') {
-    const mapped =
-      tile.root === MERCATOR_ROOT ? mapMercator(tile, level, mapping, 0) : mapCapToMercatorEdge(tile, level);
-    if (!mapped) return -1;
-  } else if (!mapGeographic(tile, level, mapping, 0)) {
-    return -1;
-  }
+  if (!mapTerrain(source, tile)) return -1;
   const wanted = mapping[MAPPING_LEVEL] ?? 0;
   const missing = missingLevel(layer, wanted);
   let arriving = false;
@@ -345,14 +343,7 @@ export function terrainHeightRange(
   out: Float64Array,
 ): boolean {
   const source = layer.source;
-  const level = terrainLevelOf(tile.level, source);
-  if (source.tiling.crs === 'EPSG:3857') {
-    const mapped =
-      tile.root === MERCATOR_ROOT ? mapMercator(tile, level, mapping, 0) : mapCapToMercatorEdge(tile, level);
-    if (!mapped) return false;
-  } else if (!mapGeographic(tile, level, mapping, 0)) {
-    return false;
-  }
+  if (!mapTerrain(source, tile)) return false;
   for (let current = mapping[MAPPING_LEVEL] ?? 0; current >= source.minLevel; current--) {
     const handle = layer.loader.peekHandle(current, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0);
     const grid = handle >= 0 ? heights.grid(handle) : undefined;

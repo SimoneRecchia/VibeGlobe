@@ -6,6 +6,7 @@
  * (ADR 0018).
  * @benchmark benchmarks/run.ts
  */
+import { grownArray } from '../collections/typed-arrays.js';
 
 const MIN_CAPACITY = 16;
 const ABSENT = -1;
@@ -174,12 +175,8 @@ export class PriorityHeap {
 
   /** Slow path: doubles the heap storage. */
   private growHeap(): void {
-    const items = new Int32Array(this.items.length * 2);
-    const keys = new Float64Array(this.keys.length * 2);
-    items.set(this.items);
-    keys.set(this.keys);
-    this.items = items;
-    this.keys = keys;
+    this.items = grownArray(this.items, this.items.length * 2);
+    this.keys = grownArray(this.keys, this.keys.length * 2);
   }
 
   /** Slow path: grows the index-to-position table until it holds `index`. */

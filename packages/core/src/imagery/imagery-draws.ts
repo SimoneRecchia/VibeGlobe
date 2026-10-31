@@ -8,7 +8,6 @@ import { MAX_OVERLAYS, TONE_BELOW, type DrawList } from './draw-list.js';
 import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
-  MAPPING_OFFSET_U,
   MAPPING_OFFSET_V,
   MAPPING_SCALE_U,
   MAPPING_SCALE_V,
@@ -107,19 +106,17 @@ export function drawImagery(
       const handle = mapped(MAPPING_HANDLE);
       drawn?.loader.markDrawn(handle);
       const geographic = drawn?.source.tiling.crs === 'EPSG:3857' && !latitudeRows(drawn.source, tile) ? 0 : 1;
-      if (isOpaque(entry.entry)) {
+      const opaque = isOpaque(entry.entry);
+      if (!opaque && overlays >= MAX_OVERLAYS) continue;
+      visible?.mark(drawn?.index ?? 0);
+      const credit = drawn?.loader.attributionOf(handle);
+      if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
+      // Tone matching between the chain's sources (F249): which one this draw shows.
+      const tone = toneSource(entry, layer, chosen);
+      if (opaque) {
         based = true;
-        visible?.mark(drawn?.index ?? 0);
-        const credit = drawn?.loader.attributionOf(handle);
-        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
-        // Tone matching between the chain's sources (F249): which one this draw shows.
-        writeBase(list, index, handle, geographic, toneSource(entry, layer, chosen));
-      } else if (overlays < MAX_OVERLAYS) {
-        visible?.mark(drawn?.index ?? 0);
-        const credit = drawn?.loader.attributionOf(handle);
-        if (credit) visible?.markCredit(credit, drawn?.index ?? 0);
-        overlays = addOverlay(entry, overlays, handle, geographic, toneSource(entry, layer, chosen));
-      }
+        writeBase(list, index, handle, geographic, tone);
+      } else overlays = addOverlay(entry, overlays, handle, geographic, tone);
     }
     writeOverlays(list, index, overlays);
   }
@@ -147,11 +144,12 @@ function writeBase(list: DrawList, index: number, handle: number, geographic: nu
   list.textures[index] = handle;
   list.geographic[index] = geographic;
   list.imageryLevels[index] = mapped(MAPPING_LEVEL);
-  const at = index * 4;
-  list.uvTransforms[at] = mapped(MAPPING_SCALE_U);
-  list.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
-  list.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
-  list.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
+  writeTransform(list.uvTransforms, index * 4);
+}
+
+/** Writes the UV transform in `mapping` (scale u, scale v, offset u, offset v: its slots in that order) at `at`. */
+function writeTransform(out: Float32Array | Float64Array, at: number): void {
+  for (let c = 0; c < 4; c++) out[at + c] = mapped(MAPPING_SCALE_U + c);
 }
 
 /** Records the tile in `mapping`, of `layer`'s source `chosen`, as the imagery under draw `index`'s own (F633). */
@@ -166,11 +164,7 @@ function writeBelow(
   latitudeRows(entry.chain[chosen]?.source, tile);
   list.below.textures[index] = mapped(MAPPING_HANDLE);
   list.below.toneSources[index] = toneSource(entry, layer, chosen);
-  const at = index * 4;
-  list.below.uvTransforms[at] = mapped(MAPPING_SCALE_U);
-  list.below.uvTransforms[at + 1] = mapped(MAPPING_SCALE_V);
-  list.below.uvTransforms[at + 2] = mapped(MAPPING_OFFSET_U);
-  list.below.uvTransforms[at + 3] = mapped(MAPPING_OFFSET_V);
+  writeTransform(list.below.uvTransforms, index * 4);
   return true;
 }
 
@@ -205,10 +199,7 @@ function addOverlay(layer: StackLayer, overlays: number, handle: number, geograp
   found[at + 1] = geographic;
   found[at + 2] = shownOpacity(layer.entry);
   found[at + 3] = BLEND_CODES[layer.entry.blend];
-  found[at + 4] = mapped(MAPPING_SCALE_U);
-  found[at + 5] = mapped(MAPPING_SCALE_V);
-  found[at + 6] = mapped(MAPPING_OFFSET_U);
-  found[at + 7] = mapped(MAPPING_OFFSET_V);
+  writeTransform(found, at + 4);
   found[at + 8] = mapped(MAPPING_LEVEL);
   found[at + 9] = tone;
   return overlays + 1;

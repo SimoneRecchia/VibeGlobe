@@ -3,7 +3,6 @@
 import { geodeticArrayToEcef, geodeticToEcef } from '../geodesy/ecef.js';
 import { planeCenterOf } from '../surface/surface-mesh.js';
 import type { LayerRenderTarget } from './layer-target.js';
-import type { ModelRenderer } from './models.js';
 import type { FrameView } from '../globe/types.js';
 import { cappedMercatorInto, mercatorScaleInto, morphPointInto } from '../view/morph.js';
 
@@ -85,67 +84,54 @@ export function writeLayerVertexAt(
   out.planes[index * 4 + 3] = scale[1] ?? 1;
 }
 
-/** A layer target whose every call also asks for a frame, so a change shows on the next frame (ADR 0037). */
+/** What a layer target or a model renderer does that changes the frame, then what it only answers or records. */
+const CHANGES = [
+  'createBatch',
+  'growBatch',
+  'writeRange',
+  'writeStrings',
+  'writeGeometry',
+  'setUniform',
+  'setCount',
+  'setOrder',
+  'setVisible',
+  'release',
+  'addImage',
+  'load',
+  'setPose',
+  'remove',
+  'setHighlight',
+  'loadSet',
+  'setInstances',
+  'setInstanceHighlight',
+  'setInstanceAngles',
+];
+const QUERIES = ['pick', 'stats', 'measureText', 'setPickId', 'drawnInstances'];
+
+/** A layer target whose every change also asks for a frame, so it shows on the next frame (ADR 0037); its models too. */
 export function requestingTarget(
   target: LayerRenderTarget | undefined,
   requestRender: () => void,
 ): LayerRenderTarget | undefined {
   if (!target) return undefined;
-  const after =
-    <A extends unknown[], R>(call: (...args: A) => R) =>
-    (...args: A): R => {
-      const result = call(...args);
-      requestRender();
-      return result;
-    };
-  return {
-    createBatch: after((descriptor) => target.createBatch(descriptor)),
-    growBatch: after((handle, capacity) => target.growBatch(handle, capacity)),
-    writeRange: after((handle, attribute, first, count, data) =>
-      target.writeRange(handle, attribute, first, count, data),
-    ),
-    writeStrings: after((handle, channel, first, count, values) =>
-      target.writeStrings(handle, channel, first, count, values),
-    ),
-    writeGeometry: after((handle, feature, geometry) => target.writeGeometry(handle, feature, geometry)),
-    setUniform: after((handle, attribute, value) => target.setUniform(handle, attribute, value)),
-    setCount: after((handle, count) => target.setCount(handle, count)),
-    setOrder: after((handle, order) => target.setOrder(handle, order)),
-    setVisible: after((handle, visible) => target.setVisible(handle, visible)),
-    release: after((handle) => target.release(handle)),
-    ...(target.pick ? { pick: target.pick.bind(target) } : {}),
-    ...(target.stats ? { stats: target.stats.bind(target) } : {}),
-    ...(target.addImage ? { addImage: after(target.addImage.bind(target)) } : {}),
-    ...(target.measureText ? { measureText: target.measureText.bind(target) } : {}),
-    ...(target.models ? { models: requestingModels(target.models, after) } : {}),
+  const requesting = <T extends object>(object: T): T => {
+    const wrapped: Record<string, unknown> = {};
+    for (const name of [...CHANGES, ...QUERIES]) {
+      const call: unknown = (object as Record<string, unknown>)[name];
+      if (typeof call !== 'function') continue;
+      const bound = (call as (...args: unknown[]) => unknown).bind(object);
+      wrapped[name] = QUERIES.includes(name)
+        ? bound
+        : (...args: unknown[]): unknown => {
+            const result = bound(...args);
+            requestRender();
+            return result;
+          };
+    }
+    return wrapped as T;
   };
-}
-
-/** What a model renderer does that changes the frame, then what it only answers or records. */
-const MODEL_CHANGES = [
-  'load',
-  'setPose',
-  'remove',
-  'setHighlight',
-  'setVisible',
-  'loadSet',
-  'setInstances',
-  'setInstanceHighlight',
-  'setInstanceAngles',
-] as const;
-const MODEL_QUERIES = ['setPickId', 'drawnInstances'] as const;
-
-/** A model renderer whose changes each ask for a frame. */
-function requestingModels(
-  models: ModelRenderer,
-  after: <A extends unknown[], R>(call: (...args: A) => R) => (...args: A) => R,
-): ModelRenderer {
-  const wrapped: Record<string, unknown> = {};
-  for (const name of [...MODEL_CHANGES, ...MODEL_QUERIES]) {
-    const call = (models[name] as ((...args: unknown[]) => unknown) | undefined)?.bind(models);
-    if (call) wrapped[name] = (MODEL_QUERIES as readonly string[]).includes(name) ? call : after(call);
-  }
-  return wrapped as unknown as ModelRenderer;
+  const wrapped = requesting(target);
+  return target.models ? { ...wrapped, models: requesting(target.models) } : wrapped;
 }
 
 const geodetic = new Float64Array(3);

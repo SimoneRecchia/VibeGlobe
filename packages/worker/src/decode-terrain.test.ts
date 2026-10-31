@@ -45,7 +45,7 @@ describe('decodeTerrain', () => {
   it('closes the bitmap of a heightmap it refuses (not square)', async () => {
     const close = vi.fn();
     vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: 4, height: 2, close }));
-    vi.stubGlobal('OffscreenCanvas', class {});
+    vi.stubGlobal('OffscreenCanvas', function OffscreenCanvas() {});
     try {
       const input = { bytes: new ArrayBuffer(8), encoding: 'terrarium', maxErrorMeters: 5, meshCells: 8 };
       await expect(decodeTerrain(input, context)).rejects.toMatchObject({ code: 'undecodable' });

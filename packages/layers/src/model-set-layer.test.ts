@@ -11,6 +11,8 @@ function fakeSets(): ModelRenderer & {
   highlights: Map<number, readonly number[] | undefined>;
   visible: boolean;
   removed: number[];
+  angles: (Float32Array | undefined)[];
+  drawn: number;
 } {
   const fake = {
     loads: [] as { source: unknown; options: ModelSetOptions }[],
@@ -18,6 +20,8 @@ function fakeSets(): ModelRenderer & {
     highlights: new Map<number, readonly number[] | undefined>(),
     visible: true,
     removed: [] as number[],
+    angles: [] as (Float32Array | undefined)[],
+    drawn: 1,
     load: () => Promise.resolve(99),
     setPose: () => undefined,
     remove: (id: number) => void fake.removed.push(id),
@@ -30,6 +34,8 @@ function fakeSets(): ModelRenderer & {
     setInstanceHighlight: (_id: number, index: number, rgba: readonly number[] | undefined) =>
       void fake.highlights.set(index, rgba),
     setVisible: (_id: number, visible: boolean) => void (fake.visible = visible),
+    setInstanceAngles: (_id: number, joint: number, angles: Float32Array) => void (fake.angles[joint] = angles),
+    drawnInstances: () => fake.drawn,
   };
   return fake;
 }
@@ -89,5 +95,132 @@ describe('model set layer (F627)', () => {
       placeholderColor: [0, 0, 1],
       placeholderSizePx: 0,
     });
+  });
+
+  it('turns each copy at its speed, easing to a new one, and asks for frames only while drawn (F648)', async () => {
+    const models = fakeSets();
+    let requests = 0;
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }), () => void requests++);
+    const turbines = [0, 1, 2].map((i) => ({
+      id: `t${String(i)}`,
+      position: { longitudeDeg: 9 + i * 0.01, latitudeDeg: 45 },
+      ...(i === 2 ? { spinRpm: 6 } : {}),
+    }));
+    const layer = stack.add(
+      new ModelSetLayer({ url: 't.glb', models: turbines, spin: { node: 'rotor', rpm: 12, rampSeconds: 0 } }),
+    );
+    await layer.ready;
+    expect(models.loads[0]?.options.joints).toEqual([{ node: 'rotor', axis: 'z' }]);
+    const angles = models.angles[0] ?? new Float32Array(0);
+    const start = Array.from(angles);
+    // Spread starting angles: the copies never turn in step.
+    expect(new Set(start).size).toBe(3);
+    const at = (nowMs: number): void =>
+      stack.frame({ nowMs, zoom: 15, projector: { geoToScreen: () => undefined, zoom: () => 15 } });
+    at(0);
+    at(100);
+    // 12 turns a minute: 0.02 turns in 100 ms; the third copy at its own 6.
+    const turned = (i: number): number => ((angles[i] ?? 0) - (start[i] ?? 0) + 2 * Math.PI) % (2 * Math.PI);
+    expect(turned(0)).toBeCloseTo(0.02 * 2 * Math.PI, 5);
+    expect(turned(2)).toBeCloseTo(0.01 * 2 * Math.PI, 5);
+    // Not drawn: no more frames once the kick after loading has passed; drawn again, a frame each frame.
+    models.drawn = 0;
+    at(116);
+    at(132);
+    requests = 0;
+    at(148);
+    expect(requests).toBe(0);
+    models.drawn = 2;
+    at(164);
+    expect(requests).toBe(1);
+    // Stopped: no frames at all.
+    expect(layer.setSpinRpm(0)).toBe(true);
+    requests = 0;
+    at(180);
+    at(196);
+    expect(requests).toBe(0);
+    expect(layer.getSpinRpm('t1')).toBe(0);
+    expect(layer.setSpinRpm(5, 'nope')).toBe(false);
+    expect(() => layer.setSpinRpm(Number.NaN)).toThrow(RangeError);
+  });
+
+  it('eases a speed change over its ramp and refuses bad spin options (F648)', async () => {
+    const models = fakeSets();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    const one = [{ id: 'a', position: { longitudeDeg: 9, latitudeDeg: 45 } }];
+    const layer = stack.add(new ModelSetLayer({ url: 't.glb', models: one, spin: { node: 'rotor', rampSeconds: 3 } }));
+    await layer.ready;
+    const angles = models.angles[0] ?? new Float32Array(0);
+    const at = (nowMs: number): void =>
+      stack.frame({ nowMs, zoom: 15, projector: { geoToScreen: () => undefined, zoom: () => 15 } });
+    at(0);
+    layer.setSpinRpm(10, 'a');
+    // One second in, a third of the ramp: the speed covers 1 − e⁻¹ of the change; after the ramp, 95%.
+    // The speed at a time, in turns per minute, from the angle turned over the next millisecond.
+    const speedAt = (nowMs: number): number => {
+      at(nowMs);
+      const before = angles[0] ?? 0;
+      at(nowMs + 1);
+      return (((angles[0] ?? 0) - before + 2 * Math.PI) % (2 * Math.PI)) / ((2 * Math.PI) / 60_000);
+    };
+    for (let t = 16; t <= 1000; t += 16) at(t);
+    expect(speedAt(1000)).toBeCloseTo(10 * (1 - Math.exp(-1)), 0);
+    for (let t = 1016; t <= 3000; t += 16) at(t);
+    expect(speedAt(3000)).toBeGreaterThan(9.4);
+    // Settled exactly soon after: the last of the change goes at a turn per minute each second at least.
+    for (let t = 3016; t <= 3600; t += 16) at(t);
+    expect(layer.getSpinRpm('a')).toBe(10);
+    expect(speedAt(3600)).toBeCloseTo(10, 1);
+    expect(() => new ModelSetLayer({ url: 'a', models: [], spin: { node: 'r', rampSeconds: -1 } })).toThrow(RangeError);
+    expect(() => new ModelSetLayer({ url: 'a', models: one, spin: { node: 'r', rpm: Infinity } })).toThrow(RangeError);
+    expect(new ModelSetLayer({ url: 'a', models: one }).setSpinRpm(3)).toBe(false);
+  });
+
+  it('turns a yawing part to face a direction the shorter way at its rate, holding the spinning part (F648)', async () => {
+    const models = fakeSets();
+    let requests = 0;
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }), () => void requests++);
+    const turbines = [
+      { id: 'a', position: { longitudeDeg: 9, latitudeDeg: 45 }, headingDeg: 180, yawDeg: 270 },
+      { id: 'b', position: { longitudeDeg: 9.01, latitudeDeg: 45 } },
+    ];
+    const layer = stack.add(
+      new ModelSetLayer({
+        url: 't.glb',
+        models: turbines,
+        yaw: { node: 'nacelle', degPerSecond: 10 },
+        spin: { node: 'rotor', rpm: 12 },
+      }),
+    );
+    await layer.ready;
+    // The nacelle holds the rotor: it comes first.
+    expect(models.loads[0]?.options.joints).toEqual([
+      { node: 'nacelle', axis: 'y' },
+      { node: 'rotor', axis: 'z' },
+    ]);
+    const yaw = models.angles[0] ?? new Float32Array(0);
+    // Facing west on a heading of south: a quarter turn clockwise seen from above, about −Y.
+    expect(yaw[0]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(yaw[1]).toBeCloseTo(0, 9);
+    expect(layer.getYawDeg('a')).toBeCloseTo(270, 4);
+    const at = (nowMs: number): void =>
+      stack.frame({ nowMs, zoom: 15, projector: { geoToScreen: () => undefined, zoom: () => 15 } });
+    at(0);
+    // To north-west, 45° clockwise: 4.5 s at 10° a second, then still (the shorter way, not 315° the other way).
+    expect(layer.setYawDeg(315, 'a')).toBe(true);
+    for (let t = 100; t <= 2000; t += 100) at(t);
+    expect(yaw[0]).toBeCloseTo((-90 - 20) * (Math.PI / 180), 4);
+    for (let t = 2100; t <= 5000; t += 100) at(t);
+    expect(yaw[0]).toBeCloseTo((-135 * Math.PI) / 180, 5);
+    expect(layer.getYawDeg('a')).toBeCloseTo(315, 3);
+    // Every copy, across north: 'b' (heading 0) turns 30° counter-clockwise to 330.
+    layer.setYawDeg(330);
+    for (let t = 5100; t <= 9000; t += 100) at(t);
+    expect(yaw[1]).toBeCloseTo((30 * Math.PI) / 180, 5);
+    expect(layer.getYawDeg('b')).toBeCloseTo(330, 3);
+    expect(layer.setYawDeg(10, 'nope')).toBe(false);
+    expect(() => layer.setYawDeg(Number.NaN)).toThrow(RangeError);
+    expect(() => new ModelSetLayer({ url: 'a', models: [], yaw: { node: 'n', degPerSecond: 0 } })).toThrow(RangeError);
+    expect(new ModelSetLayer({ url: 'a', models: turbines }).setYawDeg(90)).toBe(false);
   });
 });

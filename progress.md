@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-31: a wind turbine and a solar table for the energy park (owner's request)
+
+The owner asked for a detailed but light wind turbine whose rotor turns at an adjustable speed and whose nacelle turns
+on its tower, and for slightly tilted solar tables, both able to run by the thousand on weak machines. Both models are
+generated from original geometry by `scripts/models/build.ts`: a three-blade turbine of the 2 MW class (80 m rotor on a
+78 m conical tower, streamlined nacelle, egg-shaped spinner, twisted and tapered blades; 1,880 triangles in three meshes,
+58 KB) and a 2P × 12 fixed-tilt table at 20° on steel posts (188 triangles, one module texture repeated, 20 KB). Model
+sets gained moving parts (F648): `spin` and `yaw` turn named glTF nodes per copy inside the same instanced draws
+(`ModelSetOptions.joints`), with speeds eased at runtime and frames asked for only while a turning part is drawn; the
+renderer pays for it by sharing the single models' placement and picking code with the sets (40.30 KB, from 40.31).
+`?scenario=energy-park` shows ten turbines behind 720 tables with sliders for the rotors' speed and the wind (F649).
+
 ## 2026-10-31: code review for bugs, less code and weak devices (owner's request)
 
 The owner asked for every package to be reviewed for bugs and dead weight, and for the engine to run on weak

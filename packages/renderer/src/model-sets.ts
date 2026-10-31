@@ -29,7 +29,10 @@ export type UnlitMaker = (material: Material, highlight: Node<'vec4'>) => Materi
 interface Part {
   readonly geometry: BufferGeometry;
   readonly material: Material;
+  /** The transform within the model, or the outermost joint's above the mesh (F648). */
   readonly local: Matrix4;
+  /** The joints above the mesh, outermost first: each turns, then the transform to the next joint or the mesh. */
+  readonly turns: readonly { readonly joint: number; readonly next: Matrix4 }[];
   mesh: InstancedMesh | undefined;
   /** The unlit material the instanced mesh draws with. */
   drawn: Material | undefined;
@@ -47,6 +50,8 @@ export class ModelSet {
   visible = true;
   /** Highlights by copy, `[r, g, b, amount]` each (selection and hover, F381). */
   highlights = new Float32Array(0);
+  /** Each joint's angle by copy, radians (F648). */
+  readonly angles: (Float32Array | undefined)[] = [];
   /** The copies drawn as the model and as the placeholder in the last frame, by index. */
   modelDrawn = new Int32Array(0);
   placeholderDrawn = new Int32Array(0);
@@ -72,15 +77,28 @@ export class ModelSet {
     const bounds = new Box3().setFromObject(root);
     this.centerUp = bounds.getCenter(new Vector3()).y;
     this.radius = bounds.getSize(new Vector3()).length() / 2;
+    const joints = (options.joints ?? []).map((joint) => root.getObjectByName(joint.node));
     root.traverse((object) => {
       const mesh = object as Partial<Mesh>;
       if (!mesh.isMesh || !mesh.geometry || !mesh.material) return;
       const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      // The joints above the mesh, outermost first, each followed by the transform from it to the next.
+      const above: Object3D[] = [];
+      object.traverseAncestors((node) => void above.unshift(node));
+      const chain = [...above, object].filter((node) => joints.includes(node));
+      const turns = chain.map((node, i) => ({
+        joint: joints.indexOf(node),
+        next: node.matrixWorld
+          .clone()
+          .invert()
+          .multiply((chain[i + 1] ?? object).matrixWorld),
+      }));
       if (material)
         this.parts.push({
           geometry: mesh.geometry,
           material,
-          local: object.matrixWorld.clone(),
+          local: (chain[0] ?? object).matrixWorld.clone(),
+          turns,
           mesh: undefined,
           drawn: undefined,
         });
@@ -134,27 +152,15 @@ export class ModelSet {
   indexAt(view: FrameView, xPx: number, yPx: number): number {
     let best = -1;
     let bestRatio = Infinity;
-    const consider = (index: number, radiusPx: number | undefined): void => {
+    const consider = (index: number, radiusPx?: number): void => {
       const pose = this.poses[index];
-      if (!pose) return;
-      const scale = pose.scale ?? 1;
-      const { longitudeDeg, latitudeDeg } = pose.position;
-      const near = radiusPx === undefined;
-      const height = (pose.position.heightMeters ?? 0) + (near ? this.centerUp * scale : 0);
-      if (!projectLayerPoint(view, longitudeDeg, latitudeDeg, height, center)) return;
-      let r = radiusPx ?? 0;
-      if (near) {
-        const east = (this.radius * scale) / (111_320 * Math.max(Math.cos(latitudeDeg * RAD), 1e-6));
-        if (!projectLayerPoint(view, longitudeDeg + east, latitudeDeg, height, edge)) return;
-        r = Math.hypot((edge[0] ?? 0) - (center[0] ?? 0), (edge[1] ?? 0) - (center[1] ?? 0));
-      }
-      const ratio = Math.hypot(xPx - (center[0] ?? 0), yPx - (center[1] ?? 0)) / Math.max(r, 1);
+      const ratio = pose ? sphereRatio(view, pose, xPx, yPx, this.centerUp, this.radius, radiusPx) : Infinity;
       if (ratio <= 1 && ratio < bestRatio) {
         best = index;
         bestRatio = ratio;
       }
     };
-    for (let i = 0; i < this.modelCount; i++) consider(this.modelDrawn[i] ?? -1, undefined);
+    for (let i = 0; i < this.modelCount; i++) consider(this.modelDrawn[i] ?? -1);
     const placeholderPx = this.options.placeholderSizePx;
     for (let i = 0; i < this.placeholderCount; i++) consider(this.placeholderDrawn[i] ?? -1, placeholderPx);
     return best;
@@ -181,15 +187,8 @@ export class ModelSet {
   }
 
   private placeOne(pose: ModelPose, index: number, view: FrameView): void {
-    geodetic[0] = pose.position.longitudeDeg * RAD;
-    geodetic[1] = pose.position.latitudeDeg * RAD;
-    geodetic[2] = pose.position.heightMeters ?? 0;
-    morphPointInto(view.morph, geodetic, position);
-    const eye = view.eyeEcef;
-    rel[0] = (position[0] ?? 0) - (eye[0] ?? 0);
-    rel[1] = (position[1] ?? 0) - (eye[1] ?? 0);
-    rel[2] = (position[2] ?? 0) - (eye[2] ?? 0);
-    const distance = Math.hypot(rel[0], rel[1], rel[2]);
+    anchor(view, pose);
+    const distance = Math.hypot(rel[0] ?? 0, rel[1] ?? 0, rel[2] ?? 0);
     const scale = pose.scale ?? 1;
     const near = distance < this.options.visibleBelowMeters;
     // Ground meters per pixel at that distance: the placeholder keeps its size on screen.
@@ -197,18 +196,25 @@ export class ModelSet {
     const placeholderRadius = (this.options.placeholderSizePx / 2) * metersPerPx;
     const radius = near ? (this.radius + Math.abs(this.centerUp)) * scale : placeholderRadius;
     if (!inView(view, radius) || behindGlobe(view)) return;
-    const axes = (view.morph.factors[0] ?? 0) >= 0.5 ? view.morph.axes : enuFrame(geodetic[0], geodetic[1], enu);
+    const axes = axesAt(view);
     if (near) {
-      instanceMatrix(axes, pose, scale);
-      for (const part of this.parts)
-        if (part.mesh) part.mesh.setMatrixAt(this.modelCount, matrix.multiplyMatrices(base, part.local));
+      orient(base, axes, pose);
+      for (const part of this.parts) {
+        matrix.multiplyMatrices(base, part.local);
+        for (let k = 0; k < part.turns.length; k++) {
+          const { joint, next } = part.turns[k] ?? { joint: 0, next: matrix };
+          const angle = this.angles[joint]?.[index] ?? 0;
+          if (this.options.joints?.[joint]?.axis === 'y') turn.makeRotationY(angle);
+          else turn.makeRotationZ(angle);
+          matrix.multiply(turn).multiply(next);
+        }
+        part.mesh?.setMatrixAt(this.modelCount, matrix);
+      }
       this.modelDrawn[this.modelCount++] = index;
     } else if (this.placeholderMesh) {
       // Above the anchor by its radius, standing on the ground.
       base.makeScale(placeholderRadius, placeholderRadius, placeholderRadius);
-      base.elements[12] = rel[0] + (axes[6] ?? 0) * placeholderRadius;
-      base.elements[13] = rel[1] + (axes[7] ?? 0) * placeholderRadius;
-      base.elements[14] = rel[2] + (axes[8] ?? 0) * placeholderRadius;
+      for (let i = 0; i < 3; i++) base.elements[12 + i] = (rel[i] ?? 0) + (axes[6 + i] ?? 0) * placeholderRadius;
       this.placeholderMesh.setMatrixAt(this.placeholderCount, base);
       this.placeholderDrawn[this.placeholderCount++] = index;
     }
@@ -256,6 +262,7 @@ const center = new Float64Array(2);
 const edge = new Float64Array(2);
 const base = new Matrix4();
 const matrix = new Matrix4();
+const turn = new Matrix4();
 const axesToModel = new Matrix4();
 const attitude = new Matrix4();
 const euler = new Euler(0, 0, 0, 'YXZ');
@@ -305,14 +312,68 @@ function behindGlobe(view: FrameView): boolean {
   return (eye[0] ?? 0) * p0 + (eye[1] ?? 0) * p1 + (eye[2] ?? 0) * p2 < 0.999 * (p0 * p0 + p1 * p1 + p2 * p2);
 }
 
-/** Writes a copy's transform into `base`: east, north and up axes, then heading, pitch, roll and scale (as one model). */
-function instanceMatrix(axes: Float64Array, pose: ModelPose, scale: number): void {
+/**
+ * Writes where a pose's anchor is drawn this frame (ADR 0008: the morph, with the relief scale) relative to the eye,
+ * in float64 before any float32 matrix, into {@link rel}, and its geodetic position into {@link geodetic}.
+ */
+function anchor(view: FrameView, pose: ModelPose): void {
+  geodetic[0] = pose.position.longitudeDeg * RAD;
+  geodetic[1] = pose.position.latitudeDeg * RAD;
+  geodetic[2] = pose.position.heightMeters ?? 0;
+  morphPointInto(view.morph, geodetic, position);
+  for (let i = 0; i < 3; i++) rel[i] = (position[i] ?? 0) - (view.eyeEcef[i] ?? 0);
+}
+
+/** The local east, north and up axes at the last anchor (on the flat map, the morph's). */
+function axesAt(view: FrameView): Float64Array {
+  return (view.morph.factors[0] ?? 0) >= 0.5 ? view.morph.axes : enuFrame(geodetic[0] ?? 0, geodetic[1] ?? 0, enu);
+}
+
+/**
+ * Writes a pose's transform at the last anchor into `out`: the local axes, then heading, pitch, roll and scale. glTF's
+ * +Y is up and −Z is forward.
+ */
+function orient(out: Matrix4, axes: Float64Array, pose: ModelPose): void {
   const a = (i: number): number => axes[i] ?? 0;
+  // Model +X east, +Y up, +Z south (so −Z, glTF's forward, points north at heading 0).
   axesToModel.set(a(0), a(6), -a(3), 0, a(1), a(7), -a(4), 0, a(2), a(8), -a(5), 0, 0, 0, 0, 1);
+  // Heading turns clockwise seen from above (about −Y), pitch raises the nose (about +X), roll lowers the right side.
   euler.set((pose.pitchDeg ?? 0) * RAD, -(pose.headingDeg ?? 0) * RAD, -(pose.rollDeg ?? 0) * RAD);
   attitude.makeRotationFromEuler(euler);
-  base.multiplyMatrices(axesToModel, attitude).scale(scaled.set(scale, scale, scale));
-  base.elements[12] = rel[0] ?? 0;
-  base.elements[13] = rel[1] ?? 0;
-  base.elements[14] = rel[2] ?? 0;
+  const scale = pose.scale ?? 1;
+  out.multiplyMatrices(axesToModel, attitude).scale(scaled.set(scale, scale, scale));
+  for (let i = 0; i < 3; i++) out.elements[12 + i] = rel[i] ?? 0;
+}
+
+/** Writes a single model's transform for a frame: its anchor relative to the eye, oriented as its pose says. */
+export function placePose(out: Matrix4, view: FrameView, pose: ModelPose): void {
+  anchor(view, pose);
+  orient(out, axesAt(view), pose);
+}
+
+/**
+ * How far a screen point lies from the center of a pose's bounding sphere projected where the frame draws it, in
+ * sphere radii (Infinity when it does not project): the model's sphere, or one of `radiusPx` about the anchor.
+ */
+export function sphereRatio(
+  view: FrameView,
+  pose: ModelPose,
+  xPx: number,
+  yPx: number,
+  centerUp: number,
+  radius: number,
+  radiusPx?: number,
+): number {
+  const scale = pose.scale ?? 1;
+  const { longitudeDeg, latitudeDeg } = pose.position;
+  const height = (pose.position.heightMeters ?? 0) + (radiusPx === undefined ? centerUp * scale : 0);
+  if (!projectLayerPoint(view, longitudeDeg, latitudeDeg, height, center)) return Infinity;
+  let r = radiusPx ?? 0;
+  if (radiusPx === undefined) {
+    // The radius on screen: the center to a point one radius east of it.
+    const east = (radius * scale) / (111_320 * Math.max(Math.cos(latitudeDeg * RAD), 1e-6));
+    if (!projectLayerPoint(view, longitudeDeg + east, latitudeDeg, height, edge)) return Infinity;
+    r = Math.hypot((edge[0] ?? 0) - (center[0] ?? 0), (edge[1] ?? 0) - (center[1] ?? 0));
+  }
+  return Math.hypot(xPx - (center[0] ?? 0), yPx - (center[1] ?? 0)) / Math.max(r, 1);
 }

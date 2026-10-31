@@ -9,7 +9,8 @@
         "e2e/support/*-worker.ts",
         "e2e/**/*.bug.ts",
         "e2e/robustness/*.config.ts",
-        "scripts/release/*.ts"
+        "scripts/release/*.ts",
+        "scripts/models/build.ts"
       ],
       "project": ["scripts/**/*.ts", "benchmarks/**/*.ts", "e2e/**/*.ts", "*.config.ts"],
       "includeEntryExports": true,

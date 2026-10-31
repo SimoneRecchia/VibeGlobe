@@ -1,21 +1,11 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import {
-  enuFrame,
-  morphPointInto,
-  type FrameView,
-  type ModelPose,
-  type ModelRenderer,
-  type ModelSetOptions,
-} from '@vibeglobe/core';
-import { projectLayerPoint } from '@vibeglobe/core/layers';
-import { ModelSet } from './model-sets.js';
+import type { FrameView, ModelPose, ModelRenderer, ModelSetOptions } from '@vibeglobe/core';
+import { ModelSet, placePose, sphereRatio } from './model-sets.js';
 import { max, mix, normalView, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
 import {
   Box3,
   type BufferGeometry,
-  Euler,
-  Matrix4,
   MeshBasicNodeMaterial,
   Vector3,
   Vector4,
@@ -26,8 +16,6 @@ import {
   type Object3D,
   type Scene,
 } from 'three/webgpu';
-
-const RAD = Math.PI / 180;
 
 /** What a glTF loader does for models: three.js's `GLTFLoader` (`@vibeglobe/renderer/gltf`). */
 export interface GltfLoader {
@@ -48,43 +36,6 @@ interface Model {
   /** Bounding sphere in model units: the center's height above the anchor, and the radius. */
   readonly centerUp: number;
   readonly radius: number;
-}
-
-const geodetic = new Float64Array(3);
-const position = new Float64Array(3);
-const enu = new Float64Array(9);
-const axesToModel = new Matrix4();
-const attitude = new Matrix4();
-const euler = new Euler(0, 0, 0, 'YXZ');
-const scaled = new Vector3();
-const center = new Float64Array(2);
-const edge = new Float64Array(2);
-
-/**
- * Writes a model's transform for a frame: its anchor where the frame draws that position (ADR 0008: the morph, with the
- * relief scale), relative to the eye in float64 before the float32 matrix, oriented on the local east, north and up
- * axes (on the flat map, the anchor's) with heading, pitch, roll and scale. glTF's +Y is up and −Z is forward.
- */
-function place(model: Model, pose: ModelPose, view: FrameView): void {
-  geodetic[0] = pose.position.longitudeDeg * RAD;
-  geodetic[1] = pose.position.latitudeDeg * RAD;
-  geodetic[2] = pose.position.heightMeters ?? 0;
-  morphPointInto(view.morph, geodetic, position);
-  const axes = (view.morph.factors[0] ?? 0) >= 0.5 ? view.morph.axes : enuFrame(geodetic[0], geodetic[1], enu);
-  const a = (i: number): number => axes[i] ?? 0;
-  // Model +X east, +Y up, +Z south (so −Z, glTF's forward, points north at heading 0).
-  axesToModel.set(a(0), a(6), -a(3), 0, a(1), a(7), -a(4), 0, a(2), a(8), -a(5), 0, 0, 0, 0, 1);
-  // Heading turns clockwise seen from above (about −Y), pitch raises the nose (about +X), roll lowers the right side.
-  euler.set((pose.pitchDeg ?? 0) * RAD, -(pose.headingDeg ?? 0) * RAD, -(pose.rollDeg ?? 0) * RAD);
-  attitude.makeRotationFromEuler(euler);
-  const scale = pose.scale ?? 1;
-  const m = model.root.matrix;
-  m.multiplyMatrices(axesToModel, attitude).scale(scaled.set(scale, scale, scale));
-  const eye = view.eyeEcef;
-  m.elements[12] = (position[0] ?? 0) - (eye[0] ?? 0);
-  m.elements[13] = (position[1] ?? 0) - (eye[1] ?? 0);
-  m.elements[14] = (position[2] ?? 0) - (eye[2] ?? 0);
-  model.root.updateMatrixWorld(true);
 }
 
 /**
@@ -178,6 +129,17 @@ export class LayerModels implements ModelRenderer {
   }
 
   /** See {@link ModelRenderer}. */
+  setInstanceAngles(id: number, joint: number, anglesRad: Float32Array): void {
+    const set = this.sets.get(id);
+    if (set) set.angles[joint] = anglesRad;
+  }
+
+  /** See {@link ModelRenderer}. */
+  drawnInstances(id: number): number {
+    return this.sets.get(id)?.modelCount ?? 0;
+  }
+
+  /** See {@link ModelRenderer}. */
   setPose(id: number, pose: ModelPose): void {
     const model = this.models.get(id);
     if (model) model.pose = pose;
@@ -212,17 +174,7 @@ export class LayerModels implements ModelRenderer {
     for (const model of this.modelList) {
       const pose = model.pose;
       if (!pose || !model.visible || model.pickId === 0) continue;
-      const scale = pose.scale ?? 1;
-      const { longitudeDeg, latitudeDeg } = pose.position;
-      const height = (pose.position.heightMeters ?? 0) + model.centerUp * scale;
-      if (!projectLayerPoint(view, longitudeDeg, latitudeDeg, height, center)) continue;
-      // The radius on screen: the center to a point one radius east of it.
-      const radiusMeters = model.radius * scale;
-      const east = (radiusMeters / (111_320 * Math.max(Math.cos(latitudeDeg * RAD), 1e-6))) % 360;
-      if (!projectLayerPoint(view, longitudeDeg + east, latitudeDeg, height, edge)) continue;
-      const radiusPx = Math.hypot((edge[0] ?? 0) - (center[0] ?? 0), (edge[1] ?? 0) - (center[1] ?? 0));
-      const distance = Math.hypot(xPx - (center[0] ?? 0), yPx - (center[1] ?? 0));
-      const ratio = distance / radiusPx;
+      const ratio = sphereRatio(view, pose, xPx, yPx, model.centerUp, model.radius);
       if (ratio <= 1 && ratio < bestRatio) {
         best = model.pickId;
         bestRatio = ratio;
@@ -260,7 +212,10 @@ export class LayerModels implements ModelRenderer {
       const model = this.modelList[i];
       if (!model) continue;
       model.root.visible = model.visible && model.pose !== undefined;
-      if (model.pose) place(model, model.pose, view);
+      if (model.pose) {
+        placePose(model.root.matrix, view, model.pose);
+        model.root.updateMatrixWorld(true);
+      }
     }
     for (let i = 0; i < this.setList.length; i++) this.setList[i]?.place(view);
   }

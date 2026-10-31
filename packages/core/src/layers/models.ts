@@ -52,6 +52,14 @@ export interface ModelRenderer {
   setInstances?(id: number, poses: readonly ModelPose[], pickIds: readonly number[]): void;
   /** Blends one copy of a set toward a color, `[r, g, b, amount]`; `undefined` clears it. */
   setInstanceHighlight?(id: number, index: number, rgba: readonly [number, number, number, number] | undefined): void;
+  /**
+   * Turns each copy's joint `joint` (an index into `ModelSetOptions.joints`, F648) by its angle in `anglesRad`, by copy
+   * index, from the next frame on; the renderer keeps the array and reads it every frame, so the caller updates it in
+   * place.
+   */
+  setInstanceAngles?(id: number, joint: number, anglesRad: Float32Array): void;
+  /** How many copies of a set the last frame drew as the model (in view and near the eye). */
+  drawnInstances?(id: number): number;
 }
 
 /** How a set of models draws its copies (F627). */
@@ -62,6 +70,15 @@ export interface ModelSetOptions {
   readonly placeholderColor: readonly [number, number, number];
   /** The placeholder's size on screen, CSS pixels; 0 draws none. */
   readonly placeholderSizePx: number;
+  /** Nodes of the model that turn with their children by an angle per copy, outermost first (F648). */
+  readonly joints?: readonly ModelSetJoint[];
+}
+
+/** A glTF node of a set's model that turns, with its children, about one of its own axes (F648). */
+export interface ModelSetJoint {
+  readonly node: string;
+  /** 'y' for a nacelle yawing on its tower, 'z' for a rotor on its shaft. */
+  readonly axis: 'y' | 'z';
 }
 
 /** Throws a GlobeError unless the pose is valid. */

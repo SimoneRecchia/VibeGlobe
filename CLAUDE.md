@@ -51,6 +51,7 @@ The engine must run smoothly on the weakest PC there is: an old SCADA workstatio
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.
 - Parallel tracks (`docs/parallel-tracks.md`): the earlier tracks are merged and their sessions closed (M6 input, M11 atmosphere and M13 computational parts merged through this branch on 2026-10-23); their waiting lists are the to-do of their milestones (M6, M7, M8, M10, M11, M13, M14): review the track's code in that milestone's review, wire the engine features it waits for, replace its stubs, and answer every open row of the "Hook requests" table. Three tracks start once `main` is updated (owner, 2026-10-23), each on its own branch with pull requests the owner merges: A) `packages/ui`, `packages/gis`, `packages/vue`, `packages/web-component`, `apps/nuxt-example` (M12, M14); B) `packages/sources` except `xyz-imagery.ts` and `fetchTransport`, and `packages/offline` (M7, M8); C) new `packages/models` and `packages/quality`. Once `main` is updated, do not edit those packages except to answer their hook requests.
 - Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
+- Everything is published in the owner's name (owner, 2026-10-31): commits authored by Simone Recchia, with no `Co-Authored-By` or session trailers; pull request bodies, reviews and comments without a "Generated with Claude Code" line or any link or mention of Claude.
 
 ## Working efficiently
 

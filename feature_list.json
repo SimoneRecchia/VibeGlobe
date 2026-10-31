@@ -8027,6 +8027,17 @@
         "In the playground's energy park, fly to a turbine and to the whole park and assert every corner shows inside the padded view, the turbine centered and touching the padding"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F668",
+      "milestone": 7,
+      "section": "Sources and composition",
+      "description": "`europeOrthophotos()` also covers Baden-Württemberg (LGL DOP20, dl-de/by-2-0), Brussels (UrbIS Ortho, CC0) and, with the application's free key, Denmark (GeoDanmark spring orthophoto, CC BY 4.0), each clipped to its borders; a WMS without Web Mercator is asked in WGS84 tiles (`OrthophotoService.crs`).",
+      "steps": [
+        "Unit-test that each of the three is asked inside its borders and not outside, Denmark only with its key, in EPSG:4326 with the key as its parameter",
+        "Record their terms in ADR 0182 and the services still waiting for an endpoint in docs/open-questions.md"
+      ],
+      "status": "passing"
     }
   ]
 }

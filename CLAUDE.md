@@ -2,6 +2,17 @@
 
 Optimized, glitch-free web globe and map engine (TypeScript, WebGPU with WebGL2 fallback). `PLAN.md` is the owner's master brief; `docs/plan/` is the technical plan.
 
+## Lightness first (owner, 2026-10-31)
+
+The engine must run smoothly on the weakest PC there is: an old SCADA workstation with an integrated GPU and little memory. Google Earth, with far more content, is navigated on 20-year-old computers: if ours is heavier, our code is the problem. Every line, byte, allocation and frame is a cost to justify.
+
+- **The shortest code that gives the result.** Before adding, look for what to remove; what can be said in half the lines is said in half. A change that adds lines removes more elsewhere when it can.
+- **Nothing "just in case":** no options, parameters, branches, fallbacks, abstractions, events or exports nobody uses today. Dead code, duplicate helpers and one-use wrappers are deleted.
+- **One source for each thing:** reuse before writing; never a second copy of a helper, constant or type.
+- **Work only when something changed:** no polling, timers or frame loops while the view is still; draw only what is in view; sample, upload and allocate only for what changed; nothing per frame that can be done once.
+- **Bytes:** no dependency for what a few lines do; narrow imports so tree-shaking works; what the first frame does not need loads later. Package budgets only fall.
+- **Measure, do not guess:** bundle size, frame time and long tasks before and after every performance change.
+
 ## Start of every session
 
 1. Read `progress.md`, run `npm run status`, and `git log --oneline -20`.

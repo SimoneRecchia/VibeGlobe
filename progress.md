@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-31: panels laid out in rows, and a grid on the ground (an application's editor)
+
+F658 and F659 in `@vibeglobe/gis`, pure functions for an application's editor of solar parks. `layoutPanels` places
+identical rectangles in rows inside drawn perimeters, around fixed panels, at the wanted positions where known, all
+shrinking alike when room runs out; a scanline per row keeps it fast for every drag. `gridLines` gives the segments of
+a ground grid turned to the rows' bearing. `DrawLayers` and `DrawInput` are exported from `@vibeglobe/ui` (F660), so
+the editor's own pen drives the drawing tool. Unit tests cover the first two; the editor's browser steps are pending.
+
 ## 2026-10-31: the same engine with less code (owner's request)
 
 The owner asked for the same results with less code. Copies that had drifted apart were written once: the growth of

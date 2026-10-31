@@ -28,3 +28,7 @@ export {
   viewStateToUrl,
 } from './view-state.js';
 export type { ViewMode, ViewState } from './view-state.js';
+export { layoutPanels } from './panel-layout.js';
+export type { PanelLayout, PanelLayoutOptions } from './panel-layout.js';
+export { gridLines } from './grid-lines.js';
+export type { GridLinesOptions } from './grid-lines.js';

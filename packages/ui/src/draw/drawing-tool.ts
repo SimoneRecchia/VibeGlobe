@@ -141,6 +141,20 @@ export class DrawingTool {
     return true;
   }
 
+  /**
+   * Adds a finished shape, such as one saved earlier, without a `create` event (F660); returns its id, or undefined
+   * when it has too few vertices or a polygon crosses itself.
+   */
+  addShape(kind: ShapeKind, coordinates: readonly LonLat[]): string | undefined {
+    if (coordinates.length < MIN_VERTICES[kind] || (kind === 'polygon' && ringSelfIntersects(coordinates)))
+      return undefined;
+    const shape: DrawnShape = { id: `shape-${++shapes}`, kind, coordinates: [...coordinates] };
+    this.#shapes.set(shape.id, shape);
+    this.#layers?.show(shape);
+    this.#refresh();
+    return shape.id;
+  }
+
   /** Drops the shape being drawn, or the edit selection. */
   cancel(): void {
     this.#draft = [];

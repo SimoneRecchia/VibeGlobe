@@ -7917,6 +7917,39 @@
         "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F658",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`layoutPanels` of `@vibeglobe/gis` places identical rectangles (a solar park's tables) in rows inside one or more perimeters: rows along a bearing, filled from the far side; panels with a wanted position take the nearest free place, the others the next free places in order; fixed panels keep their places and the rest go around them; when the perimeters cannot hold them all shrink alike down to `minScale`, and panels left without a place come back undefined. A scanline per row keeps it fast enough for every move of a panel.",
+      "steps": [
+        "Unit-test rows inside the perimeter without overlaps from the far row, shrinking alike and its floor, panels around fixed ones, wanted positions, the bearing and several perimeters",
+        "In an application's editor, 2,000 panels in a drawn perimeter follow a dragged panel at 60 fps on a mid-range laptop"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F659",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`gridLines` of `@vibeglobe/gis` returns the segments of a square grid on the ground: two families of lines a spacing apart through a center, turned to a bearing, as far as a half size, at most 2000 lines (a finer grid over a larger square widens its spacing by whole multiples).",
+      "steps": [
+        "Unit-test the count and reach of the lines, the cap, and the bearing",
+        "In an application's editor, the grid drawn as a line layer stays light behind the panels"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F660",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "An application drives the drawing tool with its own controls: `DrawLayers` (the shapes, the vertices and the edit handles as data layers, in the application's colors) and `DrawInput` (pointer, touch and keyboard input on the map container) are exported from `@vibeglobe/ui` beside `DrawingTool`, so a toolbar of the application's own sets the tool's mode; `DrawingTool.addShape` loads a shape saved earlier without a `create` event.",
+      "steps": [
+        "Type-check a consumer that builds `DrawLayers` and `DrawInput` for a `DrawingTool` and sets its mode from its own buttons; unit-test that `addShape` loads a saved polygon without an event and refuses one that crosses itself",
+        "In an application's editor, a perimeter drawn with its own pen tool can then be edited vertex by vertex"
+      ],
+      "status": "failing"
     }
   ]
 }

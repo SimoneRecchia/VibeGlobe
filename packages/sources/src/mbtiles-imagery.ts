@@ -1,12 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import {
-  type TerrainSource,
-  WEB_MERCATOR_TILING,
-  type TileCoord,
-  type TileRectangleRad,
-  type TileRequest,
-} from '@vibeglobe/core';
+import type { TerrainSource } from '@vibeglobe/core';
 import type { Database } from 'sql.js';
 import { archiveTransport, HttpStatusError, NetworkError, tileOfUrl } from './archive-transport.js';
 import { retryAfterMs } from './fetch-transport.js';
@@ -18,9 +12,11 @@ import {
   type ProviderProfile,
   SourceConfigError,
 } from './metadata.js';
-import { coverageOf, inLevelsAndCoverage } from './tiling.js';
+import { coverageOf } from './tiling.js';
 import {
+  archiveImagery,
   type ArchiveTerrainOptions,
+  htmlAttribution,
   terrainFromArchive,
   vectorFromArchive,
   type VectorTileSource,
@@ -124,14 +120,6 @@ function levelRange(db: Database, query: string, metadata: Map<string, string>):
   return [Number(row[0] ?? 0), Number(row[1] ?? 0)];
 }
 
-function attributionOf(metadata: Map<string, string>): Attribution[] {
-  const raw = metadata.get('attribution');
-  if (!raw) return [];
-  const link = /href="([^"]+)"/.exec(raw)?.[1];
-  const text = raw.replace(/<[^>]*>/g, '').trim();
-  return text.length === 0 ? [] : [link === undefined ? { text } : { text, url: link }];
-}
-
 /** Opens the package and reads what the source needs, or refuses it with a descriptive error. */
 async function openPackage(options: MbtilesImageryOptions, content: 'raster' | 'any') {
   let bytes: Uint8Array;
@@ -155,7 +143,15 @@ async function openPackage(options: MbtilesImageryOptions, content: 'raster' | '
     if (minLevel > maxLevel) throw new Error('minimum zoom above maximum zoom');
     const [w, s, e, n] = (metadata.get('bounds') ?? '').split(',').map(Number);
     const coverage = coverageOf(w ?? NaN, s ?? NaN, e ?? NaN, n ?? NaN);
-    return { db, query, contentType, minLevel, maxLevel, coverage, attribution: attributionOf(metadata) };
+    return {
+      db,
+      query,
+      contentType,
+      minLevel,
+      maxLevel,
+      coverage,
+      attribution: htmlAttribution(metadata.get('attribution')),
+    };
   } catch (error) {
     throw new SourceConfigError(
       'unreadable-package',
@@ -180,38 +176,26 @@ export async function mbtilesArchive(
 ): Promise<DescribedImagerySource> {
   const opened = await openPackage(options, content);
   const statement = opened.db.prepare(opened.query);
-  const base = typeof options.package === 'string' ? options.package : `blob-package://${options.id}`;
-  const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
-  const source: DescribedImagerySource = {
-    id: options.id,
-    tiling: WEB_MERCATOR_TILING,
-    minLevel: opened.minLevel,
-    maxLevel: opened.maxLevel,
-    tileSizePx: 256,
-    pixelRatio: 1,
-    ...(opened.coverage ? { coverage: [opened.coverage] } : {}),
-    decoder: 'image',
-    attribution: options.attribution ?? opened.attribution,
-    profile: options.profile ?? CUSTOM_PROFILE,
-    transportRequired: true,
-    transport: archiveTransport((url) => {
-      const tile = tileOfUrl(url);
-      if (!tile) return Promise.resolve(undefined);
-      statement.bind([tile.z, tile.x, 2 ** tile.z - 1 - tile.y]);
-      const found = statement.step() ? statement.get()[0] : undefined;
-      statement.reset();
-      if (!(found instanceof Uint8Array) || found.length === 0) return Promise.resolve(undefined);
-      const bytes = found.slice().buffer;
-      return Promise.resolve({ bytes, contentType: opened.contentType });
-    }),
-    request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
-      if (!inLevelsAndCoverage(source, coord, extent)) return 'noData';
-      out.url = `${base}#${coord.level}/${coord.x}/${coord.y}`;
-      out.hostIndex = 0;
-      return out;
+  return archiveImagery(
+    {
+      id: options.id,
+      minLevel: opened.minLevel,
+      maxLevel: opened.maxLevel,
+      coverage: opened.coverage,
+      attribution: options.attribution ?? opened.attribution,
+      profile: options.profile ?? CUSTOM_PROFILE,
+      transport: archiveTransport((url) => {
+        const tile = tileOfUrl(url);
+        if (!tile) return Promise.resolve(undefined);
+        statement.bind([tile.z, tile.x, 2 ** tile.z - 1 - tile.y]);
+        const found = statement.step() ? statement.get()[0] : undefined;
+        statement.reset();
+        if (!(found instanceof Uint8Array) || found.length === 0) return Promise.resolve(undefined);
+        return Promise.resolve({ bytes: found.slice().buffer, contentType: opened.contentType });
+      }),
     },
-  };
-  return source;
+    typeof options.package === 'string' ? options.package : `blob-package://${options.id}`,
+  );
 }
 
 /** Terrain tiles (Terrarium, Terrain-RGB or quantized-mesh) from an MBTiles package (F328). */

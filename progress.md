@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-31: the same engine with less code (owner's request)
+
+The owner asked for the same results with less code. Copies that had drifted apart were written once: the growth of
+typed-array tables (five places), the controls' velocity fit, the LZW decoder and TIFF value reader (sources and tools
+each had one; core's `decoders` entry now holds them), the vector-tile target's types (declared in core, layers and
+the renderer), the PMTiles and MBTiles imagery sources, the package storage's IndexedDB access, the conformance
+suite's fault checks, the two tile-mesh builders and the imagery stack's entries. The tools package uses Node's
+`crc32` and the `pmtiles` library's directory search instead of its own. 47 files, about 400 lines fewer; the core's
+main entry fell from 64.86 KB to 64.48 KB gzip. Changes that would grow the renderer's bundle (a shared mesh setup) or
+pass doubles as call arguments on a per-frame path (ADR 0018) were left as they are.
+
 ## 2026-10-31: the open questions answered, and a lighter first download for the playground (owner's request)
 
 The owner asked the agent to answer the questions still open itself and do what follows (ADR 0183). Most needed no

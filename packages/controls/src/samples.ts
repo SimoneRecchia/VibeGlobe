@@ -70,10 +70,19 @@ export class SampleRing {
     const stretchMs = Math.min(2 * cadenceMs, MAX_WINDOW_MS);
     if (releaseMs - this.stillSinceMs(stillPx) >= Math.max(stillMs, stretchMs)) return;
     windowMs = Math.max(windowMs, stretchMs);
+    if (!this.fit(windowMs, lastTime, out)) return;
+    this.endSlope(Math.max(RECENT_MS, 2 * cadenceMs), lastTime, out);
+  }
+
+  /**
+   * Writes into `out` the least-squares slope of each channel over the samples of the last `spanMs` before `lastTime`;
+   * false, `out` untouched, when fewer than two samples span at least 4 ms.
+   */
+  private fit(spanMs: number, lastTime: number, out: Float64Array): boolean {
     let n = 1;
-    while (n < this.count && lastTime - (this.times[this.index(n)] ?? 0) <= windowMs) n++;
+    while (n < this.count && lastTime - (this.times[this.index(n)] ?? 0) <= spanMs) n++;
     // Two events in the same millisecond carry no usable velocity.
-    if (n < 2 || lastTime - (this.times[this.index(n - 1)] ?? 0) < 4) return;
+    if (n < 2 || lastTime - (this.times[this.index(n - 1)] ?? 0) < 4) return false;
     // Least squares on times relative to the latest sample: slope = Σ(t − t̄)(v − v̄) / Σ(t − t̄)².
     let meanT = 0;
     for (let k = 0; k < n; k++) meanT += (this.times[this.index(k)] ?? 0) - lastTime;
@@ -94,7 +103,7 @@ export class SampleRing {
       }
       out[c] = sTV / sTT;
     }
-    this.endSlope(Math.max(RECENT_MS, 2 * cadenceMs), lastTime, out);
+    return true;
   }
 
   /**
@@ -105,29 +114,8 @@ export class SampleRing {
    * direction. A straight line over a few samples, not a curve, so jitter in event times does not read as a slowdown.
    */
   private endSlope(recentMs: number, lastTime: number, out: Float64Array): void {
-    let n = 1;
-    while (n < this.count && lastTime - (this.times[this.index(n)] ?? 0) <= recentMs) n++;
-    if (n < 2 || lastTime - (this.times[this.index(n - 1)] ?? 0) < 4) return;
-    let meanT = 0;
-    for (let k = 0; k < n; k++) meanT += (this.times[this.index(k)] ?? 0) - lastTime;
-    meanT /= n;
-    let sTT = 0;
-    for (let k = 0; k < n; k++) {
-      const dt = (this.times[this.index(k)] ?? 0) - lastTime - meanT;
-      sTT += dt * dt;
-    }
     const end = this.end;
-    for (let c = 0; c < 4; c++) {
-      let meanV = 0;
-      for (let k = 0; k < n; k++) meanV += this.values[this.index(k) * 4 + c] ?? 0;
-      meanV /= n;
-      let sTV = 0;
-      for (let k = 0; k < n; k++) {
-        const i = this.index(k);
-        sTV += ((this.times[i] ?? 0) - lastTime - meanT) * ((this.values[i * 4 + c] ?? 0) - meanV);
-      }
-      end[c] = sTV / sTT;
-    }
+    if (!this.fit(recentMs, lastTime, end)) return;
     const lx = out[0] ?? 0;
     const ly = out[1] ?? 0;
     const length = Math.hypot(lx, ly);

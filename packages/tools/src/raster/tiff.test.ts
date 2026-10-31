@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { decodeLzw } from './lzw.js';
+import { decodeLzw } from '@vibeglobe/core/decoders';
 import { readGeoTiff } from './tiff.js';
 
 const fixture = (name: string): Uint8Array =>

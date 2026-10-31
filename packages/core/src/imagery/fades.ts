@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
 import type { DrawLayer } from './draw-list.js';
+import { grownArray } from '../collections/typed-arrays.js';
 
 /** Default duration of an imagery cross-fade (M3 plan §4.2: the popping detector assumes 250 ms). */
 export const DEFAULT_FADE_MS = 250;
@@ -233,26 +234,17 @@ export class ImageryFades {
   }
 
   private grow(capacity: number): void {
-    const copy = <T extends Float64Array | Float32Array | Int32Array | Uint32Array | Uint8Array | Int8Array>(
-      array: T,
-      size: number,
-      create: (length: number) => T,
-    ): T => {
-      const next = create(size);
-      next.set(array);
-      return next;
-    };
-    this.free = copy(this.free, capacity, (n) => new Int32Array(n));
-    this.keys = copy(this.keys, capacity, (n) => new Float64Array(n));
-    this.stamps = copy(this.stamps, capacity, (n) => new Uint32Array(n));
-    this.toTexture = copy(this.toTexture, capacity, (n) => new Int32Array(n));
-    this.toLevel = copy(this.toLevel, capacity, (n) => new Int8Array(n));
-    this.toGeographic = copy(this.toGeographic, capacity, (n) => new Uint8Array(n));
-    this.toTransform = copy(this.toTransform, capacity * 4, (n) => new Float32Array(n));
-    this.fromTexture = copy(this.fromTexture, capacity, (n) => new Int32Array(n));
-    this.fromGeographic = copy(this.fromGeographic, capacity, (n) => new Uint8Array(n));
-    this.fromTransform = copy(this.fromTransform, capacity * 4, (n) => new Float32Array(n));
-    this.startMs = copy(this.startMs, capacity, (n) => new Float64Array(n));
+    this.free = grownArray(this.free, capacity);
+    this.keys = grownArray(this.keys, capacity);
+    this.stamps = grownArray(this.stamps, capacity);
+    this.toTexture = grownArray(this.toTexture, capacity);
+    this.toLevel = grownArray(this.toLevel, capacity);
+    this.toGeographic = grownArray(this.toGeographic, capacity);
+    this.toTransform = grownArray(this.toTransform, capacity * 4);
+    this.fromTexture = grownArray(this.fromTexture, capacity);
+    this.fromGeographic = grownArray(this.fromGeographic, capacity);
+    this.fromTransform = grownArray(this.fromTransform, capacity * 4);
+    this.startMs = grownArray(this.startMs, capacity);
     this.capacity = capacity;
   }
 }

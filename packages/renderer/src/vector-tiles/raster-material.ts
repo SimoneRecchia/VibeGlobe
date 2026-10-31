@@ -14,7 +14,6 @@ import {
   float,
   max,
   mix,
-  positionGeometry,
   texture,
   varying,
   vec3,
@@ -29,16 +28,7 @@ import {
   UnsignedByteType,
   type Texture,
 } from 'three/webgpu';
-import {
-  createUniforms,
-  DEPTH_PULL,
-  finish,
-  ground,
-  insideClip,
-  linearRgba,
-  mixAB,
-  placed,
-} from './vector-material.js';
+import { createUniforms, DEPTH_PULL, finish, insideClip, linearRgba, mixAB, tilePlaced } from './vector-material.js';
 
 /** The tile's units per side (the vector tile extent the tile attribute is in). */
 const EXTENT = 4096;
@@ -63,15 +53,7 @@ export function rasterTexture(image: {
 /** A raster mesh's material over its texture; frame uniforms as `createVectorMaterial`'s (`setVectorFrame`). */
 export function createRasterMaterial(image: Texture, depthPath: DepthPath): MeshBasicNodeMaterial {
   const u = createUniforms();
-  const here = placed(
-    positionGeometry,
-    attribute('tileNormal', 'vec3'),
-    attribute('tilePlane', 'vec4'),
-    ground(),
-    float(0),
-    u,
-    DEPTH_PULL,
-  );
+  const here = tilePlaced(u, DEPTH_PULL);
   const viewPosition = cameraViewMatrix.mul(vec4(here, 1));
   const material = new MeshBasicNodeMaterial();
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);

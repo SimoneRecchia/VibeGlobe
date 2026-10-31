@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import { appendFileSync, closeSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs';
+import { findTile, readVarint, zxyToTileId } from 'pmtiles';
 import { gunzip, gzip } from './gzip.js';
 
 /** PMTiles tile types. */
@@ -33,25 +34,7 @@ export interface Entry {
 }
 
 /** Hilbert tile id of z/x/y. */
-export function tileId(z: number, x: number, y: number): number {
-  let acc = (4 ** z - 1) / 3;
-  const n = 2 ** z;
-  let tx = x;
-  let ty = y;
-  for (let s = n / 2; s >= 1; s /= 2) {
-    const rx = (tx & s) > 0 ? 1 : 0;
-    const ry = (ty & s) > 0 ? 1 : 0;
-    acc += s * s * ((3 * rx) ^ ry);
-    if (ry === 0) {
-      if (rx === 1) {
-        tx = n - 1 - tx;
-        ty = n - 1 - ty;
-      }
-      [tx, ty] = [ty, tx];
-    }
-  }
-  return acc;
-}
+export { zxyToTileId as tileId };
 
 function pushVarint(out: number[], value: number): void {
   let v = value;
@@ -80,36 +63,20 @@ export function encodeDirectory(entries: Entry[]): Uint8Array {
   return gzip(Uint8Array.from(out));
 }
 
-/** Reads varints from a buffer. */
-class VarintReader {
-  at = 0;
-  constructor(private readonly bytes: Uint8Array) {}
-  next(): number {
-    let value = 0;
-    let factor = 1;
-    for (;;) {
-      const byte = this.bytes[this.at++] ?? 0;
-      value += (byte & 0x7f) * factor;
-      if (byte < 0x80) return value;
-      factor *= 0x80;
-    }
-  }
-}
-
 /** Decompresses and parses a directory. */
 export function decodeDirectory(compressed: Uint8Array): Entry[] {
-  const reader = new VarintReader(gunzip(compressed));
-  const count = reader.next();
+  const at = { buf: gunzip(compressed), pos: 0 };
+  const count = readVarint(at);
   const entries: Entry[] = [];
   let last = 0;
   for (let i = 0; i < count; i++) {
-    last += reader.next();
+    last += readVarint(at);
     entries.push({ tileId: last, offset: 0, length: 0, runLength: 0 });
   }
-  for (const e of entries) e.runLength = reader.next();
-  for (const e of entries) e.length = reader.next();
+  for (const e of entries) e.runLength = readVarint(at);
+  for (const e of entries) e.length = readVarint(at);
   entries.forEach((e, i) => {
-    const value = reader.next();
+    const value = readVarint(at);
     const previous = entries[i - 1];
     e.offset = value === 0 && previous ? previous.offset + previous.length : value - 1;
   });
@@ -176,7 +143,7 @@ export function writePmtiles(
   info: PmtilesInfo,
   metadata: unknown,
 ): { addressed: number; contents: number } {
-  const sorted = tiles.map((t) => ({ id: tileId(t.z, t.x, t.y), tile: t })).sort((a, b) => a.id - b.id);
+  const sorted = tiles.map((t) => ({ id: zxyToTileId(t.z, t.x, t.y), tile: t })).sort((a, b) => a.id - b.id);
   const dataPath = `${path}.data-${process.pid}`;
   writeFileSync(dataPath, new Uint8Array());
   const seen = new Map<string, { offset: number; length: number }>();
@@ -257,21 +224,6 @@ export class PmtilesReader {
     return JSON.parse(new TextDecoder().decode(gunzip(this.read(this.u64(24), this.u64(32)))));
   }
 
-  private find(entries: Entry[], id: number): Entry | undefined {
-    let lo = 0;
-    let hi = entries.length - 1;
-    let best: Entry | undefined;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const entry = entries[mid] as Entry;
-      if (entry.tileId <= id) {
-        best = entry;
-        lo = mid + 1;
-      } else hi = mid - 1;
-    }
-    return best;
-  }
-
   /** Every entry of every directory (leaves expanded), in tile-id order. */
   entries(): Entry[] {
     const leafBase = this.u64(40);
@@ -282,12 +234,10 @@ export class PmtilesReader {
 
   /** The bytes of a tile, or `undefined` when the archive does not address it. */
   tile(z: number, x: number, y: number): Uint8Array | undefined {
-    const id = tileId(z, x, y);
-    let entry = this.find(this.root, id);
-    if (entry && entry.runLength === 0) {
-      entry = this.find(decodeDirectory(this.read(this.u64(40) + entry.offset, entry.length)), id);
-    }
-    if (!entry || entry.runLength === 0 || id >= entry.tileId + entry.runLength) return undefined;
-    return this.read(this.u64(56) + entry.offset, entry.length);
+    const id = zxyToTileId(z, x, y);
+    let entry = findTile(this.root, id);
+    if (entry?.runLength === 0)
+      entry = findTile(decodeDirectory(this.read(this.u64(40) + entry.offset, entry.length)), id);
+    return entry && entry.runLength > 0 ? this.read(this.u64(56) + entry.offset, entry.length) : undefined;
   }
 }

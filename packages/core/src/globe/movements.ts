@@ -187,7 +187,6 @@ export class Movements {
 
   /** Turns to a heading along the shorter arc, keeping center and tilt (F191). */
   rotateTo(headingDeg: number, options: MovementOptions | undefined): CameraMovement {
-    this.host.assertAlive();
     return this.start('ease', { headingDeg }, options);
   }
 
@@ -446,9 +445,7 @@ function validSignal(signal: unknown): void {
 
 /** A movement that failed validation: rejected, with nothing to cancel. */
 function rejected(error: unknown): CameraMovement {
-  const promise = Promise.reject(error) as CameraMovement;
-  promise.cancel = () => undefined;
-  return promise;
+  return Object.assign(Promise.reject(error) as Promise<MoveOutcome>, { cancel: () => undefined });
 }
 
 /** A flight's speed and curve, finite and more than 0, and an easing name or function (F195). */
@@ -482,7 +479,5 @@ function validDuration(value: unknown): number | undefined {
 
 /** A movement that has already settled as 'completed': what a jump returns (F197, F200). */
 export function completedMovement(): CameraMovement {
-  const movement = Promise.resolve<MoveOutcome>('completed') as CameraMovement;
-  movement.cancel = () => undefined;
-  return movement;
+  return Object.assign(Promise.resolve<MoveOutcome>('completed'), { cancel: () => undefined });
 }

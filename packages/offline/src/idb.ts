@@ -92,6 +92,19 @@ export function openDatabase(factory: IDBFactory, name: string): Promise<IDBData
   });
 }
 
+/**
+ * Closes the connection and calls `lost` when the browser closes it (site data cleared) or another context deletes or
+ * upgrades the database (it asks first).
+ */
+export function watchLoss(db: IDBDatabase, lost: (reason: string) => void): void {
+  const end = (reason: string): void => {
+    db.close();
+    lost(reason);
+  };
+  db.onclose = () => end('the browser closed the database');
+  db.onversionchange = () => end('the database is being deleted or upgraded elsewhere');
+}
+
 /** An IDBKeyRange of every string key starting with `prefix`. */
 export function prefixRange(prefix: string): IDBKeyRange | undefined {
   return prefix === '' ? undefined : IDBKeyRange.bound(prefix, `${prefix}￿`);

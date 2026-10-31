@@ -61,15 +61,11 @@ export class ViewControl {
     this.navigation = {
       grab: (point) => (isScreenPoint(point) ? this.positionAt(point) : undefined),
       dragTo: (anchor, point) => {
-        host.assertAlive();
-        if (host.waiting()) return;
-        host.userInput(this.coasting ? 'inertia' : 'user');
+        if (!this.input()) return;
         if (dragCamera(host.cam, host.view, anchor, point, this.northUp())) host.requestRender();
       },
       zoomAt: (point, deltaZoom) => {
-        host.assertAlive();
-        if (host.waiting()) return;
-        host.userInput(this.coasting ? 'inertia' : 'user');
+        if (!this.input()) return;
         const allowed =
           host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
             ? host.limitZoom(deltaZoom)
@@ -156,6 +152,14 @@ export class ViewControl {
   private northUp(): boolean {
     northUpLimitRad[0] = (this.navigation.northUpMaxLatitudeDeg ?? 85) * RAD;
     return this.navigation.navigationMode === 'north-up';
+  }
+
+  /** Starts a step of the user's input, or of its glide, unless the globe is waiting; false then. */
+  private input(): boolean {
+    this.host.assertAlive();
+    if (this.host.waiting()) return false;
+    this.host.userInput(this.coasting ? 'inertia' : 'user');
+    return true;
   }
 
   /** See `NavigationApi.orbit`: invalid input is ignored. */

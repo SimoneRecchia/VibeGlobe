@@ -172,26 +172,30 @@ async function openFaultChecks(subject: AnySubject): Promise<CheckResult[]> {
   return out;
 }
 
-/** Faults and cancellation of a source that talks to the network only while it opens. */
-async function onOpenChecks(subject: AnySubject, coord: TileCoord): Promise<CheckResult[]> {
-  const source = await subject.create(subject.fixture);
-  const aborted = await fetchTile(source, coord, TIMEOUTS, 0);
-  const cancelled = aborted.result !== 'noData' && aborted.result.kind === 'aborted';
-  return [
-    ...(await openFaultChecks(subject)),
-    check(
-      'cancellation',
-      'an aborted request ends once as aborted',
-      cancelled && once(aborted),
-      describe(aborted.result),
-    ),
-  ];
+type FetchRun = Awaited<ReturnType<typeof fetchTile>>;
+
+/** A check of a fault's outcome: `ok`, and the transport called back exactly once. */
+function faultCheck(area: string, name: string, run: FetchRun, ok: boolean): CheckResult {
+  return check(area, name, ok && once(run), describe(run.result));
+}
+
+function cancellationCheck(aborted: FetchRun): CheckResult {
+  return faultCheck(
+    'cancellation',
+    'an aborted request ends once as aborted',
+    aborted,
+    describe(aborted.result) === 'aborted',
+  );
 }
 
 async function faultChecks(subject: AnySubject): Promise<CheckResult[]> {
   const coord = subject.tiles[0]?.coord;
   if (!coord) return [check('error handling', 'has a fixture tile to test faults with', false)];
-  if (subject.network === 'on-open') return onOpenChecks(subject, coord);
+  // A source that talks to the network only while it opens.
+  if (subject.network === 'on-open') {
+    const aborted = await fetchTile(await subject.create(subject.fixture), coord, TIMEOUTS, 0);
+    return [...(await openFaultChecks(subject)), cancellationCheck(aborted)];
+  }
   const run = async (mode: FaultMode, timeouts = TIMEOUTS, abortAfterMs?: number) => {
     // The service works while the source opens (capabilities, archive header), then starts failing.
     const service: { faulty?: typeof fetch } = {};
@@ -199,44 +203,22 @@ async function faultChecks(subject: AnySubject): Promise<CheckResult[]> {
     service.faulty = faultyFetch(subject.fixture, mode);
     return fetchTile(source, coord, timeouts, abortAfterMs);
   };
-  const out: CheckResult[] = [];
   const notFound = await run('404');
-  out.push(
-    check(
-      'error handling',
-      'a 404 answer is no data',
-      isNoData(notFound.result) && once(notFound),
-      describe(notFound.result),
-    ),
-  );
   const failing = await run('500');
-  const transient = failing.result !== 'noData' && failing.result.kind === 'status' && failing.result.status === 500;
-  out.push(
-    check(
+  const slow = await run('hang', SHORT_TIMEOUTS);
+  const corrupt = await run('corrupt');
+  return [
+    faultCheck('error handling', 'a 404 answer is no data', notFound, isNoData(notFound.result)),
+    faultCheck(
       'error handling',
       'a 500 answer is reported as a retryable status',
-      transient && once(failing),
-      describe(failing.result),
+      failing,
+      describe(failing.result) === 'status 500',
     ),
-  );
-  const slow = await run('hang', SHORT_TIMEOUTS);
-  const timedOut = slow.result !== 'noData' && slow.result.kind === 'timeout';
-  out.push(
-    check('error handling', 'a request without an answer times out', timedOut && once(slow), describe(slow.result)),
-  );
-  const corrupt = await run('corrupt');
-  out.push(check('error handling', 'a corrupted payload never throws and ends once', !corrupt.threw && once(corrupt)));
-  const aborted = await run('hang', TIMEOUTS, 0);
-  const cancelled = aborted.result !== 'noData' && aborted.result.kind === 'aborted';
-  out.push(
-    check(
-      'cancellation',
-      'an aborted request ends once as aborted',
-      cancelled && once(aborted),
-      describe(aborted.result),
-    ),
-  );
-  return out;
+    faultCheck('error handling', 'a request without an answer times out', slow, describe(slow.result) === 'timeout'),
+    faultCheck('error handling', 'a corrupted payload never throws and ends once', corrupt, !corrupt.threw),
+    cancellationCheck(await run('hang', TIMEOUTS, 0)),
+  ];
 }
 
 async function profileChecks(subject: AnySubject): Promise<CheckResult[]> {

@@ -163,8 +163,8 @@ function writeSkirts(write: (index: number, row: number, col: number) => void): 
 }
 
 /**
- * Builds the mesh of a geographic tile spanning [west, east] × [south, north] (radians) on the ellipsoid, with skirts
- * of `skirtDepthMeters` that hide cracks between neighbors of different levels.
+ * Builds the mesh of a geographic tile spanning [west, east] × [south, north] (radians) on the ellipsoid, rows linear in
+ * latitude, with skirts of `skirtDepthMeters` that hide cracks between neighbors of different levels.
  */
 export function buildTileMesh(
   key: number,
@@ -174,29 +174,8 @@ export function buildTileMesh(
   northRad: number,
   skirtDepthMeters: number,
 ): TileMeshData {
-  const originEcef = new Float64Array(3);
-  geodeticToEcef((westRad + eastRad) / 2, (southRad + northRad) / 2, 0, originEcef);
-  const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
-  const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
-  const normals = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
-  const planes = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 4);
-  const planeCenter = planeCenterOf((westRad + eastRad) / 2, (southRad + northRad) / 2);
-  const write = (index: number, row: number, col: number, heightMeters: number): void => {
-    const latRad = northRad + ((southRad - northRad) * row) / TILE_SEGMENTS;
-    const lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
-    geodeticToEcef(lonRad, latRad, heightMeters, vertex);
-    writeNormal(normals, index, lonRad, latRad);
-    writePlane(planes, index, lonRad, latRad, heightMeters, planeCenter);
-    for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
-    // Rows are linear in latitude: both v are the row fraction.
-    writeUvs(uvs, index, col / TILE_SEGMENTS, row / TILE_SEGMENTS, row / TILE_SEGMENTS);
-  };
-  for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) write(row * GRID + col, row, col, 0);
-  writeSkirts((index, row, col) => write(index, row, col, -skirtDepthMeters));
-  markSkirts(normals);
-  const indices = tileIndices();
-  const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength + planes.byteLength;
-  return { key, originEcef, positions, uvs, normals, planes, planeCenter, indices, byteLength };
+  const rows = Array.from({ length: GRID }, (_, row) => northRad + ((southRad - northRad) * row) / TILE_SEGMENTS);
+  return buildMesh(key, westRad, eastRad, rows, skirtDepthMeters, 0);
 }
 
 /**
@@ -210,21 +189,39 @@ export function buildQuadtreeTileMesh(
   skirtDepthMeters: number,
   skirtReachMeters = SKIRT_OUTWARD * skirtDepthMeters,
 ): TileMeshData {
-  const { westRad, eastRad } = tile;
+  const rows = Array.from({ length: GRID }, (_, row) => quadtreeRowLatitudeRad(tile, row));
+  return buildMesh(
+    tile.key,
+    tile.westRad,
+    tile.eastRad,
+    rows,
+    skirtDepthMeters,
+    skirtReachMeters / WGS84.semiMajorAxisMeters,
+  );
+}
+
+/** The mesh of a tile whose grid rows lie at `rowLatitudes`, its skirts reaching `outwardRad` out from the edge. */
+function buildMesh(
+  key: number,
+  westRad: number,
+  eastRad: number,
+  rowLatitudes: readonly number[],
+  skirtDepthMeters: number,
+  outwardRad: number,
+): TileMeshData {
+  const centerLatRad = rowLatitudes[TILE_SEGMENTS / 2] ?? 0;
   const originEcef = new Float64Array(3);
-  geodeticToEcef((westRad + eastRad) / 2, quadtreeRowLatitudeRad(tile, TILE_SEGMENTS / 2), 0, originEcef);
+  geodeticToEcef((westRad + eastRad) / 2, centerLatRad, 0, originEcef);
   const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const normals = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const planes = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 4);
-  const rowLatitudes = Array.from({ length: GRID }, (_, row) => quadtreeRowLatitudeRad(tile, row));
   const northRad = rowLatitudes[0] ?? 0;
   const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
-  const planeCenter = planeCenterOf((westRad + eastRad) / 2, rowLatitudes[TILE_SEGMENTS / 2] ?? 0);
+  const planeCenter = planeCenterOf((westRad + eastRad) / 2, centerLatRad);
   // Skirts reach outward, so the skirts of neighbors overlap below the surface and close the corners and slivers where
   // tiles of different levels meet (KB-069); a skirt hangs at most a fraction of a percent of the radius down, so it
   // stays inside the ellipsoid.
-  const outwardRad = skirtReachMeters / WGS84.semiMajorAxisMeters;
   const write = (index: number, row: number, col: number, heightMeters: number): void => {
     let lonRad = westRad + ((eastRad - westRad) * col) / TILE_SEGMENTS;
     let latRad = rowLatitudes[row] ?? 0;
@@ -247,5 +244,5 @@ export function buildQuadtreeTileMesh(
   markSkirts(normals);
   const indices = tileIndices();
   const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength + planes.byteLength;
-  return { key: tile.key, originEcef, positions, uvs, normals, planes, planeCenter, indices, byteLength };
+  return { key, originEcef, positions, uvs, normals, planes, planeCenter, indices, byteLength };
 }

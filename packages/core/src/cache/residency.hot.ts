@@ -6,6 +6,7 @@
  * @benchmark benchmarks/run.ts
  */
 import { IntegerKeyMap } from '../collections/integer-key-map.hot.js';
+import { grownArray } from '../collections/typed-arrays.js';
 
 /** Never evicted: the pinned base (F084). Pinned entries are kept out of the LRU list altogether. */
 const PINNED = 1;
@@ -234,8 +235,7 @@ export class Residency {
   evictAt(keys: ArrayLike<number>, at: number): boolean {
     const slot = this.map.getAt(keys, at);
     if (slot === undefined) return false;
-    if (((this.flags[slot] ?? 0) & PINNED) !== 0 || this.isProtected(slot) || this.lastUsed[slot] === this.state[FRAME])
-      return false;
+    if (this.kept(slot)) return false;
     this.evict(slot);
     return true;
   }
@@ -284,7 +284,10 @@ export class Residency {
    */
   isKept(key: number): boolean {
     const slot = this.map.get(key);
-    if (slot === undefined) return false;
+    return slot !== undefined && this.kept(slot);
+  }
+
+  private kept(slot: number): boolean {
     return (
       ((this.flags[slot] ?? 0) & PINNED) !== 0 || this.isProtected(slot) || this.lastUsed[slot] === this.state[FRAME]
     );
@@ -441,25 +444,13 @@ export class Residency {
   private grow(): void {
     const capacity = this.keys.length;
     const grown = capacity * 2;
-    this.keys = copyFloat64(this.keys, grown);
-    this.entryBytes = copyFloat64(this.entryBytes, grown);
-    this.lastUsed = copyFloat64(this.lastUsed, grown);
-    this.drawnFrame = copyFloat64(this.drawnFrame, grown);
-    const prev = new Int32Array(grown);
-    prev.set(this.prev);
-    this.prev = prev;
-    const next = new Int32Array(grown);
-    next.set(this.next);
-    this.next = next;
-    const flags = new Uint8Array(grown);
-    flags.set(this.flags);
-    this.flags = flags;
+    this.keys = grownArray(this.keys, grown);
+    this.entryBytes = grownArray(this.entryBytes, grown);
+    this.lastUsed = grownArray(this.lastUsed, grown);
+    this.drawnFrame = grownArray(this.drawnFrame, grown);
+    this.prev = grownArray(this.prev, grown);
+    this.next = grownArray(this.next, grown);
+    this.flags = grownArray(this.flags, grown);
     this.chainFree(capacity, grown);
   }
-}
-
-function copyFloat64(source: Float64Array, length: number): Float64Array {
-  const copy = new Float64Array(length);
-  copy.set(source);
-  return copy;
 }

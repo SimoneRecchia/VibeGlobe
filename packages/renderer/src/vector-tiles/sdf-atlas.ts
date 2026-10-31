@@ -8,14 +8,9 @@
  */
 import { DataTexture, LinearFilter, RedFormat, RGBAFormat, UnsignedByteType } from 'three/webgpu';
 import { renewed } from '../layer-atlas.js';
+import type { AtlasRect } from '@vibeglobe/core';
 
-/** A packed entry, in texels. */
-export interface AtlasRect {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+export type { AtlasRect };
 
 /** Space left around each entry, so linear filtering never reads a neighbor. */
 const PADDING = 1;

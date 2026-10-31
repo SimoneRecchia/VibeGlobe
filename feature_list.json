@@ -7903,7 +7903,7 @@
       "steps": [
         "In the browser, the turbines cost three instanced draws and the tables at most three, and close over the park the modules' glass fills the view from the south and their backs from the north"
       ],
-      "status": "failing"
+      "status": "passing"
     }
   ]
 }

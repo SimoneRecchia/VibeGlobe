@@ -121,22 +121,31 @@ export function requestingTarget(
   };
 }
 
+/** What a model renderer does that changes the frame, then what it only answers or records. */
+const MODEL_CHANGES = [
+  'load',
+  'setPose',
+  'remove',
+  'setHighlight',
+  'setVisible',
+  'loadSet',
+  'setInstances',
+  'setInstanceHighlight',
+  'setInstanceAngles',
+] as const;
+const MODEL_QUERIES = ['setPickId', 'drawnInstances'] as const;
+
 /** A model renderer whose changes each ask for a frame. */
 function requestingModels(
   models: ModelRenderer,
   after: <A extends unknown[], R>(call: (...args: A) => R) => (...args: A) => R,
 ): ModelRenderer {
-  return {
-    load: after((source) => models.load(source)),
-    setPose: after((id, pose) => models.setPose(id, pose)),
-    remove: after((id) => models.remove(id)),
-    ...(models.setPickId ? { setPickId: models.setPickId.bind(models) } : {}),
-    ...(models.setHighlight ? { setHighlight: after(models.setHighlight.bind(models)) } : {}),
-    ...(models.setVisible ? { setVisible: after(models.setVisible.bind(models)) } : {}),
-    ...(models.loadSet ? { loadSet: after(models.loadSet.bind(models)) } : {}),
-    ...(models.setInstances ? { setInstances: after(models.setInstances.bind(models)) } : {}),
-    ...(models.setInstanceHighlight ? { setInstanceHighlight: after(models.setInstanceHighlight.bind(models)) } : {}),
-  };
+  const wrapped: Record<string, unknown> = {};
+  for (const name of [...MODEL_CHANGES, ...MODEL_QUERIES]) {
+    const call = (models[name] as ((...args: unknown[]) => unknown) | undefined)?.bind(models);
+    if (call) wrapped[name] = (MODEL_QUERIES as readonly string[]).includes(name) ? call : after(call);
+  }
+  return wrapped as unknown as ModelRenderer;
 }
 
 const geodetic = new Float64Array(3);

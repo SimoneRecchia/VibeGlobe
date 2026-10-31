@@ -235,4 +235,11 @@ export {
   type LayerOrigin,
   type LayerVertices,
 } from './layers/layer-geometry.js';
-export type { ModelHandle, ModelOptions, ModelPose, ModelRenderer, ModelSetOptions } from './layers/models.js';
+export type {
+  ModelHandle,
+  ModelOptions,
+  ModelPose,
+  ModelRenderer,
+  ModelSetJoint,
+  ModelSetOptions,
+} from './layers/models.js';

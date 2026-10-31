@@ -60,6 +60,8 @@ export interface ModelRenderer {
   setInstanceAngles?(id: number, joint: number, anglesRad: Float32Array): void;
   /** How many copies of a set the last frame drew as the model (in view and near the eye). */
   drawnInstances?(id: number): number;
+  /** A set's model box in its own meters, y up: `[minX, minY, minZ, maxX, maxY, maxZ]` (F667). */
+  setBounds?(id: number): readonly number[] | undefined;
 }
 
 /** How a set of models draws its copies (F627). */

@@ -67,6 +67,8 @@ export class ModelSet {
   /** Bounding sphere in model units: the center's height above the anchor, and the radius. */
   readonly centerUp: number;
   readonly radius: number;
+  /** The model's box in its own meters, y up: min x, y, z, then max (F667). */
+  readonly box: readonly number[];
 
   constructor(
     root: Object3D,
@@ -75,6 +77,7 @@ export class ModelSet {
   ) {
     root.updateMatrixWorld(true);
     const bounds = new Box3().setFromObject(root);
+    this.box = [...bounds.min.toArray(), ...bounds.max.toArray()];
     this.centerUp = bounds.getCenter(new Vector3()).y;
     this.radius = bounds.getSize(new Vector3()).length() / 2;
     const joints = (options.joints ?? []).map((joint) => root.getObjectByName(joint.node));

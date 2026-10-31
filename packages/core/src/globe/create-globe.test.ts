@@ -372,7 +372,11 @@ describe('createGlobe', () => {
   });
 
   it('zooms at the cursor, keeping the point under it within one pixel, down to about 1 m (F061)', async () => {
-    const { globe } = await started({ view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 2 } });
+    // Down to 1 m with no distance kept from the surface (KB-299 keeps 40 m by default).
+    const { globe } = await started({
+      view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 2 },
+      constraints: { minSurfaceDistanceMeters: 0 },
+    });
     const cursor = { xPx: 250, yPx: 200 };
     for (let i = 0; i < 300; i++) {
       const anchor = globe.screenToGeo(cursor);
@@ -385,6 +389,26 @@ describe('createGlobe', () => {
     expect(globe.camera.altitudeMeters).toBeLessThan(1.5);
     for (let i = 0; i < 300; i++) globe.navigation.zoomAt(cursor, -0.25);
     expect(globe.camera.zoom).toBeLessThan(3);
+  });
+
+  it('stops a wheel zoom 40 m from the surface under the cursor by default, at the distance set, never at zoom 28 (KB-299)', async () => {
+    for (const [constraints, meters] of [
+      [undefined, 40],
+      [{ minSurfaceDistanceMeters: 150 }, 150],
+    ] as const) {
+      const { globe } = await started({
+        view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 2 },
+        ...(constraints ? { constraints } : {}),
+      });
+      const cursor = { xPx: 400, yPx: 300 };
+      for (let i = 0; i < 300; i++) globe.navigation.zoomAt(cursor, 0.25);
+      // The cursor at the view's center: the eye's distance to the ellipsoid under it, along the view's tilt.
+      const distance = globe.camera.altitudeMeters / Math.cos((globe.camera.tiltDeg * Math.PI) / 180);
+      expect(distance).toBeGreaterThan(meters - 0.5);
+      expect(distance).toBeLessThan(meters * 1.1);
+      expect(globe.camera.zoom).toBeLessThan(23);
+      globe.destroy();
+    }
   });
 
   it('tells whether the globe hides a position: beyond the horizon on the globe, never on the flat map (F653)', async () => {

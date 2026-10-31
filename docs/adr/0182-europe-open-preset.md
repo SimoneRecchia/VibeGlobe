@@ -224,7 +224,7 @@ AGEA imagery has no tile service, and Brussels' current licence was not confirme
 
 The owner then fixed (2026-10-31) that the package keeps its weight, level 11 as before, and that the deeper levels
 come online only, through the services' APIs, in online and hybrid use: the orthophotos pass through the offline engine
-as network sources (KB-291). Where no orthophoto covers the land, the package's WorldCover composite (10 m) is the
+as network sources (KB-298). Where no orthophoto covers the land, the package's WorldCover composite (10 m) is the
 detail, an application may still build it deeper at its own cost: `packageLevels.imagery`
 reads it to the level the package was built to (F662), 13 for its full detail at about 27 GB, so zoom 15 shows it
 magnified four times instead of level 11 sixteen times. Each service publishes its own availability; CORS could not be

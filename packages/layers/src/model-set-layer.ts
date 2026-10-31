@@ -328,6 +328,40 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
     return { longitudeDeg: foot.longitudeDeg, latitudeDeg: foot.latitudeDeg, heightMeters };
   }
 
+  /**
+   * The corners of copies' model boxes as the frame draws them (F667), to frame whole models with `fitObjects`: a
+   * turbine with its tower, nacelle and rotor, or a plant's every device. Round the vertical axis the box takes its
+   * largest reach, so a nacelle turned any way stays inside. `ids` default to every copy; empty before the model has
+   * loaded. `reliefFactor` as for {@link ModelSetLayer.markerPosition}.
+   */
+  framePositions(ids?: readonly FeatureId[], reliefFactor = this.#ground?.camera.reliefFactor ?? 1): GeoPosition[] {
+    const box = this.#set === undefined ? undefined : this.#models?.setBounds?.(this.#set);
+    if (!box) return [];
+    const [minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0] = box;
+    const corners: GeoPosition[] = [];
+    for (const id of ids ?? this.#items.map((item) => item.id)) {
+      const index = this.#index.get(id);
+      const foot = index === undefined ? undefined : this.#poses[index]?.position;
+      if (index === undefined || !foot) continue;
+      const scale = this.#items[index]?.scale ?? 1;
+      const reachDeg = (Math.hypot(Math.max(-minX, maxX), Math.max(-minZ, maxZ)) * scale * 180) / (Math.PI * 6_378_137);
+      const lonDeg = reachDeg / Math.cos((foot.latitudeDeg * Math.PI) / 180);
+      for (const y of [minY, maxY])
+        for (const [east, north] of [
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+          [1, 1],
+        ] as const)
+          corners.push({
+            longitudeDeg: foot.longitudeDeg + east * lonDeg,
+            latitudeDeg: foot.latitudeDeg + north * reachDeg,
+            heightMeters: (foot.heightMeters ?? 0) + (reliefFactor > 0 ? (y * scale) / reliefFactor : 0),
+          });
+    }
+    return corners;
+  }
+
   /** Moves a copy (a live update). */
   setFeaturePosition(id: FeatureId, longitudeDeg: number, latitudeDeg: number, heightMeters = 0): boolean {
     const index = this.#index.get(id);

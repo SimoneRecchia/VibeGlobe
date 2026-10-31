@@ -106,7 +106,7 @@ const CHANGES = [
   'setInstanceHighlight',
   'setInstanceAngles',
 ];
-const QUERIES = ['pick', 'stats', 'measureText', 'setPickId', 'drawnInstances'];
+const QUERIES = ['pick', 'stats', 'measureText', 'setPickId', 'drawnInstances', 'setBounds'];
 
 /** A layer target whose every change also asks for a frame, so it shows on the next frame (ADR 0037); its models too. */
 export function requestingTarget(

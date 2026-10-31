@@ -209,6 +209,54 @@ describe('tours with a long-lived signal', () => {
 });
 
 describe('fitting bounds and tours (F176, F199)', () => {
+  it('frames a tall object on raised ground centered, and a lone point from a distance instead of at zoom 22 (KB-300)', async () => {
+    const { globe, ticks } = await started({
+      longitudeDeg: 9.4,
+      latitudeDeg: 45.1,
+      zoom: 12,
+      headingDeg: 30,
+      tiltDeg: 50,
+    });
+    // A 150 m turbine whose foot stands 70 m above the ellipsoid: its foot and its top must show, its middle centered.
+    const foot = { longitudeDeg: 9.4, latitudeDeg: 45.1, heightMeters: 70 };
+    const top = { ...foot, heightMeters: 220 };
+    const point = { westDeg: 9.4, eastDeg: 9.4, southDeg: 45.1, northDeg: 45.1 };
+    const movement = globe.fitBounds(point, { include: [foot, top], paddingPx: 40, movement: 'ease', durationMs: 100 });
+    ticks(30);
+    expect(await movement).toBe('completed');
+    const middle = globe.geoToScreen({ ...foot, heightMeters: 145 });
+    expect(Math.hypot((middle?.xPx ?? NaN) - 400, (middle?.yPx ?? NaN) - 300)).toBeLessThan(8);
+    for (const shown of [globe.geoToScreen(foot), globe.geoToScreen(top)]) {
+      expect(shown?.yPx).toBeGreaterThanOrEqual(39.9);
+      expect(shown?.yPx).toBeLessThanOrEqual(560.1);
+    }
+    // Snug: one of the two touches the padding.
+    const ys = [globe.geoToScreen(foot)?.yPx ?? NaN, globe.geoToScreen(top)?.yPx ?? NaN];
+    expect(Math.min(ys[0] ?? NaN, ys[1] ?? NaN) - 40 < 3 || 560 - Math.max(ys[0] ?? NaN, ys[1] ?? NaN) < 3).toBe(true);
+    // A lone point with nothing above it: framed from 100 m away, not from the 2 m of zoom 22.
+    const lone = globe.fitBounds(point, { movement: 'ease', durationMs: 100 });
+    ticks(30);
+    expect(await lone).toBe('completed');
+    const distance = globe.camera.altitudeMeters / Math.cos((globe.camera.tiltDeg * Math.PI) / 180);
+    expect(distance).toBeGreaterThan(99);
+    expect(distance).toBeLessThan(110);
+    // From a tilt given (F667): a plant seen from 30°, still framed and centered.
+    const tilted = globe.fitBounds(point, {
+      include: [foot, top],
+      paddingPx: 40,
+      tiltDeg: 30,
+      movement: 'ease',
+      durationMs: 100,
+    });
+    ticks(30);
+    expect(await tilted).toBe('completed');
+    expect(globe.camera.tiltDeg).toBeCloseTo(30, 6);
+    const centered = globe.geoToScreen({ ...foot, heightMeters: 145 });
+    expect(Math.hypot((centered?.xPx ?? NaN) - 400, (centered?.yPx ?? NaN) - 300)).toBeLessThan(8);
+    await expect(globe.fitBounds(point, { tiltDeg: 120 })).rejects.toMatchObject({ code: 'invalid-coordinate' });
+    globe.destroy();
+  });
+
   it.each([
     [30, 20],
     [-60, 0],

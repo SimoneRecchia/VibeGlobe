@@ -131,7 +131,7 @@ it, 0 meaning 1), and `[5]`, the largest tilt of the frame in radians (the engin
 
 ## Camera limits
 
-`globe.setConstraints({ minZoom, maxZoom, maxRangeMeters, maxTiltDeg, bounds })` holds every input and movement within
+`globe.setConstraints({ minZoom, maxZoom, maxRangeMeters, maxTiltDeg, bounds, minSurfaceDistanceMeters })` holds every input and movement within
 the limits (F209–F211, F646); `globe.constraints` reads them back.
 
 - `minZoom` and `maxZoom` are Web Mercator zooms at the latitude of the view's center: the same zoom is a nearer camera
@@ -142,6 +142,10 @@ the limits (F209–F211, F646); `globe.constraints` reads them back.
   most of the view at any screen size (the range sets its angular size); a drag past a pole keeps the range while the
   Web Mercator zoom falls.
 - The zoom keeps its readout meaning: a page that shows labels or markers by zoom still reads `globe.camera.zoom`.
+- `minSurfaceDistanceMeters` (default 40) is how near a zoom in (wheel, pinch, double click, keys) may bring the eye
+  to the surface it zooms toward: the terrain as drawn, mountains included, or the ellipsoid without terrain. The zoom
+  stops there, a little before the ground, so the view always shows what it frames instead of reaching zoom 28 above a
+  point lifted off the ground (KB-299). `0` lets the zoom come down to about 1 m (F061).
 
 ## Key map
 

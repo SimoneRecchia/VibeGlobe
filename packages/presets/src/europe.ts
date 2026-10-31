@@ -442,7 +442,7 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
       return true;
     },
   };
-  // The orthophotos are online sources: through the offline engine, so its modes decide when they are asked (KB-291).
+  // The orthophotos are online sources: through the offline engine, so its modes decide when they are asked (KB-298).
   const orthophotos = (options.orthophotos?.layers ?? []).map((layer) => ({
     ...layer,
     sources: layer.sources.map((source) => build.wrap(source, 'network', 'satellite')),

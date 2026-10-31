@@ -135,6 +135,26 @@ divided by the relief. On a flat relief (0), where no height shows, it is the fo
 `camera.reliefFactor` when it is at hand: without it each call reads the camera. `getPosition` keeps returning the
 position as set (with a ground, its height above it).
 
+### Flying to a model or a whole plant
+
+`framePositions(ids)` gives the corners of copies' model boxes as the frame draws them: the tower's foot, the rotor's
+tip and the reach of the blades round the tower, at the copy's scale, a nacelle turned any way included (F667).
+`fitObjects` of `@vibeglobe/layers` flies to the view that shows them all, the middle of their heights at the view's
+center:
+
+```ts
+// One turbine, whole and centered, from the view's own tilt.
+await fitObjects(globe, farm.framePositions(['WTG 01']), { paddingPx: 40 });
+// A plant: every device's box (several sets together), from 45° so the far rows show as well as the near ones.
+await fitObjects(globe, [...turbines.framePositions(plantIds), ...tables.framePositions(tableIds)], {
+  paddingPx: 40,
+  tiltDeg: 45,
+});
+```
+
+Framing the plant's own coordinates instead of its devices' frames one point: a fit never comes nearer than 100 m to
+what it frames (KB-300), but only the devices' boxes give the plant's width, depth and height.
+
 ## A light model
 
 Every triangle of a set is drawn once per copy in view, so the model's weight multiplies. Recommended limits for a

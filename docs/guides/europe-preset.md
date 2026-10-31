@@ -346,7 +346,7 @@ Rheinland-Pfalz, Sachsen, Sachsen-Anhalt, Thüringen), from 19 to 21 levels deep
 per pixel to its country's or region's borders (Natural Earth, loaded on demand), above the satellite composite;
 outside them the composite shows. They are online services, asked tile by tile through their own APIs: they add nothing to the
 package, and the offline engine's mode decides when they are asked (online and hybrid use ask them, offline use never,
-KB-291). Each
+KB-298). Each
 starts at level 12 (`ORTHOPHOTO_MIN_LEVEL`), as the services answer far views with white images, and a white tile counts
 as no data, so the composite shows through it.
 

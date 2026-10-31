@@ -120,7 +120,12 @@ posts 5 m deep, buried on flat ground.
 
 ```ts
 const field = stack.add(
-  new ModelSetLayer({ url: '/models/solar-table.glb', models: tables, ground: globe, footprint: { widthMeters: 13.9, depthMeters: 4.4 } }),
+  new ModelSetLayer({
+    url: '/models/solar-table.glb',
+    models: tables,
+    ground: globe,
+    footprint: { widthMeters: 13.9, depthMeters: 4.4 },
+  }),
 );
 ```
 

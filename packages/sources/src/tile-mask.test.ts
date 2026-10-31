@@ -12,7 +12,7 @@ describe('decode-image blank tiles (F618)', () => {
   });
 });
 
-describe('the sea key (KB-302)', () => {
+describe('the sea key (KB-303)', () => {
   it('keys water of every shade at sea, keeps the colors of land, and inside the land its lakes and shadows', () => {
     // Shallow, medium and deep water, and the package's no-data water.
     const water = [

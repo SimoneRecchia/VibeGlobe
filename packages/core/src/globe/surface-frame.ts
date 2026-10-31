@@ -302,7 +302,7 @@ export class SurfaceFrame {
     if (imagery)
       for (const layer of imagery.layers) {
         layer.loader.prefetchPaused = motion > 1 || imagery.plan.flying;
-        // A flight requests no visible tile: its plan loads the path and the destination instead (F287, F670).
+        // A flight requests no visible tile: its plan loads the path and the destination instead (F287, F671).
         layer.loader.settleMs = imagery.plan.flying ? Number.POSITIVE_INFINITY : 0;
       }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
@@ -332,7 +332,7 @@ export class SurfaceFrame {
   }
 
   /**
-   * Loads what a movement to `end` will draw ahead while it runs, along `path` when it has one (F286, F670), or stops
+   * Loads what a movement to `end` will draw ahead while it runs, along `path` when it has one (F286, F671), or stops
    * (undefined).
    */
   preloadView(end: Float64Array | undefined, camera: Camera, flight = false, path?: MovementPath): void {

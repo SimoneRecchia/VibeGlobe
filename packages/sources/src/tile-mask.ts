@@ -26,7 +26,7 @@ export function isBlank(rgba: Uint8ClampedArray, { rgb, tolerance }: BlankColor)
  * The decoded tile masked to the area's outline (even-odd: holes and several polygons) on an `OffscreenCanvas`, the
  * input closed; null for a tile of the blank color (also closed); the tile itself where no canvas is available. A
  * feathered mask fades from transparent at the border to opaque `featherPx` inside it; a keyed mask applies only to
- * pixels of its color (KB-231); the sea's key, to water's colors outside the land (KB-302).
+ * pixels of its color (KB-231); the sea's key, to water's colors outside the land (KB-303).
  */
 export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask): ImageBitmap | RgbaTile | null {
   if (typeof OffscreenCanvas !== 'function') return image;
@@ -78,7 +78,7 @@ export interface RgbaTile {
 type Outline = Pick<TileMask, 'points' | 'ringEnds'>;
 
 /**
- * The sea's fade (KB-302): the land blurred by 1.5 feathers and stretched fourfold about its outline, so its share of a
+ * The sea's fade (KB-303): the land blurred by 1.5 feathers and stretched fourfold about its outline, so its share of a
  * pixel rises from none at the outline to all a feather inside, and gaps narrower than a feather between its polygons
  * stay land.
  */
@@ -167,7 +167,7 @@ export function waterShare(r: number, g: number, b: number): number {
  * Scales each pixel's alpha by its inside value (0–255); with a key, only the pixels of the key's color; with a key
  * everywhere, every pixel, those of the key's color made transparent, fading back in up to twice its tolerance (F636);
  * with the land's share of each pixel (0–255, none past its end), water's colors by how much of the pixel is sea
- * (KB-302).
+ * (KB-303).
  */
 export function applyAlpha(
   rgba: Uint8Array,

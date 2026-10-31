@@ -1,7 +1,7 @@
 // The `earth` fixture patterns (F636): imagery sampled from the playground's Natural Earth base image, so every source
 // of a zoom scenario shows the same ground as the base image, continuous across tiles and levels. `earth` is the
 // image's own colors, `earth-package` all of it in another tone (a package stand-in: its composite's water is imagery
-// too, keyed out at sea by the preset, KB-302), `earth-fine` its own colors again (an online orthophoto stand-in, shown
+// too, keyed out at sea by the preset, KB-303), `earth-fine` its own colors again (an online orthophoto stand-in, shown
 // in its own colors: F638), `earth-marble` a Blue Marble stand-in, darker and bluer, its sea dark and blotched (KB-234,
 // KB-237).
 import { readFileSync } from 'node:fs';

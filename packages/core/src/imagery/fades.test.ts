@@ -86,7 +86,7 @@ describe('ImageryFades (F105)', () => {
     expect(list.fromTextures[0]).toBe(10);
   });
 
-  it("a layer's first tile on a tile that appears by refinement fades in from what lay below its parent (KB-305)", () => {
+  it("a layer's first tile on a tile that appears by refinement fades in from what lay below its parent (KB-306)", () => {
     const fades = new ImageryFades();
     const list = new DrawList(4);
     const now = new Float64Array([0]);
@@ -110,7 +110,7 @@ describe('ImageryFades (F105)', () => {
     expect(list.fromTextures[0]).toBe(-1);
   });
 
-  it('a tile that appears two levels finer at once, as a stopping camera refines, fades from its ancestor (KB-305)', () => {
+  it('a tile that appears two levels finer at once, as a stopping camera refines, fades from its ancestor (KB-306)', () => {
     const fades = new ImageryFades();
     const list = new DrawList(4);
     const now = new Float64Array([0]);

@@ -135,7 +135,7 @@ describe('europeOpen (F613)', () => {
     });
     const worldCover = preset.baseMaps[0]?.imagery[0]?.sources[0];
     expect(worldCover?.transparent).toBe(true);
-    // Over the open sea (level 8) the water's pixels are keyed out over the whole tile and the others stay (KB-302); a
+    // Over the open sea (level 8) the water's pixels are keyed out over the whole tile and the others stay (KB-303); a
     // tile across the package box's edge (level 8 at 32° W, 50° N) fades out beyond it over 12 pixels (F639).
     expect(worldCover?.tileMask?.(SEA)?.sea?.ringEnds.length).toBe(0);
     expect(Array.from(worldCover?.tileMask?.(SEA)?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
@@ -145,7 +145,7 @@ describe('europeOpen (F613)', () => {
     });
   });
 
-  it("keys the package's sea out at every level, its real water too, and keeps the land's lakes and shadows (KB-302)", () => {
+  it("keys the package's sea out at every level, its real water too, and keeps the land's lakes and shadows (KB-303)", () => {
     const worldCover = europeOpen({
       packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
       offline: fakeOffline(),

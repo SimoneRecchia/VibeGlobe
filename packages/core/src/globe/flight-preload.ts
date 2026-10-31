@@ -9,7 +9,7 @@ import {
   type QuadtreeTile,
 } from '../surface/surface-quadtree.hot.js';
 
-/** A movement's duration is split in this many steps: the plan selects the views at the times between them (F670). */
+/** A movement's duration is split in this many steps: the plan selects the views at the times between them (F671). */
 const SAMPLES = 12;
 /**
  * The views along a path are this much narrower and shorter than the camera's, at the same detail: the next samples
@@ -37,7 +37,7 @@ export interface MovementPath {
 }
 
 /**
- * What a movement will draw, loaded in the order it will need it (F286, F287, F670). When the movement starts, the
+ * What a movement will draw, loaded in the order it will need it (F286, F287, F671). When the movement starts, the
  * destination's view at the arrival's detail (whose ancestors a few levels up load first, so arrival is never blank),
  * the tiles its camera selects at times along the path, at the detail a moving camera shows (F288), each with the time
  * it first shows them, and a margin ring around the destination three levels coarser; each tile once, at most

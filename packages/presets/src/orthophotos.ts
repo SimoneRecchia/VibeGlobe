@@ -88,6 +88,7 @@ async function sourceOf(record: OrthophotoRecord, maxLevel: number, key?: string
     transparent: false,
     // Orthophotos carry no labels to keep whole across tile edges.
     gutterPx: 0,
+    ...(record.service.crs ? { preferredCrs: record.service.crs } : {}),
     ...(keyed ? { parameters: keyed } : {}),
   });
   return {

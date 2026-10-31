@@ -13,7 +13,7 @@
  * Gives each pixel that is not opaque, next to an opaque one, the alpha-weighted mean color of its opaque 8-neighbors,
  * `passes` times (each pass reaches one pixel further, covering the coarser mip levels). Alpha stays unchanged, and
  * translucent pixels away from opaque ones (a uniformly translucent layer) keep their color. Pixels from `opaqueAlpha`
- * up count as opaque: 1 where translucent pixels hold their exact color (a tile masked per pixel, KB-302).
+ * up count as opaque: 1 where translucent pixels hold their exact color (a tile masked per pixel, KB-303).
  */
 export function bleedTransparentEdges(
   rgba: Uint8Array | Uint8ClampedArray,

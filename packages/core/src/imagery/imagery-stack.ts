@@ -168,7 +168,7 @@ export interface StackEntry {
   blend: ImageryBlend;
   harmonize: Harmonize;
   fadeIn?: ZoomFade;
-  /** The share of its opacity the layer shows at the frame's zoom (its `fadeIn`), set each frame (F635, F669). */
+  /** The share of its opacity the layer shows at the frame's zoom (its `fadeIn`), set each frame (F635, F670). */
   zoomOpacity?: number;
   harmonizeFade?: ZoomFade;
   /** The strength of its matching to the imagery below at the frame's zoom (its `harmonizeFade`), each frame (F638). */
@@ -246,7 +246,7 @@ export function shownOpacity(entry: StackEntry): number {
 }
 
 /**
- * The least time a layer's zoom fade takes to go from one end to the other, milliseconds (F669): a fast zoom through a
+ * The least time a layer's zoom fade takes to go from one end to the other, milliseconds (F670): a fast zoom through a
  * fade changes the layer's opacity no faster, so a layer never turns on or off like a light; a slower zoom moves it with
  * the zoom, as before. (Tone matching fades over several levels, `harmonizeFade`: slow enough at any zoom speed.)
  */
@@ -255,10 +255,10 @@ export const LAYER_FADE_MS = 600;
 /**
  * Sets each layer's tone matching at the camera's Mercator zoom (F638) and moves its share of its opacity toward its value
  * there (F635), by at most the time since the last call (`time[0]` now, `time[1]` the last call, written here, engine
- * milliseconds; no time moves it at once) over {@link LAYER_FADE_MS} (F669). When a layer turns opaque or
+ * milliseconds; no time moves it at once) over {@link LAYER_FADE_MS} (F670). When a layer turns opaque or
  * translucent, every draw changes layers: `snaps` (the imagery's cross-fades, then each overlay slot's) show the next
  * frame at once, with no cross-fade from what they showed, which was the same imagery; when a layer appears or vanishes
- * under a shown one, whose overlay slot moves, the overlay slots' do (KB-306). Returns true while an opacity has not
+ * under a shown one, whose overlay slot moves, the overlay slots' do (KB-307). Returns true while an opacity has not
  * reached its value. Allocates nothing.
  */
 export function fadeByZoom(
@@ -291,7 +291,7 @@ export function fadeByZoom(
   return fading;
 }
 
-/** Whether a view at Mercator zoom `zoom` draws the layer: visible, not transparent, and within its fade (F670). */
+/** Whether a view at Mercator zoom `zoom` draws the layer: visible, not transparent, and within its fade (F671). */
 export function shownAt(entry: StackEntry, zoom: number): boolean {
   return entry.visible && entry.opacity > 0 && ramp(entry.fadeIn, zoom, 1) > 0;
 }

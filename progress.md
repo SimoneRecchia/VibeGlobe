@@ -4,19 +4,19 @@
 
 Measured first with the Europe preset's fixtures (each source the base image in its own tone) in a 960 × 640 view with
 400 ms latency on a 1.5 MB/s link, frames read at 60 Hz, before and after on the same machine. A layer's fade by zoom
-now changes no faster than once in 600 ms (F669), and only a change of role or slot cuts cross-fades short (KB-306). The
-blinking had three causes: an overlay's first tile faded in through black, a quarter darker halfway (KB-303); a layer
-with nothing resident over new ground was missing until its tiles came behind every visible one (KB-304: its ancestor
+now changes no faster than once in 600 ms (F670), and only a change of role or slot cuts cross-fades short (KB-307). The
+blinking had three causes: an overlay's first tile faded in through black, a quarter darker halfway (KB-304); a layer
+with nothing resident over new ground was missing until its tiles came behind every visible one (KB-305: its ancestor
 four levels up now comes first); and a tile appearing by refinement where its parent showed what lies below, or two
-levels finer as a camera stops, popped (KB-305). Movements plan their tiles (F670, replacing the destination and
+levels finer as a camera stops, popped (KB-306). Movements plan their tiles (F671, replacing the destination and
 look-ahead preloads): the destination with its ancestors first, the path's views in time order, a coarse margin ring,
-terrain, and layers the destination shows though hidden at the start (KB-307). The controls' smoothed zoom gives the
-view it heads for to `NavigationApi.preloadView` (F671; its browser step is still to write).
+terrain, and layers the destination shows though hidden at the start (KB-308). The controls' smoothed zoom gives the
+view it heads for to `NavigationApi.preloadView` (F672; its browser step is still to write).
 
 | Scenario (fixtures, 400 ms, 1.5 MB/s)          | Before                            | After               |
 | ---------------------------------------------- | --------------------------------- | ------------------- |
 | Zoom 4 → 12.5 in 1.5 s: largest step per frame | 10.6 (base image alone 1.9)       | 2.3                 |
-| Zoom 12.5 → 4: largest step per frame          | 13.0                              | 15.2 (KB-308, open) |
+| Zoom 12.5 → 4: largest step per frame          | 13.0                              | 15.2 (KB-309, open) |
 | Ease pan at zoom 13.5: orthophoto missing      | 56 frames, up to 59 % of the land | none                |
 | Same pan: blocks darker than both tones        | 12,736 block-frames               | 0                   |
 | Drag pan at zoom 13.5: orthophoto missing      | 2.0 % of land-frames, up to 30 %  | 0.8 %, up to 20 %   |
@@ -25,13 +25,13 @@ view it heads for to `NavigationApi.preloadView` (F671; its browser step is stil
 | Wheel zoom 10 → 14: largest step per frame     | 14.6                              | 2.4                 |
 
 A fast zoom out still drops the orthophotos in two frames: motion-aware detail coarsens the surface below their first
-level (KB-308, open, with its options). The core's main entry grows from 64.33 to 64.95 KB gzip on a Mac.
+level (KB-309, open, with its options). The core's main entry grows from 64.33 to 64.95 KB gzip on a Mac.
 
 ## 2026-10-31: one sea along the coasts (an application's screenshot of the Adriatic, branch `smooth-imagery`)
 
 The package's sea showed rectangular steps at zoom 8 to 11: its Sentinel-2 composite has real water only in the 1° cells
 holding land and a flat no-data color beyond, and from level 9 only tiles touching land, while the preset keyed out only
-the flat color, everywhere (inland lakes and shadows near it too). A coverage area's `keySea` (F668, KB-302) now makes
+the flat color, everywhere (inland lakes and shadows near it too). A coverage area's `keySea` (F669, KB-303) now makes
 water's colors transparent outside `EUROPE_LAND`, fading back in over 4 km inside it: a blur 1.5 times the fade
 stretched fourfold, which also closes the gaps of up to 3.2 km that the countries' separately simplified borders leave
 (a lake on a border would otherwise show streaks); a wide fade is blurred on a smaller canvas and stretched back. Tiles
@@ -42,6 +42,19 @@ and on all-water tiles across the Alps and Lake Geneva; no committed end-to-end 
 `e2e/europe-zoom-phases.spec.ts` passes once its package stand-in shows water as imagery (ADR 0026) rather than the
 no-data color; over the coast its zoom 10 and 11 frames now reach 17.0 and 18.4 of the 20 allowed, the stand-in's
 blurred coast partly keyed.
+
+## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
+
+The owner asked for the missing free and resellable maps of Europe to zoom 15, Italy first, and for the glitches seen
+with 3D terrain. The provider hosts are refused by the container's proxy, so terms came from search quotes and
+endpoints from the OSM editor layer index. Baden-Württemberg (LGL DOP20, dl-de/by-2-0 since LGL's open data), Brussels
+(UrbIS Ortho, CC0, with its borders from Natural Earth's map units) and Denmark (GeoDanmark, CC BY 4.0, the
+application's free key, asked in WGS84 as its WMS has no Web Mercator) joined `europeOrthophotos()` (F668). Slovenia,
+Slovakia, Lithuania, Schleswig-Holstein, Bremen and Valle d'Aosta pass on licence but wait for their layer names (open
+question 39). Italy has no other online service that passes: AGEA's 2022–2024 national imagery is CC BY 4.0 since
+August but downloads only, the route for an application's own package. The terrain glitch reproduced on the vector Map
+base: a one-pixel line along vector tile edges where the shaded surface shows through part of the MSAA samples
+(KB-302); clip, depth pull and skirts were ruled out within the time box, and the next steps are recorded.
 
 ## 2026-10-31: a zoom that stops before the ground, flights that frame whole turbines and plants (owner's request)
 

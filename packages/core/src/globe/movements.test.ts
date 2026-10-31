@@ -617,7 +617,7 @@ describe('camera constraints (F209–F211)', () => {
   });
 });
 
-describe('the view an input heads for (F671)', () => {
+describe('the view an input heads for (F672)', () => {
   it('loads a valid view ahead as a movement destination keeping the tilt, and stops on undefined or an invalid one', () => {
     const cam = new Camera();
     cam.widthPx = 800;

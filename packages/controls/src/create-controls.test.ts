@@ -234,7 +234,7 @@ describe('wheel and trackpad zoom (F168, F169)', () => {
     expect(at.yPx).toBeCloseTo(150, 6);
   });
 
-  it('says which view a smoothed zoom heads for at each notch, and when it has arrived (F671)', () => {
+  it('says which view a smoothed zoom heads for at each notch, and when it has arrived (F672)', () => {
     const h = controlsHarness();
     h.fire('wheel', { clientX: 360, clientY: 280, deltaY: -100, deltaMode: 0, ctrlKey: false });
     h.frame();

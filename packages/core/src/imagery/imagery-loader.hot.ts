@@ -43,7 +43,7 @@ import {
 export const VISIBLE_CLASS = 1024;
 /**
  * Priority keys of a visible tile's cover, its ancestor a few levels up while its layer shows nothing finer there, and
- * of the coarser ancestors requested with it (KB-304): after the pinned base, before every visible tile, so a layer is
+ * of the coarser ancestors requested with it (KB-305): after the pinned base, before every visible tile, so a layer is
  * never missing over new ground for long.
  */
 export const COVER_CLASS = VISIBLE_CLASS - 64;

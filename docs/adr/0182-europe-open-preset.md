@@ -236,3 +236,36 @@ account, a commercial subscription beyond; and the WorldCover composite's own fi
 as its bucket sends no CORS headers (`CORS is not enabled for this bucket`, checked 2026-10-31). Freemium services
 (Esri, Mapbox, Google's Map Tiles API) are free only up to a monthly quota and proprietary: an application that accepts
 their terms adds one with its key through `addSources`, limited to the area it fills.
+
+## Amendment, 2026-10-31 (evening): Baden-Württemberg, Brussels and Denmark; Italy again
+
+The owner asked again for the missing European services, Italy first, free and resellable to zoom 15. The provider
+hosts were unreachable from the container (the proxy refused them), so licences come from search quotes of the
+providers' pages and records, endpoints and layers from the OSM editor layer index or the providers' own guides. A
+service is added only when its licence, its credit and its endpoint with the layer name are all known; the WMS sources
+of the preset ask the layer without reading the capabilities, so a wrong layer name would fail every tile.
+
+| Service (id)                                         | Licence                                                              | Credit                                          | Endpoint, deepest level                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------- |
+| LGL DOP20, Baden-Württemberg (`de-bw-dop20`)         | Datenlizenz Deutschland – Namensnennung 2.0 (LGL Open GeoData, 2024) | `Datenquelle: LGL, www.lgl-bw.de, dl-de/by-2-0` | WMS `IMAGES_DOP_20_RGB`, EPSG:3857, 19                |
+| UrbIS Ortho, Brussels (`be-bru-urbis`)               | CC0 1.0 (datastore.brussels, Mobility Brussels)                      | none required; `Brussels UrbIS, Paradigm`       | WMS `Ortho`, EPSG:3857, 21                            |
+| GeoDanmark Ortofoto forår, Denmark (`dk-geodanmark`) | CC BY 4.0 (Klimadatastyrelsen, Datafordeler terms)                   | `© Klimadatastyrelsen / GeoDanmark, CC BY 4.0`  | WMS `orto_foraar` in EPSG:4326, 20; free key `apikey` |
+
+Baden-Württemberg's earlier exclusion (a permission for its Web Mercator WMS) predates the LGL's open data of 2024.
+Brussels' borders are Natural Earth's map unit, as Belgium's other regions. Denmark's WMS offers no Web Mercator, so it
+is asked in WGS84 (`OrthophotoService.crs`), as GIBS is.
+
+Licence passes, endpoint or layer still to be read at source (open question 39): Slovenia (GURS DOF025, CC BY 4.0),
+Slovakia (GKÚ Ortofotomozaika, CC BY 4.0), Lithuania (ORT10LT, CC BY 4.0 since its data.gov.lt record),
+Schleswig-Holstein (the `OpenGBD` service, CC BY 4.0), Bremen (DOP20 2023, CC BY 4.0 since 2024) and Valle d'Aosta
+(Ortofoto 2024, CC BY 4.0, credit `Estratto dall'Ortofoto 2024 di proprietà della Regione autonoma Valle d'Aosta`).
+Saarland, Latvia's newer cycles, Greece, Cyprus, Madeira and Moldova stay uncertain; Sweden, Norway, the federal BKG
+service, Hungary, Romania, Bulgaria, Ireland, the United Kingdom, Iceland, Serbia and the rest of the Balkans fail.
+
+Italy (`docs/research/italy-orthophotos.md`, second reading): AGEA's 2022–2024 national imagery (20 cm) is CC BY 4.0
+since 2026-08-26, commercial reuse included, but is still offered as downloads only, so it is the route to zoom 15 and
+beyond for all of Italy as an application's own package (`addSources`), not an online source. The regions that serve
+AGEA imagery (Veneto, Lombardia, Piemonte, Sardegna, Liguria, Trentino, Emilia-Romagna's AGEA layers) keep restrictive
+terms; Toscana's records conflict; the others publish no open licence. Emilia-Romagna's own flights (CC BY 4.0) cover
+part of the region with no confirmed reference system; Bologna's (CC BY 4.0 or ODbL) and Bergamo's (IODL 2.0) cover one
+city each.

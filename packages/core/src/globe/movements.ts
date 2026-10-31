@@ -63,7 +63,7 @@ export interface MovementHost {
   /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
   constrainEnd(end: Float64Array): void;
   /**
-   * A movement to `end` starts: what it will draw along `path` loads ahead (F286, F670; a flight also pauses prefetch,
+   * A movement to `end` starts: what it will draw along `path` loads ahead (F286, F671; a flight also pauses prefetch,
    * F287); or none runs any more (undefined).
    */
   preloadView?(end: Float64Array | undefined, flight?: boolean, path?: MovementPath): void;
@@ -140,7 +140,7 @@ export class Movements {
   }
 
   /**
-   * The tiles of the view an input heads for load ahead, as a movement's destination (a smoothed zoom's, F671); none
+   * The tiles of the view an input heads for load ahead, as a movement's destination (a smoothed zoom's, F672); none
    * for undefined. Invalid views are ignored.
    */
   preload(target: ViewInit | undefined): void {

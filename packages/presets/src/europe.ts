@@ -181,7 +181,7 @@ interface Build {
 const FEATHER_PX = 12;
 
 /**
- * How far inside `EUROPE_LAND` the package's water fades back in (KB-302): more than the outline's simplification
+ * How far inside `EUROPE_LAND` the package's water fades back in (KB-303): more than the outline's simplification
  * (0.025°, about 2.8 km) and the gaps it leaves between countries (up to about 3.2 km), so neither shows.
  */
 const SEA_FEATHER_METERS = 4000;
@@ -238,7 +238,7 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           maxLevel: options.packageLevels?.imagery ?? ESA_WORLDCOVER.maxLevel,
           // The package's box with a soft edge. Its sea, real water near the coast and a flat no-data color (RGB
           // 54, 73, 90) beyond, each ending in rectangles, is transparent outside the land; inside it nothing is keyed,
-          // as deep lakes and shadows can have that color too (KB-302).
+          // as deep lakes and shadows can have that color too (KB-303).
           area: {
             polygons: [PACKAGE_BOX],
             tiles: 'clip',

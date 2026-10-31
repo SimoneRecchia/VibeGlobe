@@ -89,7 +89,7 @@ export class ImageryRuntime {
   /** What a new loader shares with the others, the terrain's handle index and the next free one (A2). */
   readonly loaderContext: LoaderContext;
   readonly terrainIndex: number;
-  /** What a running movement will draw, wanted each frame in the order it needs it until it ends (F286, F670). */
+  /** What a running movement will draw, wanted each frame in the order it needs it until it ends (F286, F671). */
   readonly plan = new FlightPlan();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
@@ -126,7 +126,7 @@ export class ImageryRuntime {
   private readonly overlayFades = [new ImageryFades(), new ImageryFades()];
   /** The cross-fades a change of the layers' roles or slots cuts short: the imagery's, then the overlay slots'. */
   private readonly snaps = [this.fades, ...this.overlayFades];
-  /** The engine time of this frame and of the last, for the layers' fades by zoom (F669). */
+  /** The engine time of this frame and of the last, for the layers' fades by zoom (F670). */
   private readonly fadeTime = Float64Array.of(0, Number.NaN);
   /** Keeps a texture still faded from resident this frame. */
   private readonly keepTexture = (handle: number): void => {
@@ -362,7 +362,7 @@ export class ImageryRuntime {
       preloadImagery(this.stack, plan);
     }
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
-    // A layer's fade by zoom under way keeps the frames coming too (F669).
+    // A layer's fade by zoom under way keeps the frames coming too (F670).
     if (layersFading) this.fades.fading = true;
     for (let slot = 0; slot < list.overlays.length; slot++) {
       const overlay = list.overlays[slot];

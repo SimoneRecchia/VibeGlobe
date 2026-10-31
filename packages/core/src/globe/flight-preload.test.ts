@@ -51,7 +51,7 @@ describe('FlightPlan', () => {
     for (const factor of [1, 2, 4]) expect(deepest(1.5 * factor)).toBeLessThanOrEqual(still);
   });
 
-  it('plans the destination, the path at the times it is first shown and a coarse ring, each tile once (F670)', () => {
+  it('plans the destination, the path at the times it is first shown and a coarse ring, each tile once (F671)', () => {
     const { path, end } = straight([11, 45], [12.5, 42], 50_000, 4000);
     const plan = new FlightPlan();
     plan.plan(camera(), end, selection(), 1.5, 0, path);

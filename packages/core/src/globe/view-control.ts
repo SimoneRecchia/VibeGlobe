@@ -43,7 +43,7 @@ export interface ViewHost {
   interruptMovement(): void;
   /** Interrupts the running movement if it eases the tilt: a view mode chosen meanwhile takes over (KB-207). */
   interruptTilt(): void;
-  /** Loads the tiles of a view ahead, as a movement's destination (F671), or stops (undefined). */
+  /** Loads the tiles of a view ahead, as a movement's destination (F672), or stops (undefined). */
   preloadView(view: ViewInit | undefined): void;
 }
 

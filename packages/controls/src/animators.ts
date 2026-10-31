@@ -171,7 +171,7 @@ export class ZoomTarget {
 
   /**
    * Adds levels, anchored at a point; `maxLead` caps how far the target may lead the camera. The view it now heads for
-   * loads ahead (F671).
+   * loads ahead (F672).
    */
   add(levels: number, xPx: number, yPx: number, tauMs: number, maxLead = Infinity): void {
     if (this.pending === 0) this.timeline.reset();

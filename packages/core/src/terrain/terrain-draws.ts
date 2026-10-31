@@ -155,7 +155,7 @@ export function recordShownTerrain(
 }
 
 /**
- * Wants the terrain a movement's plan will draw (F670): each surface tile's terrain tile at the preload class plus
+ * Wants the terrain a movement's plan will draw (F671): each surface tile's terrain tile at the preload class plus
  * `keys[i]` (-1: not now). Allocates nothing.
  */
 export function preloadTerrain(

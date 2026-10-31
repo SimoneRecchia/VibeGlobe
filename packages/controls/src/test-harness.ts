@@ -50,7 +50,7 @@ export class FlatCamera {
   coasting = false;
   /** API movements stopped by a press. */
   movementInterruptions = 0;
-  /** The views a smoothed zoom said it heads for (F671), undefined on arrival. */
+  /** The views a smoothed zoom said it heads for (F672), undefined on arrival. */
   readonly aheads: (ViewInit | undefined)[] = [];
 
   constructor(

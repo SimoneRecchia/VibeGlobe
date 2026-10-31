@@ -153,13 +153,13 @@ for (const backend of BACKENDS) {
     expect(shown.black).toBe(0);
   });
 
-  test(`an overlay's first tiles fade in over the layers below and never darken them on ${backend} (KB-303)`, async ({
+  test(`an overlay's first tiles fade in over the layers below and never darken them on ${backend} (KB-304)`, async ({
     page,
   }) => {
     const session = await fixtureSession(page);
     await openStack(page, `${backend}&clockStepMs=16.666666666666668`, '', session);
     // The same red over the red layer, nearly opaque: added on the running globe, its tiles arrive and fade in from
-    // nothing, and every frame meanwhile shows red; a fade that mixed in black dipped by a quarter halfway (KB-303).
+    // nothing, and every frame meanwhile shows red; a fade that mixed in black dipped by a quarter halfway (KB-304).
     await page.evaluate(
       async ([repo, url]) => {
         const sources = (await import(

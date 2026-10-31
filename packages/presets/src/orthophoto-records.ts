@@ -3,10 +3,16 @@
 /** The orthophoto services of `@vibeglobe/presets/orthophotos` and their terms (ADR 0182). */
 import { TERMS_READ_DATE, type PresetSourceRecord } from './sources.js';
 
-/** How an orthophoto service is reached: an XYZ template, or a WMS GetMap URL and layer (both in EPSG:3857). */
+/** How an orthophoto service is reached: an XYZ template, or a WMS GetMap URL and layer (EPSG:3857 unless stated). */
 export type OrthophotoService =
   | { readonly kind: 'xyz'; readonly url: string }
-  | { readonly kind: 'wms'; readonly url: string; readonly layer: string };
+  | {
+      readonly kind: 'wms';
+      readonly url: string;
+      readonly layer: string;
+      /** A service without Web Mercator is asked in WGS84 (`EPSG:4326`). */
+      readonly crs?: 'EPSG:4326';
+    };
 
 /** An orthophoto service with its terms and where it has data. */
 export interface OrthophotoRecord extends PresetSourceRecord {

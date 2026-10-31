@@ -100,7 +100,7 @@ describe('coverage areas (polygon coverage of a source)', () => {
     expect(area.mask(rect(15, 46, 17, 49), true)).toMatchObject({ featherPx: 8, key });
   });
 
-  it('keys the sea outside the land with a fade in meters, every tile but those inside the land beyond it (KB-302)', () => {
+  it('keys the sea outside the land with a fade in meters, every tile but those inside the land beyond it (KB-303)', () => {
     const box: PolygonDeg = [
       [
         [0, 30],

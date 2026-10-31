@@ -46,7 +46,7 @@ export interface CoverageArea {
   readonly keyEverywhere?: KeyColor;
   /**
    * The sea, for imagery whose water is real near the coast and a flat fill farther out, each ending in rectangles (the
-   * Europe preset's WorldCover, KB-302): pixels of water's colors (blue and green above red, not bright) outside `land`
+   * Europe preset's WorldCover, KB-303): pixels of water's colors (blue and green above red, not bright) outside `land`
    * are transparent, fading back in over `featherMeters` inside it, so one sea shows below while the land's own pixels
    * stay, with its lakes and shadows. Gaps narrower than the feather between `land`'s polygons (borders simplified one
    * country at a time) count as land.

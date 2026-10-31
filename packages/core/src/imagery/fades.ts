@@ -131,7 +131,7 @@ export class ImageryFades {
       const parentStart = this.startMs[parent] ?? -Infinity;
       // A layer's tile where the parent showed what lies below (the base image, or nothing in an overlay slot: a
       // negative texture, which the draw's own `from` fields hold) fades in from it, or goes on with the parent's fade
-      // in from it (KB-305).
+      // in from it (KB-306).
       if (parent >= 0 && (this.toTexture[slot] ?? -1) >= 0)
         if (nowMs - parentStart < refineMs && (this.fromTexture[parent] ?? 0) < 0) start = parentStart;
         else if ((this.toTexture[parent] ?? 0) < 0) start = nowMs;

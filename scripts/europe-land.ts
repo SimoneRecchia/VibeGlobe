@@ -20,7 +20,7 @@ const PRESET_TOLERANCE_DEG = 0.025;
 /** Regions with orthophoto services of their own, whose borders are written too: every Land of Germany, and these. */
 const isRegion = (code: string): boolean => code.startsWith('DE-') || code === 'IT-BZ';
 /** Belgium's regions, which are Natural Earth map units, by ISO 3166-2 code. */
-const MAP_UNITS: Readonly<Record<string, string>> = { Flemish: 'BE-VLG', Walloon: 'BE-WAL' };
+const MAP_UNITS: Readonly<Record<string, string>> = { Flemish: 'BE-VLG', Walloon: 'BE-WAL', Brussels: 'BE-BRU' };
 /** The country borders clip imagery per pixel: about 300 m, near the 1:10m data's own accuracy. */
 const COUNTRY_TOLERANCE_DEG = 0.003;
 

@@ -8031,6 +8031,17 @@
     {
       "id": "F668",
       "milestone": 7,
+      "section": "Sources and composition",
+      "description": "`europeOrthophotos()` also covers Baden-Württemberg (LGL DOP20, dl-de/by-2-0), Brussels (UrbIS Ortho, CC0) and, with the application's free key, Denmark (GeoDanmark spring orthophoto, CC BY 4.0), each clipped to its borders; a WMS without Web Mercator is asked in WGS84 tiles (`OrthophotoService.crs`).",
+      "steps": [
+        "Unit-test that each of the three is asked inside its borders and not outside, Denmark only with its key, in EPSG:4326 with the key as its parameter",
+        "Record their terms in ADR 0182 and the services still waiting for an endpoint in docs/open-questions.md"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F669",
+      "milestone": 7,
       "section": "Map sources: map-agnostic design",
       "description": "A coverage area's `keySea` (`land` polygons and `featherMeters`) makes water's colors outside the land transparent, fading back in over that distance inside it, with gaps narrower than it between the land's polygons counted as land, so imagery whose water is real near the coast and a flat fill farther out shows one sea from the layer below while its land, lakes and shadows stay; the Europe preset keys its package's sea this way.",
       "steps": [
@@ -8040,7 +8051,7 @@
       "status": "passing"
     },
     {
-      "id": "F669",
+      "id": "F670",
       "milestone": 7,
       "section": "Map sources: map-agnostic design",
       "description": "An imagery layer's fade with the zoom (`fadeIn`) follows the zoom in time too: its opacity changes no faster than from 0 to 1 in 600 ms (`LAYER_FADE_MS`), so a fast zoom through a fade crosses it as a cross-fade instead of turning the layer on or off like a light, while a slower zoom moves it with the zoom as before; a layer reaching full opacity or none cuts no cross-fade short unless it turns opaque or translucent (every draw's) or appears under a shown layer (the overlay slots').",
@@ -8051,7 +8062,7 @@
       "status": "passing"
     },
     {
-      "id": "F670",
+      "id": "F671",
       "milestone": 8,
       "section": "Tiles, level of detail and streaming",
       "description": "A movement's tiles load in the order it needs them (`FlightPlan`): when a flight or an ease starts, its destination's view at the arrival's detail with each tile's ancestor up to four levels up first, the views at twelve times along its path at the detail a moving camera shows (narrowed a quarter, as the next views cover their edges), each tile with the time it is first shown, and a margin ring around the destination three levels coarser (none on a slow link); each frame the destination counts as needed within a second and every other tile from two seconds before its time until it has passed, at the preload class, terrain included, every layer the movement's deepest zoom shows included; a movement that ends, is interrupted or is replaced drops its plan.",
@@ -8063,7 +8074,7 @@
       "status": "passing"
     },
     {
-      "id": "F671",
+      "id": "F672",
       "milestone": 8,
       "section": "Tiles, level of detail and streaming",
       "description": "The view a smoothed zoom heads for loads ahead: at each wheel notch, zoom key or double click the controls give it to `NavigationApi.preloadView` (centered where a zoom on a flat map brings it, the position under the cursor staying there), and undefined on arrival; the engine loads its tiles as a movement's destination's.",

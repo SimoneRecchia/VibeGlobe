@@ -96,7 +96,7 @@ describe('drawImagery', () => {
     expect(gap.wanted.slice(0, 3)).toEqual([12, 11, 10]);
   });
 
-  it("requests a tile's cover four levels up before every visible tile while nothing finer is resident (KB-304)", () => {
+  it("requests a tile's cover four levels up before every visible tile while nothing finer is resident (KB-305)", () => {
     const requests = (states: Record<number, number>): [number, number][] => {
       const keys: [number, number][] = [];
       const { layer } = fakeLayer(states);
@@ -115,7 +115,7 @@ describe('drawImagery', () => {
     expect(requests({ 7: 42 }).map(([level]) => level)).toEqual([9, 7]);
   });
 
-  it("preloads a plan's tiles from every layer its deepest view draws, the destination's ancestors first (F670, KB-307)", () => {
+  it("preloads a plan's tiles from every layer its deepest view draws, the destination's ancestors first (F671, KB-308)", () => {
     const keys: [number, number][] = [];
     const recording = (): ImageryLayer => {
       const { layer } = fakeLayer({});

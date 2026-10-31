@@ -230,7 +230,7 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
   for (let slot = 0; slot < list.overlays.length; slot++) {
     const overlay = list.overlays[slot];
     if (!overlay) continue;
-    // What a new slot fades in from, when it fades in (KB-305): nothing.
+    // What a new slot fades in from, when it fades in (KB-306): nothing.
     overlay.fromTextures[index] = -1;
     if (slot >= overlays) {
       overlay.opacities[index] = 0;
@@ -367,7 +367,7 @@ const PREFETCH_MIN_VISIBILITY = 0.5;
 const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
 
 /**
- * Levels from a wanted tile up to its cover, requested first while nothing finer is resident (KB-304): even, so the
+ * Levels from a wanted tile up to its cover, requested first while nothing finer is resident (KB-305): even, so the
  * cover is one of the every-second ancestors requested anyway.
  */
 const COVER_LEVELS = 4;
@@ -377,7 +377,7 @@ const COVER_LEVELS = 4;
  * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
  * source of the chain) are neither requested nor looked up. While nothing finer is resident, the ancestor
  * {@link COVER_LEVELS} up (or the coarsest level), and the coarser ones requested, are requested before every visible
- * tile, coarse first (KB-304).
+ * tile, coarse first (KB-305).
  */
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
@@ -429,7 +429,7 @@ export function screenDistance(tile: QuadtreeTile, camera: Camera): number {
 
 /**
  * Wants, from every layer a view of the movement draws (shown at its deepest zoom, `plan.zoom`: a layer fades in as the
- * zoom grows, F635), the tiles its plan will draw (F286, F670, KB-307): each surface tile's imagery at its own level from the
+ * zoom grows, F635), the tiles its plan will draw (F286, F671, KB-308): each surface tile's imagery at its own level from the
  * first source of the chain that has it, at the preload class (after every visible tile, before prefetch) plus
  * `keys[i]` (-1: not now) and its level; for the destination's tiles (before `arrival`), their ancestor up to
  * {@link COVER_LEVELS} levels up, within the source's levels, first. Sources whose loading flags forbid prefetch load

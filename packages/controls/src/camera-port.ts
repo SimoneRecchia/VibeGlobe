@@ -218,7 +218,7 @@ export class CameraPort {
   }
 
   /**
-   * A smoothed zoom heads `levels` from the current view about `point` (F671): the view it will show loads ahead
+   * A smoothed zoom heads `levels` from the current view about `point` (F672): the view it will show loads ahead
    * ({@link NavigationApi.preloadView}), centered where a zoom on a flat map brings it, the position under the point
    * staying there; none once it has arrived (0).
    */

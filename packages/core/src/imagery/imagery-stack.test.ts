@@ -113,7 +113,7 @@ describe('fading a layer in with the zoom (F635)', () => {
   });
 });
 
-describe('fading a layer with the zoom in time (F669)', () => {
+describe('fading a layer with the zoom in time (F670)', () => {
   const camera = new Camera();
   camera.heightPx = 600;
   const zoomTo = (zoom: number): void => {
@@ -148,7 +148,7 @@ describe('fading a layer with the zoom in time (F669)', () => {
     }
   });
 
-  it('starts a layer added on a running globe at its value, and cuts fades short only where layers change role or slot (KB-306)', () => {
+  it('starts a layer added on a running globe at its value, and cuts fades short only where layers change role or slot (KB-307)', () => {
     const transparent = { ...valid, id: 'clipped', transparent: true };
     const [entry] = stackEntries([{ sources: [transparent], fadeIn: { fromZoom: 4, toZoom: 5 } }]);
     if (!entry) throw new Error('no layer');

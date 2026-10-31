@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 let loaded = false;
 vi.mock('three/examples/jsm/loaders/GLTFLoader.js', () => {
   loaded = true;
-  return { GLTFLoader: class {} };
+  return {
+    GLTFLoader: class {
+      readonly kind = 'gltf';
+    },
+  };
 });
 
 describe('the glTF loader entry (KB-296)', () => {

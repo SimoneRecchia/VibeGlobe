@@ -206,11 +206,12 @@ class HarnessPage implements AtmosphereHarness {
     const depthPath = depthPathOf(renderer);
     const material = new MeshBasicNodeMaterial();
     const imagery = await loadImagery(config.tileSteps ?? false);
-    material.colorNode = vec4(texture(imagery, attribute('imageryUv', 'vec2')).xyz, 1);
+    const color = texture(imagery, attribute('imageryUv', 'vec2')).xyz;
+    material.colorNode = vec4(color, 1);
     makeEyeRelative(material, depthPath);
     if (config.atmosphere !== false) {
       this.atmosphere = new Atmosphere(depthPath);
-      this.atmosphere.applyToSurface(material, eyeRelativePosition(positionGeometry));
+      material.colorNode = vec4(this.atmosphere.surfaceColor(color, eyeRelativePosition(positionGeometry)), 1);
     }
     const globe = new Mesh(ellipsoidGeometry(), material);
     globe.frustumCulled = false;

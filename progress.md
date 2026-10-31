@@ -5,6 +5,14 @@
 The wind sensors' mast and the red aviation light on the nacelle's roof are gone: the turbine has 1,850 triangles and
 56 KB. F649, which gave 1,880 triangles, is superseded by F656 (`docs/feature-changes.md`).
 
+## 2026-10-31: data layers over vector maps, flat polygons that blend (bugs from an application)
+
+KB-284 and KB-285. An application's translucent rings under wind turbines disappeared on its flat road map: polygon
+layers were always built as extrusions (the specification's default height of 0), drawn opaque before every
+translucent layer and with `fill-opacity` ignored, and a vector map made after them drew over them in any case, since
+the engine draws in scene order. A polygon is now extruded only when its style sets a height, and a vector map's group
+joins the scene before the data layers' meshes.
+
 ## 2026-10-31: a flat map that never loads terrain, and six needs of an application in the library
 
 An application's flat road map lagged while zooming over a country with its roads on. A CPU profile at a quarter of a

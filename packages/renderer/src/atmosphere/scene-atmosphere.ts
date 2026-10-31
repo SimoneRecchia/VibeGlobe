@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { AtmosphereSettings, DepthPath, FrameView, RendererQuality } from '@vibeglobe/core';
-import type { MeshBasicNodeMaterial, Scene } from 'three/webgpu';
+import type { MeshBasicNodeMaterial, Object3D, Scene } from 'three/webgpu';
 import { Atmosphere, createAtmosphereFrame, globeFrame, morphFrame } from './atmosphere.js';
 import { ATMOSPHERE_QUALITY } from './atmosphere-model.js';
 
@@ -74,6 +74,19 @@ export class SceneAtmosphere {
     }
     const height = (1 - morph) * globe.eyeAltitudeM + morph * planeHeight;
     atmosphere.update(view, morphFrame(morph, height, this.up, this.frame));
+  }
+
+  /**
+   * Adds a surface mesh to the scene before the sky: the engine draws in scene order, and the sky, which draws only
+   * where nothing did, then skips the pixels the globe covers instead of ray-marching under every one of them.
+   */
+  addBelowSky(mesh: Object3D): void {
+    this.scene.add(mesh);
+    const children = this.scene.children;
+    const sky = this.atmosphere ? children.indexOf(this.atmosphere.sky) : -1;
+    if (sky < 0) return;
+    children.pop();
+    children.splice(sky, 0, mesh);
   }
 
   /** Removes the sky from the scene and frees it. */

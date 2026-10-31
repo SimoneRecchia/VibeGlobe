@@ -247,7 +247,7 @@ export class ThreeBackend implements RendererBackend {
   private entryFor(data: TileMeshData): TileEntry {
     const mesh = createTileMesh(data, this.material);
     this.counters.meshAdded(mesh);
-    this.scene.add(mesh);
+    this.atmosphere.addBelowSky(mesh);
     return { data, mesh, draw: surface.attachSurfaceDraw(mesh) };
   }
 

@@ -44,6 +44,11 @@ export class PriorityHeap {
     return this.count;
   }
 
+  /** The record at heap position `position`, from 0 to `size − 1`: every record, in no particular order. */
+  at(position: number): number {
+    return this.items[position] ?? ABSENT;
+  }
+
   /** True when the record index is in the heap. */
   has(index: number): boolean {
     return index >= 0 && index < this.positions.length && this.positions[index] !== ABSENT;

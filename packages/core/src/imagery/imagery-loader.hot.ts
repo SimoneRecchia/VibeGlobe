@@ -194,6 +194,8 @@ export class ImageryLoader implements NetworkPoolClient {
   private readonly active: TileRecord[] = [];
   /** Slots a dispatch stepped over because their host was full, put back when it ends. */
   private readonly skippedSlots = new Int32Array(MAX_HOST_SKIPS);
+  /** Queued slots no frame wanted, removed after the scan of the queue. */
+  private dropSlots = new Int32Array(64);
   private readonly uploads: UploadQueue<PendingUpload>;
   private readonly decision = createFailureDecision();
   private readonly hosts = new Map<string, number>();
@@ -593,20 +595,30 @@ export class ImageryLoader implements NetworkPoolClient {
   }
 
   private dropUnwanted(): void {
-    const keep = (this.flags & LOAD_KEEP_IN_MEMORY) !== 0;
-    // Queued tiles nobody wanted this frame leave the queue now (ADR 0007).
-    for (const record of this.table.bySlot) {
-      if (record.state === QUEUED && record.wantedFrame !== this.frame) {
-        this.heap.remove(record.slot);
-        record.state = UNLOADED;
-      } else if (!keep && record.state === READY && record.wantedFrame !== this.frame && !record.pinned) {
-        // Memory reuse off (F282): a tile no frame uses leaves the GPU and RAM at once; one still drawn (a fallback
-        // ancestor, a fade) is kept by the residency until it is not.
+    // Queued tiles nobody wanted this frame leave the queue now (ADR 0007): the queue's records, not every record the
+    // table ever held, so the cost follows the queue rather than the session's length.
+    const heap = this.heap;
+    let dropped = 0;
+    if (this.dropSlots.length < heap.size) this.dropSlots = new Int32Array(2 * heap.size);
+    for (let i = 0; i < heap.size; i++) {
+      const slot = heap.at(i);
+      if (this.table.bySlot[slot]?.wantedFrame !== this.frame) this.dropSlots[dropped++] = slot;
+    }
+    for (let i = 0; i < dropped; i++) {
+      const slot = this.dropSlots[i] ?? 0;
+      heap.remove(slot);
+      const record = this.table.bySlot[slot];
+      if (record?.state === QUEUED) record.state = UNLOADED;
+    }
+    // Memory reuse off (F282): a tile no frame uses leaves the GPU and RAM at once; one still drawn (a fallback
+    // ancestor, a fade) is kept by the residency until it is not.
+    if ((this.flags & LOAD_KEEP_IN_MEMORY) === 0)
+      for (const record of this.table.bySlot) {
+        if (record.state !== READY || record.wantedFrame === this.frame || record.pinned) continue;
         const handle = this.options.handleBase + record.slot;
         this.evictKey[0] = handle;
         if (this.options.memory.residency.evictAt(this.evictKey, 0)) this.options.memory.ram.delete(handle);
       }
-    }
     let cancelling = false;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const record = this.active[i];

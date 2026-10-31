@@ -19,6 +19,8 @@ export class FlightPreload {
   /** A flight runs: prefetch around the moving view waits for its end, which only loads what the flight shows (F287). */
   flying = false;
   private readonly camera = new Camera();
+  /** The engine's selection rules (one object, so the same keys every time) without the morph, reused each frame. */
+  private readonly globeSelection: QuadtreeSelectionOptions = { maxScreenErrorPx: 2, maxLevel: 0 };
 
   /** Selects the destination's tiles; nothing for a destination the current view already shows at its zoom. */
   select(current: Camera, end: Float64Array, selection: QuadtreeSelectionOptions): void {
@@ -36,7 +38,9 @@ export class FlightPreload {
     camera.heightPx = current.heightPx;
     camera.update();
     // Measured on the globe: the flat map's morph is anchored at the current view, not at the destination.
-    this.count = selectQuadtreeTiles(camera, { ...selection, morph: undefined }, this.tiles);
+    const globe = Object.assign(this.globeSelection, selection);
+    globe.morph = undefined;
+    this.count = selectQuadtreeTiles(camera, globe, this.tiles);
   }
 
   /** The flight ended or was replaced. */

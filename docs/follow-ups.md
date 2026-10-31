@@ -98,3 +98,13 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
     `Residency` and `RamTier` have members only tests use; PMTiles and MBTiles imagery build the same source object;
     the Google 2D and Street View providers repeat the session retry; `bookmarks` and `layer-switcher` repeat a
     disclosure; the vector and raster materials repeat their draped placement.
+
+## Europe to zoom 15 (2026-10-31, ADR 0182)
+
+- **Endpoints to confirm from an open network:** Denmark (a Dataforsyningen WMS in EPSG:3857, with a free token),
+  Slovenia (GURS DOF025), Slovakia (GKÚ), Latvia (LĢIA) and Bremen have open licences; read their capabilities, or let
+  `wmsImagery` take EPSG:4258 or a projected system through `transforms` (F227), and add them as records.
+- **Italy from AGEA's open downloads:** AGEA's 2022–2024 imagery (20 cm) is reported CC BY 4.0 since 2026-08-26, as
+  downloads only. A pipeline source for it would let an application host Italy's tiles in its own package.
+- **BKG from 2027:** the federal DOP20 is announced as open from 2027-01-01; it would cover the four Länder left out.
+- **CORS of the new services:** none could be checked from here; try each from a page once the hosts are reachable.

@@ -7950,6 +7950,28 @@
         "In an application's editor, a perimeter drawn with its own pen tool can then be edited vertex by vertex"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F661",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`europeOrthophotos()` of `@vibeglobe/presets/orthophotos` adds the open orthophotos whose terms were read again on 2026-10-31 (ADR 0182): France (IGN), Spain (PNOA), the Netherlands (PDOK), Flanders, Wallonia, Luxembourg, Alto Adige, Bayern, Hessen, Sachsen, Hamburg, Finland, Estonia, Poland and Croatia, each clipped to its country's or region's borders and asked for up to its own deepest level (18 to 21); a service that needs a free key (Finland's) is used only with the application's own key, sent as the service's parameter (`keys`).",
+      "steps": [
+        "Unit-test that each service is asked for a tile inside its borders and not outside them, to its own level, that Flanders' and Wallonia's services keep to their regions, and that the keyed service is left out without a key and sends it when given",
+        "Record the services, their licences, credits and the ones left out with why in ADR 0182, `EXCLUDED_SOURCES` and the preset's guide"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F662",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "`europeOpen({ packageLevels: { imagery } })` reads the package's WorldCover satellite imagery to the level it was built to (11 by default, up to 13 for its full 10 m detail where no orthophoto covers the land); the orthophotos still fade in from level 12 above it.",
+      "steps": [
+        "Unit-test that the package's imagery source serves to the level given and that the orthophotos' fade does not move",
+        "Document in the preset's guide how to build the package deeper and what each level costs"
+      ],
+      "status": "passing"
     }
   ]
 }

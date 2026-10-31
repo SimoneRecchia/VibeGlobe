@@ -2,7 +2,7 @@ import type { TileSource } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
 import { featureFilter, type FilterSpecification } from '@maplibre/maplibre-gl-style-spec';
 import { describe, expect, it } from 'vitest';
-import { europeOpen, type OfflineWrapper } from './europe.js';
+import { europeOpen, onlineFade, type OfflineWrapper } from './europe.js';
 import type { StyleJson } from './styles.js';
 
 /** Records how each source is wrapped, as the offline engine would wrap it. */
@@ -65,7 +65,7 @@ describe('europeOpen (F613)', () => {
       expect(s.attribution[0]?.text).not.toBe('');
       expect(s.termsReadDate).toBe(s.id === 'nasa-gibs-blue-marble' ? '2026-10-27' : '2026-10-26');
     }
-    expect(preset.excluded.map((s) => s.id)).toContain('pnoa');
+    expect(preset.excluded.map((s) => s.id)).toContain('no-norge-i-bilder');
     // Satellite: the package's composite over the globe's base image, from the package only, with its water keyed out
     // (F639); no Blue Marble with a package. Terrain: the package, then online.
     const [composite] = preset.baseMaps[0]?.imagery ?? [];
@@ -196,6 +196,20 @@ describe('europeOpen (F613)', () => {
       ['satellite-base', { fromZoom: 3.5, toZoom: 4 }, false],
     ]);
     expect(online[0]?.sources[0]?.minLevel).toBe(0);
+  });
+
+  it("reads the package's satellite imagery to its own deepest level, the orthophotos still fading in from 12 (F662)", () => {
+    const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json', offline: fakeOffline() };
+    const satellite = (levels?: { imagery: number }) =>
+      europeOpen({ ...manifest, ...(levels ? { packageLevels: levels } : {}) }).baseMaps[0]?.imagery[0]?.sources[0];
+    expect(satellite()?.maxLevel).toBe(11);
+    const deep = satellite({ imagery: 13 });
+    expect(deep?.maxLevel).toBe(13);
+    // Level 13 over the Po valley (9.2° E, 45.1° N) comes from the package; beyond 13 its tile is magnified.
+    expect(deep?.request({ root: 0, level: 13, x: 4305, y: 2943 }, { url: '', hostIndex: 0 })).toMatchObject({
+      url: 'https://app.test/maps/europe/imagery/13/4305/2943.jpg',
+    });
+    expect(onlineFade()).toEqual({ fromZoom: 11, toZoom: 12 });
   });
 
   it('reads vector and hillshade tiles from the package up to its levels and over the sea, online beyond on land', () => {

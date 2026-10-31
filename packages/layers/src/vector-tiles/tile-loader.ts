@@ -223,6 +223,8 @@ export class VectorTileLoader {
       .filter((e) => e.state === 'queued')
       .sort((a, b) => a.priority - b.priority);
     for (const entry of queued) {
+      // An answer that came at once may have started (and settled) the next ones already.
+      if (entry.state !== 'queued') continue;
       if (!this.start(entry) && this.options.network === undefined) break;
     }
   }
@@ -235,20 +237,26 @@ export class VectorTileLoader {
       ...(entry.reload === true ? { reload: true } : {}),
     };
     const done = (result: TransportResult) => this.fetched(entry, result);
+    if (network !== undefined ? !network.hasFreeSlot(request.hostIndex) : this.direct >= DIRECT_MAX_IN_FLIGHT)
+      return false;
+    // Fetching before the request starts: a transport may answer before it returns (a cache, a throwing transport).
+    const before = entry.state;
+    entry.state = 'fetching';
     if (network !== undefined) {
-      if (!network.hasFreeSlot(request.hostIndex)) return false;
       const id = network.request(`vt:${entry.url}`, request, this.options.transport, done, TIMEOUTS_MS);
-      if (id < 0) return false;
-      entry.consumer = id;
+      if (id < 0) {
+        entry.state = before;
+        return false;
+      }
+      if (entry.state === 'fetching') entry.consumer = id;
     } else {
-      if (this.direct >= DIRECT_MAX_IN_FLIGHT) return false;
       this.direct++;
-      entry.abort = this.options.transport.start(request, TIMEOUTS_MS, (result) => {
+      const abort = this.options.transport.start(request, TIMEOUTS_MS, (result) => {
         this.direct--;
         done(result);
       });
+      if (entry.state === 'fetching') entry.abort = abort;
     }
-    entry.state = 'fetching';
     this.requestLog.push(entry.url);
     return true;
   }

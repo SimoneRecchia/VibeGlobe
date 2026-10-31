@@ -149,6 +149,26 @@ describe('vector tiles of a view (F441, F442)', () => {
     // One pick per sample of the 13 × 10 grid: the scale comes from the neighbors (KB-210).
     expect(picks).toBe(130);
   });
+
+  it('measures the scale across the antimeridian the short way, asking for no coarse tile there', () => {
+    // A zoom-14 view centered on 180°: the screen's left half is east of the line, its right half west of it.
+    const k = 1 / (512 * 2 ** 14);
+    const tiles = sampledTiles(
+      {
+        screenToGeo: ({ xPx, yPx }) => {
+          const wx = (1 + (xPx - 320) * k + 1) % 1;
+          const wy = 0.5 + (yPx - 240) * k;
+          return {
+            longitudeDeg: wx * 360 - 180,
+            latitudeDeg: (Math.atan(Math.sinh(Math.PI * (1 - 2 * wy))) * 180) / Math.PI,
+          };
+        },
+      },
+      640,
+      480,
+    );
+    expect(new Set(tiles.map((t) => t.z))).toEqual(new Set([14]));
+  });
 });
 
 describe('paint and meshes (F440, F450)', () => {
@@ -227,6 +247,35 @@ describe('tile loading (F442, F450)', () => {
     await tick();
     expect(loader.get(tiles.a)?.buckets[0]?.layerId).toBe('water2');
     expect(loader.requestLog).toEqual(['a', 'b', 'html']);
+  });
+
+  it('takes the answer of a transport that answers before it returns (a cache, a failure on the spot)', async () => {
+    const answers: TransportResult[] = [
+      { kind: 'ok', bytes: TILE, contentType: 'application/x-protobuf' },
+      { kind: 'status', status: 404, retryAfterMs: undefined },
+    ];
+    const transport: TileTransport = {
+      start(_request, _timeouts, done: (result: TransportResult) => void) {
+        done(answers.shift() ?? { kind: 'network-error' });
+        return () => undefined;
+      },
+    };
+    const loader = new VectorTileLoader({ transport, onReady: () => undefined });
+    loader.setLayers(layers, 1);
+    const [a, b] = [
+      { z: 1, x: 0, y: 0 },
+      { z: 1, x: 1, y: 0 },
+    ];
+    loader.update(
+      [
+        { url: 'a', tile: a, priority: 0 },
+        { url: 'b', tile: b, priority: 1 },
+      ],
+      new Set(),
+    );
+    await tick();
+    expect(loader.get(a)?.buckets[0]?.layerId).toBe('water');
+    expect(loader.isMissing(b)).toBe(true);
   });
 
   it('requests a tile again after a while when its bytes do not lay out, as after a failed download (TG-04)', async () => {

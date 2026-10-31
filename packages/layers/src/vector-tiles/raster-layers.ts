@@ -18,6 +18,9 @@ import { clipOf, tileKey, tilesToDraw, tilesToRequest, type TileId } from './til
 import { zoomBracket } from './vector-paint.js';
 import type { RasterImage, VectorDraw, VectorLayerDraws, VectorMesh, VectorTileTarget } from './vector-target.js';
 
+/** A tile that failed on the way is requested again after this long. */
+const RETRY_MS = 5_000;
+
 /** What raster layers need from the vector tile layer. */
 export interface RasterLayerContext {
   readonly target: VectorTileTarget;
@@ -161,6 +164,13 @@ export class RasterLayers {
       entry.abort = undefined;
       if (result.kind !== 'ok' || result.contentType.startsWith('text/html')) {
         entry.state = 'missing';
+        // A failure on the way (a timeout, a reset, 429 or 5xx) is asked for again later; no data stays missing.
+        if (result.kind !== 'ok' && !(result.kind === 'status' && [204, 404, 410].includes(result.status)))
+          setTimeout(() => {
+            if (this.images.get(key) !== entry) return;
+            this.images.delete(key);
+            this.context.onReady();
+          }, RETRY_MS);
         return;
       }
       void (this.context.decode ?? decodeImage)(result.bytes)

@@ -103,3 +103,28 @@ export function ringSelfIntersects(ring: readonly LonLat[]): boolean {
     }
   return false;
 }
+
+/** What {@link groundScreen} reads of the globe. */
+export interface GroundProjector {
+  geoToScreen(position: { longitudeDeg: number; latitudeDeg: number; heightMeters?: number }): ScreenXY | undefined;
+  elevationAt(position: { longitudeDeg: number; latitudeDeg: number }): { readonly heightMeters: number };
+  readonly camera: { readonly reliefFactor: number };
+}
+
+/**
+ * Where a drawn position shows on screen (KB-289): the shapes lie on the ground as the frame draws it, its height
+ * times the relief, so their handles and first vertex are found there and not on the ellipsoid below the hills.
+ */
+export function groundScreen(globe: GroundProjector, position: LonLat): ScreenXY | undefined {
+  const at = { longitudeDeg: position[0], latitudeDeg: position[1] };
+  const relief = globe.camera.reliefFactor;
+  let heightMeters = 0;
+  if (relief > 0) {
+    try {
+      heightMeters = globe.elevationAt(at).heightMeters * relief;
+    } catch {
+      // A display-only terrain cannot be read: the ellipsoid is the best guess.
+    }
+  }
+  return globe.geoToScreen({ ...at, heightMeters });
+}

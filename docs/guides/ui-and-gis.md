@@ -112,3 +112,16 @@ const lines = gridLines({ center: field[0], halfSizeM: 400, spacingM: 10 });
 ```
 
 `gridLines` (F659) returns the segments of a square grid on the ground, turned to a bearing, at most 2000 of them.
+
+`detectPanels` (F664) finds the tables already built in a top-down image of the area, with image arithmetic and no
+trained model: the pixels darker than the ground around them (green excluded) are panels, the bearing across which
+they pile into the sharpest stripes is the rows', the stripes are the rows and the dark runs along each row its
+tables, cut to `widthM` when given and otherwise to the length of the lone tables seen. Pass a capture of the view
+looking straight down, north up (`globe.captureView`) with its edges in degrees; it returns the rows' bearing,
+spacing, a table's size and every table's center inside the perimeters, or undefined when nothing stands out. About
+a tenth of a second for two million pixels.
+
+```ts
+const view = await globe.captureView({ widthPx: 1600, heightPx: 1000 });
+const found = detectPanels({ image: view, bounds, perimeters: [field] });
+```

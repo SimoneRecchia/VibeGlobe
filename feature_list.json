@@ -7972,6 +7972,39 @@
         "Document in the preset's guide how to build the package deeper and what each level costs"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F663",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "A model set standing on the ground takes a `footprint` (`widthMeters` across a copy's heading, `depthMeters` along it, scaled with the copy): each copy stands level at the highest ground under the footprint's corners and center instead of the ground at its center, so a long table on a slope is not buried uphill, and the playground's solar table has posts 5 m deep that meet the lower ground.",
+      "steps": [
+        "Unit-test that a copy with a footprint on a slope stands at the height of its highest corner, its width across and its depth along its heading, scaled with the copy",
+        "On a hillside, the playground's solar tables stand level with every post reaching the ground"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F664",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`detectPanels` in `@vibeglobe/gis` finds the solar tables already built in a top-down image of an area inside perimeters, with image arithmetic and no trained model: the rows' bearing (the direction across which the dark pixels pile into the sharpest stripes), their depth and spacing, a table's length (given, or that of the lone tables seen) and every table's center.",
+      "steps": [
+        "Unit-test on drawn parks at several bearings that it finds the bearing within a degree, the depth, the spacing, the table length and centers within a meter of the real ones, and nothing in bare ground",
+        "On a capture of a real park, the tables found lie on the tables seen"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F665",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`DrawColors.fillOpacity` sets how opaque a drawn polygon's fill is (default 0.25), so an application drawing an area over aerial imagery keeps what lies under it readable.",
+      "steps": [
+        "Type-check a consumer that passes `fillOpacity` to `DrawLayers`",
+        "In an application's editor, a perimeter drawn with a low fill opacity leaves the imagery under it readable"
+      ],
+      "status": "failing"
     }
   ]
 }

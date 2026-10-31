@@ -310,6 +310,37 @@ describe('model set on the ground (F655)', () => {
     expect(layer.markerPosition('missing')).toBeUndefined();
   });
 
+  it('stands a copy with a footprint level at the highest ground under it (F663)', async () => {
+    const models = fakeSets();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    // Ground rising 1 m for every meter eastward of longitude 10.
+    const perLongitude = 111_195 * Math.cos((45 * Math.PI) / 180);
+    const ground = fakeGround({});
+    ground.elevationAt = (position: GeoPosition, out: ElevationSample) => {
+      out.heightMeters = (position.longitudeDeg - 10) * perLongitude;
+      return out;
+    };
+    const at = { longitudeDeg: 10, latitudeDeg: 45 };
+    const layer = stack.add(
+      new ModelSetLayer({
+        url: 'table.glb',
+        ground,
+        footprint: { widthMeters: 10, depthMeters: 2 },
+        models: [
+          { id: 'across', position: at },
+          { id: 'along', position: at, headingDeg: 90 },
+          { id: 'big', position: at, scale: 2 },
+        ],
+      }),
+    );
+    await layer.ready;
+    const drawn = models.instances?.poses.map((p) => p.position.heightMeters ?? 0) ?? [];
+    // Heading 0: the 10 m width lies east-west, its eastern corners 5 m up; heading 90: the 2 m depth does.
+    expect(drawn[0]).toBeCloseTo(5, 6);
+    expect(drawn[1]).toBeCloseTo(1, 6);
+    expect(drawn[2]).toBeCloseTo(10, 6);
+  });
+
   it('reports a ground it cannot read once and leaves the copies where they stand', async () => {
     const models = fakeSets();
     const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));

@@ -74,6 +74,13 @@ export interface ModelSetLayerOptions {
    * at 0 and nothing is sampled. A ground that cannot be read (display-only terrain) emits `error` once and is let go.
    */
   readonly ground?: ModelSetGround;
+  /**
+   * With a `ground`, the rectangle a copy covers, meters: `widthMeters` across its heading and `depthMeters` along it,
+   * centered on its position and scaled with it (F663). A copy then stands level at the highest ground under its
+   * corners and center instead of the ground at its center, so a long table on a slope is not buried uphill; the model
+   * should reach below its base to meet lower ground (the playground's solar table has posts 5 m deep).
+   */
+  readonly footprint?: { readonly widthMeters: number; readonly depthMeters: number };
   /** A part that spins (F648): set speeds at runtime with {@link ModelSetLayer.setSpinRpm}. */
   readonly spin?: ModelSetSpin;
   /** A part that turns to face a direction (F648), with {@link ModelSetLayer.setYawDeg}; it holds the spinning part. */
@@ -356,13 +363,23 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
     return changed;
   }
 
-  /** Samples the ground under one copy; false when the ground cannot be read, which lets it go. */
+  /**
+   * Samples the ground under one copy, the highest under its footprint's corners and center when it has one; false
+   * when the ground cannot be read, which lets it go.
+   */
   #sampleGround(index: number): boolean {
     const ground = this.#ground;
     const position = this.#positions[index];
     if (!ground || !position) return true;
     try {
-      this.#grounds[index] = ground.elevationAt(position, sample).heightMeters;
+      let highest = ground.elevationAt(position, sample).heightMeters;
+      const footprint = this.#options.footprint;
+      if (footprint) {
+        const item = this.#items[index] as ModelSetItem;
+        for (const corner of footprintCorners(position, footprint, item.headingDeg ?? 0, item.scale ?? 1))
+          highest = Math.max(highest, ground.elevationAt(corner, sample).heightMeters);
+      }
+      this.#grounds[index] = highest;
       return true;
     } catch (cause) {
       this.#ground = undefined;
@@ -398,6 +415,38 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
 
 /** Where the ground's heights are read into, so sampling allocates nothing. */
 const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
+
+/** Meters in a degree of latitude, and of longitude at the equator, on the mean Earth radius: footprints are small. */
+const METERS_PER_DEGREE = 111_195;
+const DEG_TO_RAD = Math.PI / 180;
+/** The four corners of a footprint, reused so sampling allocates nothing. */
+const corners: { longitudeDeg: number; latitudeDeg: number }[] = Array.from({ length: 4 }, () => ({
+  longitudeDeg: 0,
+  latitudeDeg: 0,
+}));
+
+/** The corners of a copy's footprint around its position: width across its heading, depth along it. */
+function footprintCorners(
+  position: GeoPosition,
+  footprint: { readonly widthMeters: number; readonly depthMeters: number },
+  headingDeg: number,
+  scale: number,
+): readonly GeoPosition[] {
+  const heading = headingDeg * DEG_TO_RAD;
+  const halfWidth = (footprint.widthMeters * scale) / 2;
+  const halfDepth = (footprint.depthMeters * scale) / 2;
+  const perLongitude = METERS_PER_DEGREE * Math.max(Math.cos(position.latitudeDeg * DEG_TO_RAD), 1e-6);
+  for (let k = 0; k < 4; k++) {
+    const across = (k & 1 ? 1 : -1) * halfWidth;
+    const along = (k & 2 ? 1 : -1) * halfDepth;
+    const corner = corners[k] as { longitudeDeg: number; latitudeDeg: number };
+    corner.longitudeDeg =
+      position.longitudeDeg + (across * Math.cos(heading) + along * Math.sin(heading)) / perLongitude;
+    corner.latitudeDeg =
+      position.latitudeDeg + (along * Math.cos(heading) - across * Math.sin(heading)) / METERS_PER_DEGREE;
+  }
+  return corners;
+}
 
 function poseOf(item: ModelSetItem, position: GeoPosition): ModelPose {
   return {

@@ -321,6 +321,7 @@ export class ThreeBackend implements RendererBackend {
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
+    this.tileTextures.refilterSome(this.renderer);
     this.tileTextures.tones.frame(draws, this.tileTextures.imageOf);
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);
@@ -373,7 +374,7 @@ export class ThreeBackend implements RendererBackend {
    */
   setQuality(quality: RendererQuality): Promise<void> | undefined {
     this.anisotropy = quality.anisotropy;
-    if (!this.destroyed) this.tileTextures.refilter(this.renderer, this.imageryTexture);
+    if (!this.destroyed) this.tileTextures.refilter(this.imageryTexture);
     const atmosphereChanged = this.atmosphere.setQuality(quality, this.depthPath);
     if (this.destroyed || this.failed) return undefined;
     this.antialiasing.set(quality.antialias);

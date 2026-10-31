@@ -2,7 +2,15 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { createGlobe } from './create-globe.js';
 import type { GlobeError } from './errors.js';
 import { fakeRenderer } from './test-renderer.js';
-import type { BackendName, CameraState, GeoPosition, Globe, GlobeEvents, GlobeOptions, ScreenPoint } from './types.js';
+import type {
+  BackendName,
+  CameraState,
+  GeoPosition,
+  GeoScreenPoint,
+  Globe,
+  GlobeEvents,
+  GlobeOptions,
+} from './types.js';
 
 // These checks run in the type checker (`tsc -b` compiles test files): a `@ts-expect-error` line that compiles
 // without an error fails the build, so each one proves the API rejects that misuse at compile time.
@@ -36,6 +44,6 @@ describe('typed public API (F049)', () => {
   it('returns promises from asynchronous operations and plain values from synchronous ones', () => {
     expectTypeOf<Globe['ready']>().toEqualTypeOf<Promise<void>>();
     expectTypeOf<Globe['screenToGeo']>().returns.toEqualTypeOf<GeoPosition | undefined>();
-    expectTypeOf<Globe['geoToScreen']>().returns.toEqualTypeOf<ScreenPoint | undefined>();
+    expectTypeOf<Globe['geoToScreen']>().returns.toEqualTypeOf<GeoScreenPoint | undefined>();
   });
 });

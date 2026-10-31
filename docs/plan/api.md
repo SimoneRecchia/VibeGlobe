@@ -64,7 +64,7 @@ interface Globe {
   getElevation(position: GeoPosition): number | undefined; // best available, synchronous
   getElevationPrecise(position: GeoPosition): Promise<number>; // loads the finest level
   screenToGeo(screenPoint: ScreenPoint): GeoPosition | undefined;
-  geoToScreen(position: GeoPosition): ScreenPoint | undefined;
+  geoToScreen(position: GeoPosition): GeoScreenPoint | undefined; // behindGlobe: hidden by the globe (F653)
 
   getViewState(): ViewState; // serializable (URL or JSON)
   setViewState(state: ViewState): void;

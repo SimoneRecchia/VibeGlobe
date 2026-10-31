@@ -8,7 +8,7 @@ import type { ControlsOptions } from './options.js';
 type Handler = (event: object) => void;
 
 /** A stand-in for a DOM event target that records its listeners. */
-function fakeTarget(): {
+export function fakeTarget(): {
   listeners: Map<string, Handler>;
   addEventListener: (t: string, l: Handler) => void;
   removeEventListener: (t: string) => void;

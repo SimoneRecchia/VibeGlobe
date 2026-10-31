@@ -13,7 +13,7 @@ import type { Bucket, BucketFeature } from './layout-tile.js';
 import type { FeatureStateMap, StyleLayer } from './style-layer.js';
 import type { LoadedTile } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
-import { ancestorAt, tileKey, type TileId } from './tile-pyramid.js';
+import { tileKey, type TileId } from './tile-pyramid.js';
 import {
   meshKindOf,
   meshPaint,
@@ -66,14 +66,17 @@ export interface MeshSource {
   readonly tile: TileId;
 }
 
-const standInKey = (sourceId: string, tile: TileId, layerId: string, part: PaintPart | undefined) =>
-  `${sourceId}|${tileKey(tile)}|${layerId}|${part ?? ''}`;
+const layerKey = (sourceId: string, layerId: string, part: PaintPart | undefined) =>
+  `${sourceId}|${layerId}|${part ?? ''}`;
+
+/** A tile's number among all tiles, level by level: exact to level 26, with no string to build (KB-283). */
+const tileIndex = (z: number, x: number, y: number) => (4 ** z - 1) / 3 + y * 2 ** z + x;
 
 /** The meshes of one vector tile layer. */
 export class TileMeshCache {
   private readonly meshes = new Map<string, TileMesh>();
-  /** Per source tile, layer and part: the last mesh built, whatever the tile's data version. */
-  private readonly latest = new Map<string, TileMesh>();
+  /** Per source, layer and part, then per tile ({@link tileIndex}): the last mesh built, whatever the data version. */
+  private readonly latest = new Map<string, Map<number, TileMesh>>();
   private deadline = 0;
   private built = 0;
   /** Set when a mesh waits for the next frame's budget, to build, repaint or drape. */
@@ -130,7 +133,9 @@ export class TileMeshCache {
       entry = this.create(from, bucket, layer, zoomA, part, paintVersion);
       if (entry === undefined) return undefined;
       this.meshes.set(key, entry);
-      this.latest.set(standInKey(sourceId, tile, layer.id, part), entry);
+      const ofLayer = layerKey(sourceId, layer.id, part);
+      const byTile = this.latest.get(ofLayer) ?? this.latest.set(ofLayer, new Map()).get(ofLayer);
+      byTile?.set(tileIndex(tile.z, tile.x, tile.y), entry);
     } else if (entry.paintVersion !== paintVersion || (entry.paintZoomA !== zoomA && this.budgetLeft())) {
       this.built++;
       meshPaint(layer, entry.bucket, entry.featureIndex, zoomA, state, entry.paint, this.options(entry.bucket, part));
@@ -153,19 +158,24 @@ export class TileMeshCache {
    * its children's; each with the tile it belongs to, to clip it to the region.
    */
   standIns(sourceId: string, region: TileId, layerId: string, part: PaintPart | undefined, frame: number): StandIn[] {
-    const kept = (tile: TileId): StandIn[] => {
-      const entry = this.latest.get(standInKey(sourceId, tile, layerId, part));
-      if (entry === undefined) return [];
+    const byTile = this.latest.get(layerKey(sourceId, layerId, part));
+    if (byTile === undefined) return [];
+    const kept = (z: number, x: number, y: number): StandIn | undefined => {
+      const entry = byTile.get(tileIndex(z, x, y));
+      if (entry === undefined) return undefined;
       entry.usedAt = frame;
-      return [{ mesh: entry.mesh, zoomA: entry.paintZoomA, tile }];
+      return { mesh: entry.mesh, zoomA: entry.paintZoomA, tile: { z, x, y } };
     };
-    for (let z = region.z; z >= 0; z--) {
-      const around = kept(ancestorAt(region, z));
-      if (around.length > 0) return around;
+    for (let z = region.z, x = region.x, y = region.y; z >= 0; z--, x = Math.floor(x / 2), y = Math.floor(y / 2)) {
+      const around = kept(z, x, y);
+      if (around !== undefined) return [around];
     }
-    return [0, 1, 2, 3].flatMap((i) =>
-      kept({ z: region.z + 1, x: region.x * 2 + (i % 2), y: region.y * 2 + Math.floor(i / 2) }),
-    );
+    const children: StandIn[] = [];
+    for (let i = 0; i < 4; i++) {
+      const child = kept(region.z + 1, region.x * 2 + (i % 2), region.y * 2 + Math.floor(i / 2));
+      if (child !== undefined) children.push(child);
+    }
+    return children;
   }
 
   /** Frees meshes not drawn for a while (their tile left the cache, or an older layout version). */
@@ -175,7 +185,10 @@ export class TileMeshCache {
       entry.mesh.dispose();
       this.meshes.delete(key);
     }
-    for (const [key, entry] of this.latest) if (frame - entry.usedAt > KEEP_FRAMES) this.latest.delete(key);
+    for (const [key, byTile] of this.latest) {
+      for (const [tile, entry] of byTile) if (frame - entry.usedAt > KEEP_FRAMES) byTile.delete(tile);
+      if (byTile.size === 0) this.latest.delete(key);
+    }
   }
 
   /** Forgets every mesh (the target frees them). */

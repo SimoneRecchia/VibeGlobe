@@ -86,6 +86,11 @@ stack.add(
 );
 ```
 
+An HTML marker over the globe follows `globe.geoToScreen(position)` each frame. Its result's `behindGlobe` (F653) says
+whether the globe hides the position: on the globe, beyond the horizon seen from the eye; on the flat map, never.
+Hide the marker then; `geoToScreen` returns undefined only behind the camera. The horizon is measured at the
+position's own height, so a position high above the far side counts as hidden.
+
 ## Styling
 
 Every property takes a value or an expression: data-driven from feature properties (`['get', name]`, `match`,

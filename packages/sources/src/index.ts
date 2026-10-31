@@ -25,6 +25,8 @@ export type {
 } from './metadata.js';
 export { imageSizeOf, parseWorldFile, singleImage } from './single-image.js';
 export type { SingleImageOptions, WorldFile } from './single-image.js';
+export { mercatorImage } from './mercator-image.js';
+export type { CutTile, MercatorImageOptions } from './mercator-image.js';
 export { pmtilesArchive, pmtilesImagery, pmtilesTerrain, pmtilesVector } from './pmtiles-imagery.js';
 export type { ArchiveContent } from './pmtiles-imagery.js';
 export type { ArchiveTerrainEncoding, ArchiveTerrainOptions, VectorTileSource } from './archive-sources.js';

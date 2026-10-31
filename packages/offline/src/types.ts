@@ -106,7 +106,10 @@ export interface NetworkPolicy {
   resolve(request: PolicyRequest): PolicyDecision;
 }
 
-/** Counters of where tiles came from, per tier (F272). */
+/** The tiers a tile can come from, below the engine's GPU and RAM (F272). */
+export type ServedTier = 'persistent' | 'revalidated' | 'package' | 'network';
+
+/** Counters of where tiles came from, per tier (F272), and the bytes of the tiles each tier delivered (F651). */
 export interface TierCounters {
   /** Tiles served from the persistent cache without touching the network. */
   persistent: number;
@@ -118,4 +121,12 @@ export interface TierCounters {
   network: number;
   /** Requests answered with no tile while offline (the engine keeps an ancestor or the base). */
   offlineMisses: number;
+  /** Bytes of the tiles served from the persistent cache. */
+  persistentBytes: number;
+  /** Bytes of the stored tiles revalidated and reused. */
+  revalidatedBytes: number;
+  /** Bytes read from offline packages. */
+  packageBytes: number;
+  /** Bytes downloaded. */
+  networkBytes: number;
 }

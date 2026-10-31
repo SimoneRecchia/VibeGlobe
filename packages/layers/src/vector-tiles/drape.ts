@@ -17,6 +17,7 @@ const BUDGET_MS = 4;
 
 /** What draping reads from the globe. */
 export interface TerrainView {
+  readonly camera: { readonly reliefFactor: number };
   elevationAt(position: GeoPosition, out?: ElevationSample): ElevationSample;
   terrainStats(): { readonly uploads: number } | undefined;
 }
@@ -27,7 +28,8 @@ export class TileGrounds {
   private readonly lonLat = [0, 0];
   private readonly position = { longitudeDeg: 0, latitudeDeg: 0 };
   private deadline = 0;
-  /** The terrain's upload count: draped heights are current when made at this version. */
+  private flat = false;
+  /** The terrain's upload count, -1 while the relief is flat: draped heights are current when made at this version. */
   version = 0;
 
   constructor(
@@ -37,13 +39,15 @@ export class TileGrounds {
 
   /** Starts a frame: reads the terrain's version and opens the frame's budget. */
   frame(): void {
-    this.version = this.terrain.terrainStats()?.uploads ?? 0;
+    // A flat relief draws every height at 0: nothing to sample until it rises (KB-282).
+    this.flat = this.terrain.camera.reliefFactor === 0;
+    this.version = this.flat ? -1 : (this.terrain.terrainStats()?.uploads ?? 0);
     this.deadline = this.now() + BUDGET_MS;
   }
 
-  /** Whether the globe has terrain at all. */
+  /** Whether the globe has terrain at all, and shows its relief. */
   get active(): boolean {
-    return this.terrain.terrainStats() !== undefined;
+    return !this.flat && this.terrain.terrainStats() !== undefined;
   }
 
   /** Whether the frame's budget allows draping another mesh. */

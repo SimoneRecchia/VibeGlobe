@@ -39,7 +39,29 @@ Without `connect`, pan and zoom work and the rotate and tilt gestures are off.
 
 A new press, touch or key stops inertia and running turns where they are; a wheel zoom still in progress completes, about the point it started at.
 
+A drag that starts on the sky beside a zoomed-out globe turns it about the screen center, like a virtual trackball.
+With `gestures: { skyDragPan: false }` such a mouse or pen drag does nothing until it is released, even once it
+reaches the globe, and leaves no glide; a drag from the globe is unchanged, and so are clicks, double clicks,
+right- and Ctrl-drags and the zoom box. Touch keeps it: a finger beside the globe often starts a pinch (F654).
+
 Input over the map never scrolls or zooms the page: the map takes wheel events and sets `touch-action: none` while the controls are attached. Outside the map the page scrolls as usual.
+
+### Markers and panels over the map
+
+HTML laid over the canvas (markers, labels, a panel positioned above the map) takes the wheel events over it, so
+the map stops zooming there and the page may scroll. `forwardWheel` hands them to the map (F654): the wheel,
+trackpad scroll and pinch, and Safari's trackpad gestures over the element zoom about the pointer as over the map.
+
+```ts
+const stop = controls.forwardWheel(markersLayer); // the element and everything in it
+// …when the markers go:
+stop();
+```
+
+An event already handled is left alone (its default prevented: by the map, when the element holds the map and the
+event came from it, or by the element itself), so a container of both the map and its overlays works too. Elements
+handed over stay registered when the controls are attached again; the returned function stops one. Forward only
+elements whose own scrolling is not needed: the page does not scroll over them.
 
 ## Navigation modes
 
@@ -165,7 +187,7 @@ createControls({
 });
 ```
 
-Gesture switches: `dragPan`, `wheelZoom`, `doubleClickZoom`, `boxZoom`, `dragRotate`, `touchZoom`, `touchRotate`, `touchTilt`, `keyboard`, `inertia`.
+Gesture switches: `dragPan`, `skyDragPan`, `wheelZoom`, `doubleClickZoom`, `boxZoom`, `dragRotate`, `touchZoom`, `touchRotate`, `touchTilt`, `keyboard`, `inertia`.
 
 On a display too slow to show an animation (frames of an animation more than three of its time constants apart, as on software GPUs), wheel notches and the zoom commands apply in one step instead of costing frames.
 

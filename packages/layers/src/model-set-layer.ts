@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { GeoPosition, ModelPose, ModelRenderer, ModelSetJoint } from '@vibeglobe/core';
+import type { ElevationSample, GeoPosition, ModelPose, ModelRenderer, ModelSetJoint } from '@vibeglobe/core';
 import type { FeatureId } from './feature-store.js';
 import { LayerEmitter, type FrameContext, type Layer, type LayerContext, type PickedFeature } from './layer.js';
 import { finite, SpinMotion, YawMotion } from './model-set-motion.js';
@@ -19,6 +19,19 @@ export interface ModelSetItem {
   /** The direction this copy's yawing part faces at start, degrees clockwise from north (default: its heading). */
   readonly yawDeg?: number;
   readonly properties?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * The terrain a {@link ModelSetLayer} stands its copies on (F655): a `Globe`, or anything that answers as one does.
+ * Only what is already in memory is read, so standing copies on it costs no request.
+ */
+export interface ModelSetGround {
+  /** The height of the terrain in memory at a position, interpolated as the surface shows it (`Globe.elevationAt`). */
+  elevationAt(position: GeoPosition, out: ElevationSample): ElevationSample;
+  /** Counters whose `uploads` change as finer terrain arrives (`Globe.terrainStats`); undefined without terrain. */
+  terrainStats(): { readonly uploads: number } | undefined;
+  /** The last frame's camera, with the share of the relief it drew (`Globe.camera.reliefFactor`). */
+  readonly camera: { readonly reliefFactor: number };
 }
 
 /** A part of the model that turns, such as a wind turbine's rotor (F648). */
@@ -54,6 +67,13 @@ export interface ModelSetLayerOptions {
   readonly selectedHighlight?: readonly [number, number, number, number];
   /** The blend of a hovered copy (default white, 0.25). */
   readonly hoverHighlight?: readonly [number, number, number, number];
+  /**
+   * Stands every copy on this terrain as the globe draws it (pass the globe, F655): a copy's `heightMeters` becomes its
+   * height above the ground. The heights come from the terrain in memory, sampled again when finer terrain arrives,
+   * and the renderer scales them by the frame's relief as it does the terrain's, so on a flat view the copies stand
+   * at 0 and nothing is sampled. A ground that cannot be read (display-only terrain) emits `error` once and is let go.
+   */
+  readonly ground?: ModelSetGround;
   /** A part that spins (F648): set speeds at runtime with {@link ModelSetLayer.setSpinRpm}. */
   readonly spin?: ModelSetSpin;
   /** A part that turns to face a direction (F648), with {@link ModelSetLayer.setYawDeg}; it holds the spinning part. */
@@ -74,7 +94,15 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
   readonly draggable = false;
   readonly #items: ModelSetItem[];
   readonly #index = new Map<FeatureId, number>();
+  /** Positions as set: with a ground, heights above it. */
+  readonly #positions: GeoPosition[];
+  /** The ground's height under each copy, as last sampled. */
+  readonly #grounds: Float64Array;
   readonly #poses: ModelPose[];
+  #pickIds: readonly number[] = [];
+  #ground: ModelSetGround | undefined;
+  /** The terrain uploads the heights were sampled at. */
+  #groundVersion = -1;
   readonly #states: Readonly<Record<string, unknown>>[];
   readonly #options: ModelSetLayerOptions;
   #context: LayerContext | undefined;
@@ -102,6 +130,9 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
       if (this.#index.has(item.id)) throw new RangeError(`Duplicate model id ${String(item.id)}`);
       this.#index.set(item.id, index);
     });
+    this.#positions = this.#items.map((item) => item.position);
+    this.#grounds = new Float64Array(this.#items.length);
+    this.#ground = options.ground;
     this.#poses = this.#items.map((item) => poseOf(item, item.position));
     this.#states = this.#items.map(() => ({}));
     const { spin, yaw } = options;
@@ -147,11 +178,9 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
         (id) => {
           if (this.#context !== context) return models.remove(id);
           this.#set = id;
-          models.setInstances?.(
-            id,
-            this.#poses,
-            this.#items.map((_, index) => packPickId(this.#slot, index)),
-          );
+          this.#pickIds = this.#items.map((_, index) => packPickId(this.#slot, index));
+          this.#standOnGround();
+          models.setInstances?.(id, this.#poses, this.#pickIds);
           models.setVisible?.(id, this.#visible);
           this.#joints().forEach(([, angles], joint) => models.setInstanceAngles?.(id, joint, angles));
           this.#kick = 2;
@@ -186,12 +215,14 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
 
   /**
    * Moves the turning parts (F648): spinning parts ease toward their speed, yawing parts turn toward their direction,
-   * and frames are asked for while a part moves where the renderer draws the model; the renderer places the copies.
+   * and frames are asked for while a part moves where the renderer draws the model; the renderer places the copies. On
+   * a ground, finer terrain stands them on it again.
    */
   frame(frame: FrameContext): void {
     const dt = Math.min(Math.max(frame.nowMs - (this.#lastMs ?? frame.nowMs), 0), 250);
     this.#lastMs = frame.nowMs;
     if (this.#set === undefined) return;
+    if (this.#visible && this.#standOnGround()) this.#models?.setInstances?.(this.#set, this.#poses, this.#pickIds);
     // Both step every frame.
     const spinning = this.#spin?.step(dt) ?? false;
     const yawing = this.#yaw?.step(dt) ?? false;
@@ -265,10 +296,29 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
     return true;
   }
 
-  /** A copy's position. */
+  /** A copy's position as set: with a `ground`, its height is above the ground. */
   getPosition(id: FeatureId): GeoPosition | undefined {
     const index = this.#index.get(id);
-    return index === undefined ? undefined : this.#poses[index]?.position;
+    return index === undefined ? undefined : this.#positions[index];
+  }
+
+  /**
+   * The position to hand `Globe.geoToScreen` for a point `aboveMeters` over a copy's foot as the frame drew it, such as
+   * a marker on top of its model (F655). The frame scales heights by its relief and the model not, so the height is the
+   * foot's plus `aboveMeters` over the relief; on a flat relief, where no height shows, the foot. `reliefFactor` is the
+   * frame's `camera.reliefFactor`: pass it when at hand, as for markers placed each frame, since reading the camera
+   * builds its state; it defaults to the ground's camera, or full relief without a ground. Undefined for an unknown id.
+   */
+  markerPosition(
+    id: FeatureId,
+    aboveMeters = 0,
+    reliefFactor = this.#ground?.camera.reliefFactor ?? 1,
+  ): GeoPosition | undefined {
+    const index = this.#index.get(id);
+    const foot = index === undefined ? undefined : this.#poses[index]?.position;
+    if (!foot) return undefined;
+    const heightMeters = (foot.heightMeters ?? 0) + (reliefFactor > 0 ? aboveMeters / reliefFactor : 0);
+    return { longitudeDeg: foot.longitudeDeg, latitudeDeg: foot.latitudeDeg, heightMeters };
   }
 
   /** Moves a copy (a live update). */
@@ -276,15 +326,55 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
     const index = this.#index.get(id);
     const item = index === undefined ? undefined : this.#items[index];
     if (index === undefined || !item) return false;
-    this.#poses[index] = poseOf(item, { longitudeDeg, latitudeDeg, heightMeters });
-    if (this.#set !== undefined)
-      this.#models?.setInstances?.(
-        this.#set,
-        this.#poses,
-        this.#items.map((_, i) => packPickId(this.#slot, i)),
-      );
+    this.#positions[index] = { longitudeDeg, latitudeDeg, heightMeters };
+    this.#sampleGround(index);
+    this.#poses[index] = poseOf(item, this.#footOf(index));
+    if (this.#set !== undefined) this.#models?.setInstances?.(this.#set, this.#poses, this.#pickIds);
     this.#context?.requestFrame();
     return true;
+  }
+
+  /**
+   * Samples the ground under every copy when finer terrain arrived since the last time, unless the relief is flat (it
+   * draws every height at 0, KB-282); returns whether a pose changed.
+   */
+  #standOnGround(): boolean {
+    const ground = this.#ground;
+    if (!ground || !(ground.camera.reliefFactor > 0)) return false;
+    const version = ground.terrainStats()?.uploads ?? 0;
+    if (version === this.#groundVersion) return false;
+    this.#groundVersion = version;
+    let changed = false;
+    for (let index = 0; index < this.#items.length; index++) {
+      const before = this.#grounds[index];
+      if (!this.#sampleGround(index)) return changed;
+      if (this.#grounds[index] === before) continue;
+      this.#poses[index] = poseOf(this.#items[index] as ModelSetItem, this.#footOf(index));
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** Samples the ground under one copy; false when the ground cannot be read, which lets it go. */
+  #sampleGround(index: number): boolean {
+    const ground = this.#ground;
+    const position = this.#positions[index];
+    if (!ground || !position) return true;
+    try {
+      this.#grounds[index] = ground.elevationAt(position, sample).heightMeters;
+      return true;
+    } catch (cause) {
+      this.#ground = undefined;
+      this.emit('error', { message: 'The ground under the model set could not be read', cause });
+      return false;
+    }
+  }
+
+  /** A copy's foot: its position as set, raised by the ground under it. */
+  #footOf(index: number): GeoPosition {
+    const position = this.#positions[index] as GeoPosition;
+    if (!this.#ground) return position;
+    return { ...position, heightMeters: (position.heightMeters ?? 0) + (this.#grounds[index] ?? 0) };
   }
 
   #applyState(index: number): void {
@@ -304,6 +394,9 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
     return item ? { layerId: this.id, id: item.id, properties: item.properties ?? {} } : undefined;
   }
 }
+
+/** Where the ground's heights are read into, so sampling allocates nothing. */
+const sample: ElevationSample = { heightMeters: 0, level: -1, noData: true };
 
 function poseOf(item: ModelSetItem, position: GeoPosition): ModelPose {
   return {

@@ -6,6 +6,7 @@ import type { TerrainSource } from '../terrain/terrain-source.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { createGlobe } from './create-globe.js';
 import type { GlobeError } from './errors.js';
+import type { ViewCurvesInit } from '../view/curves.js';
 import type { ViewInit } from './types.js';
 import { fakeRenderer } from './test-renderer.js';
 
@@ -100,6 +101,7 @@ async function terrainGlobe(
   frames = 30,
   workers = terrainWorkers(),
   view: ViewInit = { longitudeDeg: 7, latitudeDeg: 46, zoom: 9 },
+  viewCurves: ViewCurvesInit = GLOBE_WITH_RELIEF,
 ) {
   const { renderer, factory } = fakeRenderer();
   const globe = createGlobe({
@@ -109,7 +111,7 @@ async function terrainGlobe(
     terrain: source,
     workers,
     view,
-    viewCurves: GLOBE_WITH_RELIEF,
+    viewCurves,
   });
   const run = async (count: number): Promise<void> => {
     for (let frame = 0; frame < count; frame++) {
@@ -158,6 +160,25 @@ describe('terrain in a globe (M4)', () => {
     expect(heights.every((handle) => handle >= 0)).toBe(true);
     // Every terrain tile is requested once.
     expect(new Set(urls).size).toBe(urls.length);
+    globe.destroy();
+  });
+
+  it('wants no terrain while the relief is flat, and loads it once the relief rises (KB-281)', async () => {
+    const urls: string[] = [];
+    const flatRelief = { ...GLOBE_WITH_RELIEF, relief: { startGroundZoom: 98, endGroundZoom: 99 } };
+    const { globe, renderer, run } = await terrainGlobe(terrain(urls), 30, terrainWorkers(), undefined, flatRelief);
+    const flat = renderer.lastDraws;
+    expect(Array.from(flat?.terrain.textures.subarray(0, flat.count) ?? []).every((handle) => handle < 0)).toBe(true);
+    // The three coarsest levels load at start whatever the view.
+    const forView = () => urls.filter((url) => !/^\/terrain\/[0-2]\//.test(url));
+    expect(forView()).toEqual([]);
+    globe.setViewCurves(GLOBE_WITH_RELIEF);
+    await run(30);
+    const raised = renderer.lastDraws;
+    expect(Array.from(raised?.terrain.textures.subarray(0, raised.count) ?? []).some((handle) => handle >= 0)).toBe(
+      true,
+    );
+    expect(forView().length).toBeGreaterThan(0);
     globe.destroy();
   });
 

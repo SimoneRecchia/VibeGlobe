@@ -170,6 +170,11 @@ export class MouseGestures {
       this.grabPending = false;
       this.anchor = port.grab(this.down);
       this.trackball = !this.anchor;
+      // A drag from the sky does nothing, glide included, when the application turned it off (F654).
+      if (this.trackball && !options.gestures.skyDragPan) {
+        this.mode = 'none';
+        return;
+      }
     }
     if (this.anchor && port.grab(this.pointer)) {
       port.dragTo(this.anchor, this.pointer);

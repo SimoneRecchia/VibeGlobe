@@ -8,6 +8,7 @@ import { DEFAULT_SHAPING, shapeText } from './text-shaping.js';
 import { StyleLayer } from './style-layer.js';
 import type { FrameView } from '@vibeglobe/core';
 import { GlyphSource } from './glyph-source.js';
+import { HiddenLabels } from './placed-labels.js';
 import { labelColors, LabelPlacer } from './label-placer.js';
 import { BUCKET_EXTENT } from './layout-tile.js';
 import type { VectorAtlas } from './vector-target.js';
@@ -470,5 +471,82 @@ describe('label opacity (KB-245)', () => {
     const colors = labelColors((name) => layer.paint(name, 5));
     expect(colors.fill[3]).toBeCloseTo(0.5);
     expect(colors.halo[3]).toBeCloseTo(0.3);
+  });
+});
+
+describe('label anchors and hidden labels (F652)', () => {
+  // Every character is a 10 × 14 glyph, 12 px apart, always ready, with room in the atlas.
+  const glyph = { id: 0, bitmap: new Uint8Array(0), width: 10, height: 14, left: 0, top: -10, advance: 12 };
+  const glyphs = {
+    need: () => undefined,
+    ready: () => true,
+    resolve: (code: number) => ({ glyph: { ...glyph, id: code }, fontStack: 'f' }),
+    icon: () => undefined,
+    spriteLoading: false,
+  } as unknown as GlyphSource;
+  const atlas = { generation: 0, get: () => ({ x: 0, y: 0, width: 16, height: 20 }) } as unknown as VectorAtlas;
+  // 10 px per degree around the screen's center.
+  const view = {
+    geoToScreen: (p: { longitudeDeg: number; latitudeDeg: number }) => ({
+      xPx: 400 + p.longitudeDeg * 10,
+      yPx: 300 - p.latitudeDeg * 10,
+    }),
+    camera: { morphFactor: 1 },
+  };
+  const half = BUCKET_EXTENT / 2;
+  const symbols = (id: string, layerIndex: number, labels: readonly { text: string; iso: string; dx: number }[]) => ({
+    layer: new StyleLayer({ id, type: 'symbol', source: 's', 'source-layer': 'place' }),
+    layerIndex,
+    opacity: 1,
+    tile: { z: 0, x: 0, y: 0 },
+    clip: [0, 0, BUCKET_EXTENT, BUCKET_EXTENT] as const,
+    bucket: {
+      layerId: id,
+      features: labels.map((l, i) => ({ id: i, type: 'Point' as const, properties: { iso_a2: l.iso } })),
+      labels: labels.map((l, i) => ({ feature: i, text: l.text, anchor: [half + l.dx, half] as [number, number] })),
+    } as never,
+    version: 1,
+  });
+  // A city's name under Italy's, on a lower layer: Italy's name takes its room.
+  const sources = [
+    symbols('countries', 1, [
+      { text: 'IT', iso: 'IT', dx: 100 },
+      { text: 'FR', iso: 'FR', dx: -300 },
+    ]),
+    symbols('cities', 0, [{ text: 'Roma', iso: 'IT', dx: 100 }]),
+  ];
+  const frameView = { widthPx: 800, heightPx: 600 } as FrameView;
+
+  it('reads where the style placed the labels of a layer, on the ground and on screen, by a feature property', () => {
+    const placer = new LabelPlacer(view, glyphs, atlas);
+    placer.frame(sources, frameView, 2, 0);
+    const anchors = placer.placedBy('countries', 'iso_a2');
+    expect([...anchors.keys()]).toEqual(['IT', 'FR']);
+    const italy = anchors.get('IT');
+    expect(italy?.position.longitudeDeg).toBeCloseTo(((half + 100) / BUCKET_EXTENT) * 360 - 180, 9);
+    expect(italy?.position.latitudeDeg).toBeCloseTo(0, 9);
+    expect(italy?.screenPoint).toEqual(view.geoToScreen(italy?.position ?? { longitudeDeg: NaN, latitudeDeg: NaN }));
+    expect(placer.placedBy('cities', 'iso_a2').size).toBe(0);
+  });
+
+  it('keeps hidden labels placed, taking their room, without drawing them, and fades them back in', () => {
+    const hidden = new HiddenLabels();
+    const placer = new LabelPlacer(view, glyphs, atlas, undefined, hidden);
+    const glyphsDrawn = (nowMs: number) => placer.frame(sources, frameView, 2, nowMs).quads.quads;
+    glyphsDrawn(0);
+    expect(glyphsDrawn(1000)).toBe(4);
+    hidden.set('countries', { property: 'iso_a2', values: ['IT'] });
+    // Italy's name fades out over the label fade, and Rome's stays out of its room.
+    expect(glyphsDrawn(1100)).toBe(4);
+    expect(glyphsDrawn(2000)).toBe(2);
+    expect([...placer.placedBy('countries', 'iso_a2').keys()]).toEqual(['IT', 'FR']);
+    expect(placer.placed().map((label) => label.text)).toEqual(['FR']);
+    hidden.set('countries', true);
+    expect(glyphsDrawn(3000)).toBe(0);
+    expect(placer.placedBy('countries', 'iso_a2').size).toBe(2);
+    hidden.set('countries', false);
+    const fadingIn = placer.frame(sources, frameView, 2, 3100).quads;
+    expect(fadingIn.quads).toBe(4);
+    expect(fadingIn.params[2]).toBeCloseTo(1 / 3, 6);
   });
 });

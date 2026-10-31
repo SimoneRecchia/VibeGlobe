@@ -10,6 +10,7 @@ import { LabelAnchorCache } from './label-anchor-cache.js';
 import { geodeticToEcef, type ElevationSample, type FrameView, type GeoPosition } from '@vibeglobe/core';
 import { tileToLonLat } from './globe-vertices.js';
 import { GlyphSource } from './glyph-source.js';
+import { drawnOf, HiddenLabels, labelsBy, type LabelPropertyValue, type PlacedLabel } from './placed-labels.js';
 import { labelAnchors, UNITS_PER_PX, type LabelAnchor } from './label-anchors.js';
 import { BUCKET_EXTENT, type Bucket, type BucketFeature } from './layout-tile.js';
 import { placeGlyphsAlongLine } from './line-labels.js';
@@ -52,18 +53,7 @@ export interface LabelView {
   elevationAt?(position: GeoPosition, out?: ElevationSample): ElevationSample;
 }
 
-/** A placed label, for the debug API (F449). */
-export interface PlacedLabel {
-  readonly id: number;
-  readonly layerId: string;
-  readonly text: string;
-  readonly boxes: readonly ScreenBox[];
-  readonly opacity: number;
-  /** The style source, the feature and the anchor's position, for picking (F459). */
-  readonly source: string;
-  readonly feature: BucketFeature;
-  readonly position: { readonly longitudeDeg: number; readonly latitudeDeg: number };
-}
+export type { PlacedLabel } from './placed-labels.js';
 
 interface Candidate extends SymbolCandidate {
   readonly layerId: string;
@@ -71,8 +61,11 @@ interface Candidate extends SymbolCandidate {
   readonly source: string;
   readonly feature: BucketFeature;
   readonly position: { readonly longitudeDeg: number; readonly latitudeDeg: number };
+  readonly screenPoint: { readonly xPx: number; readonly yPx: number };
   readonly glyphs: readonly GlyphQuad[];
   readonly opacity: number;
+  /** Kept placed without being drawn (F652). */
+  readonly hidden: boolean;
 }
 
 const ecef = new Float64Array(3);
@@ -122,6 +115,8 @@ export class LabelPlacer {
   private readonly shapings = new Map<string, Shaping>();
   private readonly quads = new QuadWriter();
   private placedLabels: PlacedLabel[] = [];
+  /** Every label the last frame placed, drawn or hidden. */
+  private anchoredLabels: PlacedLabel[] = [];
 
   constructor(
     private readonly view: LabelView,
@@ -129,6 +124,7 @@ export class LabelPlacer {
     private readonly atlas: VectorAtlas,
     private readonly stateOf: (source: string, id: number) => Readonly<Record<string, unknown>> | undefined = () =>
       undefined,
+    private readonly hidden = new HiddenLabels(),
   ) {}
 
   /** The screen point of a position on the ground (on the terrain where there is some, F452). */
@@ -141,9 +137,14 @@ export class LabelPlacer {
 
   private readonly sample = { heightMeters: 0, level: -1, noData: true };
 
-  /** The labels placed by the last frame. */
+  /** The labels placed and drawn by the last frame (hidden ones only while they fade out). */
   placed(): readonly PlacedLabel[] {
     return this.placedLabels;
+  }
+
+  /** The labels of a style layer the last frame placed, hidden ones included, by a feature property (F652). */
+  placedBy(layerId: string, property: string): Map<LabelPropertyValue, PlacedLabel> {
+    return labelsBy(this.anchoredLabels, layerId, property);
   }
 
   /** Places the frame's labels; returns their quads and whether a fade is running. */
@@ -160,30 +161,26 @@ export class LabelPlacer {
     this.anchors.endFrame(this.index);
     const viewport = { minX: 0, minY: 0, maxX: view.widthPx, maxY: view.heightPx };
     const { placed } = placeSymbols(candidates, viewport);
-    const opacities = this.fader.update(nowMs, placed);
+    // Hidden labels keep their room in collision and fade out as if they had lost it (F652).
+    const opacities = this.fader.update(nowMs, this.hidden.none ? placed : drawnOf(candidates, placed));
     this.quads.reset();
     const shown: PlacedLabel[] = [];
+    const anchored: PlacedLabel[] = [];
     let animating = false;
     const seen = new Set<number>();
     for (const c of candidates) {
       const opacity = opacities.get(c.id) ?? 0;
       if (opacity > 0 && opacity < 1) animating = true;
-      if (opacity <= 0 || seen.has(c.id)) continue;
+      if (seen.has(c.id)) continue;
       seen.add(c.id);
-      for (const g of c.glyphs) this.quads.add(g, opacity * c.opacity);
-      if (placed.has(c.id))
-        shown.push({
-          id: c.id,
-          layerId: c.layerId,
-          text: c.text,
-          boxes: c.boxes,
-          opacity,
-          source: c.source,
-          feature: c.feature,
-          position: c.position,
-        });
+      if (opacity > 0) for (const g of c.glyphs) this.quads.add(g, opacity * c.opacity);
+      if (!placed.has(c.id)) continue;
+      const label = placedLabel(c, opacity);
+      anchored.push(label);
+      if (opacity > 0) shown.push(label);
     }
     this.placedLabels = shown;
+    this.anchoredLabels = anchored;
     return { quads: this.quads.result(), animating };
   }
 
@@ -273,6 +270,8 @@ export class LabelPlacer {
         source: layer.source ?? '',
         feature: feature ?? { id: undefined, type: 'Point', properties: {} },
         position: { longitudeDeg: lon ?? 0, latitudeDeg: lat ?? 0 },
+        screenPoint: screen,
+        hidden: feature !== undefined && this.hidden.has(layer.id, feature),
       });
     }
     return out;
@@ -407,6 +406,11 @@ export class LabelPlacer {
     const key = `${fontStack}|${code}`;
     return this.atlas.get(key) ?? this.atlas.addSdf(key, glyph.bitmap, glyph.width + 6, glyph.height + 6);
   }
+}
+
+function placedLabel(c: Candidate, opacity: number): PlacedLabel {
+  const { id, layerId, text, boxes, source, feature, position, screenPoint } = c;
+  return { id, layerId, text, boxes, opacity, source, feature, position, screenPoint };
 }
 
 type GlyphStyle = Pick<GlyphQuad, 'scale' | 'fill' | 'halo' | 'haloWidthPx'>;

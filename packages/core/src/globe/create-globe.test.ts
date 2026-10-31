@@ -387,6 +387,20 @@ describe('createGlobe', () => {
     expect(globe.camera.zoom).toBeLessThan(3);
   });
 
+  it('tells whether the globe hides a position: beyond the horizon on the globe, never on the flat map (F653)', async () => {
+    const { globe, renderer } = await started({ view: { longitudeDeg: 0, latitudeDeg: 0, zoom: 2 } });
+    // Straight down onto the equator: the horizon lies at the central angle whose cosine is a / (a + altitude).
+    const horizonDeg = (Math.acos(6378137 / (6378137 + globe.camera.altitudeMeters)) * 180) / Math.PI;
+    const near = globe.geoToScreen({ longitudeDeg: horizonDeg - 1, latitudeDeg: 0 });
+    const beyond = globe.geoToScreen({ longitudeDeg: horizonDeg + 1, latitudeDeg: 0 });
+    expect([near?.behindGlobe, beyond?.behindGlobe]).toEqual([false, true]);
+    expect(globe.geoToScreen({ longitudeDeg: 180, latitudeDeg: 0 })?.behindGlobe).toBe(true);
+    globe.jumpTo({ zoom: 9 });
+    renderer.flush();
+    expect(globe.camera.morphFactor).toBe(1);
+    expect(globe.geoToScreen({ longitudeDeg: horizonDeg + 1, latitudeDeg: 0 })?.behindGlobe).toBe(false);
+  });
+
   it('reports device events and frees everything on destroy (F068)', async () => {
     const { globe, renderer } = await started();
     const lost: string[] = [];

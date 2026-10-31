@@ -5,7 +5,7 @@ import { projectToScreen } from '../camera/projection.js';
 import { groundZoomFromMercatorZoom, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
 import type { GeodeticRad } from '../geodesy/ecef.js';
 import { wrapDegrees } from './camera-state.js';
-import type { GeoPosition, ScreenPoint } from './types.js';
+import type { GeoPosition, GeoScreenPoint, ScreenPoint } from './types.js';
 import type { ValidView } from './validation.js';
 import { morphPointInto, type MorphFrame } from '../view/morph.js';
 import { pickMorphedAt, pickTerrainAt } from '../view/pick.js';
@@ -73,15 +73,20 @@ export function positionAt(
   };
 }
 
-/** The screen point showing a position as the frame draws it (camera and view brought up to date), or undefined behind it. */
-export function screenOf(camera: Camera, view: ViewState, position: GeoPosition): ScreenPoint | undefined {
+/**
+ * The screen point showing a position as the frame draws it (camera and view brought up to date), or undefined behind
+ * it; behind the globe (F653) when, before the flat map's half of the morph, the eye lies below its tangent plane.
+ */
+export function screenOf(camera: Camera, view: ViewState, position: GeoPosition): GeoScreenPoint | undefined {
   current(camera, view);
   geodetic[0] = position.longitudeDeg * RAD;
   geodetic[1] = position.latitudeDeg * RAD;
   geodetic[2] = position.heightMeters ?? 0;
   morphPointInto(view.morph, geodetic, ecefScratch);
   if (!projectToScreen(camera, ecefScratch, screenScratch)) return undefined;
-  return { xPx: screenScratch[0] ?? 0, yPx: screenScratch[1] ?? 0 };
+  let facing = 0;
+  for (let i = 0; i < 3; i++) facing += (ecefScratch[i] ?? 0) * ((camera.eyeEcef[i] ?? 0) - (ecefScratch[i] ?? 0));
+  return { xPx: screenScratch[0] ?? 0, yPx: screenScratch[1] ?? 0, behindGlobe: facing < 0 && view.morph.morph < 0.5 };
 }
 
 /** Gives a position-only jump requested before start the ground scale of the view it replaces. */

@@ -122,6 +122,8 @@ export class ImageryRuntime {
   readonly ahead = new FlightPreload();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
+  /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281). */
+  relief = true;
   private readonly byIndex = new Map<number, ImageryLoader>();
   /** The terrain layer, when the engine has a terrain source (M4). */
   readonly terrain: TerrainLayer | undefined;
@@ -390,7 +392,7 @@ export class ImageryRuntime {
     let terrainStart = terrain ? host.now() : 0;
     if (terrain) {
       terrain.loader.beginFrame();
-      drawTerrain(list, tiles, count, terrain, camera);
+      if (this.relief) drawTerrain(list, tiles, count, terrain, camera);
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       recordShownTerrain(list, tiles, count, terrain);
       if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);

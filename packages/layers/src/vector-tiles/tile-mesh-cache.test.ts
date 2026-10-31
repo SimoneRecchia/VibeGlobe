@@ -20,7 +20,11 @@ function slowCache() {
     },
   } as unknown as VectorTileTarget;
   const sample = { heightMeters: 0, level: -1, noData: true };
-  const grounds = new TileGrounds({ elevationAt: () => sample, terrainStats: () => undefined });
+  const grounds = new TileGrounds({
+    camera: { reliefFactor: 1 },
+    elevationAt: () => sample,
+    terrainStats: () => undefined,
+  });
   const cache = new TileMeshCache(
     () => target,
     grounds,

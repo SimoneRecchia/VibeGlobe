@@ -89,6 +89,35 @@ The playground's `?scenario=energy-park` shows two models built for sets, genera
 fixed-tilt solar table of 2 × 12 modules tilted 20° (188 triangles in two meshes, 20 KB, facing −Z: heading 180 faces
 south). Ten turbines and 720 tables cost five instanced draws and one for the far tables' placeholders.
 
+## Standing on the terrain
+
+With terrain, a copy placed at a height of 0 stands on the ellipsoid, under the ground in the hills. `ground: globe`
+stands every copy on the terrain as the globe draws it (F655): a copy's `heightMeters` becomes its height above the
+ground (0 by default), sampled from the terrain already in memory (`globe.elevationAt`), so it costs no request, and
+sampled again each time finer terrain arrives (`globe.terrainStats().uploads` changes) and when the relief rises from
+flat. The renderer scales heights by the frame's relief as it does the terrain's, so on a flat view the copies stand
+at 0 and nothing is sampled. A ground that cannot be read (display-only terrain) emits `error` once and the copies
+stay where they were.
+
+```ts
+const farm = stack.add(new ModelSetLayer({ url: '/models/turbine.glb', models: turbines, ground: globe }));
+// A marker on top of each 84 m turbine, placed every frame.
+globe.on('camera-change', () => {
+  const { reliefFactor } = globe.camera;
+  for (const [id, element] of markers) {
+    const top = farm.markerPosition(id, 84, reliefFactor);
+    const point = top && globe.geoToScreen(top);
+    if (point) element.style.transform = `translate(${point.xPx}px, ${point.yPx}px)`;
+  }
+});
+```
+
+`markerPosition(id, aboveMeters, reliefFactor)` is the position to hand `geoToScreen` for a point `aboveMeters` over
+a copy's foot: the relief scales the foot's height, not the model, so its height is the foot's plus `aboveMeters`
+divided by the relief. On a flat relief (0), where no height shows, it is the foot. Pass the frame's
+`camera.reliefFactor` when it is at hand: without it each call reads the camera. `getPosition` keeps returning the
+position as set (with a ground, its height above it).
+
 ## A light model
 
 Every triangle of a set is drawn once per copy in view, so the model's weight multiplies. Recommended limits for a

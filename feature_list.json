@@ -7828,6 +7828,72 @@
         "In the browser, the turbines cost three instanced draws and the tables at most three, and close over the park the modules' glass fills the view from the south and their backs from the north"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F650",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "One Web Mercator image of the whole world (a PNG, JPEG or WebP, such as night lights) is an imagery source of its own (`mercatorImage` of `@vibeglobe/sources`, levels 0 to `maxLevel`, at most 22): the image is downloaded with the first tile and decoded once, and every tile is cut from its share of the image on request; a failed download is tried again with the next tile, tiles fail with the engine's usual results (an HTTP status, a network error, a timeout, aborted) and an image that cannot be decoded is no data; an invalid `maxLevel` is a SourceConfigError ('invalid-option').",
+      "steps": [
+        "Unit-test that it passes the tiled conformance suite, downloads and decodes the image once for many tiles, cuts each tile from its share of the image, tries a failed download again and refuses an invalid maxLevel",
+        "In the browser, a globe with a 2048-pixel night-lights image as a `blend: 'night'` layer of levels 0 to 3: the lights show on the night side with no seams between tiles, and the image is requested once"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F651",
+      "milestone": 8,
+      "section": "Offline, online and caching",
+      "description": "The offline engine's statistics give the bytes of the tiles each tier delivered next to their counts (`persistentBytes`, `revalidatedBytes`, `packageBytes` and `networkBytes` of `TierCounters`, per source and in total), and `Offline.countTransport(transport, classify)` counts in them the tiles a transport delivers outside the tiers (a vector style's), with the source, tier and tile `classify` names for each URL, reporting them to `onServe` too.",
+      "steps": [
+        "Unit-test the bytes of each tier per source and in total, and the counting of a transport outside the tiers, with requests left out by `classify` and failed requests not counted",
+        "In the playground, load a view online, reload it, then go offline with a package installed: after each step `offline.stats()` shows the bytes of the tier that served it growing with its tile count"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F652",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "A vector tile layer tells an application where its style placed the labels of a symbol layer, by the value of a feature property (`labelAnchors(layerId, property)`: each label's anchor on the ground and on screen, hidden labels included), and keeps chosen labels placed without drawing them (`setLabelsHidden(layerId, true | false | { property, values })`): a hidden label keeps its room in collision, so the labels around it stay where they are, and fades out, and back in when shown again, over the label fade on the engine clock. An application grows its own marker out of a name's exact spot and hides that name while the marker shows, with no paint expression.",
+      "steps": [
+        "Unit-test the anchors of a layer's placed labels by a feature property, on the ground and on screen, and that hidden labels keep their room in collision, are still listed, draw nothing once faded and fade back in",
+        "In the browser, a style with country names: read a country's anchor, hide its name and see it fade out while the names around it stay, then show it again"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F653",
+      "milestone": 5,
+      "section": "Map experience: globe, 2D and 3D",
+      "description": "`Globe.geoToScreen` tells whether the globe hides the position (`behindGlobe` on its `GeoScreenPoint` result): on the globe's half of the morph, a position beyond the horizon seen from the eye (measured at the position's own height); never on the flat map's half. An application hides an HTML marker there without horizon math of its own.",
+      "steps": [
+        "Unit-test points just inside and just beyond the horizon straight below the eye, the far side, and the same point on the flat map",
+        "In the browser, an HTML marker that hides by `behindGlobe` disappears where the globe's limb covers its point as the globe turns, and stays on the flat map"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F654",
+      "milestone": 6,
+      "section": "Navigation and controls",
+      "description": "Input from what lies around and over the globe, as applications choose: the gesture switch `skyDragPan` (default on) turned off makes a mouse or pen drag that starts on the sky, where no globe is drawn, do nothing until it is released, glide included, even once it reaches the globe (touch keeps it, clicks and the other buttons are unchanged); `NavigationControls.forwardWheel(element)` lets the wheel, trackpad scroll and pinch, and Safari's trackpad gestures over HTML elements laid over the map (markers, labels, panels) zoom the map about the pointer as over the map, the page neither scrolling nor zooming there, events the map or the element already handled left alone, kept across attachments, and returns the function that stops it.",
+      "steps": [
+        "Unit-test that with `skyDragPan` off a drag from the sky of a zoomed-out globe moves nothing and does not glide while one from the globe pans, and that the wheel over a forwarded element zooms at the cursor, skips handled events, and stops on the returned function, on destroy and across a new attachment",
+        "In the browser, on a zoomed-out globe with the switch off, a drag from the sky leaves the globe still and one from the globe turns it; the wheel and a trackpad pinch over a marker laid over the map zoom about the pointer and the page does not scroll"
+      ],
+      "status": "failing"
+    },
+    {
+      "id": "F655",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "Model sets standing on the terrain (`ModelSetLayerOptions.ground`, a `Globe` or any `ModelSetGround`): each copy's height becomes its height above the terrain as the globe draws it, sampled from the terrain in memory (`elevationAt`) with no request, again whenever finer terrain is uploaded (`terrainStats().uploads`) and once the relief rises from flat, nothing sampled while the relief is flat (the renderer scales the heights by the frame's relief, so on a flat view the copies stand at 0); a ground that cannot be read emits `error` once and is let go. `ModelSetLayer.markerPosition(id, aboveMeters, reliefFactor)` gives the position `Globe.geoToScreen` needs to show a point that far over a copy's foot as the frame drew it (the relief scales the foot, not the model), so HTML markers sit on top of the models.",
+      "steps": [
+        "Unit-test the heights at load, after a terrain upload, none sampled with no new upload or a flat relief and again once it rises, the marker position at a relief and on a flat one, a moved copy standing on its new ground, and a ground that throws",
+        "In the browser, a wind farm on hilly terrain: the turbines stand on the ground from the first frame terrain shows, settle as finer tiles arrive with no elevation request of their own, stand at 0 on a flat view, and a marker at `markerPosition(id, towerHeight, camera.reliefFactor)` stays on each turbine's top while zooming through the relief band"
+      ],
+      "status": "failing"
     }
   ]
 }

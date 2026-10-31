@@ -10,6 +10,7 @@ import {
   requestResult,
   StorageUnavailableError,
   transactionDone,
+  watchLoss,
 } from '../idb.js';
 import type { PackageManifest } from './manifest.js';
 
@@ -50,76 +51,56 @@ export class PackageStorage {
   ) {}
 
   /** Every package record. */
-  async records(): Promise<PackageRecord[]> {
-    const db = await this.open();
-    return (await requestResult(db.transaction(PACKAGES).objectStore(PACKAGES).getAll())) as PackageRecord[];
+  records(): Promise<PackageRecord[]> {
+    return this.read(PACKAGES, (store) => store.getAll());
   }
 
   /** One package record. */
-  async record(id: string): Promise<PackageRecord | undefined> {
-    const db = await this.open();
-    return (await requestResult(db.transaction(PACKAGES).objectStore(PACKAGES).get(id))) as PackageRecord | undefined;
+  record(id: string): Promise<PackageRecord | undefined> {
+    return this.read(PACKAGES, (store) => store.get(id));
   }
 
   /** Writes a package record. */
-  async putRecord(record: PackageRecord, key = record.manifest.id): Promise<void> {
-    const db = await this.open();
-    const tx = db.transaction(PACKAGES, 'readwrite');
-    tx.objectStore(PACKAGES).put(record, key);
-    await transactionDone(tx);
+  putRecord(record: PackageRecord, key = record.manifest.id): Promise<void> {
+    return this.write(PACKAGES, (store) => store.put(record, key));
   }
 
   /** Deletes a package record. */
-  async deleteRecord(key: string): Promise<void> {
-    const db = await this.open();
-    const tx = db.transaction(PACKAGES, 'readwrite');
-    tx.objectStore(PACKAGES).delete(key);
-    await transactionDone(tx);
+  deleteRecord(key: string): Promise<void> {
+    return this.write(PACKAGES, (store) => store.delete(key));
   }
 
   /** Stores one chunk of a file of a package version. */
-  async putChunk(prefix: string, path: string, index: number, chunk: Blob): Promise<void> {
-    const db = await this.open();
-    const tx = db.transaction(PACKAGE_FILES, 'readwrite');
-    tx.objectStore(PACKAGE_FILES).put(chunk, chunkKey(prefix, path, index));
-    await transactionDone(tx);
+  putChunk(prefix: string, path: string, index: number, chunk: Blob): Promise<void> {
+    return this.write(PACKAGE_FILES, (store) => store.put(chunk, chunkKey(prefix, path, index)));
   }
 
   /** One stored chunk. */
-  async chunk(prefix: string, path: string, index: number): Promise<Blob | undefined> {
-    const db = await this.open();
-    const store = db.transaction(PACKAGE_FILES).objectStore(PACKAGE_FILES);
-    return (await requestResult(store.get(chunkKey(prefix, path, index)))) as Blob | undefined;
+  chunk(prefix: string, path: string, index: number): Promise<Blob | undefined> {
+    return this.read(PACKAGE_FILES, (store) => store.get(chunkKey(prefix, path, index)));
   }
 
   /** Indices of the chunks of a file already stored (a resumed install skips them, F308). */
   async storedChunks(prefix: string, path: string): Promise<Set<number>> {
-    const db = await this.open();
-    const store = db.transaction(PACKAGE_FILES).objectStore(PACKAGE_FILES);
-    const keys = (await requestResult(store.getAllKeys(prefixRange(`${prefix}${path}#`)))) as string[];
+    const keys = await this.read<string[]>(PACKAGE_FILES, (store) =>
+      store.getAllKeys(prefixRange(`${prefix}${path}#`)),
+    );
     return new Set(keys.map((key) => Number(key.slice(key.lastIndexOf('#') + 1))));
   }
 
   /** Stores a tile of a built package. */
-  async putTile(prefix: string, tileId: string, tile: StoredPackageTile): Promise<void> {
-    const db = await this.open();
-    const tx = db.transaction(PACKAGE_TILES, 'readwrite');
-    tx.objectStore(PACKAGE_TILES).put(tile, `${prefix}${tileId}`);
-    await transactionDone(tx);
+  putTile(prefix: string, tileId: string, tile: StoredPackageTile): Promise<void> {
+    return this.write(PACKAGE_TILES, (store) => store.put(tile, `${prefix}${tileId}`));
   }
 
   /** A tile of a built package. */
-  async tile(prefix: string, tileId: string): Promise<StoredPackageTile | undefined> {
-    const db = await this.open();
-    const store = db.transaction(PACKAGE_TILES).objectStore(PACKAGE_TILES);
-    return (await requestResult(store.get(`${prefix}${tileId}`))) as StoredPackageTile | undefined;
+  tile(prefix: string, tileId: string): Promise<StoredPackageTile | undefined> {
+    return this.read(PACKAGE_TILES, (store) => store.get(`${prefix}${tileId}`));
   }
 
   /** Keys of the tiles stored under a prefix, without the prefix. */
   async tileIds(prefix: string): Promise<Set<string>> {
-    const db = await this.open();
-    const store = db.transaction(PACKAGE_TILES).objectStore(PACKAGE_TILES);
-    const keys = (await requestResult(store.getAllKeys(prefixRange(prefix)))) as string[];
+    const keys = await this.read<string[]>(PACKAGE_TILES, (store) => store.getAllKeys(prefixRange(prefix)));
     return new Set(keys.map((key) => key.slice(prefix.length)));
   }
 
@@ -141,18 +122,29 @@ export class PackageStorage {
     this.db = undefined;
   }
 
+  /** The result of one request on a store, in a read-only transaction. */
+  private async read<T>(name: string, query: (store: IDBObjectStore) => IDBRequest): Promise<T> {
+    const db = await this.open();
+    return (await requestResult(query(db.transaction(name).objectStore(name)))) as T;
+  }
+
+  /** Changes a store and resolves once the transaction commits. */
+  private async write(name: string, change: (store: IDBObjectStore) => unknown): Promise<void> {
+    const db = await this.open();
+    const tx = db.transaction(name, 'readwrite');
+    change(tx.objectStore(name));
+    await transactionDone(tx);
+  }
+
   private open(): Promise<IDBDatabase> {
     if (!this.factory) return Promise.reject(new StorageUnavailableError('IndexedDB is not available'));
     const factory = this.factory;
     this.db ??= openDatabase(factory, this.database).then(
       (db) => {
-        const lost = (reason: string): void => {
-          db.close();
+        watchLoss(db, (reason) => {
           this.db = undefined;
           this.onLost?.(reason);
-        };
-        db.onclose = () => lost('the browser closed the database');
-        db.onversionchange = () => lost('the database is being deleted or upgraded elsewhere');
+        });
         return db;
       },
       (error: unknown) => {

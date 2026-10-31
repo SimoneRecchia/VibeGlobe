@@ -4,6 +4,7 @@ import {
   DEFAULT_DATABASE,
   isQuotaError,
   openDatabase,
+  watchLoss,
   prefixRange,
   requestResult,
   StorageUnavailableError,
@@ -152,16 +153,12 @@ class IndexedDbStore implements CacheStore {
 
   private async connect(factory: IDBFactory): Promise<IDBDatabase> {
     const db = await openDatabase(factory, this.options.database ?? DEFAULT_DATABASE);
-    const lost = (reason: string): void => {
-      db.close();
+    watchLoss(db, (reason) => {
       this.db = undefined;
       this.bytes = 0;
       this.touched.clear();
       this.options.onLost?.(reason);
-    };
-    // The browser closes the connection when site data is cleared; another context deleting the database asks first.
-    db.onclose = () => lost('the browser closed the database');
-    db.onversionchange = () => lost('the database is being deleted or upgraded elsewhere');
+    });
     this.bytes = await this.sumSizes(db);
     return db;
   }

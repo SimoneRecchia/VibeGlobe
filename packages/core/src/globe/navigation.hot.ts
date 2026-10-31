@@ -11,7 +11,8 @@ import type { GeodeticRad } from '../geodesy/ecef.js';
 import { wrapLongitudeRad } from '../projections/longitude.js';
 import { clampPoseRange } from './camera-state.js';
 import type { GeoPosition, ScreenPoint } from './types.js';
-import { pickMorphedAt } from '../view/pick.js';
+import { morphPointInto } from '../view/morph.js';
+import { pickMorphedAt, pickTerrainAt } from '../view/pick.js';
 import type { ViewState } from '../view/view-state.js';
 
 const RAD = Math.PI / 180;
@@ -132,4 +133,43 @@ export function zoomCamera(
   view?.update(camera);
   if (anchored) solveDrag(camera, view, northUp ? ANCHOR_NORTH_UP : ANCHOR_HOLD_HEADING, zoomGuess);
   return true;
+}
+
+/** The terrain's height in memory at a position, as `Globe.screenToGeo` reads it (F383); NaN without terrain. */
+export type SurfaceHeight = (longitudeRad: number, latitudeRad: number) => number;
+
+const surfacePoint = new Float64Array(3);
+const surfaceGeodetic = new Float64Array(3);
+
+/**
+ * Limits a zoom step toward `point` so the eye stays `minMeters` from the surface it frames (KB-300): the terrain as
+ * drawn under the point, the ellipsoid without terrain. Reads the step asked for from `io[0]` and writes the allowed one
+ * there; a step out, or toward the sky, passes untouched.
+ */
+export function limitZoomToSurface(
+  camera: Camera,
+  view: ViewState,
+  point: unknown,
+  heightAt: SurfaceHeight,
+  minMeters: number,
+  io: Float64Array,
+): void {
+  const step = io[0] ?? 0;
+  if (!(step > 0) || !(minMeters > 0) || !readPixel(point)) return;
+  camera.update();
+  view.update(camera);
+  // Toward the sky the zoom moves toward the target, which the terrain's clearance keeps the eye above.
+  if (!pickTerrainAt(camera, view.morph, pixel, heightAt, pick)) return;
+  surfaceGeodetic[0] = pick.longitudeRad;
+  surfaceGeodetic[1] = pick.latitudeRad;
+  surfaceGeodetic[2] = pick.heightMeters;
+  morphPointInto(view.morph, surfaceGeodetic, surfacePoint);
+  let squared = 0;
+  for (let i = 0; i < 3; i++) squared += ((camera.eyeEcef[i] ?? 0) - (surfacePoint[i] ?? 0)) ** 2;
+  // A step of z levels moves the eye toward the target by range · (1 − 2^−z), and the surface point it frames lies
+  // nearer than the target where the terrain rises above the ellipsoid: the eye may come that far less the distance.
+  const distance = Math.sqrt(squared);
+  const left = 1 - (distance - minMeters) / camera.pose.rangeMeters;
+  if (distance <= minMeters) io[0] = 0;
+  else if (left > 0 && step > -Math.log2(left)) io[0] = -Math.log2(left);
 }

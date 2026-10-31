@@ -38,6 +38,7 @@ export function validateConstraints(constraints: unknown): CameraConstraints {
     ['maxZoom', c.maxZoom, 0, 25],
     ['maxTiltDeg', c.maxTiltDeg, 0, 89],
     ['maxRangeMeters', c.maxRangeMeters, 1, 6e7],
+    ['minSurfaceDistanceMeters', c.minSurfaceDistanceMeters, 0, 10_000],
   ] as const) {
     if (value !== undefined && !(typeof value === 'number' && value >= min && value <= max))
       throw new GlobeError('invalid-option', `constraints.${name} must be a number from ${min} to ${max}`);
@@ -56,6 +57,8 @@ export class Constraints {
   /** The constraints as last set, validated (`Globe.constraints`). */
   settings: CameraConstraints = {};
   readonly values = new Float64Array(10).fill(Number.NaN);
+  /** How near a zoom in may bring the eye to the surface it zooms toward, meters (KB-300). */
+  minSurfaceDistanceMeters = 40;
   /**
    * Whether zoom limits or bounds are set: without, {@link apply} reads nothing (KB-132: a frame's reads of the values
    * allocate whenever the function runs unoptimized).
@@ -79,6 +82,7 @@ export class Constraints {
     }
     // Anything but the tilt limit clamps the pose.
     this.clamps = v.some((value, slot) => slot !== MAX_TILT && value === value);
+    this.minSurfaceDistanceMeters = constraints.minSurfaceDistanceMeters ?? 40;
     view?.setMaxTilt(this.maxTiltRad);
   }
 
@@ -115,9 +119,7 @@ export class Constraints {
     const far = v[FAR] ?? Number.NaN;
     if (minZoom !== minZoom && maxZoom !== maxZoom && far !== far) return deltaZoom;
     const pose = camera.pose;
-    const toRange =
-      ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(pose.targetLatitudeRad)) /
-      Math.tan(camera.fovYRad / 2);
+    const toRange = rangeAtZoomZero(camera);
     const zoom = Math.log2(toRange / pose.rangeMeters);
     // The farthest range is a zoom at this latitude (F646); the higher of it and minZoom holds.
     const farZoom = Math.log2(toRange / far);
@@ -146,10 +148,7 @@ export class Constraints {
     const maxZoom = v[MAX_ZOOM] ?? Number.NaN;
     const far = v[FAR] ?? Number.NaN;
     if (minZoom !== minZoom && maxZoom !== maxZoom && far !== far) return;
-    // Web Mercator zoom z at latitude φ is ground zoom z − log2(cos φ); range = (h / 2) · m/px / tan(fov / 2).
-    const toRange =
-      ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(pose.targetLatitudeRad)) /
-      Math.tan(camera.fovYRad / 2);
+    const toRange = rangeAtZoomZero(camera);
     v[MAX_RANGE] = minZoom === minZoom ? toRange / 2 ** minZoom : Number.POSITIVE_INFINITY;
     // The farthest range holds at every latitude: a drag toward a pole never moves the camera in (F646).
     if (far < (v[MAX_RANGE] ?? 0)) v[MAX_RANGE] = far;
@@ -157,6 +156,17 @@ export class Constraints {
     if (pose.rangeMeters > (v[MAX_RANGE] ?? 0)) pose.rangeMeters = v[MAX_RANGE] ?? pose.rangeMeters;
     if (pose.rangeMeters < (v[MIN_RANGE] ?? 0)) pose.rangeMeters = v[MIN_RANGE] ?? pose.rangeMeters;
   }
+}
+
+/**
+ * The range of Web Mercator zoom 0 at the target's latitude, meters: zoom z at latitude φ is ground zoom z − log2(cos φ),
+ * and range = (h / 2) · m/px / tan(fov / 2).
+ */
+function rangeAtZoomZero(camera: Camera): number {
+  return (
+    ((camera.heightPx / 2) * METERS_PER_PIXEL_AT_ZERO * Math.cos(camera.pose.targetLatitudeRad)) /
+    Math.tan(camera.fovYRad / 2)
+  );
 }
 
 /** Where a longitude is clamped (KB-132): a double passed to or returned from a call that is not inlined is boxed. */

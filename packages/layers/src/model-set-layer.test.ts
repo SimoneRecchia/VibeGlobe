@@ -40,6 +40,8 @@ function fakeSets(): ModelRenderer & {
     setVisible: (_id: number, visible: boolean) => void (fake.visible = visible),
     setInstanceAngles: (_id: number, joint: number, angles: Float32Array) => void (fake.angles[joint] = angles),
     drawnInstances: () => fake.drawn,
+    // A turbine's box: the rotor reaches 40 m across the tower (x), the nacelle 8 m behind it (z), the tip 120 m up.
+    setBounds: () => [-40, 0, -8, 40, 120, 6],
   };
   return fake;
 }
@@ -79,6 +81,33 @@ describe('model set layer (F627)', () => {
     expect(models.visible).toBe(false);
     stack.remove('farm');
     expect(models.removed).toEqual([7]);
+  });
+
+  it("gives the corners of copies' model boxes as drawn, scaled, any nacelle heading included, to frame them (F667)", async () => {
+    const models = fakeSets();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    const layer = new ModelSetLayer({
+      url: 'turbine.glb',
+      models: [
+        { id: 'a', position: { longitudeDeg: 9, latitudeDeg: 45, heightMeters: 70 } },
+        { id: 'b', position: { longitudeDeg: 9.01, latitudeDeg: 45 }, scale: 0.5 },
+      ],
+    });
+    expect(layer.framePositions()).toEqual([]);
+    stack.add(layer);
+    await layer.ready;
+    const corners = layer.framePositions(['a']);
+    expect(corners).toHaveLength(8);
+    // The box's widest reach round the tower: hypot(40, 8) m, in degrees at 45° N.
+    const reachDeg = (Math.hypot(40, 8) * 180) / (Math.PI * 6378137);
+    expect(Math.max(...corners.map((c) => c.latitudeDeg)) - 45).toBeCloseTo(reachDeg, 9);
+    expect(Math.max(...corners.map((c) => c.longitudeDeg)) - 9).toBeCloseTo(reachDeg / Math.cos(Math.PI / 4), 9);
+    expect(new Set(corners.map((c) => c.heightMeters))).toEqual(new Set([70, 190]));
+    // Every copy by default, each at its scale.
+    const all = layer.framePositions();
+    expect(all).toHaveLength(16);
+    expect(Math.max(...all.slice(8).map((c) => c.heightMeters ?? 0))).toBe(60);
+    expect(layer.framePositions(['missing'])).toEqual([]);
   });
 
   it('takes its distance and placeholder, and refuses a missing file or a bad distance', () => {

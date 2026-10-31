@@ -108,3 +108,9 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
   downloads only. A pipeline source for it would let an application host Italy's tiles in its own package.
 - **BKG from 2027:** the federal DOP20 is announced as open from 2027-01-01; it would cover the four Länder left out.
 - **CORS of the new services:** none could be checked from here; try each from a page once the hosts are reachable.
+
+## Camera fits (2026-10-31, ADR 0184)
+
+- **Padding per side:** `fitBounds` and `fitObjects` take one `paddingPx` for every side. An application with a panel
+  over one side of the map would center an asset in the part left visible with a padding per side (as MapLibre's
+  `{ top, right, bottom, left }`), the aim point moved by half the difference. The core entry has 0.09 KB left.

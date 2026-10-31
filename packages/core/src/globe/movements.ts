@@ -249,7 +249,12 @@ export class Movements {
       const include = options?.include ?? [];
       if (!Array.isArray(include)) throw new GlobeError('invalid-option', 'include must be an array of positions');
       for (const position of include) validatePosition(position);
-      target = viewForBounds(camera, this.host.view, valid, padding, include);
+      // A tilt out of range is refused with the target, by the movement.
+      const tiltDeg = options?.tiltDeg;
+      target = {
+        ...viewForBounds(camera, this.host.view, valid, padding, include, tiltDeg),
+        ...(tiltDeg === undefined ? {} : { tiltDeg }),
+      };
     } catch (error) {
       return rejected(error);
     }

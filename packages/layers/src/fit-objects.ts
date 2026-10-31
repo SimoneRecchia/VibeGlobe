@@ -61,12 +61,18 @@ export function extentOf(objects: readonly FitObject[]): { bounds: GeoBounds; ve
 
 /**
  * Flies (or eases) to the view that frames every object, heights included, inside the viewport minus `paddingPx`
- * (F387): `Globe.fitBounds` centered on their bounds, with every vertex required to show.
+ * (F387): `Globe.fitBounds` centered on their bounds, with every vertex required to show. Whole models come from
+ * `ModelSetLayer.framePositions` (a turbine with its rotor, a plant's every device, F667); `tiltDeg` frames from that
+ * tilt instead of the view mode's.
  */
 export function fitObjects(
   globe: Pick<Globe, 'fitBounds'>,
   objects: readonly FitObject[],
-  options: MovementOptions & { readonly paddingPx?: number; readonly movement?: 'fly' | 'ease' } = {},
+  options: MovementOptions & {
+    readonly paddingPx?: number;
+    readonly movement?: 'fly' | 'ease';
+    readonly tiltDeg?: number;
+  } = {},
 ): CameraMovement {
   const extent = extentOf(objects);
   if (!extent) throw new RangeError('fitObjects needs at least one object with coordinates');

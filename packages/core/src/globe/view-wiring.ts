@@ -7,6 +7,7 @@ import type { Constraints } from './constraints.hot.js';
 import type { Emitter } from './emitter.js';
 import type { EngineClock } from './engine-clock.js';
 import { Movements } from './movements.js';
+import { limitZoomToSurface, type SurfaceHeight } from './navigation.hot.js';
 import type { GlobeEvents } from './types.js';
 import { ViewControl } from './view-control.js';
 
@@ -19,6 +20,8 @@ export interface ViewWiring {
     preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
     preloadAhead(end: Float64Array, camera: Camera): void;
     cameraJumped(): void;
+    /** The terrain's height in memory at a position, NaN without terrain (F383). */
+    terrainHeightRad: SurfaceHeight;
   };
   readonly emitter: Emitter<GlobeEvents>;
   readonly clock: EngineClock;
@@ -31,6 +34,7 @@ export interface ViewWiring {
 
 /** The view API and the camera movements of a globe, wired to each other: input intents interrupt movements. */
 export function wireView(globe: ViewWiring): { viewControl: ViewControl; movements: Movements } {
+  const heightAt: SurfaceHeight = (λ, φ) => globe.surface.terrainHeightRad(λ, φ);
   const viewControl: ViewControl = new ViewControl({
     cam: globe.cam,
     view: globe.surface.view,
@@ -43,6 +47,15 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     timeInto: (out) => globe.clock.timeInto(out),
     limitZoom: (deltaZoom) => globe.constraints.limitZoomDelta(globe.cam, deltaZoom),
     zoomLimited: () => globe.constraints.zoomLimited,
+    limitToSurface: (point, io) =>
+      limitZoomToSurface(
+        globe.cam,
+        globe.surface.view,
+        point,
+        heightAt,
+        globe.constraints.minSurfaceDistanceMeters,
+        io,
+      ),
     interruptMovement: () => movements.interrupt(),
     interruptTilt: () => movements.interruptTilt(),
   });

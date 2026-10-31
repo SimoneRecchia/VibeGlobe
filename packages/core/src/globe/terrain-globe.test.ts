@@ -628,6 +628,49 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it('stops a zoom 40 m from the terrain it zooms toward, the slope ahead of a tilted view included, never at zoom 28 (KB-300)', async () => {
+    for (const tiltDeg of [0, 60]) {
+      const { globe, run } = await terrainGlobe(terrain([]), 30, terrainWorkers(), {
+        longitudeDeg: 7,
+        latitudeDeg: 46,
+        zoom: 11,
+        tiltDeg,
+      });
+      const cursor = { xPx: 400, yPx: 300 };
+      for (let i = 0; i < 160; i++) {
+        globe.navigation.zoomAt(cursor, 0.25);
+        if (i % 10 === 0) await run(2);
+      }
+      await run(5);
+      const framed = globe.screenToGeo(cursor);
+      if (!framed) throw new Error('the cursor left the terrain');
+      // The eye's distance to the terrain point under the cursor: the default 40 m, as the steps allow.
+      const camera = globe.camera;
+      const toEcef = (lonDeg: number, latDeg: number, h: number): [number, number, number] => {
+        const lon = (lonDeg * Math.PI) / 180;
+        const lat = (latDeg * Math.PI) / 180;
+        const e2 = 0.00669437999014;
+        const n = 6378137 / Math.sqrt(1 - e2 * Math.sin(lat) ** 2);
+        return [
+          (n + h) * Math.cos(lat) * Math.cos(lon),
+          (n + h) * Math.cos(lat) * Math.sin(lon),
+          (n * (1 - e2) + h) * Math.sin(lat),
+        ];
+      };
+      const eye = toEcef(camera.eyeLongitudeDeg, camera.eyeLatitudeDeg, camera.altitudeMeters);
+      const hit = toEcef(framed.longitudeDeg, framed.latitudeDeg, framed.heightMeters ?? 0);
+      const distance = Math.hypot(eye[0] - hit[0], eye[1] - hit[1], eye[2] - hit[2]);
+      expect(distance, `tilt ${tiltDeg}`).toBeGreaterThan(38);
+      expect(distance, `tilt ${tiltDeg}`).toBeLessThan(48);
+      expect(camera.zoom, `tilt ${tiltDeg}`).toBeLessThan(23);
+      // A zoom out still works from there.
+      const zoom = camera.zoom;
+      globe.navigation.zoomAt(cursor, -1);
+      expect(globe.camera.zoom).toBeLessThan(zoom - 0.5);
+      globe.destroy();
+    }
+  });
+
   it('scales Mercator terrain error with latitude: a view near the pole selects about as many tiles as without terrain (KB-090)', async () => {
     const view = { longitudeDeg: 0, latitudeDeg: 84.5, zoom: 6, tiltDeg: 50 };
     const counts: number[] = [];

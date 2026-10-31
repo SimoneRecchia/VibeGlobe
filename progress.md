@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-31: a zoom that stops before the ground, flights that frame whole turbines and plants (owner's request)
+
+In the owner's application a wheel zoom over terrain reached zoom 28: the collision lifted the camera's target off the
+ground instead of stopping (KB-300). A zoom in now stops 40 m from the terrain under the cursor, mountains included
+(`constraints.minSurfaceDistanceMeters`, F666; 0 keeps the old reach for the precision scenarios). A flight to a turbine
+went to zoom 22 at its foot (KB-301): fits now aim at the middle of what they frame, keep 100 m from it and take a
+tilt, and model sets give their copies' boxes (`framePositions`, F667), so `fitObjects` frames a turbine whole and
+centered and a plant by its every device (ADR 0184). The orthophotos now pass through the offline engine as network
+sources (KB-291), and the offline package keeps its level 11 as the owner asked.
+
 ## 2026-10-31: a lighter start for weak PCs (owner's request, branch `lighter-engine`)
 
 An application's whole-globe start downloaded 10.7 MB. Five causes are gone, each with a regression test: a vector tile

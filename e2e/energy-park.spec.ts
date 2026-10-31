@@ -9,11 +9,16 @@ interface ModelSetHooks {
   setVisible(visible: boolean): void;
   setSpinRpm(rpm: number, id?: string): boolean;
   setYawDeg(facingDeg: number, id?: string): boolean;
+  framePositions(ids?: readonly string[]): { longitudeDeg: number; latitudeDeg: number; heightMeters?: number }[];
 }
 
 declare global {
   interface Window {
-    vibeglobeEnergyPark?: { turbines: ModelSetHooks; solar: ModelSetHooks };
+    vibeglobeEnergyPark?: {
+      turbines: ModelSetHooks;
+      solar: ModelSetHooks;
+      frame(turbineIds?: readonly string[]): Promise<string>;
+    };
   }
 }
 
@@ -131,4 +136,55 @@ test('the turbine and the solar table cost a few instanced draws, the panels fac
   console.log(`[F649] dark blue share from the south ${fromSouth.toFixed(2)}, from the north ${fromNorth.toFixed(2)}`);
   expect(fromSouth).toBeGreaterThan(0.4);
   expect(fromNorth).toBeLessThan(0.15);
+});
+
+test('a flight to a turbine frames it whole and centered, and one to the park frames every device (F667, KB-301)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // The movement is a flight; reduced motion makes it a short fade (F214).
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openPark(page, 'rpm=0');
+  const size = await page.evaluate(() => {
+    const canvas = document.querySelector('#globe');
+    return { width: canvas?.clientWidth ?? 0, height: canvas?.clientHeight ?? 0 };
+  });
+  /** The screen points of the given turbines' boxes, or of every device. */
+  const shown = (ids?: string[]) =>
+    page.evaluate((only) => {
+      const park = window.vibeglobeEnergyPark;
+      const globe = window.vibeglobePlayground?.globe;
+      const corners = only
+        ? (park?.turbines.framePositions(only) ?? [])
+        : [...(park?.turbines.framePositions() ?? []), ...(park?.solar.framePositions() ?? [])];
+      return corners.map((corner) => globe?.geoToScreen(corner) ?? null);
+    }, ids);
+  const inside = (points: ({ xPx: number; yPx: number } | null)[]) =>
+    points.every(
+      (p) => p !== null && p.xPx >= 39 && p.xPx <= size.width - 39 && p.yPx >= 39 && p.yPx <= size.height - 39,
+    );
+
+  expect(await page.evaluate(() => window.vibeglobeEnergyPark?.frame(['turbine-3']))).toBe('completed');
+  await waitForIdle(page);
+  const turbine = await shown(['turbine-3']);
+  expect(inside(turbine)).toBe(true);
+  const xs = turbine.map((p) => p?.xPx ?? NaN);
+  const ys = turbine.map((p) => p?.yPx ?? NaN);
+  console.log(
+    `[F667] turbine box on screen: x ${Math.min(...xs).toFixed(0)}–${Math.max(...xs).toFixed(0)}, y ${Math.min(...ys).toFixed(0)}–${Math.max(...ys).toFixed(0)}`,
+  );
+  // Snug (a side touches the padding), and centered: the box's middle at the view's center.
+  const slack = Math.min(
+    Math.min(...xs) - 40,
+    size.width - 40 - Math.max(...xs),
+    Math.min(...ys) - 40,
+    size.height - 40 - Math.max(...ys),
+  );
+  expect(slack).toBeLessThan(4);
+  expect(Math.abs((Math.max(...ys) + Math.min(...ys)) / 2 - size.height / 2)).toBeLessThan(size.height * 0.08);
+  expect(Math.abs((Math.max(...xs) + Math.min(...xs)) / 2 - size.width / 2)).toBeLessThan(size.width * 0.08);
+
+  expect(await page.evaluate(() => window.vibeglobeEnergyPark?.frame())).toBe('completed');
+  await waitForIdle(page);
+  expect(inside(await shown())).toBe(true);
 });

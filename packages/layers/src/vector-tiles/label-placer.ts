@@ -110,11 +110,18 @@ function shapingOptions(
   };
 }
 
+/** Anchor sets kept before those of tiles the frame did not draw are dropped (the view left them). */
+const MAX_ANCHOR_SETS = 256;
+/** Text shapings kept before they start over. */
+const MAX_SHAPINGS = 8192;
+
 /** Labels of a vector tile layer: anchors per tile, placement and fades per frame. */
 export class LabelPlacer {
   private readonly index = new CrossTileSymbolIndex();
   private readonly fader = new SymbolFader();
   private readonly anchors = new Map<string, LabelAnchor[]>();
+  /** The anchor sets the current frame read. */
+  private readonly usedAnchors = new Set<string>();
   private readonly shapings = new Map<string, Shaping>();
   private readonly quads = new QuadWriter();
   private placedLabels: PlacedLabel[] = [];
@@ -157,7 +164,9 @@ export class LabelPlacer {
   ): { quads: LabelQuads; animating: boolean } {
     const candidates: Candidate[] = [];
     const morph = this.view.camera.morphFactor;
+    this.usedAnchors.clear();
     for (const source of sources) for (const c of this.candidates(source, view, zoom, morph)) candidates.push(c);
+    if (this.anchors.size > MAX_ANCHOR_SETS) this.dropUnusedAnchors();
     const viewport = { minX: 0, minY: 0, maxX: view.widthPx, maxY: view.heightPx };
     const { placed } = placeSymbols(candidates, viewport);
     const opacities = this.fader.update(nowMs, placed);
@@ -187,6 +196,21 @@ export class LabelPlacer {
     return { quads: this.quads.result(), animating };
   }
 
+  /**
+   * Forgets the anchors of the tiles this frame did not read, and their labels in the cross-tile index: they hold the
+   * tiles' line geometry, which would otherwise stay for the session.
+   */
+  private dropUnusedAnchors(): void {
+    const usedTiles = new Set<string>();
+    for (const key of this.usedAnchors) usedTiles.add(key.slice(0, key.lastIndexOf('|')));
+    for (const key of [...this.anchors.keys()]) {
+      if (this.usedAnchors.has(key)) continue;
+      this.anchors.delete(key);
+      const tile = key.slice(0, key.lastIndexOf('|'));
+      if (!usedTiles.has(tile)) this.index.removeTile(tile);
+    }
+  }
+
   private shaping(source: LabelSource, label: number, zoom: number, onLine: boolean): Shaping | undefined {
     const { layer, bucket } = source;
     const l = bucket.labels?.[label];
@@ -200,6 +224,7 @@ export class LabelPlacer {
     let shaping = this.shapings.get(key);
     if (shaping === undefined) {
       shaping = shapeText(l.text, (code) => this.glyphs.resolve(code, font), options);
+      if (this.shapings.size >= MAX_SHAPINGS) this.shapings.clear();
       this.shapings.set(key, shaping);
     }
     return shaping;
@@ -207,6 +232,7 @@ export class LabelPlacer {
 
   private anchorsOf(source: LabelSource): LabelAnchor[] | undefined {
     const key = `${source.tile.z}/${source.tile.x}/${source.tile.y}|${source.layer.id}|${source.version}`;
+    this.usedAnchors.add(key);
     let list = this.anchors.get(key);
     if (list !== undefined) return list;
     let ready = true;

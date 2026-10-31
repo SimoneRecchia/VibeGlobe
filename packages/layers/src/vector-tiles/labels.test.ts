@@ -322,6 +322,41 @@ describe('label placement cost during camera motion (KB-210)', () => {
   });
 });
 
+describe('label memory over a long session', () => {
+  it('forgets the anchors and indexed labels of tiles the view left', () => {
+    const glyphs = { need: () => undefined, ready: () => false };
+    const view = { geoToScreen: () => ({ xPx: 400, yPx: 300 }), camera: { morphFactor: 1 } };
+    const placer = new LabelPlacer(view, glyphs as unknown as GlyphSource, {} as VectorAtlas);
+    const layer = new StyleLayer({ id: 'places', type: 'symbol', source: 's', 'source-layer': 'place' });
+    const half = BUCKET_EXTENT / 2;
+    const bucket = {
+      layerId: 'places',
+      features: [{ id: 1, type: 'Point' as const, properties: {} }],
+      labels: [{ feature: 0, text: 'here', anchor: [half, half] as [number, number] }],
+    };
+    const source = (x: number) => ({
+      layer,
+      layerIndex: 0,
+      opacity: 1,
+      tile: { z: 12, x, y: 0 },
+      clip: [0, 0, BUCKET_EXTENT, BUCKET_EXTENT] as const,
+      bucket: bucket as never,
+      version: 1,
+    });
+    // A pan across 1000 tiles, four on screen at a time.
+    for (let x = 0; x < 1000; x++)
+      placer.frame(
+        [0, 1, 2, 3].map((d) => source(x + d)),
+        { widthPx: 800, heightPx: 600 } as FrameView,
+        12,
+        x * 16,
+      );
+    const internals = placer as unknown as { anchors: Map<string, unknown>; index: { size: number } };
+    expect(internals.anchors.size).toBeLessThanOrEqual(257);
+    expect(internals.index.size).toBeLessThanOrEqual(257);
+  });
+});
+
 describe('a sprite that fails to load', () => {
   it('stops holding labels back for their icons once it has failed, so their text draws alone', async () => {
     const fetchImpl = (() => Promise.reject(new Error('offline'))) as typeof fetch;

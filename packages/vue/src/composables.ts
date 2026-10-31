@@ -68,25 +68,8 @@ export function useCamera(globe: Readonly<Ref<Globe | undefined>> = useGlobe()):
     reliefFactor: 0,
     phase: 'globe' as CameraState['phase'],
   });
-  const copy = (from: CameraState): void => {
-    camera.longitudeDeg = from.longitudeDeg;
-    camera.latitudeDeg = from.latitudeDeg;
-    camera.zoom = from.zoom;
-    camera.altitudeMeters = from.altitudeMeters;
-    camera.headingDeg = from.headingDeg;
-    camera.tiltDeg = from.tiltDeg;
-    camera.rollDeg = from.rollDeg;
-    camera.rangeMeters = from.rangeMeters;
-    camera.eyeLongitudeDeg = from.eyeLongitudeDeg;
-    camera.eyeLatitudeDeg = from.eyeLatitudeDeg;
-    camera.groundHeightMeters = from.groundHeightMeters;
-    camera.viewMode = from.viewMode;
-    camera.chosenTiltDeg = from.chosenTiltDeg;
-    camera.chosenHeadingDeg = from.chosenHeadingDeg;
-    camera.morphFactor = from.morphFactor;
-    camera.reliefFactor = from.reliefFactor;
-    camera.phase = from.phase;
-  };
+  // The engine's camera states are plain objects of exactly these fields.
+  const copy = (from: CameraState): void => void Object.assign(camera, from);
   onEachValue(globe, (engine) => {
     copy(engine.camera);
     return engine.on('camera-change', copy);

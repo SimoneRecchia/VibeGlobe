@@ -1,6 +1,12 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { createControls, type ControlsOptions, type NavigationControls } from '@vibeglobe/controls';
+import {
+  createControls,
+  watchClicks,
+  type ControlsOptions,
+  type GlobeClickEvent,
+  type NavigationControls,
+} from '@vibeglobe/controls';
 import {
   createGlobe,
   type CameraState,
@@ -32,8 +38,6 @@ import {
   changedView,
   controlsOptions,
   globeOptions,
-  watchClicks,
-  type GlobeClickEvent,
   type GlobeConfig,
   type GlobeExtraOptions,
 } from './globe-config.js';

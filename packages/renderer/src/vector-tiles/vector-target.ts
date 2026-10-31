@@ -237,7 +237,10 @@ export class ThreeVectorTarget {
   /** Called by a mesh's `dispose`. */
   release(mesh: ThreeVectorMesh): void {
     this.meshes.delete(mesh);
-    for (const object of mesh.objects) object.removeFromParent();
+    for (const object of mesh.objects) {
+      object.removeFromParent();
+      announceDisposal(object);
+    }
     mesh.objects.length = 0;
     mesh.geometry.dispose();
     mesh.disposeRaster();
@@ -343,8 +346,17 @@ export class ThreeVectorTarget {
     if (this.labelMesh === undefined) return;
     this.labelMesh.removeFromParent();
     this.labelMesh.geometry.dispose();
+    announceDisposal(this.labelMesh);
     this.labelMesh = undefined;
   }
+}
+
+/**
+ * Frees three.js's per-object state of a mesh whose material is shared and outlives it: without the event, the
+ * renderer keeps every removed mesh reachable through the material (KB-116).
+ */
+function announceDisposal(mesh: Mesh): void {
+  (mesh as unknown as { dispatchEvent(event: { type: 'dispose' }): void }).dispatchEvent({ type: 'dispose' });
 }
 
 /** Creates the three.js vector tile target from a render extension's `context.renderer` (ADR 0131). */

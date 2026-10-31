@@ -9,7 +9,6 @@ import {
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
-  type NodeMaterial,
 } from 'three/webgpu';
 import { ATMOSPHERE, ATMOSPHERE_QUALITY, surfaceVisibility, type AtmosphereQuality } from './atmosphere-model.js';
 import { createAtmosphereUniforms, skyColor, surfaceColor, type AtmosphereUniforms } from './atmosphere-nodes.js';
@@ -193,11 +192,6 @@ export class Atmosphere {
     u.dither.value = this.options.quality.dither ? 1 : 0;
   }
 
-  /** The current options. */
-  get currentOptions(): AtmosphereOptions {
-    return this.options;
-  }
-
   /**
    * Wraps a surface material's color (linear RGB) in the haze and sun lighting; `eyeRelative` is the fragment's position
    * relative to the eye in meters, world axes, as the surface's vertex stage computes it (`eyeRelativePosition`), and
@@ -210,21 +204,6 @@ export class Atmosphere {
     night?: Node<'vec3'>,
   ): Node<'vec3'> {
     return surfaceColor(this.uniforms, color, varying(eyeRelative), reliefMeters && varying(reliefMeters), night);
-  }
-
-  /**
-   * Applies {@link Atmosphere.surfaceColor} to a material whose color node is set and whose vertices are eye-relative;
-   * `night` is the light of its night imagery (F647).
-   */
-  applyToSurface(
-    material: NodeMaterial,
-    eyeRelative: Node<'vec3'>,
-    reliefMeters?: Node<'float'>,
-    night?: Node<'vec3'>,
-  ): void {
-    const color = material.colorNode as Node<'vec4'> | null;
-    if (!color) return;
-    material.colorNode = vec4(this.surfaceColor(color.xyz, eyeRelative, reliefMeters, night), color.w);
   }
 
   /**

@@ -103,6 +103,7 @@ export class LayerModels implements ModelRenderer {
   /** Set from `createRenderer({ gltf })`. */
   loaderFactory: GltfLoaderFactory | undefined;
   private nextId = 1;
+  private disposed = false;
 
   constructor(private readonly scene: Scene) {}
 
@@ -145,6 +146,11 @@ export class LayerModels implements ModelRenderer {
       );
     const loader = (this.loader ??= await this.loaderFactory());
     const gltf = source.data ? await loader.parseAsync(source.data, '') : await loader.loadAsync(source.url ?? '');
+    // A model arriving after the renderer was destroyed is freed, never added to its scene.
+    if (this.disposed) {
+      disposeTree(gltf.scene);
+      throw new Error('The renderer was destroyed while the model loaded');
+    }
     return gltf.scene;
   }
 
@@ -279,6 +285,7 @@ export class LayerModels implements ModelRenderer {
 
   /** Removes every model. */
   dispose(): void {
+    this.disposed = true;
     for (const id of [...this.models.keys(), ...this.sets.keys()]) this.remove(id);
   }
 }
@@ -302,6 +309,9 @@ function unlit(material: Material, highlight: Node<'vec4'>): MeshBasicNodeMateri
   unlitMaterial.colorNode = vec4(mix(base.xyz.mul(shade), blend.xyz, blend.w), base.w);
   unlitMaterial.transparent = material.transparent;
   unlitMaterial.side = material.side;
+  // The texture now lives in a node, where no walk over the material finds it: it goes with the material.
+  const map = standard.map;
+  if (map) unlitMaterial.addEventListener('dispose', () => map.dispose());
   material.dispose();
   return unlitMaterial;
 }

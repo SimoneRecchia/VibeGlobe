@@ -20,6 +20,24 @@ describe('mouse pan (F178, ADR 0009 §3–4)', () => {
     expect(h.camera.drags).toBe(1);
   });
 
+  it('ends a drag whose pointer capture is lost, so the map does not follow a released button', () => {
+    const h = controlsHarness();
+    h.pointer('pointerdown', { x: 100, y: 100, t: 0 });
+    h.pointer('pointermove', { x: 110, y: 100, t: 10 });
+    h.frame();
+    expect(h.camera.drags).toBe(1);
+    // The release went elsewhere (a dialog took the pointer): only the lost capture arrives.
+    h.pointer('lostpointercapture', { x: 110, y: 100, t: 20 });
+    h.pointer('pointermove', { x: 150, y: 100, t: 30 });
+    h.frame();
+    expect(h.camera.drags).toBe(1);
+    // A new press drags again.
+    h.pointer('pointerdown', { x: 150, y: 100, t: 40 });
+    h.pointer('pointermove', { x: 160, y: 100, t: 50 });
+    h.frame();
+    expect(h.camera.drags).toBe(2);
+  });
+
   it('costs no frame and does not zoom for a single click', () => {
     const h = controlsHarness();
     h.pointer('pointerdown', { x: 100, y: 100, t: 0 });

@@ -12,7 +12,6 @@
 import type { DepthPath } from '@vibeglobe/core';
 import {
   attribute,
-  cameraNear,
   cameraProjectionMatrix,
   cameraViewMatrix,
   clamp,
@@ -34,7 +33,6 @@ import {
 } from 'three/tsl';
 import {
   DoubleSide,
-  GreaterEqualDepth,
   Matrix3,
   MeshBasicNodeMaterial,
   Vector2,
@@ -43,7 +41,7 @@ import {
   type Object3D,
   type Texture,
 } from 'three/webgpu';
-import { morphedEyeRelative } from '../eye-relative.js';
+import { morphedEyeRelative, writeFragmentDepth } from '../eye-relative.js';
 
 /** What a vector tile mesh draws. */
 export type VectorMeshKind = 'fill' | 'line' | 'extrusion' | 'circle' | 'raster';
@@ -168,10 +166,7 @@ export function finish(
   depthPath: DepthPath,
   solid: boolean,
 ): MeshBasicNodeMaterial {
-  if (depthPath === 'fragment') {
-    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
-    material.depthFunc = GreaterEqualDepth;
-  }
+  writeFragmentDepth(material, depthPath, viewPosition);
   material.transparent = !solid;
   material.depthWrite = solid;
   material.side = DoubleSide;

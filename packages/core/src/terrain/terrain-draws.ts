@@ -72,6 +72,8 @@ export const MAX_TERRAIN_MORPH_LEVELS = 2;
 
 /** A grid adds at most half its level's geometric error (ADR 0006 §5, the worker task's bound). */
 const GRID_ERROR_FACTOR = 1.5;
+/** A tile edge this close to ±180° lies on the antimeridian. */
+const SEAM_RAD = Math.PI - 1e-9;
 
 /**
  * The error in meters of the terrain each surface level shows, by level up to `maxLevel` (ADR 0006 §2): the source's
@@ -427,13 +429,12 @@ export function deepenFallbackSkirts(
     // The draws sharing an edge or a corner with it.
     for (let other = 0; other < count; other++) {
       const near = tiles[other];
+      if (!near || other === index || near.southRad > tile.northRad || near.northRad < tile.southRad) continue;
+      // Apart in longitude, unless one ends at the antimeridian where the other starts.
       if (
-        !near ||
-        other === index ||
-        near.westRad > tile.eastRad ||
-        near.eastRad < tile.westRad ||
-        near.southRad > tile.northRad ||
-        near.northRad < tile.southRad
+        (near.westRad > tile.eastRad || near.eastRad < tile.westRad) &&
+        !(near.westRad <= -SEAM_RAD && tile.eastRad >= SEAM_RAD) &&
+        !(tile.westRad <= -SEAM_RAD && near.eastRad >= SEAM_RAD)
       )
         continue;
       if (depth > (terrain.skirtMeters[other] ?? 0)) terrain.skirtMeters[other] = depth;

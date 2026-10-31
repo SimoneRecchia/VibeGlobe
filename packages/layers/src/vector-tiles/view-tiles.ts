@@ -116,9 +116,10 @@ export function sampledTiles(view: ViewSampler, widthPx: number, heightPx: numbe
       const r = at(row, col < SAMPLE_COLUMNS ? col + 1 : col - 1);
       const d = at(row < SAMPLE_ROWS ? row + 1 : row - 1, col);
       if (p === undefined || r === undefined || d === undefined) continue;
-      const perPx = Math.sqrt(
-        (Math.hypot(r[0] - p[0], r[1] - p[1]) / stepX) * (Math.hypot(d[0] - p[0], d[1] - p[1]) / stepY),
-      );
+      // Across the antimeridian two neighbors lie a world apart in x: the short way round.
+      const rx = r[0] - p[0] - Math.round(r[0] - p[0]);
+      const dx = d[0] - p[0] - Math.round(d[0] - p[0]);
+      const perPx = Math.sqrt((Math.hypot(rx, r[1] - p[1]) / stepX) * (Math.hypot(dx, d[1] - p[1]) / stepY));
       if (!(perPx > 0)) continue;
       const z = Math.max(0, Math.min(maxZoom, Math.round(Math.log2(1 / (perPx * TILE_PX)))));
       const n = 2 ** z;

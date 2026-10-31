@@ -79,3 +79,22 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Zoom in filters (2026-10-30):** `['zoom']` in a vector filter is the tile's whole level, so a fractional limit switches where the next level's tiles are drawn (the vector tiles guide says so); evaluating filters at the camera's zoom would need layout per frame, so a documented limit may be enough.
 - **Land cover warped off the main thread (2026-10-30):** `warpInBrowser` reprojects a single image (`singleImage`, the Landscape's land cover) per tile on the main thread: `getImageData` on a GPU canvas takes up to 100 ms, so zooming the Landscape below level 7 still drops frames the first time (KB-244's measurements). An `OffscreenCanvas` in the workers, or tiles cut ahead of time, would remove it.
 - **Day and night on vector layers (2026-10-31):** `dayNight` (F647) shades the surface's imagery only; vector tile meshes (water, land cover fills, hillshade) have no atmosphere at all, not even its haze, so a map drawn with them keeps its water lit on the night side. The vector material could take the atmosphere's night share and airlight as the surface does.
+- **Code review of 2026-10-31, items left (owner's request to clean up and speed up the code):** found by the review
+  and not changed, each needing more than a small fix or a decision:
+  - _Memory on weak devices:_ the imagery tile table never shrinks (a record per tile ever wanted); the data-layer
+    image atlas (2048², eager) and the label atlas (4096²) start full size and re-upload whole; after a switch to the
+    'none' or 'fxaa' anti-aliasing the renderer's multisampled target stays allocated (creating the renderer without
+    MSAA and drawing `msaa4` through a 4-sample pass would free it); decoded imagery bitmaps are all kept for
+    device-loss recovery.
+  - _Main-thread work:_ a hover change repaints every vector layer (even styles without `feature-state`); picking runs on
+    every `pointermove`; symbol layers evaluate their style per label per frame; composite data-layer styles
+    re-evaluate every feature each frame of a zoom; GeoTIFFs go TIFF → PNG → bitmap; plain raster tiles are read back
+    with `getImageData`; `deepenFallbackSkirts` is quadratic in the fallback draws after a jump.
+  - _Correctness, rare:_ polar cap tiles of span 2 or more never stitch (`terrain-stitch.hot.ts` ignores `span`);
+    render extensions keep their depth path after a recovery that switches backend; a rate-limited source's
+    `RateRing` stays in the page-wide pool after its layer is removed; servers ignoring `Range` make PMTiles and
+    package chunks download the whole file per request.
+  - _Simplifications:_ `UploadQueue` could key by record slot and drop its own map and free list (about 250 lines);
+    `Residency` and `RamTier` have members only tests use; PMTiles and MBTiles imagery build the same source object;
+    the Google 2D and Street View providers repeat the session retry; `bookmarks` and `layer-switcher` repeat a
+    disclosure; the vector and raster materials repeat their draped placement.

@@ -306,7 +306,13 @@ export class Movements {
     };
     const signal = options?.signal;
     if (signal?.aborted) promise.cancel();
-    else signal?.addEventListener('abort', () => promise.cancel());
+    else if (signal) {
+      // A long-lived signal reused for many tours must not keep each finished one.
+      const abort = (): void => promise.cancel();
+      signal.addEventListener('abort', abort);
+      const detach = (): void => signal.removeEventListener('abort', abort);
+      promise.then(detach, detach);
+    }
     return promise;
   }
 

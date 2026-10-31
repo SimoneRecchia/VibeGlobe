@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * @hotpath Drained every frame while tiles arrive, and reprioritized with the selection; a binary heap over typed
+ * @hotpath Drained every frame while tiles arrive; a binary heap over typed
  * arrays with tile keys and priorities read from arrays the caller holds, so the frame path allocates nothing
  * (ADR 0018).
  * @benchmark benchmarks/run.ts
@@ -158,22 +158,6 @@ export class UploadQueue<T extends DecodedTile> {
     return this.enqueueAt(this.singleKey, this.singlePriority, 0, tile, compressed);
   }
 
-  /** Sets the priority of `keys[at]` to `priorities[at]`; false when the key is not waiting. */
-  reprioritizeAt(keys: ArrayLike<number>, priorities: ArrayLike<number>, at: number): boolean {
-    const slot = this.map.getAt(keys, at);
-    if (slot === undefined) return false;
-    this.priorities[slot] = priorities[at] ?? 0;
-    this.restore(slot);
-    return true;
-  }
-
-  /** {@link reprioritizeAt} for a single key (outside the frame loop). */
-  reprioritize(key: number, priority: number): boolean {
-    this.singleKey[0] = key;
-    this.singlePriority[0] = priority;
-    return this.reprioritizeAt(this.singleKey, this.singlePriority, 0);
-  }
-
   /** Removes `keys[at]` (a tile no longer wanted) and returns its tile for the caller to release, or undefined. */
   removeAt(keys: ArrayLike<number>, at: number): T | undefined {
     const slot = this.map.deleteAt(keys, at);
@@ -186,11 +170,6 @@ export class UploadQueue<T extends DecodedTile> {
   remove(key: number): T | undefined {
     this.singleKey[0] = key;
     return this.removeAt(this.singleKey, 0);
-  }
-
-  /** True when a key is waiting (outside the frame loop). */
-  has(key: number): boolean {
-    return this.map.has(key);
   }
 
   /**

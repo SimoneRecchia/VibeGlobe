@@ -39,8 +39,6 @@ export interface SpriteImage {
 /** Loads glyph ranges and the sprite; calls `onChange` when something new arrived. */
 export class GlyphSource {
   readonly store = new GlyphStore();
-  /** Glyph range URLs requested so far (tests: F448). */
-  readonly requested: string[] = [];
   private readonly pending = new Set<string>();
   /** Answers of a range that did not decode: fetched again past the HTTP cache, which may hold them (KB-226). */
   private readonly damaged = new Map<string, number>();
@@ -50,6 +48,8 @@ export class GlyphSource {
   private icons = new Map<string, SpriteImage>();
   /** The pixel ratio of the sprite loaded (1 or 2). */
   spriteRatio = 1;
+  /** True while the sprite loads: a label waits for its icon then, and draws its text alone once it has failed. */
+  spriteLoading = false;
 
   constructor(
     private readonly glyphs: string | undefined,
@@ -77,7 +77,6 @@ export class GlyphSource {
       if (this.pending.has(url)) continue;
       this.pending.add(url);
       this.unsettled.add(url);
-      this.requested.push(url);
       void this.fetchImpl(url, this.damaged.has(url) ? { cache: 'reload' } : undefined)
         .then(async (response) => {
           // A missing range (404 and the like, or a page a server answers in its place) has no glyphs; a server
@@ -146,6 +145,7 @@ export class GlyphSource {
     pixelRatio: number,
   ): Promise<void> {
     if (sprite === undefined) return;
+    this.spriteLoading = true;
     this.spriteRatio = pixelRatio >= 1.5 ? 2 : 1;
     const icons = new Map<string, SpriteImage>();
     for (const sheet of spriteUrls(sprite, this.spriteRatio)) {
@@ -166,6 +166,7 @@ export class GlyphSource {
       }
     }
     this.icons = icons;
+    this.spriteLoading = false;
     this.onChange();
   }
 }

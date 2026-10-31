@@ -24,6 +24,11 @@ export interface QualitySettings {
   readonly atmosphere: AtmosphereLevel;
   /** Distance fog and haze over the surface (ADR 0040). */
   readonly fog: boolean;
+  /**
+   * The most drawing-buffer pixels per CSS pixel: on a dense screen the resolution scale is lowered to stay within it
+   * (a phone at device pixel ratio 3 draws at 1.5 on `medium`, not 2.25). Unlimited when absent.
+   */
+  readonly maxPixelRatio?: number;
 }
 
 /**
@@ -39,6 +44,7 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     antialias: 'none',
     atmosphere: 'low',
     fog: false,
+    maxPixelRatio: 1,
   }),
   medium: Object.freeze({
     resolutionScale: 0.75,
@@ -47,6 +53,7 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     antialias: 'fxaa',
     atmosphere: 'medium',
     fog: true,
+    maxPixelRatio: 1.5,
   }),
   high: Object.freeze({
     resolutionScale: 1,
@@ -55,6 +62,7 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     antialias: 'msaa4',
     atmosphere: 'high',
     fog: true,
+    maxPixelRatio: 2,
   }),
   ultra: Object.freeze({
     resolutionScale: 1.25,

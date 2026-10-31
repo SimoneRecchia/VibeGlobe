@@ -8,4 +8,4 @@
  */
 export { defineVibeGlobe } from './vibe-globe-element.js';
 export type { CenterDeg, VibeGlobeElement, VibeGlobeEventDetail } from './vibe-globe-element.js';
-export type { GlobeClickEvent } from './click.js';
+export type { GlobeClickEvent } from '@vibeglobe/controls';

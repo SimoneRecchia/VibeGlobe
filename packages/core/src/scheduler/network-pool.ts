@@ -50,8 +50,6 @@ export interface HostOptions {
   readonly maxInFlight?: number;
   /** The host speaks HTTP/2 or HTTP/3. */
   readonly multiplexed?: boolean;
-  /** Requests started per second at most, over any one-second window (a source's declared rate limit, F222). */
-  readonly maxRequestsPerSecond?: number;
 }
 
 /** A client of the pool: one tile scheduler, which keeps its own priority queue. */
@@ -101,8 +99,6 @@ export interface NetworkPoolOptions {
   readonly timeoutSlackMs?: number;
   /** Timeouts of requests that do not pass their own; default {@link DEFAULT_TIMEOUTS_MS}. */
   readonly timeouts?: TimeoutsMs;
-  /** Receives the bytes of a request that completed while nobody wanted it, so they can enter the RAM tier. */
-  readonly onUnclaimedResult?: (key: RequestKey, result: TransportResult) => void;
   /** Hosts get only the requests in flight the measured link supports, within their limits (F303). */
   readonly adaptive?: boolean;
 }
@@ -116,8 +112,6 @@ interface Host {
   inFlight: number;
   consecutiveTransient: number;
   responsesSinceThrottle: number;
-  /** The host's own rate limit (a provider cap on the whole host), or undefined. */
-  rate: RateRing | undefined;
 }
 
 interface Flight {
@@ -184,12 +178,10 @@ export class NetworkPool {
   registerHost(origin: string, options: HostOptions = {}): number {
     const fallback = options.multiplexed === true ? DEFAULT_MULTIPLEXED_HOST_MAX_IN_FLIGHT : DEFAULT_HOST_MAX_IN_FLIGHT;
     const limit = positiveInteger(options.maxInFlight, fallback, 'maxInFlight');
-    const rate = options.maxRequestsPerSecond;
     const known = this.hostIndices.get(origin);
     if (known !== undefined) {
       const host = this.hosts[known] as Host;
       if (limit < host.baseLimit) this.setHostLimit(known, limit);
-      if (rate !== undefined && (host.rate === undefined || rate < host.rate.starts.length)) host.rate = rateRing(rate);
       return known;
     }
     const index = this.hosts.length;
@@ -200,7 +192,6 @@ export class NetworkPool {
       inFlight: 0,
       consecutiveTransient: 0,
       responsesSinceThrottle: 0,
-      rate: rate === undefined ? undefined : rateRing(rate),
     });
     this.hostIndices.set(origin, index);
     return index;
@@ -244,7 +235,6 @@ export class NetworkPool {
     return (
       this.counters.inFlight < this.maxInFlight &&
       host.inFlight < this.hostLimit(hostIndex) &&
-      this.rateAllows(host.rate) &&
       this.rateAllows(this.rates[rateIndex])
     );
   }
@@ -321,7 +311,6 @@ export class NetworkPool {
     const id = this.attach(flight, consumer);
     this.flights.set(key, flight);
     host.inFlight++;
-    recordStart(host.rate, this.options.now());
     recordStart(this.rates[rateIndex], this.options.now());
     this.counters.inFlight++;
     this.counters.started++;
@@ -476,11 +465,11 @@ export class NetworkPool {
     const consumers = flight.consumers.slice();
     flight.consumerIds.length = 0;
     flight.consumers.length = 0;
-    if (consumers.length === 0) {
-      if (result.kind === 'ok') this.options.onUnclaimedResult?.(flight.key, result);
-      return;
-    }
-    const results = consumers.map((_, i) => (i === 0 || result.kind !== 'ok' ? result : copyBytes(result)));
+    if (consumers.length === 0) return;
+    // Each copy keeps the result's other fields (credits, freshness, cache hit).
+    const results = consumers.map((_, i) =>
+      i === 0 || result.kind !== 'ok' ? result : { ...result, bytes: result.bytes.slice(0) },
+    );
     let failure: { error: unknown } | undefined;
     consumers.forEach((consumer, i) => {
       try {
@@ -531,10 +520,6 @@ export class NetworkPool {
     // Coalesced grants use no slot; a long run of them continues in the next task.
     this.scheduleRefill();
   }
-}
-
-function copyBytes(result: TransportResult & { kind: 'ok' }): TransportResult {
-  return { kind: 'ok', bytes: result.bytes.slice(0), contentType: result.contentType };
 }
 
 function positiveInteger(value: number | undefined, fallback: number, name: string): number {

@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * @hotpath Rebuilt and drained every frame over every queued tile request (ADR 0007: heapify, drop, dispatch); a
+ * @hotpath Updated and drained every frame over every queued tile request (ADR 0007: want, drop, dispatch); a
  * priority passed as a call argument would be boxed in code V8 did not inline, so priorities are read from typed arrays
  * (ADR 0018).
  * @benchmark benchmarks/run.ts
@@ -17,10 +17,6 @@ const ABSENT = -1;
  * Priorities are passed as `priorities[at]`, an element of a typed array the caller already holds (the tile table's
  * priority column), so no double crosses a call boundary. Every operation allocates nothing once the heap has grown to
  * the working set: the heap and the index-to-position table grow by doubling on a separate slow path.
- *
- * Two ways to fill it: {@link PriorityHeap.pushAt} keeps the heap ordered after every insertion (O(log n)), while
- * {@link PriorityHeap.appendAt} followed by one {@link PriorityHeap.heapify} rebuilds it in O(n), which is how the
- * scheduler rebuilds its queue each frame.
  */
 export class PriorityHeap {
   /** Record index at each heap position. */
@@ -30,9 +26,6 @@ export class PriorityHeap {
   /** Heap position of each record index, or -1 when the record is not in the heap. */
   private positions: Int32Array;
   private count = 0;
-  /** False after {@link PriorityHeap.appendAt} until the next {@link PriorityHeap.heapify}. */
-  private ordered = true;
-  private readonly single = new Float64Array(1);
 
   /**
    * @param initialCapacity - Expected number of queued records.
@@ -51,6 +44,11 @@ export class PriorityHeap {
     return this.count;
   }
 
+  /** The record at heap position `position`, from 0 to `size − 1`: every record, in no particular order. */
+  at(position: number): number {
+    return this.items[position] ?? ABSENT;
+  }
+
   /** True when the record index is in the heap. */
   has(index: number): boolean {
     return index >= 0 && index < this.positions.length && this.positions[index] !== ABSENT;
@@ -58,9 +56,7 @@ export class PriorityHeap {
 
   /** The record index with the lowest priority, without removing it, or -1 when empty. */
   peek(): number {
-    if (this.count === 0) return ABSENT;
-    if (!this.ordered) this.heapify();
-    return this.items[0] ?? ABSENT;
+    return this.count === 0 ? ABSENT : (this.items[0] ?? ABSENT);
   }
 
   /**
@@ -68,7 +64,6 @@ export class PriorityHeap {
    * `index` must be a non-negative integer.
    */
   pushAt(index: number, priorities: ArrayLike<number>, at: number): void {
-    if (!this.ordered) this.heapify();
     if (this.has(index)) {
       this.updateAt(index, priorities, at);
       return;
@@ -77,31 +72,9 @@ export class PriorityHeap {
     this.siftUp(position);
   }
 
-  /**
-   * Inserts record `index` with priority `priorities[at]` without restoring the heap order; call
-   * {@link PriorityHeap.heapify} after the last append (other operations heapify first if needed). A record already in
-   * the heap only has its priority replaced.
-   */
-  appendAt(index: number, priorities: ArrayLike<number>, at: number): void {
-    if (this.has(index)) {
-      const priority = priorities[at] ?? Infinity;
-      this.keys[this.positions[index] ?? 0] = priority === priority ? priority : Infinity;
-    } else {
-      this.place(index, priorities, at);
-    }
-    this.ordered = false;
-  }
-
-  /** Restores the heap order in O(n) after {@link PriorityHeap.appendAt}. */
-  heapify(): void {
-    for (let position = (this.count >> 1) - 1; position >= 0; position--) this.siftDown(position);
-    this.ordered = true;
-  }
-
   /** Removes and returns the record index with the lowest priority, or -1 when empty. */
   pop(): number {
     if (this.count === 0) return ABSENT;
-    if (!this.ordered) this.heapify();
     const top = this.items[0] ?? ABSENT;
     this.removeAtPosition(0);
     return top;
@@ -110,7 +83,6 @@ export class PriorityHeap {
   /** Removes record `index`; returns false when it was not in the heap. */
   remove(index: number): boolean {
     if (!this.has(index)) return false;
-    if (!this.ordered) this.heapify();
     this.removeAtPosition(this.positions[index] ?? 0);
     return true;
   }
@@ -118,7 +90,6 @@ export class PriorityHeap {
   /** Sets the priority of record `index` to `priorities[at]`; returns false (and does nothing) when it is absent. */
   updateAt(index: number, priorities: ArrayLike<number>, at: number): boolean {
     if (!this.has(index)) return false;
-    if (!this.ordered) this.heapify();
     const position = this.positions[index] ?? 0;
     const previous = this.keys[position] ?? 0;
     const given = priorities[at] ?? Infinity;
@@ -127,25 +98,6 @@ export class PriorityHeap {
     if (next < previous) this.siftUp(position);
     else if (next > previous) this.siftDown(position);
     return true;
-  }
-
-  /** Inserts or reprioritizes a record (outside the frame loop: the priority argument may be boxed). */
-  push(index: number, priority: number): void {
-    this.single[0] = priority;
-    this.pushAt(index, this.single, 0);
-  }
-
-  /** Changes the priority of a record (outside the frame loop). */
-  update(index: number, priority: number): boolean {
-    this.single[0] = priority;
-    return this.updateAt(index, this.single, 0);
-  }
-
-  /** Removes every record; keeps the storage. */
-  clear(): void {
-    for (let position = 0; position < this.count; position++) this.positions[this.items[position] ?? 0] = ABSENT;
-    this.count = 0;
-    this.ordered = true;
   }
 
   /** Writes the record at the end of the heap and returns its position, growing the storage first if needed. */

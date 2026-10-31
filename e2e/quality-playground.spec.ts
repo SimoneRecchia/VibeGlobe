@@ -54,9 +54,11 @@ for (const backend of ['webgpu', 'webgl2'] as const)
       const drawn = await frames(page, 3);
       const expected = QUALITY_PRESETS[preset];
       const applied = await page.evaluate(() => window.vibeglobePlayground?.globe.qualitySettings);
-      // `fogAwareDetail` is no preset's: it keeps its default, on (F395).
+      // `fogAwareDetail` is no preset's: it keeps its default, on (F395). The pixel-ratio cap stays with the quality
+      // controller, which applies it through the resolution scale (at device pixel ratio 1 here, the preset's own).
+      const engine = Object.fromEntries(Object.entries(expected).filter(([key]) => key !== 'maxPixelRatio'));
       expect(applied, preset).toEqual({
-        ...expected,
+        ...engine,
         fogAwareDetail: true,
         anisotropy: expected.anisotropy === 'max' ? maxAnisotropy : Math.min(expected.anisotropy, maxAnisotropy),
       });

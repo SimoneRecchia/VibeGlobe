@@ -38,6 +38,8 @@ export interface TileRecord {
   task: number;
   /** The tile belongs to the pinned base: loaded first, never evicted (ADR 0007, F084). */
   readonly pinned: boolean;
+  /** A pinned tile counted as settled (resident, no data or failed) since the last reload: counted once. */
+  settled: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
   /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
@@ -116,6 +118,7 @@ export class TileTable {
       consumer: NO_SLOT,
       task: -1,
       pinned: level <= this.pinnedLevel && (this.isPinned?.(level, x, y) ?? true),
+      settled: false,
       availabilityUnknown: false,
       rounds: 0,
       roundSuccesses: 0,

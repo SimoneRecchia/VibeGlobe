@@ -22,15 +22,13 @@ import type { Atmosphere } from './atmosphere/atmosphere.js';
 
 /** What one surface tile draws this frame: set on its mesh before each frame, read by the shared material. */
 export interface SurfaceDraw {
-  /** Set by every frame that draws the mesh, before it draws. */
-  texture: Texture | undefined;
-  /** The imagery the tile cross-fades from (F105). */
-  fromTexture: Texture | undefined;
-  /** The terrain heights the tile shows and the ones it morphs from (ADR 0006 §4, F138). */
-  heights: Texture | undefined;
-  fromHeights: Texture | undefined;
-  /** The coarser terrain the tile's stitched edges take their heights from (KB-178). */
-  stitchHeights: Texture | undefined;
+  /**
+   * The textures the draw samples, set by every frame that draws the mesh, by index: the imagery, the imagery it
+   * cross-fades from (F105), the terrain heights it shows and the ones it morphs from (ADR 0006 §4, F138), the coarser
+   * terrain its stitched edges take their heights from (KB-178), the two overlay slots' imagery (ADR 0038; unset where
+   * a slot is empty) and the imagery each slot cross-fades from (KB-155; unset where it fades in from nothing).
+   */
+  readonly textures: (Texture | undefined)[];
   /**
    * The four UV transforms (scale u, scale v, offset u, offset v), one per column: imagery, the imagery faded from,
    * terrain, the terrain morphed from. One matrix and one vector carry every per-draw number, as three.js rebuilds
@@ -51,17 +49,11 @@ export interface SurfaceDraw {
    * the north and south edges, `TileDrawLayer.heightScales`, KB-180), column 3 the UV transform into the stitch heights.
    */
   readonly tones: Matrix4;
-  /** The imagery of the two overlay slots (ADR 0038), drawn above the tile's own; unset where a slot is empty. */
-  overlay0: Texture | undefined;
-  overlay1: Texture | undefined;
   /**
    * The overlays' numbers, by column: the two UV transforms; (geographic 0, geographic 1, opacity 0, opacity 1);
    * (blend 0, blend 1, 0, 0), blends as `TileDrawOverlay.blends` (0 normal, 1 multiply, 2 screen).
    */
   readonly overlays: Matrix4;
-  /** The imagery each overlay slot cross-fades from (KB-155); unset where it fades in from nothing. */
-  overlayFrom0: Texture | undefined;
-  overlayFrom1: Texture | undefined;
   /**
    * The overlays' fades, by column: the two `from` UV transforms; (from geographic 0, from geographic 1, fade 0, fade
    * 1), the fades as the base imagery's (1 only the slot's own imagery); (from set 0, from set 1, 0, 0).
@@ -81,15 +73,7 @@ function surfaceDrawOf(object: Object3D | null): SurfaceDraw | undefined {
  * renderer, whose texture system listens to them, so a mesh not drawn again would keep that renderer alive.
  */
 function clearSurfaceDraw(draw: SurfaceDraw): void {
-  draw.texture = undefined;
-  draw.fromTexture = undefined;
-  draw.heights = undefined;
-  draw.fromHeights = undefined;
-  draw.stitchHeights = undefined;
-  draw.overlay0 = undefined;
-  draw.overlay1 = undefined;
-  draw.overlayFrom0 = undefined;
-  draw.overlayFrom1 = undefined;
+  draw.textures.fill(undefined);
 }
 
 /** Frees a surface mesh's geometry and forgets its textures when its renderer is lost (TG-01). */
@@ -98,18 +82,16 @@ export function releaseForRecovery(entry: { readonly mesh: Mesh; readonly draw: 
   clearSurfaceDraw(entry.draw);
 }
 
-/** Texture nodes whose value each mesh sets before it draws, by key in the material's `userData`. */
-const PER_DRAW_TEXTURES = [
-  'surfaceTexture',
-  'fromTexture',
-  'heights',
-  'fromHeights',
-  'stitchHeights',
-  'overlay0',
-  'overlay1',
-  'overlayFrom0',
-  'overlayFrom1',
-] as const;
+/** `SurfaceDraw.textures` indices: the first of the heights, the first after them, the overlays and their fades. */
+const HEIGHTS = 2;
+const STITCH_HEIGHTS = 4;
+const OVERLAY = 5;
+const OVERLAY_FROM = 7;
+
+/** The texture nodes whose value each mesh sets before it draws, in `SurfaceDraw.textures` order. */
+function perDrawNodes(material: Material): ({ value: Texture } | undefined)[] {
+  return (material.userData['perDraw'] ??= []) as ({ value: Texture } | undefined)[];
+}
 
 /**
  * Attaches a draw state to a new surface mesh. Its textures reach the shared texture nodes just before the mesh is
@@ -118,19 +100,11 @@ const PER_DRAW_TEXTURES = [
  */
 export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
   const draw: SurfaceDraw = {
-    texture: undefined,
-    fromTexture: undefined,
-    heights: undefined,
-    fromHeights: undefined,
-    stitchHeights: undefined,
+    textures: new Array<Texture | undefined>(OVERLAY_FROM + 2).fill(undefined),
     transforms: new Matrix4().set(1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
     params: new Vector4(15, 1, 1, 0),
     tones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0),
-    overlay0: undefined,
-    overlay1: undefined,
     overlays: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-    overlayFrom0: undefined,
-    overlayFrom1: undefined,
     overlayFades: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0),
     overlayTones: new Matrix4().set(1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0),
   };
@@ -138,40 +112,16 @@ export function attachSurfaceDraw(object: Object3D): SurfaceDraw {
   // The textures are read from the draw state at each draw, never kept: a mesh not drawn after a device loss kept the
   // lost renderer alive through them (TG-01).
   object.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
-    for (let i = 0; i < PER_DRAW_TEXTURES.length; i++) {
-      const node = material.userData[PER_DRAW_TEXTURES[i] ?? ''] as { value: Texture } | undefined;
+    const nodes = perDrawNodes(material);
+    const flat = material.userData['flatHeights'] as Texture | undefined;
+    for (let i = 0; i < nodes.length; i++) {
       // Draws without terrain use the material's flat heights; empty overlay slots keep their texture (opacity 0).
-      const value =
-        drawTexture(draw, i) ??
-        (i >= 2 && i <= 4 ? (material.userData['flatHeights'] as Texture | undefined) : undefined);
+      const value = draw.textures[i] ?? (i >= HEIGHTS && i <= STITCH_HEIGHTS ? flat : undefined);
+      const node = nodes[i];
       if (node && value) node.value = value;
     }
   };
   return draw;
-}
-
-/** The texture of a draw for the node `PER_DRAW_TEXTURES[index]`. */
-function drawTexture(draw: SurfaceDraw, index: number): Texture | undefined {
-  switch (index) {
-    case 0:
-      return draw.texture;
-    case 1:
-      return draw.fromTexture;
-    case 2:
-      return draw.heights;
-    case 3:
-      return draw.fromHeights;
-    case 4:
-      return draw.stitchHeights;
-    case 5:
-      return draw.overlay0;
-    case 6:
-      return draw.overlay1;
-    case 7:
-      return draw.overlayFrom0;
-    default:
-      return draw.overlayFrom1;
-  }
 }
 
 /** A texture object of its own for a second binding of the same kind, sampled like `like`. */
@@ -253,8 +203,8 @@ function overlaySlots(
     });
     const node = texture(own, mapUv(tileUv, column(overlays, slot), slot === 0 ? looks.x : looks.y));
     const fromNode = texture(fromOwn, mapUv(tileUv, column(fades, slot), slot === 0 ? fadeLooks.x : fadeLooks.y));
-    material.userData[`overlay${String(slot)}`] = node;
-    material.userData[`overlayFrom${String(slot)}`] = fromNode;
+    perDrawNodes(material)[OVERLAY + slot] = node;
+    perDrawNodes(material)[OVERLAY_FROM + slot] = fromNode;
     return {
       node,
       fromNode,
@@ -338,11 +288,7 @@ export function createSurfaceMaterial(
     stitchFlat.dispose();
   };
   material.addEventListener('dispose', disposeOwn);
-  material.userData['surfaceTexture'] = map;
-  material.userData['fromTexture'] = fromMap;
-  material.userData['heights'] = heights;
-  material.userData['fromHeights'] = fromHeights;
-  material.userData['stitchHeights'] = stitchHeights;
+  perDrawNodes(material).splice(0, STITCH_HEIGHTS + 1, map, fromMap, heights, fromHeights, stitchHeights);
   material.userData['flatHeights'] = flatHeights;
   material.userData['morphParams'] = morphParams;
   material.userData['morphAxes'] = morphAxes;
@@ -408,10 +354,11 @@ export function applyDraw(
   textures.tones?.apply(draws, i, draw.tones.elements);
   const terrain = draws.terrain;
   const caps = textures.caps?.textures;
-  draw.texture = imageryOf(textures, base, caps, draws.textures[i] ?? -1);
-  draw.fromTexture = imageryOf(textures, base, caps, draws.fromTextures[i] ?? -1);
-  draw.heights = textures.get(terrain.textures[i] ?? NO_HEIGHTS);
-  draw.fromHeights = textures.get(terrain.fromTextures[i] ?? NO_HEIGHTS);
+  const own = draw.textures;
+  own[0] = imageryOf(textures, base, caps, draws.textures[i] ?? -1);
+  own[1] = imageryOf(textures, base, caps, draws.fromTextures[i] ?? -1);
+  own[HEIGHTS] = textures.get(terrain.textures[i] ?? NO_HEIGHTS);
+  own[HEIGHTS + 1] = textures.get(terrain.fromTextures[i] ?? NO_HEIGHTS);
   const flags =
     (draws.geographic[i] ?? 1) +
     2 * (draws.fromGeographic[i] ?? 1) +
@@ -420,10 +367,10 @@ export function applyDraw(
   draw.params.set(flags, draws.fades[i] ?? 1, terrain.fades[i] ?? 1, terrain.skirtMeters[i] ?? 0);
   const t = draw.tones.elements;
   const at = i * 4;
-  draw.stitchHeights = textures.get(terrain.stitchTextures?.[i] ?? NO_HEIGHTS);
+  const stitch = (own[STITCH_HEIGHTS] = textures.get(terrain.stitchTextures?.[i] ?? NO_HEIGHTS));
   let edges = 0;
   for (let c = 0; c < 4; c++) {
-    if (draw.stitchHeights && (terrain.stitchEdges?.[at + c] ?? 0) > 0) edges += 2 ** c;
+    if (stitch && (terrain.stitchEdges?.[at + c] ?? 0) > 0) edges += 2 ** c;
     t[12 + c] = terrain.stitchTransforms?.[at + c] ?? 0;
   }
   t[8] = edges;
@@ -451,8 +398,7 @@ function applyOverlays(
   for (let slot = 0; slot < 2; slot++) {
     const overlay = draws.overlays[slot];
     const shown = overlay && (overlay.opacities[i] ?? 0) > 0 ? textures.get(overlay.textures[i] ?? -1) : undefined;
-    if (slot === 0) draw.overlay0 = shown;
-    else draw.overlay1 = shown;
+    draw.textures[OVERLAY + slot] = shown;
     o[8 + slot] = overlay?.geographic[i] ?? 0;
     o[10 + slot] = shown && overlay ? (overlay.opacities[i] ?? 0) : 0;
     o[12 + slot] = overlay?.blends[i] ?? 0;
@@ -460,8 +406,7 @@ function applyOverlays(
     // The cross-fade (KB-155): from the imagery the slot showed, or from nothing when it had none.
     const fade = overlay?.fades[i] ?? 1;
     const from = shown && overlay && fade < 1 ? textures.get(overlay.fromTextures[i] ?? -1) : undefined;
-    if (slot === 0) draw.overlayFrom0 = from;
-    else draw.overlayFrom1 = from;
+    draw.textures[OVERLAY_FROM + slot] = from;
     f[8 + slot] = overlay?.fromGeographic[i] ?? 0;
     f[10 + slot] = shown ? fade : 1;
     f[12 + slot] = from ? 1 : 0;

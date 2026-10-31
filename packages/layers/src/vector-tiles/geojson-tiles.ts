@@ -167,7 +167,14 @@ function metricPieces(
   const out: { parts: TilePoint[][]; properties: Record<string, unknown> }[] = [];
   for (const part of shape.parts) {
     const path = part.map((p) => toTile(z, x, y, p));
-    const cum = path.map((_, i) => lengthOf(path.slice(0, i + 1)));
+    // Running lengths, one step at a time: a line of n vertices costs n, not n² (each prefix measured anew).
+    const cum: number[] = [];
+    let run = 0;
+    path.forEach((p, i) => {
+      const q = path[i - 1];
+      if (q !== undefined) run += Math.hypot(p[0] - q[0], p[1] - q[1]);
+      cum.push(run);
+    });
     const total = cum.at(-1) || 1;
     for (const piece of clipLine(path, RECT)) {
       if (piece.length < 2 || piece[0] === undefined) continue;
@@ -271,9 +278,13 @@ export function encodeGeoJsonTile(
 ): ArrayBuffer | undefined {
   const keys: string[] = [];
   const values: unknown[] = [];
+  // Indices by value: a search of the list for every tag was quadratic in the features of a tile.
+  const indices = [new Map<unknown, number>(), new Map<unknown, number>()] as const;
   const index = <T>(list: T[], value: T) => {
-    const i = list.indexOf(value);
-    return i >= 0 ? i : list.push(value) - 1;
+    const known = indices[list === (keys as unknown) ? 0 : 1];
+    let i = known.get(value);
+    if (i === undefined) known.set(value, (i = list.push(value) - 1));
+    return i;
   };
   const features: EncodedFeature[] = [];
   for (const shape of shapes) {

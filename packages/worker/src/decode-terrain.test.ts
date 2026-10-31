@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { decodeTerrain, gunzip } from './decode-terrain.js';
 import { TaskError, type TaskContext } from './protocol.js';
 
@@ -40,5 +40,18 @@ describe('decodeTerrain', () => {
     // The 16-cell fixture mesh needs more than 8 cells to stay within 5 m of its vertices: the grid was refined.
     expect(plain.image.cells).toBeGreaterThan(8);
     expect(plain.image.errorMeters).toBeLessThanOrEqual(5);
+  });
+
+  it('closes the bitmap of a heightmap it refuses (not square)', async () => {
+    const close = vi.fn();
+    vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: 4, height: 2, close }));
+    vi.stubGlobal('OffscreenCanvas', function OffscreenCanvas() {});
+    try {
+      const input = { bytes: new ArrayBuffer(8), encoding: 'terrarium', maxErrorMeters: 5, meshCells: 8 };
+      await expect(decodeTerrain(input, context)).rejects.toMatchObject({ code: 'undecodable' });
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

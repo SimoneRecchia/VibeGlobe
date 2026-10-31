@@ -290,6 +290,42 @@ describe('offline packages', () => {
     ).rejects.toThrow(/switched off globally/);
   });
 
+  it('fails a build on a captive portal page instead of storing it, and stops downloading once it failed', async () => {
+    let fetched = 0;
+    // Hotel Wi-Fi: every request is redirected to the same login page, answered 200.
+    const portal = (async () => {
+      fetched++;
+      return Object.defineProperty(
+        new Response('<html>login</html>', { headers: { 'Content-Type': 'text/html' } }),
+        'redirected',
+        { value: true },
+      );
+    }) as typeof fetch;
+    const { manager } = setup(new IDBFactory(), portal);
+    const source = xyzImagery({ id: 'a', url: 'https://a.test/{z}/{x}/{y}.png' });
+    const build = manager.install({
+      id: 'area',
+      version: '1',
+      area: {
+        polygonDeg: [
+          [12, 41],
+          [13, 41],
+          [12.5, 42],
+        ],
+      },
+      minLevel: 0,
+      maxLevel: 8,
+      sources: [{ source, license: 'CC-BY-4.0', attribution: { text: 'Fixture' } }],
+    });
+    await expect(build).rejects.toThrow(/could not be downloaded/);
+    // The loops still downloading finish their tile and stop: no further requests.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const settled = fetched;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    expect(fetched).toBe(settled);
+    expect(settled).toBeLessThanOrEqual(6 * 3);
+  }, 15_000);
+
   it('reports packages the browser evicted between sessions (F275)', async () => {
     const data = archive('1');
     const manifest = await manifestOf('1', data);
@@ -309,6 +345,36 @@ describe('offline packages', () => {
     await manager.ready;
     await Promise.resolve();
     expect(lost).toEqual([['rome']]);
+  });
+});
+
+describe('package storage that does not open', () => {
+  it('reports no package lost and keeps the list of what should be stored', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const net = server({ '/pkg/rome.json': JSON.stringify(manifest), '/pkg/rome.pmtiles': data });
+    const first = setup(new IDBFactory(), net.fetchImpl);
+    await first.manager.install('https://lan.test/pkg/rome.json');
+    const offline = createOffline({ store: memoryStore(), mode: 'offline' });
+    const lost: string[][] = [];
+    offline.on('storage-lost', (event) => lost.push([...event.packages]));
+    const written: string[] = [];
+    // The next session's IndexedDB cannot be opened at all.
+    const broken = {
+      open: () => {
+        throw new Error('the database is blocked');
+      },
+    } as unknown as IDBFactory;
+    const manager = createPackageManager(offline, {
+      adapters,
+      indexedDB: broken,
+      localStorage: { getItem: (k) => first.memory.get(k) ?? null, setItem: (_k, v) => void written.push(v) },
+    });
+    engines.push({ offline, manager });
+    await manager.ready.catch(() => undefined);
+    await Promise.resolve();
+    expect(lost).toEqual([]);
+    expect(written).toEqual([]);
   });
 });
 

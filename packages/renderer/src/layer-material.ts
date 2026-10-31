@@ -3,7 +3,6 @@
 import type { DepthPath } from '@vibeglobe/core';
 import {
   attribute,
-  cameraNear,
   cameraProjectionMatrix,
   cameraViewMatrix,
   float,
@@ -20,17 +19,8 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import {
-  DoubleSide,
-  GreaterEqualDepth,
-  Matrix3,
-  MeshBasicNodeMaterial,
-  Vector3,
-  Vector4,
-  type Node,
-  type Texture,
-} from 'three/webgpu';
-import { eyeRelativePosition, morphedEyeRelative } from './eye-relative.js';
+import { DoubleSide, Matrix3, MeshBasicNodeMaterial, Vector3, Vector4, type Node, type Texture } from 'three/webgpu';
+import { eyeRelativePosition, morphedEyeRelative, writeFragmentDepth } from './eye-relative.js';
 
 /** How a layer mesh places its vertices (ADR 0037). */
 export type LayerShape = 'flat' | 'solid' | 'quad' | 'line';
@@ -112,10 +102,7 @@ export function createLayerMaterial(
     shape === 'flat' || shape === 'solid'
       ? clip
       : vec4(clip.xy.add(offsetPx.mul(2).div(viewport.xy).mul(clip.w)), clip.z, clip.w);
-  if (depthPath === 'fragment') {
-    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
-    material.depthFunc = GreaterEqualDepth;
-  }
+  writeFragmentDepth(material, depthPath, viewPosition);
   const { rgb, alpha } = layerColor(shape, color, corner, normal, morphParams, atlas, labels, pixelRatio);
   // Screen-sized quads are not depth-tested: the curved surface around their anchor would cut them (see layerColor).
   if (shape === 'quad') material.depthTest = false;

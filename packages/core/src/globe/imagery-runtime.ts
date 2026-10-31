@@ -116,7 +116,6 @@ export class ImageryRuntime {
   /** What a new loader shares with the others, the terrain's handle index and the next free one (A2). */
   readonly loaderContext: LoaderContext;
   readonly terrainIndex: number;
-  nextIndex: number;
   /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
   readonly preload = new FlightPreload();
   /** The tiles of the view a flight will show in about a second, loaded instead of the current view's (F287). */
@@ -198,7 +197,6 @@ export class ImageryRuntime {
     const context: LoaderContext = { network: this.network, pool, shared, renderer, callbacks, observability };
     this.loaderContext = context;
     this.terrainIndex = sources.length;
-    this.nextIndex = sources.length + 1;
     this.terrain =
       terrain &&
       this.terrainLayer(

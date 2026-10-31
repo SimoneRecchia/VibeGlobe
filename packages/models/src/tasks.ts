@@ -36,10 +36,18 @@ export interface ModelTaskOptions {
 export function loadDraco3d(wasmUrl?: string): DracoLoader {
   let module: Promise<DracoDecoderModule> | undefined;
   return () => {
-    module ??= import('draco3d').then(
-      ({ createDecoderModule }) =>
-        createDecoderModule(wasmUrl === undefined ? {} : { locateFile: () => wasmUrl }) as Promise<DracoDecoderModule>,
-    );
+    module ??= import('draco3d')
+      .then(
+        ({ createDecoderModule }) =>
+          createDecoderModule(
+            wasmUrl === undefined ? {} : { locateFile: () => wasmUrl },
+          ) as Promise<DracoDecoderModule>,
+      )
+      .catch((error: unknown) => {
+        // A failed load is not kept: the next Draco model tries again.
+        module = undefined;
+        throw error;
+      });
     return module;
   };
 }

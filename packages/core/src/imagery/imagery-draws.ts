@@ -19,7 +19,7 @@ import {
   mapMercator,
 } from './imagery-mapping.hot.js';
 import { inCoverage, type ImagerySource } from './imagery-source.js';
-import { BLEND_CODES, fadeByZoom, isOpaque, shownOpacity, type StackEntry } from './imagery-stack.js';
+import { BLEND_CODES, isOpaque, shownOpacity, type StackEntry } from './imagery-stack.js';
 import type { VisibleSources } from './credits.js';
 
 /** Where `mapping` keeps the handle of the tile it maps to, after the mapping's own seven numbers. */
@@ -75,7 +75,6 @@ export function drawImagery(
 ): void {
   let center: QuadtreeTile | undefined;
   let centerDistance = Infinity;
-  fadeByZoom(layers, camera);
   const strengths = list.below.strengths;
   for (let layer = 0; layer < strengths.length; layer++) strengths[layer] = layers[layer]?.entry.toneStrength ?? 1;
   for (let index = 0; index < count; index++) {

@@ -99,6 +99,26 @@ describe('label placement and collision', () => {
     expect(forward).not.toContain('far');
   });
 
+  it('places the labels read before its arrays grew in the same pass (more than 1024 labels)', () => {
+    const labels: PlacementInput[] = Array.from({ length: 1500 }, (_, i) => ({
+      id: i,
+      // Far apart: 50 columns and 30 rows, 1° (100 px) between neighbors, so none collide.
+      longitudeDeg: -40 + (i % 50),
+      latitudeDeg: -15 + Math.floor(i / 50),
+      heightMeters: 0,
+      text: 'A',
+      sizePx: 12,
+      anchor: 0,
+      offsetXEm: 0,
+      offsetYEm: 0,
+      sortKey: 0,
+      enabled: true,
+    }));
+    const placer = new LabelPlacer(estimatedTextMeasurer);
+    for (let t = 0; placer.passes === 0; t += 16) placer.update(t, flatProjector(100), () => labels);
+    expect(labels.filter((label) => !placer.isPlaced(label.id)).map((label) => label.id)).toEqual([]);
+  });
+
   it('fades labels in and out over the fade duration instead of popping, between placement passes (F360)', () => {
     const placer = new LabelPlacer(estimatedTextMeasurer, { fadeDurationMs: 300, placementIntervalMs: 300 });
     const label: PlacementInput = {

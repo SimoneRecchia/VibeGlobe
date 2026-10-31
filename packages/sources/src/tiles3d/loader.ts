@@ -88,6 +88,8 @@ class Tiles3DLoader implements Tiles3DExtension {
   private root: Tileset | undefined;
   /** Each tile's placement anchor, its own center (undefined for a whole-Earth volume around the ECEF origin). */
   private readonly anchors = new WeakMap<Tile3D, TilesetAnchor | undefined>();
+  /** The external tilesets each tile attached as a child, by URI: loading its content again keeps them, not twice. */
+  private readonly externals = new WeakMap<Tile3D, Set<string>>();
   private readonly frameScratch: ViewFrame = createViewFrame();
   private readonly matrix = new Float64Array(16);
   private readonly fetcher: TileFetcher;
@@ -273,12 +275,18 @@ class Tiles3DLoader implements Tiles3DExtension {
     let bytes = 0;
     try {
       for (const content of tile.contents) {
+        const attached = this.externals.get(tile);
+        if (attached?.has(content.uri)) {
+          bytes += 1024;
+          continue;
+        }
         const parsed = parseTileContent(await this.fetchBytes(content.uri, job));
         if (parsed.type === 'error') throw new Error(`${content.uri}: ${parsed.message}`);
         if (parsed.type === 'tileset') {
           const { tileset, problems } = parseTileset(parsed.json, content.uri, tile);
           if (!tileset) throw new Error(`${content.uri}: ${problems[0]?.message ?? 'invalid tileset'}`);
           tile.children.push(tileset.root);
+          this.externals.set(tile, (attached ?? new Set()).add(content.uri));
           bytes += 1024;
           continue;
         }

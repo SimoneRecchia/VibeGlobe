@@ -25,7 +25,8 @@ const load = (baseMs: number) => (level: number) => baseMs * 0.88 ** level;
 
 describe('FrameTimeGovernor', () => {
   it('lowers within the reaction time when frames exceed the target, until frame time is back within it', () => {
-    const governor = new FrameTimeGovernor(10);
+    // No raise tried within the run: the lowering alone is under test.
+    const governor = new FrameTimeGovernor(10, { probeMs: 60_000 });
     simulate(governor, 2000, () => 10);
     const decisions = simulate(governor, 20_000, load(25), 2000);
     // First reaction: the window fills (30 frames of 25 ms) and the median stays over for reactionMs.
@@ -91,6 +92,41 @@ describe('FrameTimeGovernor', () => {
     expect(gaps[0]).toBeLessThan(4000);
     expect(gaps[gaps.length - 1]).toBeGreaterThanOrEqual(8000);
     expect(governor.raiseWaitMs).toBe(8000);
+  });
+
+  it('raises back on a screen that never draws faster than the target, and backs off when the raise is too much', () => {
+    const governor = new FrameTimeGovernor(10);
+    // A slow spell (tiles arriving) lowers quality; then every frame waits for the 60 Hz refresh.
+    simulate(governor, 10_000, load(25));
+    const lowered = governor.level;
+    expect(lowered).toBeGreaterThan(0);
+    const refresh = 1000 / 60;
+    const back = simulate(governor, 10 * GOVERNOR_DEFAULTS.probeMs * 2, () => refresh, 10_000);
+    expect(back.every((d) => d.direction === 'raise')).toBe(true);
+    expect(governor.level).toBe(0);
+    for (let i = 1; i < back.length; i++)
+      expect((back[i]?.atMs ?? 0) - (back[i - 1]?.atMs ?? 0)).toBeGreaterThanOrEqual(GOVERNOR_DEFAULTS.probeMs);
+    // Where level 0 is too slow, a tried raise is undone and the tries grow rarer.
+    const tight = new FrameTimeGovernor(10);
+    const decisions = simulate(tight, 600_000, (level) => (level === 0 ? 25 : refresh));
+    const raises = decisions.filter((d) => d.direction === 'raise').map((d) => d.atMs);
+    const gaps = raises.slice(1).map((t, i) => t - (raises[i] ?? 0));
+    expect(gaps.at(-1)).toBeGreaterThanOrEqual(8 * GOVERNOR_DEFAULTS.probeMs);
+  });
+
+  it('adapts on a device drawing a few frames a second, and an idle engine is no slow frame', () => {
+    const governor = new FrameTimeGovernor(10);
+    // 300 ms frames: under the gap that restarts the measurement, so they count.
+    const decisions = simulate(governor, 60_000, (level) => 300 * 0.88 ** level);
+    expect(decisions[0]?.direction).toBe('lower');
+    const idle = new FrameTimeGovernor(10);
+    simulate(idle, 2000, () => 10);
+    // The engine idles for a second: the frame after it starts a new measurement.
+    idle.idle();
+    idle.frame(3000);
+    expect(simulate(idle, 100, () => 10, 3000)).toEqual([]);
+    // Ten frames since: the window starts over instead of holding a one-second frame.
+    expect(idle.median()).toBeNaN();
   });
 
   it('stays within its levels', () => {

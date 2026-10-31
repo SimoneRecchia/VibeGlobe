@@ -269,15 +269,8 @@ function quadVertices(batch: BatchContents, feature: number, images: QuadImages 
   const lat = valueOf(batch, 'position', feature, 1);
   const height = valueOf(batch, 'position', feature, 2);
   if (valueOf(batch, 'visible', feature) <= 0) {
-    const none = [0, 0, 2, 2];
-    return {
-      lon,
-      lat,
-      height,
-      color: [0, 0, 0, 0],
-      corners: [none, none, none, none],
-      uvs: [HIDDEN_UV, HIDDEN_UV, HIDDEN_UV, HIDDEN_UV],
-    };
+    const corners = [HIDDEN_CORNER, HIDDEN_CORNER, HIDDEN_CORNER, HIDDEN_CORNER];
+    return { lon, lat, height, color: HIDDEN_COLOR, corners, uvs: [HIDDEN_UV, HIDDEN_UV, HIDDEN_UV, HIDDEN_UV] };
   }
   const { w, h, rect } = boxOf(batch, feature, images);
   const [ax, ay] = anchorShift(valueOf(batch, 'anchor', feature), w, h);

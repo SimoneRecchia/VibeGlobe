@@ -17,6 +17,7 @@ export class Antialiasing {
   #mode: AntialiasMode = 'msaa4';
   #pass: SinglePass | undefined;
   #loading: Promise<void> | undefined;
+  #disposed = false;
 
   /** Changes the mode; the frames use it once {@link prepare} resolves, the previous mode's until then. */
   set(mode: AntialiasMode): void {
@@ -31,6 +32,7 @@ export class Antialiasing {
     const mode = this.#mode;
     this.#loading ??= import('./fxaa.js').then(({ createSinglePass }) => {
       this.#loading = undefined;
+      if (this.#disposed) return;
       if (this.#mode === mode && !this.#pass) this.#pass = createSinglePass(renderer, scene, camera, mode === 'fxaa');
       else return this.prepare(renderer, scene, camera);
     });
@@ -47,6 +49,12 @@ export class Antialiasing {
   release(): void {
     this.#pass?.dispose();
     this.#pass = undefined;
+  }
+
+  /** Drops the pass for good: the renderer is destroyed, and a pass still loading is never built. */
+  dispose(): void {
+    this.#disposed = true;
+    this.release();
   }
 
   /**

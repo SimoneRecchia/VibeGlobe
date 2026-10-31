@@ -6,7 +6,7 @@
  * neighbors. Loaded with the first frame that uses it.
  */
 import { abs, clamp, dot, float, Fn, max, min, pass, screenSize, screenUV, select, vec2, vec3, vec4 } from 'three/tsl';
-import { RenderPipeline, type Camera, type Scene, type WebGPURenderer } from 'three/webgpu';
+import { DepthTexture, FloatType, RenderPipeline, type Camera, type Scene, type WebGPURenderer } from 'three/webgpu';
 
 /** Rec. 709 luminance weights. */
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -24,8 +24,10 @@ export interface SinglePass {
 
 /** The pass over `scene` seen from `camera`, drawn by `renderer`, with FXAA or without. */
 export function createSinglePass(renderer: WebGPURenderer, scene: Scene, camera: Camera, fxaa: boolean): SinglePass {
-  // Without multisampling whatever the canvas has: `none` shows these pixels as they are.
-  const frame = pass(scene, camera, { samples: 0 }).getTextureNode();
+  // Without multisampling whatever the canvas has: `none` shows these pixels as they are. Float depth, as the
+  // renderer's own scene target has (`useFloatSceneDepth`): 24 bits cannot hold near / d over a globe (ADR 0005).
+  const scenePass = pass(scene, camera, { samples: 0, depthTexture: new DepthTexture(1, 1, FloatType) });
+  const frame = scenePass.getTextureNode();
   const output = Fn(() => {
     const texel = vec2(1).div(screenSize);
     const at = (dx: number, dy: number) => frame.sample(screenUV.add(vec2(dx, dy).mul(texel)));
@@ -59,5 +61,12 @@ export function createSinglePass(renderer: WebGPURenderer, scene: Scene, camera:
     return vec4(select(luma.lessThan(lowest).or(luma.greaterThan(highest)), inner, outer), center.a);
   })();
   const pipeline = new RenderPipeline(renderer, fxaa ? output : frame);
-  return { render: () => pipeline.render(), dispose: () => pipeline.dispose() };
+  return {
+    render: () => pipeline.render(),
+    // The pipeline frees its quad only; the pass holds the full-size color and depth target.
+    dispose: () => {
+      pipeline.dispose();
+      scenePass.dispose();
+    },
+  };
 }

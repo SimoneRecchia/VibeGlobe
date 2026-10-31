@@ -86,6 +86,17 @@ export function placeTile(
 }
 
 /**
+ * On the 'fragment' depth path (WebGL2 without `EXT_clip_control`, ADR 0005 §4), makes a material write depth near / d,
+ * with d the view-space distance interpolated perspective-correctly, and keep the nearest fragment with a
+ * greater-equal test: the same stored value as the hardware reversed-Z path. Nothing on the reversed-Z path.
+ */
+export function writeFragmentDepth(material: NodeMaterial, depthPath: DepthPath, viewPosition: Node<'vec4'>): void {
+  if (depthPath !== 'fragment') return;
+  material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
+  material.depthFunc = GreaterEqualDepth;
+}
+
+/**
  * Makes a material place its vertices between the globe and the flat map (ADR 0008): each endpoint eye-relative as
  * in {@link makeEyeRelative}, the globe one from the mesh's origin and the plane one from its plane center, mixed as
  * (1 − m)·globe + m·plane, written out (never `mix`).
@@ -100,10 +111,7 @@ export function makeMorphedEyeRelative(
   const eyeRelative = morphedEyeRelative(globeOffset, planeOffset, morph);
   const viewPosition = cameraViewMatrix.mul(vec4(eyeRelative, 1));
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
-  if (depthPath === 'fragment') {
-    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
-    material.depthFunc = GreaterEqualDepth;
-  }
+  writeFragmentDepth(material, depthPath, viewPosition);
   return eyeRelative;
 }
 
@@ -132,10 +140,7 @@ export function morphedEyeRelative(
  * eye-relative: (offset + T_hi) + T_lo, then the rotation-only view and the
  * projection, all in float32 on the GPU. The first sum is exact where the vertex is near the eye, so a vertex keeps
  * float32 precision relative to its own distance from the eye (0.01 px at 4K, `eye-offset.test.ts`).
- *
- * On the 'fragment' depth path (WebGL2 without `EXT_clip_control`, ADR 0005 §4) the material also writes depth
- * near / d, with d the view-space distance interpolated perspective-correctly, and keeps the nearest fragment with a
- * greater-equal test: the same stored value as the hardware reversed-Z path.
+ * On the 'fragment' depth path the material also writes its depth ({@link writeFragmentDepth}).
  */
 export function makeEyeRelative(
   material: NodeMaterial,
@@ -144,10 +149,7 @@ export function makeEyeRelative(
 ): void {
   const viewPosition = eyeRelativeViewPosition(offset);
   material.vertexNode = cameraProjectionMatrix.mul(viewPosition);
-  if (depthPath === 'fragment') {
-    material.depthNode = cameraNear.div(varying(viewPosition.z.negate()));
-    material.depthFunc = GreaterEqualDepth;
-  }
+  writeFragmentDepth(material, depthPath, viewPosition);
 }
 
 /**

@@ -6,6 +6,7 @@
  * road (upright on screen), runs collision in priority order (higher style layers, then `symbol-sort-key`), fades
  * labels in and out on the engine clock, and writes the quads of the visible glyphs for the target's text material.
  */
+import { LabelAnchorCache } from './label-anchor-cache.js';
 import { geodeticToEcef, type ElevationSample, type FrameView, type GeoPosition } from '@vibeglobe/core';
 import { tileToLonLat } from './globe-vertices.js';
 import { GlyphSource } from './glyph-source.js';
@@ -110,11 +111,14 @@ function shapingOptions(
   };
 }
 
+/** Text shapings kept before they start over. */
+const MAX_SHAPINGS = 8192;
+
 /** Labels of a vector tile layer: anchors per tile, placement and fades per frame. */
 export class LabelPlacer {
   private readonly index = new CrossTileSymbolIndex();
   private readonly fader = new SymbolFader();
-  private readonly anchors = new Map<string, LabelAnchor[]>();
+  private readonly anchors = new LabelAnchorCache<LabelAnchor[]>();
   private readonly shapings = new Map<string, Shaping>();
   private readonly quads = new QuadWriter();
   private placedLabels: PlacedLabel[] = [];
@@ -142,12 +146,6 @@ export class LabelPlacer {
     return this.placedLabels;
   }
 
-  /** Forgets everything (the style's layout changed). */
-  reset(): void {
-    this.anchors.clear();
-    this.shapings.clear();
-  }
-
   /** Places the frame's labels; returns their quads and whether a fade is running. */
   frame(
     sources: readonly LabelSource[],
@@ -157,7 +155,9 @@ export class LabelPlacer {
   ): { quads: LabelQuads; animating: boolean } {
     const candidates: Candidate[] = [];
     const morph = this.view.camera.morphFactor;
+    this.anchors.beginFrame();
     for (const source of sources) for (const c of this.candidates(source, view, zoom, morph)) candidates.push(c);
+    this.anchors.endFrame(this.index);
     const viewport = { minX: 0, minY: 0, maxX: view.widthPx, maxY: view.heightPx };
     const { placed } = placeSymbols(candidates, viewport);
     const opacities = this.fader.update(nowMs, placed);
@@ -200,6 +200,7 @@ export class LabelPlacer {
     let shaping = this.shapings.get(key);
     if (shaping === undefined) {
       shaping = shapeText(l.text, (code) => this.glyphs.resolve(code, font), options);
+      if (this.shapings.size >= MAX_SHAPINGS) this.shapings.clear();
       this.shapings.set(key, shaping);
     }
     return shaping;
@@ -279,8 +280,8 @@ export class LabelPlacer {
 
   /**
    * The quad of a point label's sprite icon, centered on its anchor at `icon-size` in CSS pixels (the sprite's own
-   * pixel ratio taken out, so the 2x sheet draws at the same size, F448); undefined without an icon, null while the
-   * sprite loads.
+   * pixel ratio taken out, so the 2x sheet draws at the same size, F448); undefined without an icon (none named, or
+   * none in a sprite that loaded or failed: the text draws alone), null while the sprite loads.
    */
   private iconQuad(
     name: string | undefined,
@@ -291,7 +292,7 @@ export class LabelPlacer {
   ): GlyphQuad | null | undefined {
     if (name === undefined) return undefined;
     const image = this.glyphs.icon(name);
-    if (image === undefined) return null;
+    if (image === undefined) return this.glyphs.spriteLoading ? null : undefined;
     const key = `icon|${name}|${image.icon.pixelRatio}`;
     const rect = this.atlas.get(key) ?? this.atlas.addRgba(key, image.pixels, image.width, image.height);
     if (rect === undefined) return null;

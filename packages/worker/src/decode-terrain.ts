@@ -100,11 +100,13 @@ async function imagePixels(bytes: ArrayBuffer): Promise<{ rgba: Uint8Array; size
     throw new TaskError('undecodable', `heightmap could not be decoded: ${String(error)}`);
   }
   const { width, height } = bitmap;
-  if (width !== height) throw new TaskError('undecodable', `heightmap is ${width} × ${height}, not square`);
-  const context = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
-  if (!context) throw new TaskError('unsupported', 'no 2D context for heightmaps');
-  context.drawImage(bitmap, 0, 0);
+  const context =
+    width === height ? new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true }) : null;
+  if (context) context.drawImage(bitmap, 0, 0);
+  // Closed on every path: a rejected tile's bitmap would otherwise wait for collection in the worker.
   bitmap.close();
+  if (width !== height) throw new TaskError('undecodable', `heightmap is ${width} × ${height}, not square`);
+  if (!context) throw new TaskError('unsupported', 'no 2D context for heightmaps');
   const data = context.getImageData(0, 0, width, height, { colorSpace: 'srgb' }).data;
   return { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), sizePx: width };
 }

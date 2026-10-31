@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createGlobe } from './create-globe.js';
 import { fakeRenderer } from './test-renderer.js';
 import type { Globe, ViewInit } from './types.js';
@@ -186,6 +186,24 @@ describe('camera movements (F195–F201, ADR 0036)', () => {
       ticks(3);
       expect(globe.camera.zoom).toBeCloseTo(stoppedAt, 9);
     }
+    globe.destroy();
+  });
+});
+
+describe('tours with a long-lived signal', () => {
+  it('stop listening to the signal once they end', async () => {
+    const { globe } = await started({ longitudeDeg: 9, latitudeDeg: 45, zoom: 10 });
+    const controller = new AbortController();
+    const added = vi.spyOn(controller.signal, 'addEventListener');
+    const removed = vi.spyOn(controller.signal, 'removeEventListener');
+    for (let i = 0; i < 3; i++) {
+      const tour = globe.tour([{ target: { zoom: 8 + i }, movement: 'jump' }], { signal: controller.signal });
+      expect(await tour).toBe('completed');
+    }
+    await Promise.resolve();
+    expect(removed.mock.calls.filter(([type]) => type === 'abort').length).toBe(
+      added.mock.calls.filter(([type]) => type === 'abort').length,
+    );
     globe.destroy();
   });
 });

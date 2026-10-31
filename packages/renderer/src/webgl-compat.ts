@@ -47,9 +47,11 @@ export function releaseVertexArraysWithBuffers(backend: unknown): void {
   internals.destroyAttribute = (attribute: object) => {
     const id = internals.get(attribute).id;
     if (id !== undefined) {
-      const segment = String(id);
-      for (const key of Object.keys(internals.vaoCache)) {
-        if (!key.split(':').includes(segment)) continue;
+      // Matched as text, without splitting every key: this runs for each buffer freed, against every cached array.
+      const last = `:${String(id)}`;
+      const inner = `${last}:`;
+      for (const key in internals.vaoCache) {
+        if (!key.includes(inner) && !key.endsWith(last)) continue;
         const vertexArray = internals.vaoCache[key];
         if (vertexArray) internals.gl.deleteVertexArray(vertexArray);
         Reflect.deleteProperty(internals.vaoCache, key);

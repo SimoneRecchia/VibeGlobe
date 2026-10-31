@@ -38,17 +38,15 @@ const position = new Float64Array(2);
  * the north; once per query, so each level only scales it.
  */
 function project(mercator: boolean, at: Float64Array): void {
-  const lonRad = at[0] ?? 0;
   const latRad = at[1] ?? 0;
+  // Longitudes past ±180° (a look-ahead across the antimeridian) wrap around.
+  const x = ((at[0] ?? 0) + Math.PI) / (2 * Math.PI);
+  located[0] = x - Math.floor(x);
   if (mercator) {
     const limit = MERCATOR_EDGE_RAD; // Mercator-only terrain continues its edge heights.
     const lat = latRad > limit ? limit : latRad < -limit ? -limit : latRad;
-    located[0] = (lonRad + Math.PI) / (2 * Math.PI);
     located[1] = (1 - Math.log(Math.tan(Math.PI / 4 + lat / 2)) / Math.PI) / 2;
-  } else {
-    located[0] = (lonRad + Math.PI) / (2 * Math.PI);
-    located[1] = (Math.PI / 2 - latRad) / Math.PI;
-  }
+  } else located[1] = (Math.PI / 2 - latRad) / Math.PI;
 }
 
 /**

@@ -60,3 +60,64 @@ describe('raster layers over changing terrain (KB-242)', () => {
     expect(vi.mocked(first?.update)).toHaveBeenCalledWith({ ground: expect.any(Float32Array) });
   });
 });
+
+describe('raster tiles that fail on the way', () => {
+  it('requests a tile that failed with a 503 again later, and one answered 404 never', async () => {
+    vi.useFakeTimers();
+    try {
+      const asked: string[] = [];
+      const answers = new Map([
+        ['r/10/545/380', [503, 200]],
+        ['r/10/546/380', [404, 200]],
+      ]);
+      const context = {
+        target: { createMesh: vi.fn(() => ({ update: vi.fn(), dispose: vi.fn() })) },
+        transport: {
+          start: (request: { url: string }, _t: unknown, done: (result: unknown) => void) => {
+            asked.push(request.url);
+            const status = answers.get(request.url)?.shift() ?? 200;
+            done(
+              status === 200
+                ? { kind: 'ok', bytes: new ArrayBuffer(0), contentType: 'image/png' }
+                : { kind: 'status', status, retryAfterMs: undefined },
+            );
+            return () => undefined;
+          },
+        },
+        sources: new Map([
+          [
+            'sat',
+            {
+              templates: ['r/{z}/{x}/{y}'],
+              scheme: 'xyz',
+              coverage: { minzoom: 0, maxzoom: 12 },
+              raster: { tileSize: SIZE },
+            },
+          ],
+        ]),
+        grounds: { version: 0, active: false, canDrape: false, heights: () => undefined },
+        onReady: () => undefined,
+        buckets: () => undefined,
+        decode: () => Promise.resolve({ width: SIZE, height: SIZE, data: new Uint8ClampedArray(SIZE * SIZE * 4) }),
+      } as unknown as RasterLayerContext;
+      const rasters = new RasterLayers(context);
+      const layer = new StyleLayer({ id: 'sat', type: 'raster', source: 'sat' } as never);
+      const tiles = [
+        { z: 10, x: 545, y: 380 },
+        { z: 10, x: 546, y: 380 },
+      ];
+      const draw = (): void => {
+        rasters.beginFrame();
+        rasters.draws(layer, 1, 10, 0, tiles, []);
+      };
+      draw();
+      draw();
+      expect(asked).toEqual(['r/10/545/380', 'r/10/546/380']);
+      await vi.advanceTimersByTimeAsync(10_000);
+      draw();
+      expect(asked).toEqual(['r/10/545/380', 'r/10/546/380', 'r/10/545/380']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -358,7 +358,10 @@ export class LabelPlacer {
       const numbers = new Float64Array(this.#numbers.length * 2);
       numbers.set(this.#numbers);
       this.#numbers = numbers;
-      this.#enabled = new Uint8Array(this.#enabled.length * 2);
+      // The labels read so far keep their switches; `placed` is written by the pass itself.
+      const enabled = new Uint8Array(this.#enabled.length * 2);
+      enabled.set(this.#enabled);
+      this.#enabled = enabled;
       this.#placed = new Uint8Array(this.#placed.length * 2);
     }
     const id = input.id;

@@ -179,3 +179,18 @@ describe('cache eviction detection after clearing the cache', () => {
     }
   });
 });
+
+describe('opening IndexedDB', () => {
+  it('closes a connection that opens after the open was given up as blocked', async () => {
+    const close = vi.fn();
+    const request = { result: { close } } as unknown as IDBOpenDBRequest;
+    const factory = { open: () => request } as unknown as IDBFactory;
+    const { openDatabase } = await import('./idb.js');
+    const opening = openDatabase(factory, 'late');
+    request.onblocked?.call(request, new Event('blocked') as IDBVersionChangeEvent);
+    await expect(opening).rejects.toThrow(/blocked/);
+    // Another tab closed its connection: the open goes through, for a caller that has gone.
+    request.onsuccess?.call(request, new Event('success'));
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+});

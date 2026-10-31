@@ -8,6 +8,8 @@
 export { createControls } from './create-controls.js';
 export type { NavigationControls } from './create-controls.js';
 export type { ConnectedGlobe } from './camera-port.js';
+export { watchClicks } from './clicks.js';
+export type { GlobeClickEvent } from './clicks.js';
 export { DEFAULT_CONTROLS_OPTIONS, DEFAULT_TILT_POLICY, resolveControlsOptions } from './options.js';
 export type {
   ControlsOptions,

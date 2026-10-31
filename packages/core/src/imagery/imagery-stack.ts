@@ -239,7 +239,7 @@ export function applyChanges(entry: StackEntry, changes: ImageryLayerChanges): v
   }
   if (visible !== undefined) entry.visible = visible;
   if (blend !== undefined) {
-    if (!(blend in BLEND_CODES)) throw new RangeError(`Unknown blend mode "${String(blend)}"`);
+    if (!Object.hasOwn(BLEND_CODES, blend)) throw new RangeError(`Unknown blend mode "${String(blend)}"`);
     entry.blend = blend;
   }
 }

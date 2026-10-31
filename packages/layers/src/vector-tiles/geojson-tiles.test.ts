@@ -104,3 +104,23 @@ describe('GeoJSON sources (F444)', () => {
     expect(tokens?.labels?.map((l) => l.text)).toEqual(['dot!']);
   });
 });
+
+describe('GeoJSON tiling cost', () => {
+  it('tiles a long line with line metrics and many named features in time proportional to their size', () => {
+    // A 20,000-vertex track and 5,000 points each with its own name: quadratic steps took seconds here.
+    const track = Array.from({ length: 20_000 }, (_, i) => [-170 + (i / 20_000) * 340, Math.sin(i / 50) * 10]);
+    const points = Array.from({ length: 5000 }, (_, i) => ({
+      type: 'Feature',
+      properties: { name: `P${String(i)}` },
+      geometry: { type: 'Point', coordinates: [-170 + (i / 5000) * 340, 5] },
+    }));
+    const data = {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: track } }, ...points],
+    };
+    const shapes = geojsonShapes(data);
+    const startMs = performance.now();
+    expect(encodeGeoJsonTile(shapes, 0, 0, 0, true)).toBeDefined();
+    expect(performance.now() - startMs).toBeLessThan(1000);
+  });
+});

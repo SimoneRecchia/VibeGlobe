@@ -18,7 +18,9 @@ function fakeGlobe(capabilities: QualityTarget['capabilities'], withHook = true)
   const state = { clockMs: 0, scales: [] as number[], settings: [] as AppliedQualitySettings[], renders: 0 };
   const target: QualityTarget = {
     capabilities,
-    on: (_event, handler) => {
+    on: (event, handler) => {
+      // Frames only: the stand-in never idles.
+      if (event !== 'frame') return () => undefined;
       const h = (): void => handler({ frameNumber: 0 });
       handlers.add(h);
       return () => handlers.delete(h);
@@ -74,8 +76,10 @@ describe('createQuality', () => {
     for (const name of ['low', 'medium', 'ultra', 'high'] as const) {
       globe.frame(16, 10);
       quality.setPreset(name);
-      expect(quality.settings).toMatchObject({
-        ...QUALITY_PRESETS[name],
+      // Every engine setting of the preset; its pixel-ratio cap stays here (the test has no device pixel ratio).
+      const engine = Object.entries(QUALITY_PRESETS[name]).filter(([key]) => key !== 'maxPixelRatio');
+      expect(quality.settings).toEqual({
+        ...Object.fromEntries(engine),
         anisotropy: QUALITY_PRESETS[name].anisotropy === 'max' ? 16 : QUALITY_PRESETS[name].anisotropy,
       });
     }
@@ -86,6 +90,17 @@ describe('createQuality', () => {
       ['preset', 'high', 0],
     ]);
     expect(globe.state.renders).toBe(5);
+  });
+
+  it('draws no more pixels per CSS pixel than the preset allows on a dense screen', () => {
+    const scales = (pixelRatio: number): number[] =>
+      (['low', 'medium', 'high', 'ultra'] as const).map(
+        (preset) =>
+          createQuality(fakeGlobe(DESKTOP).target, { preset, hints: { pixelRatio } }).settings.resolutionScale,
+      );
+    // At 1 the presets' own scales; at 3 (a phone) low, medium and high draw at 1, 1.5 and 2 pixels per CSS pixel.
+    expect(scales(1)).toEqual([0.5, 0.75, 1, 1.25]);
+    expect(scales(3)).toEqual([0.333, 0.5, 0.667, 1.25]);
   });
 
   it('lowers on slow frames and raises back once frames are fast, through the resolution scale without the hook', () => {

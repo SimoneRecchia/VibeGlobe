@@ -68,18 +68,21 @@ function readTags(view: DataView, little: boolean): Tags {
   const count = view.getUint16(first, little);
   if (count > MAX_TAGS) throw new Error('too many tags');
   const tags: Tags = new Map();
+  // All tags together: they may all point at the same bytes, so a small file could claim billions of values.
+  let values = 0;
   for (let i = 0; i < count; i++) {
     const entry = first + 2 + i * 12;
     const tag = view.getUint16(entry, little);
     const type = view.getUint16(entry + 2, little);
     const n = view.getUint32(entry + 4, little);
     if (type === 2) continue;
-    if (n > MAX_VALUES) throw new Error(`tag ${String(tag)} has too many values`);
+    values += n;
+    if (values > MAX_VALUES) throw new Error(`tag ${String(tag)} brings the tags to too many values`);
     const size = (TYPE_SIZES[type] ?? 1) * n;
     const at = size <= 4 ? entry + 8 : view.getUint32(entry + 8, little);
-    const values: number[] = [];
-    for (let k = 0; k < n; k++) values.push(readValue(view, type, at + k * (TYPE_SIZES[type] ?? 1), little));
-    tags.set(tag, values);
+    const read: number[] = [];
+    for (let k = 0; k < n; k++) read.push(readValue(view, type, at + k * (TYPE_SIZES[type] ?? 1), little));
+    tags.set(tag, read);
   }
   return tags;
 }
@@ -103,7 +106,8 @@ function decompress(tags: Tags, chunk: Uint8Array, expectedBytes: number): Uint8
   const compression = one(tags, 259, 1);
   if (compression === 1) return chunk;
   if (compression === 5) return decodeLzw(chunk, expectedBytes);
-  if (compression === 8 || compression === 32946) return unzlibSync(chunk);
+  // Into a buffer of the chunk's size: a small DEFLATE stream that inflates to gigabytes stops there.
+  if (compression === 8 || compression === 32946) return unzlibSync(chunk, { out: new Uint8Array(expectedBytes) });
   throw new Error(`unsupported compression ${String(compression)}`);
 }
 

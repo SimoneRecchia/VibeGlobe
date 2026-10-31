@@ -53,8 +53,9 @@ PNG holds one exact color per class; map each class to `LANDSCAPE_COLORS` (fores
 wetland and shrubland to `grass`, croplands to `field`, open shrubland to `land`, barren to `bare`, urban to `urban`,
 snow to `ice`, water to `water`), resize to 4096 × 2048, blur by a pixel and save as WebP (about 240 KB).
 
-Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -90, 180, 90] }), record }`
-(`singleImage` of `@vibeglobe/sources`, `record` its terms), then ask for a style such as
+Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -90, 180, 90], sizePx: [4096, 2048] }), record }`
+(`singleImage` of `@vibeglobe/sources`, `record` its terms; with its size the image downloads only once the Landscape
+shows), then ask for a style such as
 `preset.styleFor(json, 'landscape', ['borders', 'countries'], 'it')`.
 
 The borders, country names and sea names overlays (F645) draw over Satellite and Landscape alike, in dark ink on the

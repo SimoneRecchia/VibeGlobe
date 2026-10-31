@@ -71,3 +71,4 @@ Conventions:
 | [0172](0172-basic-worker-program.md)                 | A basic worker program, so applications with imagery and terrain install no data-layer packages                  | Accepted (decided by agent; owner may revisit)                    |
 | [0181](0181-space-background.md)                     | Space background: catalog stars drawn procedurally and a procedural Milky Way, as a render extension             | Accepted (decided by agent; owner may revisit)                    |
 | [0182](0182-europe-open-preset.md)                   | The Europe preset: free sources that allow commercial use and redistribution, re-verified                        | Accepted                                                          |
+| [0183](0183-delegated-decisions-2026-10-31.md)       | Decisions of 2026-10-31 on the open questions (delegated by the owner)                                           | Accepted                                                          |

@@ -7274,7 +7274,7 @@
         "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles than the full-detail run (the measured reduction is recorded in ADR 0046)",
         "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F600",
@@ -7904,6 +7904,19 @@
         "In the browser, the turbines cost three instanced draws and the tables at most three, and close over the park the modules' glass fills the view from the south and their backs from the north"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F657",
+      "milestone": 11,
+      "section": "Rendering and visual quality",
+      "description": "Fog-aware detail: a tile entirely inside full fog is never requested at a fine level, and the tilted fog scenario requests fewer tiles whose center lies in full fog than the same run at full detail (the total request count follows how fast the device draws, not the fog: logged, not compared).",
+      "steps": [
+        "Unit-test the level selection with fog: a tile whose nearest point lies beyond the full-fog distance is not refined below the fog's coarse level, while a tile partly inside the visible range is",
+        "Run the same tilted flight scenario with fog-aware detail on and off and record every tile request with its level and position",
+        "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles whose center lies in full fog than the full-detail run",
+        "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
+      ],
+      "status": "failing"
     }
   ]
 }

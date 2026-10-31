@@ -6,7 +6,15 @@
  * the label quads of the frame. It implements the renderer-neutral `VectorTileTarget` of
  * `@vibeglobe/layers/vector-tiles`, which decides what to draw; it decides nothing itself.
  */
-import type { DepthPath, FrameView } from '@vibeglobe/core';
+import type {
+  DepthPath,
+  FrameView,
+  LabelQuads,
+  VectorLayerDraws,
+  VectorMesh,
+  VectorMeshData,
+  VectorMeshUpdate,
+} from '@vibeglobe/core';
 import { BufferAttribute, BufferGeometry, Group, Mesh, type MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import { placeTile } from '../eye-relative.js';
 import type { ThreeExtensionContext } from '../extensions.js';
@@ -22,88 +30,16 @@ import {
   setVectorLayer,
   createDrawUniforms,
   type VectorDrawUniforms,
-  type VectorMeshKind,
 } from './vector-material.js';
 
-/** One tile's mesh of one style layer. Attribute arrays have the lengths given in the names' comments. */
-export interface VectorMeshData {
-  readonly kind: VectorMeshKind;
-  readonly originEcef: Float64Array;
-  readonly planeCenter: Float64Array;
-  /** Offsets from the origin (3), normals (3), Mercator plane offsets (4) per vertex. */
-  readonly positions: Float32Array;
-  readonly normals: Float32Array;
-  readonly planes: Float32Array;
-  /** Tile units (2) per vertex. */
-  readonly tile: Float32Array;
-  readonly indices: Uint32Array;
-  /** Paint at the two zooms around the camera's (4 each per vertex): colors and parameters. */
-  readonly colorA: Float32Array;
-  readonly colorB: Float32Array;
-  readonly paramsA: Float32Array;
-  readonly paramsB: Float32Array;
-  /** Terrain height under each vertex (1), for draping. */
-  readonly ground: Float32Array;
-  /** Lines: the side point's globe attributes and (ex, ey, distance, 0) per vertex. */
-  readonly side?: { readonly positions: Float32Array; readonly normals: Float32Array; readonly planes: Float32Array };
-  readonly line?: Float32Array;
-  /** Extrusions: height above the ground (1), the building top (1) and the shading normal (3) per vertex. */
-  readonly height?: Float32Array;
-  readonly top?: Float32Array;
-  readonly shadeNormals?: Float32Array;
-  /** Circles: corner (2) and stroke color (4) per vertex. */
-  readonly corners?: Float32Array;
-  readonly stroke?: Float32Array;
-  /** Rasters: the tile's image (straight sRGB RGBA, top row first). */
-  readonly image?: { readonly width: number; readonly height: number; readonly data: Uint8Array | Uint8ClampedArray };
-}
-
-/** Attributes a mesh may replace in place (same lengths): paint and draping. */
-export type VectorMeshUpdate = Partial<
-  Pick<VectorMeshData, 'colorA' | 'colorB' | 'paramsA' | 'paramsB' | 'ground' | 'stroke'>
->;
-
-/** A created mesh. */
-export interface VectorMesh {
-  update(attributes: VectorMeshUpdate): void;
-  dispose(): void;
-}
-
-/** One draw of a mesh: the target square it is clipped to (tile units) and CSS pixels per tile unit. */
-export interface VectorDraw {
-  readonly mesh: VectorMesh;
-  readonly clip: readonly [number, number, number, number];
-  readonly pxPerUnit: number;
-  /** The factor between the mesh's paints A and B when not its layer's: a mesh still painted for another zoom pair. */
-  readonly zoomT?: number;
-}
-
-/** One style layer's draws this frame. */
-export interface VectorLayerDraws {
-  readonly layerId: string;
-  readonly kind: VectorMeshKind;
-  /** Opacity factor of the layer (its fade included). */
-  readonly opacity: number;
-  /** The factor between the paint at zoom A and B. */
-  readonly zoomT: number;
-  /** `line-dasharray` in line widths. */
-  readonly dash?: readonly number[];
-  /** Extrusions drawn opaque, writing depth. */
-  readonly solid?: boolean;
-  /** Extrusions: the share of their height drawn (they grow as their layer fades in, F457). */
-  readonly heightScale?: number;
-  readonly draws: readonly VectorDraw[];
-}
-
-/** The label quads of a frame: four vertices per quad, attributes as the text material reads them. */
-export interface LabelQuads {
-  readonly quads: number;
-  readonly screen: Float32Array;
-  readonly uv: Float32Array;
-  readonly fill: Float32Array;
-  readonly halo: Float32Array;
-  readonly params: Float32Array;
-}
+export type {
+  LabelQuads,
+  VectorDraw,
+  VectorLayerDraws,
+  VectorMesh,
+  VectorMeshData,
+  VectorMeshUpdate,
+} from '@vibeglobe/core';
 
 class ThreeVectorMesh implements VectorMesh {
   readonly geometry: BufferGeometry;

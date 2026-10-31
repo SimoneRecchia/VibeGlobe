@@ -148,7 +148,7 @@ const scan = await singleImage({
 const survey = await geotiffImage({ id: 'survey', image: 'https://images.example.com/survey.tif' });
 ```
 
-The image is downloaded and decoded once, and every engine tile draws its own piece, so an image larger than the GPU's texture limit shows completely. Rotated world files are refused with a `SourceConfigError`, as are images that cannot be read or placed.
+The image is downloaded and decoded once, and every engine tile draws its own piece, so an image larger than the GPU's texture limit shows completely. Rotated world files are refused with a `SourceConfigError`, as are images that cannot be read or placed. Without `sizePx` or `maxLevel` the factory downloads the image to read its size; give `sizePx` (or `bounds` and `maxLevel`) and it downloads with the first tile instead, so an image in a hidden layer costs nothing until shown.
 
 A Web Mercator image of the whole world (180° W to 180° E, about 85.05° S to 85.05° N), such as night lights shown
 from afar, needs no reprojection: `mercatorImage` downloads it with the first tile, decodes it once and cuts each tile

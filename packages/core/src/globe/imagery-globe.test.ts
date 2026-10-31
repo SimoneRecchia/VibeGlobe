@@ -316,6 +316,37 @@ describe('imagery layers added and removed at runtime (track A hook 2)', () => {
     globe.destroy();
   });
 
+  it('loads nothing for a hidden layer, not even its pinned base, until it is shown (KB-294)', async () => {
+    const urls: string[] = [];
+    const hidden: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source(urls), { id: 'night', sources: [{ ...source(hidden), id: 'night' }], visible: false }],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    let ready = false;
+    void globe.ready.then(() => (ready = true));
+    const run = async (frames: number): Promise<void> => {
+      for (let frame = 0; frame < frames; frame++) {
+        await settle();
+        renderer.timers.advance(50);
+        renderer.flush();
+      }
+    };
+    await run(30);
+    expect(ready).toBe(true);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(hidden).toEqual([]);
+    globe.imageryLayers.set('night', { visible: true });
+    await run(30);
+    expect(hidden.length).toBeGreaterThan(0);
+    globe.destroy();
+  });
+
   it('reuses the texture handles of removed layers, so a layer added after hundreds of swaps still draws', async () => {
     const { renderer, factory } = fakeRenderer();
     const globe = createGlobe({

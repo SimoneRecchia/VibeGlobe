@@ -3,6 +3,7 @@ import type { TileCoord } from '@vibeglobe/core';
 import { transformCoordinates } from '@vibeglobe/gis';
 import { geoImagePng, geoImageTiff, worldFileOf, type GeoImageSpec } from './__fixtures__/georeferenced.js';
 import { failures, mutate, runTiledConformance } from './conformance/index.js';
+import { fetchTile } from './conformance/tiled.js';
 import { geotiffImage, readGeotiff } from './geotiff.js';
 import { SourceConfigError } from './metadata.js';
 import { imageSizeOf, parseWorldFile, singleImage } from './single-image.js';
@@ -125,6 +126,23 @@ describe('single georeferenced images (F234)', () => {
       geotiffImage({ id: 'x', image: new Blob([png]) }),
     ];
     for (const attempt of attempts) await expect(attempt).rejects.toBeInstanceOf(SourceConfigError);
+  });
+
+  it('downloads nothing until its first tile when its size or its levels are given (KB-295)', async () => {
+    const spec = SPECS[0] as GeoImageSpec;
+    const url = 'https://images.test/lazy.png';
+    let fetches = 0;
+    const fetchImpl: typeof fetch = (input, init) => (fetches++, served(url, geoImagePng(spec))(input, init));
+    const sources = await Promise.all([
+      singleImage({ id: 'sized', image: url, bounds: spec.box, sizePx: [256, 256], fetch: fetchImpl, ...stand }),
+      singleImage({ id: 'levels', image: url, bounds: spec.box, maxLevel: 6, fetch: fetchImpl, ...stand }),
+    ]);
+    expect(fetches).toBe(0);
+    for (const source of sources) {
+      const { result } = await fetchTile(source, INSIDE);
+      expect(result).toMatchObject({ kind: 'ok' });
+    }
+    expect(fetches).toBe(2);
   });
 
   it('never throws on malformed world files, image headers or GeoTIFFs (fuzz)', { timeout: 60_000 }, async () => {

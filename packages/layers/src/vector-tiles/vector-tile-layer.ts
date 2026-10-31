@@ -293,7 +293,7 @@ class Runtime implements VectorTileLayer {
     if (target === undefined) return;
     const zoom = this.globe.camera.zoom;
     this.updateCredits(zoom, context);
-    const draws = this.sourceDraws(view);
+    const draws = this.sourceDraws(view, zoom);
     this.grounds.frame();
     this.rasters?.beginFrame();
     this.meshes?.beginFrame();
@@ -340,8 +340,11 @@ class Runtime implements VectorTileLayer {
     return out;
   }
 
-  /** Per source: the tiles to draw for the view's targets (requesting what is missing), each with its clip. */
-  private sourceDraws(view: FrameView): Map<string, readonly SourceDraw[]> {
+  /**
+   * Per source: the tiles to draw for the view's targets, each with its clip, requesting what is missing only while a
+   * visible layer of the source draws at this zoom (KB-292).
+   */
+  private sourceDraws(view: FrameView, zoom: number): Map<string, readonly SourceDraw[]> {
     const detail = sampledTiles(this.globe, view.widthPx, view.heightPx);
     const targets = viewTargets(this.globe.surfaceTiles(), 24, detail);
     this.targets = targets;
@@ -349,11 +352,17 @@ class Runtime implements VectorTileLayer {
     this.lastDrawn = [];
     this.drawnTilesWithBuckets = [];
     for (const source of this.sources.values()) {
-      const layers = this.style.layers.filter((l) => l.source === source.id).map((l) => l.json);
-      source.loader.setLayers(layers, this.layoutVersion);
+      const layers = this.style.layers.filter((l) => l.source === source.id);
+      source.loader.setLayers(
+        layers.map((l) => l.json),
+        this.layoutVersion,
+      );
       const isReady = (tile: TileId) => source.loader.get(tile) !== undefined;
       const sourceDraws = tilesToDraw(targets, source.coverage, isReady);
-      const wanted = wantedTiles(source, targets).map((tile, i) => ({ tile, url: tileUrl(source, tile), priority: i }));
+      const drawn = layers.some((l) => l.visible && l.inZoomRange(zoom));
+      const wanted = drawn
+        ? wantedTiles(source, targets).map((tile, i) => ({ tile, url: tileUrl(source, tile), priority: i }))
+        : [];
       source.loader.update(wanted, retainedTiles(sourceDraws));
       draws.set(
         source.id,

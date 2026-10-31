@@ -99,12 +99,16 @@ function isRgba(image: unknown): image is RgbaImage {
  * a device loss can recreate every texture without decoding again.
  */
 export class TileTextures {
-  private readonly entries: (Entry | undefined)[] = [];
+  /**
+   * The textures by handle. A map, not an array: handles are a layer's index times 2^22 plus a slot, so an array would
+   * be hundreds of millions of holes long, and walking it froze the view for a second (KB-299).
+   */
+  private readonly entries = new Map<number, Entry>();
   private count = 0;
   private bytes = 0;
   private compressed = 0;
-  /** The next handle {@link refilterSome} checks, or -1 while every texture has the current anisotropy. */
-  private refilterFrom = -1;
+  /** The handles {@link refilterSome} still has to check after the anisotropy changed. */
+  private stale: number[] = [];
 
   /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
   readonly tones = new ToneMatcher();
@@ -138,18 +142,18 @@ export class TileTextures {
   }
 
   /** The decoded image under a handle, if any (tone matching measures it on first use, F249). */
-  readonly imageOf = (handle: number): unknown => this.entries[handle]?.tile.image;
+  readonly imageOf = (handle: number): unknown => this.entries.get(handle)?.tile.image;
 
   /** The texture under a handle, if any. */
   get(handle: number): Texture | undefined {
-    return this.entries[handle]?.texture;
+    return this.entries.get(handle)?.texture;
   }
 
   /** Creates the texture under `handle`, replacing one held there, and uploads it now. */
   upload(renderer: WebGPURenderer, handle: number, tile: DecodedTile): void {
     this.release(handle, false);
     const entry: Entry = { tile, texture: this.create(tile) };
-    this.entries[handle] = entry;
+    this.entries.set(handle, entry);
     this.count++;
     this.bytes += tile.gpuBytes;
     if (isCompressed(tile.image)) this.compressed++;
@@ -158,11 +162,11 @@ export class TileTextures {
 
   /** Disposes the texture under `handle`; `closeImage` also frees the decoded image (an `ImageBitmap`'s memory). */
   release(handle: number, closeImage = true): void {
-    const entry = this.entries[handle];
+    const entry = this.entries.get(handle);
     if (!entry) return;
     entry.texture.dispose();
     if (closeImage) (entry.tile.image as { close?: () => void }).close?.();
-    this.entries[handle] = undefined;
+    this.entries.delete(handle);
     this.tones.release(handle);
     this.count--;
     this.bytes -= entry.tile.gpuBytes;
@@ -171,13 +175,12 @@ export class TileTextures {
 
   /** Disposes every texture, keeping the images: the GPU copies are gone after a device loss. */
   disposeTextures(): void {
-    for (const entry of this.entries) entry?.texture.dispose();
+    for (const entry of this.entries.values()) entry.texture.dispose();
   }
 
   /** Creates and uploads every texture again on a new renderer, from the kept images. */
   restore(renderer: WebGPURenderer): void {
-    for (const entry of this.entries) {
-      if (!entry) continue;
+    for (const entry of this.entries.values()) {
       entry.texture = this.create(entry.tile);
       renderer.initTexture(entry.texture);
     }
@@ -195,7 +198,7 @@ export class TileTextures {
       base.anisotropy = level;
       base.needsUpdate = true;
     }
-    this.refilterFrom = 0;
+    this.stale = [...this.entries.keys()];
   }
 
   /**
@@ -203,25 +206,22 @@ export class TileTextures {
    * until every texture has the level. Returns how many it made.
    */
   refilterSome(renderer: WebGPURenderer, count = REFILTER_PER_FRAME): number {
-    if (this.refilterFrom < 0) return 0;
     const level = this.anisotropy();
     let made = 0;
-    for (; this.refilterFrom < this.entries.length && made < count; this.refilterFrom++) {
-      const entry = this.entries[this.refilterFrom];
+    while (made < count && this.stale.length) {
+      const entry = this.entries.get(this.stale.pop() ?? -1);
       if (!entry || isHeights(entry.tile.image) || entry.texture.anisotropy === level) continue;
       entry.texture.dispose();
       entry.texture = this.create(entry.tile);
       renderer.initTexture(entry.texture);
       made++;
     }
-    if (this.refilterFrom >= this.entries.length) this.refilterFrom = -1;
     return made;
   }
 
   /** Releases everything. */
   clear(): void {
-    for (let handle = 0; handle < this.entries.length; handle++) this.release(handle);
-    this.entries.length = 0;
+    for (const handle of [...this.entries.keys()]) this.release(handle);
     // Also drops the caps' renderer and base image: a destroyed globe the host still references holds neither (KB-045).
     this.caps.rebuild(undefined, undefined);
   }

@@ -17,7 +17,8 @@
     "playwright.config.ts",
     "apps/*/vite.config.ts",
     "eslint.config.ts",
-    "packages/sources/src/__fixtures__"
+    "packages/sources/src/__fixtures__",
+    "packages/presets/src/polygons.ts"
   ],
   "exclude": ["scripts/fixtures/consumer"]
 }

@@ -17,12 +17,8 @@ import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
 import { startDragLoop, startFrameLoop, startMeasuredLoop, type FrameLoop } from './frame-loop.js';
-import { instrumentMainThread, startWorkerRendering } from './render-experiment/page.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
-import { customAdapters } from './custom-adapters.js';
-import { REAL_DATA, montBlancLayers } from './mont-blanc.js';
-import { europeLayers, showEuropePreset } from './europe-preset.js';
 import { exposeTestHooks } from './test-hooks.js';
 import { PAGE_UI, SHOWCASE } from './page-mode.js';
 
@@ -36,6 +32,11 @@ const offlineDemo = params.has('network')
   : undefined;
 // `?utm=` layers need the gis package and proj4: loaded only then, so the engine alone loads neither (F418).
 const reprojected = params.has('utm') ? await import('./reprojected-layers.js') : undefined;
+// The Europe preset, the Mont Blanc builds (the showcase's too) and a consumer's own adapters, each loaded only by the
+// pages that use them: the presets package and the fixture adapters stay out of every other page's first download.
+const europe = params.get('preset') === 'europe' ? await import('./europe-preset.js') : undefined;
+const montBlanc = SHOWCASE || params.get('scenario') === 'mont-blanc' ? await import('./mont-blanc.js') : undefined;
+const custom = params.get('custom') === 'quadkey' ? await import('./custom-adapters.js') : undefined;
 
 /**
  * Terrain scenarios (M4): URL parameters each one sets unless the URL gives them, over the fixture server's analytic
@@ -126,7 +127,9 @@ const TERRAIN_SCENARIOS: Readonly<Record<string, Readonly<Record<string, string>
     tilt: '70',
   },
 };
-for (const [name, value] of Object.entries({ ...TERRAIN_SCENARIOS, ...REAL_DATA }[params.get('scenario') ?? ''] ?? {}))
+for (const [name, value] of Object.entries(
+  { ...TERRAIN_SCENARIOS, ...montBlanc?.REAL_DATA }[params.get('scenario') ?? ''] ?? {},
+))
   if (!params.has(name)) params.set(name, value);
 const app = document.querySelector<HTMLDivElement>('#app');
 const canvas = document.querySelector<HTMLCanvasElement>('#globe');
@@ -287,9 +290,9 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
     ...terrain,
     ...imagery,
     ...wrapped,
-    ...customAdapters(params),
-    ...montBlancLayers,
-    ...europeLayers,
+    ...custom?.customAdapters(params),
+    ...montBlanc?.montBlancLayers,
+    ...europe?.europeLayers,
   };
 }
 
@@ -404,7 +407,7 @@ if (params.get('experiment') === 'gpu-probes') {
   await runGpuProbesPage(params, status);
 } else if (app && canvas && experiment === 'worker') {
   // F065: the engine renders in a worker (ADR 0011); the page keeps only the overlay and forwards input.
-  startWorkerRendering(app, canvas, {
+  (await import('./render-experiment/page.js')).startWorkerRendering(app, canvas, {
     backend,
     view: viewFromUrl(),
     imageryUrl: `${import.meta.env.BASE_URL}imagery/natural-earth-4096.jpg`,
@@ -456,8 +459,8 @@ if (params.get('experiment') === 'gpu-probes') {
     void globe.ready.then(async () => (await import('./quality-demo.js')).startQuality(globe, params, canvas));
   if (/=mvt-|vectorStyle=/.test(location.search)) void import('./vector-tiles-demo.js').then((m) => m.show(globe));
   // `?preset=europe`: the Europe preset's map types with their selector (F617).
-  if (params.get('preset') === 'europe') void showEuropePreset(globe, app);
-  if (experiment === 'main') instrumentMainThread(globe, app);
+  if (europe) void europe.showEuropePreset(globe, app);
+  if (experiment === 'main') (await import('./render-experiment/page.js')).instrumentMainThread(globe, app);
   const setStatus = (text: string): void => {
     if (status) status.textContent = text;
   };

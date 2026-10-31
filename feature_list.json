@@ -7916,7 +7916,7 @@
         "Assert no request of the fog-aware run is a fine-level tile lying entirely inside full fog, and that it requests fewer tiles whose center lies in full fog than the full-detail run",
         "Verify no visible difference in the fogged region and no black or empty pixels near the horizon in either run"
       ],
-      "status": "failing"
+      "status": "passing"
     }
   ]
 }

@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
+
+The owner asked for the missing free and resellable maps of Europe to zoom 15, Italy first, and for the glitches seen
+with 3D terrain. The provider hosts are refused by the container's proxy, so terms came from search quotes and
+endpoints from the OSM editor layer index. Baden-Württemberg (LGL DOP20, dl-de/by-2-0 since LGL's open data), Brussels
+(UrbIS Ortho, CC0, with its borders from Natural Earth's map units) and Denmark (GeoDanmark, CC BY 4.0, the
+application's free key, asked in WGS84 as its WMS has no Web Mercator) joined `europeOrthophotos()` (F668). Slovenia,
+Slovakia, Lithuania, Schleswig-Holstein, Bremen and Valle d'Aosta pass on licence but wait for their layer names (open
+question 39). Italy has no other online service that passes: AGEA's 2022–2024 national imagery is CC BY 4.0 since
+August but downloads only, the route for an application's own package. The terrain glitch reproduced on the vector Map
+base: a one-pixel line along vector tile edges where the shaded surface shows through part of the MSAA samples
+(KB-302); clip, depth pull and skirts were ruled out within the time box, and the next steps are recorded.
+
 ## 2026-10-31: a zoom that stops before the ground, flights that frame whole turbines and plants (owner's request)
 
 In the owner's application a wheel zoom over terrain reached zoom 28: the collision lifted the camera's target off the

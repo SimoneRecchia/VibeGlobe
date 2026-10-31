@@ -118,7 +118,7 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 ## Classic bugs of other engines, checked 2026-10-31
 
 Checked against VibeGlobe from the issue trackers of MapLibre, Cesium and deck.gl (`docs/known-bugs.md` has the ones
-found and fixed: TG-06, KB-302). Not changed:
+found and fixed: TG-06, KB-303). Not changed:
 
 - **Canvas readback noise (MapLibre #3110):** fingerprinting protection (Safari's private windows, Firefox's
   `resistFingerprinting`, Brave) can add noise to `getImageData`, which the worker uses to read heightmap pixels

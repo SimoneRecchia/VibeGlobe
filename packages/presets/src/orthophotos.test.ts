@@ -19,7 +19,7 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     const orthophotos = await europeOrthophotos({
       exclude: ['de-nw-dop'],
       onlineMaxLevel: { 'cz-cuzk-ortofoto': 18 },
-      keys: { 'fi-mml': 'key' },
+      keys: { 'fi-mml': 'key', 'dk-geodanmark': 'key' },
     });
     expect(orthophotos.layers).toHaveLength(EUROPE_ORTHOPHOTOS.length - 1);
     const austria = orthophotos.layers.find((l) => l.id === 'basemap-at-orthofoto')?.sources[0];
@@ -56,13 +56,13 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
       // Every service up to its own deepest level, none cut by a default.
       expect(layer.sources[0]?.maxLevel).toBe(EUROPE_ORTHOPHOTOS.find((r) => r.id === layer.id)?.maxLevel);
     }
-    const options = await withAllOnlineSources({ farLevels: 4 }, { keys: { 'fi-mml': 'key' } });
+    const options = await withAllOnlineSources({ farLevels: 4 }, { keys: { 'fi-mml': 'key', 'dk-geodanmark': 'key' } });
     expect(options.farLevels).toBe(4);
     expect(options.orthophotos?.layers.map((l) => l.id)).toEqual(EUROPE_ORTHOPHOTOS.map((r) => r.id));
   });
 
   it('covers France, Spain, the Netherlands, Belgium, Luxembourg, Alto Adige, four Länder, Finland, Estonia, Poland and Croatia, each within its borders, to its own level (F661)', async () => {
-    const { layers } = await europeOrthophotos({ keys: { 'fi-mml': 'app-key' } });
+    const { layers } = await europeOrthophotos({ keys: { 'fi-mml': 'app-key', 'dk-geodanmark': 'app-key' } });
     /** The level-14 tile at a position. */
     const at = (lonDeg: number, latDeg: number) => {
       const n = 2 ** 14;
@@ -86,6 +86,8 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
       ['ee-maaamet', 24.75, 59.44, 'kaart.maaamet.ee'],
       ['pl-geoportal-orto', 21.01, 52.23, 'mapy.geoportal.gov.pl'],
       ['hr-dgu-dof', 15.98, 45.81, 'geoportal.dgu.hr'],
+      ['de-bw-dop20', 9.18, 48.78, 'owsproxy.lgl-bw.de'],
+      ['be-bru-urbis', 4.35, 50.85, 'geoservices-grid.irisnet.be'],
     ];
     for (const [id, lon, lat, host] of places) {
       const source = layers.find((l) => l.id === id)?.sources[0];
@@ -101,7 +103,8 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     expect(wallonia?.request(at(3.72, 51.05), { ...out })).toBe('noData');
     // Every service of the second reading has its terms, and none is also listed as excluded.
     const second = EUROPE_ORTHOPHOTOS.filter((r) => r.termsReadDate === '2026-10-31');
-    expect(second.map((r) => r.id).sort()).toEqual(places.map(([id]) => id).sort());
+    // Denmark, in WGS84 tiles, has a test of its own (F668).
+    expect(second.map((r) => r.id).sort()).toEqual([...places.map(([id]) => id), 'dk-geodanmark'].sort());
   });
 
   it("uses a service that needs a key only with the application's own key, sent as its parameter (F661)", async () => {
@@ -114,6 +117,18 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     expect(finland?.request(tile(14, 9327, 4742), { ...out })).toMatchObject({
       url: 'https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/14/4742/9327.jpg?api-key=a+b%26c',
     });
+  });
+
+  it('adds Baden-Württemberg, Brussels and, with its key, Denmark, asked in WGS84 where the service has no Web Mercator (F668)', async () => {
+    const { layers } = await europeOrthophotos({ keys: { 'dk-geodanmark': 'k' } });
+    // Level 14 over Copenhagen: a tile of the geographic tiling, the key as its parameter.
+    const denmark = layers.find((l) => l.id === 'dk-geodanmark')?.sources[0];
+    const request = denmark?.request(tile(14, 17528, 3123), { ...out });
+    expect(request).toMatchObject({ url: expect.stringContaining('CRS=EPSG%3A4326') });
+    expect(request).toMatchObject({ url: expect.stringContaining('apikey=k') });
+    // Brussels' service is not asked for Ghent, in Flanders.
+    const brussels = layers.find((l) => l.id === 'be-bru-urbis')?.sources[0];
+    expect(brussels?.request(tile(14, 8361, 5471), { ...out })).toBe('noData');
   });
 
   it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {

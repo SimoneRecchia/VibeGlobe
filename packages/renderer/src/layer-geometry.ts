@@ -11,7 +11,7 @@ import {
 import earcut from 'earcut';
 import { valueOf, type BatchContents } from './layer-contents.js';
 
-export { valueOf, type BatchContents } from './layer-contents.js';
+export { rises, valueOf, type BatchContents } from './layer-contents.js';
 import {
   DRAPE_STEP_DEG,
   extentOf,

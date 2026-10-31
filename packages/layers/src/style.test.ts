@@ -15,6 +15,16 @@ function value(
   return text ?? [...out].filter((v) => !Number.isNaN(v));
 }
 
+describe('flat polygons (KB-285)', () => {
+  it('extrudes a polygon only when its style sets a height: the specification default of 0 would draw it opaque', () => {
+    const flat = compileStyle('polygon', { 'fill-color': '#ff0000', 'fill-opacity': 0.3 });
+    expect(flat.properties.map((p) => p.channel)).not.toContain('heightMeters');
+    expect(flat.properties.map((p) => p.channel)).not.toContain('baseMeters');
+    const raised = compileStyle('polygon', { 'fill-extrusion-height': 12 });
+    expect(raised.properties.map((p) => p.channel)).toContain('heightMeters');
+  });
+});
+
 describe('layer styles (MapLibre expressions)', () => {
   it('derives color, size, width, opacity, icon and text from feature properties (F369)', () => {
     const color = ['match', ['get', 'kind'], 'hot', '#ff0000', 'cold', '#0000ff', '#808080'];

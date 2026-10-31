@@ -10,6 +10,7 @@ import type { DepthPath, FrameView } from '@vibeglobe/core';
 import { BufferAttribute, BufferGeometry, Group, Mesh, type MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import { placeTile } from '../eye-relative.js';
 import type { ThreeExtensionContext } from '../extensions.js';
+import { LAYER_RENDER_ORDER } from '../layer-order.js';
 import { rasterizeSdfGlyphs } from './local-glyphs.js';
 import { SdfAtlas } from './sdf-atlas.js';
 import { updateVectorGeometry, vectorGeometry } from './vector-geometry.js';
@@ -165,6 +166,10 @@ export class ThreeVectorTarget {
     this.root.matrixAutoUpdate = false;
     this.root.matrixWorldAutoUpdate = false;
     context.scene.add(this.root);
+    // Under the application's data layers: the engine draws in scene order, and a map's fills would cover them (KB-284).
+    const children = context.scene.children;
+    const first = children.findIndex((child) => child.renderOrder >= LAYER_RENDER_ORDER);
+    if (first >= 0) children.splice(first, 0, children.pop() as Group);
   }
 
   /** Uploads one tile's mesh of one style layer; it is drawn when a frame's draws list it. */

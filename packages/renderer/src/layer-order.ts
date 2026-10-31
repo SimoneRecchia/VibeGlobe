@@ -2,6 +2,9 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Object3D } from 'three/webgpu';
 
+/** The draw order of the application's layer meshes, from which their stack order counts. */
+export const LAYER_RENDER_ORDER = 1000;
+
 /**
  * Puts the layer meshes among `children` in their draw order (`renderOrder`, ties as they are), each in a slot a layer
  * mesh held, so other objects keep their places: the engine draws without sorting, in scene order, so a layer's

@@ -3,11 +3,11 @@
 // to about a kilometre; with the 1:10m countries too, the preset's country borders for sources clipped to a country
 // (`@vibeglobe/presets/countries`, F618). Run once when the bounds, the countries or the tolerance change:
 //   node scripts/europe-land.ts <ne_50m_admin_0_countries.geojson> [<ne_10m_admin_0_countries.geojson>
-//     [<ne_10m_admin_1_states_provinces.geojson>]]
+//     [<ne_10m_admin_1_states_provinces.geojson> [<ne_10m_admin_0_map_units.geojson>]]]
 // With the 1:10m states and provinces too, the borders of the regions that have their own orthophoto services (Germany's
-// Länder) are written next to the countries, by ISO 3166-2 code. The inputs come from
-// https://github.com/nvkelso/natural-earth-vector (geojson/ne_*_admin_0_countries.geojson,
-// geojson/ne_10m_admin_1_states_provinces.geojson).
+// Länder, the province of Bolzano) are written next to the countries, by ISO 3166-2 code; with the map units, Belgium's
+// regions. The inputs come from https://github.com/nvkelso/natural-earth-vector (geojson/ne_*_admin_0_countries.geojson,
+// geojson/ne_10m_admin_1_states_provinces.geojson, geojson/ne_10m_admin_0_map_units.geojson).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 /** West, south, east, north in degrees: mainland Europe, Iceland, the Azores, Madeira and the Canary Islands. */
@@ -16,8 +16,10 @@ const EUROPE_BOUNDS = [-32, 27, 45, 72] as const;
 const TOLERANCE_DEG = 0.01;
 /** The preset's mask, bundled with the application, only bounds online requests: about 2.5 km is enough. */
 const PRESET_TOLERANCE_DEG = 0.025;
-/** Countries whose regions have orthophoto services of their own: their regions' borders are written too. */
-const REGION_COUNTRIES = new Set(['DE']);
+/** Regions with orthophoto services of their own, whose borders are written too: every Land of Germany, and these. */
+const isRegion = (code: string): boolean => code.startsWith('DE-') || code === 'IT-BZ';
+/** Belgium's regions, which are Natural Earth map units, by ISO 3166-2 code. */
+const MAP_UNITS: Readonly<Record<string, string>> = { Flemish: 'BE-VLG', Walloon: 'BE-WAL' };
 /** The country borders clip imagery per pixel: about 300 m, near the 1:10m data's own accuracy. */
 const COUNTRY_TOLERANCE_DEG = 0.003;
 
@@ -187,11 +189,18 @@ if (fine) {
     };
     for (const feature of provinces.features) {
       const code = feature.properties.iso_3166_2 ?? '';
-      if (!REGION_COUNTRIES.has(code.slice(0, 2)) || !/^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(code)) continue;
+      if (!isRegion(code) || !/^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(code)) continue;
       const polygons = countryPolygons(feature, COUNTRY_TOLERANCE_DEG);
       if (polygons.length > 0) borders[code] = polygons;
     }
   }
+  const mapUnits = process.argv[5];
+  if (mapUnits)
+    for (const feature of (JSON.parse(readFileSync(mapUnits, 'utf8')) as Countries).features) {
+      const code = MAP_UNITS[feature.properties.NAME ?? ''];
+      const polygons = code === undefined ? [] : countryPolygons(feature, COUNTRY_TOLERANCE_DEG);
+      if (code !== undefined && polygons.length > 0) borders[code] = polygons;
+    }
   const codes = Object.keys(borders).sort();
   const header = `// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -213,9 +222,10 @@ export default polygons;
     `${header}import type { PolygonDeg } from '@vibeglobe/core';
 
 /**
- * The country borders of Europe by ISO 3166-1 alpha-2 code, and Germany's Länder by ISO 3166-2 code, each in its own
- * module so that an application loads only those it uses: Natural Earth 1:10m countries and states (public domain,
- * https://www.naturalearthdata.com), clipped to Europe and simplified to ${COUNTRY_TOLERANCE_DEG}° (about 300 m) by scripts/europe-land.ts.
+ * The country borders of Europe by ISO 3166-1 alpha-2 code, and Germany's Länder, Belgium's regions and the province
+ * of Bolzano by ISO 3166-2 code, each in its own module so that an application loads only those it uses: Natural Earth
+ * 1:10m countries, states and map units (public domain, https://www.naturalearthdata.com), clipped to Europe and
+ * simplified to ${COUNTRY_TOLERANCE_DEG}° (about 300 m) by scripts/europe-land.ts.
  */
 export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: readonly PolygonDeg[] }>>> = {
 ${codes.map((code) => `  ${code.includes('-') ? `'${code}'` : code}: () => import('./${code.toLowerCase()}.js'),`).join('\n')}

@@ -177,3 +177,52 @@ Mapterhorn beyond its data. With a package Satellite is now:
 - The online sources and orthophotos are not matched (`harmonize: false`): their colors are their own.
 - Terrain is asked for no deeper than a tile its loader knows missing (F640): a service whose data ends at a shallower
   level costs one 404 a tile of its first missing level, not one a level.
+
+## Amendment, 2026-10-31: Europe to zoom 15, the second reading of the orthophotos
+
+The owner asked for imagery of all of Europe at zoom 15, from free sources only that allow commercial use and
+redistribution, and delegated every decision to the agent. The providers' hosts are still blocked here, so the terms
+were read again, country by country, through search quotes of the providers' own pages (their domain, open-data portal,
+INSPIRE record or official gazette); endpoints were cross-checked against the OpenStreetMap editor layer index, never
+used for licences. Two changes of method, decided for the owner:
+
+- **Credits composed from the licence's own rule.** Where a licence asks only for the source and a date (Etalab 2.0,
+  the Croatian open licence) or a CC BY attribution, and the provider fixes no text, the credit is the provider's name,
+  product and year as that rule asks. An application updates the year with its own reading. This settles the exclusions
+  of 2026-10-26 that stood on an unsettled credit (IGN, PNOA, PDOK, Alto Adige, Croatia, Estonia, Sachsen).
+- **A free key is acceptable.** A service that needs a key free on registration is included and used only with the
+  application's own key (`europeOrthophotos({ keys })`, the record's `keyParam`).
+
+Included (`SECOND_READING_ORTHOPHOTOS` in `packages/presets/src/orthophoto-records-2026-10-31.ts`), each clipped to its
+borders from Natural Earth (Belgium's regions are its map units, Bolzano its province), from level 12 to its own:
+
+| Service (id)                                         | Licence                                       | Credit                                                                   | Endpoint, deepest level                      |
+| ---------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------- |
+| IGN BD ORTHO / ORTHO HR, France (`ign-bd-ortho`)     | Licence Ouverte Etalab 2.0                    | `© IGN 2026 – BD ORTHO®` (composed)                                      | Géoplateforme WMTS, PM matrix, 19            |
+| PNOA Máxima Actualidad, Spain (`pnoa`)               | CC BY 4.0 (IGN conditions)                    | `PNOA-MA CC-BY 4.0 scne.es 2026` (IGN's short form)                      | WMTS GoogleMapsCompatible, 20                |
+| PDOK Luchtfoto, Netherlands (`pdok-luchtfoto`)       | CC BY 4.0                                     | `Beeldmateriaal.nl, CC BY 4.0`                                           | WMTS `Actueel_orthoHR`, 21                   |
+| Orthofotomozaïek, Flanders (`be-vlg-omw`)            | Vlaamse Open Data licentie v1.2               | `Bron: Orthofotomozaïek Vlaanderen 2025, Digitaal Vlaanderen`            | WMTS `GoogleMapsVL`, 21                      |
+| SPW ORTHO_LAST, Wallonia (`be-wal-ortho-last`)       | CC BY 4.0                                     | `© SPW 2023`                                                             | WMS layer `0`, 19                            |
+| ACT BD-L-ORTHO, Luxembourg (`lu-act-ortho`)          | CC0 1.0                                       | none required; `Administration du cadastre et de la topographie (ACT)`   | XYZ, 20                                      |
+| Ortofoto 2023, Alto Adige (`alto-adige-2023`)        | CC BY 4.0                                     | `© Provincia autonoma di Bolzano – Alto Adige, Ortofoto 2023, CC BY 4.0` | WMS `Aerial-2023-RGB`, 19                    |
+| DOP20, Bayern (`de-by-dop20`)                        | CC BY 4.0                                     | `Datenquelle: Bayerische Vermessungsverwaltung – www.geodaten.bayern.de` | WMS `by_dop20c`, 19                          |
+| DOP20, Hessen (`de-he-dop20`)                        | Datenlizenz Deutschland – Zero 2.0            | none required; the HVBG's `Geobasisdaten ©` line shown                   | WMS `he_dop20_rgb`, 19                       |
+| DOP20, Sachsen (`de-sn-dop20`)                       | Datenlizenz Deutschland – Namensnennung 2.0   | `Geodaten Sachsen, dl-de/by-2-0` (the service record's text)             | WMS `sn_dop_020`, 19                         |
+| DOP20 summer, Hamburg (`de-hh-dop20`)                | Datenlizenz Deutschland – Namensnennung 2.0   | `Freie und Hansestadt Hamburg, … (LGV), dl-de/by-2-0`                    | WMS `dop_zeitreihe_belaubt`, 19              |
+| Maanmittauslaitos orthophotos, Finland (`fi-mml`)    | CC BY 4.0                                     | `Contains data from the National Land Survey of Finland Orthophotos …`   | WMTS Pseudo-Mercator, 18; free key `api-key` |
+| Maa- ja Ruumiamet orthophoto, Estonia (`ee-maaamet`) | the agency's open-data licence (as CC BY 4.0) | `Ortofoto: Maa- ja Ruumiamet 2026` (composed)                            | WMS `of10000`, 19                            |
+| GUGiK Ortofotomapa, Poland (`pl-geoportal-orto`)     | free of charge, "for any purpose"             | `Główny Urząd Geodezji i Kartografii (geoportal.gov.pl)`                 | WMTS EPSG:3857, 19; no bulk downloading      |
+| DGU DOF 2023–2024, Croatia (`hr-dgu-dof`)            | Otvorena dozvola (NN 67/2017)                 | `Izvor: Državna geodetska uprava, Digitalni ortofoto 2023.–2024.`        | WMS `OI.OrthoimageCoverage`, 19              |
+
+Left out, in `EXCLUDED_SOURCES` with why: no Europe-wide source passes (Copernicus VHR 2021 and 2024 are commercial
+mission imagery for eligible users only; EOX's Sentinel-2 cloudless is non-commercial from 2018 and its 2016 terms
+conflict). Denmark, Slovenia, Slovakia, Latvia and Bremen have open licences but no Web Mercator endpoint could be
+confirmed; Baden-Württemberg, Saarland and Schleswig-Holstein have conflicting records; the federal BKG service is paid
+until 2027; Norway, Sweden, Lithuania, Hungary, Romania, Bulgaria, the western Balkans, Moldova, Ukraine, Belarus,
+Russia, the United Kingdom, Ireland, Greece, Cyprus, Malta, Iceland and the small states have no open service; Italy's
+AGEA imagery has no tile service, and Brussels' current licence was not confirmed.
+
+Where no orthophoto covers the land, the package's WorldCover composite (10 m) is the detail: `packageLevels.imagery`
+reads it to the level the package was built to (F662), 13 for its full detail at about 27 GB, so zoom 15 shows it
+magnified four times instead of level 11 sixteen times. Each service publishes its own availability; CORS could not be
+checked from here for any of them, and a service that refuses a page's requests leaves the package's imagery in view.

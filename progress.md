@@ -12,6 +12,18 @@ million pixels, checked on a real orthophoto of Prenzlau. The drawing tool found
 handles on the ellipsoid while the shapes lie on the terrain (KB-289), and draped polygons and lines sank into the
 coarser terrain mesh from a few kilometers (KB-290). `DrawColors.fillOpacity` (F665) lightens a drawn area's fill.
 
+## 2026-10-31: Europe to zoom 15 from open imagery (owner's request)
+
+The owner asked for all of Europe at zoom 15 from free sources that allow commercial use and redistribution. Every
+country's orthophoto services were read again (ADR 0182, amendment of 2026-10-31), with credits composed from each
+licence's own rule where the provider fixes none and free keys accepted. Fifteen services joined
+`europeOrthophotos()` (F661): France, Spain, the Netherlands, Flanders, Wallonia, Luxembourg, Alto Adige, Bayern,
+Hessen, Sachsen, Hamburg, Finland (with the application's key), Estonia, Poland and Croatia, each clipped to its
+borders (Belgium's regions and Bolzano's province were added to the generated borders) and asked for up to level 18 to 21. No Europe-wide source passes (Copernicus VHR is for eligible users, EOX is non-commercial), and Italy, the United
+Kingdom, Ireland, Scandinavia but Finland, most of the east and the Balkans have no open service: there the package's
+10 m WorldCover is the detail, now readable to the level it was built to (`packageLevels.imagery`, F662). The
+exclusions were shortened, so the presets entry fell to 44.06 KB.
+
 ## 2026-10-31: panels laid out in rows, and a grid on the ground (an application's editor)
 
 F658 and F659 in `@vibeglobe/gis`, pure functions for an application's editor of solar parks. `layoutPanels` places

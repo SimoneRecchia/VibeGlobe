@@ -338,9 +338,13 @@ Google's tiles are never packaged or cached persistently (the Google profile, [A
 
 ## National and regional orthophotos
 
-`@vibeglobe/presets/orthophotos` adds the open orthophoto services whose terms were verified (ADR 0182): basemap.at,
-SWISSIMAGE, ČÚZK, DGT Portugal and seven German Länder. Each is a layer of its own, clipped per pixel to its country's or
-Land's borders (Natural Earth, loaded on demand), above the satellite composite; outside them the composite shows. Each
+`@vibeglobe/presets/orthophotos` adds the open orthophoto services whose terms were verified (ADR 0182): France (IGN),
+Spain (PNOA), Portugal (DGT), the Netherlands (PDOK), Flanders, Wallonia, Luxembourg, Switzerland (SWISSIMAGE),
+Austria (basemap.at), Czechia (ČÚZK), Poland (GUGiK), Croatia (DGU), Estonia, Finland, Alto Adige and twelve German
+Länder (Bayern, Brandenburg and Berlin, Hamburg, Hessen, Mecklenburg-Vorpommern, Niedersachsen, Nordrhein-Westfalen,
+Rheinland-Pfalz, Sachsen, Sachsen-Anhalt, Thüringen), from 19 to 21 levels deep. Each is a layer of its own, clipped
+per pixel to its country's or region's borders (Natural Earth, loaded on demand), above the satellite composite;
+outside them the composite shows. Each
 starts at level 12 (`ORTHOPHOTO_MIN_LEVEL`), as the services answer far views with white images, and a white tile counts
 as no data, so the composite shows through it.
 
@@ -353,20 +357,26 @@ const preset = europeOpen({ orthophotos });
 const credits = preset.sources.filter((s) => s.kind === 'imagery').map((s) => s.attribution[0]?.text);
 ```
 
-SWISSIMAGE is free under fair use (up to about 20,000 users a day); the other services publish no limit. The services
-left out, with why, are `preset.excluded`.
+SWISSIMAGE is free under fair use (up to about 20,000 users a day), the Polish Geoportal bars bulk downloading, and
+Finland's open interface is not meant for high-volume services; the other services publish no limit. Finland's service
+needs a key, free on registration with the National Land Survey: pass the application's own as
+`europeOrthophotos({ keys: { 'fi-mml': key } })`, without it the service is left out. A credit carries the year the
+data was read (`© IGN 2026 – BD ORTHO®`): update it with your own reading. The services left out, with why, are
+`preset.excluded`: there is no open orthophoto yet for Italy (except Alto Adige), the United Kingdom, Ireland, the
+Nordic countries but Finland, most of Central and Eastern Europe and the Balkans, nor a Europe-wide one; there the
+package's WorldCover composite is the detail (below).
 
 ## Maximum online zoom per area
 
 The deepest level asked for online, by area and source, with the default options (`onlineMaxLevel` lowers them).
 Beyond it the deepest tile is magnified.
 
-| Area                                                                                                                                                          | Satellite                                                                                         | Map, labels, roads, buildings                       | Terrain and relief                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Land in Europe                                                                                                                                                | Blue Marble to 8 online; the package's WorldCover from 5 to 11                                    | 14 (OpenFreeMap; the package first up to 11)        | 17 (Mapterhorn, where it holds them; the package first up to 11) |
-| Sea in Europe                                                                                                                                                 | Blue Marble to 8 online                                                                           | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
-| Outside Europe                                                                                                                                                | Blue Marble to 8                                                                                  | 14 (OpenFreeMap)                                    | none                                                             |
-| Austria, Switzerland, Czechia, mainland Portugal, Niedersachsen, NRW, Thüringen, Brandenburg, Berlin, Mecklenburg-Vorpommern, Sachsen-Anhalt, Rheinland-Pfalz | with `europeOrthophotos()`: from 12 to 19 or 20, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
+| Area                                                                                                                                                                                                                                                               | Satellite                                                                                      | Map, labels, roads, buildings                       | Terrain and relief                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| Land in Europe                                                                                                                                                                                                                                                     | Blue Marble to 8 online; the package's WorldCover from 5 to 11                                 | 14 (OpenFreeMap; the package first up to 11)        | 17 (Mapterhorn, where it holds them; the package first up to 11) |
+| Sea in Europe                                                                                                                                                                                                                                                      | Blue Marble to 8 online                                                                        | none in hybrid; the package up to 8, then magnified | none online; the package up to 8                                 |
+| Outside Europe                                                                                                                                                                                                                                                     | Blue Marble to 8                                                                               | 14 (OpenFreeMap)                                    | none                                                             |
+| France, Spain, mainland Portugal, Netherlands, Belgium but Brussels, Luxembourg, Switzerland, Austria, Czechia, Poland, Croatia, Estonia, Finland (with a key), Alto Adige, twelve German Länder (all but Baden-Württemberg, Bremen, Saarland, Schleswig-Holstein) | with `europeOrthophotos()`: from 12 to 18–21, the service's own levels, clipped to its borders | as land in Europe                                   | as land in Europe                                                |
 
 Every source is asked for up to its own deepest level, and beyond it its deepest tile is magnified without a stop: the
 preset sets no zoom limit. Mapterhorn's tiles are asked for down to level 17; where it holds no deeper tile, its deepest one is magnified. OpenFreeMap's vector tiles stop at level 14 and are
@@ -466,6 +476,11 @@ Levels 5 to 9 add about 0.14 GB. One copy, in decimal gigabytes.
 Tiles get smaller with depth (the composite's 10 m pixels are smoother at level 13), and they vary with the landscape:
 an Alpine tile at level 10 weighs 31.6 kB, a field in the Beauce 21.0 kB. `europe.json` uses these averages as its
 `bytesPerTile`.
+
+Built deeper, tell the preset: `europeOpen({ packageLevels: { imagery: 13 } })` reads the package's satellite imagery
+to level 13 (F662). Level 13 holds WorldCover's 10 m detail in full, so where no orthophoto covers the land (Italy, the
+United Kingdom, Scandinavia, the Balkans) zoom 15 shows it magnified four times instead of level 11 sixteen times; the
+orthophotos still fade in from level 12 above it.
 
 ## Hosting the package
 

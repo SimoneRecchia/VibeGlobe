@@ -4,9 +4,10 @@
 import type { PolygonDeg } from '@vibeglobe/core';
 
 /**
- * The country borders of Europe by ISO 3166-1 alpha-2 code, and Germany's Länder by ISO 3166-2 code, each in its own
- * module so that an application loads only those it uses: Natural Earth 1:10m countries and states (public domain,
- * https://www.naturalearthdata.com), clipped to Europe and simplified to 0.003° (about 300 m) by scripts/europe-land.ts.
+ * The country borders of Europe by ISO 3166-1 alpha-2 code, and Germany's Länder, Belgium's regions and the province
+ * of Bolzano by ISO 3166-2 code, each in its own module so that an application loads only those it uses: Natural Earth
+ * 1:10m countries, states and map units (public domain, https://www.naturalearthdata.com), clipped to Europe and
+ * simplified to 0.003° (about 300 m) by scripts/europe-land.ts.
  */
 export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: readonly PolygonDeg[] }>>> = {
   AD: () => import('./ad.js'),
@@ -15,6 +16,8 @@ export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: r
   AX: () => import('./ax.js'),
   BA: () => import('./ba.js'),
   BE: () => import('./be.js'),
+  'BE-VLG': () => import('./be-vlg.js'),
+  'BE-WAL': () => import('./be-wal.js'),
   BG: () => import('./bg.js'),
   BY: () => import('./by.js'),
   CH: () => import('./ch.js'),
@@ -53,6 +56,7 @@ export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: r
   IM: () => import('./im.js'),
   IS: () => import('./is.js'),
   IT: () => import('./it.js'),
+  'IT-BZ': () => import('./it-bz.js'),
   JE: () => import('./je.js'),
   LI: () => import('./li.js'),
   LT: () => import('./lt.js'),

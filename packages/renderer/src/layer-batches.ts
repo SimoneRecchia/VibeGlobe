@@ -24,7 +24,7 @@ import {
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
 import { releaseMesh } from './release-mesh.js';
-import { orderLayerMeshes } from './layer-order.js';
+import { LAYER_RENDER_ORDER, orderLayerMeshes } from './layer-order.js';
 import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
@@ -36,7 +36,6 @@ import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-
 import { setSurfaceMorph } from './surface-material.js';
 
 /** Draw order of layers: their `renderOrder`, kept as their order among the scene's children (`reorder`). */
-const LAYER_RENDER_ORDER = 1000;
 
 interface Batch extends BatchContents {
   readonly descriptor: BatchDescriptor;

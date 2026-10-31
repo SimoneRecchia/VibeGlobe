@@ -1,4 +1,4 @@
-import { BufferGeometry, Mesh, MeshBasicNodeMaterial, Scene } from 'three/webgpu';
+import { BufferGeometry, Group, Mesh, MeshBasicNodeMaterial, Scene } from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import type { ThreeExtensionContext } from '../extensions.js';
 import { ThreeVectorTarget, type VectorMeshData } from './vector-target.js';
@@ -6,6 +6,18 @@ import { ThreeVectorTarget, type VectorMeshData } from './vector-target.js';
 const f32 = (n: number): Float32Array => new Float32Array(n);
 
 describe('ThreeVectorTarget', () => {
+  it("draws under the application's data layers already in the scene, since the engine draws in scene order (KB-284)", () => {
+    const scene = new Scene();
+    const surface = new Mesh(new BufferGeometry(), new MeshBasicNodeMaterial());
+    const dataLayer = new Mesh(new BufferGeometry(), new MeshBasicNodeMaterial());
+    dataLayer.renderOrder = 1000;
+    scene.add(surface, dataLayer);
+    new ThreeVectorTarget({ scene, depthPath: () => 'reversed-z' } as unknown as ThreeExtensionContext);
+    expect(scene.children[0]).toBe(surface);
+    expect(scene.children[1]).toBeInstanceOf(Group);
+    expect(scene.children[2]).toBe(dataLayer);
+  });
+
   it("announces each released draw object's disposal, so meshes sharing a material are freed (KB-116)", () => {
     const context = { scene: new Scene(), depthPath: () => 'reversed-z' } as unknown as ThreeExtensionContext;
     const target = new ThreeVectorTarget(context);

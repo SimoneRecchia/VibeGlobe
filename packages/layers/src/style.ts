@@ -135,6 +135,9 @@ function propertySpec(groups: readonly string[], name: string): StylePropertySpe
   return undefined;
 }
 
+/** Properties that only count when a style sets them: the specification's default height would extrude every polygon. */
+const SET_ONLY = new Set(['fill-extrusion-height', 'fill-extrusion-base']);
+
 /**
  * Validates and compiles a style for a layer kind.
  * @throws StyleError listing every unknown property and malformed expression.
@@ -150,7 +153,8 @@ export function compileStyle(kind: BatchKind, style: LayerStyle = {}): CompiledS
   for (const [name, channel] of Object.entries(map)) {
     const spec = propertySpec(groups, name);
     if (spec === undefined) throw new Error(`style specification has no ${name}`);
-    const value = style[name] ?? (spec as { default?: unknown }).default;
+    // A polygon is flat unless its style extrudes it (KB-285): flat fills blend over the map.
+    const value = style[name] ?? (SET_ONLY.has(name) ? undefined : (spec as { default?: unknown }).default);
     if (value === undefined) continue;
     // A constant array (`[0, 1]` for an offset, a font stack) is a literal, not an expression (MapLibre semantics).
     const input = Array.isArray(value) && !isExpression(value) ? ['literal', value] : value;

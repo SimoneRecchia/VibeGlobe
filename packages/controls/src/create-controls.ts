@@ -25,8 +25,9 @@ export interface NavigationControls extends ControlsFactory {
   /** The settings in use, defaults filled in. */
   readonly options: ResolvedControlsOptions;
   /**
-   * Connects the globe the controls drive, after `createGlobe`: the Home and view-mode keys run its commands, and the
-   * tilt policy switches it back to the automatic view mode. Without it every gesture works and those keys do nothing.
+   * Connects the globe the controls drive, after `createGlobe`: the Home and view-mode keys run its commands, a
+   * Shift-drag box zooms through its `fitBounds`, and the tilt policy switches it back to the automatic view mode.
+   * Without it the other gestures work and those do nothing.
    */
   connect(globe: ConnectedGlobe): void;
   /** Zooms in one level about the screen center, animated; rapid calls accumulate (F174). */

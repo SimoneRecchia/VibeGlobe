@@ -95,7 +95,7 @@ export function viewForBounds(
       Math.min(MAX_LATITUDE_DEG, latitudeOfY((mercatorY(bounds.southDeg) + mercatorY(bounds.northDeg)) / 2)),
     ) * RAD;
   // The bounds lie at the lowest of the included positions (their ground), and the view aims at the middle of their
-  // heights, so a tall object stands centered (KB-300).
+  // heights, so a tall object stands centered (KB-301).
   const heights = include.map((p) => p.heightMeters ?? 0);
   const low = heights.length > 0 ? Math.min(...heights) : 0;
   const middle = (low + (heights.length > 0 ? Math.max(...heights) : 0)) / 2;

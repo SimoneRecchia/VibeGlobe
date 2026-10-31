@@ -209,7 +209,7 @@ describe('tours with a long-lived signal', () => {
 });
 
 describe('fitting bounds and tours (F176, F199)', () => {
-  it('frames a tall object on raised ground centered, and a lone point from a distance instead of at zoom 22 (KB-300)', async () => {
+  it('frames a tall object on raised ground centered, and a lone point from a distance instead of at zoom 22 (KB-301)', async () => {
     const { globe, ticks } = await started({
       longitudeDeg: 9.4,
       latitudeDeg: 45.1,

@@ -11,7 +11,7 @@ export interface CameraConstraints {
   readonly maxTiltDeg?: number;
   readonly bounds?: GeoBounds;
   /**
-   * How near a zoom in may bring the eye to the surface it zooms toward, meters (KB-299; default 40, 0 for none): the
+   * How near a zoom in may bring the eye to the surface it zooms toward, meters (KB-300; default 40, 0 for none): the
    * terrain as drawn, mountains included, or the ellipsoid without terrain. The zoom stops there, so the view always
    * shows the ground it frames.
    */

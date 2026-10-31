@@ -145,7 +145,7 @@ the limits (F209–F211, F646); `globe.constraints` reads them back.
 - `minSurfaceDistanceMeters` (default 40) is how near a zoom in (wheel, pinch, double click, keys) may bring the eye
   to the surface it zooms toward: the terrain as drawn, mountains included, or the ellipsoid without terrain. The zoom
   stops there, a little before the ground, so the view always shows what it frames instead of reaching zoom 28 above a
-  point lifted off the ground (KB-299). `0` lets the zoom come down to about 1 m (F061).
+  point lifted off the ground (KB-300). `0` lets the zoom come down to about 1 m (F061).
 
 ## Key map
 

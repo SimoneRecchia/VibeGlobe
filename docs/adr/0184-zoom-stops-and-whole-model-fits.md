@@ -2,14 +2,14 @@
 
 - Status: Accepted
 - Date: 2026-10-31
-- Milestone: M6, M10 (F666, F667; KB-299, KB-300)
+- Milestone: M6, M10 (F666, F667; KB-300, KB-301)
 
 ## Context
 
 In the owner's application over a wind farm, a wheel zoom never stopped: the terrain collision kept the eye 10 m above
 the ground by lifting the camera's target off it (F146), so the range fell toward zero, the zoom read 28 and the view
-looked at a point in the air (KB-299). A flight to a turbine went to zoom 22 at its foot, while one to a solar field
-worked: the fit framed one point with no size and aimed at the ellipsoid under the object (KB-300). The owner asked for
+looked at a point in the air (KB-300). A flight to a turbine went to zoom 22 at its foot, while one to a solar field
+worked: the fit framed one point with no size and aimed at the ellipsoid under the object (KB-301). The owner asked for
 a zoom that stops a little before the terrain, mountains included, so the view always shows what it frames; for a
 flight to an asset that frames it whole and centered; and for a flight to a plant that shows every device.
 
@@ -35,4 +35,4 @@ flight to an asset that frames it whole and centered; and for a flight to a plan
   view.
 - Applications fly to assets with `fitObjects(globe, layer.framePositions([id]))`, and to a plant with every device's
   boxes (the models guide); the plant's own coordinates frame one point.
-- The core bundle grew to 64.91 KB of its 65 KB budget, the renderer to 40.48 KB of 40.5 KB.
+- The core bundle grew to 64.97 KB of its 65 KB budget, the renderer to 40.46 KB of 40.5 KB (with #89 merged).

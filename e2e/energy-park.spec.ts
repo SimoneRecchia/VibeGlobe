@@ -138,7 +138,7 @@ test('the turbine and the solar table cost a few instanced draws, the panels fac
   expect(fromNorth).toBeLessThan(0.15);
 });
 
-test('a flight to a turbine frames it whole and centered, and one to the park frames every device (F667, KB-300)', async ({
+test('a flight to a turbine frames it whole and centered, and one to the park frames every device (F667, KB-301)', async ({
   page,
 }) => {
   test.setTimeout(120_000);

@@ -142,7 +142,7 @@ const surfacePoint = new Float64Array(3);
 const surfaceGeodetic = new Float64Array(3);
 
 /**
- * Limits a zoom step toward `point` so the eye stays `minMeters` from the surface it frames (KB-299): the terrain as
+ * Limits a zoom step toward `point` so the eye stays `minMeters` from the surface it frames (KB-300): the terrain as
  * drawn under the point, the ellipsoid without terrain. Reads the step asked for from `io[0]` and writes the allowed one
  * there; a step out, or toward the sky, passes untouched.
  */

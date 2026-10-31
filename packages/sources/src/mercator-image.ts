@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { archiveTransport, HttpStatusError, NetworkError, tileOfUrl } from './archive-transport.js';
+import { archiveTransport, tileOfUrl } from './archive-transport.js';
 import {
   type Attribution,
   CUSTOM_PROFILE,
@@ -8,7 +8,7 @@ import {
   type ProviderProfile,
   SourceConfigError,
 } from './metadata.js';
-import { downloadImage } from './single-image.js';
+import { imageOnce } from './single-image.js';
 import { xyzImagery } from './xyz-imagery.js';
 
 /**
@@ -62,17 +62,6 @@ async function decodeInBrowser(image: Blob): Promise<CutTile> {
   };
 }
 
-/** The image as a `Blob`; a download that fails without an HTTP status is a network error, retried by the engine. */
-function imageOf(options: MercatorImageOptions): Promise<Blob> {
-  if (typeof options.image !== 'string') return Promise.resolve(options.image);
-  return downloadImage(options).then(
-    (bytes) => new Blob([bytes]),
-    (error: unknown) => {
-      throw error instanceof HttpStatusError ? error : new NetworkError(error);
-    },
-  );
-}
-
 /**
  * One Web Mercator image of the whole world as an imagery source (F650), for an image too coarse to be worth a folder
  * of tiles, such as night lights shown from afar. The image is downloaded with the first tile and decoded once; each
@@ -89,17 +78,17 @@ export function mercatorImage(options: MercatorImageOptions): DescribedImagerySo
     );
   const decode = options.decodeImage ?? decodeInBrowser;
   const sizePx = options.tileSizePx ?? 256;
+  const image = imageOnce(options);
   let decoded: Promise<CutTile> | undefined;
-  const cutter = (): Promise<CutTile> => {
-    if (decoded) return decoded;
-    const image = imageOf(options);
-    const current = image.then(decode);
-    decoded = current;
-    image.catch(() => {
-      if (decoded === current) decoded = undefined;
-    });
-    return current;
-  };
+  // A failed download is tried again with the next tile; an image that does not decode stays failed.
+  const cutter = (): Promise<CutTile> =>
+    (decoded ??= image().then(
+      (bytes) => decode(new Blob([bytes])),
+      (error: unknown) => {
+        decoded = undefined;
+        throw error;
+      },
+    ));
   const source = xyzImagery({
     id,
     url: `mercator-image:${encodeURIComponent(id)}/{z}/{x}/{y}`,

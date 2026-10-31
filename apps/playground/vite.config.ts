@@ -90,7 +90,7 @@ export default defineConfig({
       '@maplibre/maplibre-gl-style-spec',
       '@noble/hashes/sha2.js',
       '@noble/hashes/utils.js',
-      'draco3d',
+      'draco3d/draco_decoder_nodejs.js',
       'earcut',
       'fflate',
       'pbf',

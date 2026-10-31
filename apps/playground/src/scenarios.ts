@@ -51,7 +51,7 @@ function strip(
  * vertex jitter shows as motion of the checker edges.
  */
 function streetLevelJitter(globe: Globe): void {
-  // Wheel zooms reach 1 m here: no distance kept from the surface (KB-299 keeps 40 m by default).
+  // Wheel zooms reach 1 m here: no distance kept from the surface (KB-300 keeps 40 m by default).
   globe.setConstraints({ minSurfaceDistanceMeters: 0 });
   const { longitudeDeg, latitudeDeg } = globe.camera;
   globe.setDebugShapes([strip({ longitudeDeg, latitudeDeg }, 0, -2, 2, 4, 0.01, [0.95, 0.9, 0.2], 0.05)]);

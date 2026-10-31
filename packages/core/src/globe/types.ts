@@ -742,7 +742,7 @@ export interface Globe {
    * Flies (or eases, with `movement: 'ease'`) to the view that shows `bounds` inside the viewport minus `paddingPx`
    * (default 0) on every side, keeping the heading and the view mode's tilt (F176). Positions in `include`, heights
    * included, must show inside it too (objects above the ground, F387), the middle of their heights at the view's center
-   * and the eye at least 100 m from it (KB-300).
+   * and the eye at least 100 m from it (KB-301).
    */
   fitBounds(
     bounds: GeoBounds,

@@ -1,7 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { AbortHandle, TileRequest, TimeoutsMs, TransportResult } from '@vibeglobe/core';
-import { HttpStatusError, NetworkError } from './archive-transport.js';
+import { archiveTransport, HttpStatusError, NetworkError } from './archive-transport.js';
 import { retryAfterMs } from './fetch-transport.js';
 import {
   type Attribution,
@@ -19,6 +18,8 @@ import {
 } from './reproject/reprojected-imagery.js';
 import type { FromSource, SourceBbox, ToSource } from './reproject/warp-math.js';
 
+type Transforms = { readonly toSource: ToSource; readonly fromSource: FromSource };
+
 /** Options of {@link singleImage}. */
 export interface SingleImageOptions {
   /** Unique per engine instance. */
@@ -31,13 +32,16 @@ export interface SingleImageOptions {
   readonly bounds?: SourceBbox;
   /** The text of an ESRI world file (`.pgw`, `.jgw`, `.wld`), instead of `bounds`. */
   readonly worldFile?: string;
-  /** The image's size, pixels; read from the image's header when omitted. */
+  /**
+   * The image's size, pixels; read from the image's header when omitted. Given, or with `bounds` and `maxLevel`, the
+   * image downloads with the first tile, so a source never shown costs nothing (KB-295).
+   */
   readonly sizePx?: readonly [widthPx: number, heightPx: number];
   /**
    * Transforms for systems other than EPSG:4326 and EPSG:3857, such as `transformCoordinates` of `@vibeglobe/gis`; the
    * image is reprojected on the client (ADR 0039).
    */
-  readonly transforms?: (crs: string) => { readonly toSource: ToSource; readonly fromSource: FromSource } | undefined;
+  readonly transforms?: (crs: string) => Transforms | undefined;
   readonly attribution?: readonly Attribution[];
   readonly profile?: ProviderProfile;
   /** The finest engine level; by default one level finer than the image's own resolution. */
@@ -113,7 +117,7 @@ const DEG = Math.PI / 180;
 const MAX_LAT_DEG = 85.0511287798066;
 
 /** The built-in systems: geographic degrees and Web Mercator meters. */
-function builtInTransforms(crs: string): { toSource: ToSource; fromSource: FromSource } | undefined {
+function builtInTransforms(crs: string): Transforms | undefined {
   if (crs === 'EPSG:4326') return { toSource: (lon, lat) => [lon, lat], fromSource: (x, y) => [x, y] };
   if (crs === 'EPSG:3857' || crs === 'EPSG:900913')
     return {
@@ -150,8 +154,21 @@ export async function downloadImage(
   }
 }
 
-/** The image's box in its system from `bounds` or a world file. */
-function boxOf(options: SingleImageOptions, sizePx: readonly [number, number]): SourceBbox {
+/**
+ * The image's bytes, downloaded on the first call and kept; a failed download is tried again by the next call. A
+ * failure without an HTTP status is a network error, so tiles fail and are retried as downloaded ones are.
+ */
+export function imageOnce(options: Pick<SingleImageOptions, 'image' | 'fetch' | 'downloadTimeoutMs'>) {
+  let bytes: Promise<ArrayBuffer> | undefined;
+  return (): Promise<ArrayBuffer> =>
+    (bytes ??= downloadImage(options).catch((error: unknown) => {
+      bytes = undefined;
+      throw error instanceof HttpStatusError ? error : new NetworkError(error);
+    }));
+}
+
+/** The image's box in its system from `bounds` or a world file (with the image's size). */
+function boxOf(options: SingleImageOptions, sizePx?: readonly [number, number]): SourceBbox {
   if (options.bounds) {
     const [w, s, e, n] = options.bounds;
     if (![w, s, e, n].every(Number.isFinite) || w >= e || s >= n)
@@ -162,7 +179,7 @@ function boxOf(options: SingleImageOptions, sizePx: readonly [number, number]): 
     return options.bounds;
   }
   const world = options.worldFile === undefined ? undefined : parseWorldFile(options.worldFile);
-  if (!world)
+  if (!world || !sizePx)
     throw new SourceConfigError(
       'missing-georeference',
       `Single image '${options.id}': give bounds or a world file of six numbers`,
@@ -232,28 +249,6 @@ function composeOnce(): ComposeImage {
   };
 }
 
-/** Serves the downloaded image's bytes for its key, always the same buffer (the composition caches its decoding). */
-function imageTransport(key: string, bytes: ArrayBuffer, contentType: string) {
-  return {
-    start(request: TileRequest, _timeouts: TimeoutsMs, done: (result: TransportResult) => void): AbortHandle {
-      let aborted = false;
-      queueMicrotask(() => {
-        if (aborted) return;
-        done(
-          request.url === key
-            ? { kind: 'ok', bytes, contentType }
-            : { kind: 'status', status: 404, retryAfterMs: undefined },
-        );
-      });
-      return () => {
-        if (aborted) return;
-        aborted = true;
-        done({ kind: 'aborted' });
-      };
-    },
-  };
-}
-
 function contentTypeOf(bytes: Uint8Array): string {
   if (bytes[0] === 0x89) return 'image/png';
   if (bytes[0] === 0xff) return 'image/jpeg';
@@ -264,7 +259,8 @@ function contentTypeOf(bytes: Uint8Array): string {
  * A single georeferenced image (F234): a PNG, JPEG or WebP with explicit bounds or a world file, in EPSG:4326,
  * EPSG:3857, or any system `transforms` knows, shown at its exact place and reprojected on the client. The image is
  * downloaded once and decoded once; every engine tile draws its own piece. Rejects with a {@link SourceConfigError}
- * when the image cannot be read or placed.
+ * when the image cannot be placed, or read when its size is needed: with `sizePx`, or `bounds` and `maxLevel`, it
+ * downloads with the first tile instead, and a failed download fails that tile, retried as a downloaded tile's.
  */
 export async function singleImage(options: SingleImageOptions): Promise<DescribedImagerySource> {
   const crs = options.crs ?? 'EPSG:4326';
@@ -274,17 +270,36 @@ export async function singleImage(options: SingleImageOptions): Promise<Describe
       'needs-reprojection',
       `Single image '${options.id}': ${crs} needs transforms (for example transformCoordinates of @vibeglobe/gis)`,
     );
+  const image = imageOnce(options);
+  if (options.bounds && options.maxLevel !== undefined)
+    return imageSource(options, crs, pair, image, boxOf(options), options.maxLevel);
+  const sizePx = options.sizePx ?? (await sizeOfImage(options.id, image));
+  const box = boxOf(options, sizePx);
+  return imageSource(options, crs, pair, image, box, options.maxLevel ?? levelOf(box, sizePx, pair.fromSource));
+}
+
+/** The size read from the image's header, downloading it; rejects with a {@link SourceConfigError}. */
+async function sizeOfImage(id: string, image: () => Promise<ArrayBuffer>): Promise<[number, number]> {
   let bytes: ArrayBuffer;
   try {
-    bytes = await downloadImage(options);
+    bytes = await image();
   } catch (error) {
-    throw new SourceConfigError('unreachable-image', `Single image '${options.id}': cannot load it (${String(error)})`);
+    throw new SourceConfigError('unreachable-image', `Single image '${id}': cannot load it (${String(error)})`);
   }
-  const header = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 65_536));
-  const sizePx = options.sizePx ?? imageSizeOf(header);
-  if (!sizePx)
-    throw new SourceConfigError('unreadable-image', `Single image '${options.id}': not a PNG, JPEG or WebP image`);
-  const box = boxOf(options, sizePx);
+  const sizePx = imageSizeOf(new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 65_536)));
+  if (!sizePx) throw new SourceConfigError('unreadable-image', `Single image '${id}': not a PNG, JPEG or WebP image`);
+  return sizePx;
+}
+
+/** The source over the placed image, whose bytes come from `image` with the first tile that needs them. */
+function imageSource(
+  options: SingleImageOptions,
+  crs: string,
+  pair: Transforms,
+  image: () => Promise<ArrayBuffer>,
+  box: SourceBbox,
+  maxLevel: number,
+): DescribedImagerySource {
   const key = `single-image:${encodeURIComponent(options.id)}`;
   const [bw, bs, be, bn] = box;
   const source = reprojectedImagery({
@@ -293,7 +308,7 @@ export async function singleImage(options: SingleImageOptions): Promise<Describe
     toSource: pair.toSource,
     fromSource: pair.fromSource,
     bounds: box,
-    maxLevel: options.maxLevel ?? levelOf(box, sizePx, pair.fromSource),
+    maxLevel,
     image: (bbox, widthPx, heightPx) => {
       const [x0, y0, x1, y1] = bbox;
       if (be <= x0 || bw >= x1 || bn <= y0 || bs >= y1) return [];
@@ -303,7 +318,12 @@ export async function singleImage(options: SingleImageOptions): Promise<Describe
         { url: key, xPx: (bw - x0) * sx, yPx: (y1 - bn) * sy, widthPx: (be - bw) * sx, heightPx: (bn - bs) * sy },
       ];
     },
-    transport: imageTransport(key, bytes, contentTypeOf(header)),
+    // Always the same buffer for the key: the composition caches its decoding by it.
+    transport: archiveTransport(async (url) => {
+      if (url !== key) return undefined;
+      const bytes = await image();
+      return { bytes, contentType: contentTypeOf(new Uint8Array(bytes, 0, 1)) };
+    }),
     composeImage: options.composeImage ?? composeOnce(),
     ...(options.warpImage ? { warpImage: options.warpImage } : {}),
   });

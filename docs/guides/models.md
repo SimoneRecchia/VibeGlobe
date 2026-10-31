@@ -153,7 +153,7 @@ await fitObjects(globe, [...turbines.framePositions(plantIds), ...tables.framePo
 ```
 
 Framing the plant's own coordinates instead of its devices' frames one point: a fit never comes nearer than 100 m to
-what it frames (KB-300), but only the devices' boxes give the plant's width, depth and height.
+what it frames (KB-301), but only the devices' boxes give the plant's width, depth and height.
 
 ## A light model
 

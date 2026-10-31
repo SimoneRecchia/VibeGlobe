@@ -36,9 +36,10 @@ export interface ModelTaskOptions {
 export function loadDraco3d(wasmUrl?: string): DracoLoader {
   let module: Promise<DracoDecoderModule> | undefined;
   return () => {
-    module ??= import('draco3d')
+    // The decoder alone: the package's main module carries the encoder too (65 KB).
+    module ??= import('draco3d/draco_decoder_nodejs.js')
       .then(
-        ({ createDecoderModule }) =>
+        ({ default: createDecoderModule }) =>
           createDecoderModule(
             wasmUrl === undefined ? {} : { locateFile: () => wasmUrl },
           ) as Promise<DracoDecoderModule>,

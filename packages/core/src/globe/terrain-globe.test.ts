@@ -182,6 +182,21 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
+  it("loads not even the terrain's pinned base while the relief is flat, and is ready without it (KB-293)", async () => {
+    const urls: string[] = [];
+    const flatRelief = { ...GLOBE_WITH_RELIEF, relief: { startGroundZoom: 98, endGroundZoom: 99 } };
+    const { globe, run } = await terrainGlobe(terrain(urls), 30, terrainWorkers(), undefined, flatRelief);
+    let ready = false;
+    void globe.ready.then(() => (ready = true));
+    await run(1);
+    expect(ready).toBe(true);
+    expect(urls).toEqual([]);
+    globe.setViewCurves(GLOBE_WITH_RELIEF);
+    await run(30);
+    expect(urls.filter((url) => /^\/terrain\/[0-2]\//.test(url)).length).toBe(21);
+    globe.destroy();
+  });
+
   it("reports each tile's terrain level and error, within τ_terrain below the source's levels, and the terrain counters (F126, F134)", async () => {
     const { globe } = await terrainGlobe(terrain([]));
     const tiles = globe.surfaceTiles();
@@ -613,7 +628,7 @@ describe('terrain in a globe (M4)', () => {
     globe.destroy();
   });
 
-  it('stops a zoom 40 m from the terrain it zooms toward, the slope ahead of a tilted view included, never at zoom 28 (KB-299)', async () => {
+  it('stops a zoom 40 m from the terrain it zooms toward, the slope ahead of a tilted view included, never at zoom 28 (KB-300)', async () => {
     for (const tiltDeg of [0, 60]) {
       const { globe, run } = await terrainGlobe(terrain([]), 30, terrainWorkers(), {
         longitudeDeg: 7,

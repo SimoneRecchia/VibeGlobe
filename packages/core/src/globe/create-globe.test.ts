@@ -372,7 +372,7 @@ describe('createGlobe', () => {
   });
 
   it('zooms at the cursor, keeping the point under it within one pixel, down to about 1 m (F061)', async () => {
-    // Down to 1 m with no distance kept from the surface (KB-299 keeps 40 m by default).
+    // Down to 1 m with no distance kept from the surface (KB-300 keeps 40 m by default).
     const { globe } = await started({
       view: { longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 2 },
       constraints: { minSurfaceDistanceMeters: 0 },
@@ -391,7 +391,7 @@ describe('createGlobe', () => {
     expect(globe.camera.zoom).toBeLessThan(3);
   });
 
-  it('stops a wheel zoom 40 m from the surface under the cursor by default, at the distance set, never at zoom 28 (KB-299)', async () => {
+  it('stops a wheel zoom 40 m from the surface under the cursor by default, at the distance set, never at zoom 28 (KB-300)', async () => {
     for (const [constraints, meters] of [
       [undefined, 40],
       [{ minSurfaceDistanceMeters: 150 }, 150],

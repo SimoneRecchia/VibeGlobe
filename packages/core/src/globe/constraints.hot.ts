@@ -57,7 +57,7 @@ export class Constraints {
   /** The constraints as last set, validated (`Globe.constraints`). */
   settings: CameraConstraints = {};
   readonly values = new Float64Array(10).fill(Number.NaN);
-  /** How near a zoom in may bring the eye to the surface it zooms toward, meters (KB-299). */
+  /** How near a zoom in may bring the eye to the surface it zooms toward, meters (KB-300). */
   minSurfaceDistanceMeters = 40;
   /**
    * Whether zoom limits or bounds are set: without, {@link apply} reads nothing (KB-132: a frame's reads of the values

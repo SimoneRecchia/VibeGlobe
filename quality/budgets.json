@@ -108,7 +108,7 @@
       "bundleGzipKB": 5
     },
     "presets": {
-      "bundleGzipKB": 45
+      "bundleGzipKB": 30
     },
     "tools": {
       "bundleGzipKB": 100

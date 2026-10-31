@@ -116,7 +116,7 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     });
   });
 
-  it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-298)', async () => {
+  it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {
     const orthophotos = await europeOrthophotos();
     const tiers = new Map<string, string | undefined>();
     const offline = {

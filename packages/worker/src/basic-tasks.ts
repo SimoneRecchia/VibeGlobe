@@ -9,7 +9,6 @@ import { decodeImage } from './decode-image.js';
 import { decodeTerrain } from './decode-terrain.js';
 import { lazyTable } from './lazy-task.js';
 import type { TaskTable } from './protocol.js';
-import { transcodeKtx2 } from './transcode-ktx2.js';
 
 /**
  * A vector task of `@vibeglobe/sources/vector` (F371, M13): the parsers load on the first such task, in their own
@@ -21,7 +20,10 @@ const vectorTask = lazyTable('vector', () => import('@vibeglobe/sources/vector')
 export const BASIC_TASKS: TaskTable = Object.freeze({
   'decode-image': decodeImage,
   'decode-terrain': decodeTerrain,
-  'transcode-ktx2': transcodeKtx2,
+  // Its JavaScript loads with the first KTX2 tile, as its WebAssembly does (KB-296).
+  'transcode-ktx2': lazyTable('ktx2', () =>
+    import('./transcode-ktx2.js').then((module) => ({ 'transcode-ktx2': module.transcodeKtx2 })),
+  )('transcode-ktx2'),
   'parse-geojson': vectorTask('parse-geojson'),
   'parse-kml': vectorTask('parse-kml'),
   'parse-gpx': vectorTask('parse-gpx'),

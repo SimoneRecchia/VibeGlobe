@@ -53,8 +53,9 @@ PNG holds one exact color per class; map each class to `LANDSCAPE_COLORS` (fores
 wetland and shrubland to `grass`, croplands to `field`, open shrubland to `land`, barren to `bare`, urban to `urban`,
 snow to `ice`, water to `water`), resize to 4096 × 2048, blur by a pixel and save as WebP (about 240 KB).
 
-Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -90, 180, 90] }), record }`
-(`singleImage` of `@vibeglobe/sources`, `record` its terms), then ask for a style such as
+Pass it as `landCover: { source: await singleImage({ id, image, bounds: [-180, -90, 180, 90], sizePx: [4096, 2048] }), record }`
+(`singleImage` of `@vibeglobe/sources`, `record` its terms; with its size the image downloads only once the Landscape
+shows), then ask for a style such as
 `preset.styleFor(json, 'landscape', ['borders', 'countries'], 'it')`.
 
 The borders, country names and sea names overlays (F645) draw over Satellite and Landscape alike, in dark ink on the
@@ -346,7 +347,7 @@ Rheinland-Pfalz, Sachsen, Sachsen-Anhalt, Thüringen), from 19 to 21 levels deep
 per pixel to its country's or region's borders (Natural Earth, loaded on demand), above the satellite composite;
 outside them the composite shows. They are online services, asked tile by tile through their own APIs: they add nothing to the
 package, and the offline engine's mode decides when they are asked (online and hybrid use ask them, offline use never,
-KB-298). Each
+KB-291). Each
 starts at level 12 (`ORTHOPHOTO_MIN_LEVEL`), as the services answer far views with white images, and a white tile counts
 as no data, so the composite shows through it.
 

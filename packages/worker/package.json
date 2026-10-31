@@ -16,6 +16,11 @@
       "source": "./src/basic.ts",
       "default": "./dist/basic.js"
     },
+    "./transcode-ktx2": {
+      "types": "./dist/transcode-ktx2.d.ts",
+      "source": "./src/transcode-ktx2.ts",
+      "default": "./dist/transcode-ktx2.js"
+    },
     "./vibeglobe-worker.js": {
       "source": "./src/vibeglobe-worker.ts",
       "default": "./dist/vibeglobe-worker.js"

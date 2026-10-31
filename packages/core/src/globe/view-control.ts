@@ -37,7 +37,7 @@ export interface ViewHost {
   limitZoom(deltaZoom: number): number;
   /** Whether zoom limits are set: without them a step goes through untouched, with no call (KB-132). */
   zoomLimited(): boolean;
-  /** Limits the zoom step in `io[0]` toward `point` so the eye keeps its distance to the surface (KB-299). */
+  /** Limits the zoom step in `io[0]` toward `point` so the eye keeps its distance to the surface (KB-300). */
   limitToSurface(point: unknown, io: Float64Array): void;
   /** Stops a running API movement (KB-127). */
   interruptMovement(): void;

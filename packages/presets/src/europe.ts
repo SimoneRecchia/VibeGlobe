@@ -442,7 +442,12 @@ export function europeOpen(options: EuropeOpenOptions = {}): EuropePreset {
       return true;
     },
   };
-  const imagery = [...satelliteLayers(build), ...(options.orthophotos?.layers ?? [])];
+  // The orthophotos are online sources: through the offline engine, so its modes decide when they are asked (KB-291).
+  const orthophotos = (options.orthophotos?.layers ?? []).map((layer) => ({
+    ...layer,
+    sources: layer.sources.map((source) => build.wrap(source, 'network', 'satellite')),
+  }));
+  const imagery = [...satelliteLayers(build), ...orthophotos];
   used.push(...(options.orthophotos?.sources ?? []));
   const terrain = terrainSource(build);
   const vectors = build.use(OPENFREEMAP);

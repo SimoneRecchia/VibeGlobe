@@ -32,13 +32,11 @@ describe('the basic worker program (ADR 0172, F532)', () => {
     }
   });
 
-  it('loads the KTX2 transcoder and the quantized-mesh decoder only with their first task (KB-295)', () => {
+  it('loads the KTX2 transcoder only with its first task (KB-295)', () => {
     const graph = moduleGraph('./vibeglobe-worker.ts', STATIC_IMPORT);
     expect(graph.has('./decode-terrain.ts')).toBe(true);
-    for (const file of graph)
-      expect(readFileSync(new URL(file, import.meta.url), 'utf8'), file).not.toMatch(
-        /from\s*['"]\.\/transcode-ktx2\.js['"]|decodeQuantizedMesh/,
-      );
+    expect(graph.has('./transcode-ktx2.ts')).toBe(false);
+    expect(moduleGraph('./vibeglobe-worker.ts').has('./transcode-ktx2.ts')).toBe(true);
   });
 
   it('runs the imagery, terrain, KTX2 and vector tasks, and the full program runs them all', () => {

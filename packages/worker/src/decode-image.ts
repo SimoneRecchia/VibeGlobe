@@ -5,6 +5,7 @@
  * decoded with fixed options so neither renderer backend converts anything at upload. A tile across its source's
  * border is masked to the source's area, and a tile of the source's blank color is answered as no data (F618).
  */
+import { rgba8Bytes } from '@vibeglobe/core/decoders';
 import { maskTile, type RgbaTile } from '@vibeglobe/sources/tile-mask';
 import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
@@ -25,7 +26,7 @@ export interface DecodedImage {
   readonly image: ImageBitmap | RgbaTile;
   readonly widthPx: number;
   readonly heightPx: number;
-  /** Bytes of the texture on the GPU as RGBA8 with a full mip chain, from {@link rgba8MipChainBytes}. */
+  /** Bytes of the texture on the GPU as RGBA8 with a full mip chain. */
   readonly gpuBytes: number;
 }
 
@@ -38,24 +39,6 @@ const DECODE_OPTIONS: ImageBitmapOptions = {
   premultiplyAlpha: 'none',
   colorSpaceConversion: 'none',
 };
-
-const BYTES_PER_TEXEL_RGBA8 = 4;
-
-/**
- * Exact bytes of an RGBA8 texture of `widthPx` × `heightPx` with every mip level down to 1 × 1: the sum of the level
- * sizes, each level halving both dimensions (rounded down, at least 1).
- */
-export function rgba8MipChainBytes(widthPx: number, heightPx: number): number {
-  let width = Math.max(1, Math.floor(widthPx));
-  let height = Math.max(1, Math.floor(heightPx));
-  let total = width * height * BYTES_PER_TEXEL_RGBA8;
-  while (width > 1 || height > 1) {
-    width = width > 1 ? Math.floor(width / 2) : 1;
-    height = height > 1 ? Math.floor(height / 2) : 1;
-    total += width * height * BYTES_PER_TEXEL_RGBA8;
-  }
-  return total;
-}
 
 function parseInput(input: unknown): DecodeImageInput {
   if (typeof input !== 'object' || input === null) throw new TaskError('invalid-input', 'decode-image needs an object');
@@ -103,7 +86,7 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
     image,
     widthPx: image.width,
     heightPx: image.height,
-    gpuBytes: rgba8MipChainBytes(image.width, image.height),
+    gpuBytes: rgba8Bytes(image.width, image.height),
   };
   return { output, transfer: ['data' in image ? image.data.buffer : image] };
 }

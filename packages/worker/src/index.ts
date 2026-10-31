@@ -10,10 +10,7 @@
 import { workerFactory, type CreateWorkersOptions } from './factory.js';
 import type { WorkerEndpointFactory } from './protocol.js';
 
-export { rgba8MipChainBytes } from './decode-image.js';
 export type { DecodedImage, DecodeImageInput } from './decode-image.js';
-export { createTranscodeKtx2 } from './transcode-ktx2.js';
-export type { TranscodeKtx2Input, TranscoderLoader } from './transcode-ktx2.js';
 export { TaskError, WORKER_BUILD_ID, WORKER_PROTOCOL_VERSION } from './protocol.js';
 export type {
   SerializedTaskError,

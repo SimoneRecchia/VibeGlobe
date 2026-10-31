@@ -4,7 +4,10 @@
  * The `transcode-ktx2` task (ADR 0020 rules 2–4): KTX2 bytes in, a tile in the GPU format the device decodes out. The
  * reader in core validates the file and predicts every level's size before the transcoder runs; the transcoder is
  * VibeGlobe's own WebAssembly build of Basis Universal (`wasm/vibeglobe-basis.wasm`), with a plain C interface and
- * no JavaScript glue, loaded on the first KTX2 task only, so pages without KTX2 sources never download it.
+ * no JavaScript glue, loaded on the first KTX2 task only, so pages without KTX2 sources never download it. The worker
+ * program imports this module with its first KTX2 task (KB-295); `@vibeglobe/worker/transcode-ktx2` gives
+ * `createTranscodeKtx2` to tests and tools that bring their own transcoder.
+ * @module @vibeglobe/worker/transcode-ktx2
  */
 import {
   chooseKtx2Target,

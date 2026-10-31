@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fc } from '@fast-check/vitest';
-import { TaskError, createTranscodeKtx2 } from '@vibeglobe/worker';
+import { TaskError } from '@vibeglobe/worker';
+import { createTranscodeKtx2 } from '@vibeglobe/worker/transcode-ktx2';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderTile } from './generate.ts';
 import { encodeKtx2 } from './ktx2.ts';

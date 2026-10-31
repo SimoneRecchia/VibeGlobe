@@ -4,7 +4,7 @@ import type { Camera } from '../camera/camera.js';
 import { NO_TERRAIN } from '../globe/types.js';
 import { screenDistance } from '../imagery/imagery-draws.js';
 import type { DrawList } from '../imagery/draw-list.js';
-import { ARRIVING, type ImageryLoader } from '../imagery/imagery-loader.hot.js';
+import { ARRIVING, PRELOAD_CLASS, type ImageryLoader } from '../imagery/imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_U,
@@ -152,6 +152,24 @@ export function recordShownTerrain(
     if (tile && level >= 0) layer.shown.current.set(tile.key, level);
   }
   layer.shown.swap();
+}
+
+/**
+ * Wants the terrain a movement's plan will draw (F670): each surface tile's terrain tile at the preload class plus
+ * `keys[i]` (-1: not now). Allocates nothing.
+ */
+export function preloadTerrain(
+  layer: TerrainLayer,
+  plan: { readonly tiles: readonly QuadtreeTile[]; readonly keys: Float64Array; readonly count: number },
+): void {
+  if (!layer.loader.preloading) return;
+  for (let index = 0; index < plan.count; index++) {
+    const tile = plan.tiles[index];
+    const key = plan.keys[index] ?? -1;
+    if (!tile || key < 0 || !mapTerrain(layer.source, tile)) continue;
+    const level = mapping[MAPPING_LEVEL] ?? 0;
+    layer.loader.want(level, mapping[MAPPING_X] ?? 0, mapping[MAPPING_Y] ?? 0, PRELOAD_CLASS + key + level);
+  }
 }
 
 /** Maps a surface tile onto its terrain level in `mapping`; false where the source has no tile for it. */

@@ -41,6 +41,12 @@ import {
 
 /** Priority keys of visible tiles (ADR 0007 class 1) start here: lower keys are the pinned base's. */
 export const VISIBLE_CLASS = 1024;
+/**
+ * Priority keys of a visible tile's cover, its ancestor a few levels up while its layer shows nothing finer there, and
+ * of the coarser ancestors requested with it (KB-304): after the pinned base, before every visible tile, so a layer is
+ * never missing over new ground for long.
+ */
+export const COVER_CLASS = VISIBLE_CLASS - 64;
 /** Priority keys of prefetched tiles start here, after every visible tile (ADR 0007). */
 export const PREFETCH_CLASS = 4 * 1024;
 /** The class of a flight's destination tiles (F286): after every visible tile, before prefetch. */
@@ -384,7 +390,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Whether a flight holds back the visible tile in `slot` because it has not been wanted for long enough (F287). */
   private unsettled(slot: number, priority: number): boolean {
-    if (this.settleMs <= 0 || priority < VISIBLE_CLASS || priority >= PRELOAD_CLASS) return false;
+    if (this.settleMs <= 0 || priority < COVER_CLASS || priority >= PRELOAD_CLASS) return false;
     return this.options.now() - (this.table.wantedSince[slot] ?? 0) < this.settleMs;
   }
 

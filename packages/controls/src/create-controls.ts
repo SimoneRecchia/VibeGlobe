@@ -175,7 +175,7 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
     port,
     options,
     inertia: new Inertia(),
-    zoom: new ZoomTarget(),
+    zoom: new ZoomTarget(port),
     heading: new HeadingTarget(),
     keys: new KeyMotion(),
     widthPx: () => element.clientWidth,

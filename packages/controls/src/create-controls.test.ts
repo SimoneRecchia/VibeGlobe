@@ -234,6 +234,25 @@ describe('wheel and trackpad zoom (F168, F169)', () => {
     expect(at.yPx).toBeCloseTo(150, 6);
   });
 
+  it('says which view a smoothed zoom heads for at each notch, and when it has arrived (F671)', () => {
+    const h = controlsHarness();
+    h.fire('wheel', { clientX: 360, clientY: 280, deltaY: -100, deltaMode: 0, ctrlKey: false });
+    h.frame();
+    h.fire('wheel', { clientX: 360, clientY: 280, deltaY: -100, deltaMode: 0, ctrlKey: false });
+    expect(h.camera.aheads).toHaveLength(2);
+    expect(h.camera.aheads[0]?.zoom).toBeCloseTo(1 / 3, 9);
+    // The second notch adds to what the first has left: the view two notches in.
+    expect(h.camera.aheads[1]?.zoom).toBeCloseTo(2 / 3, 9);
+    for (let i = 0; i < 60; i++) h.frame();
+    expect(h.camera.aheads).toHaveLength(3);
+    expect(h.camera.aheads[2]).toBeUndefined();
+    // Where the zoom arrived: the view it said.
+    const ahead = h.camera.aheads[1];
+    expect(h.camera.zoom).toBeCloseTo(ahead?.zoom ?? 0, 9);
+    expect(h.camera.centerX).toBeCloseTo(ahead?.longitudeDeg ?? 0, 6);
+    expect(h.camera.centerY).toBeCloseTo(ahead?.latitudeDeg ?? 0, 6);
+  });
+
   it('applies trackpad pixel deltas in the next frame, summed, and pinch (ctrlKey) at a third of the distance', () => {
     const h = controlsHarness();
     h.fire('wheel', { clientX: 210, clientY: 170, deltaY: -3.5, deltaMode: 0, ctrlKey: false });

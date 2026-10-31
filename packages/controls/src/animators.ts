@@ -167,13 +167,19 @@ export class ZoomTarget {
   readonly at: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly timeline = new Timeline();
 
-  /** Adds levels, anchored at a point; `maxLead` caps how far the target may lead the camera. */
+  constructor(private readonly port: CameraPort) {}
+
+  /**
+   * Adds levels, anchored at a point; `maxLead` caps how far the target may lead the camera. The view it now heads for
+   * loads ahead (F671).
+   */
   add(levels: number, xPx: number, yPx: number, tauMs: number, maxLead = Infinity): void {
     if (this.pending === 0) this.timeline.reset();
     this.pending = Math.min(Math.max(this.pending + levels, -maxLead), maxLead);
     this.at.xPx = xPx;
     this.at.yPx = yPx;
     this.tauMs = tauMs;
+    this.port.zoomAhead(this.at, this.pending);
   }
 
   /** Stops at once. */
@@ -189,6 +195,7 @@ export class ZoomTarget {
     if (Math.abs(this.pending - levels) < ZOOM_REST_LEVELS || port.tooSlowFor(this.tauMs)) levels = this.pending;
     this.pending -= levels;
     port.zoomAt(this.at, levels);
+    if (this.pending === 0) port.zoomAhead(this.at, 0);
     return this.pending !== 0;
   }
 }

@@ -1,12 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
-import {
-  groundZoomForRange,
-  groundZoomFromMercatorZoom,
-  mercatorZoomFromGroundZoom,
-  rangeForGroundZoom,
-} from '../camera/zoom.js';
+import { cameraZoom, groundZoomFromMercatorZoom, rangeForGroundZoom } from '../camera/zoom.js';
 import type { CameraState } from './types.js';
 import type { ValidView } from './validation.js';
 import type { ViewState } from '../view/view-state.js';
@@ -66,17 +61,15 @@ export function writeFramePayload(
 ): void {
   out.frameNumber = frameNumber;
   out.tiles = tiles;
-  const groundZoom = groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
-  out.zoom = mercatorZoomFromGroundZoom(groundZoom, camera.pose.targetLatitudeRad);
+  out.zoom = cameraZoom(camera);
 }
 
 /** Writes the camera's public state into `out` and returns it; allocates nothing, so the frame loop can use it. */
 export function writeCameraState(camera: Camera, out: MutableCameraState, view?: ViewState): MutableCameraState {
   const { pose } = camera;
-  const groundZoom = groundZoomForRange(pose.rangeMeters, camera.heightPx, camera.fovYRad);
   out.longitudeDeg = wrapDegrees(pose.targetLongitudeRad * DEG);
   out.latitudeDeg = pose.targetLatitudeRad * DEG;
-  out.zoom = mercatorZoomFromGroundZoom(groundZoom, pose.targetLatitudeRad);
+  out.zoom = cameraZoom(camera);
   out.altitudeMeters = camera.eyeGeodetic.heightMeters;
   out.headingDeg = wrapDegrees(pose.headingRad * DEG);
   out.tiltDeg = pose.tiltRad * DEG;

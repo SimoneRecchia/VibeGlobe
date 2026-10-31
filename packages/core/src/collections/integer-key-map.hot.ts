@@ -17,20 +17,17 @@ const MIN_CAPACITY = 16;
  * the single-key conveniences may box their argument; both belong outside the frame loop.
  */
 export class IntegerKeyMap<V> {
-  private keys: Float64Array;
-  private values: (V | undefined)[];
-  private states: Uint8Array;
-  private mask: number;
+  private keys = new Float64Array(0);
+  private values: (V | undefined)[] = [];
+  private states = new Uint8Array(0);
+  private mask = 0;
   private count = 0;
   private readonly single = new Float64Array(1);
 
   constructor(initialCapacity = MIN_CAPACITY) {
     let capacity = MIN_CAPACITY;
     while (capacity < initialCapacity * 2) capacity *= 2;
-    this.keys = new Float64Array(capacity);
-    this.values = new Array<V | undefined>(capacity).fill(undefined);
-    this.states = new Uint8Array(capacity);
-    this.mask = capacity - 1;
+    this.allocate(capacity);
   }
 
   /** Number of entries. */
@@ -159,16 +156,18 @@ export class IntegerKeyMap<V> {
     return hash & this.mask;
   }
 
-  private grow(): void {
-    const keys = this.keys;
-    const values = this.values;
-    const states = this.states;
-    const capacity = (this.mask + 1) * 2;
+  /** Empty tables of `capacity` slots (a power of two). */
+  private allocate(capacity: number): void {
     this.keys = new Float64Array(capacity);
     this.values = new Array<V | undefined>(capacity).fill(undefined);
     this.states = new Uint8Array(capacity);
     this.mask = capacity - 1;
     this.count = 0;
+  }
+
+  private grow(): void {
+    const { keys, values, states } = this;
+    this.allocate((this.mask + 1) * 2);
     for (let slot = 0; slot < states.length; slot++) {
       if (states[slot] === USED) this.setAt(keys, slot, values[slot] as V);
     }

@@ -5,7 +5,7 @@ import type { Camera } from '../camera/camera.js';
 /** Up to this speed, in view ranges per second, the camera counts as still: full detail. */
 const STILL_SPEED = 0.25;
 /** The coarsest motion asks for: four times the texel size, two imagery levels. */
-const MAX_FACTOR = 4;
+export const MAX_FACTOR = 4;
 /** How fast the remembered speed fades once the camera slows, per second: detail returns within about half a second. */
 const SPEED_DECAY_PER_S = 0.002;
 /** Longer gaps than this (a day, or a NaN or infinite one) measure no speed. */

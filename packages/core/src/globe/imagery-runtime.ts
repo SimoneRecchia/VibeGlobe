@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { DEFAULT_UPLOAD_BUDGET } from '../cache/upload-queue.hot.js';
-import { FlightPreload } from './flight-preload.js';
+import { FlightPlan } from './flight-preload.js';
 import { applyPixelRatio } from './imagery-variants.js';
 import { loaderBase, type LoaderBase, type LoaderContext } from './loader-context.js';
 import { PHASE_SCHEDULING, PHASE_UPLOAD, type Observability, type PhaseTimer } from '../diagnostics/observability.js';
@@ -13,7 +13,7 @@ import { fadeByZoom, pinnedLevels, type StackEntry } from '../imagery/imagery-st
 import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import type { DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
-import { ImageryLoader, type DecodeTask, type TileMemory } from '../imagery/imagery-loader.hot.js';
+import { ImageryLoader, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
 import { acquireWorkerPool } from '../scheduler/worker-pool.js';
@@ -24,6 +24,7 @@ import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { stitchTerrainEdges } from '../terrain/terrain-stitch.hot.js';
 import {
   drawTerrain,
+  preloadTerrain,
   recordShownTerrain,
   gridErrorsByLevel,
   MAX_TERRAIN_MORPH_LEVELS,
@@ -32,13 +33,11 @@ import {
   type TerrainLayer,
 } from '../terrain/terrain-draws.js';
 import type { HeightGrid } from '../terrain/heightmap.js';
-import { heightTile } from '../terrain/height-tile.js';
 import { toEllipsoidal } from '../terrain/vertical-datum.js';
-import type { TileCoord } from '../tiling/tile-key.js';
 import { FINEST_FAILED, TerrainHeights, type ElevationSample } from '../terrain/terrain-heights.js';
 import { emptyLoaderStats, terrainStatsOf } from './diagnostics.js';
 import { GlobeError } from './errors.js';
-import type { TerrainSource } from '../terrain/terrain-source.js';
+import { terrainDecodeTask, type TerrainSource } from '../terrain/terrain-source.js';
 import type { ImageryStats, MemoryOptions, RendererBackend, TerrainStats } from './types.js';
 
 /** Texture handles of layer `i` start at `i × HANDLES_PER_LAYER`. */
@@ -72,34 +71,8 @@ interface PendingElevation {
   onAbort: () => void;
 }
 
-/** Height-grid cells of a quantized-mesh tile, which has no grid of its own (ADR 0006 §5). */
-const MESH_GRID_CELLS = 64;
 /** Terrain tiles at this level and coarser form the terrain's pinned base: a few hundred kilobytes (F084). */
 const TERRAIN_PINNED_LEVEL = 2;
-
-/**
- * How a terrain source's tiles decode: built-in encodings in the worker pool, their grid adding at most half the
- * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0027, F132).
- */
-function terrainDecodeTask(
-  source: TerrainSource,
-): (bytes: ArrayBuffer, contentType: string, coord: TileCoord) => DecodeTask {
-  const decoder = source.decoder;
-  return (bytes, _contentType, coord) => {
-    if (decoder.kind === 'custom') {
-      return { task: 'custom-terrain', input: undefined, run: () => heightTile(decoder.decode(bytes, coord)) };
-    }
-    return {
-      task: 'decode-terrain',
-      input: {
-        bytes,
-        encoding: decoder.kind,
-        maxErrorMeters: source.geometricErrorMeters(coord.level) / 2,
-        meshCells: MESH_GRID_CELLS,
-      },
-    };
-  };
-}
 
 /**
  * The imagery of one engine instance (M3 plan §2.3): a loader per layer over a network pool, a lease on the shared
@@ -116,10 +89,8 @@ export class ImageryRuntime {
   /** What a new loader shares with the others, the terrain's handle index and the next free one (A2). */
   readonly loaderContext: LoaderContext;
   readonly terrainIndex: number;
-  /** The tiles of a running flight's destination, wanted every frame until it ends (F286). */
-  readonly preload = new FlightPreload();
-  /** The tiles of the view a flight will show in about a second, loaded instead of the current view's (F287). */
-  readonly ahead = new FlightPreload();
+  /** What a running movement will draw, wanted each frame in the order it needs it until it ends (F286, F670). */
+  readonly plan = new FlightPlan();
   /** The last render-target pixels per CSS pixel, for layers added later (F241). */
   pixelRatio = 1;
   /** False while the frame's relief is flat: the terrain draws on no tile and loads nothing for the view (KB-281, KB-293). */
@@ -153,6 +124,10 @@ export class ImageryRuntime {
   private readonly terrainFades = new ImageryFades();
   /** The overlay slots' cross-fades (KB-155). */
   private readonly overlayFades = [new ImageryFades(), new ImageryFades()];
+  /** The cross-fades a change of the layers' roles or slots cuts short: the imagery's, then the overlay slots'. */
+  private readonly snaps = [this.fades, ...this.overlayFades];
+  /** The engine time of this frame and of the last, for the layers' fades by zoom (F669). */
+  private readonly fadeTime = Float64Array.of(0, Number.NaN);
   /** Keeps a texture still faded from resident this frame. */
   private readonly keepTexture = (handle: number): void => {
     // The base image and the caps' fills (KB-211) have negative handles and no loader.
@@ -378,11 +353,17 @@ export class ImageryRuntime {
     this.frame++;
     this.residency.startFrame(this.frame);
     for (const { entry, chain } of this.stack) for (const layer of chain) layer.loader.beginFrame(entry.visible);
-    if (fadeByZoom(this.stack, camera)) this.stackChanged();
+    this.fadeTime[0] = nowMs[0] ?? 0;
+    const layersFading = fadeByZoom(this.stack, camera, this.fadeTime, this.snaps);
     drawImagery(list, tiles, count, this.stack, camera, this.credits.visible);
-    if (this.ahead.count > 0) preloadImagery(this.stack, this.ahead.tiles, this.ahead.count);
-    if (this.preload.count > 0) preloadImagery(this.stack, this.preload.tiles, this.preload.count);
+    const plan = this.plan;
+    if (plan.count > 0) {
+      plan.keysAt(nowMs);
+      preloadImagery(this.stack, plan);
+    }
     this.fades.apply(list, list.imageryLayer, nowMs, fadeMs, this.keepTexture);
+    // A layer's fade by zoom under way keeps the frames coming too (F669).
+    if (layersFading) this.fades.fading = true;
     for (let slot = 0; slot < list.overlays.length; slot++) {
       const overlay = list.overlays[slot];
       if (overlay) this.overlayFades[slot]?.apply(list, overlay, nowMs, fadeMs, this.keepTexture);
@@ -392,7 +373,10 @@ export class ImageryRuntime {
     let terrainStart = terrain ? host.now() : 0;
     if (terrain) {
       terrain.loader.beginFrame(this.relief);
-      if (this.relief) drawTerrain(list, tiles, count, terrain, camera);
+      if (this.relief) {
+        drawTerrain(list, tiles, count, terrain, camera);
+        preloadTerrain(terrain, plan);
+      }
       this.terrainFades.apply(list, list.terrain, nowMs, fadeMs, this.keepTexture, MAX_TERRAIN_MORPH_LEVELS);
       recordShownTerrain(list, tiles, count, terrain);
       if (this.heights) deepenFallbackSkirts(list, tiles, count, terrain, this.heights);

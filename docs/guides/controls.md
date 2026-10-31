@@ -23,19 +23,19 @@ Without `connect`, pan and zoom work and the rotate and tilt gestures are off.
 
 ## Gestures
 
-| Input                                   | Movement                                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Drag (primary button, one finger)       | Pans; the grabbed point stays under the pointer. Released with speed, it coasts and slows to rest. |
-| Wheel                                   | Zooms at the cursor; a notch animates over about 100 ms. Over empty sky it zooms about the center. |
-| Trackpad scroll and pinch               | Zoom continuously at the cursor, in proportion to the fingers' motion.                             |
-| Double click, double tap                | Zoom in one level at the point.                                                                    |
-| Two-finger tap                          | Zooms out one level about the fingers' midpoint.                                                   |
-| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view. Escape cancels.                           |
-| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center. No context menu.    |
-| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together; each starts past a small threshold.    |
-| Two fingers side by side, moved up/down | Tilts, on its own (decided within the first 100 ms).                                               |
-| Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                            |
-| Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                        |
+| Input                                   | Movement                                                                                                                                                                      |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drag (primary button, one finger)       | Pans; the grabbed point stays under the pointer. Released with speed, it coasts and slows to rest.                                                                            |
+| Wheel                                   | Zooms at the cursor; a notch animates over about 100 ms, and the view it heads for loads ahead (`NavigationApi.preloadView`, F671). Over empty sky it zooms about the center. |
+| Trackpad scroll and pinch               | Zoom continuously at the cursor, in proportion to the fingers' motion.                                                                                                        |
+| Double click, double tap                | Zoom in one level at the point.                                                                                                                                               |
+| Two-finger tap                          | Zooms out one level about the fingers' midpoint.                                                                                                                              |
+| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view. Escape cancels.                                                                                                      |
+| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center. No context menu.                                                                               |
+| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together; each starts past a small threshold.                                                                               |
+| Two fingers side by side, moved up/down | Tilts, on its own (decided within the first 100 ms).                                                                                                                          |
+| Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                                                                                                       |
+| Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                                                                                                   |
 
 A new press, touch or key stops inertia and running turns where they are; a wheel zoom still in progress completes, about the point it started at.
 

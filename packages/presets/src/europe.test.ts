@@ -135,14 +135,28 @@ describe('europeOpen (F613)', () => {
     });
     const worldCover = preset.baseMaps[0]?.imagery[0]?.sources[0];
     expect(worldCover?.transparent).toBe(true);
-    // Over the open sea and deep inside France (level 8, about 2° E, 46.5° N) the water's pixels are keyed out over the
-    // whole tile and the others stay (F636); a tile across the package box's edge (level 8 at 32° W, 50° N) fades out
-    // beyond it over 12 pixels (F639).
-    for (const inside of [SEA, tile(8, 129, 90)]) {
-      expect(worldCover?.tileMask?.(inside)).toMatchObject({ key: { rgb: [54, 73, 90], everywhere: true } });
-      expect(Array.from(worldCover?.tileMask?.(inside)?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
-    }
-    expect(worldCover?.tileMask?.(tile(8, 105, 86))).toMatchObject({ featherPx: 12, key: { everywhere: true } });
+    // Over the open sea (level 8) the water's pixels are keyed out over the whole tile and the others stay (KB-302); a
+    // tile across the package box's edge (level 8 at 32° W, 50° N) fades out beyond it over 12 pixels (F639).
+    expect(worldCover?.tileMask?.(SEA)?.sea?.ringEnds.length).toBe(0);
+    expect(Array.from(worldCover?.tileMask?.(SEA)?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    expect(worldCover?.tileMask?.(tile(8, 105, 86))).toMatchObject({
+      featherPx: 12,
+      sea: { ringEnds: new Uint32Array() },
+    });
+  });
+
+  it("keys the package's sea out at every level, its real water too, and keeps the land's lakes and shadows (KB-302)", () => {
+    const worldCover = europeOpen({
+      packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
+      offline: fakeOffline(),
+    }).baseMaps[0]?.imagery[0]?.sources[0];
+    // A level 10 tile of the coast at Ancona (13.5° E, 43.6° N), where the package's real water ends in rectangles:
+    // the land's outline, its water fading back in over 4 km inside it (36.2 pixels of this tile).
+    const coast = worldCover?.tileMask?.(tile(10, 550, 373))?.sea;
+    expect(coast?.ringEnds.length).toBeGreaterThan(0);
+    expect(coast?.featherPx).toBeCloseTo(36.2, 1);
+    // Deep inside France (level 8, about 2° E, 46.5° N) nothing is keyed: its lakes and shadows stay.
+    expect(worldCover?.tileMask?.(tile(8, 129, 90))).toBeUndefined();
   });
 
   it('hands the levels above the package to the online sources an app adds, and magnifies level 11 without them (F632)', () => {

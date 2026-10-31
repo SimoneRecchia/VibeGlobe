@@ -108,3 +108,7 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
   downloads only. A pipeline source for it would let an application host Italy's tiles in its own package.
 - **BKG from 2027:** the federal DOP20 is announced as open from 2027-01-01; it would cover the four Länder left out.
 - **CORS of the new services:** none could be checked from here; try each from a page once the hosts are reachable.
+- **The package's sea keyed when it is built (KB-302):** the pipeline knows the composite's 1° cells and the land, so
+  it could write the sea transparent (WebP with alpha) and the decoder would need no land outline or color test; it
+  needs a rebuilt package. Until then the lakes of the land outside Europe's countries (Turkey, North Africa) are keyed
+  with the sea: `EUROPE_LAND` holds only Europe's countries.

@@ -50,6 +50,8 @@ export class FlatCamera {
   coasting = false;
   /** API movements stopped by a press. */
   movementInterruptions = 0;
+  /** The views a smoothed zoom said it heads for (F671), undefined on arrival. */
+  readonly aheads: (ViewInit | undefined)[] = [];
 
   constructor(
     readonly widthPx: number,
@@ -99,6 +101,7 @@ export class FlatCamera {
         this.centerX = world.x - (point.xPx - this.widthPx / 2) / scale;
         this.centerY = world.y - (point.yPx - this.heightPx / 2) / scale;
       },
+      preloadView: (view) => void this.aheads.push(view),
       requestUpdate: () => void this.requests++,
       interruptMovement: () => void this.movementInterruptions++,
       // The engine's tilt policy array (F625): the tests write `[3]` as the engine would.
@@ -313,7 +316,8 @@ function fakeGlobe(camera: FlatCamera) {
       camera.timeMs = value;
     },
     get camera(): CameraState {
-      return { headingDeg: camera.headingDeg, tiltDeg: camera.tiltDeg } as CameraState;
+      const { centerX, centerY, zoom, headingDeg, tiltDeg } = camera;
+      return { longitudeDeg: centerX, latitudeDeg: centerY, zoom, headingDeg, tiltDeg } as CameraState;
     },
     viewMode: 'auto' as 'auto' | '2d' | 'manual',
     setViewMode(mode: '2d' | '3d' | 'auto'): void {

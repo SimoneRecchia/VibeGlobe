@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Camera } from '../camera/camera.js';
+import { groundZoomFromMercatorZoom, rangeForGroundZoom } from '../camera/zoom.js';
+import { currentView } from './camera-state.js';
 import { createGlobe } from './create-globe.js';
+import { Movements, type MovementHost } from './movements.js';
 import { fakeRenderer } from './test-renderer.js';
 import type { Globe, ViewInit } from './types.js';
 
@@ -562,5 +566,32 @@ describe('camera constraints (F209–F211)', () => {
     expect(globe.camera.chosenTiltDeg).toBeLessThanOrEqual(30 + 1e-9);
     await expect(globe.tiltTo(Number.NaN)).rejects.toMatchObject({ code: 'invalid-coordinate' });
     globe.destroy();
+  });
+});
+
+describe('the view an input heads for (F671)', () => {
+  it('loads a valid view ahead as a movement destination keeping the tilt, and stops on undefined or an invalid one', () => {
+    const cam = new Camera();
+    cam.widthPx = 800;
+    cam.heightPx = 600;
+    cam.update();
+    const ends: (Float64Array | undefined)[] = [];
+    const movements = new Movements({
+      cam,
+      currentView: () => currentView(cam),
+      constrainEnd: () => undefined,
+      preloadView: (end: Float64Array | undefined) => ends.push(end),
+    } as unknown as MovementHost);
+    movements.preload({ longitudeDeg: 10, latitudeDeg: 45, zoom: 12 });
+    movements.preload({ latitudeDeg: 99 });
+    movements.preload(undefined);
+    const [end] = ends;
+    expect([end?.[0], end?.[1]]).toEqual([(10 * Math.PI) / 180, (45 * Math.PI) / 180]);
+    expect(end?.[2]).toBeCloseTo(
+      rangeForGroundZoom(groundZoomFromMercatorZoom(12, (45 * Math.PI) / 180), 600, cam.fovYRad),
+      6,
+    );
+    expect(end?.[4]).toBeNaN();
+    expect(ends.slice(1)).toEqual([undefined, undefined]);
   });
 });

@@ -217,6 +217,26 @@ export class CameraPort {
     if (deltaZoom !== 0) this.navigation.zoomAt(point, deltaZoom);
   }
 
+  /**
+   * A smoothed zoom heads `levels` from the current view about `point` (F671): the view it will show loads ahead
+   * ({@link NavigationApi.preloadView}), centered where a zoom on a flat map brings it, the position under the point
+   * staying there; none once it has arrived (0).
+   */
+  zoomAhead(point: ScreenPoint, levels: number): void {
+    const camera = this.globe?.camera;
+    const at = levels !== 0 && camera ? this.navigation.grab(point) : undefined;
+    const scale = 2 ** -levels;
+    this.navigation.preloadView(
+      at && camera
+        ? {
+            longitudeDeg: at.longitudeDeg + (((camera.longitudeDeg - at.longitudeDeg + 540) % 360) - 180) * scale,
+            latitudeDeg: at.latitudeDeg + (camera.latitudeDeg - at.latitudeDeg) * scale,
+            zoom: camera.zoom + levels,
+          }
+        : undefined,
+    );
+  }
+
   /** The applied heading, in degrees. */
   headingDeg(): number {
     return this.navigation.headingDeg;

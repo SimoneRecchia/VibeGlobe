@@ -6,6 +6,8 @@ import { grownArray } from '../collections/typed-arrays.js';
 
 /** Default duration of an imagery cross-fade (M3 plan §4.2: the popping detector assumes 250 ms). */
 export const DEFAULT_FADE_MS = 250;
+/** Levels up a tile appearing by refinement looks for an ancestor drawn last frame: motion-aware detail's (F288). */
+const MAX_REFINE_LEVELS = 3;
 
 /**
  * Cross-fades between the imagery a surface tile showed and what it shows now (F105, ADR 0006): when a tile's texture
@@ -113,29 +115,57 @@ export class ImageryFades {
     const slot = this.allocate(key);
     this.store(slot, layer, i);
     this.startMs[slot] = -Infinity;
-    if (layer.seeded[i] === 1) {
+    let start = layer.seeded[i] === 1 ? nowMs : Number.NaN;
+    if (refineMs > 0 && key % 3 === 0) {
+      const tile = tileOfKey(key);
+      const level = tile[0];
+      const column = tile[1];
+      const row = tile[2];
+      // The nearest ancestor drawn last frame: a camera stopping refines by up to its motion's levels at once (F288).
+      let parent = -1;
+      let up = 0;
+      while (parent < 0 && up < MAX_REFINE_LEVELS && up < level) {
+        up++;
+        parent = this.drawnLastFrame(meshKey(level - up, column >> up, row >> up));
+      }
+      const parentStart = this.startMs[parent] ?? -Infinity;
+      // A layer's tile where the parent showed what lies below (the base image, or nothing in an overlay slot: a
+      // negative texture, which the draw's own `from` fields hold) fades in from it, or goes on with the parent's fade
+      // in from it (KB-305).
+      if (parent >= 0 && (this.toTexture[slot] ?? -1) >= 0)
+        if (nowMs - parentStart < refineMs && (this.fromTexture[parent] ?? 0) < 0) start = parentStart;
+        else if ((this.toTexture[parent] ?? 0) < 0) start = nowMs;
+      if (
+        start !== start &&
+        (layer.geographic[i] ?? 1) === 0 &&
+        !this.seedFromParent(slot, parent, 2 ** up, column, row, nowMs, refineMs)
+      )
+        this.seedFromChildren(slot, level, column, row, nowMs, refineMs);
+    }
+    if (start === start) {
       this.fromTexture[slot] = layer.fromTextures[i] ?? 0;
       this.fromGeographic[slot] = layer.fromGeographic[i] ?? 1;
       for (let c = 0; c < 4; c++) this.fromTransform[slot * 4 + c] = layer.fromUvTransforms[i * 4 + c] ?? 0;
-      this.startMs[slot] = nowMs;
-    } else if (refineMs > 0 && (layer.geographic[i] ?? 1) === 0 && key % 3 === 0) {
-      if (!this.seedFromParent(slot, key, nowMs, refineMs)) this.seedFromChildren(slot, key, nowMs, refineMs);
+      this.startMs[slot] = start;
     }
     return slot;
   }
 
   /**
-   * A Web Mercator tile appearing by refinement: fades from its quarter of what its parent showed last frame, or goes
-   * on with the parent's fade under way. Returns whether it did.
+   * A Web Mercator tile appearing by refinement, at `column` and `row`: fades from its part of what its ancestor
+   * `parent` (−1: none), `cells` of it to a side, showed last frame, or goes on with the ancestor's fade under way.
+   * Returns whether it did.
    */
-  private seedFromParent(slot: number, key: number, nowMs: number, fadeMs: number): boolean {
-    const tile = tileOfKey(key);
-    const level = tile[0];
-    const column = tile[1];
-    const row = tile[2];
-    if (level === 0) return false;
-    const parent = this.drawnLastFrame(meshKey(level - 1, column >> 1, row >> 1));
-    if (parent < 0) return false;
+  private seedFromParent(
+    slot: number,
+    parent: number,
+    cells: number,
+    column: number,
+    row: number,
+    nowMs: number,
+    fadeMs: number,
+  ): boolean {
+    if (parent < 0 || this.toGeographic[parent] !== 0) return false;
     // A fade of the parent under way goes on from where it started, with its timing, also when the child shows the
     // imagery the parent fades to: cutting it off would jump.
     const fading = nowMs - (this.startMs[parent] ?? -Infinity) < fadeMs && this.fromGeographic[parent] === 0;
@@ -143,33 +173,36 @@ export class ImageryFades {
     const source = fading ? this.fromTransform : this.toTransform;
     this.fromTexture[slot] = (fading ? this.fromTexture[parent] : this.toTexture[parent]) ?? 0;
     this.fromGeographic[slot] = 0;
-    // The child's quarter of what the parent showed: half its scale, offset by the child's column and row.
-    const su = (source[parent * 4] ?? 1) / 2;
-    const sv = (source[parent * 4 + 1] ?? 1) / 2;
+    // The tile's part of what the ancestor showed: its scale over the cells, offset by its column and row within it.
+    const su = (source[parent * 4] ?? 1) / cells;
+    const sv = (source[parent * 4 + 1] ?? 1) / cells;
     this.fromTransform[slot * 4] = su;
     this.fromTransform[slot * 4 + 1] = sv;
-    this.fromTransform[slot * 4 + 2] = (source[parent * 4 + 2] ?? 0) + (column % 2) * su;
-    this.fromTransform[slot * 4 + 3] = (source[parent * 4 + 3] ?? 0) + (row % 2) * sv;
+    this.fromTransform[slot * 4 + 2] = (source[parent * 4 + 2] ?? 0) + (column % cells) * su;
+    this.fromTransform[slot * 4 + 3] = (source[parent * 4 + 3] ?? 0) + (row % cells) * sv;
     this.startMs[slot] = fading ? (this.startMs[parent] ?? nowMs) : nowMs;
     return true;
   }
 
   /**
-   * A Web Mercator tile appearing by coarsening, where every child drawn last frame showed the same imagery (a stand-in
-   * magnified over all of them), or was fading from the same imagery: fades from that imagery over the whole tile, or
-   * goes on with the children's fade.
+   * A Web Mercator tile appearing by coarsening, at `level`, `column` and `row`, where every child drawn last frame with
+   * Web Mercator imagery showed the same imagery (a stand-in magnified over all of them), or was fading from the same
+   * imagery: fades from that imagery over the whole tile, or goes on with the children's fade.
    */
-  private seedFromChildren(slot: number, key: number, nowMs: number, fadeMs: number): void {
-    const tile = tileOfKey(key);
-    const level = tile[0];
-    const column = tile[1];
-    const row = tile[2];
+  private seedFromChildren(
+    slot: number,
+    level: number,
+    column: number,
+    row: number,
+    nowMs: number,
+    fadeMs: number,
+  ): void {
     let first = -1;
     let firstChild = 0;
     let fading = false;
     for (let k = 0; k < 4; k++) {
       const child = this.drawnLastFrame(meshKey(level + 1, 2 * column + (k & 1), 2 * row + (k >> 1)));
-      if (child < 0) continue;
+      if (child < 0 || this.toGeographic[child] !== 0) continue;
       // A fade of the children under way goes on, from what they all fade from.
       const childFading = nowMs - (this.startMs[child] ?? -Infinity) < fadeMs && this.fromGeographic[child] === 0;
       const shown = (childFading ? this.fromTexture[child] : this.toTexture[child]) ?? 0;
@@ -193,10 +226,10 @@ export class ImageryFades {
     this.startMs[slot] = fading ? (this.startMs[first] ?? nowMs) : nowMs;
   }
 
-  /** The slot of a Web Mercator tile drawn last frame with Web Mercator imagery, −1 for none. */
+  /** The slot of a tile drawn last frame, −1 for none. */
   private drawnLastFrame(key: number): number {
     const slot = this.slots.get(key);
-    return slot !== undefined && this.stamps[slot] === this.frame - 1 && this.toGeographic[slot] === 0 ? slot : -1;
+    return slot !== undefined && this.stamps[slot] === this.frame - 1 ? slot : -1;
   }
 
   private store(slot: number, layer: DrawLayer, i: number): void {

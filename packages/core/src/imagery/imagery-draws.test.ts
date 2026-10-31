@@ -3,9 +3,9 @@ import { Camera } from '../camera/camera.js';
 import { MERCATOR_ROOT, quadtreeTileBounds, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { WEB_MERCATOR_TILING } from '../tiling/tiling-scheme.js';
 import { DrawList, drawOnBaseImage, TONE_BELOW } from './draw-list.js';
-import { drawImagery, type ImageryLayer, type StackLayer } from './imagery-draws.js';
+import { drawImagery, preloadImagery, type ImageryLayer, type StackLayer } from './imagery-draws.js';
 import type { StackEntry } from './imagery-stack.js';
-import { ARRIVING, type ImageryLoader } from './imagery-loader.hot.js';
+import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
 import type { ImagerySource } from './imagery-source.js';
 
 const tile = (level: number, x: number, y: number): QuadtreeTile =>
@@ -94,6 +94,49 @@ describe('drawImagery', () => {
     const gap = fakeLayer({}, [12]);
     draw(gap.layer, tile(12, 2160, 1460));
     expect(gap.wanted.slice(0, 3)).toEqual([12, 11, 10]);
+  });
+
+  it("requests a tile's cover four levels up before every visible tile while nothing finer is resident (KB-304)", () => {
+    const requests = (states: Record<number, number>): [number, number][] => {
+      const keys: [number, number][] = [];
+      const { layer } = fakeLayer(states);
+      const want = (level: number, _x: number, _y: number, key: number): number => {
+        keys.push([level, key]);
+        return states[level] ?? -1;
+      };
+      draw({ ...layer, loader: { ...layer.loader, want } as unknown as ImageryLoader }, tile(9, 300, 170));
+      return keys.filter(([, key]) => key < PREFETCH_CLASS);
+    };
+    // Nothing resident: level 5 and the coarser ones at the cover class, before the wanted tile and level 7.
+    const cold = requests({});
+    expect(cold.map(([level]) => level)).toEqual([9, 7, 5, 3, 1, 0]);
+    for (const [level, key] of cold) expect(key < VISIBLE_CLASS, `level ${String(level)}`).toBe(level <= 5);
+    // Level 7 resident: the layer shows there, and its cover is not asked for.
+    expect(requests({ 7: 42 }).map(([level]) => level)).toEqual([9, 7]);
+  });
+
+  it("preloads a plan's tiles from every layer its deepest view draws, the destination's ancestors first (F670, KB-307)", () => {
+    const keys: [number, number][] = [];
+    const recording = (): ImageryLayer => {
+      const { layer } = fakeLayer({});
+      const want = (level: number, _x: number, _y: number, key: number): number => keys.push([level, key]) && -1;
+      return { ...layer, loader: { ...layer.loader, want, preloading: true } as unknown as ImageryLoader };
+    };
+    // Hidden at the current zoom, shown at the plan's deepest: preloaded; shown only deeper still: not.
+    const orthophoto = stacked([recording()], { fadeIn: { fromZoom: 11, toZoom: 12 }, zoomOpacity: 0 });
+    const deeper = stacked([recording()], { id: 'b', fadeIn: { fromZoom: 15, toZoom: 16 } });
+    preloadImagery([orthophoto, deeper], {
+      tiles: [tile(14, 8700, 6000), tile(13, 4300, 3000), tile(13, 4301, 3000)],
+      keys: Float64Array.of(0, 10, -1),
+      count: 3,
+      arrival: 1,
+      zoom: 13,
+    });
+    expect(keys).toEqual([
+      [14, PRELOAD_CLASS + 14],
+      [10, PRELOAD_CLASS + 10],
+      [13, PRELOAD_CLASS + 10 + 13],
+    ]);
   });
 
   it('prefetches no children under a center tile in full fog (F574, KB-174)', () => {

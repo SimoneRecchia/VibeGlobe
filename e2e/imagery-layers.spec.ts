@@ -153,6 +153,32 @@ for (const backend of BACKENDS) {
     expect(shown.black).toBe(0);
   });
 
+  test(`an overlay's first tiles fade in over the layers below and never darken them on ${backend} (KB-303)`, async ({
+    page,
+  }) => {
+    const session = await fixtureSession(page);
+    await openStack(page, `${backend}&clockStepMs=16.666666666666668`, '', session);
+    // The same red over the red layer, nearly opaque: added on the running globe, its tiles arrive and fade in from
+    // nothing, and every frame meanwhile shows red; a fade that mixed in black dipped by a quarter halfway (KB-303).
+    await page.evaluate(
+      async ([repo, url]) => {
+        const sources = (await import(
+          /* @vite-ignore */ `${repo}/packages/sources/src/index.ts`
+        )) as typeof import('@vibeglobe/sources');
+        window.vibeglobePlayground?.globe.imageryLayers.add({
+          sources: [sources.xyzImagery({ id: 'late-red', url, maxLevel: 18 })],
+          opacity: 0.99,
+        });
+      },
+      [`/@fs${process.cwd()}`, `/fixture-tiles/${session}/red/mercator/{z}/{x}/{y}.png?late=1`] as const,
+    );
+    const reds: number[] = [];
+    for (let frame = 0; frame < 40; frame++) reds.push(center(await canvasImage(page))[0]);
+    await waitForImagery(page);
+    expect((await requestLog(page, session)).some((r) => r.query === '?late=1' && r.status === 200)).toBe(true);
+    expect(Math.min(...reds), reds.join()).toBeGreaterThanOrEqual(solid('red')[0] - TOLERANCE);
+  });
+
   test(`normal, multiply and screen blending match their formulas on ${backend} (F246)`, async ({ page }) => {
     const session = await fixtureSession(page);
     await openStack(page, backend, 'shade', session);

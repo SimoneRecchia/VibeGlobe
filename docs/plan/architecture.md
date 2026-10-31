@@ -106,7 +106,7 @@ selection ─▶ wanted tiles (priority) ─▶ policy ─▶ cache hierarchy �
 - **Upload budget:** GPU uploads are drained within a per-frame time and byte budget, so no frame stutters when many tiles arrive together.
 - **Compression:** KTX2/Basis transcoding in workers where the source provides it, chosen per device capability.
 - **Motion-aware detail:** while the camera moves fast, `maxSse` rises and prefetch shrinks; detail refines when motion slows or stops.
-- **Flight preloading:** when a flight starts, the path is sampled; the destination at its arrival levels is requested first, then only tiles that will be visible along the path at the levels needed there, capped by the bandwidth estimate.
+- **Flight preloading:** when a flight or an ease starts (`FlightPlan`, F670), the destination's view at its arrival levels is planned, its ancestors four levels up first, then the views at twelve times along the van Wijk path, at the detail their speed allows, each tile with the time it is first shown, and a margin ring three levels coarser; each frame the destination counts as needed within a second and every other tile is requested from two seconds before its time, so they load in the order the movement needs them, terrain included, and a smoothed zoom's target loads the same way (F671). Layers are included as the movement's deepest zoom shows them. Requests keep the preload class: after every visible tile, before prefetch.
 
 ## 8. Network modes, cache and offline
 

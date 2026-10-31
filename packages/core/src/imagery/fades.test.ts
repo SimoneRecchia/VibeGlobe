@@ -86,6 +86,47 @@ describe('ImageryFades (F105)', () => {
     expect(list.fromTextures[0]).toBe(10);
   });
 
+  it("a layer's first tile on a tile that appears by refinement fades in from what lay below its parent (KB-305)", () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(4);
+    const now = new Float64Array([0]);
+    const parent = quadtreeTileKey(0, 3, 2, 5);
+    // The parent showed the base image (or nothing, in an overlay slot); its child's layer tile is already resident.
+    fades.apply(frame(list, -1, -1, parent), list.imageryLayer, now, 250, () => undefined);
+    now[0] = 16;
+    frame(list, 11, 4, quadtreeTileKey(0, 4, 5, 10));
+    list.fromTextures[0] = -1;
+    list.fromUvTransforms.set([0.1, 0.2, 0.3, 0.4]);
+    fades.apply(list, list.imageryLayer, now, 250, () => undefined);
+    expect([list.fades[0], list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([
+      0,
+      -1,
+      [0.1, 0.2, 0.3, 0.4].map(Math.fround),
+    ]);
+    // Its own child appears mid-fade: it goes on with the fade in from below, on the same clock.
+    now[0] = 116;
+    fades.apply(frame(list, 12, 5, quadtreeTileKey(0, 5, 10, 21)), list.imageryLayer, now, 250, () => undefined);
+    expect(list.fades[0]).toBeCloseTo(0.4, 6);
+    expect(list.fromTextures[0]).toBe(-1);
+  });
+
+  it('a tile that appears two levels finer at once, as a stopping camera refines, fades from its ancestor (KB-305)', () => {
+    const fades = new ImageryFades();
+    const list = new DrawList(4);
+    const now = new Float64Array([0]);
+    frame(list, 10, 3, quadtreeTileKey(0, 3, 2, 5));
+    list.uvTransforms.set([0.5, 0.5, 0.25, 0]);
+    fades.apply(list, list.imageryLayer, now, 250, () => undefined);
+    now[0] = 16;
+    // Level 5, column 9 and row 21: the east and south quarter of the level 3 tile's 4 × 4 cells, one in from each.
+    fades.apply(frame(list, 12, 5, quadtreeTileKey(0, 5, 9, 21)), list.imageryLayer, now, 250, () => undefined);
+    expect([list.fades[0], list.fromTextures[0], [...list.fromUvTransforms.subarray(0, 4)]]).toEqual([
+      0,
+      10,
+      [0.125, 0.125, 0.375, 0.125],
+    ]);
+  });
+
   it('a tile that appears by coarsening fades from the stand-in its children all showed (KB-199)', () => {
     const fades = new ImageryFades();
     const list = new DrawList(8);

@@ -1,8 +1,9 @@
 // The `earth` fixture patterns (F636): imagery sampled from the playground's Natural Earth base image, so every source
 // of a zoom scenario shows the same ground as the base image, continuous across tiles and levels. `earth` is the
-// image's own colors, `earth-package` its land in another tone with the sea in the WorldCover package's flat no-data
-// water (a package stand-in), `earth-fine` its own colors again (an online orthophoto stand-in, shown in its own colors:
-// F638), `earth-marble` a Blue Marble stand-in, darker and bluer, its sea dark and blotched (KB-234, KB-237).
+// image's own colors, `earth-package` all of it in another tone (a package stand-in: its composite's water is imagery
+// too, keyed out at sea by the preset, KB-302), `earth-fine` its own colors again (an online orthophoto stand-in, shown
+// in its own colors: F638), `earth-marble` a Blue Marble stand-in, darker and bluer, its sea dark and blotched (KB-234,
+// KB-237).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import jpeg from 'jpeg-js';
@@ -12,8 +13,6 @@ const IMAGE_PATH = fileURLToPath(
   new URL('../../../apps/playground/public/imagery/natural-earth-4096.jpg', import.meta.url),
 );
 
-/** The package's no-data water (`WORLDCOVER_WATER_RGB` of `@vibeglobe/presets`). */
-export const PACKAGE_WATER_RGB: readonly [number, number, number] = [54, 73, 90];
 /** The per-channel tones of the package and fine stand-ins over the base image's colors. */
 export const EARTH_TONES: Readonly<Record<string, readonly [number, number, number]>> = {
   earth: [1, 1, 1],
@@ -63,7 +62,6 @@ export function isWater(color: readonly [number, number, number]): boolean {
 /** A pixel of an `earth` pattern at a position (radians). */
 export function earthPixel(pattern: string, lonRad: number, latRad: number): [number, number, number] {
   const color = earthColor(lonRad, latRad);
-  if (pattern === 'earth-package' && isWater(color)) return [...PACKAGE_WATER_RGB];
   if (pattern === 'earth-marble' && isWater(color)) {
     // Dark blotches some tens of kilometers wide, as the Blue Marble's sea floor shows through its water.
     const blotch = 1 - MARBLE_BLOTCHES * (0.5 + 0.5 * Math.sin(lonRad * 900) * Math.sin(latRad * 1100));

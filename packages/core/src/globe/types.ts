@@ -294,6 +294,11 @@ export interface NavigationApi extends NavigationModeSettings {
   /** Zooms by `deltaZoom` levels keeping the position under `point` fixed. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void;
   /**
+   * The view an input is heading for, as a smoothed zoom's target (F671): its tiles load ahead, as a movement's
+   * destination's do, before the camera gets there; undefined when it has arrived. Invalid views are ignored.
+   */
+  preloadView(view: ViewInit | undefined): void;
+  /**
    * Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4); a request
    * made inside `update` asks for the next frame.
    */

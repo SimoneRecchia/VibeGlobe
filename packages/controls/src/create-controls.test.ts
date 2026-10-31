@@ -2,7 +2,7 @@ import { GlobeError } from '@vibeglobe/core';
 import { describe, expect, it } from 'vitest';
 import { createControls } from './create-controls.js';
 import { DEFAULT_CONTROLS_OPTIONS } from './options.js';
-import { controlsHarness } from './test-harness.js';
+import { controlsHarness, fakeTarget, type OrthoGlobe } from './test-harness.js';
 
 describe('mouse pan (F178, ADR 0009 §3–4)', () => {
   it('records input in the handlers and drags once per frame, keeping the grabbed point under the pointer', () => {
@@ -512,5 +512,67 @@ describe('the tilt policy (F625)', () => {
     h.frame();
     expect(h.controls.tiltAvailable).toBe(true);
     expect(heard).toEqual([false, true]);
+  });
+});
+
+describe('sky drags and overlays laid over the map (F654)', () => {
+  /** A drag from 300 px right of the center (beyond the globe's 250 px disc) toward it, then a release with speed. */
+  function dragFromSky(h: ReturnType<typeof controlsHarness>): void {
+    h.pointer('pointerdown', { x: 700, y: 300, t: 0 });
+    for (let t = 8; t <= 200; t += 8) {
+      h.pointer('pointermove', { x: 700 - t, y: 300, t });
+      h.frame(8);
+    }
+    h.pointer('pointerup', { x: 500, y: 300, t: 208 });
+    h.run(h.globe.timeMs + 1000, 8);
+  }
+
+  it('with skyDragPan off, a drag that starts on the sky does nothing, even over the globe; one from the globe pans', () => {
+    const turning = controlsHarness(undefined, { globeRadiusPx: 250 });
+    dragFromSky(turning);
+    expect(turning.camera.drags).toBeGreaterThan(0);
+    const h = controlsHarness({ gestures: { skyDragPan: false } }, { globeRadiusPx: 250 });
+    const before = (h.camera as OrthoGlobe).centerVector();
+    dragFromSky(h);
+    expect(h.camera.drags).toBe(0);
+    expect((h.camera as OrthoGlobe).centerVector()).toEqual(before);
+    h.pointer('pointerdown', { x: 400, y: 300, t: 3000 });
+    h.pointer('pointermove', { x: 450, y: 300, t: 3010 });
+    h.frame();
+    expect(h.camera.drags).toBe(1);
+  });
+
+  it('zooms at the cursor with the wheel over an element handed to forwardWheel, until stopped', () => {
+    const h = controlsHarness();
+    const overlay = fakeTarget();
+    const stop = h.controls.forwardWheel(overlay as unknown as EventTarget);
+    expect([...overlay.listeners.keys()].sort()).toEqual(['gesturechange', 'gestureend', 'gesturestart', 'wheel']);
+    let prevented = 0;
+    const wheel = (init: object): void =>
+      overlay.listeners.get('wheel')?.({ type: 'wheel', preventDefault: () => void prevented++, ...init });
+    const under = h.camera.worldAt({ xPx: 200, yPx: 150 });
+    wheel({ clientX: 210, clientY: 170, deltaY: -3, deltaMode: 0, ctrlKey: false });
+    h.frame();
+    expect(prevented).toBe(1);
+    expect(h.camera.zoom).toBeCloseTo(3 / 300, 12);
+    expect(h.camera.pixelOf(under).xPx).toBeCloseTo(200, 6);
+    // Already handled: by the map, when the element holds it and the event bubbled from it, or by the element itself.
+    wheel({ clientX: 210, clientY: 170, deltaY: -3, deltaMode: 0, ctrlKey: false, defaultPrevented: true });
+    h.frame();
+    expect(h.camera.zooms).toBe(1);
+    stop();
+    expect(overlay.listeners.size).toBe(0);
+  });
+
+  it('keeps the elements handed to forwardWheel across attachments, and removes their listeners on destroy', () => {
+    const h = controlsHarness();
+    const overlay = fakeTarget();
+    h.controls.forwardWheel(overlay as unknown as EventTarget);
+    h.instance.destroy();
+    expect(overlay.listeners.size).toBe(0);
+    const again = h.controls(h.element, h.camera.navigation);
+    expect(overlay.listeners.has('wheel')).toBe(true);
+    again.destroy();
+    expect(overlay.listeners.size).toBe(0);
   });
 });

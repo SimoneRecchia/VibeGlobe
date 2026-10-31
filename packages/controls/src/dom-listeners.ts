@@ -152,3 +152,63 @@ function otherListeners(element: HTMLElement, port: CameraPort, context: Gesture
     [doc, 'keyup', onDocKey as EventListener],
   ];
 }
+
+/** The map's events an element laid over it hands on: the wheel and Safari's trackpad gestures. */
+const FORWARDED = new Set(['wheel', 'gesturestart', 'gesturechange', 'gestureend']);
+
+/**
+ * The elements laid over the map whose wheel and trackpad events the map takes, such as markers or panels
+ * (`NavigationControls.forwardWheel`, F654): kept across attachments, they run the latest attachment's own handlers. An
+ * event already handled is left alone: one the map took on its way up (the element holds the map), or one the element
+ * itself prevented.
+ */
+export class WheelForwarding {
+  private readonly sources = new Set<EventTarget>();
+  /** The listeners added to each source for the current attachment. */
+  private readonly added = new Map<EventTarget, Listener[]>();
+  private handlers: readonly Listener[] = [];
+
+  /** Hands the sources' events to an attachment's handlers until the returned function stops it. */
+  attach(element: HTMLElement, listeners: readonly Listener[]): () => void {
+    const handlers = listeners.filter(([target, type]) => target === element && FORWARDED.has(type));
+    this.stopAll();
+    this.handlers = handlers;
+    for (const source of this.sources) this.listen(source);
+    return () => {
+      if (this.handlers !== handlers) return;
+      this.stopAll();
+      this.handlers = [];
+    };
+  }
+
+  /** See `NavigationControls.forwardWheel`. */
+  forward(source: EventTarget): () => void {
+    this.sources.add(source);
+    this.listen(source);
+    return () => {
+      this.sources.delete(source);
+      this.stop(source);
+    };
+  }
+
+  private listen(source: EventTarget): void {
+    if (this.added.has(source) || this.handlers.length === 0) return;
+    const listeners = this.handlers.map(([, type, handler]): Listener => {
+      const forward = (event: Event): void => {
+        if (!event.defaultPrevented) handler(event);
+      };
+      return [source, type, forward];
+    });
+    for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: false });
+    this.added.set(source, listeners);
+  }
+
+  private stop(source: EventTarget): void {
+    for (const [target, type, listener] of this.added.get(source) ?? []) target.removeEventListener(type, listener);
+    this.added.delete(source);
+  }
+
+  private stopAll(): void {
+    for (const source of [...this.added.keys()]) this.stop(source);
+  }
+}

@@ -39,6 +39,16 @@ export interface ScreenPoint {
   readonly yPx: number;
 }
 
+/** The screen point showing a WGS84 position ({@link Globe.geoToScreen}). */
+export interface GeoScreenPoint extends ScreenPoint {
+  /**
+   * Whether the globe hides the position from the eye, so an HTML marker there should hide (F653): on the globe's half
+   * of the morph, the eye lies below the position's horizontal plane (beyond the horizon, measured at the position's
+   * own height: a position high above the far side counts as hidden); never on the flat map's half.
+   */
+  readonly behindGlobe: boolean;
+}
+
 /** Graphics backend names. */
 export type BackendName = 'webgpu' | 'webgl2';
 
@@ -797,9 +807,10 @@ export interface Globe {
   screenToGeo(point: ScreenPoint): GeoPosition | undefined;
   /**
    * The screen point showing a WGS84 position, or undefined when it is behind the camera or before the viewport has a
-   * size. A position with non-finite values or a latitude outside ±90° throws a GlobeError ('invalid-coordinate').
+   * size; `behindGlobe` tells whether the globe hides it (F653). A position with non-finite values or a latitude
+   * outside ±90° throws a GlobeError ('invalid-coordinate').
    */
-  geoToScreen(position: GeoPosition): ScreenPoint | undefined;
+  geoToScreen(position: GeoPosition): GeoScreenPoint | undefined;
   /** Subscribes to an event; returns an unsubscribe function. */
   on<E extends keyof GlobeEvents>(event: E, handler: (payload: GlobeEvents[E]) => void): () => void;
   /** Changes the resolution scale (a multiplier of the device pixel ratio, 0.1–4) and redraws. */

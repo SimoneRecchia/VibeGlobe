@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-10-31: a flat map that never loads terrain, and six needs of an application in the library
+
+An application's flat road map lagged while zooming over a country with its roads on. A CPU profile at a quarter of a
+fast laptop's speed showed three costs the flat view did not need: the engine wanted terrain for every tile although
+the relief drew every height at 0 (KB-281: about 170 DEM tiles at each move), vector meshes sampled the terrain under
+every vertex (KB-282), and tiles waiting for their mesh built text keys for every ancestor of every layer each frame
+(KB-283). With all three fixed, the long tasks while zooming fell from about 850 ms to 60–330 ms per move and the
+vector layer's frame time from about 45 ms to 16 ms at that speed.
+
+Six needs of the same application, which had built them itself, are in the library now. `mercatorImage`
+(`@vibeglobe/sources`, F650) serves levels 0 to `maxLevel` of one Web Mercator image of the world, decoded once.
+`TierCounters` (`@vibeglobe/offline`, F651) give the bytes per tier, and `Offline.countTransport` counts a transport
+outside the tiers. A vector tile layer reads where its style placed the labels of a layer by a feature property
+(`labelAnchors`) and keeps chosen labels placed without drawing them (`setLabelsHidden`, F652). `Globe.geoToScreen`
+reports `behindGlobe` (F653). The controls gain the gesture switch `skyDragPan` and `forwardWheel(element)` for HTML
+over the map (F654). A `ModelSetLayer` with `ground: globe` stands its copies on the terrain as drawn, from the
+terrain in memory, and `markerPosition` puts an HTML marker on a model's top under any relief (F655). Unit tests
+cover all six; their browser steps are pending.
+
 ## 2026-10-31: a wind turbine and a solar table for the energy park (owner's request)
 
 The owner asked for a detailed but light wind turbine whose rotor turns at an adjustable speed and whose nacelle turns

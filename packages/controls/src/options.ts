@@ -6,6 +6,12 @@ import { GlobeError, type NavigationMode } from '@vibeglobe/core';
 export interface GestureSwitches {
   /** Primary-button or one-finger drag pans. */
   readonly dragPan: boolean;
+  /**
+   * A mouse or pen drag that starts on the sky, where no globe is drawn, turns the globe about the screen center
+   * (KB-202). Off, such a drag does nothing until the button is released, even once it reaches the globe; clicks and
+   * the other buttons work as before. Touch keeps it: a finger beside the globe often starts a pinch.
+   */
+  readonly skyDragPan: boolean;
   /** Wheel, trackpad scroll and trackpad pinch zoom. */
   readonly wheelZoom: boolean;
   /** Double-click and double-tap zoom in one level. */
@@ -180,6 +186,7 @@ export const DEFAULT_TILT_POLICY: TiltPolicy = Object.freeze({
 export const DEFAULT_CONTROLS_OPTIONS: ResolvedControlsOptions = {
   gestures: {
     dragPan: true,
+    skyDragPan: true,
     wheelZoom: true,
     doubleClickZoom: true,
     boxZoom: true,

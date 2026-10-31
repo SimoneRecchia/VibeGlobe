@@ -81,3 +81,17 @@ fractional zoom use the layer's `minzoom` and `maxzoom`, which follow the camera
 `layer.queryRenderedFeatures({ xPx, yPx })` returns the features under a point, topmost first (labels, then layers
 from the top down), with their layer, properties, position and, for buildings, their heights. With `element`, hover
 and click events reach `layer.on(listener)` and set the `hover` and `selected` feature-states.
+
+## Labels an application follows
+
+`layer.labelAnchors(layerId, property)` says where the last frame placed the labels of a symbol layer, by the value of
+a feature property (F652): each label's anchor on the ground (`position`) and on screen (`screenPoint`), the whole
+label (`text`, `boxes`, `feature`) with it. An application grows its own marker out of a country's name with
+`layer.labelAnchors('country-names', 'iso_a2').get('IT')?.position`.
+
+`layer.setLabelsHidden(layerId, labels)` keeps labels placed without drawing them: `true` hides every label of the
+layer, `false` none, `{ property: 'iso_a2', values: ['IT', 'FR'] }` those whose feature property has one of the values;
+each call replaces the layer's last choice. A hidden label keeps its room in collision, so the names around it stay
+where they are, and `labelAnchors` still lists it; it fades out over the label fade (300 ms on the engine clock) and
+back in when shown again. `placedLabels()` and picking leave hidden labels out once they have faded. Prefer this to a
+`text-opacity` expression: a label at opacity 0 is still picked, and the fade follows the style instead of the page.

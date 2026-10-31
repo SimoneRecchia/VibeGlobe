@@ -14,7 +14,8 @@ Every `ts` example below runs as an end-to-end test (`e2e/offline-guide.spec.ts`
 
 Wrap each source with `offline.source()`. A wrapped source looks for each tile in the engine's GPU and RAM memory,
 then in the persistent cache, then in the offline packages, then on the network, and stores downloads on the way
-back. `offline.stats()` counts where tiles came from.
+back. `offline.stats()` counts where tiles came from, and the bytes each tier delivered (`networkBytes`, `persistentBytes`,
+`revalidatedBytes`, `packageBytes`).
 
 ```ts
 import { createOffline } from '@vibeglobe/offline';
@@ -27,8 +28,15 @@ const request = imagery.request({ root: 0, level: 3, x: 4, y: 2 }, { url: '', ho
 if (request === 'noData') throw new Error('the tile should exist');
 await new Promise((done) => imagery.transport.start(request, { firstByteMs: 10_000, totalMs: 10_000 }, done));
 if (offline.stats('osm').network !== 1) throw new Error('the first tile comes from the network');
+if (offline.stats('osm').networkBytes === 0) throw new Error('its bytes are counted too');
 offline.destroy();
 ```
+
+Tiles that reach the engine without the tiers, such as a vector style's loaded through `addVectorTiles`, can be
+counted in the same statistics: `offline.countTransport(fetchTransport(), classify)` returns a transport to pass as the
+style's `transport`, and `classify(url)` names each request's source, its tier (`'network'`, or `'package'` for URLs a
+package host serves) and, for `onServe`, its tile; it returns `undefined` for requests not to count, such as glyphs and
+sprites. Only delivered tiles count.
 
 ## Network modes
 

@@ -150,6 +150,25 @@ const survey = await geotiffImage({ id: 'survey', image: 'https://images.example
 
 The image is downloaded and decoded once, and every engine tile draws its own piece, so an image larger than the GPU's texture limit shows completely. Rotated world files are refused with a `SourceConfigError`, as are images that cannot be read or placed.
 
+A Web Mercator image of the whole world (180° W to 180° E, about 85.05° S to 85.05° N), such as night lights shown
+from afar, needs no reprojection: `mercatorImage` downloads it with the first tile, decodes it once and cuts each tile
+of levels 0 to `maxLevel` from it on request; the engine enlarges the finest tiles beyond. A failed download is tried
+again with the next tile, and tiles fail as downloaded ones do. For an image of part of the world, use `singleImage`
+with `crs: 'EPSG:3857'` and its bounds.
+
+```ts
+import { mercatorImage } from '@vibeglobe/sources';
+
+// 2048 pixels wide: levels 0 to 3 are cut from it at their full resolution.
+const lights = mercatorImage({
+  id: 'night-lights',
+  image: 'https://images.example.com/night-lights.webp',
+  maxLevel: 3,
+  attribution: [{ text: 'Night lights: NASA Black Marble' }],
+});
+// A layer of its own: globe.imageryLayers.add({ id: 'night-lights', blend: 'night', sources: [lights] }).
+```
+
 ## Reprojection
 
 The engine draws Web Mercator and geographic tile pyramids. A service in another reference system, such as Italian data in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) or a custom WMTS tile matrix set, is reprojected on the client ([ADR 0039](../adr/0039-reprojection-and-tone-harmonization.md)): each engine tile asks for the source image covering it (a WMS GetMap, or the WMTS tiles composed in place) and warps it piecewise-affinely.

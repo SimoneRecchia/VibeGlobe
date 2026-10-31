@@ -90,6 +90,8 @@ export { VectorInteraction } from './vector-interaction.js';
 export type { VectorFeatureEvent } from './vector-interaction.js';
 export { LabelPlacer } from './label-placer.js';
 export type { LabelSource, LabelView, PlacedLabel } from './label-placer.js';
+export { HiddenLabels } from './placed-labels.js';
+export type { LabelPropertyValue, LabelsHidden } from './placed-labels.js';
 export { GlyphSource, LOCAL_FONT_STACK } from './glyph-source.js';
 export type { SpriteImage } from './glyph-source.js';
 export { VectorTileLoader } from './tile-loader.js';

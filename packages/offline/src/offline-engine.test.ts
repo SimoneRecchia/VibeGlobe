@@ -1,9 +1,9 @@
-import type { ImagerySource, TileCoord, TransportResult } from '@vibeglobe/core';
+import type { ImagerySource, TileCoord, TileTransport, TransportResult } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
 import { afterEach, describe, expect, it } from 'vitest';
 import { freshnessOf } from './cache-policy.js';
 import { memoryStore } from './memory-store.js';
-import { createOffline, type Offline, type OfflineOptions } from './offline-engine.js';
+import { createOffline, type Offline, type OfflineOptions, type ServeEvent } from './offline-engine.js';
 
 interface Served {
   status?: number;
@@ -576,6 +576,73 @@ describe('tier counters and aborted requests (TB-03)', () => {
     expect(events).toEqual([
       { mode: 'offline', sourceIds: [] },
       { mode: 'hybrid', sourceIds: ['a', 'b'] },
+    ]);
+  });
+});
+
+describe('bytes per tier (F651)', () => {
+  const bytes = (body: string) => ({
+    kind: 'ok' as const,
+    bytes: new TextEncoder().encode(body).buffer,
+    contentType: '',
+  });
+
+  it('counts the bytes each tier delivered next to its tiles, per source and in total', async () => {
+    const net = fakeNetwork((url) => {
+      if (url.endsWith('/1/0/0.png')) return { headers: { 'Cache-Control': 'max-age=3600' }, body: 'fresh' };
+      if (url.endsWith('/3/0/0.png'))
+        return { headers: { 'Cache-Control': 'no-cache', ETag: '"e"' }, body: 'etag-tile' };
+      return { body: 'x' };
+    });
+    const offline = engine({ fetch: net.fetchImpl });
+    offline.setPackageReader({
+      read: (_id, coord) =>
+        Promise.resolve(
+          coord.level === 2 ? { ...bytes('pkg!'), contentType: 'image/png', packageId: 'p@1' } : undefined,
+        ),
+    });
+    const osm = offline.source(fixture());
+    for (const coord of [tile(1, 0, 0), tile(1, 0, 0), tile(2, 0, 0), tile(3, 0, 0), tile(3, 0, 0)])
+      await load(osm, coord);
+    await load(offline.source(fixture('other')), tile(4, 0, 0));
+    const tiers = { persistent: 1, revalidated: 1, package: 1, network: 2, offlineMisses: 0 };
+    const tierBytes = { persistentBytes: 5, revalidatedBytes: 9, packageBytes: 4 };
+    expect(offline.stats('osm')).toEqual({ ...tiers, ...tierBytes, networkBytes: 14 });
+    expect(offline.stats()).toEqual({ ...tiers, ...tierBytes, network: 3, networkBytes: 15 });
+  });
+
+  it('counts the tiles a transport delivers outside the tiers, such as a vector style', async () => {
+    const served: ServeEvent[] = [];
+    const offline = engine({ onServe: (event) => served.push(event) });
+    const direct: TileTransport = {
+      start: (request, _timeouts, done) => {
+        const missing = request.url.includes('/missing/');
+        queueMicrotask(() =>
+          done(missing ? { kind: 'status', status: 404, retryAfterMs: undefined } : bytes('vector')),
+        );
+        return () => undefined;
+      },
+    };
+    const transport = offline.countTransport(direct, (url) => {
+      const [, level, x, y] = /\/(\d+)\/(\d+)\/(\d+)\.pbf$/.exec(url) ?? [];
+      if (level === undefined) return undefined;
+      const tier = url.startsWith('https://package.test/') ? 'package' : 'network';
+      return { sourceId: 'roads', tier, coord: tile(Number(level), Number(x), Number(y)) };
+    });
+    const urls = [
+      'https://package.test/roads/4/8/5.pbf',
+      'https://tiles.test/roads/5/16/10.pbf',
+      'https://tiles.test/missing/5/16/11.pbf',
+      'https://tiles.test/glyphs/0-255.pbf',
+    ];
+    const results = await Promise.all(
+      urls.map((url) => new Promise<TransportResult>((done) => transport.start({ url, hostIndex: 0 }, TIMEOUTS, done))),
+    );
+    expect(results.map((result) => result.kind)).toEqual(['ok', 'ok', 'status', 'ok']);
+    expect(offline.stats('roads')).toMatchObject({ package: 1, packageBytes: 6, network: 1, networkBytes: 6 });
+    expect(served.map((event) => [event.tier, event.coord.level])).toEqual([
+      ['package', 4],
+      ['network', 5],
     ]);
   });
 });

@@ -1,13 +1,14 @@
-import type { ModelPose, ModelRenderer, ModelSetOptions } from '@vibeglobe/core';
-import { describe, expect, it } from 'vitest';
+import type { ElevationSample, GeoPosition, Globe, ModelPose, ModelRenderer, ModelSetOptions } from '@vibeglobe/core';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { LayerStack } from './layer-stack.js';
-import { ModelSetLayer } from './model-set-layer.js';
+import { ModelSetLayer, type ModelSetGround } from './model-set-layer.js';
 import { RecordingRenderTarget } from './testing.js';
 
 /** A model renderer with sets that records what the layer tells it. */
 function fakeSets(): ModelRenderer & {
   loads: { source: unknown; options: ModelSetOptions }[];
   instances: { poses: readonly ModelPose[]; pickIds: readonly number[] } | undefined;
+  instanceUploads: number;
   highlights: Map<number, readonly number[] | undefined>;
   visible: boolean;
   removed: number[];
@@ -17,6 +18,7 @@ function fakeSets(): ModelRenderer & {
   const fake = {
     loads: [] as { source: unknown; options: ModelSetOptions }[],
     instances: undefined as { poses: readonly ModelPose[]; pickIds: readonly number[] } | undefined,
+    instanceUploads: 0,
     highlights: new Map<number, readonly number[] | undefined>(),
     visible: true,
     removed: [] as number[],
@@ -29,8 +31,10 @@ function fakeSets(): ModelRenderer & {
       fake.loads.push({ source, options });
       return Promise.resolve(7);
     },
-    setInstances: (_id: number, poses: readonly ModelPose[], pickIds: readonly number[]) =>
-      void (fake.instances = { poses, pickIds }),
+    setInstances: (_id: number, poses: readonly ModelPose[], pickIds: readonly number[]) => {
+      fake.instances = { poses, pickIds };
+      fake.instanceUploads++;
+    },
     setInstanceHighlight: (_id: number, index: number, rgba: readonly number[] | undefined) =>
       void fake.highlights.set(index, rgba),
     setVisible: (_id: number, visible: boolean) => void (fake.visible = visible),
@@ -222,5 +226,100 @@ describe('model set layer (F627)', () => {
     expect(() => layer.setYawDeg(Number.NaN)).toThrow(RangeError);
     expect(() => new ModelSetLayer({ url: 'a', models: [], yaw: { node: 'n', degPerSecond: 0 } })).toThrow(RangeError);
     expect(new ModelSetLayer({ url: 'a', models: turbines }).setYawDeg(90)).toBe(false);
+  });
+});
+
+/** A ground whose height at a longitude is `heights[lon]`, with its terrain uploads and relief set by the test. */
+function fakeGround(heights: Record<number, number>): ModelSetGround & {
+  uploads: number;
+  samples: number;
+  camera: { reliefFactor: number };
+} {
+  const ground = {
+    uploads: 1,
+    samples: 0,
+    camera: { reliefFactor: 1 },
+    elevationAt: (position: GeoPosition, out: ElevationSample) => {
+      ground.samples++;
+      out.heightMeters = heights[position.longitudeDeg] ?? 0;
+      return out;
+    },
+    terrainStats: () => ({ uploads: ground.uploads }),
+  };
+  return ground;
+}
+
+const PROJECTOR = { geoToScreen: () => undefined, zoom: () => 14 };
+
+describe('model set on the ground (F655)', () => {
+  it('stands its copies on the terrain in memory, again only when finer terrain arrives and the relief is not flat', async () => {
+    expectTypeOf<Globe>().toExtend<ModelSetGround>();
+    const models = fakeSets();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    const heights: Record<number, number> = { 9: 120, 10: 300 };
+    const ground = fakeGround(heights);
+    const layer = stack.add(
+      new ModelSetLayer({
+        url: 'turbine.glb',
+        ground,
+        models: [
+          { id: 'a', position: { longitudeDeg: 9, latitudeDeg: 45 } },
+          { id: 'b', position: { longitudeDeg: 10, latitudeDeg: 45, heightMeters: 5 } },
+        ],
+      }),
+    );
+    await layer.ready;
+    const heightsDrawn = (): (number | undefined)[] =>
+      models.instances?.poses.map((p) => p.position.heightMeters) ?? [];
+    expect(heightsDrawn()).toEqual([120, 305]);
+    const frame = (): void => stack.frame({ nowMs: 0, zoom: 14, projector: PROJECTOR });
+    frame();
+    expect(ground.samples).toBe(2);
+    expect(models.instanceUploads).toBe(1);
+    // Finer terrain arrived.
+    heights[9] = 118;
+    ground.uploads++;
+    frame();
+    expect(heightsDrawn()).toEqual([118, 305]);
+    // A flat relief draws every height at 0: nothing is sampled until it rises again.
+    ground.camera.reliefFactor = 0;
+    ground.uploads++;
+    frame();
+    expect(ground.samples).toBe(4);
+    ground.camera.reliefFactor = 0.5;
+    frame();
+    expect(ground.samples).toBe(6);
+    // The renderer scales the drawn heights by the relief, not the model: 84 m above `b`'s foot is 168 m in a position.
+    expect(layer.markerPosition('b', 84)).toEqual({ longitudeDeg: 10, latitudeDeg: 45, heightMeters: 305 + 168 });
+    expect(layer.getPosition('b')).toEqual({ longitudeDeg: 10, latitudeDeg: 45, heightMeters: 5 });
+    layer.setFeaturePosition('a', 10, 45, 2);
+    expect(heightsDrawn()).toEqual([302, 305]);
+    expect(layer.markerPosition('a', 84, 0.25)?.heightMeters).toBe(302 + 336);
+    ground.camera.reliefFactor = 0;
+    expect(layer.markerPosition('a', 84)).toEqual({ longitudeDeg: 10, latitudeDeg: 45, heightMeters: 302 });
+    expect(layer.markerPosition('missing')).toBeUndefined();
+  });
+
+  it('reports a ground it cannot read once and leaves the copies where they stand', async () => {
+    const models = fakeSets();
+    const stack = new LayerStack(Object.assign(new RecordingRenderTarget(), { models }));
+    const ground = fakeGround({});
+    ground.elevationAt = () => {
+      throw new Error('display only');
+    };
+    const layer = stack.add(
+      new ModelSetLayer({
+        url: 'a.glb',
+        ground,
+        models: [{ id: 'a', position: { longitudeDeg: 9, latitudeDeg: 45 } }],
+      }),
+    );
+    const errors: unknown[] = [];
+    layer.on('error', (error) => errors.push(error.cause));
+    await layer.ready;
+    ground.uploads++;
+    stack.frame({ nowMs: 0, zoom: 14, projector: PROJECTOR });
+    expect(errors).toHaveLength(1);
+    expect(models.instances?.poses[0]?.position).toEqual({ longitudeDeg: 9, latitudeDeg: 45 });
   });
 });

@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The public types of vector tile layers (ADR 0131). */
 import type { ScreenPoint, TileTransport } from '@vibeglobe/core';
+import type { LabelPropertyValue, LabelsHidden } from './placed-labels.js';
 import type { PlacedLabel } from './label-placer.js';
 import type { VectorFeatureEvent } from './vector-interaction.js';
 import type { PickedVectorFeature } from './vector-picking.js';
@@ -38,8 +39,24 @@ export interface VectorTileLayer {
     feature: { readonly source: string; readonly id: number | string },
     state: Record<string, unknown>,
   ): void;
-  /** The labels the last frame placed, with their screen boxes (F449). */
+  /**
+   * The labels the last frame placed and drew, with their screen boxes (F449); hidden ones (`setLabelsHidden`) only
+   * while they fade out.
+   */
   placedLabels(): readonly PlacedLabel[];
+  /**
+   * Where the last frame placed the labels of a style layer, by the value of a feature property (F652): each label's
+   * anchor on the ground (`position`) and on screen (`screenPoint`), for example to grow a marker out of a country's
+   * name. Labels hidden with `setLabelsHidden` are included; of several labels with the same value, the first.
+   */
+  labelAnchors(layerId: string, property: string): ReadonlyMap<LabelPropertyValue, PlacedLabel>;
+  /**
+   * Keeps labels of a style layer placed without drawing them (F652): they keep their room in collision, so the labels
+   * around them stay where they are, and `labelAnchors` still lists them, while they fade out over the label fade
+   * (300 ms on the engine clock) and back in when shown again. `true` hides every label of the layer, `false` none,
+   * `{ property, values }` those whose feature property has one of the values; each call replaces the layer's last.
+   */
+  setLabelsHidden(layerId: string, labels: LabelsHidden): void;
   /**
    * Tiles requested or being laid out and not ready yet, over every source, and glyph ranges labels wait for (tests
    * wait for 0).

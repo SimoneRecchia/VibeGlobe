@@ -312,6 +312,7 @@ export class SurfaceFrame {
     drawWithoutTerrain(this.draws, count);
     timer.end(PHASE_SELECTION);
     if (this.imagery) {
+      this.imagery.relief = this.view.morph.factors[1] !== 0;
       this.imagery.draw(this.draws, this.tiles, count, camera, this.nowMs, this.fadeMs, timer);
     } else {
       timer.end(PHASE_SCHEDULING);

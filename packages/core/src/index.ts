@@ -48,6 +48,7 @@ export type {
   TileDrawOverlay,
   TileDrawList,
   GeoPosition,
+  GeoScreenPoint,
   Globe,
   GlobeEvents,
   GlobeOptions,

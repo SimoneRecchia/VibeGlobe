@@ -12,7 +12,7 @@ import type {
 import { freshnessOf, type SourceCachePolicy } from './cache-policy.js';
 import { endpointOf } from './connectivity.js';
 import { fetchTile, type FetchOutcome } from './network-fetch.js';
-import type { CachedTile, PolicyDecision, ProviderRules, TierCounters } from './types.js';
+import type { CachedTile, PolicyDecision, ProviderRules, ServedTier } from './types.js';
 
 /** A tile read from an offline package. */
 export interface PackageTile {
@@ -20,6 +20,13 @@ export interface PackageTile {
   readonly contentType: string;
   /** The package and version it came from, as `id@version`. */
   readonly packageId: string;
+}
+
+/** A tile a tier delivered: where it lies (when known), its size, and the package it came from. */
+export interface ServedTile {
+  readonly coord?: TileCoord | undefined;
+  readonly bytes: number;
+  readonly packageId?: string;
 }
 
 /** What a wrapped source needs from the engine around it (supplied by `createOffline`). */
@@ -46,7 +53,8 @@ export interface TierContext {
   offlineOnly(sourceId: string, layerId: string): boolean;
   /** Counts changes of connectivity, mode or switches: a miss is worth retrying only after one (KB-190). */
   changes(): number;
-  count(sourceId: string, tier: keyof TierCounters, coord?: TileCoord, packageId?: string): void;
+  /** Counts a tile a tier delivered, with its size (F651); without a tile, a request no tier could answer. */
+  count(sourceId: string, tier: ServedTier | 'offlineMisses', tile?: ServedTile): void;
   /** The credit a package's tiles of a source carry (F306, KB-189): one object per package and source, or none. */
   packageCredit(sourceId: string, packageId: string): Attribution | undefined;
   readonly fetch: typeof fetch;
@@ -201,14 +209,14 @@ class TileLoader {
     // A request the engine aborted meanwhile delivers nothing, so no tier counts it (TB-03).
     if (signal.aborted) return ABORTED;
     if (stored && this.fresh(stored)) {
-      this.context.count(id, 'persistent', coord);
+      this.context.count(id, 'persistent', { coord, bytes: stored.bytes.byteLength });
       return okOf(stored);
     }
     if (decision.readPackages) {
       const tile = await this.context.readPackage(id, coord, signal).catch(() => undefined);
       if (signal.aborted) return ABORTED;
       if (tile) {
-        this.context.count(id, 'package', coord, tile.packageId);
+        this.context.count(id, 'package', { coord, bytes: tile.bytes.byteLength, packageId: tile.packageId });
         // The package's credit is listed while this tile is drawn, and no longer (F306, KB-189).
         const attribution = this.context.packageCredit(id, tile.packageId);
         return {
@@ -239,7 +247,7 @@ class TileLoader {
     }
     if (stored) {
       // Expired but unreachable: a stale tile beats a hole.
-      this.context.count(id, 'persistent', coord);
+      this.context.count(id, 'persistent', { coord, bytes: stored.bytes.byteLength });
       return okOf(stored);
     }
     return this.miss(decision, key, signal);
@@ -293,7 +301,7 @@ class TileLoader {
         this.context.count(
           id,
           stored?.etag !== undefined && outcome.headers.etag === stored.etag ? 'revalidated' : 'network',
-          coord,
+          { coord, bytes: outcome.bytes.byteLength },
         );
         this.write(key, decision, outcome.headers, { bytes: outcome.bytes, contentType: outcome.contentType });
         const timing = outcome.timing;
@@ -310,7 +318,7 @@ class TileLoader {
       case 'not-modified': {
         this.context.reportSuccess(endpoint);
         if (!stored) return { kind: 'status', status: 502, retryAfterMs: undefined };
-        this.context.count(id, 'revalidated', coord);
+        this.context.count(id, 'revalidated', { coord, bytes: stored.bytes.byteLength });
         this.write(key, decision, outcome.headers, stored);
         return okOf(stored);
       }

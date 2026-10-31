@@ -15,6 +15,7 @@ import { pickVectorFeatures, type DrawnTile, type PickedVectorFeature } from './
 import { fetchTransport } from '@vibeglobe/sources';
 import { TileGrounds } from './drape.js';
 import { GlyphSource } from './glyph-source.js';
+import { HiddenLabels, type LabelPropertyValue, type LabelsHidden } from './placed-labels.js';
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
 import { localizedTextField } from './osm.js';
@@ -83,6 +84,7 @@ class Runtime implements VectorTileLayer {
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
   private unsubscribe: (() => void) | undefined;
   private placer: LabelPlacer | undefined;
+  private readonly hiddenLabels = new HiddenLabels();
   private glyphs: GlyphSource | undefined;
   private readonly grounds: TileGrounds;
   private rasters: RasterLayers | undefined;
@@ -152,6 +154,15 @@ class Runtime implements VectorTileLayer {
     return this.placer?.placed() ?? [];
   }
 
+  labelAnchors(layerId: string, property: string): ReadonlyMap<LabelPropertyValue, PlacedLabel> {
+    return this.placer?.placedBy(layerId, property) ?? new Map();
+  }
+
+  setLabelsHidden(layerId: string, labels: LabelsHidden): void {
+    this.hiddenLabels.set(layerId, labels);
+    this.globe.requestRender();
+  }
+
   loadingTiles(): number {
     let n = 0;
     for (const source of this.sources.values()) n += source.loader.loading;
@@ -192,9 +203,7 @@ class Runtime implements VectorTileLayer {
     );
     void glyphs.loadSprite(this.style.sprite, globalThis.devicePixelRatio ?? 1);
     this.glyphs = glyphs;
-    this.placer = new LabelPlacer(this.globe, glyphs, target.atlas, (source, id) =>
-      this.featureStates.get(`${source}|${id}`),
-    );
+    this.placer = new LabelPlacer(this.globe, glyphs, target.atlas, (s, id) => this.stateOf(s, id), this.hiddenLabels);
     for (const [id, source] of this.resolved) {
       if (source === undefined || source.raster !== undefined) continue;
       const loader = new VectorTileLoader({

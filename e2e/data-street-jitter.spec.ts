@@ -58,7 +58,7 @@ async function anchors(page: Page, lon: number, lat: number, heights: readonly n
     [PRIMITIVES.map((p, i) => at(p.east, p.north, heights[i] ?? 0)), square] as const,
   );
   const polygon = PRIMITIVES.findIndex((p) => p.name === 'polygon');
-  if (corners.every((c) => c !== undefined)) points[polygon] = areaCentroid(corners);
+  if (corners.every((c) => c !== undefined)) points[polygon] = { ...areaCentroid(corners), behindGlobe: false };
   return points;
 }
 

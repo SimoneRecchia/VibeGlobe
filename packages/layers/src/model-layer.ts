@@ -207,4 +207,10 @@ function poseOf(feature: ModelFeature, position: GeoPosition): ModelPose {
 }
 
 export { ModelSetLayer } from './model-set-layer.js';
-export type { ModelSetItem, ModelSetLayerOptions, ModelSetSpin, ModelSetYaw } from './model-set-layer.js';
+export type {
+  ModelSetGround,
+  ModelSetItem,
+  ModelSetLayerOptions,
+  ModelSetSpin,
+  ModelSetYaw,
+} from './model-set-layer.js';

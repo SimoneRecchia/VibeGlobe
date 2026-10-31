@@ -7,6 +7,7 @@
  */
 export { createOffline } from './offline-engine.js';
 export type {
+  CountedTile,
   Offline,
   OfflineEvents,
   OfflineOptions,
@@ -66,6 +67,7 @@ export type {
   PolicyRequest,
   ProviderRules,
   RequestPurpose,
+  ServedTier,
   StorageUsage,
   SwitchScope,
   TierCounters,

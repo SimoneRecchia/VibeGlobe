@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { Attribution, TileCoord, TileSource } from '@vibeglobe/core';
+import type { Attribution, TileCoord, TileSource, TileTransport } from '@vibeglobe/core';
 import { ConnectivityMonitor, endpointOf, type HealthCheckTiming } from './connectivity.js';
 import { DEFAULT_CACHE_BYTES, indexedDbStore } from './idb-store.js';
 import { workerStore } from './worker-store.js';
@@ -9,7 +9,7 @@ import { requestPersistence, type PersistenceResult } from './persistence.js';
 import { defaultNetworkPolicy } from './policy.js';
 import { SwitchBoard } from './switches.js';
 import type { PackageAttribution } from './packages/manifest.js';
-import { tieredSource, type PackageTile, type TieredSourceOptions } from './tiered-source.js';
+import { tieredSource, type PackageTile, type ServedTile, type TieredSourceOptions } from './tiered-source.js';
 import type {
   CacheStore,
   Connectivity,
@@ -18,6 +18,7 @@ import type {
   NetworkMode,
   NetworkPolicy,
   ProviderRules,
+  ServedTier,
   SwitchScope,
   TierCounters,
 } from './types.js';
@@ -71,9 +72,16 @@ export interface OfflineOptions {
 export interface ServeEvent {
   readonly sourceId: string;
   readonly coord: TileCoord;
-  readonly tier: keyof TierCounters;
+  readonly tier: ServedTier;
   /** The package it was read from, for the package tier. */
   readonly packageId?: string;
+}
+
+/** How {@link Offline.countTransport} counts a delivered tile: its source, its tier and, for `onServe`, where it lies. */
+export interface CountedTile {
+  readonly sourceId: string;
+  readonly tier: ServedTier;
+  readonly coord?: TileCoord;
 }
 
 /** The effective settings (F271). */
@@ -106,8 +114,14 @@ export interface Offline {
    * network tiers (F272).
    */
   source<S extends TileSource>(source: S, options?: TieredSourceOptions): S;
-  /** Where tiles came from, per source and in total. */
+  /** Where tiles came from and their bytes, per source and in total. */
   stats(sourceId?: string): TierCounters;
+  /**
+   * Wraps a transport whose tiles reach the engine without the tiers, such as a vector style's (F651), so that the tiles
+   * it delivers count in {@link Offline.stats} and reach `onServe`: `classify` names a request's source and tier, or
+   * returns undefined to leave it out (glyphs, sprites).
+   */
+  countTransport(transport: TileTransport, classify: (url: string) => CountedTile | undefined): TileTransport;
   /** The persistent cache's use and limit. */
   cacheUsage(): Promise<{ bytes: number; quotaBytes: number | undefined }>;
   /** Removes cached tiles: of one source, or all. */
@@ -140,7 +154,17 @@ function writeFlag(value: string): void {
   }
 }
 
-const zeroCounters = (): TierCounters => ({ persistent: 0, revalidated: 0, package: 0, network: 0, offlineMisses: 0 });
+const zeroCounters = (): TierCounters => ({
+  persistent: 0,
+  revalidated: 0,
+  package: 0,
+  network: 0,
+  offlineMisses: 0,
+  persistentBytes: 0,
+  revalidatedBytes: 0,
+  packageBytes: 0,
+  networkBytes: 0,
+});
 
 /** Creates an offline engine (ADR 0033). Its sources plug into the engine through the frozen source contract. */
 export function createOffline(options: OfflineOptions = {}): Offline {
@@ -299,6 +323,29 @@ class OfflineEngine implements Offline {
     return total;
   }
 
+  countTransport(transport: TileTransport, classify: (url: string) => CountedTile | undefined): TileTransport {
+    return {
+      start: (request, timeouts, done) =>
+        transport.start(request, timeouts, (result) => {
+          if (result.kind === 'ok') {
+            const tile = classify(request.url);
+            if (tile) this.count(tile.sourceId, tile.tier, { coord: tile.coord, bytes: result.bytes.byteLength });
+          }
+          done(result);
+        }),
+    };
+  }
+
+  private count(sourceId: string, tier: ServedTier | 'offlineMisses', tile?: ServedTile): void {
+    let counters = this.counters.get(sourceId);
+    if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
+    counters[tier]++;
+    if (!tile || tier === 'offlineMisses') return;
+    counters[`${tier}Bytes`] += tile.bytes;
+    const { coord, packageId } = tile;
+    if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
+  }
+
   cacheUsage(): Promise<{ bytes: number; quotaBytes: number | undefined }> {
     return this.store.usage().catch(() => ({ bytes: 0, quotaBytes: undefined }));
   }
@@ -407,12 +454,7 @@ class OfflineEngine implements Offline {
         }),
       offlineOnly: (sourceId, layerId) => this.modeOf(sourceId, layerId) === 'offline',
       changes: () => this.changeCount,
-      count: (sourceId, tier, coord, packageId) => {
-        let counters = this.counters.get(sourceId);
-        if (!counters) this.counters.set(sourceId, (counters = zeroCounters()));
-        counters[tier]++;
-        if (coord) this.onServe?.({ sourceId, coord, tier, ...(packageId === undefined ? {} : { packageId }) });
-      },
+      count: (sourceId, tier, tile) => this.count(sourceId, tier, tile),
       packageCredit: (sourceId, packageId) => this.packageCredit(sourceId, packageId),
       fetch: this.fetchImpl,
     };

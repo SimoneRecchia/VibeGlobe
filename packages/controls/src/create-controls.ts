@@ -18,7 +18,7 @@ import { TiltPolicyState } from './tilt-policy.js';
 import { TouchGestures } from './touch-gestures.js';
 import { WheelInput } from './wheel-input.js';
 import { ZoomBox } from './zoom-box.js';
-import { domListeners } from './dom-listeners.js';
+import { domListeners, WheelForwarding } from './dom-listeners.js';
 
 /** The controls factory with commands for buttons and applications. */
 export interface NavigationControls extends ControlsFactory {
@@ -70,6 +70,13 @@ export interface NavigationControls extends ControlsFactory {
   readonly maxTiltDeg: number;
   /** Calls `listener` with {@link NavigationControls.tiltAvailable} each time it changes; returns the unsubscribe. */
   onTiltAvailabilityChange(listener: (available: boolean) => void): () => void;
+  /**
+   * Lets the wheel and the trackpad zoom the map over `element` too (F654): markers, labels or panels laid over the
+   * map, which would otherwise take those events. They zoom about the pointer as over the map, and the page neither
+   * scrolls nor zooms there. An event the map or the element already handled (its default prevented) is left alone,
+   * so `element` may also hold the map. Kept from one attachment to the next; returns the function that stops it.
+   */
+  forwardWheel(element: EventTarget): () => void;
 }
 
 /**
@@ -84,13 +91,14 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   let mode = resolved.navigationMode;
   let maxLatitudeDeg = resolved.northUpMaxLatitudeDeg;
   let navigationApi: NavigationApi | undefined;
+  const wheels = new WheelForwarding();
   const tilt = new TiltPolicyState(resolved.tiltPolicy);
   const factory = (element: unknown, navigation: NavigationApi): Controls => {
     navigationApi = navigation;
     navigation.navigationMode = mode;
     navigation.northUpMaxLatitudeDeg = maxLatitudeDeg;
     tilt.write(navigation);
-    const attached = attach(element as HTMLElement, navigation, resolved, globe);
+    const attached = attach(element as HTMLElement, navigation, resolved, globe, wheels);
     current = attached;
     return {
       update() {
@@ -128,6 +136,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
     tiltAvailable: true,
     maxTiltDeg: 90,
     onTiltAvailabilityChange: (listener: (available: boolean) => void) => tilt.listen(listener),
+    forwardWheel: (source: EventTarget) => wheels.forward(source),
   });
   Object.defineProperty(controls, 'tiltPolicy', { get: () => tilt.policy, enumerable: true });
   Object.defineProperty(controls, 'tiltAvailable', { get: () => tilt.available, enumerable: true });
@@ -182,11 +191,26 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
   return context;
 }
 
+/** Takes the element for input until the returned function gives it back as it was. */
+function takeElement(element: HTMLElement): () => void {
+  // The browser must not take drags and pinches over the map for scrolling or page zoom (F189).
+  const touchAction = element.style.touchAction;
+  element.style.touchAction = 'none';
+  // Keyboard navigation needs a focusable map (F213): an application's own canvas may not be.
+  const focusable = element.hasAttribute('tabindex');
+  if (!focusable) element.tabIndex = 0;
+  return () => {
+    element.style.touchAction = touchAction;
+    if (!focusable) element.removeAttribute('tabindex');
+  };
+}
+
 function attach(
   element: HTMLElement,
   navigation: NavigationApi,
   options: ResolvedControlsOptions,
   globe: ConnectedGlobe | undefined,
+  wheels: WheelForwarding,
 ): Attached {
   const view = element.ownerDocument.defaultView;
   const port = new CameraPort(navigation, () => view?.performance.now() ?? Date.now());
@@ -201,13 +225,9 @@ function attach(
     box.stop();
   });
   const listeners = domListeners(element, port, context, { mouse, touch, wheel, keyboard, box });
-  // The browser must not take drags and pinches over the map for scrolling or page zoom (F189).
-  const touchAction = element.style.touchAction;
-  element.style.touchAction = 'none';
-  // Keyboard navigation needs a focusable map (F213): an application's own canvas may not be.
-  const focusable = element.hasAttribute('tabindex');
-  if (!focusable) element.tabIndex = 0;
+  const restore = takeElement(element);
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: false });
+  const stopWheels = wheels.attach(element, listeners);
   return {
     port,
     keyboard,
@@ -239,8 +259,8 @@ function attach(
     },
     destroy() {
       for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
-      element.style.touchAction = touchAction;
-      if (!focusable) element.removeAttribute('tabindex');
+      stopWheels();
+      restore();
       box.cancel();
       element.style.outline = '';
     },

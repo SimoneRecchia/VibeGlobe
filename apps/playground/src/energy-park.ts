@@ -9,12 +9,18 @@
  * second). Without `lon` and `lat` the camera starts south of the park. Hooks in `window.vibeglobeEnergyPark`.
  */
 import type { Globe } from '@vibeglobe/core';
-import { createGlobeLayers, type LayerStack } from '@vibeglobe/layers';
+import { createGlobeLayers, fitObjects, type LayerStack } from '@vibeglobe/layers';
 import { ModelSetLayer } from '@vibeglobe/layers/models';
 
 declare global {
   interface Window {
-    vibeglobeEnergyPark?: { stack: LayerStack; turbines: ModelSetLayer; solar: ModelSetLayer };
+    vibeglobeEnergyPark?: {
+      stack: LayerStack;
+      turbines: ModelSetLayer;
+      solar: ModelSetLayer;
+      /** Flies to the turbines given, whole, or with none to the whole park from 45°, every device in view (F667). */
+      frame(turbineIds?: readonly string[]): Promise<string>;
+    };
   }
 }
 
@@ -76,7 +82,12 @@ export async function showEnergyPark(globe: Globe, app: HTMLElement, params: URL
   );
   if (!params.has('lon')) globe.jumpTo({ ...at(820, 380), zoom: 15.6, tiltDeg: 68, headingDeg: 0 });
   await Promise.all([turbines.ready, solar.ready]);
-  window.vibeglobeEnergyPark = { stack, turbines, solar };
+  // A turbine from the view's own tilt; the whole park from 45°, so its far row shows as well as the near one.
+  const frame = (ids?: readonly string[]): Promise<string> =>
+    ids
+      ? fitObjects(globe, turbines.framePositions(ids), { paddingPx: 40 })
+      : fitObjects(globe, [...turbines.framePositions(), ...solar.framePositions()], { paddingPx: 40, tiltDeg: 45 });
+  window.vibeglobeEnergyPark = { stack, turbines, solar, frame };
   const panel = document.createElement('div');
   panel.id = 'energy-park-controls';
   panel.style.cssText =

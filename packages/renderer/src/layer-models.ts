@@ -140,6 +140,11 @@ export class LayerModels implements ModelRenderer {
   }
 
   /** See {@link ModelRenderer}. */
+  setBounds(id: number): readonly number[] | undefined {
+    return this.sets.get(id)?.box;
+  }
+
+  /** See {@link ModelRenderer}. */
   setPose(id: number, pose: ModelPose): void {
     const model = this.models.get(id);
     if (model) model.pose = pose;

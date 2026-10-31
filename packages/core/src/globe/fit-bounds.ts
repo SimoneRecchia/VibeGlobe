@@ -17,6 +17,10 @@ const EDGE_SAMPLES = 9;
 const MIN_ZOOM = 0;
 const MAX_ZOOM = 22;
 const STEPS = 20;
+/** The nearest a fit brings the eye to the middle of what it frames, meters: a lone point is seen with its ground. */
+const MIN_FIT_DISTANCE_METERS = 100;
+/** The equatorial radius, meters, for the few hundred meters a fitted center moves. */
+const EARTH_RADIUS_METERS = 6_378_137;
 
 /** Throws a GlobeError unless `bounds` are finite degrees with south ≤ north; east < west crosses the antimeridian. */
 export function validateBounds(bounds: unknown): GeoBounds {
@@ -70,7 +74,8 @@ function edgeSamples(bounds: GeoBounds, width: number): { longitudeDeg: number; 
  * The view that shows `bounds` inside the viewport minus `paddingPx` on every side, with the camera's heading and the
  * tilt the view mode applies there (F176): centered on the bounds' Web Mercator middle (across the antimeridian when
  * east < west), at the largest zoom where every corner and edge sample projects inside the padded viewport, using the
- * engine's own projection through the globe-to-flat morph; `include` adds positions (with heights) that must fit too.
+ * engine's own projection through the globe-to-flat morph; `include` adds positions (with heights) that must fit too,
+ * and `tiltDeg` replaces the view mode's tilt.
  * Works on copies: the camera and view state are untouched.
  */
 export function viewForBounds(
@@ -79,49 +84,76 @@ export function viewForBounds(
   bounds: GeoBounds,
   paddingPx: number,
   include: readonly GeoPosition[] = [],
+  tiltDeg?: number,
 ): { longitudeDeg: number; latitudeDeg: number; zoom: number } {
   const width =
     bounds.eastDeg >= bounds.westDeg ? bounds.eastDeg - bounds.westDeg : bounds.eastDeg + 360 - bounds.westDeg;
-  let longitudeDeg = bounds.westDeg + width / 2;
-  if (longitudeDeg >= 180) longitudeDeg -= 360;
-  const latitudeDeg = latitudeOfY((mercatorY(bounds.southDeg) + mercatorY(bounds.northDeg)) / 2);
-  const samples: GeoPosition[] = [...edgeSamples(bounds, width), ...include];
+  const lon = (bounds.westDeg + width / 2) * RAD;
+  const lat =
+    Math.max(
+      -MAX_LATITUDE_DEG,
+      Math.min(MAX_LATITUDE_DEG, latitudeOfY((mercatorY(bounds.southDeg) + mercatorY(bounds.northDeg)) / 2)),
+    ) * RAD;
+  // The bounds lie at the lowest of the included positions (their ground), and the view aims at the middle of their
+  // heights, so a tall object stands centered (KB-301).
+  const heights = include.map((p) => p.heightMeters ?? 0);
+  const low = heights.length > 0 ? Math.min(...heights) : 0;
+  const middle = (low + (heights.length > 0 ? Math.max(...heights) : 0)) / 2;
+  const samples = [...edgeSamples(bounds, width).map((sample) => ({ ...sample, heightMeters: low })), ...include];
+  const { probe, fit } = probeOf(camera, view);
+  if (tiltDeg !== undefined) fit.chooseTilt(tiltDeg * RAD);
+  const pose = probe.pose;
+  pose.targetLatitudeRad = lat;
+  const fits = (zoom: number): boolean => {
+    pose.rangeMeters = rangeForGroundZoom(groundZoomFromMercatorZoom(zoom, lat), probe.heightPx, probe.fovYRad);
+    probe.update();
+    fit.previewTilt(probe);
+    // The aim point is where the view's central ray, through the middle of the heights, meets the ellipsoid; the eye
+    // is that much nearer the middle than the aim point.
+    const ahead = (middle * Math.tan(pose.tiltRad)) / EARTH_RADIUS_METERS;
+    pose.targetLatitudeRad = lat + ahead * Math.cos(pose.headingRad);
+    pose.targetLongitudeRad = lon + (ahead * Math.sin(pose.headingRad)) / Math.cos(lat);
+    if (pose.rangeMeters - middle / Math.cos(pose.tiltRad) < MIN_FIT_DISTANCE_METERS) return false;
+    return samples.every((sample) => inside(screenOf(probe, fit, sample), probe, paddingPx));
+  };
+  let lowest = MIN_ZOOM;
+  let high = MAX_ZOOM;
+  if (fits(high)) lowest = high;
+  for (let step = 0; step < STEPS && high - lowest > 0; step++) {
+    const zoom = (lowest + high) / 2;
+    if (fits(zoom)) lowest = zoom;
+    else high = zoom;
+  }
+  // The aim point of the zoom found.
+  fits(lowest);
+  const longitudeDeg = pose.targetLongitudeRad * DEG;
+  return {
+    longitudeDeg: longitudeDeg >= 180 ? longitudeDeg - 360 : longitudeDeg,
+    latitudeDeg: pose.targetLatitudeRad * DEG,
+    zoom: lowest,
+  };
+}
+
+/** A camera and a view state like the globe's, to try views on: same viewport, heading and view mode. */
+function probeOf(camera: Camera, view: ViewState): { probe: Camera; fit: ViewState } {
   const probe = new Camera();
   probe.widthPx = camera.widthPx;
   probe.heightPx = camera.heightPx;
   probe.fovYRad = camera.fovYRad;
   probe.pose.headingRad = camera.pose.headingRad;
-  probe.pose.targetLongitudeRad = longitudeDeg * RAD;
-  probe.pose.targetLatitudeRad = Math.max(-MAX_LATITUDE_DEG, Math.min(MAX_LATITUDE_DEG, latitudeDeg)) * RAD;
   const fit = new ViewState(view.curves);
   if (view.mode === 'manual') fit.chooseTilt(view.chosenTiltRad);
   else if (view.mode === '2d') fit.setMode('2d');
-  const fits = (zoom: number): boolean => {
-    probe.pose.rangeMeters = rangeForGroundZoom(
-      groundZoomFromMercatorZoom(zoom, probe.pose.targetLatitudeRad),
-      probe.heightPx,
-      probe.fovYRad,
-    );
-    probe.update();
-    fit.previewTilt(probe);
-    return samples.every((sample) => {
-      const point = screenOf(probe, fit, sample);
-      return (
-        point !== undefined &&
-        point.xPx >= paddingPx - 1e-6 &&
-        point.xPx <= probe.widthPx - paddingPx + 1e-6 &&
-        point.yPx >= paddingPx - 1e-6 &&
-        point.yPx <= probe.heightPx - paddingPx + 1e-6
-      );
-    });
-  };
-  let low = MIN_ZOOM;
-  let high = MAX_ZOOM;
-  if (fits(high)) low = high;
-  for (let step = 0; step < STEPS && high - low > 0; step++) {
-    const middle = (low + high) / 2;
-    if (fits(middle)) low = middle;
-    else high = middle;
-  }
-  return { longitudeDeg, latitudeDeg: probe.pose.targetLatitudeRad * DEG, zoom: low };
+  return { probe, fit };
+}
+
+/** Whether a screen point lies inside the viewport less `paddingPx` on every side. */
+function inside(point: { xPx: number; yPx: number } | undefined, probe: Camera, paddingPx: number): boolean {
+  return (
+    point !== undefined &&
+    point.xPx >= paddingPx - 1e-6 &&
+    point.xPx <= probe.widthPx - paddingPx + 1e-6 &&
+    point.yPx >= paddingPx - 1e-6 &&
+    point.yPx <= probe.heightPx - paddingPx + 1e-6
+  );
 }

@@ -423,6 +423,8 @@ for (const backend of BACKENDS) {
     // 160 wheel steps, each drawn by a software rasterizer in CI.
     test.setTimeout(180_000);
     await openGlobe(page, `backend=${backend}&lon=9.19&lat=45.46&zoom=2`);
+    // Down to 1 m with no distance kept from the surface (KB-300 keeps 40 m by default).
+    await page.evaluate(() => window.vibeglobePlayground?.globe.setConstraints({ minSurfaceDistanceMeters: 0 }));
     const box = await page.locator('#globe').boundingBox();
     if (!box) throw new Error('no canvas');
     const cursor = { xPx: box.width / 2 + 40, yPx: box.height / 2 - 30 };

@@ -12,6 +12,8 @@ import { positionAt } from './view-geometry.js';
 import { ControlsSlot } from './controls-slot.js';
 
 const RAD = Math.PI / 180;
+/** The zoom step being limited (ADR 0018: doubles in arrays, not through calls). */
+const step = new Float64Array(1);
 
 /** How a drag moves the camera (see `NavigationApi.navigationMode`). */
 export type NavigationMode = NonNullable<NavigationApi['navigationMode']>;
@@ -35,6 +37,8 @@ export interface ViewHost {
   limitZoom(deltaZoom: number): number;
   /** Whether zoom limits are set: without them a step goes through untouched, with no call (KB-132). */
   zoomLimited(): boolean;
+  /** Limits the zoom step in `io[0]` toward `point` so the eye keeps its distance to the surface (KB-300). */
+  limitToSurface(point: unknown, io: Float64Array): void;
   /** Stops a running API movement (KB-127). */
   interruptMovement(): void;
   /** Interrupts the running movement if it eases the tilt: a view mode chosen meanwhile takes over (KB-207). */
@@ -68,11 +72,10 @@ export class ViewControl {
       },
       zoomAt: (point, deltaZoom) => {
         if (!this.input()) return;
-        const allowed =
-          host.zoomLimited() && typeof deltaZoom === 'number' && Number.isFinite(deltaZoom)
-            ? host.limitZoom(deltaZoom)
-            : deltaZoom;
-        if (zoomCamera(host.cam, host.view, point, allowed, this.northUp())) host.requestRender();
+        if (typeof deltaZoom !== 'number' || !Number.isFinite(deltaZoom)) return;
+        step[0] = host.zoomLimited() ? host.limitZoom(deltaZoom) : deltaZoom;
+        host.limitToSurface(point, step);
+        if (zoomCamera(host.cam, host.view, point, step[0], this.northUp())) host.requestRender();
       },
       preloadView: (view) => host.preloadView(view),
       requestUpdate: () => {

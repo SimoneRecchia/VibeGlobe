@@ -8007,6 +8007,28 @@
       "status": "failing"
     },
     {
+      "id": "F666",
+      "milestone": 6,
+      "section": "Navigation",
+      "description": "A zoom in by wheel, pinch, double click or keys stops `constraints.minSurfaceDistanceMeters` (default 40) from the surface it zooms toward: the terrain as drawn, slopes ahead of a tilted view included, or the ellipsoid without terrain, so the view always shows the ground it frames and never reaches zoom 28 above a point lifted off the ground; 0 lets the zoom come down to about 1 m (F061). A zoom out always works.",
+      "steps": [
+        "Unit-test that repeated wheel steps at the cursor stop at the default and at a set distance from the ellipsoid, and 40 m from fixture terrain in a straight-down and a 60° view, and that a zoom out then works",
+        "Document the constraint in the controls guide"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F667",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "A flight frames whole models: `ModelSetLayer.framePositions(ids)` gives the corners of copies' model boxes as drawn (the renderer reports each set's box), `fitBounds` and `fitObjects` center the middle of the framed heights and never come nearer than 100 m to it, and take an optional `tiltDeg`; a turbine is framed whole and centered, and a plant by its devices, every one in view.",
+      "steps": [
+        "Unit-test the box corners of copies at their scale, a tall object on raised ground framed centered, a lone point framed from 100 m, and a given tilt",
+        "In the playground's energy park, fly to a turbine and to the whole park and assert every corner shows inside the padded view, the turbine centered and touching the padding"
+      ],
+      "status": "passing"
+    },
+    {
       "id": "F668",
       "milestone": 7,
       "section": "Map sources: map-agnostic design",

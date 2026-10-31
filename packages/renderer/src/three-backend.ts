@@ -281,12 +281,9 @@ export class ThreeBackend implements RendererBackend {
 
   /** Loads the equirectangular base imagery; resolves when it is decoded and bound to the surface material. */
   async setBaseImagery(url: string): Promise<void> {
-    let image: ImageBitmap;
-    try {
-      image = await decodeBitmap(url);
-    } catch (error) {
-      throw new GlobeError('resource-failed', `The base imagery could not be loaded from ${url}`, { cause: error });
-    }
+    const image = await decodeBitmap(url).catch((cause: unknown) => {
+      throw new GlobeError('resource-failed', `The base imagery could not be loaded from ${url}`, { cause });
+    });
     if (this.destroyed) return;
     this.imagery = image;
     this.createImageryResources();
@@ -392,9 +389,11 @@ export class ThreeBackend implements RendererBackend {
    * material whose pipeline is still compiling is skipped and the globe would vanish for a frame (F399).
    */
   private async swapMaterial(texture: Texture): Promise<void> {
-    const material = surface.createSurfaceMaterial(texture, this.depthPath, this.atmosphere.current);
+    const sky = this.atmosphere.current;
+    const material = surface.createSurfaceMaterial(texture, this.depthPath, sky);
     await this.warmUpPipelines(material);
-    if (this.destroyed || this.imageryTexture !== texture) return material.dispose();
+    // A later change may have compiled sooner: a material of an atmosphere since replaced is not used.
+    if (this.destroyed || this.imageryTexture !== texture || this.atmosphere.current !== sky) return material.dispose();
     this.material?.dispose();
     this.material = material;
     this.tiles.forEach((entry) => (entry.mesh.material = material));
@@ -508,6 +507,7 @@ export class ThreeBackend implements RendererBackend {
     this.layers.dispose();
     this.extensions.dispose();
     this.atmosphere.dispose();
+    this.antialiasing.dispose();
     this.material?.dispose();
     this.material = undefined;
     this.imageryTexture?.dispose();

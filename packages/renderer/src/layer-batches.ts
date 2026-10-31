@@ -24,6 +24,7 @@ import {
 } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
 import { releaseMesh } from './release-mesh.js';
+import { orderLayerMeshes } from './layer-order.js';
 import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
@@ -34,7 +35,7 @@ import type { QuadImages } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
 
-/** Draw order of layers: after every surface tile (three.js sorts transparent objects by this, then by order). */
+/** Draw order of layers: their `renderOrder`, kept as their order among the scene's children (`reorder`). */
 const LAYER_RENDER_ORDER = 1000;
 
 interface Batch extends BatchContents {
@@ -236,6 +237,7 @@ export class LayerBatches implements LayerRenderTarget {
     const batch = this.get(handle);
     batch.order = order;
     if (batch.mesh) batch.mesh.renderOrder = LAYER_RENDER_ORDER + order;
+    orderLayerMeshes(this.scene.children, this.batchList);
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -473,6 +475,7 @@ export class LayerBatches implements LayerRenderTarget {
     mesh.renderOrder = LAYER_RENDER_ORDER + batch.order;
     batch.mesh = mesh;
     this.scene.add(mesh);
+    orderLayerMeshes(this.scene.children, this.batchList);
   }
 
   private disposeMesh(batch: Batch): void {

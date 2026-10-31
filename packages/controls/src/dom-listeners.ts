@@ -74,13 +74,18 @@ function pointerListeners(element: HTMLElement, port: CameraPort, r: Recognizers
     else if (event.pointerId === r.mouse.pointerId) request(r.mouse.move(xPx, yPx, event.timeStamp, event.ctrlKey));
   };
   const onUp = (event: PointerEvent): void => {
+    // Lost capture (the release went elsewhere, a dialog took the pointer) ends the gesture like a cancel. The capture
+    // is released after the gesture ends, so its own lostpointercapture finds nothing left to cancel.
+    const cancelled = event.type !== 'pointerup';
+    if (event.pointerType === 'touch') request(r.touch.up(event.pointerId, event.timeStamp, cancelled));
+    else if (event.pointerId === r.mouse.pointerId) {
+      if (cancelled) r.mouse.cancel();
+      else {
+        const { xPx, yPx } = localPoint(element, event);
+        request(r.mouse.up(xPx, yPx, event.timeStamp));
+      }
+    }
     if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
-    const cancelled = event.type === 'pointercancel';
-    if (event.pointerType === 'touch') return request(r.touch.up(event.pointerId, event.timeStamp, cancelled));
-    if (event.pointerId !== r.mouse.pointerId) return;
-    if (cancelled) return r.mouse.cancel();
-    const { xPx, yPx } = localPoint(element, event);
-    request(r.mouse.up(xPx, yPx, event.timeStamp));
   };
   const onWheel = (event: WheelEvent): void => {
     // Only over the map: the page keeps scrolling elsewhere, and a pinch never zooms the page here (F189).
@@ -94,6 +99,7 @@ function pointerListeners(element: HTMLElement, port: CameraPort, r: Recognizers
     [element, 'pointermove', onMove as EventListener],
     [element, 'pointerup', onUp as EventListener],
     [element, 'pointercancel', onUp as EventListener],
+    [element, 'lostpointercapture', onUp as EventListener],
     [element, 'wheel', onWheel as EventListener],
   ];
 }

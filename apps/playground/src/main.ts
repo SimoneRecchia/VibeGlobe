@@ -440,7 +440,7 @@ if (params.get('experiment') === 'gpu-probes') {
   // `?scenario=wind-farm`: 2,000 instanced turbines of one model set (F627), loaded only when asked for.
   if (scenario === 'wind-farm')
     void globe.ready.then(async () => (await import('./wind-farm.js')).showWindFarm(globe, params));
-  // `?scenario=energy-park`: ten turbines with turning rotors beside a solar park (F648, F649).
+  // `?scenario=energy-park`: ten turbines with turning rotors beside a solar park (F648, F656).
   if (scenario === 'energy-park')
     void globe.ready.then(async () => (await import('./energy-park.js')).showEnergyPark(globe, app, params));
   if (params.get('layers') === 'demo')

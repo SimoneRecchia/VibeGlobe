@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-10-31: the turbine without a mast on its nacelle (owner's request)
+
+The wind sensors' mast and the red aviation light on the nacelle's roof are gone: the turbine has 1,850 triangles and
+56 KB. F649, which gave 1,880 triangles, is superseded by F656 (`docs/feature-changes.md`).
+
 ## 2026-10-31: a flat map that never loads terrain, and six needs of an application in the library
 
 An application's flat road map lagged while zooming over a country with its roads on. A CPU profile at a quarter of a

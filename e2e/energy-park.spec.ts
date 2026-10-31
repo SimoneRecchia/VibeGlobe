@@ -1,5 +1,6 @@
-// The playground's wind turbine and solar table (`?scenario=energy-park`, F648, F649): rotors turning at a speed set
-// at runtime, frames only while a turning rotor is drawn, and both models drawn as a few instanced draws.
+// The playground's wind turbine and solar table (`?scenario=energy-park`, F648, F656, which replaced F649): rotors
+// turning at a speed set at runtime, frames only while a turning rotor is drawn, and both models drawn as a few
+// instanced draws.
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { BACKGROUND_RGB, canvasImage, openGlobe, waitForIdle } from './support/globe.ts';
@@ -21,7 +22,7 @@ test.use({ viewport: { width: 640, height: 480 } });
 /** From the south-west, low over the ground, the first turbine large in the foreground. */
 const ROTOR_VIEW = 'lon=9.409544&lat=45.110736&zoom=16.6&tilt=84&heading=48';
 /** The turbine's triangles (tower, nacelle and rotor) and the solar table's (structure and glass). */
-const TURBINE_TRIANGLES = 1880;
+const TURBINE_TRIANGLES = 1850;
 const TABLE_TRIANGLES = 188;
 
 async function openPark(page: Page, query: string): Promise<void> {

@@ -4,7 +4,7 @@
 // `ModelSetLayer`'s `yaw`) and in it the `rotor` (spinner and blades) turning on its shaft (about its Z axis, `spin`).
 // They share one 256 × 512 texture atlas. Original geometry from the class's public dimensions; no third-party data.
 import { Image, MeshBuilder, add, scale, type NodeSpec, type Vec3 } from './glb.ts';
-import { box, disc, lathe, loopBand, openBand, rotateX, rotateZ } from './shapes.ts';
+import { disc, lathe, loopBand, openBand, rotateX, rotateZ } from './shapes.ts';
 
 const TOWER_TOP = 76;
 const TILT_DEG = 6;
@@ -15,7 +15,7 @@ const PIVOT: Vec3 = [0, 1.9, 0];
 const HUB: Vec3 = [0, 1.9 + 4.05 * Math.sin(tilt), -4.05 * Math.cos(tilt)];
 
 /** Atlas regions: the tower's column (u < 0.5), the blades' (0.5–0.75) and small color blocks in the last column. */
-const BLOCK = { foundation: 0, nacelle: 1, spinner: 2, dark: 3, mast: 4, beacon: 5 } as const;
+const BLOCK = { foundation: 0, nacelle: 1, spinner: 2, dark: 3 } as const;
 const blockUv = (block: number, t = 0.5): [number, number] => [0.875, (block * 64 + 6 + t * 52) / 512];
 
 /** The turbine: the body at the origin, the nacelle on the tower top, the rotor at the hub, tilted with the shaft. */
@@ -82,7 +82,7 @@ function body(): MeshBuilder {
 
 /**
  * The nacelle: a streamlined housing 10.4 m long, 3.4 m wide and 3.6 m high, rounder on top than below, narrowing to
- * meet the spinner in front and rounded off behind, with the wind sensors' mast and the aviation light on its roof.
+ * meet the spinner in front and rounded off behind.
  */
 function nacelle(): MeshBuilder {
   const mesh = new MeshBuilder();
@@ -114,11 +114,6 @@ function nacelle(): MeshBuilder {
       else mesh.triangle(center, a, b);
     });
   }
-  // The wind sensors on a short mast at the rear of the roof, the red light on top.
-  const roof = PIVOT[1] + 1.8;
-  box(mesh, [-0.05, roof - 0.1, 5.9], [0.05, roof + 1.3, 6.0], blockUv(BLOCK.mast));
-  box(mesh, [-0.7, roof + 1.2, 5.92], [0.7, roof + 1.27, 5.98], blockUv(BLOCK.mast));
-  box(mesh, [-0.14, roof + 1.3, 5.81], [0.14, roof + 1.55, 6.09], blockUv(BLOCK.beacon));
   // A dark band where the housing sits on the tower's yaw bearing.
   lathe(
     mesh,
@@ -259,8 +254,6 @@ function turbineAtlas(): Image {
     if (block === BLOCK.nacelle) return mixRgb([198, 201, 203], [234, 236, 237], Math.min(1, t * 1.5));
     if (block === BLOCK.spinner) return [236, 238, 239];
     if (block === BLOCK.dark) return [92, 96, 102];
-    if (block === BLOCK.mast) return [206, 208, 211];
-    if (block === BLOCK.beacon) return [214, 32, 28];
     return GREY;
   });
   return image;

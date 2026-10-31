@@ -19,7 +19,7 @@ import { HiddenLabels, type LabelPropertyValue, type LabelsHidden } from './plac
 import { LabelPlacer, type LabelSource, type PlacedLabel } from './label-placer.js';
 import { LayerFader } from './layer-fader.js';
 import { localizedTextField } from './osm.js';
-import { VectorTileLoader } from './tile-loader.js';
+import { bucketVersion, VectorTileLoader } from './tile-loader.js';
 import {
   ancestorAt,
   clipOf,
@@ -79,6 +79,8 @@ class Runtime implements VectorTileLayer {
   private target: VectorTileTarget | undefined;
   private removeExtension: (() => void) | undefined;
   private layoutVersion = 1;
+  /** The layers whose layout or filter changed since the last frame; undefined for every layer (TD-02). */
+  private relayout: Set<string> | undefined = new Set();
   private readonly paints = new PaintStamps();
   private targets: TileId[] = [];
   private lastDrawn: { tile: string; target: string; standIn: boolean }[] = [];
@@ -249,8 +251,12 @@ class Runtime implements VectorTileLayer {
   }
 
   private changed(change: StyleChange): void {
-    if (changeNeedsRelayout(change)) this.layoutVersion++;
-    else this.paints.changed(change);
+    if (changeNeedsRelayout(change)) {
+      this.layoutVersion++;
+      // A filter or layout change lays out its layer alone; a layer added, removed or moved, every layer (TD-02).
+      if (change.kind === 'order') this.relayout = undefined;
+      else this.relayout?.add(change.layerId);
+    } else this.paints.changed(change);
     if (change.kind === 'order' && this.style.layer(change.layerId) === undefined)
       this.target?.removeLayer(change.layerId);
     this.globe.requestRender();
@@ -334,7 +340,8 @@ class Runtime implements VectorTileLayer {
         const loaded = source.loader.get(d.tile);
         const bucket = loaded?.buckets.find((b) => b.layerId === layer.id);
         if (loaded === undefined || bucket === undefined) continue;
-        out.push({ layer, layerIndex, opacity, tile: d.tile, clip: d.clip, bucket, version: loaded.version });
+        const version = bucketVersion(loaded, layer.id);
+        out.push({ layer, layerIndex, opacity, tile: d.tile, clip: d.clip, bucket, version });
       }
     });
     return out;
@@ -356,6 +363,7 @@ class Runtime implements VectorTileLayer {
       source.loader.setLayers(
         layers.map((l) => l.json),
         this.layoutVersion,
+        this.relayout,
       );
       const isReady = (tile: TileId) => source.loader.get(tile) !== undefined;
       const sourceDraws = tilesToDraw(targets, source.coverage, isReady);
@@ -378,6 +386,8 @@ class Runtime implements VectorTileLayer {
         this.drawnTilesWithBuckets.push({ source: source.id, tile: d.tile, clip: clipOf(d.tile, d.target), buckets });
       }
     }
+    if (this.relayout) this.relayout.clear();
+    else this.relayout = new Set();
     return draws;
   }
 

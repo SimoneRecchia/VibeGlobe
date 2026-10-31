@@ -1,12 +1,12 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * `?scenario=energy-park` (F648, F649): ten wind turbines whose nacelles turn into the wind and whose rotors spin
- * (`models/wind-turbine.glb`, 1,880 triangles; the `nacelle` and `rotor` nodes) behind a solar park of 720 fixed-tilt
+ * `?scenario=energy-park` (F648, F656): ten wind turbines whose nacelles turn into the wind and whose rotors spin
+ * (`models/wind-turbine.glb`, 1,850 triangles; the `nacelle` and `rotor` nodes) behind a solar park of 720 fixed-tilt
  * tables of 24 modules (`models/solar-table.glb`, 188 triangles, facing south), south-east of Milan, as two
  * `ModelSetLayer`s. Sliders set the rotors' speed (`&rpm=` at start, 0 to 20; `&ramp=` the seconds a change takes) and
- * the direction the wind comes from (`&wind=`, degrees; the nacelles turn to face it, at `&yawSpeed=` degrees a second). Without `lon` and `lat` the
- * camera starts south of the park. Hooks in `window.vibeglobeEnergyPark`.
+ * the direction the wind comes from (`&wind=`, degrees; the nacelles turn to face it, at `&yawSpeed=` degrees a
+ * second). Without `lon` and `lat` the camera starts south of the park. Hooks in `window.vibeglobeEnergyPark`.
  */
 import type { Globe } from '@vibeglobe/core';
 import { createGlobeLayers, type LayerStack } from '@vibeglobe/layers';

@@ -6,6 +6,7 @@ import { TileGrounds } from './drape.js';
 describe('draping on the terrain (F452)', () => {
   it('samples no terrain while the relief is flat, and drapes again once it rises (KB-282)', () => {
     let samples = 0;
+    let statsReads = 0;
     const camera = { reliefFactor: 0 };
     const grounds = new TileGrounds({
       camera,
@@ -13,7 +14,10 @@ describe('draping on the terrain (F452)', () => {
         samples++;
         return Object.assign(out ?? { level: 0, noData: false }, { heightMeters: 120 });
       },
-      terrainStats: () => ({ uploads: 3 }),
+      terrainStats: () => {
+        statsReads++;
+        return { uploads: 3 };
+      },
     });
     const tile = { z: 8, x: 134, y: 92 };
     const xy = Float32Array.of(0, 0, 4096, 4096);
@@ -30,5 +34,7 @@ describe('draping on the terrain (F452)', () => {
     expect(grounds.version).not.toBe(flatVersion);
     expect(Array.from(grounds.heights(tile, xy, new Float32Array(2)))).toEqual([120, 120]);
     expect(samples).toBe(2);
+    // The terrain's counters, which walk its every tile, are read once a frame however many meshes are draped.
+    expect(statsReads).toBe(1);
   });
 });

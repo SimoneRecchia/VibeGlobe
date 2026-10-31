@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-31: a second look at the code added since the review (owner's request)
+
+The changes merged since the code review (#80 to #83) were read again for waste on weak machines. Two per-frame costs
+are gone: a vector map draped on the terrain walked every terrain tile kept several times a frame to read the terrain's
+counters (KB-286), and a model set standing on the ground built the globe's whole camera state every frame (KB-287).
+
+## 2026-10-31: the turbine without a mast on its nacelle (owner's request)
+
+The wind sensors' mast and the red aviation light on the nacelle's roof are gone: the turbine has 1,850 triangles and
+56 KB. F649, which gave 1,880 triangles, is superseded by F656 (`docs/feature-changes.md`).
+
 ## 2026-10-31: data layers over vector maps, flat polygons that blend (bugs from an application)
 
 KB-284 and KB-285. An application's translucent rings under wind turbines disappeared on its flat road map: polygon

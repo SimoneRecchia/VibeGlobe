@@ -340,9 +340,10 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
    */
   #standOnGround(): boolean {
     const ground = this.#ground;
-    if (!ground || !(ground.camera.reliefFactor > 0)) return false;
+    if (!ground) return false;
+    // The relief is read (it builds the camera's state) only once finer terrain has arrived.
     const version = ground.terrainStats()?.uploads ?? 0;
-    if (version === this.#groundVersion) return false;
+    if (version === this.#groundVersion || !(ground.camera.reliefFactor > 0)) return false;
     this.#groundVersion = version;
     let changed = false;
     for (let index = 0; index < this.#items.length; index++) {

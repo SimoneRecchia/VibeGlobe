@@ -1,4 +1,4 @@
-// Shapes for the generated models: surfaces of revolution, discs, bands between rows of vertices, boxes, rotations.
+// Shapes for the generated models: surfaces of revolution, discs, bands between rows of vertices, rotations.
 import type { MeshBuilder, Vec3 } from './glb.ts';
 
 /** A surface of revolution about Y (or Z) through profile points (radius, height), its seam duplicated for the UVs. */
@@ -67,45 +67,6 @@ export function loopBand(mesh: MeshBuilder, a: readonly number[], b: readonly nu
     const next = (k + 1) % a.length;
     mesh.quad(a[k] ?? 0, b[k] ?? 0, b[next] ?? 0, a[next] ?? 0);
   }
-}
-
-/** An axis-aligned box without its bottom face, every face flat. */
-export function box(mesh: MeshBuilder, min: Vec3, max: Vec3, uv: [number, number]): void {
-  const [x0, y0, z0] = min;
-  const [x1, y1, z1] = max;
-  const faces: [Vec3, Vec3, Vec3, Vec3][] = [
-    [
-      [x0, y1, z1],
-      [x1, y1, z1],
-      [x1, y1, z0],
-      [x0, y1, z0],
-    ],
-    [
-      [x0, y0, z1],
-      [x1, y0, z1],
-      [x1, y1, z1],
-      [x0, y1, z1],
-    ],
-    [
-      [x1, y0, z0],
-      [x0, y0, z0],
-      [x0, y1, z0],
-      [x1, y1, z0],
-    ],
-    [
-      [x1, y0, z1],
-      [x1, y0, z0],
-      [x1, y1, z0],
-      [x1, y1, z1],
-    ],
-    [
-      [x0, y0, z0],
-      [x0, y0, z1],
-      [x0, y1, z1],
-      [x0, y1, z0],
-    ],
-  ];
-  for (const face of faces) mesh.flatQuad(face, [uv, uv, uv, uv]);
 }
 
 export function rotateX(values: number[], i: number, angle: number, pivot: Vec3): void {

@@ -233,12 +233,19 @@ describe('model set layer (F627)', () => {
 function fakeGround(heights: Record<number, number>): ModelSetGround & {
   uploads: number;
   samples: number;
-  camera: { reliefFactor: number };
+  cameraReads: number;
+  relief: number;
 } {
   const ground = {
     uploads: 1,
     samples: 0,
-    camera: { reliefFactor: 1 },
+    cameraReads: 0,
+    relief: 1,
+    // A globe builds its camera's state at each read: counted.
+    get camera() {
+      ground.cameraReads++;
+      return { reliefFactor: ground.relief };
+    },
     elevationAt: (position: GeoPosition, out: ElevationSample) => {
       ground.samples++;
       out.heightMeters = heights[position.longitudeDeg] ?? 0;
@@ -273,20 +280,23 @@ describe('model set on the ground (F655)', () => {
       models.instances?.poses.map((p) => p.position.heightMeters) ?? [];
     expect(heightsDrawn()).toEqual([120, 305]);
     const frame = (): void => stack.frame({ nowMs: 0, zoom: 14, projector: PROJECTOR });
+    const reads = ground.cameraReads;
     frame();
     expect(ground.samples).toBe(2);
     expect(models.instanceUploads).toBe(1);
+    // No finer terrain: the frame reads neither the ground nor the camera.
+    expect(ground.cameraReads).toBe(reads);
     // Finer terrain arrived.
     heights[9] = 118;
     ground.uploads++;
     frame();
     expect(heightsDrawn()).toEqual([118, 305]);
     // A flat relief draws every height at 0: nothing is sampled until it rises again.
-    ground.camera.reliefFactor = 0;
+    ground.relief = 0;
     ground.uploads++;
     frame();
     expect(ground.samples).toBe(4);
-    ground.camera.reliefFactor = 0.5;
+    ground.relief = 0.5;
     frame();
     expect(ground.samples).toBe(6);
     // The renderer scales the drawn heights by the relief, not the model: 84 m above `b`'s foot is 168 m in a position.
@@ -295,7 +305,7 @@ describe('model set on the ground (F655)', () => {
     layer.setFeaturePosition('a', 10, 45, 2);
     expect(heightsDrawn()).toEqual([302, 305]);
     expect(layer.markerPosition('a', 84, 0.25)?.heightMeters).toBe(302 + 336);
-    ground.camera.reliefFactor = 0;
+    ground.relief = 0;
     expect(layer.markerPosition('a', 84)).toEqual({ longitudeDeg: 10, latitudeDeg: 45, heightMeters: 302 });
     expect(layer.markerPosition('missing')).toBeUndefined();
   });

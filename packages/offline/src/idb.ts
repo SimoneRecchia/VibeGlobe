@@ -54,16 +54,22 @@ const OPEN_TIMEOUT_MS = 10_000;
 /** Opens (and creates or upgrades) the database. */
 export function openDatabase(factory: IDBFactory, name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    // Settled by a timeout or a blocked open, the promise is gone: a connection that still opens later is closed.
+    let settled = false;
+    const fail = (error: StorageUnavailableError): void => {
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    };
     const timer = setTimeout(
-      () => reject(new StorageUnavailableError('IndexedDB did not open in time')),
+      () => fail(new StorageUnavailableError('IndexedDB did not open in time')),
       OPEN_TIMEOUT_MS,
     );
     let request: IDBOpenDBRequest;
     try {
       request = factory.open(name, VERSION);
     } catch (error) {
-      clearTimeout(timer);
-      reject(new StorageUnavailableError(`IndexedDB cannot be opened: ${String(error)}`));
+      fail(new StorageUnavailableError(`IndexedDB cannot be opened: ${String(error)}`));
       return;
     }
     request.onupgradeneeded = () => {
@@ -77,14 +83,12 @@ export function openDatabase(factory: IDBFactory, name: string): Promise<IDBData
       db.createObjectStore(PACKAGE_TILES);
     };
     request.onsuccess = () => {
+      if (settled) return request.result.close();
       clearTimeout(timer);
       resolve(request.result);
     };
-    request.onerror = () => {
-      clearTimeout(timer);
-      reject(new StorageUnavailableError(`IndexedDB open failed: ${String(request.error)}`));
-    };
-    request.onblocked = () => reject(new StorageUnavailableError('IndexedDB open is blocked by another connection'));
+    request.onerror = () => fail(new StorageUnavailableError(`IndexedDB open failed: ${String(request.error)}`));
+    request.onblocked = () => fail(new StorageUnavailableError('IndexedDB open is blocked by another connection'));
   });
 }
 

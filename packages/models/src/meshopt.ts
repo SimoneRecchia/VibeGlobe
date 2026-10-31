@@ -53,11 +53,17 @@ const FILTERS: Readonly<Record<string, string | undefined>> = {
 export function meshoptWasmDecoder(compile: () => Promise<WebAssembly.Module>): MeshoptLoader {
   let decoder: Promise<MeshoptDecoderLike> | undefined;
   return () =>
-    (decoder ??= compile().then(async (module) => {
-      const exports = (await WebAssembly.instantiate(module, {})).exports as unknown as MeshoptExports;
-      exports.__wasm_call_ctors();
-      return { supported: true, ready: Promise.resolve(), decodeGltfBuffer: decodeWith(exports) };
-    }));
+    (decoder ??= compile()
+      .then(async (module) => {
+        const exports = (await WebAssembly.instantiate(module, {})).exports as unknown as MeshoptExports;
+        exports.__wasm_call_ctors();
+        return { supported: true, ready: Promise.resolve(), decodeGltfBuffer: decodeWith(exports) };
+      })
+      .catch((error: unknown) => {
+        // A failed load (a connection reset) is not kept: the next model tries again.
+        decoder = undefined;
+        throw error;
+      }));
 }
 
 /** `decodeGltfBuffer` over the module: the stream and the result in the module's memory, freed after each call. */

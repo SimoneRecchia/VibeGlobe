@@ -35,22 +35,26 @@ export class ElementUi {
       if (theme === 'light' || theme === 'dark') ui.setTheme(theme);
       const language = this.host.getAttribute('lang');
       if (language !== null && ui.i18n.languages().includes(language)) ui.setLanguage(language);
-    });
+    }, NO_UI);
   }
 
   /** Removes the layer. */
   stop(): void {
     this.#stopped = true;
-    void this.#ui?.then((ui) => ui.destroy());
+    void this.#ui?.then((ui) => ui.destroy(), NO_UI);
   }
 
   async #create(mode: string): Promise<Ui> {
     const { addAllControls, addDefaultControls, createUi } = await import('@vibeglobe/ui');
+    // Removed while the UI loaded: the globe is gone, and the controls would subscribe to it.
+    if (this.#stopped) throw new Error('the element was removed');
     const ui = createUi(this.globe, this.container);
     // Host pages theme the controls through `vibe-globe::part(ui)`, setting the documented `--vg-ui-*` variables.
     ui.element.setAttribute('part', 'ui');
     (mode === 'all' ? addAllControls : addDefaultControls)(ui);
-    if (this.#stopped) ui.destroy();
     return ui;
   }
 }
+
+/** A UI that never came (the element was removed while it loaded): nothing to apply or destroy. */
+const NO_UI = (): void => undefined;

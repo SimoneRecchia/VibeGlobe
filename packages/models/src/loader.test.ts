@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createModelLoader,
   createModelTasks,
+  meshoptWasmDecoder,
   ModelError,
   poolRunner,
   type ModelTaskRunner,
@@ -84,5 +85,20 @@ describe('createModelLoader', () => {
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ModelError);
     expect(error).toMatchObject({ code: 'decode-failed', message: 'bad stream' });
+  });
+});
+
+describe('decoder loads that fail', () => {
+  it('are not kept: the next model loads the meshopt decoder again', async () => {
+    let compiles = 0;
+    const loader = meshoptWasmDecoder(() => {
+      compiles++;
+      return compiles === 1
+        ? Promise.reject(new Error('connection reset'))
+        : WebAssembly.compile(readFileSync(new URL('../../worker/wasm/meshopt-decoder.wasm', import.meta.url)));
+    });
+    await expect(loader()).rejects.toThrow('connection reset');
+    await expect(loader()).resolves.toMatchObject({ supported: true });
+    expect(compiles).toBe(2);
   });
 });

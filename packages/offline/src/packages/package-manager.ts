@@ -307,7 +307,9 @@ class Manager implements PackageManager {
     try {
       records = await this.storage.records();
     } catch {
-      records = [];
+      // Storage that did not open (Safari's IndexedDB that never answers) lost nothing: no loss is reported, and the
+      // list of packages that should exist is kept for the next start.
+      return;
     }
     this.installed = records.filter((r) => r.state === 'complete').sort((a, b) => b.installedAtMs - a.installedAtMs);
     const now = this.installed.map((r) => `${r.manifest.id}@${r.manifest.version}`);

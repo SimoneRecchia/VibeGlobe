@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { ImagerySource, TileCoord } from '@vibeglobe/core';
+import { looksLikePortal } from '../network-fetch.js';
 import { tileKey } from '../tiered-source.js';
 import type { ProviderRules } from '../types.js';
 import { tilesOfArea, type PackageArea } from './area.js';
@@ -97,6 +98,8 @@ async function download(
     try {
       const response = await fetchImpl(url, { mode: 'cors', credentials: 'omit', ...(signal ? { signal } : {}) });
       if (response.status === 404 || response.status === 204) return undefined;
+      // A captive portal's login page is no tile: stored, it would pass its own hash check on every read.
+      if (looksLikePortal(response)) throw new Error('a login page answered (captive portal)');
       if (response.ok) return response;
       if (attempt >= ATTEMPTS) throw new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -175,8 +178,9 @@ export async function buildPackage(
     for (const coord of tilesFor(request, source)) jobs.push({ source, coord, id: tileKey(source.id, coord) });
   const totalBytes = jobs.length * ESTIMATED_TILE_BYTES;
   const count = { loaded: 0, resumed: 0, bytes: 0, tiles: 0 };
+  let cursor = 0;
   const next = async (): Promise<void> => {
-    for (let job = jobs.shift(); job; job = jobs.shift()) {
+    for (let job = jobs[cursor++]; job; job = jobs[cursor++]) {
       const resumed = done.has(job.id);
       const size = resumed
         ? ((await context.storage.tile(prefix, job.id))?.bytes.byteLength ?? 0)
@@ -193,7 +197,12 @@ export async function buildPackage(
       });
     }
   };
-  await Promise.all(Array.from({ length: CONCURRENCY }, next));
+  // One tile failing for good fails the build: the other loops stop too, rather than store the rest for nothing.
+  const stopOnFailure = (error: unknown): never => {
+    cursor = jobs.length;
+    throw error;
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => next().catch(stopOnFailure)));
   return {
     manifest: manifestOf(request, sources),
     report: { included, excluded, tiles: count.tiles, bytes: count.bytes },

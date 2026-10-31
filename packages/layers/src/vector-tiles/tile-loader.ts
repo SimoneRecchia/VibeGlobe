@@ -8,6 +8,7 @@
  * keeps the most recently used ones within its size.
  */
 import type { AbortHandle, NetworkPool, TileTransport, TransportResult, WorkerPool } from '@vibeglobe/core';
+import { FAILURE_TRANSIENT, classifyTransportResult } from '@vibeglobe/core/layers';
 import { layoutDecodable, type Bucket } from './layout-tile.js';
 import type { StyleLayerJson } from './style-layer.js';
 import { tileKey, type TileId } from './tile-pyramid.js';
@@ -294,10 +295,14 @@ export class VectorTileLoader {
     if (result.kind === 'ok' && result.bytes.byteLength > 0 && !result.contentType.startsWith('text/html')) {
       entry.bytes = result.bytes;
       this.layout(entry);
-    } else if (result.kind === 'ok' || (result.kind === 'status' && (result.status === 404 || result.status === 204))) {
-      entry.state = 'missing';
-      this.options.onReady();
-    } else if (result.kind !== 'aborted') this.failed(entry);
+    } else if (result.kind !== 'aborted') {
+      // No data (404, 204, an empty body) or refused for good (401, 403, 410, CORS): a retry would only repeat it.
+      if (classifyTransportResult(result) === FAILURE_TRANSIENT) this.failed(entry);
+      else {
+        entry.state = 'missing';
+        this.options.onReady();
+      }
+    }
     this.pump();
   }
 

@@ -114,3 +114,20 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Padding per side:** `fitBounds` and `fitObjects` take one `paddingPx` for every side. An application with a panel
   over one side of the map would center an asset in the part left visible with a padding per side (as MapLibre's
   `{ top, right, bottom, left }`), the aim point moved by half the difference. The core entry has 0.09 KB left.
+
+## Classic bugs of other engines, checked 2026-10-31
+
+Checked against VibeGlobe from the issue trackers of MapLibre, Cesium and deck.gl (`docs/known-bugs.md` has the ones
+found and fixed: TG-06, KB-302). Not changed:
+
+- **Canvas readback noise (MapLibre #3110):** fingerprinting protection (Safari's private windows, Firefox's
+  `resistFingerprinting`, Brave) can add noise to `getImageData`, which the worker uses to read heightmap pixels
+  (`packages/worker/src/decode-terrain.ts`) and masked imagery tiles (`@vibeglobe/sources/tile-mask`): heights would
+  turn into spikes. Not verifiable here (Chromium reads back exactly). To check on the owner's devices with
+  `?terrain=terrarium`; if it shows, read the bitmap through a `VideoFrame` copy (RGBA or BGRA, swapped) once a fill
+  drawn on a canvas does not read back exactly. A version of it costs about 0.25 KB of the worker's 5 KB budget, which
+  has 0.05 KB left: room is needed first.
+- **Resize during a device or context loss (MapLibre #8837):** checked on both backends: a resize while the GPU
+  recovers draws the new size once recovered, without errors.
+- **Tiles answered with 204 or an empty body (Cesium #7914):** imagery and terrain treat them as no data
+  (`classifyTransportResult`), and so do vector tiles; they never keep the engine from going idle.

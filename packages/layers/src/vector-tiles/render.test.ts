@@ -397,6 +397,42 @@ describe('tile loading (F442, F450)', () => {
     }
   });
 
+  it('does not request again a tile its server refuses for good (401, 403, 410, CORS), only one that failed for now (500)', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers: Record<string, TransportResult> = {
+        u: { kind: 'status', status: 401, retryAfterMs: undefined },
+        f: { kind: 'status', status: 403, retryAfterMs: undefined },
+        g: { kind: 'status', status: 410, retryAfterMs: undefined },
+        c: { kind: 'network-error', cause: 'cors' },
+        s: { kind: 'status', status: 500, retryAfterMs: undefined },
+      };
+      const requested: string[] = [];
+      const transport: TileTransport = {
+        start(request, _timeouts, done: (result: TransportResult) => void) {
+          requested.push(request.url);
+          queueMicrotask(() => done(answers[request.url] ?? { kind: 'network-error' }));
+          return () => undefined;
+        },
+      };
+      let nowMs = 0;
+      const loader = new VectorTileLoader({ transport, onReady: () => undefined, now: () => nowMs });
+      const wanted = Object.keys(answers).map((url, x) => ({ url, tile: { z: 3, x, y: 0 }, priority: x }));
+      loader.update(wanted, new Set());
+      await Promise.resolve();
+      nowMs = 6_000;
+      vi.advanceTimersByTime(6_000);
+      loader.update(wanted, new Set());
+      await Promise.resolve();
+      expect(requested.sort()).toEqual(['c', 'f', 'g', 's', 's', 'u']);
+      // Only the 500 keeps the loader busy: the refused tiles are missing, as a 404 is.
+      expect(loader.loading).toBe(1);
+      expect(wanted.filter((w) => loader.isMissing(w.tile)).map((w) => w.url)).toEqual(['u', 'f', 'g', 'c']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('cancels tiles no frame wants any more', () => {
     const aborted: string[] = [];
     const transport: TileTransport = {

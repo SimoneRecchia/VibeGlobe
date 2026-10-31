@@ -60,9 +60,6 @@ interface TileEntry {
   readonly draw: surface.SurfaceDraw;
 }
 
-/** Tile textures made again a frame after the anisotropy changed (KB-288): a few milliseconds of uploads at most. */
-const REFILTER_PER_FRAME = 4;
-
 /** Which backend to use: automatic (WebGPU, falling back to WebGL2) or forced. */
 export type BackendChoice = 'auto' | 'webgpu' | 'webgl2';
 
@@ -324,7 +321,7 @@ export class ThreeBackend implements RendererBackend {
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
-    this.tileTextures.refilterSome(this.renderer, REFILTER_PER_FRAME);
+    this.tileTextures.refilterSome(this.renderer);
     this.tileTextures.tones.frame(draws, this.tileTextures.imageOf);
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);

@@ -59,6 +59,9 @@ function compressedTexture(image: CompressedTileImage): Texture {
   return texture;
 }
 
+/** Tile textures made again a frame after the anisotropy changed (KB-288): a few milliseconds of uploads at most. */
+const REFILTER_PER_FRAME = 4;
+
 /** A terrain height grid (`HeightGrid` of `@vibeglobe/core`): (cells + 1)² float32 heights, rows from the north. */
 interface HeightImage {
   readonly cells: number;
@@ -199,7 +202,7 @@ export class TileTextures {
    * Makes again, with the current anisotropy, up to `count` tile textures that have another one; a frame calls it
    * until every texture has the level. Returns how many it made.
    */
-  refilterSome(renderer: WebGPURenderer, count: number): number {
+  refilterSome(renderer: WebGPURenderer, count = REFILTER_PER_FRAME): number {
     if (this.refilterFrom < 0) return 0;
     const level = this.anisotropy();
     let made = 0;

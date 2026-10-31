@@ -7,7 +7,7 @@ layer requests a source's tiles only while one of its visible layers draws at th
 levels 0 to 2 whose layers start at 2 or 3); the terrain's pinned base loads only once relief is drawn, and `ready`
 no longer waits for it (KB-292: about 770 KB of Mapterhorn); a hidden imagery layer loads nothing, pinned base
 included, until shown (KB-293); `singleImage` with `sizePx` (or `bounds` and `maxLevel`) downloads with its first tile
-(KB-294; the application passes `sizePx: [4096, 2048]` to its land cover); the worker loads the KTX2 transcoder with
+(KB-294; the Europe guide now passes the land cover's `sizePx`); the worker loads the KTX2 transcoder with
 its first task and Draco without its encoder, and the guides ask Vite and Nuxt applications for ES-module workers,
 whose entry is 16 KB instead of the 457 KB Vite's default format inlines (KB-295); three.js's glTF loader loads with the
 first model (KB-296); the land mask and country borders are stored as polyline text, a quarter of their JSON, and the

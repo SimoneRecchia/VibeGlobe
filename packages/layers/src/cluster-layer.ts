@@ -230,10 +230,12 @@ export class ClusterLayer extends DataLayer {
     if (this.#job === undefined && this.#pending !== undefined) {
       this.#job = this.#startApply(this.#pending.zoom, this.#pending.items);
       this.#pending = undefined;
+      // A change applied over several frames animates from its first one: timed from the previous change, its first
+      // slices would end their transitions at once and pop (F375).
+      this.#transitionStartMs = frame.nowMs;
     }
-    if (this.#job !== undefined) this.#continueApply(this.#job, frame.nowMs);
-    // The transitions start once the last slice is in: before, they would end at once and pop (F375).
-    if (this.#job === undefined) this.#animate(frame.nowMs);
+    if (this.#job !== undefined) this.#continueApply(this.#job);
+    this.#animate(frame.nowMs);
   }
 
   #request(zoom: number): void {
@@ -270,8 +272,8 @@ export class ClusterLayer extends DataLayer {
     };
   }
 
-  /** Applies the next slice of a job; once the last is in, the zoom shows and the transitions start. */
-  #continueApply(job: ApplyJob, nowMs: number): void {
+  /** Applies the next slice of a job; once the last is in, the zoom shows. */
+  #continueApply(job: ApplyJob): void {
     const end = Math.min(job.added.length + job.removed.length, job.done + CLUSTER_APPLY_SLICE);
     const added: Feature[] = [];
     for (; job.done < end; job.done++) {
@@ -297,7 +299,6 @@ export class ClusterLayer extends DataLayer {
     }
     this.#job = undefined;
     this.#shownZoom = job.zoom;
-    this.#transitionStartMs = nowMs;
   }
 
   #transition(

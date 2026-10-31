@@ -76,7 +76,7 @@ describe('clustered point layer', () => {
     expect(counts).toEqual([5000, 10_000, 12_000]);
   });
 
-  it('keeps the first slices of an animated zoom change hidden until the whole change is in, never popping (F375)', async () => {
+  it('fades the first slices of an animated zoom change in from its start, never showing them at once (F375)', async () => {
     const layer = new ClusterLayer({ data: randomPoints(12_000), cluster: { radiusPx: 60, transitionMs: 300 } });
     const target = new RecordingRenderTarget();
     const stack = new LayerStack(target);
@@ -91,8 +91,9 @@ describe('clustered point layer', () => {
     await settle();
     stack.frame(frameAt(1016, 18));
     expect(layer.shownZoom).toBe(0);
+    // 16 ms into a 300 ms transition: barely faded in, where they showed at full opacity at once.
     const added = Array.from({ length: 100 }, (_, i) => target.value({ id: 1 }, 'visible', before + i) ?? 0);
-    expect(Math.max(...added)).toBe(0);
+    expect(Math.max(...added)).toBeLessThan(0.1);
   });
 
   it('splits and merges with animated transitions instead of pops', async () => {

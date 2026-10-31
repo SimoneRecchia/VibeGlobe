@@ -103,3 +103,22 @@ No Italy-wide or Piemonte colour orthophoto passes for **online** use today. Rec
 - Puglia: https://community.openstreetmap.org/t/wms-della-regione-puglia/106045 ; https://lists.openstreetmap.org/pipermail/talk-it/2015-October/049326.html
 - Sicilia: https://lists.openstreetmap.org/pipermail/talk-it/2014-September/044686.html ; https://josm.openstreetmap.de/ticket/23533
 - Sardegna: https://inspire-geoportal.ec.europa.eu/srv/api/records/R_SARDEG:c82b8535-50b8-4f00-8a5e-a3ae24c33030 ; https://webgis2.regione.sardegna.it/geonetwork/geonetwork/api/records/R_SARDEG:54fa199b-7860-473d-9f06-a8256d3d5b79
+
+## Second reading, 2026-10-31
+
+Hosts still unreachable (proxy); search quotes only. Changes since the first reading:
+
+- **AGEA 2022–2024, 20 cm, all of Italy**: CC BY 4.0 since 2026-08-26 ("riuso … anche commerciale", credit to AGEA and
+  the changes made; legal notes at geoportale.agea.gov.it/legal-notes). Still no WMS/WMTS: an application's own package
+  is the route to zoom 15+.
+- **Valle d'Aosta Ortofoto 2024** (whole region, flown 21 Aug–2 Nov 2024): CC BY 4.0 in the region's licence
+  (sct-outil.regione.vda.it/SCTProfessional/static/pdf/CC_BY_Ortofoto_2024.pdf), credit "Estratto dall'Ortofoto 2024 di
+  proprietà della Regione autonoma Valle d'Aosta". Published "su geonavigatore e WMS" on 2026-03-10; the WMS layer, its
+  reference systems and whether it needs a login were not found. Best Italian lead.
+- **Bergamo 2023** (10 cm, city only): IODL 2.0 on the city's metadata page; WMTS in EPSG:32632, a Web Mercator ArcGIS
+  service whose tile path was not confirmed.
+- **Bolzano municipal 2024** (Consorzio dei Comuni, up to 4 cm, inhabited areas): CC BY 4.0; layer not seen.
+- Unchanged: Veneto ("TUTTI I DIRITTI RISERVATI"), Lombardia 2024 (no commercial use), Sardegna (owner's consent),
+  Toscana 2023 (CC BY 4.0 vs CC BY-NC-ND 3.0), PCN (orthophotos excluded from CC BY), FVG (IODL 2.0 only in informal
+  posts), Puglia, Sicilia, Trentino 2015, Liguria, Lazio, Umbria, Marche, Campania, Calabria, Abruzzo, Molise, Basilicata
+  2013 (IODL 2.0, native CRS only, 1:25,000 and larger).

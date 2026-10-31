@@ -16,6 +16,7 @@ export const COUNTRY_BORDERS: Readonly<Record<string, () => Promise<{ default: r
   AX: () => import('./ax.js'),
   BA: () => import('./ba.js'),
   BE: () => import('./be.js'),
+  'BE-BRU': () => import('./be-bru.js'),
   'BE-VLG': () => import('./be-vlg.js'),
   'BE-WAL': () => import('./be-wal.js'),
   BG: () => import('./bg.js'),

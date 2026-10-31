@@ -183,7 +183,7 @@ export const EUROPE_SOURCES: readonly PresetSourceRecord[] = [
   NATURAL_EARTH,
 ];
 
-const ENDPOINT = 'open licence, but no Web Mercator endpoint confirmed';
+const ENDPOINT = 'open licence, but no endpoint and layer confirmed';
 const CLOSED = 'no open licence';
 
 /**
@@ -198,21 +198,18 @@ export const EXCLUDED_SOURCES: readonly ExcludedSource[] = [
   },
   { id: 'copernicus-vhr', name: 'Copernicus VHR mosaics 2021, 2024', reason: 'for eligible users only' },
   { id: 'eox-s2cloudless', name: 'EOX Sentinel-2 cloudless', reason: '2016: conflicting terms; later: non-commercial' },
-  { id: 'dk-geodanmark', name: 'GeoDanmark orthophoto (Denmark)', reason: ENDPOINT },
   { id: 'si-gurs-dof', name: 'GURS DOF025 (Slovenia)', reason: ENDPOINT },
   { id: 'sk-gku-ortofoto', name: 'GKÚ Ortofotomozaika (Slovakia)', reason: ENDPOINT },
   { id: 'lv-lgia', name: 'LĢIA orthophoto (Latvia)', reason: ENDPOINT },
   { id: 'de-hb-dop', name: 'DOP (Bremen)', reason: ENDPOINT },
   { id: 'it-er-ortofoto', name: 'Ortofoto RER (Emilia-Romagna)', reason: ENDPOINT },
   { id: 'it-basilicata', name: 'Basilicata orthophotos', reason: ENDPOINT },
-  { id: 'de-bw-dop20', name: 'DOP20 (Baden-Württemberg)', reason: 'its Web Mercator WMS needs a permission' },
   { id: 'de-sl-dop20', name: 'DOP20 (Saarland)', reason: 'conflicting records: open, or a fee to embed' },
-  { id: 'de-sh-dop20', name: 'DOP20 (Schleswig-Holstein)', reason: 'conflicting records; services need an agreement' },
+  { id: 'de-sh-dop20', name: 'DOP20 (Schleswig-Holstein)', reason: ENDPOINT },
   { id: 'de-bkg-dop', name: 'BKG DOP20 (Germany)', reason: 'a fee for third parties; open from 2027' },
-  { id: 'be-bru-urbis', name: 'UrbIS orthophoto (Brussels)', reason: 'current licence not confirmed' },
   { id: 'no-norge-i-bilder', name: 'Norge i bilder (Norway)', reason: CLOSED },
   { id: 'se-lantmateriet', name: 'Lantmäteriet orthophoto (Sweden)', reason: 'a yearly fee for its viewing service' },
-  { id: 'lt-ort10lt', name: 'ORT10LT (Lithuania)', reason: 'a paid licence' },
+  { id: 'lt-ort10lt', name: 'ORT10LT (Lithuania)', reason: ENDPOINT },
   { id: 'hu-ro-bg', name: 'Hungary, Romania, Bulgaria orthophotos', reason: 'paid or restricted' },
   { id: 'east', name: 'Balkans, Moldova, Ukraine, Belarus, Russia orthophotos', reason: CLOSED },
   {
@@ -220,7 +217,8 @@ export const EXCLUDED_SOURCES: readonly ExcludedSource[] = [
     name: 'United Kingdom, Ireland, Crown dependencies orthophotos',
     reason: 'sold or public-sector only',
   },
-  { id: 'it-agea', name: 'AGEA orthophotos (Italy, its regions)', reason: 'institutional terms, or downloads only' },
+  { id: 'it-agea', name: 'AGEA orthophotos (Italy, its regions)', reason: 'CC BY 4.0 downloads only; regions: closed' },
+  { id: 'it-vda-2024', name: "Ortofoto 2024 (Valle d'Aosta)", reason: ENDPOINT },
   { id: 'it-pcn', name: 'Geoportale Nazionale (Italy)', reason: 'conflicting terms, imagery of 2006–2012' },
   { id: 'toscana-2023', name: 'Regione Toscana orthophoto 2023', reason: 'conflicting terms' },
   { id: 'small-states', name: 'Greece, Cyprus, Malta, Iceland and the small states orthophotos', reason: CLOSED },

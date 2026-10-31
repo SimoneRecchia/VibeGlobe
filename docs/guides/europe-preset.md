@@ -361,12 +361,14 @@ const credits = preset.sources.filter((s) => s.kind === 'imagery').map((s) => s.
 ```
 
 SWISSIMAGE is free under fair use (up to about 20,000 users a day), the Polish Geoportal bars bulk downloading, and
-Finland's open interface is not meant for high-volume services; the other services publish no limit. Finland's service
-needs a key, free on registration with the National Land Survey: pass the application's own as
-`europeOrthophotos({ keys: { 'fi-mml': key } })`, without it the service is left out. A credit carries the year the
+Finland's open interface is not meant for high-volume services; the other services publish no limit. Finland's and
+Denmark's services need a key, free on registration with the National Land Survey and with Datafordeler: pass the
+application's own as `europeOrthophotos({ keys: { 'fi-mml': key, 'dk-geodanmark': key } })`, without one the service
+is left out. A credit carries the year the
 data was read (`© IGN 2026 – BD ORTHO®`): update it with your own reading. The services left out, with why, are
-`preset.excluded`: there is no open orthophoto yet for Italy (except Alto Adige), the United Kingdom, Ireland, the
-Nordic countries but Finland, most of Central and Eastern Europe and the Balkans, nor a Europe-wide one; there the
+`preset.excluded`: there is no open orthophoto service yet for Italy (except Alto Adige: AGEA's national imagery is CC BY 4.0 but
+offered as downloads only, for an application's own package), the United Kingdom, Ireland, Norway, Sweden, most of
+Central and Eastern Europe and the Balkans, nor a Europe-wide one; there the
 package's WorldCover composite is the detail (below).
 
 ## Maximum online zoom per area

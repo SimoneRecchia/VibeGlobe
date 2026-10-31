@@ -40,3 +40,10 @@ export function valueOf(batch: BatchContents, attribute: BatchAttribute, feature
   const own = values?.[feature * ATTRIBUTE_COMPONENTS[attribute] + component];
   return own ?? DEFAULTS[attribute]?.[component] ?? 0;
 }
+
+/** Whether a polygon batch rises off the ground: a feature with a height or a base other than 0 (KB-285). */
+export function rises(batch: BatchContents): boolean {
+  for (let feature = 0; feature < batch.count; feature++)
+    if (valueOf(batch, 'heightMeters', feature) !== 0 || valueOf(batch, 'baseMeters', feature) !== 0) return true;
+  return false;
+}

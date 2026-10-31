@@ -31,11 +31,10 @@ import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { FieldWaits, LabelSdf } from './label-sdf.js';
 import { FeatureChanges, stableRanges } from './layer-changes.hot.js';
 import { buildLayerArrays, rewriteQuads, type BatchContents, type LayerArrays } from './layer-geometry.js';
+import { rises } from './layer-contents.js';
 import type { QuadImages } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
-
-/** Draw order of layers: their `renderOrder`, kept as their order among the scene's children (`reorder`). */
 
 interface Batch extends BatchContents {
   readonly descriptor: BatchDescriptor;
@@ -45,6 +44,8 @@ interface Batch extends BatchContents {
   readonly rangePools: UpdateRange[][];
   capacity: number;
   order: number;
+  /** A polygon batch with heights, drawn as solid volumes; set when its mesh is built (KB-285). */
+  solid?: boolean;
   visible: boolean;
   dirty: boolean;
   mesh: Mesh | undefined;
@@ -67,10 +68,9 @@ const QUAD_ATTRIBUTES = [
   ['layerUv', 4],
 ] as const;
 
-function shapeOf(batch: BatchContents): LayerShape {
+function shapeOf(batch: Batch): LayerShape {
   const kind = batch.kind;
-  if (kind === 'polygon' && (batch.attributes.has('heightMeters') || batch.uniforms.has('heightMeters')))
-    return 'solid';
+  if (kind === 'polygon' && batch.solid === true) return 'solid';
   return kind === 'polyline' ? 'line' : kind === 'polygon' || kind === 'circle' ? 'flat' : 'quad';
 }
 
@@ -452,6 +452,7 @@ export class LayerBatches implements LayerRenderTarget {
     batch.changes.clear();
     this.rebuilds++;
     this.disposeMesh(batch);
+    batch.solid = batch.kind === 'polygon' && rises(batch);
     this.waits.current = batch;
     const arrays = buildLayerArrays(batch, this.images, this.groundOf(batch));
     this.waits.current = undefined;

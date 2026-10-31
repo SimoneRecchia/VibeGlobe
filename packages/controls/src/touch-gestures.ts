@@ -140,14 +140,9 @@ export class TouchGestures {
     this.ids[slot] = -1;
     if (slot === 0 && this.ids[1] !== -1) {
       // Keep the remaining finger in slot 0.
-      this.ids[0] = this.ids[1] ?? -1;
+      for (const a of [this.ids, this.x, this.y, this.downX, this.downY, this.moveMs, this.previousMoveMs])
+        a[0] = a[1] ?? 0;
       this.ids[1] = -1;
-      this.x[0] = this.x[1] ?? 0;
-      this.y[0] = this.y[1] ?? 0;
-      this.downX[0] = this.downX[1] ?? 0;
-      this.downY[0] = this.downY[1] ?? 0;
-      this.moveMs[0] = this.moveMs[1] ?? 0;
-      this.previousMoveMs[0] = this.previousMoveMs[1] ?? 0;
     }
     this.count--;
     this.latestMs = timeMs;

@@ -182,32 +182,24 @@ function isSource(input: ImageryLayerInput): input is ImagerySource {
 /** The layers of `GlobeOptions.imagery`, normalized; throws `RangeError` for an empty chain or a duplicate id. */
 export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[] {
   const entries = inputs.map((input): StackEntry => {
-    if (isSource(input))
-      return {
-        id: input.id,
-        sources: [input],
-        transparent: input.transparent === true,
-        opacity: 1,
-        visible: true,
-        blend: 'normal',
-        harmonize: true,
-        zoomOpacity: 1,
-      };
-    const first = input.sources[0];
+    const layer = isSource(input) ? undefined : input;
+    const sources = isSource(input) ? [input] : input.sources;
+    const first = sources[0];
     if (!first) throw new RangeError('An imagery layer needs at least one source');
     const entry: StackEntry = {
-      id: input.id ?? first.id,
-      sources: input.sources,
-      transparent: input.sources.some((source) => source.transparent === true),
+      id: layer?.id ?? first.id,
+      sources,
+      transparent: sources.some((source) => source.transparent === true),
       opacity: 1,
       visible: true,
       blend: 'normal',
       harmonize: true,
       zoomOpacity: 1,
     };
-    applyChanges(entry, input);
-    if (input.fadeIn) entry.fadeIn = zoomFade(input.fadeIn, 'fadeIn');
-    if (input.harmonizeFade) entry.harmonizeFade = zoomFade(input.harmonizeFade, 'harmonizeFade');
+    if (!layer) return entry;
+    applyChanges(entry, layer);
+    if (layer.fadeIn) entry.fadeIn = zoomFade(layer.fadeIn, 'fadeIn');
+    if (layer.harmonizeFade) entry.harmonizeFade = zoomFade(layer.harmonizeFade, 'harmonizeFade');
     return entry;
   });
   const ids = new Set<string>();

@@ -4,7 +4,27 @@ title: Sources and adapters
 
 # Sources and adapters
 
-Every map layer reads its data through a source adapter of `@vibeglobe/sources`. Adapters implement the engine's source contract (`ImagerySource` in `@vibeglobe/core`): a tiling scheme, levels, coverage, a `request(coord)` that addresses a tile, and a transport that fetches it. They also declare their attribution and their provider profile. This guide covers the adapter interface, every built-in adapter, reprojection, layer composition and source chains, provider profiles, and writing and testing your own adapter with the conformance suites. Every example below runs as a test (`scripts/integration/sources-guide.test.ts`).
+A globe reads every tiled layer through a source: an object that implements `ImagerySource` or `TerrainSource` of
+`@vibeglobe/core`. `@vibeglobe/sources` builds sources from URL templates, OGC services, PMTiles and MBTiles packages
+and single images, attaches their credits and provider profiles, and ships conformance suites for your own adapters.
+Use `@vibeglobe/offline` to cache and package tiles ([offline guide](offline.md)), the [terrain guide](terrain.md) for
+heights and the camera, the [hosting guide](hosting.md) to serve the files, and the
+[vector tiles guide](vector-tiles.md) for styled vector maps.
+
+## Quick start
+
+```ts
+import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
+import { xyzImagery } from '@vibeglobe/sources';
+
+declare const baseImageryUrl: string;
+declare const workers: WorkerEndpointFactory; // createWorkers() of @vibeglobe/worker
+
+const base = xyzImagery({ id: 'base', url: 'https://tiles.example.com/{z}/{x}/{y}.png', maxLevel: 18 });
+createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [base] });
+```
+
+`createGlobe` takes sources in `imagery` (layers, bottom first) and one source in `terrain`; both need `workers`.
 
 ## The adapter interface
 
@@ -22,27 +42,33 @@ const plain: ImagerySource = {
   tileSizePx: 256,
   pixelRatio: 1, // 2 for @2x tiles
   decoder: 'image', // or 'ktx2'
-  transport: fetchTransport(), // fetches the bytes; a source may bring its own
+  transport: fetchTransport(),
   request(coord, out) {
-    // Write the tile's URL and host, or answer 'noData' for a tile that never exists.
-    if (coord.level > 16) return 'noData';
+    if (coord.level > 16) return 'noData'; // a tile that never exists is never requested
     out.url = `https://tiles.example.com/${coord.level}/${coord.x}/${coord.y}.png`;
     out.hostIndex = 0;
     return out;
   },
 };
-// Credits and provider rules: `withProfile` adds them and caps per-host concurrency at the profile's limit.
 const mine = withProfile(plain, CUSTOM_PROFILE, [{ text: '© My tiles', url: 'https://tiles.example.com/' }]);
 ```
 
-A terrain source (`TerrainSource`) adds a decoder (`terrarium`, `terrain-rgb`, `quantized-mesh`, or a custom `decode` function), its vertical datum and its geometric error per level. The engine validates every source when it is added: a source with inverted levels, a zero tile size or an unknown reference system is refused with a message naming it, and the other layers keep rendering.
+- `request(coord, out, pixelRatio?)` writes the tile's URL and host into `out` and returns it, or returns `'noData'`
+  (never requested) or `'unknown'` (asked again later, while availability is not known yet).
+- `withProfile(source, profile, attribution?)` adds `attribution` and `profile`, puts the profile's required credit
+  first when `attribution` lacks it, and caps `maxRequestsPerHost` at the profile's `maxConcurrentRequests`.
+- A terrain source (`TerrainSource`) adds `decoder` (`terrarium`, `terrain-rgb`, `quantized-mesh` or
+  `{ kind: 'custom', decode }`), `datum` and `geometricErrorMeters(level)`.
 
 ## Imagery adapters
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
+import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { pmtilesImagery, wmsImagery, wmtsImagery, xyzImagery } from '@vibeglobe/sources';
 import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+
+declare const baseImageryUrl: string;
+declare const workers: WorkerEndpointFactory;
 
 const xyz = xyzImagery({ id: 'base', url: 'https://tiles.example.com/{z}/{x}/{y}.png', maxLevel: 18 });
 const wmts = await wmtsImagery({
@@ -62,16 +88,30 @@ const lan = await mbtilesImagery({
   wasmUrl: '/assets/sql-wasm.wasm',
 });
 
-const globe = createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [xyz, wmts, archive] });
+createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [xyz, wmts, archive, lan, wms] });
 ```
 
-| Adapter          | Reads                                                                             | Notes                                                                                                                                                                |
-| ---------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `xyzImagery`     | XYZ and TMS URL templates (`{z}`, `{x}`, `{y}`, `{-y}`, `{s}`)                    | Subdomains, `@2x` tiles, coverage, per-host concurrency                                                                                                              |
-| `wmtsImagery`    | WMTS 1.0.0 GetCapabilities (URL or XML text)                                      | Layers, styles, formats, dimensions (`dimensions: { Time: '2024' }`), tile matrix limits; RESTful or KVP; EPSG:3857 or EPSG:4326 requested directly (`preferredCrs`) |
-| `wmsImagery`     | WMS 1.1.1 and 1.3.0 GetMap, one image per tile                                    | 1.3.0's latitude-first EPSG:4326, transparency, a 32 px gutter cropped away so labels are never cut (`gutterPx`), XML service exceptions treated as failures         |
-| `pmtilesImagery` | PMTiles v3 raster archives over HTTP range requests, or a local `File` or `Blob`  | The header and directories are read once and cached; levels, bounds and attribution come from the archive                                                            |
-| `mbtilesImagery` | MBTiles packages (plain or deduplicated schema) from a local file or a LAN server | In `@vibeglobe/sources/mbtiles` (it brings SQLite as WebAssembly); host `sql-wasm.wasm` from the `sql.js` package next to your other engine assets and pass its URL  |
+| Adapter                                         | Reads                                                                 | Returns                           |
+| ----------------------------------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| `xyzImagery`                                    | an XYZ or TMS URL template                                            | `ImagerySource`                   |
+| `wmtsImagery`                                   | WMTS 1.0.0 capabilities (URL or XML text), RESTful or KVP tiles       | `Promise<DescribedImagerySource>` |
+| `wmsImagery`                                    | WMS 1.1.1 or 1.3.0 GetMap, one image per tile                         | `Promise<DescribedImagerySource>` |
+| `pmtilesImagery`                                | a PMTiles v3 raster archive: a URL (range requests), `File`, `Blob`   | `Promise<DescribedImagerySource>` |
+| `mbtilesImagery` (`@vibeglobe/sources/mbtiles`) | an MBTiles package: a URL downloaded whole, `File`, `Blob`            | `Promise<DescribedImagerySource>` |
+| `singleImage`, `geotiffImage`, `mercatorImage`  | one georeferenced image ([below](#single-georeferenced-images))       | see below                         |
+| `reprojectedImagery`                            | an image service in another reference system ([below](#reprojection)) | `ImagerySource`                   |
+
+- `wmtsImagery` takes the layer's default style, the first format of PNG, JPEG and WebP, and the first tile matrix
+  set that lines up with `preferredCrs` (`EPSG:3857` by default, or `EPSG:4326`). `dimensions` sets values such as
+  `{ Time: '2024-01-01' }`; each dimension's default applies otherwise. `encoding` is RESTful when the layer has a
+  resource URL, else KVP.
+- `wmsImagery` asks for version 1.3.0 unless the capabilities say otherwise, with `transparent: true` and a 32 px
+  gutter cropped away (`gutterPx`), so labels at a tile edge are drawn whole. An XML service exception fails the tile
+  for good. `parameters` adds vendor parameters such as `TIME`.
+- `pmtilesImagery` reads the header and directories once and caches them; levels, bounds and attribution come from
+  the archive. `headers`, `credentials` and `fetch` apply to its range requests; `maxRequestsPerHost` is 6.
+- `mbtilesImagery` reads the plain `tiles` table and the deduplicated `map` and `images` schema. It needs `wasmUrl`,
+  the URL of `sql-wasm.wasm` from the `sql.js` package, which the application hosts; Node finds the file itself.
 
 ## Terrain adapters
 
@@ -91,7 +131,6 @@ const terrainRgb = heightmapTerrain({
   attribution: [{ text: '© Terrain provider' }],
 });
 const mesh = await quantizedMeshTerrain({ id: 'mesh', url: 'https://dem.example.com/mesh/layer.json' });
-// Packages of terrain tiles (F328): the same encodings in a PMTiles archive or an MBTiles package.
 const packaged = await pmtilesTerrain({
   id: 'alps',
   archive: 'https://cdn.example.com/alps.pmtiles',
@@ -105,7 +144,10 @@ const onTheNas = await mbtilesTerrain({
 });
 ```
 
-`createGlobe({ terrain })` takes one terrain source. Heights are meters above the WGS84 ellipsoid unless the source declares a geoid `datum` (see the terrain guide).
+- `heightmapTerrain` reads Terrarium or Terrain-RGB PNG tiles, levels 0 to 15 by default, 256 px (or `tileSizePx: 512`).
+- `quantizedMeshTerrain` reads `layer.json` (tiling, levels, URL templates, extensions, availability) before it resolves.
+- `pmtilesTerrain` and `mbtilesTerrain` take `encoding`: `terrarium`, `terrain-rgb` or `quantized-mesh`.
+- Heights are metres above the WGS84 ellipsoid unless the source declares a geoid `datum` ([terrain guide](terrain.md)).
 
 ## Vector tiles in packages
 
@@ -121,9 +163,8 @@ if (typeof request === 'object')
   });
 ```
 
-`pmtilesVector` and `mbtilesVector` read Mapbox Vector Tiles from packages over HTTP, from a local file or, wrapped by `@vibeglobe/offline`, from browser storage.
-
-The asynchronous factories read capabilities, archive headers or sessions before they return, and reject with a `SourceConfigError` (a stable `code` and a message naming the source) when the service cannot be used. Services that offer only other reference systems are reprojected on the client when you pass `transforms` (next section); without them they are refused with the code `needs-reprojection`.
+`pmtilesVector` and `mbtilesVector` return a `VectorTileSource` of Mapbox Vector Tiles (`format: 'mvt'`) from a URL, a
+local file or, wrapped by `offline.source()`, browser storage.
 
 ## Single georeferenced images
 
@@ -131,14 +172,13 @@ The asynchronous factories read capabilities, archive headers or sessions before
 import { singleImage } from '@vibeglobe/sources';
 import { geotiffImage } from '@vibeglobe/sources/geotiff';
 
-// A PNG, JPEG or WebP placed by its bounds (west, south, east, north in the units of `crs`, degrees by default)…
+// Bounds are west, south, east, north in the units of `crs` (EPSG:4326 degrees by default).
 const flood = await singleImage({
   id: 'flood-map',
   image: 'https://images.example.com/flood.png',
   bounds: [12.3, 41.7, 12.7, 42.0],
   attribution: [{ text: '© Civil protection' }],
 });
-// …or by its world file, or a GeoTIFF by its own tags; other systems are reprojected through `transforms`.
 const scan = await singleImage({
   id: 'scan',
   image: 'https://images.example.com/scan.jpg',
@@ -148,18 +188,23 @@ const scan = await singleImage({
 const survey = await geotiffImage({ id: 'survey', image: 'https://images.example.com/survey.tif' });
 ```
 
-The image is downloaded and decoded once, and every engine tile draws its own piece, so an image larger than the GPU's texture limit shows completely. Rotated world files are refused with a `SourceConfigError`, as are images that cannot be read or placed. Without `sizePx` or `maxLevel` the factory downloads the image to read its size; give `sizePx` (or `bounds` and `maxLevel`) and it downloads with the first tile instead, so an image in a hidden layer costs nothing until shown.
+- `singleImage` places a PNG, JPEG or WebP by `bounds` or by the text of a world file (`.pgw`, `.jgw`, `.wld`), in
+  `EPSG:4326`, `EPSG:3857` or any system `transforms` knows. `geotiffImage` reads the placement from the GeoTIFF's tags.
+- The image is downloaded and decoded once; each engine tile draws its own piece, so an image larger than the GPU's
+  texture limit shows whole.
+- Without `sizePx`, and without both `bounds` and `maxLevel`, the factory downloads the image to read its size. With
+  them the image downloads with the first tile, so a hidden layer costs nothing until shown.
+- `maxLevel` defaults to one level finer than the image's own resolution.
 
-A Web Mercator image of the whole world (180° W to 180° E, about 85.05° S to 85.05° N), such as night lights shown
-from afar, needs no reprojection: `mercatorImage` downloads it with the first tile, decodes it once and cuts each tile
-of levels 0 to `maxLevel` from it on request; the engine enlarges the finest tiles beyond. A failed download is tried
-again with the next tile, and tiles fail as downloaded ones do. For an image of part of the world, use `singleImage`
-with `crs: 'EPSG:3857'` and its bounds.
+`mercatorImage` shows one image of the whole Web Mercator square (180° W to 180° E, about 85.05° S to 85.05° N), such
+as night lights seen from afar. It downloads the image with the first tile, decodes it once and cuts the tiles of
+levels 0 to `maxLevel` (0 to 22) from it; the engine enlarges finer levels. A failed download is tried again with the
+next tile. For an image of part of the world, use `singleImage` with `crs: 'EPSG:3857'`.
 
 ```ts
 import { mercatorImage } from '@vibeglobe/sources';
 
-// 2048 pixels wide: levels 0 to 3 are cut from it at their full resolution.
+// 2048 pixels wide: levels 0 to 3 are cut at full resolution.
 const lights = mercatorImage({
   id: 'night-lights',
   image: 'https://images.example.com/night-lights.webp',
@@ -171,7 +216,9 @@ const lights = mercatorImage({
 
 ## Reprojection
 
-The engine draws Web Mercator and geographic tile pyramids. A service in another reference system, such as Italian data in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) or a custom WMTS tile matrix set, is reprojected on the client ([ADR 0039](../internal/adr/0039-reprojection-and-tone-harmonization.md)): each engine tile asks for the source image covering it (a WMS GetMap, or the WMTS tiles composed in place) and warps it piecewise-affinely.
+The engine draws Web Mercator and geographic pyramids. A service in another reference system, such as UTM zones 32N
+and 33N (`EPSG:32632`, `EPSG:32633`) or a custom WMTS tile matrix set, is reprojected on the client: each engine tile
+asks for the source image covering it (a WMS GetMap, or WMTS tiles composed in place) and warps it piecewise-affinely.
 
 ```ts
 import { transformCoordinates } from '@vibeglobe/gis';
@@ -190,14 +237,14 @@ const transforms = (crs: string) =>
         },
       }
     : undefined;
-// A WMTS layer whose only tile matrix set is in UTM 32N: reprojected because `transforms` knows its system.
+// A WMTS layer whose only tile matrix set is in UTM 32N.
 const utmWmts = await wmtsImagery({
   id: 'utm',
   capabilities: 'https://wmts.example.com/WMTSCapabilities.xml',
   layer: 'utm-only',
   transforms,
 });
-// Any image service in its own system: the bounds are in its units, `image` names the picture of a box.
+// Any image service: `bounds` in its units, `image` returns the URL of the picture of a box.
 const pair = transforms('EPSG:32632');
 if (pair)
   reprojectedImagery({
@@ -211,28 +258,39 @@ if (pair)
   });
 ```
 
-`wmsImagery` takes the same `transforms`. Reprojected tiles are transparent outside the data, so the layers below show there.
+`wmtsImagery`, `wmsImagery`, `singleImage` and `geotiffImage` take the same `transforms`. Reprojected tiles are
+transparent outside the data, so the layers below show there.
 
 ## Polar caps
 
-Web Mercator sources end at ±85.0511°. Beyond, the globe draws two polar caps in geographic tiles: a geographic (EPSG:4326) imagery source that covers them, such as NASA GIBS in `EPSG:4326`, fills them; otherwise each cap shows one fill color, the sea of the default base image in the north and its ice in the south. Choose the colors at start or change them at runtime:
+Web Mercator sources end at ±85.0511°. Beyond, the globe draws two polar caps: a geographic (`EPSG:4326`) imagery
+source that covers them fills them; otherwise each cap shows one color, `#78a9cd` in the north and `#f2f3f7` in the
+south (the sea and the ice of the default base image).
 
 ```ts
 import { createGlobe } from '@vibeglobe/core';
+
+declare const baseImageryUrl: string;
 
 const globe = createGlobe({ container, renderer, baseImageryUrl, polarCapColors: { north: '#0b2a4a' } });
 globe.setPolarCapColors({ north: '#1d3d5f', south: '#ffffff' });
 ```
 
-A view that reaches a cap stays a globe at every zoom (ADR 0008, update of 2026-10-26), so the cap is always a whole disc.
+Colors are `#rrggbb`; another value throws a `GlobeError` with code `invalid-option`. A view that reaches a cap stays a
+globe at every zoom, so the cap is always a whole disc.
 
 ## Layer composition and source chains
 
-`createGlobe({ imagery })` takes layers bottom first. A layer is a source, or a chain of sources in priority order with its look: each tile comes from the first source that has it, and a source that fails (errors, timeouts, offline) leaves its tiles to the next one ([ADR 0038](../internal/adr/0038-imagery-layer-stack.md)).
+`createGlobe({ imagery })` takes layers bottom first. A layer is a source, or `{ id, sources, opacity, visible, blend }`
+with sources in priority order: each tile comes from the first source that has it, and a source that fails (errors,
+timeouts, offline) leaves its tiles to the next one.
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
+import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
+
+declare const baseImageryUrl: string;
+declare const workers: WorkerEndpointFactory;
 
 const offlineBase = xyzImagery({ id: 'lan-base', url: 'http://nas.local/tiles/{z}/{x}/{y}.png', maxLevel: 8 });
 const onlineBase = xyzImagery({ id: 'cdn-base', url: 'https://tiles.example.com/{z}/{x}/{y}.png', maxLevel: 18 });
@@ -249,32 +307,42 @@ const globe = createGlobe({
   ],
 });
 globe.imageryLayers.set('labels', { visible: false }); // a hidden layer requests no tiles
-globe.imageryLayers.move('labels', 0); // reorder at runtime
+globe.imageryLayers.move('labels', 0);
 ```
 
-Blend modes are `normal`, `multiply`, `screen` and `night`: a `night` layer is light added on the night side of the
-atmosphere's day and night (F647, the [space background guide](space-background.md#day-and-night-and-a-clearer-globe-from-afar)
-shows it with a city-lights image). Blended and translucent layers share the two overlay slots of each surface tile.
+- Blend modes are `normal` (default), `multiply`, `screen` and `night`. A `night` layer adds light on the night side
+  ([space background guide](space-background.md#day-and-night-and-a-clearer-globe-from-afar)).
+- Each surface tile shows the topmost opaque layer that has a tile for it, with at most two translucent or blended
+  layers above it.
+- `globe.imageryLayers` also has `add(layer, index?)`, `remove(id)` and `list()`.
 
-A source limited to a country or a region gets its `area`: rectangles (`coverage`), polygons, or GeoJSON such as a
-country's borders. Tiles wholly outside the area are never requested. With GeoJSON (or `tiles: 'clip'`), tiles that
-cross the border are requested too, and their pixels outside the area become transparent when they are decoded, so the
-layer below shows there instead of the white or black filler many national services send beyond their country
-(F618, KB-209). Put such a source in its own layer above the fallback: a layer's chain draws each tile from one source.
-`@vibeglobe/presets/countries` has the borders of Europe's countries (`await countryBorders('AT')`, Natural Earth,
-public domain). `blankTile` is the fallback for services whose area is not known: their tiles of that color alone count
-as no data.
+A source limited to a country or a region takes `coverage` or `area`:
+
+| Option                                 | Tiles requested               | Border pixels                                          |
+| -------------------------------------- | ----------------------------- | ------------------------------------------------------ |
+| `coverage`: rectangles, in radians     | those overlapping a rectangle | as the service sends them                              |
+| `area: { polygons }` (degrees)         | only those wholly inside      | the next source, or the layer below, shows at the edge |
+| `area: { polygons, tiles: 'overlap' }` | every tile touching the area  | as the service sends them (for transparent tiles)      |
+| `area` as GeoJSON, or `tiles: 'clip'`  | every tile touching the area  | transparent outside the area                           |
+
+GeoJSON is a `Polygon`, `MultiPolygon`, `Feature` or `FeatureCollection`. A clipped source becomes transparent, so the
+layer below shows outside the area instead of the white or black filler many national services send. Put such a
+source in its own layer above the fallback: a layer draws each tile from one source. `countryBorders('AT')` of
+`@vibeglobe/presets/countries` resolves a European country's borders as GeoJSON. `blankTile` is the fallback when the
+area is not known: a tile of that color alone counts as no data.
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
+import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';
+
+declare const baseImageryUrl: string;
+declare const workers: WorkerEndpointFactory;
 
 const world = xyzImagery({ id: 'world', url: 'https://world.example.com/{z}/{x}/{y}.jpg', maxLevel: 9 });
 const national = xyzImagery({
   id: 'national-ortho',
   url: 'https://ortho.example.com/{z}/{x}/{y}.jpg',
   maxLevel: 19,
-  // The country's borders as GeoJSON: border tiles are clipped per pixel.
   area: {
     type: 'Polygon',
     coordinates: [
@@ -305,24 +373,45 @@ createGlobe({
 
 ## Vector formats
 
-The vector parsers run in workers: `@vibeglobe/sources/vector` exports them and `VECTOR_TASKS`, the worker task table the engine's worker program registers.
+`@vibeglobe/sources/vector` exports the parsers and `VECTOR_TASKS`, the task table the worker program registers.
 
 ```ts
 import { decodeMvt, parseGeoJson, parseGpx, parseKml } from '@vibeglobe/sources/vector';
 
-const { features, issues } = parseGeoJson(text); // every geometry type; invalid features are listed in `issues`
-const kml = parseKml(kmzBytes); // placemarks with styles and folders, ground overlays, the archive's images in `resources`
+declare const text: string;
+declare const kmzBytes: Uint8Array;
+declare const bytes: Uint8Array;
+
+const { features, issues } = parseGeoJson(text); // every geometry type; invalid features listed in `issues`
+const kml = parseKml(kmzBytes); // KML or KMZ: placemarks, styles, folders, ground overlays, images in `resources`
 const gpx = parseGpx(text); // waypoints, routes and tracks with elevation and time
 const tile = decodeMvt(bytes); // layers and features in tile coordinates, or undefined for a malformed tile
 ```
 
-No parser throws: a malformed document gives an empty result with its issue, and a malformed tile is no data.
+No parser throws: a malformed document gives an empty result with its issue.
 
 ## Provider profiles
 
-**Your application is responsible for its map data.** VibeGlobe is an engine: it grants no right to any map, image or elevation data, and its maintainers give no legal advice. The application chooses its sources, holds their keys, accepts their terms (non-commercial, development-only or paid plans included), pays for them and checks that its use is allowed; a profile is the application's own reading of those terms, which the engine then enforces. The records of the presets and of the data pipeline (`docs/data-licenses.md`, ADR 0182) list the terms as they were read on their dates, to help that check, not to replace it.
+**Your application is responsible for its map data.** VibeGlobe grants no right to any map, image or elevation data,
+and its maintainers give no legal advice. The application chooses its sources, holds their keys, accepts their terms,
+pays for them and checks that its use is allowed. A profile is the application's reading of a provider's terms, which
+the library then enforces. [Data licenses](../data-licenses.md) lists the terms of the default datasets as read on
+their dates, to help that check.
 
-A provider profile switches off what a provider's terms forbid; it never switches anything on. Every loading feature (persistent cache, memory reuse, prefetch and flight preloading, offline packaging) is on by default; a profile switches off only what its provider forbids, and only for its own source; you can switch off more, globally or per source, with `@vibeglobe/offline`, but nothing switches on what a profile forbids (a warning names the rule).
+A profile only switches features off, and only for its own source. Every loading feature (persistent cache, memory
+reuse, prefetch and flight preloading, offline packaging) is on by default. `@vibeglobe/offline` can switch off more,
+globally or per source, and switches on nothing a profile forbids.
+
+| `ProviderProfile` field             | Effect                                                                    | Enforced by                      |
+| ----------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
+| `id`                                | names the profile in warnings and errors                                  | —                                |
+| `forbids`                           | `persistentCache`, `memoryReuse`, `prefetch`, `offlinePackaging` stay off | `@vibeglobe/offline` only        |
+| `respectCacheHeaders`               | responses are reused only while their cache headers allow it              | the engine, `@vibeglobe/offline` |
+| `maxConcurrentRequests`             | caps the source's `maxRequestsPerHost`                                    | `withProfile`                    |
+| `requiredAttribution`               | a credit always shown, also when the source is in `hiddenCredits`         | the engine                       |
+| `displayOnly`                       | pixel readback, tile data and elevation sampling throw `display-only`     | the engine                       |
+| `warning`                           | logged once per engine instance                                           | the engine                       |
+| `sessionRenewalSeconds`, `termsAdr` | recorded for the application                                              | —                                |
 
 ### Your own provider's profile
 
@@ -338,20 +427,27 @@ const acme: ProviderProfile = {
   termsAdr: 'docs/terms/acme.md',
 };
 const acmeTiles = withProfile(xyzImagery({ id: 'acme', url: 'https://tiles.acme.example/{z}/{x}/{y}.png' }), acme);
-// Two sets of terms at once (a provider serving someone else's data): every rule of both applies.
+// A provider serving someone else's data: both sets of terms at once.
 const strictest = combineProfiles(acme, { id: 'reseller', forbids: new Set(['prefetch']), respectCacheHeaders: true });
 ```
 
-The engine and `@vibeglobe/offline` enforce a declared profile exactly as they enforce the built-in ones, and the conformance suite checks it.
+`combineProfiles(inner, outer)` forbids what either forbids, keeps the lower `maxConcurrentRequests` and
+`sessionRenewalSeconds`, respects cache headers when either asks, and takes `outer`'s required credit (else
+`inner`'s). It does not carry `displayOnly` or `warning`: set them on the result when either profile has them.
 
 ### Commercial providers, from your own code
 
-VibeGlobe ships no adapter of a paid or proprietary service: an application that has its own contract with one (Google's Map Tiles API, a national mapping agency's paid service, …) connects it from its own code through the generic adapters, with its own key and a profile that states the provider's terms. The key and the session stay in the transport, which adds them only when a request is made; the profile makes the engine and `@vibeglobe/offline` keep those terms. For Google's 2D tiles, for example:
+VibeGlobe ships no adapter of a paid or proprietary service. An application with its own contract (Google's Map Tiles
+API, a national mapping agency's paid service, …) connects it through the generic adapters, with its own key and a
+profile of the provider's terms. The key and the session stay in the transport, which adds them only when a request
+is made. For Google's 2D tiles, for example:
 
 ```ts
 import { fetchTransport, withProfile, xyzImagery, type ProviderProfile } from '@vibeglobe/sources';
 
-// Your reading of the provider's terms: here Google's Map Tiles API policies.
+declare const myRestrictedKey: string;
+
+// Your reading of the provider's terms.
 const googleTerms: ProviderProfile = {
   id: 'google',
   forbids: new Set(['persistentCache', 'prefetch', 'offlinePackaging']),
@@ -360,7 +456,7 @@ const googleTerms: ProviderProfile = {
   requiredAttribution: { text: 'Google Maps', logo: { src: '/assets/google-logo.png', alt: 'Google Maps' } },
   termsAdr: 'docs/terms/google.md',
 };
-// A session started on the first tile, with your restricted key.
+// A session started with the first tile.
 let session: Promise<string> | undefined;
 const sessionToken = (): Promise<string> =>
   (session ??= fetch(`https://tile.googleapis.com/v1/createSession?key=${myRestrictedKey}`, {
@@ -370,7 +466,7 @@ const sessionToken = (): Promise<string> =>
   })
     .then((response) => response.json() as Promise<{ session: string }>)
     .then((answer) => answer.session));
-// The session and the key are added inside the transport: the URLs the engine sees, logs and shows carry neither.
+// The URLs the engine sees, logs and shows carry neither the session nor the key.
 const transport = fetchTransport(async (input, init) =>
   fetch(`${String(input)}?session=${await sessionToken()}&key=${myRestrictedKey}`, init),
 );
@@ -380,7 +476,12 @@ const google = withProfile(
 );
 ```
 
-The same pattern serves Photorealistic 3D Tiles: `tiles3d({ url, transport, profile })` of `@vibeglobe/sources/tiles3d` takes the root tileset's URL, your transport and your profile, and its `copyrights()` lists the credits of the tiles in view. A provider whose credits change with the view (Google's viewport endpoint) updates the source's `attribution` and calls `globe.refreshCredits()` when the view settles (`globe.on('idle', …)`). Which terms apply, in which billing region, and whether a key may be used in a browser are between you and the provider.
+Photorealistic 3D Tiles follow the same pattern: `tiles3d({ url, meshes, transport, profile })` of
+`@vibeglobe/sources/tiles3d`, added with `globe.addRenderExtension`, takes the root tileset's URL, the meshes of
+`@vibeglobe/renderer/tiles3d` (`threeTileMeshes`), your transport and your profile; its `copyrights()` lists the
+credits of the tiles drawn. A provider whose credits change with the view updates the source's `attribution` and calls
+`globe.refreshCredits()` when the view settles (`globe.on('idle', …)`). Which terms apply, in which billing region, and
+whether a key may be used in a browser are between you and the provider.
 
 ### OpenStreetMap public servers
 
@@ -390,7 +491,11 @@ import { openStreetMapImagery } from '@vibeglobe/sources';
 const osm = openStreetMapImagery({ appName: 'My demo', appUrl: 'https://demo.example.com/' });
 ```
 
-**The OpenStreetMap Foundation's public tile servers are unsuitable for production products.** They run on donated capacity for light use only; the profile keeps at most two requests in flight, identifies the application on every request, forbids prefetch and offline packaging, and logs one warning when it is used ([ADR 0032](../internal/adr/0032-openstreetmap-tile-usage-policy.md)). Products serve tiles built from an OpenStreetMap extract by the data pipeline (`vibeglobe-data`, see the hosting guide), with the attribution "© OpenStreetMap contributors" and no usage limits beyond their own servers'.
+**The OpenStreetMap Foundation's public tile servers are unsuitable for production products.** They run on donated
+capacity for light use. `OSM_PUBLIC_PROFILE` keeps at most 2 requests in flight, identifies the application on every
+request, forbids prefetch, persistent caching and offline packaging, and logs one warning per engine instance. A `url`
+with `{s}` or the retired `a.`, `b.` and `c.` hosts is refused. Products serve tiles built from an
+OpenStreetMap extract by the data pipeline (`vibeglobe-data`, [hosting guide](hosting.md)).
 
 ### Self-hosted OpenStreetMap tiles
 
@@ -410,7 +515,9 @@ const viaProvider = openStreetMapHostedImagery({
 });
 ```
 
-Self-hosted OpenStreetMap tiles enable every feature and show "© OpenStreetMap contributors, ODbL" linked to the copyright page; a commercial provider's profile adds its own rules and credit on top.
+Self-hosted OpenStreetMap tiles (`OSM_SELF_HOSTED_PROFILE`) enable every feature and show "© OpenStreetMap
+contributors, ODbL" linked to the copyright page. A commercial provider's profile in `provider` adds its rules and its
+credit on top.
 
 ### Apple map data
 
@@ -418,52 +525,68 @@ Apple's map data may only be used through Apple's own MapKit, so VibeGlobe offer
 
 ## Keeping secrets out of URLs
 
-Send credentials in headers where the provider supports it (`headers` on the PMTiles and MBTiles adapters). Where a provider requires a key in the URL, the transport adds the key (and a session) only when the request is made: the URLs the engine sees, coalesces, logs and shows in the debug overlay carry neither.
-
-Any tiled adapter that takes a `transport` gets the same protection from `fetchTransport`'s third argument:
+Send credentials in headers where the provider supports them (`headers` on `xyzImagery`, `pmtilesImagery` and
+`mbtilesImagery`). `fetchTransport(fetchImpl?, headers?, extras?)` restricts them to origins, renews them, and adds a
+key the provider requires in the URL only when the request is made:
 
 ```ts
 import { fetchTransport, xyzImagery } from '@vibeglobe/sources';
 
+declare const session: { token: string; renew(): Promise<void> };
+declare const myRestrictedKey: string;
+
 const transport = fetchTransport(undefined, undefined, {
-  // Headers sent only to these origins; renewed once when the server answers 401 or 403.
+  // Sent only to these origins; renewed once when the server answers 401 or 403.
   auth: {
     origins: ['https://tiles.example.com'],
     headers: () => ({ Authorization: `Bearer ${session.token}` }),
     refresh: () => session.renew(),
   },
-  // A key the provider insists on in the URL: appended only when the request is made.
+  // A key the provider insists on in the URL.
   secretQuery: () => ({ key: myRestrictedKey }),
-  // The fetch credentials mode (cookies) for this source; 'omit' by default.
-  credentials: 'omit',
+  credentials: 'omit', // the fetch credentials mode (cookies); 'omit' by default
 });
 const imagery = xyzImagery({ id: 'tiles', url: 'https://tiles.example.com/{z}/{x}/{y}.png', transport });
 ```
 
-The engine never sees the `secretQuery` values or the headers, so its logs, traces, errors and debug overlay cannot show them. When your own code logs URLs, pass them through `redactUrl`, which masks the values of query parameters named like keys, tokens and signatures. Tiles from another origin need CORS headers (`Access-Control-Allow-Origin`) on the tile server; without them the engine logs one error naming the source and the cause, and treats its tiles as unavailable instead of retrying them.
+The engine never sees the `secretQuery` values or the headers, so its logs, traces, errors and debug overlay cannot
+show them. When your own code logs URLs, pass them through `redactUrl`, which replaces the values of query parameters
+named like keys, tokens, signatures and sessions with `***`.
 
 ## Writing and testing a custom adapter
 
-An adapter is any object that implements `ImagerySource`; add `attribution` and `profile` (`DescribedImagerySource`) so the engine can credit it and enforce its terms. Run the shared conformance suite, which needs no test framework, from your own tests:
+An adapter is any object that implements `ImagerySource`; `withProfile` turns it into a `DescribedImagerySource`, so
+the engine credits it and the library enforces its terms. `@vibeglobe/sources/conformance` runs the shared checks
+without a test framework and returns every check with its outcome; `failures(results)` lists the failed ones:
 
 ```ts
+import type { DescribedImagerySource } from '@vibeglobe/sources';
 import { failures, runTiledConformance } from '@vibeglobe/sources/conformance';
+
+declare const myAdapter: (options: { fetch: typeof fetch }) => DescribedImagerySource;
+declare const myRecordedService: typeof fetch; // answers like the real service
 
 const results = await runTiledConformance({
   name: 'my adapter',
   create: (fetchImpl) => myAdapter({ fetch: fetchImpl }),
-  fixture: myRecordedService, // a fetch that answers like the real service
+  fixture: myRecordedService,
   tiles: [{ coord: { root: 0, level: 3, x: 4, y: 2 } }],
   missing: [{ root: 0, level: 3, x: 5, y: 2 }],
 });
-expect(failures(results)).toEqual([]);
+if (failures(results).length > 0) throw new Error(failures(results).join('\n'));
 ```
 
-It checks metadata, tile addressing, coverage, the zoom range, 404 and 500 answers, timeouts, corrupted payloads, cancellation, attribution and the profile's rules (concurrency, required credit and logo, and any `profileChecks` you add). Terrain adapters run the same checks plus decoded heights at reference points:
+The tiled suite checks metadata, tile addressing, coverage, the zoom range, 404 and 500 answers, timeouts, corrupted
+payloads, cancellation, attribution and the profile's rules (concurrency, required credit and logo, and your
+`profileChecks`). `runTerrainConformance` adds decoded heights at reference points:
 
-````ts
-import { heightmapTerrain } from '@vibeglobe/sources';
+```ts
+import { fetchTransport, heightmapTerrain } from '@vibeglobe/sources';
 import { failures, runTerrainConformance } from '@vibeglobe/sources/conformance';
+
+declare const myRecordedService: typeof fetch;
+// RGBA of a heightmap tile, for tests in Node; in the browser the engine decodes images.
+declare const myPngDecoder: (bytes: Uint8Array) => { rgba: Uint8Array; sizePx: number };
 
 const terrainResults = await runTerrainConformance({
   name: 'my terrain',
@@ -472,13 +595,90 @@ const terrainResults = await runTerrainConformance({
       id: 'dem',
       url: 'https://dem.example.com/{z}/{x}/{y}.png',
       encoding: 'terrarium',
-      transport: myTransport(fetchImpl),
+      transport: fetchTransport(fetchImpl),
     }),
   fixture: myRecordedService,
   tiles: [{ coord: { root: 0, level: 3, x: 4, y: 2 } }],
   heights: [{ coord: { root: 0, level: 3, x: 4, y: 2 }, u: 0.5, v: 0.5, meters: 120, toleranceMeters: 0.5 }],
-  decodeImage: myPngDecoder, // RGBA of a heightmap tile; the browser decodes images in the engine
+  decodeImage: myPngDecoder,
 });
-expect(failures(terrainResults)).toEqual([]);
-``` `runParserConformance` checks a parser against fixtures and fuzzes it. The opt-in live run (`npm run test:live-sources`, or the manual "Live sources" workflow in CI) contacts only endpoints whose terms allow automated tests and stops at the first quota error.
-````
+if (failures(terrainResults).length > 0) throw new Error(failures(terrainResults).join('\n'));
+```
+
+`runParserConformance` checks a parser against fixtures and fuzzes it.
+
+## Options
+
+The options of `xyzImagery`, the adapter most layers use. The TSDoc of each adapter's options type lists the rest.
+
+| Option                 | Type                          | Default            | Effect                                                      |
+| ---------------------- | ----------------------------- | ------------------ | ----------------------------------------------------------- |
+| `id`                   | `string`                      | required           | unique per engine instance                                  |
+| `url`                  | `string`                      | required           | template: `{z}`, `{x}`, `{y}` or `{-y}` (TMS), `{s}`, `{r}` |
+| `tiling`               | `'mercator' \| 'geographic'`  | `'mercator'`       | Web Mercator, or the two-root geographic pyramid            |
+| `minLevel`, `maxLevel` | `number`                      | `0`, `19`          | levels outside are never requested                          |
+| `tileSizePx`           | `number`                      | `256`              | tile edge in pixels                                         |
+| `pixelRatio`           | `number`                      | `1`                | `2` for tiles that are always `@2x`                         |
+| `subdomains`           | `string[]`                    | none               | values of `{s}`, spread over tiles                          |
+| `coverage`             | `TileRectangleRad[]`          | none               | rectangles in radians; tiles outside are never requested    |
+| `area`                 | `CoverageArea \| GeoJsonArea` | none               | polygons in degrees (table above)                           |
+| `blankTile`            | `#rrggbb` or `[r, g, b]`      | none               | a tile of this color alone counts as no data                |
+| `transparent`          | `boolean`                     | `false`            | the tiles have transparent areas                            |
+| `headers`              | `Record<string, string>`      | none               | sent with every request by the default transport            |
+| `transport`            | `TileTransport`               | `fetchTransport()` | replaces `headers`                                          |
+| `maxRequestsPerHost`   | `number`                      | `6` (`16`)         | requests in flight per host; 16 with `multiplexed`          |
+| `maxRequestsPerSecond` | `number`                      | none               | the engine never starts more in any second                  |
+| `timeoutsMs`           | `{ firstByteMs, totalMs }`    | 10 s, 30 s         | time to the headers, and in all                             |
+| `attribution`          | `Attribution[]`               | none               | credits shown while its tiles are in view                   |
+| `profile`              | `CreditProfile`               | none               | credit rules only; use `withProfile` for a full profile     |
+
+`{r}` becomes `@2x` on high-DPI canvases and nothing elsewhere. `{s}` without `subdomains` is refused.
+
+## Rules and pitfalls
+
+- `coverage` is in radians and `area` in degrees: degrees in `coverage` make the source request almost nothing.
+- A plain `area: { polygons }` requests only tiles wholly inside it: give GeoJSON or `tiles: 'clip'` to draw the
+  source up to the border.
+- `forbids` takes effect only for sources wrapped by `offline.source()`: without `@vibeglobe/offline` the engine keeps
+  tiles in memory and prefetches whatever the profile says.
+- `xyzImagery`'s `profile` option is a `CreditProfile`; `withProfile` adds the full `ProviderProfile`, caps the
+  concurrency and adds the required credit.
+- A source with invalid metadata (levels outside 0 to 30 or inverted, a tile size that is not a positive integer, a
+  reference system other than `EPSG:3857` or `EPSG:4326`, an empty coverage rectangle) leaves its whole layer out:
+  `createGlobe` logs an error and emits `error`, and `imageryLayers.add` throws.
+- PMTiles and MBTiles raster sources are read as Web Mercator tiles of 256 pixels.
+- Tiles from another origin need `Access-Control-Allow-Origin` on the tile server. Without it the engine logs one error
+  naming the source and the cause, and treats its tiles as unavailable instead of retrying them.
+- `mbtilesImagery` downloads the whole package before it resolves (time limit 120 s, `downloadTimeoutMs`): serve
+  large datasets as PMTiles.
+- Source ids are unique per engine instance: they key the caches, the credits and the per-source switches.
+
+## Errors
+
+The asynchronous factories reject with a `SourceConfigError`: a stable `code` and a message naming the source.
+
+| Code                                                          | When                                                                           | What to do                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
+| `invalid-url-template`                                        | `xyzImagery`: unknown field, unpaired brace, no `{z}`/`{x}`/`{y}`              | fix the template                              |
+| `invalid-option`                                              | `xyzImagery` `blankTile` not `#rrggbb`; `mercatorImage` `maxLevel` out of 0–22 | fix the option                                |
+| `unreachable-capabilities`, `invalid-capabilities`            | WMS or WMTS capabilities cannot be loaded or parsed                            | check the URL, CORS and the document          |
+| `unknown-layer`, `no-layers`                                  | the layer is not in the capabilities, or none is named                         | use an identifier from the capabilities       |
+| `no-resource-url`, `no-kvp-endpoint`, `no-getmap-url`         | the service lacks the endpoint the request needs                               | pick the other `encoding`, or pass `url`      |
+| `needs-reprojection`                                          | the service or image uses another reference system                             | pass `transforms`                             |
+| `unreadable-archive`, `not-raster`, `invalid-levels`          | PMTiles: unreadable, not raster tiles, or minimum zoom above maximum           | check the archive and its range requests      |
+| `unreachable-package`, `unreadable-package`                   | MBTiles: download failed, or not an MBTiles file                               | check the URL and `wasmUrl`                   |
+| `invalid-bounds`, `invalid-world-file`, `rotated-image`       | single image: bad bounds, bad world file, or a rotated world file              | fix the placement; rotation is not supported  |
+| `missing-georeference`                                        | single image without `bounds` or a world file of six numbers                   | pass one of them                              |
+| `unreachable-image`, `unreadable-image`, `unreadable-geotiff` | the image cannot be downloaded or decoded                                      | check the URL, CORS and the format            |
+| `missing-app-identity`, `osm-subdomains`                      | OpenStreetMap public servers without `appName`/`appUrl`, or with `{s}`         | identify the application; use the single host |
+
+`quantizedMeshTerrain` rejects with a plain `Error` when `layer.json` cannot be loaded or read. The engine reports a
+display-only source's refused data access as a `GlobeError` with code `display-only`.
+
+## See also
+
+- [Offline packages](offline.md): persistent cache, network modes, loading switches and packages.
+- [Terrain](terrain.md): datums, elevation queries and the camera above the ground.
+- [Hosting](hosting.md): serving tiles, packages and engine assets.
+- [Vector tiles](vector-tiles.md): styled vector maps.
+- [Data licenses](../data-licenses.md): the terms of the default datasets.

@@ -4,121 +4,164 @@ title: Navigation controls
 
 # Navigation controls
 
-`@vibeglobe/controls` turns mouse, trackpad, touch and keyboard input into camera movement. DOM handlers only record input; once per frame the engine asks the controls to turn it into camera intents (ADR 0009), so many events between two frames cost one camera update. Every movement is time-based: inertia, the smoothed wheel zoom and held keys follow the same path at any refresh rate.
+`@vibeglobe/controls` turns mouse, trackpad, touch and keyboard input into camera movement: `createControls()` returns
+the factory that `GlobeOptions.controls` takes, with commands for an application's buttons. The Vue component takes
+the same options in its `controls` prop and the `<vibe-globe>` element creates default controls (see the
+[integration guide](integration.md)). Ready-made buttons (zoom, compass, 2D / 3D / Auto, tilt slider) are in
+`@vibeglobe/ui` ([UI and GIS guide](ui-and-gis.md)); camera movements from code are `Globe` methods (`flyTo`, …).
+
+## Quick start
 
 ```ts
 import { createControls } from '@vibeglobe/controls';
 import { createGlobe } from '@vibeglobe/core';
 
+declare const zoomInButton: HTMLButtonElement;
+declare const zoomOutButton: HTMLButtonElement;
+
 const controls = createControls();
-const globe = createGlobe({ container, renderer, controls, baseImageryUrl });
-// Rotation, tilt and the engine clock need the globe until the engine's navigation interface carries them.
-controls.connect(globe);
+createGlobe({ container, renderer, controls, baseImageryUrl: '/vibeglobe/fallback-base.jpg' });
 
 zoomInButton.onclick = () => controls.zoomIn();
 zoomOutButton.onclick = () => controls.zoomOut();
 ```
 
-Without `connect`, pan and zoom work and the rotate and tilt gestures are off.
+`createGlobe` attaches the controls to its canvas once the renderer starts and connects them to the globe
+(`controls.connect`); the commands do nothing before. DOM handlers only record input; once per frame the engine asks
+the controls to apply it, so many events between two frames cost one camera update. Inertia, the smoothed wheel zoom
+and held keys run on the engine clock and follow the same path at any refresh rate.
+
+| Command                              | Effect                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `zoomIn()`, `zoomOut()`              | One level about the screen center, animated; calls add up               |
+| `resetNorth()`                       | Turns to north up along the shorter arc                                 |
+| `setNavigationMode(mode)`            | `'free'` or `'north-up'` (below)                                        |
+| `setNorthUpMaxLatitude(deg)`         | The `'north-up'` latitude limit, 1 to 89.9                              |
+| `setTiltPolicy(policy)`              | Turns the tilt policy on, changes it or turns it off                    |
+| `onTiltAvailabilityChange(listener)` | Calls `listener(tiltAvailable)` on each change; returns the unsubscribe |
+| `forwardWheel(element)`              | Lets the wheel zoom the map over an overlay element                     |
 
 ## Gestures
 
-| Input                                   | Movement                                                                                                                                                                      |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Drag (primary button, one finger)       | Pans; the grabbed point stays under the pointer. Released with speed, it coasts and slows to rest.                                                                            |
-| Wheel                                   | Zooms at the cursor; a notch animates over about 100 ms, and the view it heads for loads ahead (`NavigationApi.preloadView`, F672). Over empty sky it zooms about the center. |
-| Trackpad scroll and pinch               | Zoom continuously at the cursor, in proportion to the fingers' motion.                                                                                                        |
-| Double click, double tap                | Zoom in one level at the point.                                                                                                                                               |
-| Two-finger tap                          | Zooms out one level about the fingers' midpoint.                                                                                                                              |
-| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view. Escape cancels.                                                                                                      |
-| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center. No context menu.                                                                               |
-| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together; each starts past a small threshold.                                                                               |
-| Two fingers side by side, moved up/down | Tilts, on its own (decided within the first 100 ms).                                                                                                                          |
-| Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                                                                                                       |
-| Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                                                                                                   |
+| Input                                   | Movement                                                                          |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| Drag (primary button, one finger)       | Pans: the grabbed point stays under the pointer; released with speed, it glides   |
+| Drag from the sky beside the globe      | Turns the globe about the screen center, like a trackball                         |
+| Wheel                                   | Zooms at the cursor; a notch animates over 100 ms; over the sky, about the center |
+| Trackpad scroll and pinch               | Zoom continuously at the cursor                                                   |
+| Double click, double tap                | Zoom in one level at the point                                                    |
+| Two-finger tap                          | Zooms out one level about the fingers' midpoint                                   |
+| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view; Escape cancels           |
+| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center     |
+| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together                        |
+| Two fingers side by side, moved up/down | Tilts alone, when decided within 100 ms of the second finger                      |
+| Safari trackpad gestures                | Pinch zooms, rotation turns the heading                                           |
 
-A new press, touch or key stops inertia and running turns where they are; a wheel zoom still in progress completes, about the point it started at.
+A press, touch or key stops inertia where it is; a wheel zoom in progress completes about the point it started
+at. Adding or lifting a finger continues the gesture without a jump. Right-drag opens no context menu.
 
-A drag that starts on the sky beside a zoomed-out globe turns it about the screen center, like a virtual trackball.
-With `gestures: { skyDragPan: false }` such a mouse or pen drag does nothing until it is released, even once it
-reaches the globe, and leaves no glide; a drag from the globe is unchanged, and so are clicks, double clicks,
-right- and Ctrl-drags and the zoom box. Touch keeps it: a finger beside the globe often starts a pinch (F654).
+Input over the map never scrolls or zooms the page: the controls take the wheel and set `touch-action: none` on the
+canvas while attached. They also make it focusable (`tabindex="0"`) for the keyboard.
 
-Input over the map never scrolls or zooms the page: the map takes wheel events and sets `touch-action: none` while the controls are attached. Outside the map the page scrolls as usual.
+### Overlays over the map
 
-### Markers and panels over the map
-
-HTML laid over the canvas (markers, labels, a panel positioned above the map) takes the wheel events over it, so
-the map stops zooming there and the page may scroll. `forwardWheel` hands them to the map (F654): the wheel,
-trackpad scroll and pinch, and Safari's trackpad gestures over the element zoom about the pointer as over the map.
+HTML laid over the canvas (markers, labels, a panel) takes the wheel events over it, so the map does not zoom there.
+`forwardWheel` hands them to the map:
 
 ```ts
-const stop = controls.forwardWheel(markersLayer); // the element and everything in it
-// …when the markers go:
-stop();
+import type { NavigationControls } from '@vibeglobe/controls';
+
+declare const controls: NavigationControls;
+declare const markers: HTMLElement;
+
+const stop = controls.forwardWheel(markers); // the element and everything in it
+stop(); // when the markers go
 ```
 
-An event already handled is left alone (its default prevented: by the map, when the element holds the map and the
-event came from it, or by the element itself), so a container of both the map and its overlays works too. Elements
-handed over stay registered when the controls are attached again; the returned function stops one. Forward only
-elements whose own scrolling is not needed: the page does not scroll over them.
+An event already handled (its default prevented) is left alone, so a container of both the map and its overlays works
+too. Forwarded elements stay registered when the controls are attached again. Forward only elements whose own
+scrolling is not needed: the page does not scroll over them.
+
+### Clicks
+
+`watchClicks` reports a press and release in place (primary button, under 4 px and 500 ms) with its position:
+
+```ts
+import { watchClicks } from '@vibeglobe/controls';
+import type { Globe } from '@vibeglobe/core';
+
+declare const globe: Globe;
+
+const stop = watchClicks(container, globe, ({ point, position }) => {
+  if (position) console.log(point.xPx, point.yPx, position.longitudeDeg, position.latitudeDeg);
+});
+```
+
+`position` is undefined over the sky. The Vue component and the element emit the same payload as `globe-click`.
 
 ## Navigation modes
 
-How a drag moves the camera. Choose it at start with the `navigationMode` option and change it at runtime; the default is `'free'`.
+How a drag moves the camera: the `navigationMode` option at start, `setNavigationMode` at runtime.
 
-```ts
-const controls = createControls({ navigationMode: 'north-up' });
-// …later, for example from a settings menu:
-controls.setNavigationMode('free');
-console.log(controls.navigationMode); // 'free'
-```
+| Mode               | A drag                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `'free'` (default) | Turns the globe like a trackball: it passes over the poles and the heading turns with the globe |
+| `'north-up'`       | Keeps north up: horizontal motion turns about the polar axis, vertical motion changes latitude  |
 
-| Mode               | A drag                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `'free'` (default) | Turns the globe about any axis, like a trackball (Google Earth): the grabbed point stays under the cursor, the view passes over the poles without stopping, and the heading turns with the globe (north is no longer up after a diagonal drag or a pass over a pole). On the flat map, at regional and street scale, a drag keeps the heading.                                                                                                                                                                 |
-| `'north-up'`       | Keeps north up: horizontal motion turns the globe about the polar axis, vertical motion changes the latitude, and the heading never changes. The point the camera looks at stops at a latitude limit, 85° by default (`northUpMaxLatitudeDeg`, from 1 to 89.9, or `setNorthUpMaxLatitude` at runtime): vertical motion beyond it is ignored, horizontal motion still turns about the axis, with no jump, no flip and no spin about the pole. A camera placed beyond the limit stays there and goes no further. |
-
-In both modes inertia, zoom to the cursor, tilt and rotation gestures, and the compass (`resetNorth`, the `N` key, a click on the UI's compass: north up) work the same; a wheel zoom never turns the heading. Any value other than `'free'` and `'north-up'` throws a `GlobeError` (`invalid-option`). An input plug-in of its own sets `NavigationApi.navigationMode` on the navigation interface it receives.
-
-In the playground, `?navigationMode=north-up` starts in that mode and the "Navigation mode" selector (the settings panel on the showcase page) switches it.
+- In `'free'` mode the flat map, at regional and street scale, keeps the heading during a drag.
+- In `'north-up'` mode the point the camera looks at stops at `northUpMaxLatitudeDeg` (default 85, from 1 to 89.9):
+  vertical motion beyond it is ignored and horizontal motion still turns the globe. A camera placed beyond the limit
+  stays there.
+- In both modes inertia, zoom to the cursor, the rotate and tilt gestures and `resetNorth` work the same, and a wheel
+  zoom never turns the heading.
 
 ## Tilt policy
 
-By default the engine's zoom curves tilt the view near street level (Auto mode), and any tilt can be chosen at any
-distance. The tilt policy (F625) ties the tilt to the distance from the camera to the point it looks at instead (the
-height above the ground when looking straight down):
+Without a policy the engine's Auto curves tilt the view near street level, and any tilt can be chosen at any distance.
+The tilt policy ties the tilt to the distance from the eye to the point it looks at (the height above the ground when
+looking straight down):
 
 ```ts
-const controls = createControls({ tiltPolicy: true }); // 20,000 m, 2,000 m, 60°
-controls.setTiltPolicy({ lock2DAboveMeters: 20_000, autoTiltBelowMeters: 2_000, autoTiltMaxDeg: 60 });
+import { createControls } from '@vibeglobe/controls';
+
+declare const button3d: HTMLButtonElement;
+
+const controls = createControls({ tiltPolicy: true });
+controls.setTiltPolicy({ lock2DAboveMeters: 100_000, fullTiltBelowMeters: 5_000 });
 controls.onTiltAvailabilityChange((available) => (button3d.disabled = !available));
 ```
 
-| Field                 | Default       | Effect                                                                                                                                                                                                                                                                                                                     |
-| --------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lock2DAboveMeters`   | 20,000 m      | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. A flight or fit that chooses a tilt keeps it until it ends, so one from afar into a tilted view arrives tilted (KB-310). `tiltAvailable` is false and the UI's 3D button is disabled. |
-| `autoTiltBelowMeters` | 2,000 m       | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.                                                                                                                              |
-| `autoTiltMaxDeg`      | 60°           | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                                                                                                                                                |
-| `fullTiltBelowMeters` | half the lock | Where the policy's cap ends (F641): from 0° at `lock2DAboveMeters` the largest allowed tilt rises continuously in the distance's logarithm to no cap here. Above 0 and below the lock.                                                                                                                                     |
+| Field                 | Default       | Effect                                                                          |
+| --------------------- | ------------- | ------------------------------------------------------------------------------- |
+| `lock2DAboveMeters`   | 20,000        | Beyond it the tilt is 0° and gestures, `jumpTo({ tiltDeg })` and 3D cannot tilt |
+| `autoTiltBelowMeters` | 2,000         | Within it the tilt rises by itself, below the lock                              |
+| `autoTiltMaxDeg`      | 60            | The automatic tilt, reached at a quarter of `autoTiltBelowMeters`               |
+| `fullTiltBelowMeters` | half the lock | Where the cap on the tilt ends, below the lock                                  |
 
-A tilt chosen by hand below the lock stays at every distance until it is changed, or until the camera passes the lock:
-between `fullTiltBelowMeters` and the lock (10 to 20 km by default) the allowed tilt falls continuously to 0°, and beyond
-the lock the view returns to Auto. A far lock with a near `fullTiltBelowMeters` (for example 100 km and 5 km) gives a
-view that is flat at a country's scale and tilts more and more while zooming in: a tilt chosen at 50 km rises with the
-cap instead of jumping. `setTiltPolicy(false)` (or `null`) turns the policy off; invalid
-values throw a `GlobeError` (`invalid-option`). The UI's 2D / 3D / Auto toggle takes the controls as its `tilt` option
-(`new ViewModeControl({ tilt: controls })`, or `addAllControls(ui, { tilt: controls })`). In the playground,
-`?tiltPolicy=1` turns the policy on; the showcase page has it on. In Vue, `VibeGlobe`'s `controls` prop takes the same
-options (`:controls="{ tiltPolicy: true }"`), and `useTiltAvailable()` returns the availability as a ref.
+- From `lock2DAboveMeters` to `fullTiltBelowMeters` the largest allowed tilt rises continuously, in the distance's
+  logarithm, from 0° to 90°; a far lock with a near end (100 km and 5 km) gives a view flat at a country's scale that
+  tilts more and more while zooming in.
+- A tilt chosen by hand below the lock stays until it is changed or the camera passes the lock; beyond the lock the
+  view returns to Auto.
+- A flight or fit that chooses a tilt keeps it until it ends, so one from afar into a tilted view arrives tilted.
+- `tiltAvailable` is false beyond the lock. `ViewModeControl` and `addAllControls` of `@vibeglobe/ui` take the
+  controls as their `tilt` option and disable 3D then; in Vue, `useTiltAvailable()` returns it as a ref.
+- `setTiltPolicy(false)` or `setTiltPolicy(null)` turns the policy off.
 
 ### A tilt slider
 
-`controls.maxTiltDeg` is the largest tilt the view allows now (F642): the empty-sky limit, the constraints'
-`maxTiltDeg`, the policy's cap, or the tilt the terrain clearance holds the camera at while it does (90 before the
-controls are attached). The engine writes it every frame, so a slider reads it with the camera:
+`controls.maxTiltDeg` is the largest tilt of the last frame: the empty-sky limit, the constraints' `maxTiltDeg`, the
+policy's cap, or the tilt the terrain clearance holds the camera at (90 before the controls are attached). Read it
+when the camera changes:
 
 ```ts
+import type { NavigationControls } from '@vibeglobe/controls';
+import type { Globe } from '@vibeglobe/core';
+
+declare const globe: Globe;
+declare const controls: NavigationControls;
+declare const slider: HTMLInputElement;
+
 globe.on('camera-change', () => {
   slider.max = String(Math.round(controls.maxTiltDeg));
   slider.value = String(Math.round(globe.camera.tiltDeg));
@@ -126,73 +169,85 @@ globe.on('camera-change', () => {
 slider.oninput = () => globe.jumpTo({ tiltDeg: Number(slider.value) });
 ```
 
-`controls.tiltPolicy` keeps two slots for this: `[4]`, the octaves from the lock to the full tilt (the controls write
-it, 0 meaning 1), and `[5]`, the largest tilt of the frame in radians (the engine writes it).
-
 ## Camera limits
 
-`globe.setConstraints({ minZoom, maxZoom, maxRangeMeters, maxTiltDeg, bounds, minSurfaceDistanceMeters })` holds every input and movement within
-the limits (F209–F211, F646); `globe.constraints` reads them back.
+`globe.setConstraints(constraints)` holds every input and movement within limits (also `GlobeOptions.constraints`);
+`globe.constraints` reads them back.
 
-- `minZoom` and `maxZoom` are Web Mercator zooms at the latitude of the view's center: the same zoom is a nearer camera
-  at high latitudes. As a far limit on a globe, `minZoom` therefore moves the camera in while the view is dragged
-  toward a pole.
-- `maxRangeMeters` is the farthest the camera's range (eye to target) may be, the same at every latitude: the right far
-  limit for a globe that must never look smaller than a given size. A range of 18,000 km keeps the whole globe filling
-  most of the view at any screen size (the range sets its angular size); a drag past a pole keeps the range while the
-  Web Mercator zoom falls.
-- The zoom keeps its readout meaning: a page that shows labels or markers by zoom still reads `globe.camera.zoom`.
-- `minSurfaceDistanceMeters` (default 40) is how near a zoom in (wheel, pinch, double click, keys) may bring the eye
-  to the surface it zooms toward: the terrain as drawn, mountains included, or the ellipsoid without terrain. The zoom
-  stops there, a little before the ground, so the view always shows what it frames instead of reaching zoom 28 above a
-  point lifted off the ground (KB-300). `0` lets the zoom come down to about 1 m (F061).
+| Field                      | Range         | Effect                                                                        |
+| -------------------------- | ------------- | ----------------------------------------------------------------------------- |
+| `minZoom`, `maxZoom`       | 0 to 25       | Web Mercator zooms at the latitude of the view's center                       |
+| `maxRangeMeters`           | 1 to 6 × 10⁷  | The farthest the eye may be from the point it looks at, at every latitude     |
+| `maxTiltDeg`               | 0 to 89       | The largest tilt                                                              |
+| `bounds`                   | a `GeoBounds` | Where the view's center may go; movements end inside                          |
+| `minSurfaceDistanceMeters` | 0 to 10,000   | How near a zoom in brings the eye to the surface it zooms toward (default 40) |
+
+- The same Web Mercator zoom is a nearer camera at high latitudes, so `minZoom` as a far limit moves the camera in
+  while the view is dragged toward a pole. `maxRangeMeters` is the far limit that keeps the globe's size on screen.
+- `minSurfaceDistanceMeters` measures to the terrain as drawn, mountains included, or to the ellipsoid without terrain;
+  `0` removes the limit.
 
 ## Key map
 
-The keys work while the map has focus (Tab reaches it; a focus ring shows when it is reached from the keyboard). Keys typed into other elements of the page never move the map, and keys with Ctrl, Alt or Meta are left to the browser.
+Keys work while the map has focus (Tab reaches it, with a focus ring). Keys typed into other elements never move the
+map, and keys with Ctrl, Alt or Meta are left to the browser.
 
-| Key                     | Action                                                         |
-| ----------------------- | -------------------------------------------------------------- |
-| Arrows                  | Pan while held, with an eased start and stop                   |
-| Shift+Left, Shift+Right | Rotate while held                                              |
-| Shift+Up, Shift+Down    | Tilt while held                                                |
-| `+` / `=`, `-`          | Zoom in / out one level about the center; presses accumulate   |
-| `N`                     | Turn to north up                                               |
-| Home                    | Fly to the home view (when the engine offers `goHome`)         |
-| `2`, `3`, `A`           | 2D, 3D and Auto view modes (when the engine offers view modes) |
-| Escape                  | Cancel a zoom box                                              |
+| Key                     | Action                                                   |
+| ----------------------- | -------------------------------------------------------- |
+| Arrows                  | Pan while held, with an eased start and stop             |
+| Shift+Left, Shift+Right | Rotate while held                                        |
+| Shift+Up, Shift+Down    | Tilt while held                                          |
+| `+` / `=`, `-`          | Zoom in / out one level about the center; presses add up |
+| `N`                     | Turn to north up                                         |
+| Home                    | Fly to the home view (`globe.goHome()`)                  |
+| `2`, `3`, `A`           | 2D, 3D and Auto view modes                               |
+| Escape                  | Cancel a zoom box                                        |
 
 ## Options
 
-Every option is optional; invalid values throw a `GlobeError` with code `invalid-option`.
+Every option is optional. The groups `inertia`, `wheel`, `keyboard` and `touch` take some of their fields, and
+`DEFAULT_CONTROLS_OPTIONS` holds every default.
 
-```ts
-createControls({
-  gestures: { boxZoom: false, inertia: true }, // switch single gestures off
-  inertia: {
-    panTauMs: 650,
-    rotateTauMs: 650,
-    twistTauMs: 200,
-    tiltTauMs: 150,
-    zoomTauMs: 150,
-    velocityWindowMs: 50,
-    stillMs: 150,
-    stillPx: 2,
-    maxPanSpeedPxPerS: 2500,
-  },
-  wheel: { pixelsPerLevel: 300, pinchPixelsPerLevel: 100, notchSmoothingMs: 100, maxLeadLevels: 2 },
-  keyboard: { panViewportsPerS: 0.8, rotateDegPerS: 90, tiltDegPerS: 45, smoothingMs: 150, zoomLevelsPerPress: 1 },
-  touch: { tapMaxMovePx: 10, tapMaxMs: 250, doubleTapMs: 300, tiltDecisionMs: 100, rotateThresholdPx: 25 },
-  rotateDegPerViewportWidth: 180,
-  tiltDegPerViewportHeight: 90,
-  maxTiltDeg: 89,
-  zoomAnimationMs: 120,
-  reducedMotion: 'system', // 'reduce' or 'no-preference' to override the system setting
-});
-```
+| Option                      | Type                                      | Default    | Effect                                                     |
+| --------------------------- | ----------------------------------------- | ---------- | ---------------------------------------------------------- |
+| `gestures`                  | `Partial<GestureSwitches>`                | all `true` | Switches single gestures off                               |
+| `inertia`                   | `Partial<InertiaSettings>`                | per field  | Glide time constants and release-speed sampling            |
+| `wheel`                     | `Partial<WheelSettings>`                  | per field  | Wheel and pinch pixels per level, notch smoothing          |
+| `keyboard`                  | `Partial<KeyboardSettings>`               | per field  | Key pan, rotate and tilt speeds, levels per `+`/`-` press  |
+| `touch`                     | `Partial<TouchSettings>`                  | per field  | Tap, double-tap, tilt, pinch and twist thresholds          |
+| `rotateDegPerViewportWidth` | `number`                                  | 180        | Heading change of a rotate drag across the viewport        |
+| `tiltDegPerViewportHeight`  | `number`                                  | 90         | Tilt change of a tilt drag across the viewport             |
+| `maxTiltDeg`                | `number`                                  | 89         | The largest tilt input asks for, 0 to 89                   |
+| `zoomAnimationMs`           | `number`                                  | 120        | Time constant of the zoom commands, double click, zoom box |
+| `reducedMotion`             | `'system' \| 'reduce' \| 'no-preference'` | `'system'` | `'reduce'` shortens inertia to a quarter                   |
+| `navigationMode`            | `'free' \| 'north-up'`                    | `'free'`   | How a drag moves the camera                                |
+| `northUpMaxLatitudeDeg`     | `number`                                  | 85         | The `'north-up'` latitude limit, 1 to 89.9                 |
+| `tiltPolicy`                | `boolean \| Partial<TiltPolicy>`          | off        | The tilt policy                                            |
 
-Gesture switches: `dragPan`, `skyDragPan`, `wheelZoom`, `doubleClickZoom`, `boxZoom`, `dragRotate`, `touchZoom`, `touchRotate`, `touchTilt`, `keyboard`, `inertia`.
+Gesture switches: `dragPan`, `skyDragPan`, `wheelZoom`, `doubleClickZoom`, `boxZoom`, `dragRotate`, `touchZoom`,
+`touchRotate`, `touchTilt`, `keyboard`, `inertia`.
 
-On a display too slow to show an animation (frames of an animation more than three of its time constants apart, as on software GPUs), wheel notches and the zoom commands apply in one step instead of costing frames.
+## Rules and pitfalls
 
-With reduced motion (the system's `prefers-reduced-motion: reduce`, followed at runtime, or `reducedMotion: 'reduce'`) inertia lasts a quarter as long.
+- `skyDragPan: false` makes a mouse or pen drag that starts on the sky do nothing until it is released, even once it
+  reaches the globe; touch keeps it, because a finger beside the globe often starts a pinch.
+- Reduced motion (the system's `prefers-reduced-motion: reduce`, followed at runtime, or `reducedMotion: 'reduce'`)
+  shortens inertia to a quarter of its time constants.
+- On a display too slow to show an animation (two animation frames in a row more than three time constants apart, as
+  on software GPUs), wheel notches and the zoom commands apply in one step.
+- A Shift-drag zoom box, the Home key and the view-mode keys use the connected globe; controls attached by other means
+  than `createGlobe` need `controls.connect(globe)` for them.
+- The engine's maximum tilt and the constraints may clamp a tilt further than `maxTiltDeg`.
+
+## Errors
+
+| Error or code                 | When                                                                           | What to do                       |
+| ----------------------------- | ------------------------------------------------------------------------------ | -------------------------------- |
+| `GlobeError` `invalid-option` | An unknown option or gesture, a value out of range, an unknown navigation mode | Fix the option the message names |
+| `GlobeError` `invalid-option` | `setConstraints` with values out of range or `minZoom` above `maxZoom`         | Nothing changed; fix the values  |
+
+## See also
+
+- [UI and GIS](ui-and-gis.md): zoom, compass, 2D / 3D / Auto and tilt controls.
+- [Integration](integration.md): the Vue `controls` prop and the element's `no-controls`.
+- [Terrain](terrain.md): the camera above the ground.

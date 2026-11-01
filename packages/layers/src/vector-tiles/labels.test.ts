@@ -470,7 +470,7 @@ describe('labels in the page font (F689)', () => {
     const target = {
       rasterizeGlyphs: (font: string, family: string, codes: readonly number[]) => {
         drawn.push(`${font}|${family}|${codes.join(',')}`);
-        return codes.map((id) => ({ id, width: 1, height: 1, left: 0, top: 0, advance: 8, bitmap: new Uint8Array(1) }));
+        return codes.map((id) => ({ id, width: 1, height: 1, left: 0, top: 0, advance: 8, bitmap: [0] }));
       },
     };
     const source = new GlyphSource(

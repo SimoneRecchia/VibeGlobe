@@ -126,4 +126,19 @@ describe('coverage areas (polygon coverage of a source)', () => {
     const unclipped = coverageTest({ polygons: [box], keySea: sea }).mask(rect(39.5, 40, 40.5, 41), false);
     expect(Array.from(unclipped?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
   });
+
+  it('keeps water up to offshoreMeters beyond the land: the tiles that near asked for, its reach in pixels (F687)', () => {
+    const sea = { land: [COUNTRY], featherMeters: 2000, offshoreMeters: 5000 };
+    const area = coverageTest({ polygons: [COUNTRY], tiles: 'overlap', keySea: sea });
+    // The east border runs at 16° E (1° is 75.2 km at 47.5° N): a tile starting 1.5 km beyond it is asked for, one
+    // 15 km beyond it is not, and without the reach offshore neither is.
+    const near = rect(16.02, 47, 16.05, 47.3);
+    expect(area.covers(near)).toBe(true);
+    expect(area.covers(rect(16.2, 47, 16.3, 47.3))).toBe(false);
+    expect(coverageTest({ polygons: [COUNTRY], tiles: 'overlap' }).covers(near)).toBe(false);
+    // Its mask carries the land beyond the tile, and the reach in pixels at the fade's scale.
+    const mask = area.mask(near, false)?.sea;
+    expect(mask?.ringEnds.length).toBe(2);
+    expect((mask?.growPx ?? 0) / (mask?.featherPx ?? 1)).toBeCloseTo(2.5, 6);
+  });
 });

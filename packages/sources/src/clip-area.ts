@@ -32,7 +32,8 @@ export function sourceArea(
   if (!input) return undefined;
   const area = coverageArea(input);
   const test = coverageTest(area);
-  if (area.tiles !== 'clip' && !area.keyOutside && !area.keyEverywhere) return { test, clip: false };
+  // The sea's key masks per pixel too: without it the sea of a source keying it alone stayed (KB-329).
+  if (area.tiles !== 'clip' && !area.keyOutside && !area.keyEverywhere && !area.keySea) return { test, clip: false };
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const mercator = tiling.crs === 'EPSG:3857';
   return {

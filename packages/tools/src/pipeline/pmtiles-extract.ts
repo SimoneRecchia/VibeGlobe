@@ -1,12 +1,13 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Tiles copied from a remote PMTiles archive (OpenFreeMap's planet vector tiles, Mapterhorn's terrain): each tile of
- * the build's area and levels is read with range requests, never the whole archive, and written as it is.
+ * Tiles copied from a remote PMTiles archive (OpenFreeMap's planet vector tiles, Mapterhorn's terrain) or an XYZ tile
+ * service of the same tiling (NASA's Blue Marble from GIBS, F686): each tile of the build's area and levels is read,
+ * never the whole archive, and written as it is.
  */
 import { join } from 'node:path';
 import { PMTiles, type RangeResponse, type Source } from 'pmtiles';
-import type { DatasetConfig, PmtilesSource } from '../config/schema.js';
+import type { DatasetConfig, PmtilesSource, XyzSource } from '../config/schema.js';
 import { tileExtension } from '../output/metadata.js';
 import { type Area, areaTiles } from '../tiles/area.js';
 import type { TileCoord } from '../tiles/mercator.js';
@@ -36,16 +37,38 @@ export function openArchive(source: PmtilesSource, fetchImpl: typeof fetch): PMT
   return new PMTiles(rangeSource(source.url, fetchImpl));
 }
 
-/** Copies a dataset's tiles from its archive into its tile folder; returns built and skipped counts. */
-export async function extractPmtilesDataset(
+/** One tile's bytes from the source, or undefined where it holds none. */
+function tileReader(
+  source: PmtilesSource | XyzSource,
+  fetchImpl: typeof fetch,
+): (tile: TileCoord) => Promise<Uint8Array | undefined> {
+  if (source.type === 'pmtiles') {
+    const archive = openArchive(source, fetchImpl);
+    return async ({ z, x, y }) => {
+      const found = await archive.getZxy(z, x, y);
+      return found && new Uint8Array(found.data);
+    };
+  }
+  return async ({ z, x, y }) => {
+    const url = source.url.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
+    const response = await fetchImpl(url);
+    if (response.status === 404) return undefined;
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
+  };
+}
+
+/** Copies a dataset's tiles from its archive or tile service into its tile folder; returns built and skipped counts. */
+export async function extractTiles(
   dataset: DatasetConfig,
   area: Area,
   folders: DatasetFolders,
   fetchImpl: typeof fetch,
   tilesAt?: (z: number) => Iterable<TileCoord>,
 ): Promise<{ built: number; skipped: number }> {
-  if (dataset.source.type !== 'pmtiles') throw new Error(`${dataset.id}: not a PMTiles source`);
-  const archive = openArchive(dataset.source, fetchImpl);
+  const source = dataset.source;
+  if (source.type !== 'pmtiles' && source.type !== 'xyz') throw new Error(`${dataset.id}: not a tile source`);
+  const read = tileReader(source, fetchImpl);
   const extension = tileExtension(dataset);
   const counts = { built: 0, skipped: 0 };
   for (let z = dataset.minZoom; z <= dataset.maxZoom; z++) {
@@ -59,16 +82,16 @@ export async function extractPmtilesDataset(
           counts.skipped++;
           continue;
         }
-        const found = await archive.getZxy(tile.z, tile.x, tile.y);
-        // Tiles the archive does not hold (open sea in some archives) are not written.
+        const found = await read(tile);
+        // Tiles the source does not hold (open sea in some archives) are not written.
         if (!found) continue;
-        folders.log.write('tile', key, path, new Uint8Array(found.data));
+        folders.log.write('tile', key, path, found);
         levelBuilt++;
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     counts.built += levelBuilt;
-    folders.report(`z${z}: ${levelBuilt} tiles copied from the archive`);
+    folders.report(`z${z}: ${levelBuilt} tiles copied from the source`);
   }
   return counts;
 }

@@ -201,4 +201,30 @@ describe('xyzImagery coverage area', () => {
     expect(source.tileMask?.(tile(10, 550, 354))).toBeUndefined();
     expect(() => xyzImagery({ id: 'x', url: 'https://t/{z}/{x}/{y}.jpg', blankTile: 'white' })).toThrow(/#rrggbb/);
   });
+
+  it('keys the sea of an area with keySea alone: the source transparent, every tile with the land over it (KB-329)', () => {
+    const world: [number, number][] = [
+      [-180, -85],
+      [180, -85],
+      [180, 85],
+      [-180, 85],
+      [-180, -85],
+    ];
+    const island: [number, number][] = [
+      [10, 46],
+      [16, 46],
+      [16, 49],
+      [10, 49],
+      [10, 46],
+    ];
+    const source = xyzImagery({
+      id: 'package',
+      url: 'https://t/{z}/{x}/{y}.jpg',
+      area: { polygons: [[world]], keySea: { land: [[island]], featherMeters: 4000 } },
+    });
+    expect(source.transparent).toBe(true);
+    // Level 10: x = 540 straddles the island's western edge, x = 600 lies at sea.
+    expect(source.tileMask?.(tile(10, 540, 354))?.sea?.ringEnds.length).toBe(1);
+    expect(source.tileMask?.(tile(10, 600, 354))?.sea?.ringEnds.length).toBe(0);
+  });
 });

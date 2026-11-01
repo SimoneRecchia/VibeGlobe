@@ -8212,6 +8212,27 @@
         "Unit-test that with the world's land the satellite chain holds Europe's imagery from level 9 and the world's from 3 to 8, a world tile named in its own package folder, and Europe's alone without it"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F686",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "The package's sea: `world-sea.json` copies NASA's Blue Marble with shaded relief and bathymetry from GIBS's Web Mercator tiles at levels 0 to 7 (the pipeline copies an `xyz` source tile by tile, as a PMTiles one), and `europeOpen` with `packageLevels.sea` lays it from the package as Satellite's and Hybrid's lowest layer, `satellite-base`, so the water keyed out of the imagery above shows the sea's depth instead of the globe's base image.",
+      "steps": [
+        "Unit-test that the pipeline copies an XYZ service's tiles of the area as they are, leaves out those it lacks and asks none twice",
+        "Unit-test that with `packageLevels.sea` the satellite's lowest layer is the package's `world-sea` from level 0 to its own, fading in as the online Blue Marble does, and absent without it"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F687",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`keySea.offshoreMeters` of a source's `area`: for imagery whose water is real everywhere (an online satellite service), water stays up to that distance beyond the land and fades out there instead of at the land's outline, and the tiles within that distance of the land are requested too.",
+      "steps": [
+        "Unit-test that a tile within the reach of the land is requested and one beyond it is not, and that its mask carries the land's reach in pixels at the fade's scale"
+      ],
+      "status": "passing"
     }
   ]
 }

@@ -113,6 +113,18 @@ export const ESA_WORLDCOVER: PresetSourceRecord = {
   coverage: 'europe',
 };
 
+/**
+ * NASA's Blue Marble with bathymetry from the app's package (F686): the satellite's lowest layer, so the water the
+ * packages and the online imagery key out shows the sea's depth instead of the globe's base image.
+ */
+export const WORLD_SEA: PresetSourceRecord = {
+  ...NASA_GIBS_BLUE_MARBLE,
+  id: 'world-sea',
+  name: 'NASA Blue Marble, shaded relief and bathymetry, world (package)',
+  tiers: 'package',
+  maxLevel: 7,
+};
+
 /** The same WorldCover composite over the whole world's land at the package's lower levels (F684). */
 export const WORLD_WORLDCOVER: PresetSourceRecord = {
   ...ESA_WORLDCOVER,
@@ -179,6 +191,7 @@ const NATURAL_EARTH: PresetSourceRecord = {
 /** Every included source. */
 export const EUROPE_SOURCES: readonly PresetSourceRecord[] = [
   NASA_GIBS_BLUE_MARBLE,
+  WORLD_SEA,
   ESA_WORLDCOVER,
   WORLD_WORLDCOVER,
   OPENFREEMAP,

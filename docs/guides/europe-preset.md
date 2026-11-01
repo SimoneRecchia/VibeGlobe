@@ -172,6 +172,7 @@ in over the whole view at once. A level shows at about the zoom one below it.
   `farLevels + 5`. The online layers always fade in over levels 12 to 13.
 - The sea, the polar caps and everything outside the package's box (32° W to 45° E, 27° N to 72° N) show the base
   image at every level, unless the [world package](#the-world-package) covers the world's land: WorldCover's water is keyed out outside `EUROPE_LAND`, fading back in over 4 km inside it.
+  With the [package's sea](#the-sea) the keyed water shows NASA's Blue Marble with its depth instead of the base image.
 - From level 9 the package holds Europe's land only; elsewhere in the box its level 8 tiles are magnified.
 - Online only, NASA's Blue Marble replaces WorldCover, land and sea, in its own colors, fading in from level
   `farLevels + 0.5` to `farLevels + 1`.
@@ -417,6 +418,20 @@ imagery then shows from level `farLevels + 1` to `packageLevels.world` (8), its 
 imagery starts at level 9, so the package's Europe levels 5 to 8 go unread. Antarctica stays the base image. Beyond
 level 8 outside Europe, an added online source takes over, or level 8 is magnified.
 
+### The sea
+
+`world-sea.json` copies NASA's Blue Marble with shaded relief and bathymetry (500 m, no restrictions on use) from GIBS's
+Web Mercator tiles over the whole world at levels 0 to 7: 21,845 tiles, about 0.17 GB as JPEG. Add its
+`world-sea.pmtiles` to the package with `sourceId` `world-sea` and pass its deepest level:
+
+```text
+europeOpen({ packageManifestUrl, offline, farLevels: 2, worldLand: WORLD_LAND, packageLevels: { sea: 7 } })
+```
+
+It becomes Satellite's and Hybrid's lowest layer, `satellite-base`, fading in over the base image from level
+`farLevels + 0.5` and magnified beyond level 7: every water pixel keyed out of the imagery above, the packages' and an
+online source's keyed with `keySea`, shows the sea's depth, deep blue offshore and lighter over the shelves.
+
 ## Estimating the package
 
 `vibeglobe-data estimate <config>` counts the tiles of every level, land and sea apart, and prints the size and the
@@ -488,7 +503,7 @@ Publish the build's `output/` folder and the manifest under a versioned path, su
 MIME types):
 
 - `manifest.json` and the archives `europe-satellite.pmtiles`, `europe-terrain.pmtiles` (and
-  `world-satellite.pmtiles`), read by the offline engine;
+  `world-satellite.pmtiles`, `world-sea.pmtiles`), read by the offline engine;
 - the static folders `europe-vectors/{z}/{x}/{y}.pbf` and `europe-terrain/{z}/{x}/{y}.webp`, read by the vector style
   and its hillshade through `transformUrl`;
 - for offline use, `openfreemap/`: a copy of the Liberty style (`styles/liberty`), its TileJSON (`planet`), fonts and
@@ -498,19 +513,19 @@ MIME types):
 
 `EuropeOpenOptions`; the TSDoc has the details.
 
-| Option               | Type                                   | Default               | Effect                                                           |
-| -------------------- | -------------------------------------- | --------------------- | ---------------------------------------------------------------- |
-| `packageManifestUrl` | `string`                               | none: online only     | The package's manifest; needs `offline`                          |
-| `offline`            | `OfflineWrapper`                       | none                  | The offline engine (`createOffline()`); required with a package  |
-| `packageBaseUrl`     | `string`                               | the manifest's folder | Where the package's static folders and `openfreemap/` mirror are |
-| `packageLevels`      | `{ vectors, terrain, imagery, world }` | 11, 11, 11, 8         | The package's deepest levels: each dataset's `maxZoom`           |
-| `worldLand`          | `readonly PolygonDeg[]`                | none                  | `WORLD_LAND`, with the world package                             |
-| `farLevels`          | `number`                               | 4                     | Levels 0 to this show the base image in Satellite and Hybrid     |
-| `onlineMaxLevel`     | `Record<string, number>`               | each source's deepest | Lowers `openfreemap` (14) and `europe-terrain` (17)              |
-| `exclude`            | `readonly string[]`                    | none                  | Source ids to leave out                                          |
-| `addSources`         | `readonly AddedSource[]`               | none                  | The application's imagery sources in Satellite and Hybrid        |
-| `orthophotos`        | `OrthophotoLayers`                     | none                  | `await europeOrthophotos()`                                      |
-| `landCover`          | `AddedSource`                          | none                  | The Landscape's land cover image below level 7                   |
+| Option               | Type                                        | Default               | Effect                                                                           |
+| -------------------- | ------------------------------------------- | --------------------- | -------------------------------------------------------------------------------- |
+| `packageManifestUrl` | `string`                                    | none: online only     | The package's manifest; needs `offline`                                          |
+| `offline`            | `OfflineWrapper`                            | none                  | The offline engine (`createOffline()`); required with a package                  |
+| `packageBaseUrl`     | `string`                                    | the manifest's folder | Where the package's static folders and `openfreemap/` mirror are                 |
+| `packageLevels`      | `{ vectors, terrain, imagery, world, sea }` | 11, 11, 11, 8, none   | The package's deepest levels: each dataset's `maxZoom`; `sea` adds the sea layer |
+| `worldLand`          | `readonly PolygonDeg[]`                     | none                  | `WORLD_LAND`, with the world package                                             |
+| `farLevels`          | `number`                                    | 4                     | Levels 0 to this show the base image in Satellite and Hybrid                     |
+| `onlineMaxLevel`     | `Record<string, number>`                    | each source's deepest | Lowers `openfreemap` (14) and `europe-terrain` (17)                              |
+| `exclude`            | `readonly string[]`                         | none                  | Source ids to leave out                                                          |
+| `addSources`         | `readonly AddedSource[]`                    | none                  | The application's imagery sources in Satellite and Hybrid                        |
+| `orthophotos`        | `OrthophotoLayers`                          | none                  | `await europeOrthophotos()`                                                      |
+| `landCover`          | `AddedSource`                               | none                  | The Landscape's land cover image below level 7                                   |
 
 ## Rules and pitfalls
 

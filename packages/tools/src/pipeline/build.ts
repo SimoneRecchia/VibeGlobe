@@ -21,7 +21,7 @@ import { type DatasetFolders, convertSources, rasterMosaic, tileRasterDataset } 
 import { StepLog, sha256 } from './step-log.js';
 import { PIPELINE_VERSION } from '../version.js';
 import { tileVectorDataset } from './vector-dataset.js';
-import { extractPmtilesDataset } from './pmtiles-extract.js';
+import { extractTiles } from './pmtiles-extract.js';
 
 /** The steps of a build, in order. */
 export const STEPS = ['download', 'convert', 'tile', 'package'] as const;
@@ -163,8 +163,8 @@ async function buildDataset(
       : convertSources(dataset, files, f, loaded.config.tools.gdal, options.outDir);
   if (options.until === 'convert') return result;
   const counts =
-    dataset.source.type === 'pmtiles'
-      ? await extractPmtilesDataset(dataset, area, f, options.fetch ?? fetch, tilesAt)
+    dataset.source.type === 'pmtiles' || dataset.source.type === 'xyz'
+      ? await extractTiles(dataset, area, f, options.fetch ?? fetch, tilesAt)
       : dataset.kind === 'vector'
         ? tileVectorDataset(dataset, area, converted, f)
         : tileRasterDataset(dataset, area, rasterMosaic(dataset, files, converted), f, tilesAt);

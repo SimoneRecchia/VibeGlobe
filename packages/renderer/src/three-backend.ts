@@ -321,7 +321,8 @@ export class ThreeBackend implements RendererBackend {
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
-    this.tileTextures.refilterSome(this.renderer);
+    // Tiles made again with a new anisotropy, a few a frame: frames follow until all are (KB-313).
+    if (this.tileTextures.refilterSome(this.renderer) > 0) this.layers.contentReady?.();
     this.tileTextures.tones.frame(draws, this.tileTextures.imageOf);
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);

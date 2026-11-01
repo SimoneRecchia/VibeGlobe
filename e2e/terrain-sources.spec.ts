@@ -131,7 +131,8 @@ test.describe('quantized-mesh availability (F128)', () => {
     ] as const) {
       const session = await fixtureSession(page);
       await page.request.post(`/_fixture/${session}/layer`, { data: JSON.stringify(layer([...declared])) });
-      await openGlobe(page, `terrain=quantized-mesh&session=${session}&lon=4.2&lat=46.4&zoom=6`);
+      // A view that draws relief: none loads under a flat one (KB-293).
+      await openGlobe(page, `terrain=quantized-mesh&session=${session}&lon=4.2&lat=46.4&zoom=10`);
       await settle(page);
       const requests = await terrainRequests(page, session);
       expect(requests.length).toBeGreaterThan(0);

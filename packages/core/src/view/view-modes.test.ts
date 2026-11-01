@@ -308,6 +308,22 @@ describe('temporary tilt clamps (F165, F166)', () => {
     }
     expect(previous).toBeCloseTo(45, 3);
   });
+
+  it('keeps the surface flat at a tilt that would raise the relief when the curves allow none (F678)', () => {
+    const camera = new Camera();
+    camera.widthPx = 320;
+    camera.heightPx = 240;
+    camera.pose.rangeMeters = 2_000_000;
+    camera.pose.tiltRad = 50 * DEG;
+    camera.update();
+    const view = new ViewState(DEFAULT_VIEW_CURVES);
+    view.update(camera);
+    // From afar the zoom curve gives no relief, but a 50° tilt gives it all (ADR 0034).
+    expect(view.morph.factors[1]).toBe(1);
+    view.setCurves({ ...DEFAULT_VIEW_CURVES, maxRelief: 0 });
+    view.update(camera);
+    expect(view.morph.factors[1]).toBe(0);
+  });
 });
 
 describe('view regressions of the M5 review', () => {

@@ -33,6 +33,11 @@ export interface PanelLayoutOptions {
   readonly wanted?: readonly (LonLat | undefined)[];
   /** The smallest size, as a share of the given one, the panels may shrink to (default 0.85). */
   readonly minScale?: number;
+  /**
+   * A panel center the rows pass through (F677): a panel seen in an aerial image, or one already placed, so the
+   * rows line up with it; by default the rows take the phase that holds the most panels.
+   */
+  readonly anchor?: LonLat;
 }
 
 /** A layout: each panel's center (undefined when no place was left) and the size share all of them were given. */
@@ -123,7 +128,9 @@ interface Grid {
 }
 
 /** Every place a panel fits at a scale and grid phase, rows from the far side, left to right along each row. */
-function places(grid: Grid, o: Required<Omit<PanelLayoutOptions, 'fixed' | 'wanted'>>, scale: number, phase: Point) {
+type Sizes = Required<Omit<PanelLayoutOptions, 'fixed' | 'wanted' | 'anchor'>>;
+
+function places(grid: Grid, o: Sizes, scale: number, phase: Point) {
   const w = o.widthM * scale;
   const d = o.depthM * scale;
   const pitchX = w + o.gapM;
@@ -148,7 +155,7 @@ function places(grid: Grid, o: Required<Omit<PanelLayoutOptions, 'fixed' | 'want
 }
 
 /** The phase of the grid that holds the most panels at a scale. */
-function roomiest(grid: Grid, o: Required<Omit<PanelLayoutOptions, 'fixed' | 'wanted'>>, scale: number): Point[] {
+function roomiest(grid: Grid, o: Sizes, scale: number): Point[] {
   let best: Point[] = [];
   for (let i = 0; i < PHASES; i++)
     for (let j = 0; j < 2; j++) {
@@ -157,6 +164,17 @@ function roomiest(grid: Grid, o: Required<Omit<PanelLayoutOptions, 'fixed' | 'wa
       if (found.length > best.length) best = found;
     }
   return best;
+}
+
+/** The free places at a scale: in rows through the anchor's center when there is one, else the roomiest phase. */
+function placesAt(grid: Grid, o: Sizes, scale: number, anchor: Point | undefined): Point[] {
+  if (!anchor) return roomiest(grid, o, scale);
+  const step = (value: number, size: number) => ((value % size) + size) % size;
+  const [w, d] = [o.widthM * scale, o.depthM * scale];
+  return places(grid, o, scale, [
+    step(anchor[0] - w / 2 - grid.minX, w + o.gapM),
+    step(grid.maxY - d / 2 - anchor[1], d + o.rowGapM),
+  ]);
 }
 
 /** The free places in square cells, so the nearest one to a point is found among a few cells, not all of them. */
@@ -224,6 +242,7 @@ export function layoutPanels(options: PanelLayoutOptions): PanelLayout {
     minScale: options.minScale ?? 0.85,
   };
   const frame = new Frame(o.perimeters.flat(), o.rowBearingDeg);
+  const anchor = options.anchor && frame.toLocal(options.anchor);
   const rings = o.perimeters.map((ring) => ring.map((p) => frame.toLocal(p)));
   const all = rings.flat();
   const grid: Grid = {
@@ -234,15 +253,15 @@ export function layoutPanels(options: PanelLayoutOptions): PanelLayout {
     maxY: Math.max(...all.map(([, y]) => y)),
   };
   let scale = 1;
-  let free = roomiest(grid, o, scale);
+  let free = placesAt(grid, o, scale, anchor);
   if (free.length < o.count) {
     let lo = o.minScale;
     let hi = 1;
-    free = roomiest(grid, o, lo);
+    free = placesAt(grid, o, lo, anchor);
     scale = lo;
     for (let step = 0; step < SCALE_STEPS && free.length >= o.count; step++) {
       const mid = (lo + hi) / 2;
-      const found = roomiest(grid, o, mid);
+      const found = placesAt(grid, o, mid, anchor);
       if (found.length >= o.count) [lo, scale, free] = [mid, mid, found];
       else hi = mid;
     }

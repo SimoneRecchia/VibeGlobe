@@ -48,7 +48,7 @@ export function undulationMeters(model: GeoidModel, lonRad: number, latRad: numb
 }
 
 /** Mercator y of a latitude (unbounded). */
-function mercatorY(latRad: number): number {
+export function mercatorY(latRad: number): number {
   return Math.log(Math.tan(Math.PI / 4 + latRad / 2));
 }
 

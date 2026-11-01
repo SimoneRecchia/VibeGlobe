@@ -6,6 +6,7 @@
  * dispatched or decoded tile, not per frame, so a `Map` serves; it keeps insertion order, which is the LRU order when a
  * hit re-inserts its entry.
  */
+import { invalidBytes } from './residency.hot.js';
 
 /** The coalescing key of a tile: source id, tile key and variant, as a string or a packed number (ADR 0007). */
 export type RamTierKey = string | number;
@@ -43,10 +44,6 @@ export interface RamTierOptions {
   onEvict?: (key: RamTierKey) => void;
 }
 
-function checkBytes(name: string, bytes: number): void {
-  if (!(bytes >= 0) || bytes % 1 !== 0) throw new RangeError(`${name} must be a non-negative integer, got ${bytes}`);
-}
-
 /**
  * A byte-budgeted LRU of encoded tiles. {@link put} evicts the least recently used evictable entries just enough to
  * make room and refuses, evicting nothing, when that cannot be done, so usage never exceeds the budget. The tier keeps
@@ -66,7 +63,7 @@ export class RamTier {
 
   constructor(options: RamTierOptions) {
     this.overhead = options.overheadBytesPerEntry ?? DEFAULT_RAM_ENTRY_OVERHEAD_BYTES;
-    checkBytes('overheadBytesPerEntry', this.overhead);
+    if (!(this.overhead >= 0) || this.overhead % 1 !== 0) invalidBytes('overheadBytesPerEntry', this.overhead);
     this.canEvict = options.canEvict;
     this.onEvict = options.onEvict;
     this.setBudget(options.budgetBytes);
@@ -166,7 +163,7 @@ export class RamTier {
    * protected entries allow. Returns the number of entries evicted.
    */
   setBudget(bytes: number): number {
-    checkBytes('budgetBytes', bytes);
+    if (!(bytes >= 0) || bytes % 1 !== 0) invalidBytes('budgetBytes', bytes);
     this.budget = bytes;
     const before = this.evictedCount;
     if (this.used > bytes) this.evictUpTo(this.used - bytes, undefined);

@@ -2,10 +2,9 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import {
   WORLD_WIDTH_METERS,
-  degToRad,
   longitudeToXMeters,
-  radToDeg,
-  wrapLongitudeDeg,
+  projectDeg,
+  unprojectDeg,
   xMetersToLongitudeRad,
 } from './longitude.js';
 import type { LonLatDeg, ProjectedPointMeters } from './types.js';
@@ -66,8 +65,7 @@ export function unprojectGeographicRad(
  * @returns The projected point in meters.
  */
 export function projectGeographicDeg(lonDeg: number, latDeg: number): ProjectedPointMeters {
-  const out = projectGeographicRad(degToRad(lonDeg), degToRad(latDeg), new Float64Array(2));
-  return { xMeters: out[0] ?? Number.NaN, yMeters: out[1] ?? Number.NaN };
+  return projectDeg(projectGeographicRad, lonDeg, latDeg);
 }
 
 /**
@@ -77,6 +75,5 @@ export function projectGeographicDeg(lonDeg: number, latDeg: number): ProjectedP
  * @returns The longitude in [-180°, 180°) and the latitude in [-90°, 90°], in degrees.
  */
 export function unprojectGeographicDeg(xMeters: number, yMeters: number): LonLatDeg {
-  const out = unprojectGeographicRad(xMeters, yMeters, new Float64Array(2));
-  return { lonDeg: wrapLongitudeDeg(radToDeg(out[0] ?? Number.NaN)), latDeg: radToDeg(out[1] ?? Number.NaN) };
+  return unprojectDeg(unprojectGeographicRad, xMeters, yMeters);
 }

@@ -64,8 +64,11 @@ export class FlightPlan {
   private readonly selected: QuadtreeTile[] = [];
   private readonly seen = new Set<number>();
   private readonly io = new Float64Array(2);
-  /** The engine's selection rules (one object, so the same keys every time) without the morph. */
-  private readonly globeSelection: QuadtreeSelectionOptions = { maxScreenErrorPx: 2, maxLevel: 0 };
+  /**
+   * The engine's selection rules on the globe, a copy of its own object so the selection sees one shape: an object of
+   * another shape deoptimized it, which boxed doubles over thousands of frames (KB-312).
+   */
+  private globeSelection: QuadtreeSelectionOptions | undefined;
 
   /**
    * Plans a movement from the current camera to `end` (longitude and latitude in radians, range in meters, heading and
@@ -88,7 +91,7 @@ export class FlightPlan {
     const slow = (link?.bitsPerSecond ?? Infinity) < SLOW_LINK_BPS_HERE;
     const moving = texelPx * MAX_FACTOR * (slow ? 2 : 1);
     // Measured on the globe: the flat map's morph is anchored at the current view, not along the movement.
-    Object.assign(this.globeSelection, selection).morph = undefined;
+    (this.globeSelection = Object.assign(this.globeSelection ?? { ...selection }, selection)).morph = undefined;
     this.count = 0;
     this.seen.clear();
     this.spacingMs = (endMs - startMs) / SAMPLES;
@@ -147,8 +150,10 @@ export class FlightPlan {
 
   /** Adds the tiles `camera` selects with texels up to `texelPx`, first shown at `timeMs`; planned tiles keep theirs. */
   private add(camera: Camera, texelPx: number, timeMs: number): void {
-    this.globeSelection.maxTexelErrorPx = texelPx;
-    const count = selectQuadtreeTiles(camera, this.globeSelection, this.selected);
+    const selection = this.globeSelection;
+    if (!selection) return;
+    selection.maxTexelErrorPx = texelPx;
+    const count = selectQuadtreeTiles(camera, selection, this.selected);
     for (let i = 0; i < count && this.count < MAX_TILES; i++) {
       const tile = this.selected[i];
       if (!tile || this.seen.has(tile.key)) continue;

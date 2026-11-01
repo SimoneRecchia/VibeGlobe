@@ -8094,6 +8094,17 @@
         "Record its terms in ADR 0182 and the Italian research"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F674",
+      "milestone": 7,
+      "section": "Sources and composition",
+      "description": "`europeOrthophotos()` covers Slovakia (GKÚ Ortofotomozaika SR, CC BY 4.0, WMS layer `1`) and Bremen with Bremerhaven (Landesamt GeoInformation Bremen DOP20 2023, CC BY 4.0, two WMS layers asked together), each clipped to its borders to level 19; a record's WMS `layer` may list several layers separated by commas.",
+      "steps": [
+        "Unit-test that each is asked inside its borders and not over Rome, Bremen's tiles with both layers",
+        "Record their terms in ADR 0182 and leave the services still waiting in open question 39"
+      ],
+      "status": "passing"
     }
   ]
 }

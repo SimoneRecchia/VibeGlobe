@@ -60,10 +60,10 @@ export function extentOf(objects: readonly FitObject[]): { bounds: GeoBounds; ve
 }
 
 /**
- * Flies (or eases) to the view that frames every object, heights included, inside the viewport minus `paddingPx`
- * (F387; per side, centered in the part it leaves, F676): `Globe.fitBounds` centered on their bounds, with every vertex required to show. Whole models come from
- * `ModelSetLayer.framePositions` (a turbine with its rotor, a plant's every device, F667); `tiltDeg` frames from that
- * tilt instead of the view mode's.
+ * Flies (or eases) to the view that frames every object, heights included, inside the viewport minus `paddingPx` (per
+ * side, centered in the part it leaves): `Globe.fitBounds` centered on their bounds, with every vertex required to
+ * show. Whole models come from `ModelSetLayer.framePositions` (a turbine with its rotor, a plant's every device);
+ * `tiltDeg` frames from that tilt instead of the view mode's. Throws a RangeError when no object has coordinates.
  */
 export function fitObjects(
   globe: Pick<Globe, 'fitBounds'>,

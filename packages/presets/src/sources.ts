@@ -29,7 +29,7 @@ export interface PresetSourceRecord {
   readonly maxLevel: number;
   /**
    * Where it has data: Europe's land (online sources), Europe's land and sea (the package), or the whole world (NASA's
-   * Blue Marble: the lowest levels and the polar caps).
+   * Blue Marble, the world package).
    */
   readonly coverage: 'europe-land' | 'europe' | 'world';
   /** The online endpoint, as a tile URL template or a style URL; absent for package-only sources. */
@@ -65,8 +65,8 @@ export const OPENFREEMAP: PresetSourceRecord = {
 };
 
 /**
- * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326, one image per Web Mercator tile
- * (KB-232): the satellite layer below the package, past the far levels: the sea, and the land outside Europe. Level 8
+ * NASA's Blue Marble (shaded relief and bathymetry, 500 m) from GIBS in EPSG:4326, one image per Web Mercator tile:
+ * the satellite layer past the far levels when there is no package (with one, the base image shows there). Level 8
  * (about 430 m a pixel at 45° N) is the first finer than its data; the engine magnifies it beyond.
  */
 export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
@@ -90,9 +90,9 @@ export const NASA_GIBS_BLUE_MARBLE: PresetSourceRecord = {
 };
 
 /**
- * ESA WorldCover 2021 Sentinel-2 composite, 10 m: the satellite layer of the app's package, from level 5 (below it the
- * Blue Marble shows the whole world) to the package's level, 11 by the owner's decision (2026-10-27); the engine
- * magnifies its deepest tiles beyond.
+ * ESA WorldCover 2021 Sentinel-2 composite, 10 m: the satellite layer of the app's package over Europe's box, from
+ * level 5 (or from the level after the world package's) to the package's level, 11 by default; below it the base image
+ * or the world package shows. The engine magnifies its deepest tiles beyond.
  */
 export const ESA_WORLDCOVER: PresetSourceRecord = {
   id: 'europe-satellite',

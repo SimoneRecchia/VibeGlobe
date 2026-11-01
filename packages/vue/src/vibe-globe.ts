@@ -103,7 +103,8 @@ function startGlobe(
   const controls = options === false ? undefined : createControls(options);
   controlsRef.value = controls;
   const engine = createGlobe(globeOptions(element, config, controls));
-  // Rotation, tilt and the engine clock of the controls need the globe (the M6 input track's hook 5).
+  // createGlobe connects the controls once its renderer is ready; connecting now lets the tilt policy see API
+  // movements that start before that.
   controls?.connect(engine);
   globe.value = engine;
   const applyMode = (mode: ToggleMode | undefined): void => {

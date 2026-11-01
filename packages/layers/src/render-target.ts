@@ -37,8 +37,8 @@ export interface TextMeasurer {
 }
 
 /**
- * A stand-in measurer until the renderer exposes its glyph metrics (docs/internal/parallel-tracks.md, hook request): 0.6 em per
- * character, 1.2 em high.
+ * An estimate without glyph metrics: 0.6 em per character, 1.2 em high. Label layers use it when the render target
+ * does not measure text.
  */
 export const estimatedTextMeasurer: TextMeasurer = {
   measure: (text, sizePx) => ({ widthPx: [...text].length * 0.6 * sizePx, heightPx: 1.2 * sizePx }),

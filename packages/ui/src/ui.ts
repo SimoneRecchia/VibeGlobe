@@ -270,7 +270,9 @@ class UiLayer implements Ui {
 }
 
 /**
- * Adds a UI layer to the map container of `globe`. The container must be positioned (the globe's own container is).
+ * Adds a UI layer to the map container of `globe`. The container must be positioned (not `position: static`), since
+ * the layer fills it absolutely; the engine makes a static container `position: relative` only when it shows its
+ * credits element.
  *
  * @param globe - The engine instance, used through its public API only.
  * @param container - The element the map fills.

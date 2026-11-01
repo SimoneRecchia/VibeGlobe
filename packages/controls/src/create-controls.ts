@@ -40,7 +40,7 @@ export interface NavigationControls extends ControlsFactory {
   readonly navigationMode: NavigationMode;
   /**
    * Switches how a drag moves the camera, from the next input on: 'free' (trackball) or 'north-up' (north stays up,
-   * stops at the poles). Anything else throws a GlobeError ('invalid-option').
+   * stops at {@link NavigationControls.northUpMaxLatitudeDeg}). Anything else throws a GlobeError ('invalid-option').
    */
   setNavigationMode(mode: NavigationMode): void;
   /** The 'north-up' latitude limit now, degrees (the `northUpMaxLatitudeDeg` option, then the setter below). */

@@ -22,7 +22,10 @@ export interface ParseModelOptions {
   readonly resources?: ModelResources;
   /** Loads the Draco decoder; without it a Draco-compressed model is rejected ('unsupported'). */
   readonly draco?: DracoLoader;
-  /** Loads the meshopt decoder (default: meshoptimizer's module, loaded only for models that need it). */
+  /**
+   * Loads the meshopt decoder, such as `meshoptWasmDecoder(...)`; called only for models that need it. Without it a
+   * model that needs meshopt decoding is rejected.
+   */
   readonly meshopt?: MeshoptLoader;
   readonly limits?: ModelLimits;
 }

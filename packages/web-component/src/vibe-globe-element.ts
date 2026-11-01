@@ -210,7 +210,8 @@ function startEngine(
     void element.dispatchEvent(new CustomEvent(type, { detail }));
   const controls = element.hasAttribute('no-controls') ? undefined : createControls();
   const globe = createGlobe(readOptions(element, container, sources, controls));
-  // Rotation, tilt and the engine clock of the controls need the globe (the M6 input track's hook 5).
+  // createGlobe connects the controls once its renderer is ready; connecting now lets the tilt policy see API
+  // movements that start before that.
   controls?.connect(globe);
   const mode = parseViewMode(element.getAttribute('view-mode'));
   if (mode) globe.setViewMode(mode);

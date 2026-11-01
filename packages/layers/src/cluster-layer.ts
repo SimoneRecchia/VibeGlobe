@@ -26,7 +26,10 @@ export interface ClusterLayerOptions extends Omit<DataLayerOptions, 'data'> {
   /** Point features (other geometries are rejected). */
   readonly data?: FeatureCollection | readonly Feature[];
   readonly cluster?: ClusterOptions;
-  /** Where the index is built; the worker pool's engine once it exists. */
+  /**
+   * Where the index is built and queried: {@link localClusterEngine} on the calling thread by default, or
+   * `workerClusterEngine(workers)` from `@vibeglobe/layers/cluster-worker` off the main thread.
+   */
   readonly engine?: ClusterEngine;
 }
 

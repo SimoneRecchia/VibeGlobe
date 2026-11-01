@@ -16,13 +16,13 @@ import type { ScreenProjector, TextMeasurer } from './render-target.js';
 
 /** Placement settings. */
 export interface PlacementOptions {
-  /** Minimum time between placement passes (MapLibre uses 300 ms). */
+  /** Minimum time between placement passes, in milliseconds (default 300, as MapLibre). */
   readonly placementIntervalMs?: number;
-  /** Duration of a full fade in or out. */
+  /** Duration of a full fade in or out, in milliseconds (default 300). */
   readonly fadeDurationMs?: number;
-  /** Extra space kept free around each label, in CSS pixels. */
+  /** Extra space kept free around each label, in CSS pixels (default 2). */
   readonly paddingPx?: number;
-  /** Placement work allowed per frame, in milliseconds; a longer pass continues on the next frames. */
+  /** Placement work allowed per frame, in milliseconds (default 4); a longer pass continues on the next frames. */
   readonly budgetMs?: number;
 }
 

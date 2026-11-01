@@ -629,10 +629,10 @@ export interface MovementOptions {
 }
 
 /**
- * Why a tile failed for good: `corrupt` bytes that do not decode, `failed` after its retries ran out, or
- * `unsupported` data the engine or device cannot use (for example KTX2 without a usable transcoder, ADR 0020).
+ * Why a tile failed for good: `corrupt` bytes that do not decode, `failed` after its retries ran out, `unsupported`
+ * data the engine or device cannot use (for example KTX2 without a usable transcoder), or `cors` when its server sends
+ * no CORS headers.
  */
-/** Why a tile failed for good: 'cors' when its server sends no CORS headers (F251). */
 export type TileErrorReason = 'corrupt' | 'failed' | 'unsupported' | 'cors';
 
 /** A tile that failed for good. */

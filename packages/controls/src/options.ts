@@ -139,8 +139,8 @@ export interface ControlsOptions {
   /**
    * How a drag moves the camera: 'free' (default) turns the globe as a trackball, so the grabbed point stays under the
    * cursor, the view passes over the poles and the heading turns with it; 'north-up' keeps north up, horizontal drags
-   * turning about the polar axis and vertical ones changing latitude, and stops at the poles. Changed at runtime with
-   * `setNavigationMode`.
+   * turning about the polar axis and vertical ones changing latitude, and stops at `northUpMaxLatitudeDeg` (default
+   * 85°). Changed at runtime with `setNavigationMode`.
    */
   readonly navigationMode?: NavigationMode;
   /**

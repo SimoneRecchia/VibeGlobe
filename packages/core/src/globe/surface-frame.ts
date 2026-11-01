@@ -188,11 +188,6 @@ export class SurfaceFrame {
     }
   }
 
-  /** The error of the terrain each surface level shows, once terrain is started (skirt depths, ADR 0006 §6). */
-  get terrainErrorMeters(): Float64Array | undefined {
-    return this.selection.terrainErrorMeters;
-  }
-
   /**
    * Sets `camera.groundHeightMeters` to the surface this frame draws under the eye, as drawn (times the relief factor,
    * and σ·k(φ) on the flat map, ADR 0008), and returns the finest resident terrain there at the same scale: where

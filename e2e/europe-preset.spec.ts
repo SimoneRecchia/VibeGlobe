@@ -121,3 +121,45 @@ test('Map is a political map with roads only on request, Relief adds a tint and 
   await page.getByRole('radio', { name: 'Satellite' }).check();
   await expect.poll(async () => near(await north(), [0x7a, 0xac, 0xd0])).toBe(true);
 });
+
+test('Map over 3D terrain shows no line along the tile edges (KB-302)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await routeOnlineSources(page);
+  // The fixture server's analytic Alps as Mapterhorn's terrain (routes added later are matched first).
+  await page.route('https://tiles.mapterhorn.com/**', async (route) => {
+    const tile = /\/(\d+)\/(\d+)\/(\d+)\.webp$/.exec(route.request().url());
+    const fixture =
+      tile &&
+      (await page.request.get(
+        `/fixture-tiles/playground/terrain/mercator/${tile[1]}/${tile[2]}/${tile[3]}.terrarium.png`,
+      ));
+    if (!fixture?.ok()) return route.fulfill({ status: 404 });
+    return route.fulfill({ status: 200, contentType: 'image/png', body: await fixture.body() });
+  });
+  await openGlobe(
+    page,
+    'preset=europe&presetStyle=/vector-tiles/styles/streets.json&presetBase=map&presetOverlays=terrain&lon=6.86&lat=45.7&zoom=11&tilt=50',
+  );
+  await page.waitForFunction(() => window.vibeglobeEuropePreset?.layer !== undefined);
+  await page.evaluate(() => {
+    const style = window.vibeglobeEuropePreset?.layer?.style as unknown as {
+      layers: { id: string; type: string }[];
+      setVisibility(id: string, visible: boolean): void;
+    };
+    for (const l of style.layers) if (l.type === 'symbol') style.setVisibility(l.id, false);
+  });
+  await waitForIdle(page);
+  const image = await canvasImage(page);
+  // The land color fills the view but for the roads (yellow and orange); a grey pixel darker than it is the shaded
+  // terrain showing through the map at a tile edge.
+  const at = (x: number, y: number) => (y * image.width + x) * 4;
+  const land = [...image.data.subarray(at(10, image.height - 40), at(10, image.height - 40) + 3)];
+  let lines = 0;
+  for (let y = Math.round(image.height * 0.2); y < image.height - 30; y++)
+    for (let x = 0; x < image.width; x++) {
+      const [r = 0, g = 0, b = 0] = image.data.subarray(at(x, y), at(x, y) + 3);
+      const grey = Math.abs(r - g) < 6 && Math.abs(g - b) < 14;
+      if (grey && r < (land[0] ?? 0) - 8) lines++;
+    }
+  expect(lines).toBe(0);
+});

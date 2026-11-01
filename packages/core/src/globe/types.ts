@@ -181,8 +181,9 @@ export interface TileDrawLayer {
    */
   readonly skirtMeters: Float32Array;
   /**
-   * Terrain only, four per draw (north, east, south, west edge): 1 where the edge's heights come from the draw's stitch
-   * texture, the coarser terrain its neighbor across that edge shows, so the two meet (KB-178); 0 elsewhere.
+   * Terrain only, four per draw (north, east, south, west edge): bit 0 set where the edge's heights come from the draw's
+   * stitch texture, the coarser terrain its neighbor across that edge shows, so the two meet (KB-178); the top three
+   * bits (`>> 5`) the levels, up to 4, the neighbor's mesh is coarser by, whose segments the edge follows (KB-302).
    */
   readonly stitchEdges?: Uint8Array;
   /** Terrain only: the texture handle of each draw's stitch heights, or -1 for none. */

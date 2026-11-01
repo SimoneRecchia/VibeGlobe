@@ -45,7 +45,8 @@ export interface SurfaceDraw {
   /**
    * The tone gains of the draw's imagery (column 0, rgb) and of the imagery it fades from (column 1), 1 without tone
    * matching (F249, ADR 0044). Packed here to add no uniform: column 2 (bits of the terrain edges that take the stitch
-   * heights, north 1, east 2, south 4, west 8, `TileDrawLayer.stitchEdges`, KB-178; 0; the terrain height scales at
+   * heights, north 1, east 2, south 4, west 8, `TileDrawLayer.stitchEdges`, KB-178; the levels a neighbor's mesh is
+   * coarser by, three bits per edge in the same order, KB-302; the terrain height scales at
    * the north and south edges, `TileDrawLayer.heightScales`, KB-180), column 3 the UV transform into the stitch heights.
    */
   readonly tones: Matrix4;
@@ -369,11 +370,15 @@ export function applyDraw(
   const at = i * 4;
   const stitch = (own[STITCH_HEIGHTS] = textures.get(terrain.stitchTextures?.[i] ?? NO_HEIGHTS));
   let edges = 0;
+  let steps = 0;
   for (let c = 0; c < 4; c++) {
-    if (stitch && (terrain.stitchEdges?.[at + c] ?? 0) > 0) edges += 2 ** c;
+    const e = terrain.stitchEdges?.[at + c] ?? 0;
+    if (stitch && e & 1) edges += 2 ** c;
+    steps += (e >> 5) * 8 ** c;
     t[12 + c] = terrain.stitchTransforms?.[at + c] ?? 0;
   }
   t[8] = edges;
+  t[9] = steps;
   t[10] = terrain.heightScales?.[i * 2] ?? 1;
   t[11] = terrain.heightScales?.[i * 2 + 1] ?? 1;
   const e = draw.transforms.elements;

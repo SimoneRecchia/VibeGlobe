@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-31: the line along tile edges on maps with 3D terrain fixed (KB-302)
+
+The owner saw the maps glitch with 3D terrain. On the Europe preset's Map over the fixture Alps a line one pixel wide
+ran along tile edges: the meshes' skirts, twice the terrain error deep, won the depth test against the draped vector
+map on part of the MSAA samples. Skirts now keep the flat globe's few meters with terrain (the frame still deepens them
+where coarser terrain or a morph shows), and edges next to a coarser mesh follow its segments in the surface shader
+(`stitchEdges` top bits), which closes the T-junctions the deep skirts used to hide (ADR 0006, update of 2026-10-31).
+A new end-to-end test fails with 176 line pixels on the old skirts and passes now; the crack sweep, morphs and missing
+terrain (F137–F139) pass on both backends. To fit the renderer's budget the GPU readback probes moved to their own entry
+(`@vibeglobe/renderer/gpu-probes`): the main entry fell from 40.46 to 37.97 KB gzip and its budget to 38.5 KB.
+
 ## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
 
 The owner asked for the missing free and resellable maps of Europe to zoom 15, Italy first, and for the glitches seen

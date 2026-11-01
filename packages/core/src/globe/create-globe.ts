@@ -235,7 +235,7 @@ class GlobeEngine implements Globe {
       sourceError: (error) => this.emitter.emit('error', error),
     });
     // After the terrain starts: its errors set the skirt depths.
-    this.surface = new SurfaceCache(renderer, this.surfaceFrame.terrainErrorMeters);
+    this.surface = new SurfaceCache(renderer);
     renderer.layers?.setGround?.(this.surfaceFrame.layerGround());
     renderer.layers?.onContentReady?.(() => this.requestRender());
     if (this.debugMeshes.length > 0) renderer.setDebugMeshes(this.debugMeshes);

@@ -260,18 +260,37 @@ function takeEarlyProperties(element: HTMLElement): [property: string, value: un
   return early;
 }
 
+let sheet: CSSStyleSheet | undefined;
+
+/**
+ * Styles a shadow tree with one constructed sheet shared by every element, which a strict `style-src` allows where it
+ * blocks an inline `<style>` (KB-325); a browser without constructed sheets gets the `<style>`.
+ */
+function styleShadow(shadow: ShadowRoot): void {
+  if (typeof CSSStyleSheet !== 'undefined' && 'replaceSync' in CSSStyleSheet.prototype) {
+    if (!sheet) {
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(STYLE);
+    }
+    shadow.adoptedStyleSheets = [sheet];
+    return;
+  }
+  const style = document.createElement('style');
+  style.textContent = STYLE;
+  shadow.append(style);
+}
+
 /** Builds the element's shadow tree and returns the engine's container (part `engine`). */
 function buildShadow(host: HTMLElement): HTMLDivElement {
   const shadow = host.attachShadow({ mode: 'open' });
-  const style = document.createElement('style');
-  style.textContent = STYLE;
+  styleShadow(shadow);
   const container = document.createElement('div');
   container.className = 'engine';
   container.setAttribute('part', 'engine');
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.append(document.createElement('slot'));
-  shadow.append(style, container, overlay);
+  shadow.append(container, overlay);
   return container;
 }
 

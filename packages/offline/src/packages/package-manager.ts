@@ -12,6 +12,7 @@ import {
   type PackageManifest,
   type PackageSourceEntry,
 } from './manifest.js';
+import { StorageUnavailableError } from '../idb.js';
 import { PackageStorage, type PackageRecord, versionKey } from './package-storage.js';
 import { PackageTileReader, type ActivePackage, type ArchiveAdapters } from './reader.js';
 
@@ -106,6 +107,16 @@ function describe(record: PackageRecord): InstalledPackage {
   };
 }
 
+/** Rethrows a refusal of the browser's storage as the package error a caller can tell apart (KB-326). */
+function rethrowStorage(error: unknown): never {
+  if (
+    error instanceof StorageUnavailableError ||
+    (error instanceof DOMException && error.name === 'QuotaExceededError')
+  )
+    throw new PackageError('storage-unavailable', `browser storage refused the package: ${error.message}`);
+  throw error;
+}
+
 const isRequest = (from: unknown): from is PackageRequest =>
   typeof from === 'object' && from !== null && 'minLevel' in from && 'sources' in from && !('files' in from);
 
@@ -145,9 +156,20 @@ class Manager implements PackageManager {
     return Promise.resolve(estimateRequest(request));
   }
 
-  async install(
+  install(
     from: string | URL | LocalPackage | PackageRequest,
     options: InstallOptions = {},
+  ): Promise<InstalledPackage & { report?: BuildReport }> {
+    return this.installFrom(from, options).catch(rethrowStorage);
+  }
+
+  update(id: string, options: InstallOptions = {}): Promise<InstalledPackage> {
+    return this.updateFrom(id, options).catch(rethrowStorage);
+  }
+
+  private async installFrom(
+    from: string | URL | LocalPackage | PackageRequest,
+    options: InstallOptions,
   ): Promise<InstalledPackage & { report?: BuildReport }> {
     await this.ready;
     if (isRequest(from)) return this.build(from, options);
@@ -159,7 +181,7 @@ class Manager implements PackageManager {
     return this.installArchive(validateManifest(raw), { files: from.files }, undefined, options);
   }
 
-  async update(id: string, options: InstallOptions = {}): Promise<InstalledPackage> {
+  private async updateFrom(id: string, options: InstallOptions): Promise<InstalledPackage> {
     await this.ready;
     const record = this.installed.find((r) => r.manifest.id === id);
     if (!record) throw new PackageError('not-installed', `package '${id}' is not installed`);

@@ -25,7 +25,12 @@ view it heads for to `NavigationApi.preloadView` (F672; its browser step is stil
 | Wheel zoom 10 → 14: largest step per frame     | 14.6                              | 2.4                 |
 
 A fast zoom out still drops the orthophotos in two frames: motion-aware detail coarsens the surface below their first
-level (KB-309, open, with its options). The core's main entry grows from 64.33 to 64.95 KB gzip on a Mac.
+level (KB-309, open, with its options). Merged with main's #91 and #92, the core's main entry measured 65.37 KB gzip
+on a Mac (about 65.56 in CI, Node 22): back to 64.76 by moving the heading, pitch and roll conversions, which the engine
+never calls, to `@vibeglobe/core/geodesy`, by one pair of degree constants instead of thirteen, one refinement-fade
+seeder and one error-message helper. An application's flight from afar to a plant with `fitObjects(…, { tiltDeg })`
+was interrupted at once by the controls' tilt policy beyond its lock (KB-310): an API movement now keeps the tilt it
+chose until it ends.
 
 ## 2026-10-31: one sea along the coasts (an application's screenshot of the Adriatic, branch `smooth-imagery`)
 

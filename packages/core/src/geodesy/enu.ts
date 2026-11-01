@@ -11,6 +11,7 @@
  * roll lowers the right wing (positive right-wing-down); they apply in that order (heading, then pitch, then roll),
  * the aerospace yaw-pitch-roll sequence, so heading = pitch = roll = 0 gives exactly the ENU frame.
  */
+import { DEG_TO_RAD } from './geodesic-angles.js';
 
 const HALF_PI = Math.PI / 2;
 const TWO_PI = 2 * Math.PI;
@@ -168,8 +169,6 @@ export interface HeadingPitchRollDeg {
   /** Roll in degrees, positive right wing down. */
   readonly rollDeg: number;
 }
-
-const DEG_TO_RAD = Math.PI / 180;
 
 /**
  * Builds the east-north-up frame at a longitude and latitude in degrees (see {@link enuFrame}).

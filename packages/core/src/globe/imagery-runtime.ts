@@ -407,8 +407,7 @@ export class ImageryRuntime {
 
   /** A change of the imagery stack: the next frame shows it at once, without cross-fades (F243). */
   readonly stackChanged = (): void => {
-    this.fades.snapNext = true;
-    for (const fades of this.overlayFades) fades.snapNext = true;
+    for (const fades of this.snaps) fades.snapNext = true;
     this.callbacks.requestFrame();
   };
   /** The list of layers changed: added, removed or moved (`imagery-layers-change`). */

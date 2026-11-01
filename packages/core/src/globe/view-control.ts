@@ -10,8 +10,8 @@ import type { GeoPosition, GlobeEvents, NavigationApi, ScreenPoint, ViewInit } f
 import { isScreenPoint } from './validation.js';
 import { positionAt } from './view-geometry.js';
 import { ControlsSlot } from './controls-slot.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 /** The zoom step being limited (ADR 0018: doubles in arrays, not through calls). */
 const step = new Float64Array(1);
 

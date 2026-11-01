@@ -320,6 +320,15 @@ function fakeGlobe(camera: FlatCamera) {
       return { longitudeDeg: centerX, latitudeDeg: centerY, zoom, headingDeg, tiltDeg } as CameraState;
     },
     viewMode: 'auto' as 'auto' | '2d' | 'manual',
+    handlers: new Map<string, (payload: never) => void>(),
+    on(event: string, handler: (payload: never) => void): () => void {
+      this.handlers.set(event, handler);
+      return () => this.handlers.delete(event);
+    },
+    /** Announces a globe event to the controls, as the engine does. */
+    emit(event: string, payload: unknown): void {
+      this.handlers.get(event)?.(payload as never);
+    },
     setViewMode(mode: '2d' | '3d' | 'auto'): void {
       this.viewMode = mode === '3d' ? 'manual' : mode;
     },

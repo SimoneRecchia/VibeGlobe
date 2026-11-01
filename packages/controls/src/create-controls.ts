@@ -115,7 +115,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   const controls = Object.assign(factory, {
     options: resolved,
     connect(target: ConnectedGlobe) {
-      globe = target;
+      tilt.follow((globe = target));
       if (current) current.port.globe = target;
     },
     zoomIn: () => current?.keyboard.zoomBy(1),

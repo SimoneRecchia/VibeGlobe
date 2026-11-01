@@ -5,9 +5,8 @@ import { cameraZoom, groundZoomFromMercatorZoom, rangeForGroundZoom } from '../c
 import type { CameraState } from './types.js';
 import type { ValidView } from './validation.js';
 import type { ViewState } from '../view/view-state.js';
+import { DEG_TO_RAD as RAD, RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
-const DEG = 180 / Math.PI;
-const RAD = Math.PI / 180;
 /** The eye never goes lower than this above the ellipsoid (F061 reaches about 1 m). */
 const MIN_EYE_HEIGHT_METERS = 0.5;
 /** The farthest the camera may be from its target. */

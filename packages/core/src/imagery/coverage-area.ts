@@ -5,6 +5,7 @@
  * pixels of a tile across the border are its own. A source that answers only inside its area returns `noData`
  * elsewhere, so the next source of the layer (or the layer below) is drawn there.
  */
+import { DEG_TO_RAD } from '../geodesy/geodesic-angles.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import type { TileRectangleRad } from '../tiling/tiling-scheme.js';
 
@@ -110,8 +111,6 @@ export interface CoverageTest {
   mask(extent: TileRectangleRad, mercator: boolean, tileSizePx?: number): TileMask | undefined;
 }
 
-const DEG = Math.PI / 180;
-
 interface PreparedPolygon {
   readonly rings: readonly Float64Array[];
   readonly west: number;
@@ -128,8 +127,8 @@ function prepare(polygon: PolygonDeg): PreparedPolygon {
   const rings = polygon.map((ring) => {
     const out = new Float64Array(ring.length * 2);
     ring.forEach(([lon, lat], i) => {
-      out[i * 2] = lon * DEG;
-      out[i * 2 + 1] = lat * DEG;
+      out[i * 2] = lon * DEG_TO_RAD;
+      out[i * 2 + 1] = lat * DEG_TO_RAD;
     });
     return out;
   });

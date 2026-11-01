@@ -4,6 +4,7 @@ import { rgba8Bytes } from '../cache/byte-size.js';
 import type { Camera } from '../camera/camera.js';
 import { cameraZoom } from '../camera/zoom.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
+import { RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
 /**
  * How a layer combines with the layers below it (F246). `'night'` adds the layer as light on the night side of the
@@ -93,8 +94,6 @@ export interface ImageryLayerState {
   /** The layer's sources in priority order (F220). */
   readonly sources: readonly ImagerySourceInfo[];
 }
-
-const DEG = 180 / Math.PI;
 
 /** The metadata of a source, in degrees (F220). */
 export function sourceInfo(source: ImagerySource): ImagerySourceInfo {

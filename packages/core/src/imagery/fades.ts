@@ -135,10 +135,17 @@ export class ImageryFades {
       if (parent >= 0 && (this.toTexture[slot] ?? -1) >= 0)
         if (nowMs - parentStart < refineMs && (this.fromTexture[parent] ?? 0) < 0) start = parentStart;
         else if ((this.toTexture[parent] ?? 0) < 0) start = nowMs;
+      // A Web Mercator tile appearing by refinement fades from its part of what a Web Mercator ancestor (none at −1)
+      // showed, `cells` of it to a side: its scale over the cells, offset by its column and row within it; or goes on
+      // with the ancestor's fade under way. Else, appearing by coarsening, from what its children showed.
+      const cells = 2 ** up;
       if (
         start !== start &&
         (layer.geographic[i] ?? 1) === 0 &&
-        !this.seedFromParent(slot, parent, 2 ** up, column, row, nowMs, refineMs)
+        !(
+          this.toGeographic[parent] === 0 &&
+          this.seed(slot, parent, this.fadingAt(parent, nowMs, refineMs), 1 / cells, column % cells, row % cells, nowMs)
+        )
       )
         this.seedFromChildren(slot, level, column, row, nowMs, refineMs);
     }
@@ -149,39 +156,6 @@ export class ImageryFades {
       this.startMs[slot] = start;
     }
     return slot;
-  }
-
-  /**
-   * A Web Mercator tile appearing by refinement, at `column` and `row`: fades from its part of what its ancestor
-   * `parent` (−1: none), `cells` of it to a side, showed last frame, or goes on with the ancestor's fade under way.
-   * Returns whether it did.
-   */
-  private seedFromParent(
-    slot: number,
-    parent: number,
-    cells: number,
-    column: number,
-    row: number,
-    nowMs: number,
-    fadeMs: number,
-  ): boolean {
-    if (parent < 0 || this.toGeographic[parent] !== 0) return false;
-    // A fade of the parent under way goes on from where it started, with its timing, also when the child shows the
-    // imagery the parent fades to: cutting it off would jump.
-    const fading = nowMs - (this.startMs[parent] ?? -Infinity) < fadeMs && this.fromGeographic[parent] === 0;
-    if (!fading && this.toTexture[parent] === this.toTexture[slot]) return false;
-    const source = fading ? this.fromTransform : this.toTransform;
-    this.fromTexture[slot] = (fading ? this.fromTexture[parent] : this.toTexture[parent]) ?? 0;
-    this.fromGeographic[slot] = 0;
-    // The tile's part of what the ancestor showed: its scale over the cells, offset by its column and row within it.
-    const su = (source[parent * 4] ?? 1) / cells;
-    const sv = (source[parent * 4 + 1] ?? 1) / cells;
-    this.fromTransform[slot * 4] = su;
-    this.fromTransform[slot * 4 + 1] = sv;
-    this.fromTransform[slot * 4 + 2] = (source[parent * 4 + 2] ?? 0) + (column % cells) * su;
-    this.fromTransform[slot * 4 + 3] = (source[parent * 4 + 3] ?? 0) + (row % cells) * sv;
-    this.startMs[slot] = fading ? (this.startMs[parent] ?? nowMs) : nowMs;
-    return true;
   }
 
   /**
@@ -204,7 +178,7 @@ export class ImageryFades {
       const child = this.drawnLastFrame(meshKey(level + 1, 2 * column + (k & 1), 2 * row + (k >> 1)));
       if (child < 0 || this.toGeographic[child] !== 0) continue;
       // A fade of the children under way goes on, from what they all fade from.
-      const childFading = nowMs - (this.startMs[child] ?? -Infinity) < fadeMs && this.fromGeographic[child] === 0;
+      const childFading = this.fadingAt(child, nowMs, fadeMs);
       const shown = (childFading ? this.fromTexture[child] : this.toTexture[child]) ?? 0;
       if (first < 0) {
         first = child;
@@ -212,18 +186,41 @@ export class ImageryFades {
         fading = childFading;
       } else if (childFading !== fading || shown !== (fading ? this.fromTexture[first] : this.toTexture[first])) return;
     }
-    if (first < 0 || (!fading && this.toTexture[first] === this.toTexture[slot])) return;
-    const source = fading ? this.fromTransform : this.toTransform;
-    this.fromTexture[slot] = (fading ? this.fromTexture[first] : this.toTexture[first]) ?? 0;
-    this.fromGeographic[slot] = 0;
     // The child showed its quarter of this tile's part: twice its scale, back by its column and row within this tile.
-    const su = source[first * 4] ?? 1;
-    const sv = source[first * 4 + 1] ?? 1;
-    this.fromTransform[slot * 4] = 2 * su;
-    this.fromTransform[slot * 4 + 1] = 2 * sv;
-    this.fromTransform[slot * 4 + 2] = (source[first * 4 + 2] ?? 0) - (firstChild & 1) * su;
-    this.fromTransform[slot * 4 + 3] = (source[first * 4 + 3] ?? 0) - (firstChild >> 1) * sv;
-    this.startMs[slot] = fading ? (this.startMs[first] ?? nowMs) : nowMs;
+    if (first >= 0) this.seed(slot, first, fading, 2, (firstChild & 1) / -2, (firstChild >> 1) / -2, nowMs);
+  }
+
+  /** Whether the fade of the tile in `slot` drawn last frame is under way and from Web Mercator imagery. */
+  private fadingAt(slot: number, nowMs: number, fadeMs: number): boolean {
+    return nowMs - (this.startMs[slot] ?? -Infinity) < fadeMs && this.fromGeographic[slot] === 0;
+  }
+
+  /**
+   * Fades `slot` from what the tile in `from` showed, `scale` times its transform offset by `u` and `v` of the scaled
+   * one; or, with its fade under way (`fading`), goes on from where that started, with its timing, also to the imagery
+   * it fades to: cutting it off would jump. Returns whether it did: not when `from` showed the same imagery.
+   */
+  private seed(
+    slot: number,
+    from: number,
+    fading: boolean,
+    scale: number,
+    u: number,
+    v: number,
+    nowMs: number,
+  ): boolean {
+    if (!fading && this.toTexture[from] === this.toTexture[slot]) return false;
+    const source = fading ? this.fromTransform : this.toTransform;
+    this.fromTexture[slot] = (fading ? this.fromTexture[from] : this.toTexture[from]) ?? 0;
+    this.fromGeographic[slot] = 0;
+    const su = (source[from * 4] ?? 1) * scale;
+    const sv = (source[from * 4 + 1] ?? 1) * scale;
+    this.fromTransform[slot * 4] = su;
+    this.fromTransform[slot * 4 + 1] = sv;
+    this.fromTransform[slot * 4 + 2] = (source[from * 4 + 2] ?? 0) + u * su;
+    this.fromTransform[slot * 4 + 3] = (source[from * 4 + 3] ?? 0) + v * sv;
+    this.startMs[slot] = fading ? (this.startMs[from] ?? nowMs) : nowMs;
+    return true;
   }
 
   /** The slot of a tile drawn last frame, −1 for none. */

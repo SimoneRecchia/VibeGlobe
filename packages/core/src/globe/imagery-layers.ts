@@ -10,7 +10,7 @@ import {
   type ImageryLayers,
   type ImageryLayerState,
 } from '../imagery/imagery-stack.js';
-import { GlobeError } from './errors.js';
+import { GlobeError, messageOf } from './errors.js';
 import type { ImageryRuntime } from './imagery-runtime.js';
 
 /** What holds a globe's imagery runtime (its `SurfaceFrame`). */
@@ -70,7 +70,7 @@ class ImageryLayersController implements ImageryLayers {
     try {
       applyChanges(layer.entry, changes);
     } catch (error) {
-      throw new GlobeError('invalid-option', error instanceof Error ? error.message : String(error));
+      throw new GlobeError('invalid-option', messageOf(error));
     }
     this.changed();
   }

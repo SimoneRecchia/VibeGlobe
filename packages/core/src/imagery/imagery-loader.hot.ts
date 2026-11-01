@@ -21,6 +21,7 @@ import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } f
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
 import type { TileErrorReason } from '../globe/types.js';
+import { messageOf } from '../globe/errors.js';
 import type { Observability } from '../diagnostics/observability.js';
 import { WorkerTaskError, type WorkerPool, type WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type TileSource } from './imagery-source.js';
@@ -59,8 +60,7 @@ function runInline(run: () => DecodedTile): WorkerTaskOutcome {
   try {
     return { ok: true, output: run() };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, error: new WorkerTaskError('task-failed', message, 'undecodable') };
+    return { ok: false, error: new WorkerTaskError('task-failed', messageOf(error), 'undecodable') };
   }
 }
 

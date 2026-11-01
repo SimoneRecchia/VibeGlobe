@@ -33,8 +33,8 @@ import { validatePosition, validateView, type ValidView } from './validation.js'
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
 import type { ViewState } from '../view/view-state.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 /** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
 const REDUCED_MOTION_FADE_MS = 300;
 

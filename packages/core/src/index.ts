@@ -93,15 +93,7 @@ export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.
 export type { ViewMode, ViewPhase } from './view/view-state.js';
 export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
-export {
-  enuFrame,
-  enuFrameDeg,
-  headingPitchRollToRotationDeg,
-  headingPitchRollToRotationRad,
-  rotationToHeadingPitchRollDeg,
-  rotationToHeadingPitchRollRad,
-} from './geodesy/enu.js';
-export type { HeadingPitchRollDeg } from './geodesy/enu.js';
+export { enuFrame, enuFrameDeg } from './geodesy/enu.js';
 export {
   nearestWorldCopyXMeters,
   WORLD_WIDTH_METERS,

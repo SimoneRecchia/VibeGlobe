@@ -4,8 +4,8 @@ import { geodeticToEcef } from '../geodesy/ecef.js';
 import { GlobeError } from './errors.js';
 import { describeInput } from './validation.js';
 import type { DebugMeshData, DebugShape } from './types.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 const corner = new Float64Array(3);
 
 /** Throws a typed error unless `shapes` is a list of debug quads (F050, KB-038); corners are checked when built. */

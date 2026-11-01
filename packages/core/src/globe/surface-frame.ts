@@ -41,8 +41,8 @@ import type {
   TileDrawList,
   ReloadOptions,
 } from './types.js';
+import { DEG_TO_RAD } from '../geodesy/geodesic-angles.js';
 
-const DEG_TO_RAD = Math.PI / 180;
 /** The eye's default clearance above the displayed terrain (F146). */
 const DEFAULT_CLEARANCE_METERS = 10;
 

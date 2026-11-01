@@ -532,6 +532,20 @@ describe('the tilt policy (F625)', () => {
     expect(h.controls.tiltAvailable).toBe(true);
     expect(heard).toEqual([false, true]);
   });
+
+  it('beyond the lock: a tilt an API movement chose stays until the movement ends (KB-310)', () => {
+    const h = controlsHarness({ tiltPolicy: true });
+    const globe = h.globe as unknown as { viewMode: string; emit(event: string, payload: unknown): void };
+    const policy = h.camera.navigation.tiltPolicy ?? new Float64Array(6);
+    policy[3] = 0;
+    globe.viewMode = 'manual';
+    globe.emit('movestart', { cause: 'api' });
+    h.frame();
+    expect(globe.viewMode).toBe('manual');
+    globe.emit('moveend', { cause: 'api', outcome: 'completed' });
+    h.frame();
+    expect(globe.viewMode).toBe('auto');
+  });
 });
 
 describe('sky drags and overlays laid over the map (F654)', () => {

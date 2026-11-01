@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { stackEntries, type ImageryLayerInput } from '../imagery/imagery-stack.js';
-import { GlobeError } from './errors.js';
+import { GlobeError, messageOf } from './errors.js';
 import { validateConstraints } from './constraints.hot.js';
 import type { GeoPosition, GlobeEvents, GlobeOptions, ScreenPoint, ViewInit } from './types.js';
 
@@ -159,7 +159,7 @@ function validateImagery(imagery: unknown, workers: unknown): void {
   try {
     stackEntries(imagery as ImageryLayerInput[]);
   } catch (error) {
-    throw new GlobeError('invalid-option', error instanceof Error ? error.message : String(error));
+    throw new GlobeError('invalid-option', messageOf(error));
   }
   if (imagery.length > 0) requireWorkers(workers, 'imagery');
 }

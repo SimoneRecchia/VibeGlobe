@@ -130,6 +130,19 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
+    // F690: the daily planet builds of Protomaps's basemap, one download for maps of any theme.
+    id: 'protomaps-basemap',
+    name: 'Protomaps basemap (OpenStreetMap, Protomaps schema)',
+    license: 'ODbL-1.0 (data)',
+    licenseUrl: 'https://docs.protomaps.com/basemaps/downloads',
+    termsReadDate: '2026-11-02',
+    attribution: 'Protomaps © OpenStreetMap',
+    sourceUrl: 'https://maps.protomaps.com/builds/',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
     // ADR 0182: Terrarium tiles from each source's open terrain model; Copernicus GLO-30 up to level 12 in Europe.
     id: 'mapterhorn',
     name: 'Mapterhorn terrain (Terrarium)',

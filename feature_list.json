@@ -8243,6 +8243,26 @@
         "Unit-test that slow frames during motion lower the level, an idle engine shows the preset in full with the level kept, the first move applies the level again, and frames drawn without camera motion rest after 150 ms without lowering it"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F689",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`addVectorTiles` takes `fontFamily`: every label draws locally in that CSS font family, the application's own, with the weight and style its font stack names (Bold, Semibold, Medium, Light, Italic …), offline included; the style's glyphs are never fetched.",
+      "steps": [
+        "Unit-test that with a page font no glyph range is fetched and each font stack's characters are drawn once, in the page font at the weight and style its name gives"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F690",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`world-protomaps.json` copies Protomaps's basemap vector tiles (OpenStreetMap, Protomaps schema; profile `protomaps-basemap`, ODbL) over the whole world at levels 0 to 7, from a pinned daily planet build: one download an application styles in any theme.",
+      "steps": [
+        "Unit-test that the license records list the Protomaps profile in ADR 0025 and the configuration's dataset in the data licenses"
+      ],
+      "status": "passing"
     }
   ]
 }

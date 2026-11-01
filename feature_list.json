@@ -8170,6 +8170,17 @@
         "Run a build whose imagery source names a Sentinel-2 cloudless layer and assert it stops at the license gate"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F681",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The library takes no responsibility for map data: the sources guide and the README say that the application chooses its sources, holds their keys and keeps to their terms (development-only, non-commercial or paid plans included). The playground's Europe preset adds online imagery of the person's own choice from `VITE_ONLINE_IMAGERY_URL` (a tile URL template with their key, in a never-committed `.env.local`) and `VITE_ONLINE_IMAGERY_CREDIT`, worldwide from level 12 to 19 above the preset's free sources, asked from the network only, with its credit required.",
+      "steps": [
+        "Unit-test that nothing is added without a URL, and that the URL is added from level 12 to 19, online only, with its required credit",
+        "Start the playground with the variables set to fixture tiles and confirm in a browser that the source is not asked far away, and that near the ground its tiles show with the credit"
+      ],
+      "status": "passing"
     }
   ]
 }

@@ -4,7 +4,8 @@
  * `?preset=europe`: the Europe preset of free map types (`@vibeglobe/presets`, ADR 0182) with a selector of its base
  * maps and overlays (F617), online only. `&presetBase=satellite|hybrid|map|relief` and `&presetOverlays=labels,roads,…`
  * set the start; `&presetStyle=<url>` replaces OpenFreeMap's style (tests use the fixture streets style, in the same
- * OpenMapTiles schema); `&presetExclude=<id>,…` leaves sources out. 3D terrain is chosen when the globe is created, so
+ * OpenMapTiles schema); `&presetExclude=<id>,…` leaves sources out. `VITE_ONLINE_IMAGERY_URL` adds online imagery of
+ * the person's own choice from level 12 (F681, `src/online-imagery.ts`). 3D terrain is chosen when the globe is created, so
  * switching it reloads the page. Hooks in `window.vibeglobeEuropePreset`.
  */
 import type { Globe, GlobeOptions, TileSource } from '@vibeglobe/core';
@@ -19,12 +20,16 @@ import {
 } from '@vibeglobe/presets';
 import { xyzImagery } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
+import { onlineImagery } from './online-imagery.js';
 
 const params = new URLSearchParams(location.search);
 const enabled = params.get('preset') === 'europe';
 const exclude = (params.get('presetExclude') ?? '').split(',').filter((id) => id !== '');
 const fixtures = params.get('presetFixtures');
-const preset = enabled ? europeOpen(fixtures ? fixtureOptions(fixtures) : { exclude }) : undefined;
+const online = onlineImagery(import.meta.env);
+const preset = enabled
+  ? europeOpen(fixtures ? fixtureOptions(fixtures) : { exclude, ...(online ? { addSources: [online] } : {}) })
+  : undefined;
 
 /**
  * `&presetFixtures=<session>`: the preset with a package, every source's tiles from the fixture server's `earth`

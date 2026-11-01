@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-01: map data is the application's responsibility; online imagery of your choice in the playground (F681)
+
+The sources guide and the README now say that VibeGlobe grants no right to map data: the application chooses its
+sources, holds their keys and keeps to their terms. The playground's Europe preset reads `VITE_ONLINE_IMAGERY_URL` and
+`VITE_ONLINE_IMAGERY_CREDIT` from a never-committed `.env.local` (now in `.gitignore`) and adds that imagery worldwide
+from level 12 to 19 above the free sources, so a developer can try a keyed service (MapTiler, Esri, …) under their own
+plan while the offline package stays the light free one.
+
 ## 2026-11-01: no Google adapter, no Sentinel-2 cloudless; any provider from the application (F679, ADR 0185)
 
 After an audit of the connected maps (every default source allows commercial use), the owner removed what no default

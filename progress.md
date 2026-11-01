@@ -16,8 +16,10 @@ view never applied (KB-315: the refilter now asks for its frames). `main`'s full
 the causes were tests left behind by owner decisions (F383 and F128 under the flat relief of KB-293, F409's fill since
 KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-315. Checked and unchanged
 (`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
-hosts are refused). Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's
-desktop views).
+hosts are refused). Also fixed: `main`'s flaky allocation test (KB-312): V8 compiled the test's own driver, then engine functions, inside
+the sampled frames, because the single warm-up call had been optimized in place; the warm-up now runs in several calls
+and lets the background compiler finish (10 of 10 runs pass, 2 of 4 failed before). Still open: KB-110, KB-208,
+KB-212, KB-240, KB-241 (CI pace), KB-317 (F609 since #93), KB-180, KB-181 (the owner's desktop views).
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

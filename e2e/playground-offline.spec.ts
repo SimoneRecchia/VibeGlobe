@@ -17,6 +17,9 @@ async function tiers(page: Page): Promise<{ package: number; network: number }> 
 test('?network= runs the playground on the offline engine: hybrid tiers in ?debug=1, offline-only asks no network (KB-185)', async ({
   page,
 }) => {
+  // Two page loads and the network tier's first tiles: 21 s on a free machine, 57 s with the browser on one core, past
+  // the default 30 s on CI's software GPU (both attempts, in the full runs after #99 and #101).
+  test.setTimeout(120_000);
   await openGlobe(page, 'imagery=world&session=playground-offline&network=hybrid&debug=1');
   await expect(page.getByText(/network hybrid · online/)).toBeVisible({ timeout: 30_000 });
   // The tiles of the view came from the network tier (nothing installed, the persistent cache empty).

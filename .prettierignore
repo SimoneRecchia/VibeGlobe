@@ -12,7 +12,9 @@ playwright-report/
 benchmark-results/
 .output/
 .nuxt/
-# Generated data (scripts/europe-land.ts), kept on a few lines.
+# Generated data (scripts/europe-land.ts, scripts/world-land.ts), kept on a few lines.
 packages/presets/src/europe-land.ts
+packages/presets/src/world-land.ts
 packages/tools/configs/regions/europe-land.geojson
+packages/tools/configs/regions/world-land.geojson
 packages/presets/src/countries/

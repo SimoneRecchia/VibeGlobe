@@ -8202,6 +8202,16 @@
         "Start the playground with the variables set to fixture tiles and confirm in a browser that the source is not asked far away, and that near the ground its tiles show with the credit"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F684",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`europeOpen` takes `worldLand` (`WORLD_LAND` of `@vibeglobe/presets/world-land`, Natural Earth's land but Antarctica) for a package that also holds WorldCover over the whole world at its lower levels (`world-satellite.json`): that imagery shows from the level after the far levels to `packageLevels.world` (8), its sea keyed out on that land, below Europe's own imagery, which then starts at the level after.",
+      "steps": [
+        "Unit-test that with the world's land the satellite chain holds Europe's imagery from level 9 and the world's from 3 to 8, a world tile named in its own package folder, and Europe's alone without it"
+      ],
+      "status": "passing"
     }
   ]
 }

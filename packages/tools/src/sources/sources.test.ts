@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StepLog, sha256 } from '../pipeline/step-log.js';
-import { type DownloadContext, downloadFile } from './download.js';
+import { type DownloadContext, downloadAll, downloadFile } from './download.js';
 import { type SourceFile, copernicusDemName } from './files.js';
 import { signS3Get } from './sigv4.js';
 
@@ -95,6 +95,27 @@ describe('sources', () => {
         'SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, ' +
         'Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41',
     );
+  });
+});
+
+describe('downloads of a whole build', () => {
+  it("downloads eight files at a time and returns their results in the files' order", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const slow = (async () => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight--;
+      return new Response(body, { status: 200 });
+    }) as typeof fetch;
+    const files = Array.from({ length: 20 }, (_, i) => ({
+      ...file,
+      url: `https://example.test/${i}.tif`,
+      key: `${i}.tif`,
+    }));
+    const results = await downloadAll(files, context(slow));
+    expect(most).toBe(8);
+    expect(results.map((r) => r.key)).toEqual(files.map((f) => f.key));
   });
 });
 

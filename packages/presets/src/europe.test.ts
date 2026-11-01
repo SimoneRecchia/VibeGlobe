@@ -3,6 +3,7 @@ import { xyzImagery } from '@vibeglobe/sources';
 import { featureFilter, type FilterSpecification } from '@maplibre/maplibre-gl-style-spec';
 import { describe, expect, it } from 'vitest';
 import { europeOpen, onlineFade, type OfflineWrapper } from './europe.js';
+import { EUROPE_LAND } from './europe-land.js';
 import type { StyleJson } from './styles.js';
 
 /** Records how each source is wrapped, as the offline engine would wrap it. */
@@ -210,6 +211,27 @@ describe('europeOpen (F613)', () => {
       ['satellite-base', { fromZoom: 3.5, toZoom: 4 }, false],
     ]);
     expect(online[0]?.sources[0]?.minLevel).toBe(0);
+  });
+
+  it("adds the world's imagery below Europe's, its sea keyed out on the world's land, Europe's levels above it (F684)", () => {
+    const manifest = {
+      packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
+      offline: fakeOffline(),
+      farLevels: 2,
+    };
+    const sources = (worldLand?: typeof EUROPE_LAND) =>
+      europeOpen({ ...manifest, ...(worldLand ? { worldLand } : {}) }).baseMaps[0]?.imagery[0]?.sources ?? [];
+    const both = sources(EUROPE_LAND);
+    expect(both.map((s) => [s.id, s.minLevel, s.maxLevel])).toEqual([
+      ['europe-satellite', 9, 11],
+      ['world-satellite', 3, 8],
+    ]);
+    // Level 8 over Brazil (50° W, 10° S) comes from the world's imagery, in its own folder of the package.
+    expect(both[1]?.request(tile(8, 92, 135), out)).toMatchObject({
+      url: 'https://app.test/maps/europe/world-imagery/8/92/135.jpg',
+    });
+    // Without the world's land the package holds Europe alone, from the level after the far levels.
+    expect(sources().map((s) => [s.id, s.minLevel])).toEqual([['europe-satellite', 5]]);
   });
 
   it("reads the package's satellite imagery to its own deepest level, the orthophotos still fading in from 12 (F662)", () => {

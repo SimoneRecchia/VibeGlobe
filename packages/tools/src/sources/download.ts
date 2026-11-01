@@ -167,9 +167,17 @@ async function downloadWindow(
   return { key: file.key, status: 'downloaded', transferred: result.transferred, sha256: checksum };
 }
 
-/** Downloads every file in order; returns per-file results. */
+/** Files downloaded at once: a world-wide build asks for tens of thousands of windows, most of them sea with no file. */
+const DOWNLOADS_AT_ONCE = 8;
+
+/** Downloads every file, {@link DOWNLOADS_AT_ONCE} at a time; returns per-file results in the files' order. */
 export async function downloadAll(files: SourceFile[], context: DownloadContext): Promise<DownloadResult[]> {
   const results: DownloadResult[] = [];
-  for (const file of files) results.push(await downloadFile(file, context));
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (let index = next++; index < files.length; index = next++)
+      results[index] = await downloadFile(files[index] as SourceFile, context);
+  };
+  await Promise.all(Array.from({ length: Math.min(DOWNLOADS_AT_ONCE, files.length) }, worker));
   return results;
 }

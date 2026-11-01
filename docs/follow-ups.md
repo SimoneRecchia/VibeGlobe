@@ -132,3 +132,11 @@ found and fixed: TG-06, KB-313, KB-314). Not changed:
   recovers draws the new size once recovered, without errors.
 - **Tiles answered with 204 or an empty body (Cesium #7914):** imagery and terrain treat them as no data
   (`classifyTransportResult`), and so do vector tiles; they never keep the engine from going idle.
+
+## Benchmark frame timing (2026-11-01, KB-317)
+
+- **The drag benchmarks' CPU sample assumes the engine draws after its marker.** `startMeasuredLoop`
+  (`apps/playground/src/frame-loop.ts`) registers a marker before each move and stops at the engine's `frame` event;
+  when the engine requests its next frame itself (a `moveend` listener during user input, F200; a fade or a load), the
+  engine's frame runs before the marker and the sample spans a whole frame interval. Timing the engine's own frame
+  (its diagnostics timer, `PHASE_RENDER`) would remove the assumption, for pages that listen for `moveend` too.

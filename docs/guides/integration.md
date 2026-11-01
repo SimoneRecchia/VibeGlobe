@@ -279,9 +279,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self
 - A worker follows the policy of its own script's response: KTX2 imagery needs `'wasm-unsafe-eval'` in the
   `script-src` of the policy sent with the worker program. MBTiles packages read in the browser run sql.js on the page
   and need it in the page's policy.
-- `@vibeglobe/ui` installs its stylesheet as a constructed stylesheet, which `style-src 'self'` allows.
-- The `<vibe-globe>` element styles its shadow tree with a `<style>` element, which needs `'unsafe-inline'` in
-  `style-src`.
+- `@vibeglobe/ui` and the `<vibe-globe>` element style the page and the shadow tree with constructed stylesheets,
+  which `style-src 'self'` allows.
 
 ## Network modes and offline packages
 

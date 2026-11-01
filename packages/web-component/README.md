@@ -38,8 +38,6 @@ element.zoom = 6; // moves the running camera
 - `base-imagery-url` is required.
 - `imagery`, `imagery-url`, `backend` and `no-controls` are read when the element is connected: set them before.
 - The element is at least 150px high: give it the height you want.
-- Its shadow tree is styled with a `<style>` element, which a Content Security Policy must allow (`'unsafe-inline'`
-  in `style-src`).
 
 ## Guides
 

@@ -402,16 +402,16 @@ A profile only switches features off, and only for its own source. Every loading
 reuse, prefetch and flight preloading, offline packaging) is on by default. `@vibeglobe/offline` can switch off more,
 globally or per source, and switches on nothing a profile forbids.
 
-| `ProviderProfile` field             | Effect                                                                    | Enforced by                      |
-| ----------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
-| `id`                                | names the profile in warnings and errors                                  | —                                |
-| `forbids`                           | `persistentCache`, `memoryReuse`, `prefetch`, `offlinePackaging` stay off | `@vibeglobe/offline` only        |
-| `respectCacheHeaders`               | responses are reused only while their cache headers allow it              | the engine, `@vibeglobe/offline` |
-| `maxConcurrentRequests`             | caps the source's `maxRequestsPerHost`                                    | `withProfile`                    |
-| `requiredAttribution`               | a credit always shown, also when the source is in `hiddenCredits`         | the engine                       |
-| `displayOnly`                       | pixel readback, tile data and elevation sampling throw `display-only`     | the engine                       |
-| `warning`                           | logged once per engine instance                                           | the engine                       |
-| `sessionRenewalSeconds`, `termsAdr` | recorded for the application                                              | —                                |
+| `ProviderProfile` field | Effect                                                                    | Enforced by                      |
+| ----------------------- | ------------------------------------------------------------------------- | -------------------------------- |
+| `id`                    | names the profile in warnings and errors                                  | —                                |
+| `forbids`               | `persistentCache`, `memoryReuse`, `prefetch`, `offlinePackaging` stay off | `@vibeglobe/offline` only        |
+| `respectCacheHeaders`   | responses are reused only while their cache headers allow it              | the engine, `@vibeglobe/offline` |
+| `maxConcurrentRequests` | caps the source's `maxRequestsPerHost`                                    | `withProfile`                    |
+| `requiredAttribution`   | a credit always shown, also when the source is in `hiddenCredits`         | the engine                       |
+| `displayOnly`           | pixel readback, tile data and elevation sampling throw `display-only`     | the engine                       |
+| `warning`               | logged once per engine instance                                           | the engine                       |
+| `termsAdr`              | recorded for the application                                              | —                                |
 
 ### Your own provider's profile
 
@@ -431,9 +431,9 @@ const acmeTiles = withProfile(xyzImagery({ id: 'acme', url: 'https://tiles.acme.
 const strictest = combineProfiles(acme, { id: 'reseller', forbids: new Set(['prefetch']), respectCacheHeaders: true });
 ```
 
-`combineProfiles(inner, outer)` forbids what either forbids, keeps the lower `maxConcurrentRequests` and
-`sessionRenewalSeconds`, respects cache headers when either asks, and takes `outer`'s required credit (else
-`inner`'s). It does not carry `displayOnly` or `warning`: set them on the result when either profile has them.
+`combineProfiles(inner, outer)` forbids what either forbids, keeps the lower `maxConcurrentRequests`, respects cache
+headers and is `displayOnly` when either asks, carries both warnings, and takes `outer`'s required credit (else
+`inner`'s).
 
 ### Commercial providers, from your own code
 
@@ -671,9 +671,9 @@ The asynchronous factories reject with a `SourceConfigError`: a stable `code` an
 | `missing-georeference`                                        | single image without `bounds` or a world file of six numbers                   | pass one of them                              |
 | `unreachable-image`, `unreadable-image`, `unreadable-geotiff` | the image cannot be downloaded or decoded                                      | check the URL, CORS and the format            |
 | `missing-app-identity`, `osm-subdomains`                      | OpenStreetMap public servers without `appName`/`appUrl`, or with `{s}`         | identify the application; use the single host |
+| `unreachable-layer`, `invalid-layer`                          | quantized-mesh terrain: `layer.json` cannot be loaded, or is not a valid one   | check the URL, CORS and the file              |
 
-`quantizedMeshTerrain` rejects with a plain `Error` when `layer.json` cannot be loaded or read. The engine reports a
-display-only source's refused data access as a `GlobeError` with code `display-only`.
+The engine reports a display-only source's refused data access as a `GlobeError` with code `display-only`.
 
 ## See also
 

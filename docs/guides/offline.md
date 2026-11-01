@@ -302,14 +302,15 @@ empties the cache of one source or all of them.
 
 The package manager rejects with a `PackageError`: a stable `code` and a message naming the package, file or source.
 
-| Code                  | When                                                                                  | What to do                                      |
-| --------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `invalid-manifest`    | the manifest is not valid; a local file is missing; a served file has no chunk hashes | rebuild it with `createManifest`                |
-| `download-failed`     | the manifest, a file or a tile could not be downloaded                                | check the URL and CORS, then install again      |
-| `integrity`           | a file's size or a chunk's SHA-256 does not match the manifest                        | rebuild the manifest or download the file again |
-| `not-installed`       | `update` or `remove` of a package that is not installed                               | check `list()`                                  |
-| `packaging-disabled`  | the in-browser builder while `offlinePackaging` is off globally                       | switch it on, or do not build                   |
-| `packaging-forbidden` | the in-browser builder with a source whose `rules` forbid packaging                   | leave that source out                           |
+| Code                  | When                                                                                  | What to do                                        |
+| --------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `invalid-manifest`    | the manifest is not valid; a local file is missing; a served file has no chunk hashes | rebuild it with `createManifest`                  |
+| `download-failed`     | the manifest, a file or a tile could not be downloaded                                | check the URL and CORS, then install again        |
+| `integrity`           | a file's size or a chunk's SHA-256 does not match the manifest                        | rebuild the manifest or download the file again   |
+| `not-installed`       | `update` or `remove` of a package that is not installed                               | check `list()`                                    |
+| `packaging-disabled`  | the in-browser builder while `offlinePackaging` is off globally                       | switch it on, or do not build                     |
+| `packaging-forbidden` | the in-browser builder with a source whose `rules` forbid packaging                   | leave that source out                             |
+| `storage-unavailable` | `install` or `update` while the browser refuses storage: blocked, closed or full      | free space, or install where IndexedDB is allowed |
 
 The offline engine emits `warning` events (`quota`, `storage-unavailable`, `profile-rule`) once per kind and never
 throws for them.

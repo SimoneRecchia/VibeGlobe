@@ -250,6 +250,7 @@ const lines = gridLines({ center: corner, halfSizeM: 400, spacingM: 10 }); // se
 
 `gridLines` returns the segments of a square grid on the ground, each as its two ends, turned to `bearingDeg`
 (default 0). It returns at most 2000 lines: a finer grid over a larger square has its spacing doubled until it fits.
+It throws a `RangeError` when `spacingM` is not a positive number of meters.
 
 `detectPanels` finds the tables already built in a top-down image of the area, with image arithmetic and no trained
 model: blue pixels (or, for black modules, pixels darker than the ground; never green or warm tones) are panels.

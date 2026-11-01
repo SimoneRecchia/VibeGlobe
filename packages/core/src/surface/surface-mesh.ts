@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { geodeticToEcef } from '../geodesy/ecef.js';
+import { geodeticArrayToEcef } from '../geodesy/ecef.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { cappedMercatorInto, mercatorScaleInto } from '../view/morph.js';
 import { quadtreeRowLatitudeRad, QUADTREE_SEGMENTS, type QuadtreeTile } from './surface-quadtree.hot.js';
@@ -94,45 +94,46 @@ function skirtEdges(): number[][] {
 }
 
 const vertex = new Float64Array(3);
-const lonLat = new Float64Array(2);
+const geodetic = new Float64Array(3);
 const mercator = new Float64Array(2);
 const scale = new Float64Array(2);
 
-/** The capped Mercator x and y of a position into a new array, for a tile's plane center. */
-export function planeCenterOf(lonRad: number, latRad: number): Float64Array {
-  lonLat[0] = lonRad;
-  lonLat[1] = latRad;
-  const center = new Float64Array(2);
-  cappedMercatorInto(lonLat, center);
-  return center;
+/** Where a mesh at a position (radians) is measured from: its ECEF origin and its capped Mercator plane center. */
+export function meshOrigin(lonRad: number, latRad: number): Pick<TileMeshData, 'originEcef' | 'planeCenter'> {
+  geodetic[0] = lonRad;
+  geodetic[1] = latRad;
+  geodetic[2] = 0;
+  const planeCenter = new Float64Array(2);
+  cappedMercatorInto(geodetic, planeCenter);
+  return { originEcef: geodeticArrayToEcef(geodetic, new Float64Array(3)), planeCenter };
 }
 
-/** Writes a vertex's plane endpoint data (see {@link TileMeshData.planes}). */
-function writePlane(
-  planes: Float32Array,
+/**
+ * Writes vertex `index` of a mesh measured from `origin` at `position` (radians, and the drop below the surface in
+ * meters): its offset, unit ellipsoid normal and plane endpoint data (see {@link TileMeshData}). Layer geometry writes
+ * its vertices with it too (ADR 0037). Allocates nothing.
+ */
+export function writeMeshVertex(
+  out: Pick<TileMeshData, 'positions' | 'normals' | 'planes'>,
   index: number,
-  lonRad: number,
-  latRad: number,
-  dropMeters: number,
-  center: Float64Array,
+  position: Float64Array,
+  origin: Pick<TileMeshData, 'originEcef' | 'planeCenter'>,
 ): void {
-  lonLat[0] = lonRad;
-  lonLat[1] = latRad;
-  cappedMercatorInto(lonLat, mercator);
+  const lonRad = position[0] ?? 0;
+  const latRad = position[1] ?? 0;
+  geodeticArrayToEcef(position, vertex);
+  for (let i = 0; i < 3; i++) out.positions[index * 3 + i] = (vertex[i] ?? 0) - (origin.originEcef[i] ?? 0);
+  const cosLat = Math.cos(latRad);
+  out.normals[index * 3] = cosLat * Math.cos(lonRad);
+  out.normals[index * 3 + 1] = cosLat * Math.sin(lonRad);
+  out.normals[index * 3 + 2] = Math.sin(latRad);
+  cappedMercatorInto(position, mercator);
   scale[0] = latRad;
   mercatorScaleInto(scale);
-  planes[index * 4] = (mercator[0] ?? 0) - (center[0] ?? 0);
-  planes[index * 4 + 1] = (mercator[1] ?? 0) - (center[1] ?? 0);
-  planes[index * 4 + 2] = dropMeters;
-  planes[index * 4 + 3] = scale[1] ?? 1;
-}
-
-/** Writes the unit ellipsoid normal at a geodetic position. */
-function writeNormal(normals: Float32Array, index: number, lonRad: number, latRad: number): void {
-  const cosLat = Math.cos(latRad);
-  normals[index * 3] = cosLat * Math.cos(lonRad);
-  normals[index * 3 + 1] = cosLat * Math.sin(lonRad);
-  normals[index * 3 + 2] = Math.sin(latRad);
+  out.planes[index * 4] = (mercator[0] ?? 0) - (origin.planeCenter[0] ?? 0);
+  out.planes[index * 4 + 1] = (mercator[1] ?? 0) - (origin.planeCenter[1] ?? 0);
+  out.planes[index * 4 + 2] = position[2] ?? 0;
+  out.planes[index * 4 + 3] = scale[1] ?? 1;
 }
 
 /**
@@ -209,16 +210,14 @@ function buildMesh(
   skirtDepthMeters: number,
   outwardRad: number,
 ): TileMeshData {
-  const centerLatRad = rowLatitudes[TILE_SEGMENTS / 2] ?? 0;
-  const originEcef = new Float64Array(3);
-  geodeticToEcef((westRad + eastRad) / 2, centerLatRad, 0, originEcef);
+  const origin = meshOrigin((westRad + eastRad) / 2, rowLatitudes[TILE_SEGMENTS / 2] ?? 0);
   const positions = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const uvs = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const normals = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 3);
   const planes = new Float32Array((SURFACE_VERTICES + SKIRT_VERTICES) * 4);
   const northRad = rowLatitudes[0] ?? 0;
   const heightRad = northRad - (rowLatitudes[TILE_SEGMENTS] ?? 0);
-  const planeCenter = planeCenterOf((westRad + eastRad) / 2, centerLatRad);
+  const vertices = { positions, normals, planes };
   // Skirts reach outward, so the skirts of neighbors overlap below the surface and close the corners and slivers where
   // tiles of different levels meet (KB-069); a skirt hangs at most a fraction of a percent of the radius down, so it
   // stays inside the ellipsoid.
@@ -231,10 +230,10 @@ function buildMesh(
       latRad += row === 0 ? outwardRad : row === TILE_SEGMENTS ? -outwardRad : 0;
       latRad = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, latRad));
     }
-    geodeticToEcef(lonRad, latRad, heightMeters, vertex);
-    writeNormal(normals, index, lonRad, latRad);
-    writePlane(planes, index, lonRad, latRad, heightMeters, planeCenter);
-    for (let i = 0; i < 3; i++) positions[index * 3 + i] = (vertex[i] ?? 0) - (originEcef[i] ?? 0);
+    geodetic[0] = lonRad;
+    geodetic[1] = latRad;
+    geodetic[2] = heightMeters;
+    writeMeshVertex(vertices, index, geodetic, origin);
     // Rows are uniform in the tile's own scheme (Mercator y for the Mercator root, latitude for the caps).
     const vGeographic = row === 0 ? 0 : row === TILE_SEGMENTS ? 1 : (northRad - latRad) / heightRad;
     writeUvs(uvs, index, col / TILE_SEGMENTS, row / TILE_SEGMENTS, vGeographic);
@@ -244,5 +243,6 @@ function buildMesh(
   markSkirts(normals);
   const indices = tileIndices();
   const byteLength = positions.byteLength + uvs.byteLength + normals.byteLength + planes.byteLength;
+  const { originEcef, planeCenter } = origin;
   return { key, originEcef, positions, uvs, normals, planes, planeCenter, indices, byteLength };
 }

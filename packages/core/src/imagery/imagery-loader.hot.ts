@@ -897,8 +897,12 @@ export class ImageryLoader implements NetworkPoolClient {
       this.reportError(record, 'failed');
       return;
     }
+    this.failFor(record, DECODE_RETRY_MS * 2 ** (record.retries - 1));
+  }
+
+  /** Fails `record` until `delayMs` from now, and wakes a frame then: nothing else would. */
+  private failFor(record: TileRecord, delayMs: number): void {
     record.state = FAILED;
-    const delayMs = DECODE_RETRY_MS * 2 ** (record.retries - 1);
     this.table.eligibleAt[record.slot] = this.options.now() + delayMs;
     this.options.setTimer(() => this.options.requestFrame(), delayMs);
   }
@@ -991,9 +995,7 @@ export class ImageryLoader implements NetworkPoolClient {
       // Not uploaded: not counted. The bytes stay in RAM; the tile waits before it is tried again, and meanwhile its
       // ancestors are drawn and requested.
       closeImage(tile);
-      record.state = FAILED;
-      this.table.eligibleAt[record.slot] = this.options.now() + REFUSED_RETRY_MS;
-      this.options.setTimer(() => this.options.requestFrame(), REFUSED_RETRY_MS);
+      this.failFor(record, REFUSED_RETRY_MS);
       measuredMs[0] = UPLOAD_REFUSED;
       return;
     }

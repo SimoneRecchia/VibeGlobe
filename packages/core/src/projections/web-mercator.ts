@@ -2,11 +2,11 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { WGS84 } from '../geodesy/wgs84.js';
 import {
-  degToRad,
   longitudeToXMeters,
   nearestWorldCopyXMeters,
+  projectDeg,
   radToDeg,
-  wrapLongitudeDeg,
+  unprojectDeg,
   xMetersToLongitudeRad,
 } from './longitude.js';
 import type { LonLatDeg, ProjectedPointMeters } from './types.js';
@@ -38,6 +38,16 @@ export const WEB_MERCATOR_HALF_EXTENT_METERS = Math.PI * RADIUS_METERS;
  */
 export function clampWebMercatorLatitudeRad(latRad: number): number {
   return Math.min(Math.max(latRad, -WEB_MERCATOR_MAX_LATITUDE_RAD), WEB_MERCATOR_MAX_LATITUDE_RAD);
+}
+
+/**
+ * The latitude of a Web Mercator row edge, `row` of `rows` rows from the north (rows may be fractional): the inverse
+ * Gudermannian of the row's projected y, the limit at and beyond the map's edges.
+ */
+export function mercatorRowLatitudeRad(row: number, rows: number): number {
+  if (row <= 0) return WEB_MERCATOR_MAX_LATITUDE_RAD;
+  if (row >= rows) return -WEB_MERCATOR_MAX_LATITUDE_RAD;
+  return Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / rows)));
 }
 
 /**
@@ -105,8 +115,7 @@ export function webMercatorScaleFactor(latRad: number): number {
  * @returns The projected point in meters.
  */
 export function projectWebMercatorDeg(lonDeg: number, latDeg: number): ProjectedPointMeters {
-  const out = projectWebMercatorRad(degToRad(lonDeg), degToRad(latDeg), new Float64Array(2));
-  return { xMeters: out[0] ?? Number.NaN, yMeters: out[1] ?? Number.NaN };
+  return projectDeg(projectWebMercatorRad, lonDeg, latDeg);
 }
 
 /**
@@ -116,6 +125,5 @@ export function projectWebMercatorDeg(lonDeg: number, latDeg: number): Projected
  * @returns The longitude in [-180°, 180°) and the latitude, in degrees.
  */
 export function unprojectWebMercatorDeg(xMeters: number, yMeters: number): LonLatDeg {
-  const out = unprojectWebMercatorRad(xMeters, yMeters, new Float64Array(2));
-  return { lonDeg: wrapLongitudeDeg(radToDeg(out[0] ?? Number.NaN)), latDeg: radToDeg(out[1] ?? Number.NaN) };
+  return unprojectDeg(unprojectWebMercatorRad, xMeters, yMeters);
 }

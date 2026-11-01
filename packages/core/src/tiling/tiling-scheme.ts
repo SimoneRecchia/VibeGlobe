@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
+import { mercatorRowLatitudeRad, WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import type { TileCoord } from './tile-key.js';
 
 /**
@@ -76,13 +76,6 @@ export const WEB_MERCATOR_TILING: TilingScheme = {
     return out;
   },
 };
-
-/** The latitude of a Web Mercator row edge at `n` rows: the inverse Gudermannian of the row's projected y. */
-function mercatorRowLatitudeRad(row: number, n: number): number {
-  if (row === 0) return WEB_MERCATOR_MAX_LATITUDE_RAD;
-  if (row === n) return -WEB_MERCATOR_MAX_LATITUDE_RAD;
-  return Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / n)));
-}
 
 /** The geographic pyramid (EPSG:4326): two root tiles, west and east of the prime meridian, covering ±90°. */
 export const GEOGRAPHIC_TILING: TilingScheme = {

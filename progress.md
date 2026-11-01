@@ -49,7 +49,10 @@ and lets the background compiler finish, a window over the limit gets a second o
 longer crosses a call as a double, which boxed it every frame (18 runs in a row pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
 for `moveend` with the tilt policy off too, which made the engine request every drag frame from inside the previous
 one, so the benchmark sampled frame intervals; they listen only while an API movement runs (F609: about 0 ms again).
-Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's desktop views).
+The CI-pace rows, reproduced with the whole browser on one CPU core: KB-241's wheel tests waited behind
+frames a software GPU drew at 1280 × 720 (480 × 360 canvases now, and F438 a 6-minute limit), KB-240 was fixed by #93's
+path preloading, KB-208's WebGPU slowness is its uploads (a follow-up). Still open: KB-110 and KB-212 (not reproduced,
+passing in CI), KB-180, KB-181 (the owner's desktop views).
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

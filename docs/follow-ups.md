@@ -133,10 +133,15 @@ found and fixed: TG-06, KB-313, KB-314). Not changed:
 - **Tiles answered with 204 or an empty body (Cesium #7914):** imagery and terrain treat them as no data
   (`classifyTransportResult`), and so do vector tiles; they never keep the engine from going idle.
 
-## Benchmark frame timing (2026-11-01, KB-317)
+## Frame timing and uploads on slow frames (2026-11-01, KB-317, KB-208)
 
 - **The drag benchmarks' CPU sample assumes the engine draws after its marker.** `startMeasuredLoop`
   (`apps/playground/src/frame-loop.ts`) registers a marker before each move and stops at the engine's `frame` event;
   when the engine requests its next frame itself (a `moveend` listener during user input, F200; a fade or a load), the
   engine's frame runs before the marker and the sample spans a whole frame interval. Timing the engine's own frame
   (its diagnostics timer, `PHASE_RENDER`) would remove the assumption, for pages that listen for `moveend` too.
+- **Tile uploads cost about 3.5 times more main-thread time on WebGPU than on WebGL2** (KB-208, measured 2026-11-01 under
+  SwiftShader: about 0.5 against 0.14 ms a tile; texture creation and three.js's mipmap passes). Within the 2 ms upload
+  budget a WebGPU frame takes 4 tiles instead of 14, so a view of 400 tiles fills in about 95 frames instead of 25.
+  Mipmaps made in the worker (one bitmap per level) or a mipmap pipeline shared across tiles would bring WebGPU's rate to
+  WebGL2's, which matters most where frames are slow anyway.

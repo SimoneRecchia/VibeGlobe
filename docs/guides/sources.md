@@ -331,6 +331,14 @@ source in its own layer above the fallback: a layer draws each tile from one sou
 `@vibeglobe/presets/countries` resolves a European country's borders as GeoJSON. `blankTile` is the fallback when the
 area is not known: a tile of that color alone counts as no data.
 
+`keySea: { land, featherMeters }` in an `area` keys the sea out of imagery: pixels of water's colors outside `land`
+(polygons in degrees, such as `WORLD_LAND` of `@vibeglobe/presets/world-land`) become transparent, so one sea, the
+layer below, shows everywhere. Inside the land water stays (lakes, shadows), fading out over `featherMeters` toward
+the outline. For imagery whose water is real everywhere, such as an online satellite service, add `offshoreMeters`:
+water stays up to that distance beyond the land and fades out there, so the coast keeps its own water whatever the
+outline's precision, and the tiles within that distance of the land are requested too. A source keying the sea is
+transparent.
+
 ```ts
 import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { xyzImagery } from '@vibeglobe/sources';

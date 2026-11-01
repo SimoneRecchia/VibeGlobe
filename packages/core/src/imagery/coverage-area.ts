@@ -50,9 +50,15 @@ export interface CoverageArea {
    * Europe preset's WorldCover, KB-303): pixels of water's colors (blue and green above red, not bright) outside `land`
    * are transparent, fading back in over `featherMeters` inside it, so one sea shows below while the land's own pixels
    * stay, with its lakes and shadows. Gaps narrower than the feather between `land`'s polygons (borders simplified one
-   * country at a time) count as land.
+   * country at a time) count as land. With `offshoreMeters`, for imagery whose water is real everywhere (an online
+   * satellite service), water stays up to that distance beyond the land and fades out there instead, so the coast
+   * keeps its own water whatever the outline's precision; the tiles that near the land are asked for too (F687).
    */
-  readonly keySea?: { readonly land: readonly PolygonDeg[]; readonly featherMeters: number };
+  readonly keySea?: {
+    readonly land: readonly PolygonDeg[];
+    readonly featherMeters: number;
+    readonly offshoreMeters?: number;
+  };
 }
 
 /** A color the decoder matches per pixel: sRGB channels and the largest difference per channel (JPEG noise). */
@@ -86,7 +92,13 @@ export interface TileMask {
    * The land's outline over the tile and its fade in pixels of the tile ({@link CoverageArea.keySea}): water's colors
    * outside it are transparent; with no ring, the whole tile is sea.
    */
-  readonly sea?: { readonly points: Float64Array; readonly ringEnds: Uint32Array; readonly featherPx: number };
+  readonly sea?: {
+    readonly points: Float64Array;
+    readonly ringEnds: Uint32Array;
+    readonly featherPx: number;
+    /** How far the land reaches beyond its outline, in pixels of the tile ({@link CoverageArea.keySea}). */
+    readonly growPx?: number;
+  };
 }
 
 /** A GeoJSON geometry, feature or feature collection of polygons, the form country borders come in. */
@@ -266,17 +278,41 @@ function tileMask(
 const WHOLE_TILE = Float64Array.of(0, 0, 1, 0, 1, 1, 0, 1);
 const WHOLE_TILE_END = Uint32Array.of(4);
 
-/** The land's outline over a tile with its fade in pixels; undefined for a tile inside the land beyond the fade. */
+/** The width of a tile, meters, at its middle latitude. */
+const tileMetersOf = (e: TileRectangleRad): number =>
+  (e.eastRad - e.westRad) * WGS84.semiMajorAxisMeters * Math.cos((e.northRad + e.southRad) / 2);
+
+/**
+ * The land's outline over a tile with its fade and its reach offshore in pixels; undefined for a tile inside the land
+ * beyond the fade.
+ */
 function seaMask(
   land: readonly PreparedPolygon[],
   e: TileRectangleRad,
   mercator: boolean,
-  featherMeters: number,
+  sea: NonNullable<CoverageArea['keySea']>,
   tileSizePx: number,
 ): TileMask['sea'] {
-  const tileMeters = (e.eastRad - e.westRad) * WGS84.semiMajorAxisMeters * Math.cos((e.northRad + e.southRad) / 2);
-  const outline = tileMask(land, e, mercator, featherMeters / tileMeters);
-  return outline && { ...outline, featherPx: (featherMeters / tileMeters) * tileSizePx };
+  const tileMeters = tileMetersOf(e);
+  const offshore = sea.offshoreMeters ?? 0;
+  const outline = tileMask(land, e, mercator, (sea.featherMeters + offshore) / tileMeters);
+  if (!outline) return undefined;
+  const featherPx = (sea.featherMeters / tileMeters) * tileSizePx;
+  return offshore > 0
+    ? { ...outline, featherPx, growPx: (offshore / tileMeters) * tileSizePx }
+    : { ...outline, featherPx };
+}
+
+/** A tile's extent grown by `meters` on every side. */
+function grownBy(e: TileRectangleRad, meters: number): TileRectangleRad {
+  const dLat = meters / WGS84.semiMajorAxisMeters;
+  const dLon = dLat / Math.max(0.01, Math.cos((e.northRad + e.southRad) / 2));
+  return {
+    westRad: e.westRad - dLon,
+    eastRad: e.eastRad + dLon,
+    southRad: e.southRad - dLat,
+    northRad: e.northRad + dLat,
+  };
 }
 
 /** Prepares an area for tile tests: done once per source, the tests themselves allocate nothing. */
@@ -293,17 +329,20 @@ export function coverageTest(area: CoverageArea): CoverageTest {
     everywhere ?? (area.keyOutside && { rgb: area.keyOutside.rgb, tolerance: area.keyOutside.tolerance ?? 8 });
   const featherPx = Math.max(0, area.featherPx ?? 0);
   const land = area.keySea?.land.map(prepare);
+  const offshore = area.keySea?.offshoreMeters ?? 0;
   return {
     rectangles: polygons.map((p) => ({ westRad: p.west, southRad: p.south, eastRad: p.east, northRad: p.north })),
-    covers(extent: TileRectangleRad): boolean {
+    covers(tile: TileRectangleRad): boolean {
       if (key && !everywhere) return true;
+      // Water kept offshore needs the tiles that near the land too (F687).
+      const extent = offshore > 0 ? grownBy(tile, offshore) : tile;
       for (const polygon of polygons)
         if (overlap ? rectangleOverlaps(polygon, extent) : rectangleInside(polygon, extent)) return true;
       return false;
     },
     mask(extent: TileRectangleRad, mercator: boolean, tileSizePx = 256): TileMask | undefined {
       if (!clip && !key && !land) return undefined;
-      const sea = land && seaMask(land, extent, mercator, area.keySea?.featherMeters ?? 0, tileSizePx);
+      const sea = land && area.keySea && seaMask(land, extent, mercator, area.keySea, tileSizePx);
       const seaPart = sea ? { sea } : {};
       // A key everywhere and the sea's key mask the tiles wholly inside the area too, the whole tile as their outline.
       const outline = clip || key ? tileMask(polygons, extent, mercator, featherPx / tileSizePx) : undefined;

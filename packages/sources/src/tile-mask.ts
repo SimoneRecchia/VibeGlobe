@@ -51,7 +51,7 @@ export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask
     const land =
       mask.sea &&
       (mask.sea.ringEnds.length > 0
-        ? insideAlpha(mask.sea, width, height, mask.sea.featherPx * SEA_BLUR, SEA_GAIN)
+        ? insideAlpha(mask.sea, width, height, mask.sea.featherPx * SEA_BLUR, SEA_GAIN, mask.sea.growPx)
         : NO_LAND);
     if (!inside || (mask.sea && !land)) return image;
     const data = new Uint8Array(context.getImageData(0, 0, width, height).data.buffer);
@@ -111,9 +111,10 @@ function tracePath(
 
 /**
  * How much of each pixel lies inside the outline, 0–255: the outline filled on a canvas larger than the tile by the
- * blur's reach (so the fade does not stop at the tile's edges), blurred by `blurPx` (σ) and stretched by `gain` about
- * the outline, where the blurred alpha is a half. A wide blur is drawn smaller and stretched back to the tile: it
- * varies slowly, and a blur costs as many pixels as its canvas. Undefined where no canvas context is available.
+ * blur's reach (so the fade does not stop at the tile's edges), grown by `growPx` with a round stroke, blurred by
+ * `blurPx` (σ) and stretched by `gain` about the outline, where the blurred alpha is a half. A wide blur is drawn
+ * smaller and stretched back to the tile: it varies slowly, and a blur costs as many pixels as its canvas. Undefined
+ * where no canvas context is available.
  */
 function insideAlpha(
   outline: Outline,
@@ -121,8 +122,9 @@ function insideAlpha(
   height: number,
   blurPx: number,
   gain: number,
+  growPx = 0,
 ): Uint8ClampedArray | undefined {
-  const pad = Math.ceil(blurPx * 4) + 1;
+  const pad = Math.ceil(blurPx * 4 + growPx) + 1;
   const scale = Math.max(1, Math.floor(blurPx / 8));
   const filled = new OffscreenCanvas(Math.ceil((width + 2 * pad) / scale), Math.ceil((height + 2 * pad) / scale));
   const fill = filled.getContext('2d');
@@ -130,6 +132,11 @@ function insideAlpha(
   fill.scale(1 / scale, 1 / scale);
   tracePath(fill, outline, width, height, pad);
   fill.fill('evenodd');
+  if (growPx > 0) {
+    fill.lineWidth = 2 * growPx;
+    fill.lineJoin = 'round';
+    fill.stroke();
+  }
   let source: OffscreenCanvas = filled;
   if (blurPx > 0) {
     const blurred = new OffscreenCanvas(filled.width, filled.height);

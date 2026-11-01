@@ -158,6 +158,16 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     expect(bremen?.request(tile(14, 8760, 6088), { ...out })).toBe('noData');
   });
 
+  it('adds Slovenia within its borders (F675)', async () => {
+    const { layers } = await europeOrthophotos();
+    const slovenia = layers.find((l) => l.id === 'si-gurs-dof')?.sources[0];
+    // Level 14 over Ljubljana, and over Rome.
+    expect(slovenia?.request(tile(14, 8852, 5825), { ...out })).toMatchObject({
+      url: expect.stringContaining('LAYERS=SI.GURS.ZPDZ%3ADOF025_3857'),
+    });
+    expect(slovenia?.request(tile(14, 8760, 6088), { ...out })).toBe('noData');
+  });
+
   it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {
     const orthophotos = await europeOrthophotos();
     const tiers = new Map<string, string | undefined>();

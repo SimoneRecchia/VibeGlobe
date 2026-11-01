@@ -20,3 +20,4 @@ Latest request: first baselines of the canonical views and pixel ratios (M2, F07
 - 2026-10-24T19:57:57Z: data-layer labels drawn from signed distance fields (M10, F358, ADR 0045): the data-labels view
 - 2026-10-25T01:05:31Z: the space background on both backends (M11, F608, ADR 0181): `e2e/starfield.spec.ts` @baseline
 - 2026-10-26T17:46:00Z: the polar caps stay a globe and show their fill color (KB-211, F619): the north-pole and polar tiling views; the demotiles globe view after the label placement change (KB-210)
+- 2026-11-01T04:50:05Z: the terrain views after KB-302 (#95): skirts keep the flat globe's few meters with terrain and edges next to a coarser mesh follow its segments, which moves 126 to 677 pixels along tile edges in terrain-terrarium, terrain-rgb and terrain-quantized-mesh on both backends (identical counts in CI's full runs of #95 and #99)

@@ -291,3 +291,8 @@ CC BY 4.0` (`sk-gku-ortofoto`, 19). Bremen's DOP20 2023 (CC BY 4.0 since 2024, i
 others (`de-hb-dop20`, 19); a record's `layer` may now list layers separated by commas. Lithuania's Web Mercator cache
 is an ArcGIS cache whose levels start at Web Mercator's 7, and Schleswig-Holstein's and Slovenia's layers and Valle
 d'Aosta's service are still not confirmed.
+
+Slovenia's GURS DOF025 (CC BY 4.0, its INSPIRE record) was confirmed the same day: the WMS
+`ipi.eprostor.gov.si/wms-si-gurs-dts/ows` with the layer `SI.GURS.ZPDZ:DOF025_3857`, in EPSG:3857, as a public
+application built on it requests it (`si-gurs-dof`, 19). Lithuania stays out: its readings conflict (a paid licence on
+2026-10-31, CC BY 4.0 on data.gov.lt), and its Web Mercator cache's levels start at 7.

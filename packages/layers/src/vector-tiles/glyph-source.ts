@@ -33,7 +33,7 @@ const WEIGHTS: readonly (readonly [RegExp, number])[] = [
 ];
 
 /** The CSS font style and weight of a font stack, read from its first font's name ("Noto Sans Bold Italic"). */
-export function fontOfStack(fontStack: readonly string[]): string {
+function fontOfStack(fontStack: readonly string[]): string {
   const name = (fontStack[0] ?? '').toLowerCase();
   const weight = String(WEIGHTS.find(([word]) => word.test(name))?.[1] ?? 400);
   return /italic|oblique/.test(name) ? `italic ${weight}` : weight;

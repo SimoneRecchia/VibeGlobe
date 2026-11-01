@@ -5,12 +5,12 @@ Items only the owner can provide or decide. Each lists the stub or default used 
 ## Open
 
 - **39. Six more orthophoto services, and Italy's AGEA imagery (ADR 0182, amendment of 2026-10-31 evening).**
-  Slovenia, Slovakia, Lithuania, Schleswig-Holstein, Bremen and Valle d'Aosta publish their orthophotos under open
-  licences that allow commercial use, but their layer names or endpoints could not be read: the container's network
-  policy refuses the provider hosts (`ipi.eprostor.gov.si`, `zbgisws.skgeodesy.sk`, `www.geoportal.lt`,
-  `service.gdi-sh.de`, `geodienste.bremen.de`, `geoservizi.regione.vda.it`, `geoportale.regione.vda.it`). Options:
-  (a) allow those hosts in the environment's network settings, and the next session reads their capabilities and adds
-  them; (b) the owner reads the six GetCapabilities documents and passes the layer names. Italy beyond Alto Adige needs
+  Slovenia, Lithuania, Schleswig-Holstein and Valle d'Aosta publish their orthophotos under open licences that allow
+  commercial use, but their layer names or endpoints could not be read: the container's network policy refuses the
+  provider hosts (`ipi.eprostor.gov.si`, `www.geoportal.lt`, `service.gdi-sh.de`, `geoservizi.regione.vda.it`,
+  `geoportale.regione.vda.it`); Slovakia and Bremen were confirmed and added on 2026-11-01 (F674). Options: (a) allow
+  those hosts in the environment's network settings, and the next session reads their capabilities and adds them; (b)
+  the owner reads the four GetCapabilities documents and passes the layer names. Italy beyond Alto Adige needs
   AGEA's 2022–2024 imagery (CC BY 4.0, downloads only) as the application's own package through `addSources`, or a
   region's WMS once one is relicensed. Until then they stay in `EXCLUDED_SOURCES`.
 

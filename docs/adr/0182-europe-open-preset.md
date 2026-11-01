@@ -280,3 +280,14 @@ no municipal borders, so a record may give a box instead of regions (`Orthophoto
 outside the city stay no data. The Emilia-Romagna region's own 2023–2024 flights over Bologna and Modena (CC BY 4.0)
 and its October 2024 flood flight cover cities or flooded areas only, through WMS services whose layers could not be
 read here.
+
+## Amendment, 2026-11-01 (later): Slovakia and Bremen
+
+Two of the services waiting for their layers (open question 39) were confirmed from independent sources. Slovakia's
+GKÚ Ortofotomozaika SR (CC BY 4.0, GKÚ's WMS page) is the WMS `zbgis_ortofoto_wms` with layer `1` in EPSG:3857 (the
+Spatineo directory's layer list and published GetMap requests), credited `© GKÚ Bratislava, NLC, Ortofotomozaika SR,
+CC BY 4.0` (`sk-gku-ortofoto`, 19). Bremen's DOP20 2023 (CC BY 4.0 since 2024, its INSPIRE record) is the WMS
+`wms_dop20_2023` with the layers `DOP20_2023_HB` and `DOP20_2023_BHV`, Bremen and Bremerhaven, in EPSG:3857 among
+others (`de-hb-dop20`, 19); a record's `layer` may now list layers separated by commas. Lithuania's Web Mercator cache
+is an ArcGIS cache whose levels start at Web Mercator's 7, and Schleswig-Holstein's and Slovenia's layers and Valle
+d'Aosta's service are still not confirmed.

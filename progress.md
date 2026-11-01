@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-01: Slovakia and Bremen join the orthophotos (F674)
+
+Two services of open question 39 were confirmed from independent sources and added: Slovakia's GKÚ Ortofotomozaika
+(WMS layer `1`, EPSG:3857, CC BY 4.0) and Bremen's DOP20 2023 with Bremerhaven (two WMS layers, CC BY 4.0). Slovenia,
+Lithuania (an ArcGIS cache whose levels start at 7), Schleswig-Holstein and Valle d'Aosta still wait for their layers.
+
 ## 2026-11-01: Bologna's orthophotos, Italy read a third time (owner's request)
 
 Italy's regions still publish no orthophoto service open for commercial use, AGEA's CC BY 4.0 imagery is downloads only,

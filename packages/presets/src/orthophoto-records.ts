@@ -9,6 +9,7 @@ export type OrthophotoService =
   | {
       readonly kind: 'wms';
       readonly url: string;
+      /** Its layer, or layers separated by commas. */
       readonly layer: string;
       /** A service without Web Mercator is asked in WGS84 (`EPSG:4326`). */
       readonly crs?: 'EPSG:4326';

@@ -142,6 +142,22 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     expect(bologna?.maxLevel).toBe(21);
   });
 
+  it('adds Slovakia and Bremen, asking Bremen and Bremerhaven together, each within its borders (F674)', async () => {
+    const { layers } = await europeOrthophotos();
+    // Level 14 over Bratislava, Bremen and Bremerhaven, and over Rome.
+    const slovakia = layers.find((l) => l.id === 'sk-gku-ortofoto')?.sources[0];
+    const bremen = layers.find((l) => l.id === 'de-hb-dop20')?.sources[0];
+    expect(slovakia?.request(tile(14, 8970, 5685), { ...out })).toMatchObject({
+      url: expect.stringContaining('zbgisws.skgeodesy.sk/zbgis_ortofoto_wms/service.svc/get'),
+    });
+    expect(slovakia?.request(tile(14, 8760, 6088), { ...out })).toBe('noData');
+    for (const at of [tile(14, 8592, 5331), tile(14, 8582, 5295)])
+      expect(bremen?.request(at, { ...out })).toMatchObject({
+        url: expect.stringContaining('LAYERS=DOP20_2023_HB,DOP20_2023_BHV'),
+      });
+    expect(bremen?.request(tile(14, 8760, 6088), { ...out })).toBe('noData');
+  });
+
   it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {
     const orthophotos = await europeOrthophotos();
     const tiers = new Map<string, string | undefined>();

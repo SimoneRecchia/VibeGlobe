@@ -115,3 +115,25 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
   it could write the sea transparent (WebP with alpha) and the decoder would need no land outline or color test; it
   needs a rebuilt package. Until then the lakes of the land outside Europe's countries (Turkey, North Africa) are keyed
   with the sea: `EUROPE_LAND` holds only Europe's countries.
+
+## Classic bugs of other engines, checked 2026-10-31
+
+Checked against VibeGlobe from the issue trackers of MapLibre, Cesium and deck.gl (`docs/known-bugs.md` has the ones
+found and fixed: TG-06, KB-313, KB-314). Not changed:
+
+- **Canvas readback noise in masked imagery (MapLibre #3110):** heightmaps read through a `VideoFrame` where the canvas
+  adds noise (KB-314); the masked imagery tiles of `@vibeglobe/sources/tile-mask` (track B's package) still read
+  pixels with `getImageData` for blank tiles and keyed masks, so a blank tile could show instead of being no data
+  there. The same check and `VideoFrame` read would fix it, in that package.
+- **Resize during a device or context loss (MapLibre #8837):** checked on both backends: a resize while the GPU
+  recovers draws the new size once recovered, without errors.
+- **Tiles answered with 204 or an empty body (Cesium #7914):** imagery and terrain treat them as no data
+  (`classifyTransportResult`), and so do vector tiles; they never keep the engine from going idle.
+
+## Benchmark frame timing (2026-11-01, KB-317)
+
+- **The drag benchmarks' CPU sample assumes the engine draws after its marker.** `startMeasuredLoop`
+  (`apps/playground/src/frame-loop.ts`) registers a marker before each move and stops at the engine's `frame` event;
+  when the engine requests its next frame itself (a `moveend` listener during user input, F200; a fade or a load), the
+  engine's frame runs before the marker and the sample spans a whole frame interval. Timing the engine's own frame
+  (its diagnostics timer, `PHASE_RENDER`) would remove the assumption, for pages that listen for `moveend` too.

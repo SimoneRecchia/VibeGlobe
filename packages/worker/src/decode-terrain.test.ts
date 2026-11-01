@@ -42,6 +42,48 @@ describe('decodeTerrain', () => {
     expect(plain.image.errorMeters).toBeLessThanOrEqual(5);
   });
 
+  it('reads heightmap pixels through a video frame where the canvas adds noise to them (fingerprinting protection, KB-314)', async () => {
+    const size = 16;
+    const close = vi.fn();
+    vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: size, height: size, close }));
+    // A canvas that never reads back what was drawn, as with Safari's private windows or Firefox's resistFingerprinting.
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return {
+            fillRect: () => undefined,
+            clearRect: () => undefined,
+            drawImage: () => undefined,
+            getImageData: (_x: number, _y: number, w: number, h: number) => ({
+              data: Uint8ClampedArray.from({ length: w * h * 4 }, (_, i) => (i * 7919) % 256),
+            }),
+          };
+        }
+      },
+    );
+    // Terrarium 132, 0, 0 is 1024 m; the frame holds it in BGRA order.
+    vi.stubGlobal(
+      'VideoFrame',
+      class {
+        readonly format = 'BGRA';
+        allocationSize = () => size * size * 4;
+        copyTo = (out: Uint8Array) =>
+          Promise.resolve(out.set(Array.from({ length: size * size }, () => [0, 0, 132, 255]).flat()));
+        close = vi.fn();
+      },
+    );
+    try {
+      const input = { bytes: new ArrayBuffer(8), encoding: 'terrarium', maxErrorMeters: 5, meshCells: 8 };
+      const { output } = await decodeTerrain(input, context);
+      const heights = (output as { image: { heightsMeters: Float32Array } }).image.heightsMeters;
+      expect(new Set(heights)).toEqual(new Set([1024]));
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('closes the bitmap of a heightmap it refuses (not square)', async () => {
     const close = vi.fn();
     vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: 4, height: 2, close }));

@@ -70,8 +70,6 @@ for (const backend of BACKENDS)
       page,
     }) => {
       test.setTimeout(180_000);
-      // KB-221: between its subdivision points (about 1 km apart) the fill is flat, and finer terrain shows through it.
-      test.fail(kind === 'polygons', 'KB-221');
       await openGlobe(page, `backend=${backend}&terrain=terrarium&scenario=draped-${kind}&lon=6.86&lat=45.75&zoom=4`);
       await page.waitForFunction(() => window.vibeglobeLayers !== undefined);
       // Samples along the line (45.83° N), and inside the polygon (6.7–7.0° E, 45.72–45.95° N) away from its edges.

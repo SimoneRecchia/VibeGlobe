@@ -7,7 +7,7 @@
  */
 import { rgba8Bytes } from '@vibeglobe/core/decoders';
 import { maskTile, type RgbaTile } from '@vibeglobe/sources/tile-mask';
-import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
+import { cancelled, inputWithBytes, TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
 /** Input of `decode-image`: encoded bytes (transferred to the worker) and their declared content type. */
 export interface DecodeImageInput {
@@ -32,26 +32,21 @@ export interface DecodedImage {
 
 /**
  * No orientation change beyond the file's own, no premultiplication and no color-space conversion: textures use
- * `flipY = false`, `premultiplyAlpha = false` and declare sRGB themselves (ADR 0010 §6).
+ * `flipY = false`, `premultiplyAlpha = false` and declare sRGB themselves (ADR 0010 §6), and heightmaps keep their
+ * file's bytes.
  */
-const DECODE_OPTIONS: ImageBitmapOptions = {
+export const DECODE_OPTIONS: ImageBitmapOptions = {
   imageOrientation: 'from-image',
   premultiplyAlpha: 'none',
   colorSpaceConversion: 'none',
 };
 
 function parseInput(input: unknown): DecodeImageInput {
-  if (typeof input !== 'object' || input === null) throw new TaskError('invalid-input', 'decode-image needs an object');
-  const { bytes, contentType } = input as Partial<Record<keyof DecodeImageInput, unknown>>;
-  if (!(bytes instanceof ArrayBuffer)) throw new TaskError('invalid-input', 'decode-image needs `bytes` (ArrayBuffer)');
-  if (typeof contentType !== 'string')
+  const parsed = inputWithBytes('decode-image', input);
+  if (typeof parsed['contentType'] !== 'string')
     throw new TaskError('invalid-input', 'decode-image needs `contentType` (string)');
   // `mask` and `blank` come from the engine, not from the tile's bytes.
-  return input as DecodeImageInput;
-}
-
-function cancelledError(): TaskError {
-  return new TaskError('cancelled', 'decode-image was cancelled');
+  return parsed as unknown as DecodeImageInput;
 }
 
 /**
@@ -64,18 +59,17 @@ export async function decodeImage(input: unknown, context: TaskContext): Promise
   const { bytes, contentType } = parsed;
   if (typeof createImageBitmap !== 'function')
     throw new TaskError('unsupported', 'createImageBitmap is not available in this context');
-  if (context.isCancelled()) throw cancelledError();
+  if (context.isCancelled()) throw cancelled('decode-image');
   let image: ImageBitmap | RgbaTile;
   try {
     image = await createImageBitmap(new Blob([bytes], { type: contentType }), DECODE_OPTIONS);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    const type = contentType === '' ? 'no content type' : contentType;
-    throw new TaskError('undecodable', `${bytes.byteLength} bytes (${type}) could not be decoded: ${reason}`);
+    const type = contentType || 'no content type';
+    throw new TaskError('undecodable', `${bytes.byteLength} bytes (${type}) could not be decoded: ${String(error)}`);
   }
   if (context.isCancelled()) {
     image.close();
-    throw cancelledError();
+    throw cancelled('decode-image');
   }
   if (parsed.mask || parsed.blank) {
     const masked = maskTile(image as ImageBitmap, parsed.blank, parsed.mask);

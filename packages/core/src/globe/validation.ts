@@ -243,10 +243,9 @@ export function validatePosition(position: unknown): void {
   // One check per field, no arrays: elevation queries validate every position and allocate nothing (F144). The checks
   // are inline: a double passed to a call the compiler does not inline is boxed, which a loaded machine shows.
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
-  if (typeof longitudeDeg !== 'number' || !Number.isFinite(longitudeDeg)) finite(longitudeDeg, 'longitudeDeg');
-  if (typeof latitudeDeg !== 'number' || !Number.isFinite(latitudeDeg)) finite(latitudeDeg, 'latitudeDeg');
-  if (heightMeters != null && (typeof heightMeters !== 'number' || !Number.isFinite(heightMeters)))
-    finite(heightMeters, 'heightMeters');
+  if (!Number.isFinite(longitudeDeg)) finite(longitudeDeg, 'longitudeDeg');
+  if (!Number.isFinite(latitudeDeg)) finite(latitudeDeg, 'latitudeDeg');
+  if (heightMeters != null && !Number.isFinite(heightMeters)) finite(heightMeters, 'heightMeters');
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',

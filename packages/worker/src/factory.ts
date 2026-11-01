@@ -48,7 +48,7 @@ function sameOriginUrl(raw: string): string {
   if (url.origin !== page.origin)
     throw new WorkerConfigError(
       'cross-origin-url',
-      `the worker URL ${url.href} is not on the page's origin ${page.origin}; serve the worker from the page's origin`,
+      `the worker URL ${url.href} is not on the page's origin ${page.origin}`,
     );
   return url.href;
 }
@@ -65,10 +65,7 @@ function workerCount(count: number | undefined): number {
 
 function describeError(event: Event, url: string): string {
   if (event instanceof ErrorEvent && event.message !== '') return event.message;
-  return (
-    `the worker program at ${url} failed to load: a wrong URL, a Content Security Policy that refuses it, ` +
-    'or an HTML page served in its place'
-  );
+  return `the worker program at ${url} failed to load (a wrong URL, a Content Security Policy, an HTML page instead)`;
 }
 
 function connect(

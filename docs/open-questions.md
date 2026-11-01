@@ -13,7 +13,10 @@ Items only the owner can provide or decide. Each lists the stub or default used 
   capabilities and adds them; (b) the owner reads the GetCapabilities documents and passes the layer names, and
   confirms Lithuania's licence with the NŽT. Italy beyond Alto Adige needs
   AGEA's 2022–2024 imagery (CC BY 4.0, downloads only) as the application's own package through `addSources`, or a
-  region's WMS once one is relicensed. Until then they stay in `EXCLUDED_SOURCES`.
+  region's WMS once one is relicensed. Until then they stay in `EXCLUDED_SOURCES`. 2026-11-01: the seven hosts are
+  still refused from a new session, and the OpenStreetMap editor layer index has for Slovenia, Slovakia and Lithuania
+  only community tile mirrors made for map editing (`gis.level2.si`, `ofmozaika.tiles.freemap.sk`, `ort10lt.openmap.lt`),
+  not the official services, and nothing for Schleswig-Holstein, Bremen or Valle d'Aosta.
 
 ## Pending owner steps
 

@@ -20,11 +20,12 @@ const clusterTask = lazyTable('cluster', () =>
 /** The built-in tasks: the basic ones and those of `@vibeglobe/layers` and `@vibeglobe/models` (ADR 0172). */
 export const TASKS: TaskTable = Object.freeze({
   ...BASIC_TASKS,
-  'cluster-load': clusterTask('cluster-load'),
-  'cluster-items': clusterTask('cluster-items'),
-  'cluster-expansion': clusterTask('cluster-expansion'),
-  'cluster-leaves': clusterTask('cluster-leaves'),
-  'cluster-destroy': clusterTask('cluster-destroy'),
+  ...Object.fromEntries(
+    ['load', 'items', 'expansion', 'leaves', 'destroy'].map((name) => [
+      `cluster-${name}`,
+      clusterTask(`cluster-${name}`),
+    ]),
+  ),
   'layout-vector-tile': lazyTable('vector-tile', () =>
     import('@vibeglobe/layers/vector-tiles').then((module) => module.VECTOR_TILE_TASKS),
   )('layout-vector-tile'),

@@ -8,12 +8,25 @@ test.use({ viewport: { width: 480, height: 360 } });
 
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 
+// `relief`: whether the view curves draw relief there (from ground zoom 10, `DEFAULT_VIEW_CURVES`; ground zoom does not
+// depend on latitude, ADR 0008: Mercator zoom 10 here is about ground zoom 10.5). Below, the surface is flat and no
+// terrain loads (KB-293): the ground picked is the ellipsoid, with no terrain data.
 const VIEWS = [
-  { name: 'globe', mode: 'auto', view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 3 } },
-  { name: '2D zoom 8', mode: '2d', view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 8 } },
-  { name: '2D zoom 10', mode: '2d', view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 10 } },
-  { name: 'tilted zoom 10', mode: '3d', view: { longitudeDeg: 6.86, latitudeDeg: 45.78, zoom: 10, tiltDeg: 50 } },
-  { name: 'tilted zoom 12', mode: '3d', view: { longitudeDeg: 7.0, latitudeDeg: 45.75, zoom: 12, tiltDeg: 45 } },
+  { name: 'globe', mode: 'auto', relief: false, view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 3 } },
+  { name: '2D zoom 8', mode: '2d', relief: false, view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 8 } },
+  { name: '2D zoom 10', mode: '2d', relief: true, view: { longitudeDeg: 6.86, latitudeDeg: 45.83, zoom: 10 } },
+  {
+    name: 'tilted zoom 10',
+    mode: '3d',
+    relief: true,
+    view: { longitudeDeg: 6.86, latitudeDeg: 45.78, zoom: 10, tiltDeg: 50 },
+  },
+  {
+    name: 'tilted zoom 12',
+    mode: '3d',
+    relief: true,
+    view: { longitudeDeg: 7.0, latitudeDeg: 45.75, zoom: 12, tiltDeg: 45 },
+  },
 ] as const;
 
 for (const backend of BACKENDS) {
@@ -22,7 +35,7 @@ for (const backend of BACKENDS) {
   }) => {
     test.setTimeout(120_000);
     await openGlobe(page, `backend=${backend}&terrain=terrarium&lon=6.86&lat=45.83&zoom=8`);
-    for (const { name, mode, view } of VIEWS) {
+    for (const { name, mode, relief, view } of VIEWS) {
       await page.evaluate(
         ({ mode, view }) => {
           const globe = window.vibeglobePlayground?.globe;
@@ -79,7 +92,7 @@ for (const backend of BACKENDS) {
       expect(results.length, name).toBeGreaterThan(3);
       for (const result of results) {
         if ('error' in result) throw new Error(`${name}: ${String(result.error)}`);
-        expect(result.noData, name).toBe(false);
+        expect(result.noData, name).toBe(!relief);
         // Within one screen pixel on the ground, and the terrain's height there within 2 m plus a pixel of 45° slope.
         expect(result.offMeters, `${name}: ${JSON.stringify(result)}`).toBeLessThanOrEqual(result.pixelMeters);
         expect(result.heightError, `${name}: ${JSON.stringify(result)}`).toBeLessThanOrEqual(2 + result.pixelMeters);

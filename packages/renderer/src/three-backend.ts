@@ -293,7 +293,7 @@ export class ThreeBackend implements RendererBackend {
   /** Compiles the surface pipelines before the first frame (ADR 0010 §4); `pipelineCompiles` counts from here. */
   private async warmUpPipelines(material = this.material): Promise<void> {
     const sky = this.atmosphere.skyMaterial;
-    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material]);
+    if (material) await warmUpPipelines(this.renderer, sky ? [material, sky] : [material], (r) => r === this.renderer);
     this.counters.resetCompiles();
   }
 
@@ -321,7 +321,8 @@ export class ThreeBackend implements RendererBackend {
       if (mesh) mesh.visible = false;
     }
     this.shownCount = 0;
-    this.tileTextures.refilterSome(this.renderer);
+    // Tiles made again with a new anisotropy, a few a frame: frames follow until all are (KB-315).
+    if (this.tileTextures.refilterSome(this.renderer) > 0) this.layers.contentReady?.();
     this.tileTextures.tones.frame(draws, this.tileTextures.imageOf);
     for (let i = 0; i < draws.count; i++) {
       const entry = this.tiles.getAt(draws.meshKeys, i);

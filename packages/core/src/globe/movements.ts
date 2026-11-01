@@ -191,7 +191,7 @@ export class Movements {
         center[1] = options.center.latitudeDeg * RAD;
       }
       rate = options?.degreesPerSecond ?? 10;
-      if (typeof rate !== 'number' || !Number.isFinite(rate))
+      if (!Number.isFinite(rate))
         throw new GlobeError('invalid-option', `degreesPerSecond must be finite, got ${String(rate)}`);
       validSignal(options?.signal);
     } catch (error) {
@@ -476,7 +476,7 @@ function rejected(error: unknown): CameraMovement {
 function validShape(options: MovementOptions | undefined): void {
   for (const key of ['speed', 'curve'] as const) {
     const value: unknown = options?.[key];
-    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0))
+    if (value !== undefined && !(Number.isFinite(value) && (value as number) > 0))
       throw new GlobeError(
         'invalid-option',
         `A movement's ${key} must be a finite number above 0, got ${String(value)}`,
@@ -493,12 +493,12 @@ function validShape(options: MovementOptions | undefined): void {
 /** A duration in milliseconds, 0 or more and finite, or undefined for the automatic one. */
 function validDuration(value: unknown): number | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+  if (!(Number.isFinite(value) && (value as number) >= 0))
     throw new GlobeError(
       'invalid-option',
       `A movement's durationMs must be finite and 0 or more, got ${String(value)}`,
     );
-  return value;
+  return value as number;
 }
 
 /** A movement that has already settled as 'completed': what a jump returns (F197, F200). */

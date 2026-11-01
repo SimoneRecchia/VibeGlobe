@@ -9,7 +9,8 @@
  */
 import { chooseGrid, decodeHeightmap, type HeightGrid } from '@vibeglobe/core/decoders';
 import { decodeQuantizedMesh, meshGridErrorMeters, rasterizeQuantizedMesh } from '@vibeglobe/core/decoders';
-import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
+import { DECODE_OPTIONS } from './decode-image.js';
+import { cancelled, inputWithBytes, TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 
 /** Input of `decode-terrain`. */
 interface DecodeTerrainInput {
@@ -26,13 +27,6 @@ const MAX_MESH_CELLS = 256;
 
 /** Output of `decode-terrain`: a {@link HeightGrid} whose heights are transferred. */
 type DecodedTerrain = HeightGrid & { readonly errorMeters: number; readonly metadata?: unknown };
-
-const DECODE_OPTIONS: ImageBitmapOptions = { premultiplyAlpha: 'none', colorSpaceConversion: 'none' };
-
-/** True for bytes that start with the gzip magic number. */
-function isGzip(bytes: Uint8Array): boolean {
-  return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
-}
 
 /**
  * The most bytes a gzip-compressed terrain tile may inflate to (F131: no unbounded allocation). Quantized-mesh tiles,
@@ -51,42 +45,30 @@ export async function gunzip(
   if (typeof DecompressionStream !== 'function')
     throw new TaskError('unsupported', 'DecompressionStream is needed for gzip-compressed terrain');
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
-  const chunks: Uint8Array[] = [];
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
   let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > limitBytes) {
-        await reader.cancel();
-        throw new TaskError('undecodable', `gzip-compressed terrain inflates beyond ${limitBytes} bytes`);
-      }
-      chunks.push(value);
+  // A corrupt stream rejects a read: `decodeTerrain` reports it as `undecodable`.
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limitBytes) {
+      await reader.cancel();
+      throw new TaskError('undecodable', `gzip-compressed terrain inflates beyond ${limitBytes} bytes`);
     }
-  } catch (error) {
-    if (error instanceof TaskError) throw error;
-    throw new TaskError('undecodable', `gzip-compressed terrain could not be inflated: ${String(error)}`);
+    chunks.push(value as Uint8Array<ArrayBuffer>);
   }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, at);
-    at += chunk.byteLength;
-  }
-  return out;
+  return new Uint8Array(await new Blob(chunks).arrayBuffer());
 }
 
 function parseInput(input: unknown): DecodeTerrainInput {
-  if (typeof input !== 'object' || input === null)
-    throw new TaskError('invalid-input', 'decode-terrain needs an object');
-  const { bytes, encoding, maxErrorMeters, meshCells } = input as Partial<Record<keyof DecodeTerrainInput, unknown>>;
-  if (!(bytes instanceof ArrayBuffer)) throw new TaskError('invalid-input', 'decode-terrain needs `bytes`');
+  const parsed = inputWithBytes('decode-terrain', input);
+  const { encoding, maxErrorMeters, meshCells } = parsed;
   if (encoding !== 'terrarium' && encoding !== 'terrain-rgb' && encoding !== 'quantized-mesh')
     throw new TaskError('invalid-input', 'decode-terrain needs a known `encoding`');
   if (typeof maxErrorMeters !== 'number' || typeof meshCells !== 'number')
     throw new TaskError('invalid-input', 'decode-terrain needs `maxErrorMeters` and `meshCells`');
-  return { bytes, encoding, maxErrorMeters, meshCells };
+  return parsed as unknown as DecodeTerrainInput;
 }
 
 /** The RGBA bytes of an encoded square image. */
@@ -100,16 +82,39 @@ async function imagePixels(bytes: ArrayBuffer): Promise<{ rgba: Uint8Array; size
     throw new TaskError('undecodable', `heightmap could not be decoded: ${String(error)}`);
   }
   const { width, height } = bitmap;
-  const context =
-    width === height ? new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true }) : null;
-  if (context) context.drawImage(bitmap, 0, 0);
-  // Closed on every path: a rejected tile's bitmap would otherwise wait for collection in the worker.
-  bitmap.close();
-  if (width !== height) throw new TaskError('undecodable', `heightmap is ${width} × ${height}, not square`);
-  if (!context) throw new TaskError('unsupported', 'no 2D context for heightmaps');
-  const data = context.getImageData(0, 0, width, height, { colorSpace: 'srgb' }).data;
-  return { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), sizePx: width };
+  try {
+    if (width !== height) throw new TaskError('undecodable', `heightmap is ${width} × ${height}, not square`);
+    const context = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
+    if (!context) throw new TaskError('unsupported', 'no 2D context for heightmaps');
+    if (exactReadback === undefined) {
+      context.fillRect(0, 0, 8, 8);
+      exactReadback = context.getImageData(0, 0, 8, 8).data.every((value, i) => value === (i % 4 > 2 ? 255 : 0));
+      context.clearRect(0, 0, 8, 8);
+    }
+    if (exactReadback) {
+      context.drawImage(bitmap, 0, 0);
+      const data = context.getImageData(0, 0, width, height).data;
+      return { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), sizePx: width };
+    }
+    const frame = new VideoFrame(bitmap, { timestamp: 0 });
+    const bgr = frame.format?.[0] === 'B';
+    const rgba = new Uint8Array(frame.allocationSize());
+    await frame.copyTo(rgba).finally(() => frame.close());
+    // A frame may hold the pixels as BGRA (a rare path: a view per pixel is cheap enough).
+    if (bgr) for (let i = 0; i < rgba.length; i += 4) rgba.subarray(i, i + 3).reverse();
+    return { rgba, sizePx: width };
+  } finally {
+    // Closed on every path: a rejected tile's bitmap would otherwise wait for collection in the worker.
+    bitmap.close();
+  }
 }
+
+/**
+ * Whether a canvas reads back exactly what was drawn (a black fill), checked once. Fingerprinting protection
+ * (Safari's private windows, Firefox's resistFingerprinting, Brave) adds noise to `getImageData`, which would turn
+ * heights into spikes (MapLibre #3110); the pixels then come from a `VideoFrame` copy, which it leaves alone (KB-304).
+ */
+let exactReadback: boolean | undefined;
 
 /** Decodes a terrain tile; fails with `undecodable` for bytes that are not a valid tile of their encoding. */
 export async function decodeTerrain(input: unknown, context: TaskContext): Promise<TaskOutput> {
@@ -118,7 +123,8 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
   try {
     if (encoding === 'quantized-mesh') {
       let raw: Uint8Array<ArrayBuffer> = new Uint8Array(bytes);
-      if (isGzip(raw)) raw = await gunzip(raw);
+      // The gzip magic number.
+      if (raw[0] === 0x1f && raw[1] === 0x8b) raw = await gunzip(raw);
       const mesh = decodeQuantizedMesh(raw);
       // From `meshCells` up to 256 cells, the first grid within the bound of every mesh vertex (F134, ADR 0028).
       let raster = rasterizeQuantizedMesh(mesh, meshCells);
@@ -127,7 +133,7 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
         raster = rasterizeQuantizedMesh(mesh, cells);
         errorMeters = meshGridErrorMeters(mesh, raster);
       }
-      grid = { ...raster, errorMeters, ...(mesh.metadata === undefined ? {} : { metadata: mesh.metadata }) };
+      grid = { ...raster, errorMeters, metadata: mesh.metadata };
     } else {
       const { rgba, sizePx } = await imagePixels(bytes);
       const pixels = decodeHeightmap(rgba, sizePx, encoding);
@@ -138,7 +144,7 @@ export async function decodeTerrain(input: unknown, context: TaskContext): Promi
     if (error instanceof TaskError) throw error;
     throw new TaskError('undecodable', error instanceof Error ? error.message : String(error));
   }
-  if (context.isCancelled()) throw new TaskError('cancelled', 'decode-terrain was cancelled');
+  if (context.isCancelled()) throw cancelled('decode-terrain');
   // Core's DecodedTile: a float32 texture of the grid's vertices, without mipmaps.
   const side = grid.cells + 1;
   const output = { widthPx: side, heightPx: side, gpuBytes: side * side * 4, image: grid };

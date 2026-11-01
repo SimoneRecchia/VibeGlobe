@@ -61,6 +61,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/** A task's input object with its `bytes` an `ArrayBuffer`; fails with `invalid-input` otherwise. */
+export function inputWithBytes(
+  task: string,
+  input: unknown,
+): Record<string, unknown> & { readonly bytes: ArrayBuffer } {
+  if (!isRecord(input) || !(input['bytes'] instanceof ArrayBuffer))
+    throw new TaskError('invalid-input', `${task} needs \`bytes\` (ArrayBuffer)`);
+  return input as Record<string, unknown> & { readonly bytes: ArrayBuffer };
+}
+
+/** The error of a task cancelled while it ran. */
+export const cancelled = (task: string): TaskError => new TaskError('cancelled', `${task} was cancelled`);
+
 /** Validates a message received from the main thread; anything else gives `undefined` and is ignored. */
 export function parseWorkerRequest(data: unknown): WorkerRequest | undefined {
   if (!isRecord(data) || typeof data['id'] !== 'number') return undefined;

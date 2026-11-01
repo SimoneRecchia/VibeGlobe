@@ -20,7 +20,7 @@ import {
   readKtx2,
 } from '@vibeglobe/core/decoders';
 import type { CompressedLevel, CompressedTileImage, Ktx2Info, Ktx2Target } from '@vibeglobe/core';
-import { TaskError, type TaskContext, type TaskOutput } from './protocol.js';
+import { cancelled, inputWithBytes, TaskError, type TaskContext, type TaskOutput } from './protocol.js';
 import { compileWasm } from './wasm.js';
 
 /** Input of `transcode-ktx2`: the file (transferred) and the compressed families the device decodes. */
@@ -63,14 +63,11 @@ const TRANSCODER_URL = new URL('../wasm/vibeglobe-basis.wasm', import.meta.url);
 const fetchTranscoder: TranscoderLoader = () => compileWasm(TRANSCODER_URL);
 
 function parseInput(input: unknown): TranscodeKtx2Input {
-  if (typeof input !== 'object' || input === null)
-    throw new TaskError('invalid-input', 'transcode-ktx2 needs an object');
-  const { bytes, formats } = input as Partial<Record<keyof TranscodeKtx2Input, unknown>>;
-  if (!(bytes instanceof ArrayBuffer))
-    throw new TaskError('invalid-input', 'transcode-ktx2 needs `bytes` (ArrayBuffer)');
+  const parsed = inputWithBytes('transcode-ktx2', input);
+  const { formats } = parsed;
   if (!Array.isArray(formats) || !formats.every((format) => typeof format === 'string'))
     throw new TaskError('invalid-input', 'transcode-ktx2 needs `formats` (string[])');
-  return { bytes, formats: formats as string[] };
+  return parsed as unknown as TranscodeKtx2Input;
 }
 
 function readOrFail(bytes: Uint8Array): Ktx2Info {
@@ -80,10 +77,6 @@ function readOrFail(bytes: Uint8Array): Ktx2Info {
     if (!(error instanceof Ktx2Error)) throw error;
     throw new TaskError(error.code === 'invalid' ? 'undecodable' : 'format-unsupported', error.message);
   }
-}
-
-function cancelled(): TaskError {
-  return new TaskError('cancelled', 'transcode-ktx2 was cancelled');
 }
 
 /** Copies the levels of a raw file whose blocks the device decodes as they are. */
@@ -120,7 +113,7 @@ function transcode(
     if (transcoder === 0) throw new TaskError('undecodable', 'the transcoder refused the file');
     const levels: CompressedLevel[] = [];
     for (let level = 0; level < levelCount; level++) {
-      if (context.isCancelled()) throw cancelled();
+      if (context.isCancelled()) throw cancelled('transcode-ktx2');
       const [widthPx, heightPx] = ktx2LevelSize(info.widthPx, info.heightPx, level);
       const length = ktx2LevelBytes(target, widthPx, heightPx);
       // Capacity in blocks, or in pixels for RGBA32.
@@ -160,8 +153,7 @@ export function createTranscodeKtx2(load: TranscoderLoader) {
       .catch((error: unknown) => {
         // A failed load (a reset connection) is not kept: the next KTX2 task loads it again (TH-01).
         instance = undefined;
-        const reason = error instanceof Error ? error.message : String(error);
-        throw new TaskError('format-unsupported', `the KTX2 transcoder could not be loaded: ${reason}`);
+        throw new TaskError('format-unsupported', `the KTX2 transcoder could not be loaded: ${String(error)}`);
       }));
 
   /**
@@ -176,14 +168,14 @@ export function createTranscodeKtx2(load: TranscoderLoader) {
     const target = chooseKtx2Target(info, formats);
     if (target === undefined)
       throw new TaskError('format-unsupported', `the device decodes none of the file's ${info.rawTarget} blocks`);
-    if (context.isCancelled()) throw cancelled();
+    if (context.isCancelled()) throw cancelled('transcode-ktx2');
     const gpuBytes = ktx2GpuBytes(info, target);
     const base = { widthPx: info.widthPx, heightPx: info.heightPx, gpuBytes };
     let levels: CompressedLevel[];
     if (info.kind === 'raw' && target !== 'rgba8') levels = passThrough(bytes, info, target);
     else if (info.kind === 'raw') levels = [rawRgba(bytes, info)];
     else levels = transcode(await transcoder(), bytes, info, target, target === 'rgba8' ? 1 : info.levelCount, context);
-    if (context.isCancelled()) throw cancelled();
+    if (context.isCancelled()) throw cancelled('transcode-ktx2');
     const transfer = levels.map((level) => level.data.buffer);
     if (target === 'rgba8') {
       const level = levels[0] as CompressedLevel;

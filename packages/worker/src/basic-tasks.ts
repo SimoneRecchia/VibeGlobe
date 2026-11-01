@@ -24,8 +24,7 @@ export const BASIC_TASKS: TaskTable = Object.freeze({
   'transcode-ktx2': lazyTable('ktx2', () =>
     import('./transcode-ktx2.js').then((module) => ({ 'transcode-ktx2': module.transcodeKtx2 })),
   )('transcode-ktx2'),
-  'parse-geojson': vectorTask('parse-geojson'),
-  'parse-kml': vectorTask('parse-kml'),
-  'parse-gpx': vectorTask('parse-gpx'),
-  'decode-mvt': vectorTask('decode-mvt'),
+  ...Object.fromEntries(
+    ['parse-geojson', 'parse-kml', 'parse-gpx', 'decode-mvt'].map((name) => [name, vectorTask(name)]),
+  ),
 });

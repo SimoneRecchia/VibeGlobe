@@ -118,15 +118,12 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 ## Classic bugs of other engines, checked 2026-10-31
 
 Checked against VibeGlobe from the issue trackers of MapLibre, Cesium and deck.gl (`docs/known-bugs.md` has the ones
-found and fixed: TG-06, KB-303). Not changed:
+found and fixed: TG-06, KB-303, KB-304). Not changed:
 
-- **Canvas readback noise (MapLibre #3110):** fingerprinting protection (Safari's private windows, Firefox's
-  `resistFingerprinting`, Brave) can add noise to `getImageData`, which the worker uses to read heightmap pixels
-  (`packages/worker/src/decode-terrain.ts`) and masked imagery tiles (`@vibeglobe/sources/tile-mask`): heights would
-  turn into spikes. Not verifiable here (Chromium reads back exactly). To check on the owner's devices with
-  `?terrain=terrarium`; if it shows, read the bitmap through a `VideoFrame` copy (RGBA or BGRA, swapped) once a fill
-  drawn on a canvas does not read back exactly. A version of it costs about 0.25 KB of the worker's 5 KB budget, which
-  has 0.05 KB left: room is needed first.
+- **Canvas readback noise in masked imagery (MapLibre #3110):** heightmaps read through a `VideoFrame` where the canvas
+  adds noise (KB-304); the masked imagery tiles of `@vibeglobe/sources/tile-mask` (track B's package) still read
+  pixels with `getImageData` for blank tiles and keyed masks, so a blank tile could show instead of being no data
+  there. The same check and `VideoFrame` read would fix it, in that package.
 - **Resize during a device or context loss (MapLibre #8837):** checked on both backends: a resize while the GPU
   recovers draws the new size once recovered, without errors.
 - **Tiles answered with 204 or an empty body (Cesium #7914):** imagery and terrain treat them as no data

@@ -152,6 +152,13 @@ await fitObjects(globe, [...turbines.framePositions(plantIds), ...tables.framePo
 });
 ```
 
+A panel over one side of the map, a detail panel on the left or a column of buttons on the right, takes a padding per
+side: the view frames in the part left visible, centered there, in one movement (F676):
+
+```ts
+await fitObjects(globe, farm.framePositions(['WTG 01']), { paddingPx: { top: 48, right: 120, bottom: 48, left: 460 } });
+```
+
 Framing the plant's own coordinates instead of its devices' frames one point: a fit never comes nearer than 100 m to
 what it frames (KB-301), but only the devices' boxes give the plant's width, depth and height.
 

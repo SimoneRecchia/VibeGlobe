@@ -22,6 +22,8 @@ export interface ViewCurves {
   readonly tilt: GroundZoomRange;
   /** The tilt Auto reaches at street scale, degrees, 45–60. */
   readonly autoTiltDeg: number;
+  /** The most relief any zoom or tilt shows, 0–1 (F678): 0 keeps the surface flat, a tilted view included. */
+  readonly maxRelief: number;
 }
 
 /** Partial curves for the options: every field not given keeps its default. */
@@ -30,6 +32,7 @@ export interface ViewCurvesInit {
   readonly relief?: Partial<GroundZoomRange>;
   readonly tilt?: Partial<GroundZoomRange>;
   readonly autoTiltDeg?: number;
+  readonly maxRelief?: number;
 }
 
 /**
@@ -41,6 +44,7 @@ export const DEFAULT_VIEW_CURVES: ViewCurves = Object.freeze({
   relief: Object.freeze({ startGroundZoom: 10, endGroundZoom: 15 }),
   tilt: Object.freeze({ startGroundZoom: 14, endGroundZoom: 16.5 }),
   autoTiltDeg: 50,
+  maxRelief: 1,
 });
 
 /** Lowest and highest automatic tilt, degrees (`PLAN.md`: 45–60°). */
@@ -71,12 +75,15 @@ export function validateViewCurves(init: ViewCurvesInit | undefined): ViewCurves
   const autoTiltDeg = init.autoTiltDeg ?? DEFAULT_VIEW_CURVES.autoTiltDeg;
   if (!(autoTiltDeg >= AUTO_TILT_RANGE_DEG[0] && autoTiltDeg <= AUTO_TILT_RANGE_DEG[1]))
     throw new GlobeError('invalid-option', `viewCurves.autoTiltDeg must be 45–60° (got ${String(autoTiltDeg)})`);
+  const maxRelief = init.maxRelief ?? 1;
+  if (!(maxRelief >= 0 && maxRelief <= 1))
+    throw new GlobeError('invalid-option', `viewCurves.maxRelief must be 0–1 (got ${String(maxRelief)})`);
   if (tilt.startGroundZoom < morph.endGroundZoom)
     throw new GlobeError(
       'invalid-option',
       `viewCurves: the tilt band (${String(tilt.startGroundZoom)}) must start after the morph band (${String(morph.endGroundZoom)})`,
     );
-  return Object.freeze({ morph, relief, tilt, autoTiltDeg });
+  return Object.freeze({ morph, relief, tilt, autoTiltDeg, maxRelief });
 }
 
 /**

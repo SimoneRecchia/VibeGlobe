@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-11-01: rows that pass through a panel, terrain switched off at any tilt (F677, F678, owner's request)
+
+An application's panel editor laid its rows at the phase that held the most panels, often half a row off the tables an
+aerial image showed: `layoutPanels` takes an `anchor`, a panel center its rows pass through (F677). Its terrain
+switch flattened the relief by moving the relief band out of reach, but a tilted view raises the relief by itself
+(ADR 0034), so the terrain stayed at 45°: `ViewCurves.maxRelief` caps the relief any zoom or tilt shows, and 0 keeps
+the surface flat (F678). The core entry stays under its budget after a trim: shared mesh-vertex writers, pure block
+formats, one Web Mercator latitude helper and a shared pool acquisition.
+
+## 2026-11-01: fits frame beside a panel, in one movement (F676, owner's request)
+
+An application with a detail panel over the map's left framed an asset across the whole canvas and then eased it
+beside the panel: the zoom overshot and the view slid sideways. `fitBounds` and `fitObjects` now take `paddingPx` per
+side (`{ top, right, bottom, left }`, MapLibre's shape, `ScreenInsets`): each zoom tried aims so the framed middle
+shows at the middle of the part the padding leaves, measured on screen from how it moves for a step east and north at
+its height (tilt and parallax counted), and the zoom found is the largest where everything shows inside that part. The
+follow-up of #91 is done.
+
 ## 2026-11-01: open known bugs and classic engine bugs (owner's request)
 
 The owner asked to close the open questions and known bugs, and to check other globe and map engines' classic bugs
@@ -18,7 +36,8 @@ KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-3
 (`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
 hosts are refused). Also fixed: `main`'s flaky allocation test (KB-312): V8 compiled the test's own driver, then engine functions, inside
 the sampled frames, because the single warm-up call had been optimized in place; the warm-up now runs in several calls
-and lets the background compiler finish (10 of 10 runs pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
+and lets the background compiler finish, a window over the limit gets a second one, and the wheel zoom's step no
+longer crosses a call as a double, which boxed it every frame (18 runs in a row pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
 for `moveend` with the tilt policy off too, which made the engine request every drag frame from inside the previous
 one, so the benchmark sampled frame intervals; they listen only while an API movement runs (F609: about 0 ms again).
 Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's desktop views).

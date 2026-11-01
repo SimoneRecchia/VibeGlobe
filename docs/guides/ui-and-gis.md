@@ -96,6 +96,9 @@ take the free place nearest to it, the others the next free places, so a list or
 stays together. `fixed` panels (locked, or being dragged) keep their places and the rest go around them. When the
 perimeters cannot hold every panel at its size, all shrink alike down to `minScale` (default 0.85); panels that still
 find no place come back undefined. A scanline over each row keeps it fast enough to run on every move of a panel.
+An `anchor` (a panel seen in an aerial image, or one already placed) lines the rows up with it, every place a whole
+number of steps away (F677); without one the rows take the phase that holds the most panels. Giving every panel its
+current place as `wanted`, in priority order, snaps them back onto even rows after a drag without any overlapping.
 
 ```ts
 import { gridLines, layoutPanels } from '@vibeglobe/gis';

@@ -2,10 +2,9 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { GlobeError } from './errors.js';
 import type { NetworkPool } from '../scheduler/network-pool.js';
-import { acquireWorkerPool } from '../scheduler/worker-pool.js';
 import type { WorkerPool, WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
-import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
+import { acquirePools, releaseNetworkPool } from './page-network.js';
 import type { CreditedSource } from '../imagery/credits.js';
 import { extensionCredits, type RuntimeCredits } from './runtime-credits.js';
 import type { FrameView, RendererBackend } from './types.js';
@@ -61,13 +60,7 @@ function extensionPools(
   if (!workers || !renderer) return undefined;
   let pools = ownPools.get(owner);
   if (!pools) {
-    const host = renderer.host;
-    pools = {
-      network: acquireNetworkPool(host),
-      lease: acquireWorkerPool(workers, {
-        timers: { set: (callback, delayMs) => host.setTimer(callback, delayMs), clear: (h) => host.clearTimer(h) },
-      }),
-    };
+    pools = acquirePools(workers, renderer.host);
     ownPools.set(owner, pools);
   }
   return pools;

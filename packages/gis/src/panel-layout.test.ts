@@ -86,6 +86,19 @@ describe('panel layout (F658)', () => {
     });
     expect(two.centers.some((c) => meters(must(c))[0] > 150)).toBe(true);
   });
+
+  it('lines the rows up with an anchor, every place a whole number of steps from it (F677)', () => {
+    const anchor = at(37.3, 41.7);
+    const layout = layoutPanels({ perimeters: [rectangle(100, 60)], count: 12, widthM: 10, depthM: 4, anchor });
+    const placed = layout.centers.filter((c): c is LonLat => c !== undefined);
+    expect(placed).toHaveLength(12);
+    for (const c of placed) {
+      const [x, y] = meters(c);
+      // Steps of 10.5 m along the rows (width and gap) and 8 m across them (depth and row gap), within a centimeter.
+      expect(Math.abs((x - 37.3) / 10.5 - Math.round((x - 37.3) / 10.5))).toBeLessThan(1e-3);
+      expect(Math.abs((y - 41.7) / 8 - Math.round((y - 41.7) / 8))).toBeLessThan(1e-3);
+    }
+  });
 });
 
 describe('panel layout at the size of a park (F658)', () => {

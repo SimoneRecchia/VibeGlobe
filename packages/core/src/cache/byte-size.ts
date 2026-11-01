@@ -20,15 +20,35 @@ export interface BlockFormat {
 export const RGBA8_BYTES_PER_TEXEL = 4;
 
 /** BC1 (S3TC DXT1): 4 × 4 texels in 8 bytes; the target for opaque ETC1S on devices with BC (ADR 0020 §3). */
-export const BC1_FORMAT: BlockFormat = Object.freeze({ blockWidthPx: 4, blockHeightPx: 4, bytesPerBlock: 8 });
+export const BC1_FORMAT: BlockFormat = /* @__PURE__ */ Object.freeze({
+  blockWidthPx: 4,
+  blockHeightPx: 4,
+  bytesPerBlock: 8,
+});
 /** BC7: 4 × 4 texels in 16 bytes. */
-export const BC7_FORMAT: BlockFormat = Object.freeze({ blockWidthPx: 4, blockHeightPx: 4, bytesPerBlock: 16 });
+export const BC7_FORMAT: BlockFormat = /* @__PURE__ */ Object.freeze({
+  blockWidthPx: 4,
+  blockHeightPx: 4,
+  bytesPerBlock: 16,
+});
 /** ETC2 RGB8: 4 × 4 texels in 8 bytes. */
-export const ETC2_RGB8_FORMAT: BlockFormat = Object.freeze({ blockWidthPx: 4, blockHeightPx: 4, bytesPerBlock: 8 });
+export const ETC2_RGB8_FORMAT: BlockFormat = /* @__PURE__ */ Object.freeze({
+  blockWidthPx: 4,
+  blockHeightPx: 4,
+  bytesPerBlock: 8,
+});
 /** ETC2 RGBA8 (with EAC alpha): 4 × 4 texels in 16 bytes. */
-export const ETC2_RGBA8_FORMAT: BlockFormat = Object.freeze({ blockWidthPx: 4, blockHeightPx: 4, bytesPerBlock: 16 });
+export const ETC2_RGBA8_FORMAT: BlockFormat = /* @__PURE__ */ Object.freeze({
+  blockWidthPx: 4,
+  blockHeightPx: 4,
+  bytesPerBlock: 16,
+});
 /** ASTC 4x4: 4 × 4 texels in 16 bytes. */
-export const ASTC_4X4_FORMAT: BlockFormat = Object.freeze({ blockWidthPx: 4, blockHeightPx: 4, bytesPerBlock: 16 });
+export const ASTC_4X4_FORMAT: BlockFormat = /* @__PURE__ */ Object.freeze({
+  blockWidthPx: 4,
+  blockHeightPx: 4,
+  bytesPerBlock: 16,
+});
 
 /** An uncompressed RGBA8 texel seen as a 1 × 1 block. */
 const RGBA8_TEXEL_BLOCK: BlockFormat = Object.freeze({

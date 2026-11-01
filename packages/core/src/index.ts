@@ -64,6 +64,7 @@ export type {
   RenderHost,
   ResourceCounts,
   ReloadOptions,
+  ScreenInsets,
   ScreenPoint,
   SurfaceStats,
   SurfaceTileInfo,

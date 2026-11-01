@@ -45,7 +45,8 @@ export interface ResidencyOptions {
   initialCapacity?: number;
 }
 
-function invalidBytes(name: string, bytes: number): never {
+/** Throws the RangeError of a byte count that is not a non-negative integer. */
+export function invalidBytes(name: string, bytes: number): never {
   throw new RangeError(`${name} must be a non-negative integer, got ${bytes}`);
 }
 

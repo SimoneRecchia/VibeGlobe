@@ -7,7 +7,7 @@
  */
 import type { Camera } from '../camera/camera.js';
 import { WGS84 } from '../geodesy/wgs84.js';
-import { WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
+import { mercatorRowLatitudeRad, WEB_MERCATOR_MAX_LATITUDE_RAD } from '../projections/web-mercator.js';
 import { MAX_TILE_LEVEL } from '../tiling/tile-key.js';
 import { cappedMercatorInto, wrapDeltaInto, type MorphFrame } from '../view/morph.js';
 import { fogVisibilityInto } from './fog.js';
@@ -116,13 +116,6 @@ const CAP_HEIGHT = Math.PI / 2 - MAX_LAT;
 /** A tile key unique across the three roots: `packTileKey` written out, since a key above 31 bits would be boxed. */
 export function quadtreeTileKey(root: number, level: number, x: number, y: number): number {
   return (((4 ** level - 1) / 3 + y * 2 ** level + x) * 3 + root) as number;
-}
-
-/** The latitude of a Web Mercator row edge, `row` of `rows` rows from the north (rows may be fractional). */
-function mercatorRowLatitudeRad(row: number, rows: number): number {
-  if (row <= 0) return MAX_LAT;
-  if (row >= rows) return -MAX_LAT;
-  return Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / rows)));
 }
 
 /**

@@ -261,6 +261,38 @@ describe('fitting bounds and tours (F176, F199)', () => {
     globe.destroy();
   });
 
+  it('frames in the part a padding per side leaves, centered there, in one movement (F676)', async () => {
+    const { globe, ticks } = await started({ longitudeDeg: 9.4, latitudeDeg: 45.1, zoom: 12, headingDeg: 30 });
+    const foot = { longitudeDeg: 9.4, latitudeDeg: 45.1, heightMeters: 70 };
+    const top = { ...foot, heightMeters: 220 };
+    const point = { westDeg: 9.4, eastDeg: 9.4, southDeg: 45.1, northDeg: 45.1 };
+    // A 300 px panel on the left and 60 px of buttons on the right: the part left runs from x 300 to 740.
+    const paddingPx = { top: 40, right: 60, bottom: 40, left: 300 };
+    for (const tiltDeg of [0, 50]) {
+      const movement = globe.fitBounds(point, {
+        include: [foot, top],
+        paddingPx,
+        tiltDeg,
+        movement: 'ease',
+        durationMs: 100,
+      });
+      ticks(30);
+      expect(await movement).toBe('completed');
+      const middle = globe.geoToScreen({ ...foot, heightMeters: 145 });
+      expect(Math.hypot((middle?.xPx ?? NaN) - 520, (middle?.yPx ?? NaN) - 300)).toBeLessThan(3);
+      for (const shown of [globe.geoToScreen(foot), globe.geoToScreen(top)]) {
+        expect(shown?.xPx).toBeGreaterThanOrEqual(299);
+        expect(shown?.xPx).toBeLessThanOrEqual(741);
+        expect(shown?.yPx).toBeGreaterThanOrEqual(39);
+        expect(shown?.yPx).toBeLessThanOrEqual(561);
+      }
+    }
+    await expect(globe.fitBounds(point, { paddingPx: { ...paddingPx, right: 500 } })).rejects.toMatchObject({
+      code: 'invalid-option',
+    });
+    globe.destroy();
+  });
+
   it.each([
     [30, 20],
     [-60, 0],

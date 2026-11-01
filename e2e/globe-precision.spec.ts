@@ -31,6 +31,8 @@ for (const backend of BACKENDS) {
   test(`tiles get no automatic matrix updates and textures upload only when scheduled on ${backend} (F052)`, async ({
     page,
   }) => {
+    // A small canvas: each wheel step waits for frames that a software GPU draws in proportion to its size (KB-241).
+    await page.setViewportSize({ width: 480, height: 360 });
     await openGlobe(page, `backend=${backend}&lon=10&lat=45&zoom=3`);
     await waitForIdle(page);
     const first = await stats(page);

@@ -141,7 +141,9 @@ for (const input of ['mouse', 'touch', 'keyboard'] as const)
       page,
       context,
     }) => {
-      test.setTimeout(180_000);
+      // Every control's flight in real time, then its tiles drawn by a software GPU at 1280 × 800: 1.8 min on a free
+      // machine, 5 min with the browser on one core, which a busy CI runner approaches (KB-241).
+      test.setTimeout(360_000);
       await context.grantPermissions(['geolocation']);
       await context.setGeolocation({ latitude: 45.07, longitude: 7.69, accuracy: 300 });
       // The Italian runs with reduced motion (quick fades), the English ones with every animation.

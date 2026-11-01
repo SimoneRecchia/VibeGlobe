@@ -420,8 +420,9 @@ for (const backend of BACKENDS) {
   test(`wheel zoom stays anchored at the cursor from orbit to about 1 m and back on ${backend} (F061)`, async ({
     page,
   }) => {
-    // 160 wheel steps, each drawn by a software rasterizer in CI.
+    // 160 wheel steps, each drawn by a software rasterizer in CI, in proportion to the canvas size (KB-241).
     test.setTimeout(180_000);
+    await page.setViewportSize({ width: 480, height: 360 });
     await openGlobe(page, `backend=${backend}&lon=9.19&lat=45.46&zoom=2`);
     // Down to 1 m with no distance kept from the surface (KB-300 keeps 40 m by default).
     await page.evaluate(() => window.vibeglobePlayground?.globe.setConstraints({ minSurfaceDistanceMeters: 0 }));

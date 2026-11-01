@@ -2096,6 +2096,14 @@ License: Public domain
 
 Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
 
+## configs/regions/world-land.geojson in @vibeglobe/tools
+
+The world's land without Antarctica, simplified to 0.01°, for the world-satellite build (land and sea levels); source: Natural Earth 1:50m land, https://www.naturalearthdata.com/
+
+License: Public domain
+
+Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
+
 ## src/starfield/bsc5-stars.bin in @vibeglobe/renderer
 
 The 9,096 stars of the Yale Bright Star Catalog, 5th revised edition (Hoffleit and Warren 1991), encoded for the space background (ADR 0181); source: Yale Bright Star Catalog (BSC5, NASA Astronomical Data Center and CDS catalog V/50) through the JSON conversion of https://github.com/brettonw/YaleBrightStarCatalog

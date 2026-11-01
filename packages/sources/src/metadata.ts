@@ -36,8 +36,6 @@ export interface ProviderProfile {
   readonly requiredAttribution?: Attribution;
   /** The terms allow drawing only: pixel readback, tile data, elevation sampling and picking are refused. */
   readonly displayOnly?: boolean;
-  /** Sessions are renewed after this many seconds. */
-  readonly sessionRenewalSeconds?: number;
   /** The ADR that records the reading of the provider's terms. */
   readonly termsAdr?: string;
   /** A warning about the provider's terms, which the engine logs once per instance (KB-PT-07, F267). */
@@ -80,25 +78,25 @@ export class SourceConfigError extends Error {
 }
 
 /**
- * A profile that applies every rule of both (F325, F326): the union of what they forbid, the lower concurrency and
- * renewal limits, cache headers respected when either asks. `outer`'s required credit leads; the adapter keeps the
- * inner one among its credits, so neither is lost.
+ * A profile that applies every rule of both (F325, F326): the union of what they forbid, the lower concurrency limit,
+ * cache headers respected and drawing only when either asks, both warnings. `outer`'s required credit leads; the
+ * adapter keeps the inner one among its credits, so neither is lost.
  */
 export function combineProfiles(inner: ProviderProfile, outer: ProviderProfile): ProviderProfile {
-  const lower = (a: number | undefined, b: number | undefined): number | undefined =>
-    a === undefined ? b : b === undefined ? a : Math.min(a, b);
-  const maxConcurrentRequests = lower(inner.maxConcurrentRequests, outer.maxConcurrentRequests);
-  const sessionRenewalSeconds = lower(inner.sessionRenewalSeconds, outer.sessionRenewalSeconds);
+  const limits = [inner.maxConcurrentRequests, outer.maxConcurrentRequests].filter((n) => n !== undefined);
   const requiredAttribution = outer.requiredAttribution ?? inner.requiredAttribution;
   const termsAdr = outer.termsAdr ?? inner.termsAdr;
+  // Dropping either would lift a rule of the provider's terms (KB-328).
+  const warning = [outer.warning, inner.warning].filter(Boolean).join(' ');
   return Object.freeze({
     id: `${outer.id}+${inner.id}`,
     forbids: new Set([...inner.forbids, ...outer.forbids]),
     respectCacheHeaders: inner.respectCacheHeaders || outer.respectCacheHeaders,
-    ...(maxConcurrentRequests === undefined ? {} : { maxConcurrentRequests }),
-    ...(sessionRenewalSeconds === undefined ? {} : { sessionRenewalSeconds }),
+    ...(limits.length > 0 ? { maxConcurrentRequests: Math.min(...limits) } : {}),
     ...(requiredAttribution ? { requiredAttribution } : {}),
+    ...(inner.displayOnly || outer.displayOnly ? { displayOnly: true } : {}),
     ...(termsAdr === undefined ? {} : { termsAdr }),
+    ...(warning ? { warning } : {}),
   });
 }
 

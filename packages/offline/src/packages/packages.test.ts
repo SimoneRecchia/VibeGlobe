@@ -462,4 +462,20 @@ describe('package credits (F306)', () => {
     expect(source.attribution ?? []).toEqual([]);
     (await manager.list()).forEach((p) => expect(p.licenses).toEqual(['ODbL-1.0']));
   });
+
+  it('reports browser storage that refuses an install as storage-unavailable (KB-326)', async () => {
+    const data = archive('1');
+    const manifest = await manifestOf('1', data);
+    const denied = new DOMException('storage was denied', 'SecurityError');
+    const refusing = {
+      open: () => {
+        throw denied;
+      },
+    } as unknown as IDBFactory;
+    const { manager } = setup(refusing);
+    const files = { 'rome.pmtiles': new Blob([data as Uint8Array<ArrayBuffer>]) };
+    const error = await manager.install({ manifest, files }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: 'PackageError', code: 'storage-unavailable' });
+    expect((error as Error).message).toContain('storage was denied');
+  });
 });

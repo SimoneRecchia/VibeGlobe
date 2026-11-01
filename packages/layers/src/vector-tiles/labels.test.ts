@@ -459,6 +459,46 @@ describe('glyph ranges that fail on the way (TG-04)', () => {
   });
 });
 
+describe('labels in the page font (F689)', () => {
+  it('draws every label locally in the page font, with the weight and style of its font stack, fetching no glyphs', () => {
+    const asked: string[] = [];
+    const fetchImpl = ((url: string) => {
+      asked.push(url);
+      return Promise.reject(new Error('offline'));
+    }) as typeof fetch;
+    const drawn: string[] = [];
+    const target = {
+      rasterizeGlyphs: (font: string, family: string, codes: readonly number[]) => {
+        drawn.push(`${font}|${family}|${codes.join(',')}`);
+        return codes.map((id) => ({ id, width: 1, height: 1, left: 0, top: 0, advance: 8, bitmap: new Uint8Array(1) }));
+      },
+    };
+    const source = new GlyphSource(
+      'https://g.test/{fontstack}/{range}.pbf',
+      fetchImpl,
+      () => undefined,
+      target,
+      undefined,
+      'system-ui',
+    );
+    const bold = ['Noto Sans Bold'];
+    source.need(bold, 'Ab');
+    expect(source.ready(bold, 'Ab')).toBe(true);
+    expect(source.ready(['Arial Unicode MS Italic'], 'A')).toBe(true);
+    expect(source.ready(['Noto Sans Semibold Italic'], 'A')).toBe(true);
+    expect(source.ready(['Noto Sans Regular'], 'A')).toBe(true);
+    expect(source.ready(bold, 'b')).toBe(true);
+    expect(drawn).toEqual([
+      '700|system-ui|65,98',
+      'italic 400|system-ui|65',
+      'italic 600|system-ui|65',
+      '400|system-ui|65',
+    ]);
+    expect(source.resolve(65, bold)?.fontStack).toBe('Noto Sans Bold');
+    expect(asked).toEqual([]);
+  });
+});
+
 describe('label opacity (KB-245)', () => {
   it('fades the halo with the text', () => {
     const layer = new StyleLayer({

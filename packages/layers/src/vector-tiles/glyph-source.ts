@@ -20,6 +20,25 @@ import type { VectorTileTarget } from './vector-target.js';
 /** The font stack name of locally drawn glyphs. */
 export const LOCAL_FONT_STACK = 'local';
 
+/** A font name's weight, by the word that names it (the first that matches). */
+const WEIGHTS: readonly (readonly [RegExp, number])[] = [
+  [/black|heavy/, 900],
+  [/(extra|ultra) ?bold/, 800],
+  [/(semi|demi) ?bold/, 600],
+  [/bold/, 700],
+  [/medium/, 500],
+  [/(extra|ultra) ?light/, 200],
+  [/light/, 300],
+  [/thin|hairline/, 100],
+];
+
+/** The CSS font style and weight of a font stack, read from its first font's name ("Noto Sans Bold Italic"). */
+export function fontOfStack(fontStack: readonly string[]): string {
+  const name = (fontStack[0] ?? '').toLowerCase();
+  const weight = String(WEIGHTS.find(([word]) => word.test(name))?.[1] ?? 400);
+  return /italic|oblique/.test(name) ? `italic ${weight}` : weight;
+}
+
 /** A glyph range that failed on the way is requested again after this long. */
 const GLYPH_RETRY_MS = 5_000;
 /**
@@ -44,7 +63,7 @@ export class GlyphSource {
   private readonly damaged = new Map<string, number>();
   /** Ranges requested and not arrived, those waiting to be requested again included. */
   private readonly unsettled = new Set<string>();
-  private readonly localTried = new Set<number>();
+  private readonly localTried = new Set<number | string>();
   private icons = new Map<string, SpriteImage>();
   /** The pixel ratio of the sprite loaded (1 or 2). */
   spriteRatio = 1;
@@ -57,6 +76,7 @@ export class GlyphSource {
     private readonly onChange: () => void,
     private readonly target: Pick<VectorTileTarget, 'rasterizeGlyphs'>,
     private readonly localFontFamily: string | undefined,
+    private readonly pageFontFamily?: string,
   ) {}
 
   /** Glyph ranges requested and not arrived yet, those that failed and wait to be requested again included. */
@@ -71,7 +91,7 @@ export class GlyphSource {
 
   /** Requests the ranges `text` needs in `fontStack` that are not loaded or loading. */
   need(fontStack: readonly string[], text: string): void {
-    if (this.glyphs === undefined) return;
+    if (this.glyphs === undefined || this.pageFontFamily !== undefined) return;
     for (const start of this.store.missingRanges(fontStack, text)) {
       const url = new URL(glyphUrl(this.glyphs, fontStack, start), globalThis.location?.href).href;
       if (this.pending.has(url)) continue;
@@ -108,6 +128,7 @@ export class GlyphSource {
    * (once each) when a local font family is configured.
    */
   ready(fontStack: readonly string[], text: string): boolean {
+    if (this.pageFontFamily !== undefined) return this.drawInPageFont(fontStack, text);
     if (this.glyphs !== undefined && this.store.missingRanges(fontStack, text).length > 0) return false;
     if (this.localFontFamily === undefined || this.target.rasterizeGlyphs === undefined) return true;
     const missing: number[] = [];
@@ -124,6 +145,26 @@ export class GlyphSource {
         new Map(glyphs.map((g) => [g.id, { ...g, bitmap: Uint8Array.from(g.bitmap) }])),
       );
     }
+    return true;
+  }
+
+  /** Draws the characters of `text` the font stack lacks in the page's font, with the stack's weight and style. */
+  private drawInPageFont(fontStack: readonly string[], text: string): boolean {
+    const family = this.pageFontFamily;
+    if (family === undefined || this.target.rasterizeGlyphs === undefined) return true;
+    const key = fontStack.join(',');
+    const missing: number[] = [];
+    for (const char of text) {
+      const code = char.codePointAt(0) ?? 0;
+      const tried = `${key}#${String(code)}`;
+      if (code > 0x20 && !this.localTried.has(tried)) {
+        this.localTried.add(tried);
+        missing.push(code);
+      }
+    }
+    if (missing.length === 0) return true;
+    const glyphs = this.target.rasterizeGlyphs(fontOfStack(fontStack), family, missing);
+    this.store.add(fontStack, -1, new Map(glyphs.map((g) => [g.id, { ...g, bitmap: Uint8Array.from(g.bitmap) }])));
     return true;
   }
 

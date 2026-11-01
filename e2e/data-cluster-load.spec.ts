@@ -1,7 +1,7 @@
 // F375: 500,000 clustered points load in a worker without blocking the main thread, and the engine stays responsive and
 // within its memory budgets through 60 seconds of panning and zooming. On the container's software GPU every frame is
 // itself a long task, so the 50 ms bound on long tasks applies on a reference device (`VIBEGLOBE_REFERENCE_DEVICE=1`,
-// docs/open-questions.md); elsewhere the longest task is logged.
+// docs/internal/open-questions.md); elsewhere the longest task is logged.
 import { expect, test } from '@playwright/test';
 import { openGlobe } from './support/globe.ts';
 

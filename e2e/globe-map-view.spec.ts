@@ -13,7 +13,7 @@ const DEG = Math.PI / 180;
 
 test.use({ viewport: { width: 320, height: 240 } });
 
-/** The Auto curves' defaults (docs/plan/m5-globe-map-3d.md, ADR 0008), re-derived here, not read from the engine. */
+/** The Auto curves' defaults (docs/internal/plan/m5-globe-map-3d.md, ADR 0008), re-derived here, not read from the engine. */
 function smootherstep(start: number, end: number, x: number): number {
   const t = x <= start ? 0 : x >= end ? 1 : (x - start) / (end - start);
   return t * t * t * (t * (t * 6 - 15) + 10);

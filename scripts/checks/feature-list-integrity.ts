@@ -46,7 +46,7 @@ export function findFeatureListViolations(base: FeatureList, current: FeatureLis
 }
 
 /**
- * Lists superseded entries that `record` (the text of docs/feature-changes.md) does not justify (ADR 0016): every
+ * Lists superseded entries that `record` (the text of docs/internal/feature-changes.md) does not justify (ADR 0016): every
  * superseded entry has a row `| F… | replacement ids | … |`, every row names a superseded entry, and its replacements
  * exist and are not superseded themselves.
  */
@@ -59,15 +59,16 @@ export function findSupersessionViolations(current: FeatureList, record: string)
   }
   for (const feature of current.features) {
     if (feature.status === 'superseded' && !rows.has(feature.id)) {
-      violations.push(`${feature.id}: superseded but not recorded in docs/feature-changes.md`);
+      violations.push(`${feature.id}: superseded but not recorded in docs/internal/feature-changes.md`);
     }
   }
   for (const [id, replacements] of rows) {
     const status = byId.get(id)?.status;
     if (status !== 'superseded') {
-      violations.push(`${id}: recorded in docs/feature-changes.md but its status is "${status ?? 'missing'}"`);
+      violations.push(`${id}: recorded in docs/internal/feature-changes.md but its status is "${status ?? 'missing'}"`);
     }
-    if (replacements.length === 0) violations.push(`${id}: no replacement recorded in docs/feature-changes.md`);
+    if (replacements.length === 0)
+      violations.push(`${id}: no replacement recorded in docs/internal/feature-changes.md`);
     for (const replacement of replacements) {
       const replacementStatus = byId.get(replacement)?.status;
       if (replacementStatus === undefined) violations.push(`${id}: replacement ${replacement} does not exist`);
@@ -82,7 +83,7 @@ export function findSupersessionViolations(current: FeatureList, record: string)
 const PENDING_HEADING = '## Pending owner steps';
 
 /**
- * Lists pending entries that docs/open-questions.md does not justify (ADR 0017): every pending entry has a row in the
+ * Lists pending entries that docs/internal/open-questions.md does not justify (ADR 0017): every pending entry has a row in the
  * "Pending owner steps" section naming the owner-only step, and every row there names a pending entry.
  */
 export function findPendingViolations(current: FeatureList, openQuestions: string): string[] {
@@ -90,7 +91,7 @@ export function findPendingViolations(current: FeatureList, openQuestions: strin
   const section = start === -1 ? '' : (openQuestions.slice(start).split(/\n## /)[0] ?? '');
   const listed = new Set([...section.matchAll(/^\|\s*(F\d+)\s*\|/gm)].map((match) => match[1] as string));
   const violations: string[] = [];
-  const where = 'under "Pending owner steps" in docs/open-questions.md';
+  const where = 'under "Pending owner steps" in docs/internal/open-questions.md';
   for (const feature of current.features) {
     if (feature.status === 'pending' && !listed.has(feature.id))
       violations.push(`${feature.id}: pending but not listed ${where}`);

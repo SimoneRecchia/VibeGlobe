@@ -8,7 +8,7 @@ title: The Europe preset
 terms allow commercial use and redistribution: `europeOpen(options)`. It returns base maps (Satellite, Hybrid, Map,
 Relief) and overlays (labels and borders, roads, 3D buildings, 3D terrain), each as a list of layers with
 pre-configured sources: their URL, coverage, levels, licence, exact attribution and the day their terms were read
-([ADR 0182](../adr/0182-europe-open-preset.md)). The credits of every visible source are shown together.
+([ADR 0182](../internal/adr/0182-europe-open-preset.md)). The credits of every visible source are shown together.
 
 The intended use is hybrid: the application publishes an offline package of Europe on its own server, up to a level it
 chooses, and the online sources add detail over land beyond it, tile by tile. The sea never loads online detail: it
@@ -40,7 +40,7 @@ globe created with imagery, so a globe that starts on Map or Relief is created w
 Low levels use Natural Earth (public domain, the base image) wherever nothing else is drawn. `preset.sources` lists
 every source in use with its terms, and `preset.excluded` the sources left out with the reason. Eleven national
 and regional orthophotos with verified terms come with `@vibeglobe/presets/orthophotos` (below); IGN BD ORTHO, PNOA,
-PDOK and others wait for their exact credit or endpoint ([open question 34](../open-questions.md)). An application whose
+PDOK and others wait for their exact credit or endpoint ([open question 34](../internal/open-questions.md)). An application whose
 own review allows them adds them with `addSources`.
 
 ## Landscape and its labels

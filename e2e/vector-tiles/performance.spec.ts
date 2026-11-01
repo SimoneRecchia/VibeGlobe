@@ -8,7 +8,7 @@ import { openVector, settle } from './support.ts';
 
 test.use({ viewport: { width: 480, height: 360 } });
 
-/** Vector tile main-thread time per frame while moving, p95 (ADR 0131; within the 6 ms frame of docs/plan/quality.md). */
+/** Vector tile main-thread time per frame while moving, p95 (ADR 0131; within the 6 ms frame of docs/internal/plan/quality.md). */
 const VECTOR_CPU_BUDGET_MS = 4;
 const LONG_TASK_MS = 50;
 

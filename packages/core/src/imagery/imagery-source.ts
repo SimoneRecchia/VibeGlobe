@@ -62,7 +62,7 @@ export const LOAD_PREFETCH = 2;
 export const LOAD_ALL = LOAD_KEEP_IN_MEMORY | LOAD_PREFETCH;
 
 /**
- * A tiled imagery source (docs/plan/api.md, M3 plan §2.2). Adapters such as `xyzImagery` in `@vibeglobe/sources`
+ * A tiled imagery source (docs/internal/plan/api.md, M3 plan §2.2). Adapters such as `xyzImagery` in `@vibeglobe/sources`
  * implement it; M7 adds provider profiles, authentication and chains.
  */
 export interface ImagerySource extends TileSource {

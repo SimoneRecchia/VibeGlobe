@@ -171,7 +171,7 @@ const lights = mercatorImage({
 
 ## Reprojection
 
-The engine draws Web Mercator and geographic tile pyramids. A service in another reference system, such as Italian data in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) or a custom WMTS tile matrix set, is reprojected on the client ([ADR 0039](../adr/0039-reprojection-and-tone-harmonization.md)): each engine tile asks for the source image covering it (a WMS GetMap, or the WMTS tiles composed in place) and warps it piecewise-affinely.
+The engine draws Web Mercator and geographic tile pyramids. A service in another reference system, such as Italian data in UTM zones 32N and 33N (EPSG:32632, EPSG:32633) or a custom WMTS tile matrix set, is reprojected on the client ([ADR 0039](../internal/adr/0039-reprojection-and-tone-harmonization.md)): each engine tile asks for the source image covering it (a WMS GetMap, or the WMTS tiles composed in place) and warps it piecewise-affinely.
 
 ```ts
 import { transformCoordinates } from '@vibeglobe/gis';
@@ -228,7 +228,7 @@ A view that reaches a cap stays a globe at every zoom (ADR 0008, update of 2026-
 
 ## Layer composition and source chains
 
-`createGlobe({ imagery })` takes layers bottom first. A layer is a source, or a chain of sources in priority order with its look: each tile comes from the first source that has it, and a source that fails (errors, timeouts, offline) leaves its tiles to the next one ([ADR 0038](../adr/0038-imagery-layer-stack.md)).
+`createGlobe({ imagery })` takes layers bottom first. A layer is a source, or a chain of sources in priority order with its look: each tile comes from the first source that has it, and a source that fails (errors, timeouts, offline) leaves its tiles to the next one ([ADR 0038](../internal/adr/0038-imagery-layer-stack.md)).
 
 ```ts
 import { createGlobe } from '@vibeglobe/core';
@@ -390,7 +390,7 @@ import { openStreetMapImagery } from '@vibeglobe/sources';
 const osm = openStreetMapImagery({ appName: 'My demo', appUrl: 'https://demo.example.com/' });
 ```
 
-**The OpenStreetMap Foundation's public tile servers are unsuitable for production products.** They run on donated capacity for light use only; the profile keeps at most two requests in flight, identifies the application on every request, forbids prefetch and offline packaging, and logs one warning when it is used ([ADR 0032](../adr/0032-openstreetmap-tile-usage-policy.md)). Products serve tiles built from an OpenStreetMap extract by the data pipeline (`vibeglobe-data`, see the hosting guide), with the attribution "© OpenStreetMap contributors" and no usage limits beyond their own servers'.
+**The OpenStreetMap Foundation's public tile servers are unsuitable for production products.** They run on donated capacity for light use only; the profile keeps at most two requests in flight, identifies the application on every request, forbids prefetch and offline packaging, and logs one warning when it is used ([ADR 0032](../internal/adr/0032-openstreetmap-tile-usage-policy.md)). Products serve tiles built from an OpenStreetMap extract by the data pipeline (`vibeglobe-data`, see the hosting guide), with the attribution "© OpenStreetMap contributors" and no usage limits beyond their own servers'.
 
 ### Self-hosted OpenStreetMap tiles
 

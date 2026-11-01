@@ -23,8 +23,8 @@ const percent = active.length === 0 ? 0 : (100 * passing) / active.length;
 
 console.log(`Passing:    ${passing}`);
 console.log(`Failing:    ${failing}`);
-console.log(`Pending:    ${pending} (waiting only for owner-only steps, docs/open-questions.md)`);
-console.log(`Superseded: ${superseded} (replaced by owner decisions, docs/feature-changes.md)`);
+console.log(`Pending:    ${pending} (waiting only for owner-only steps, docs/internal/open-questions.md)`);
+console.log(`Superseded: ${superseded} (replaced by owner decisions, docs/internal/feature-changes.md)`);
 console.log(`Total:      ${features.length} (${percent.toFixed(1)}% of the ${active.length} active entries passing)`);
 
 console.log('\nBy milestone (passing/active, pending, superseded):');

@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * The small typed interface through which data layers draw (docs/parallel-tracks.md, "Data layers track"). The layers
+ * The small typed interface through which data layers draw (docs/internal/parallel-tracks.md, "Data layers track"). The layers
  * package owns the feature data and decides what changed; the renderer owns GPU buffers and draws them. The main
  * session implements this interface in `@vibeglobe/renderer`; tests use `RecordingRenderTarget` (`@vibeglobe/layers/testing`).
  */
@@ -37,7 +37,7 @@ export interface TextMeasurer {
 }
 
 /**
- * A stand-in measurer until the renderer exposes its glyph metrics (docs/parallel-tracks.md, hook request): 0.6 em per
+ * A stand-in measurer until the renderer exposes its glyph metrics (docs/internal/parallel-tracks.md, hook request): 0.6 em per
  * character, 1.2 em high.
  */
 export const estimatedTextMeasurer: TextMeasurer = {

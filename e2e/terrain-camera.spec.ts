@@ -18,9 +18,9 @@ test.use({ viewport: { width: 480, height: 360 } });
 const BACKENDS = ['webgpu', 'webgl2'] as const;
 /** The playground's engine clock at 60 Hz: morphs advance one frame per drawn frame. */
 const CLOCK = 'clockStepMs=16.666666666666668';
-/** Main-thread time terrain may take per frame, p95 (docs/plan/quality.md, F134). */
+/** Main-thread time terrain may take per frame, p95 (docs/internal/plan/quality.md, F134). */
 const TERRAIN_CPU_BUDGET_MS = 2;
-/** Time 10,000 synchronous elevation queries may take, p95 (docs/plan/quality.md, F144). */
+/** Time 10,000 synchronous elevation queries may take, p95 (docs/internal/plan/quality.md, F144). */
 const QUERY_BUDGET_MS = 4;
 /** The playground's default clearance, meters (`terrainClearanceMeters`). */
 const CLEARANCE_METERS = 10;
@@ -149,7 +149,7 @@ test('10,000 synchronous elevation queries at random positions fit in a frame (F
   console.log(
     `10,000 queries: p50 ${quantile(warm, 0.5).toFixed(3)} ms, p95 ${quantile(warm, 0.95).toFixed(3)} ms; sorted ${JSON.stringify([...warm].sort((a, b) => a - b))}`,
   );
-  // Timings are gated on a real GPU only (ADR 0012, docs/plan/quality.md): on the software GPU its rendering threads
+  // Timings are gated on a real GPU only (ADR 0012, docs/internal/plan/quality.md): on the software GPU its rendering threads
   // share the CPU with the page, and the time is recorded (`npm run hardware-run` gates it).
   testInfo.annotations.push({ type: 'p95 ms per 10,000 queries', description: quantile(warm, 0.95).toFixed(3) });
   if (hardwareGpu()) expect(quantile(warm, 0.95)).toBeLessThanOrEqual(QUERY_BUDGET_MS);

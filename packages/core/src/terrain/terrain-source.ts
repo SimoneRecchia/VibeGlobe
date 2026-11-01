@@ -22,7 +22,7 @@ export type TerrainDecoder =
     };
 
 /**
- * A tiled terrain source (docs/plan/api.md, M4 plan): where its tiles come from, how they are cut and decoded, and
+ * A tiled terrain source (docs/internal/plan/api.md, M4 plan): where its tiles come from, how they are cut and decoded, and
  * what its heights are measured from. Adapters such as `terrariumTerrain` and `quantizedMeshTerrain` in
  * `@vibeglobe/sources` implement it; any other encoding implements it with a custom decoder (F132).
  */

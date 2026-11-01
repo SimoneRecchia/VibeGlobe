@@ -14,7 +14,7 @@ export interface ZoomControlOptions {
   readonly step?: number;
   /**
    * Zoom limits; the buttons are disabled at them, and at a limit the engine applies (a step that ends short of its
-   * target). Defaults 0 and 22, until the engine exposes its zoom constraints (F209; docs/parallel-tracks.md).
+   * target). Defaults 0 and 22, until the engine exposes its zoom constraints (F209; docs/internal/parallel-tracks.md).
    */
   readonly minZoom?: number;
   readonly maxZoom?: number;

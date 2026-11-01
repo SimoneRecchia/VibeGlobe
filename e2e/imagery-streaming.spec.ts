@@ -13,7 +13,7 @@ import {
 // Streaming over the software GPU is slow: the context set-up counts against the timeout too.
 test.describe.configure({ timeout: 120_000 });
 
-/** M3's streaming slice (docs/plan/m3-imagery-streaming.md, increment 3b) against the playground's fixture tiles. */
+/** M3's streaming slice (docs/internal/plan/m3-imagery-streaming.md, increment 3b) against the playground's fixture tiles. */
 
 const ROME = { lon: 12.5, lat: 41.9 };
 

@@ -1,5 +1,5 @@
 // A module worker that runs the vector adapters' worker tasks, for the test that parsing happens off the main thread
-// (F236–F239). The engine's own worker program registers the same table (docs/parallel-tracks.md).
+// (F236–F239). The engine's own worker program registers the same table (docs/internal/parallel-tracks.md).
 import { VECTOR_TASKS } from '@vibeglobe/sources/vector';
 
 interface Scope {

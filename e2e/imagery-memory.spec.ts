@@ -178,7 +178,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     }
     const timings = frames.map((frame) => frame.stats.uploadMsLastFrame).filter((ms) => ms > 0);
     console.log(`upload ms per frame on ${backend}: ${timings.map((ms) => ms.toFixed(1)).join(' ')}`);
-    // Every burst of arrivals drains within 15 frames (docs/plan/quality.md): no 16 frames in a row with a tile waiting.
+    // Every burst of arrivals drains within 15 frames (docs/internal/plan/quality.md): no 16 frames in a row with a tile waiting.
     let waiting = 0;
     for (const frame of frames) {
       waiting = frame.stats.uploadsPending > 0 ? waiting + 1 : 0;

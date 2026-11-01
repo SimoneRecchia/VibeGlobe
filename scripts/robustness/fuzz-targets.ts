@@ -52,8 +52,8 @@ export interface FuzzTarget {
   /** Slower than this is a hang. */
   readonly timeLimitMs: number;
   /**
-   * Open engine bugs this target finds (docs/known-bugs.md): failures matching them are logged, not failed, in the
-   * default run until the bug is fixed; `VIBEGLOBE_FUZZ_KNOWN_BUGS=1` fails on them too (docs/test-changes.md).
+   * Open engine bugs this target finds (docs/internal/known-bugs.md): failures matching them are logged, not failed, in the
+   * default run until the bug is fixed; `VIBEGLOBE_FUZZ_KNOWN_BUGS=1` fails on them too (docs/internal/test-changes.md).
    */
   readonly knownBugs?: readonly { readonly id: string; readonly pattern: RegExp }[];
 }

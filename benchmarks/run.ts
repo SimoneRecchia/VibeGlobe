@@ -47,7 +47,7 @@ const SCENARIOS: Record<string, string> = {
   // KB-210: a drag over a city with a vector style of roads and labels on imagery and terrain (the fixture streets style,
   // world imagery and Terrarium terrain from the local fixture server), at street level and tilted. Not in the budgets
   // yet: on a software GPU its first frame takes longer than this runner waits; run it with `--budgets` and a file that
-  // names it on a real GPU (docs/follow-ups.md).
+  // names it on a real GPU (docs/internal/follow-ups.md).
   'drag-vector-roads':
     '?scenario=drag&gpuTiming=1&backend=webgl2&vectorStyle=streets&imagery=world&terrain=terrarium&lon=9.19&lat=45.465&zoom=15&tilt=45',
   // ADR 0005: the fragment depth path may cost at most 1.25 times the clip-control path in GPU time.

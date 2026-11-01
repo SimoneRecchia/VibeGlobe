@@ -10,7 +10,7 @@ const coverageThresholds = JSON.parse(
 /**
  * Tests that count heap allocations by sampling (F064, KB-028): V8 coverage instrumentation changes how functions are
  * optimized, so their counts mean nothing under it. A coverage run leaves them out and `npm run coverage` runs them
- * after it, uninstrumented (docs/test-changes.md, 2026-10-22).
+ * after it, uninstrumented (docs/internal/test-changes.md, 2026-10-22).
  */
 const ALLOCATION_TESTS = [
   'packages/core/src/globe/frame-allocation.test.ts',

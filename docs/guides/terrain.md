@@ -49,7 +49,7 @@ node scripts/geoid-grid.ts convert egm2008-15m.txt egm2008-15m.bin
 node scripts/geoid-grid.ts check egm2008-15m.bin egm2008-reference.txt 1
 ```
 
-Checking a real EGM2008 grid against published undulations needs the dataset download, an owner step (`docs/open-questions.md`, F133).
+Checking a real EGM2008 grid against published undulations needs the dataset download, an owner step (`docs/internal/open-questions.md`, F133).
 
 ## Elevation queries
 
@@ -63,7 +63,7 @@ Every frame, the camera keeps the eye `terrainClearanceMeters` (default 10 m) ab
 ## Diagnostics
 
 - `globe.surfaceTiles()`: each tile's `terrainLevel` (an ancestor's while its own loads) and `terrainErrorPx`, which the selection keeps at or below 2 px (τ_terrain) above the source's last level (F126).
-- `globe.terrainStats()`: the terrain loader's counters, the bytes uploaded in the last frame against `uploadBudgetBytes`, and `msLastFrame`, the main-thread time the last frame spent on terrain (budget in `docs/plan/quality.md`, F134).
+- `globe.terrainStats()`: the terrain loader's counters, the bytes uploaded in the last frame against `uploadBudgetBytes`, and `msLastFrame`, the main-thread time the last frame spent on terrain (budget in `docs/internal/plan/quality.md`, F134).
 
 ## Picking terrain
 

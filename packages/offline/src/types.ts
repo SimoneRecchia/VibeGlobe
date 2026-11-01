@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Public types of the offline engine (docs/plan/api.md, "Loading policy and caches" and "Offline packages"; ADR 0033).
+ * Public types of the offline engine (docs/internal/plan/api.md, "Loading policy and caches" and "Offline packages"; ADR 0033).
  */
 
 /** Where tiles may come from: online only, offline only (never the network), or both (the default). */
@@ -29,7 +29,7 @@ export interface SwitchScope {
 }
 
 /**
- * What a provider's terms allow (docs/plan/api.md, `ProviderProfile`). Structurally the subset of the source adapters'
+ * What a provider's terms allow (docs/internal/plan/api.md, `ProviderProfile`). Structurally the subset of the source adapters'
  * `ProviderProfile` that this package enforces, so adapters' profiles can be passed as they are. A profile can only
  * switch features off (PLAN.md).
  */
@@ -64,7 +64,7 @@ export interface StorageUsage {
 }
 
 /**
- * A persistent tile store (docs/plan/api.md, `CacheStore`): a public extension point, so applications can plug in
+ * A persistent tile store (docs/internal/plan/api.md, `CacheStore`): a public extension point, so applications can plug in
  * their own. Keys are opaque strings. Implementations never throw for a full store: `put` resolves `'quota'` instead.
  */
 export interface CacheStore {
@@ -82,7 +82,7 @@ export interface CacheStore {
 /** Why a tile was requested. */
 export type RequestPurpose = 'visible' | 'prefetch' | 'package';
 
-/** What one request may use (docs/plan/api.md, `NetworkPolicy.resolve`). */
+/** What one request may use (docs/internal/plan/api.md, `NetworkPolicy.resolve`). */
 export interface PolicyDecision {
   useNetwork: boolean;
   readPackages: boolean;
@@ -99,7 +99,7 @@ export interface PolicyRequest {
 }
 
 /**
- * Decides, per request, which tiers may be used and whether the network may be touched (docs/plan/api.md). A public
+ * Decides, per request, which tiers may be used and whether the network may be touched (docs/internal/plan/api.md). A public
  * extension point; {@link defaultNetworkPolicy} resolves the mode, the switches and the provider rules.
  */
 export interface NetworkPolicy {

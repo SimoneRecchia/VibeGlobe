@@ -93,7 +93,7 @@ export interface HarnessConfig {
   readonly clockStepMs?: number;
   /**
    * Waits for the globe's `ready` (default true). A start with no reachable data for the pinned levels resolves it
-   * only once connectivity returns (docs/parallel-tracks.md, hook requests).
+   * only once connectivity returns (docs/internal/parallel-tracks.md, hook requests).
    */
   readonly awaitReady?: boolean;
   /** Memory budgets of the engine's GPU and RAM tiers. */

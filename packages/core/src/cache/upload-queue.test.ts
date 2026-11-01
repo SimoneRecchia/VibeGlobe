@@ -187,7 +187,7 @@ describe('UploadQueue budget (F101)', () => {
     }
     expect(last).toBeGreaterThan(0);
     expect(costModel.predictMs(349_524, false)).toBeCloseTo(0.05, 3);
-    // 200 arrivals drained within 15 frames (docs/plan/m3-imagery-streaming.md §3).
+    // 200 arrivals drained within 15 frames (docs/internal/plan/m3-imagery-streaming.md §3).
     expect(frames).toBeLessThanOrEqual(15);
   });
 

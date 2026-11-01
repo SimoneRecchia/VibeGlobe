@@ -1,6 +1,6 @@
 // The atmosphere (M11, F391–F396) on the atmosphere harness (e2e/support/atmosphere.html), on WebGPU and forced WebGL2:
 // sky, limb glow, continuity with altitude, tilt and morph, haze, fog visibility, sun lighting. The engine's own views
-// follow once the main session wires the atmosphere into the frame loop (docs/parallel-tracks.md, "Atmosphere hook").
+// follow once the main session wires the atmosphere into the frame loop (docs/internal/parallel-tracks.md, "Atmosphere hook").
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import {
@@ -49,7 +49,7 @@ function flight(frames: number): HarnessPose[] {
 const JUMP_LEVELS = 3;
 /**
  * A tile boundary whose brightness step stays under this many 8-bit luma levels is not distinguishable from its
- * neighbors (F394): about 1%, below what the seam detector of docs/plan/quality.md flags on imagery.
+ * neighbors (F394): about 1%, below what the seam detector of docs/internal/plan/quality.md flags on imagery.
  */
 const SEAM_LEVELS = 3;
 
@@ -150,7 +150,7 @@ for (const backend of BACKENDS) {
     });
 
     test(`F393: sky and haze stay continuous through the tilt and the morph to flat (${backend})`, async ({ page }) => {
-      // 69 frames: about 21 s locally, more than the default 30 s on CI's runner (docs/test-changes.md).
+      // 69 frames: about 21 s locally, more than the default 30 s on CI's runner (docs/internal/test-changes.md).
       test.setTimeout(60_000);
       // The tilt into the 3D view at 20 km, by 2° steps.
       const tilts: HarnessPose[] = [];

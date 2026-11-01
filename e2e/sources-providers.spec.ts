@@ -183,7 +183,7 @@ test.describe("a provider's required logo and credit (F255, F679)", () => {
     }
 
   test('stay visible when configuration or the page CSS tries to hide or cover them', async ({ page }) => {
-    // The regression test of TB-02 (docs/known-bugs.md): the logo inside the credits element stays pinned.
+    // The regression test of TB-02 (docs/internal/known-bugs.md): the logo inside the credits element stays pinned.
     await page.setViewportSize({ width: 800, height: 600 });
     await mountProvider(page, ['provider']);
     await expect.poll(() => credits(page)).toContainEqual({ text: 'Provider', shown: true, logo: 'shown' });

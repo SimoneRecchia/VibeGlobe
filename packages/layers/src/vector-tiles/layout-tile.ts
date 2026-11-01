@@ -432,7 +432,7 @@ function transfers(buckets: readonly Bucket[]): ArrayBuffer[] {
 /**
  * The worker task of vector tiles (ADR 0011): `layout-vector-tile` (`LayoutInput` → `Bucket[]`, typed arrays
  * transferred). It marks `vibeglobe:layout-vector-tile` in the worker's performance timeline (F443). The engine's
- * worker program registers this table (hook request in `docs/parallel-tracks.md`).
+ * worker program registers this table (hook request in `docs/internal/parallel-tracks.md`).
  */
 export const VECTOR_TILE_TASKS: TaskTable = Object.freeze({
   'layout-vector-tile': (input: unknown): TaskOutput => {

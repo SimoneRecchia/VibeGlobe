@@ -89,7 +89,7 @@ export function createAtmosphereUniforms(): AtmosphereUniforms {
 
 /** Brightness of the sunlight, which maps the model's radiance to display values with {@link toDisplay}. */
 const SUN_INTENSITY = 0.6;
-/** The surface brightness on the night side with sun lighting: dark, never black (`docs/plan/quality.md`). */
+/** The surface brightness on the night side with sun lighting: dark, never black (`docs/internal/plan/quality.md`). */
 const NIGHT_AMBIENT = 0.04;
 /** The ground color where a ray hits the ground and no tile is drawn (holes, below the horizon). */
 const GROUND_ALBEDO = 0.1;

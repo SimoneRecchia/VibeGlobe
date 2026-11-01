@@ -17,7 +17,7 @@ export interface AppliedQualitySettings extends QualitySettings {
 
 /**
  * The part of a `Globe` adaptive quality drives (its public API). `setQualitySettings` is the engine hook that
- * applies level of detail and effects (docs/parallel-tracks.md, "Hook requests"); until a globe has it, only the
+ * applies level of detail and effects (docs/internal/parallel-tracks.md, "Hook requests"); until a globe has it, only the
  * resolution scale changes, through `setResolutionScale`.
  */
 export interface QualityTarget {

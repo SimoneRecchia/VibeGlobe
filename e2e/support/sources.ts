@@ -1,6 +1,6 @@
 // A globe with one imagery source of `@vibeglobe/sources` mounted over the playground, for the source adapters
 // track's end-to-end tests. The playground stays as it is: the tests import the packages' sources through the Vite dev
-// server and use the engine through its public API only (docs/parallel-tracks.md).
+// server and use the engine through its public API only (docs/internal/parallel-tracks.md).
 import { resolve } from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import type * as CoreModule from '@vibeglobe/core';

@@ -1,6 +1,6 @@
 // The soak test (F509): randomized navigation (flights, eases, pans and zooms, view-mode changes, imagery and data
 // layer toggles) for `VIBEGLOBE_SOAK_MINUTES` on both backends: 6 minutes with small cache budgets in the default run,
-// 4 hours on the reference desktop for the entry (docs/hardening-backlog.md). The JS heap after a forced collection,
+// 4 hours on the reference desktop for the entry (docs/internal/hardening-backlog.md). The JS heap after a forced collection,
 // the engine's GPU bytes and the frame times are sampled every 15 s: no crash or console error, no upward heap trend
 // after the warm-up (every view visited once), GPU memory within its budget, and the late p95 frame time no worse than the early one.
 import { expect, test, type Page } from '@playwright/test';

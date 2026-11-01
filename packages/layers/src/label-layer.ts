@@ -12,7 +12,7 @@ import type { FeatureId } from './feature-store.js';
 
 /** Options of a label layer. */
 export interface LabelLayerOptions extends DataLayerOptions {
-  /** Glyph metrics for collision boxes; the renderer's measurer once it exists (docs/parallel-tracks.md). */
+  /** Glyph metrics for collision boxes; the renderer's measurer once it exists (docs/internal/parallel-tracks.md). */
   readonly measurer?: TextMeasurer;
   /** Placement interval, fade duration and padding. */
   readonly collision?: PlacementOptions;

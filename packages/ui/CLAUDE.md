@@ -11,4 +11,4 @@ Optional ready-made DOM controls, theming with CSS variables, English and Italia
 - `npm test` (root) runs this package's tests; tests sit next to the code as `*.test.ts`.
 - `npm run build` (root) builds it with `tsc -b` to `dist/` (ESM + declarations).
 
-See the root `CLAUDE.md` for the workflow and `docs/plan/architecture.md` for where this package fits.
+See the root `CLAUDE.md` for the workflow and `docs/internal/plan/architecture.md` for where this package fits.

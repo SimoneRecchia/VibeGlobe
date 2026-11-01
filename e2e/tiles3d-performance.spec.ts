@@ -2,7 +2,7 @@
 // flight) over the fixture city draws no hole and no black pixel after the root tile has loaded; its CPU frame times
 // are reported, and gated (p95 at most 16.7 ms) only on a real GPU (ADR 0012): the container's software GPU measures
 // the rasterizer, not the engine. The reference desktop and tablet runs and the benchmark history are the owner's
-// and the main session's (docs/open-questions.md, hook request E (5)).
+// and the main session's (docs/internal/open-questions.md, hook request E (5)).
 import { expect, test, type Page } from '@playwright/test';
 import { hardwareGpu } from '../scripts/browser/gpu-args.ts';
 import { canvasImage } from './support/globe.ts';

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 // ADR 0004 and 0005's GPU readback probes on every depth path: eye-relative vertices read back from an rgba32float
 // target against float64, the reassociation canary, and depth reconstructed from a float depth texture. The results
-// are printed, so the hardware run records them per device (docs/guides/hardware-testing.md).
+// are printed, so the hardware run records them per device (docs/internal/hardware-testing.md).
 
 const PATHS = [
   { name: 'webgpu', query: 'backend=webgpu', depthPath: 'reversed-z' },

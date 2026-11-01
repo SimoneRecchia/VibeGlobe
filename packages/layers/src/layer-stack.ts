@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * The stack of data layers (`globe.layers` in docs/plan/api.md): add, remove, reorder, show and hide at runtime, with
+ * The stack of data layers (`globe.layers` in docs/internal/plan/api.md): add, remove, reorder, show and hide at runtime, with
  * every change applied on the next frame. The stack owns the pick-slot table, so a picked id resolves to its layer
  * and feature (ADR 0029).
  */

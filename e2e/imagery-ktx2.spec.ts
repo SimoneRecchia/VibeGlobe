@@ -6,7 +6,7 @@ import { compareImages, CROSS_BACKEND } from './support/visual.js';
 
 /** F104: KTX2 imagery uploads in a compressed format where the device has one, and transcodes to RGBA8 elsewhere. */
 
-// Seven pages each stream 126 tiles to full detail; on the software GPU of CI that takes 3–5 minutes (docs/test-changes.md).
+// Seven pages each stream 126 tiles to full detail; on the software GPU of CI that takes 3–5 minutes (docs/internal/test-changes.md).
 test.describe.configure({ timeout: 360_000 });
 
 /** A view whose every tile is a Mercator tile of level 3: 256 px tiles with a full chain of 9 levels. */

@@ -29,9 +29,9 @@ controls; the test scenarios keep their own parameters ([apps/playground/CLAUDE.
 ## Documentation
 
 - [PLAN.md](PLAN.md): the owner's master brief.
-- [docs/plan/](docs/plan/README.md): technical plan (architecture, APIs, milestones, targets and testing).
-- [docs/adr/](docs/adr/README.md): architecture decisions.
-- [docs/research/](docs/research/README.md): research survey.
+- [docs/internal/plan/](docs/internal/plan/README.md): technical plan (architecture, APIs, milestones, targets and testing).
+- [docs/internal/adr/](docs/internal/adr/README.md): architecture decisions.
+- [docs/internal/research/](docs/internal/research/README.md): research survey.
 - [progress.md](progress.md): session log.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, with the [Developer Certificate of Origin](DCO.md) sign-off.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.

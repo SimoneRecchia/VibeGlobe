@@ -15,7 +15,7 @@ const SWITCH_NAMES: readonly LoadingSwitch[] = ['persistentCache', 'memoryReuse'
 
 /**
  * The loading switches set globally, per source and per layer (F290). The effective value for a source in a layer is
- * `global ∧ layer ∧ source ∧ profileAllows` (docs/plan/architecture.md §8): an override or a profile can only switch a
+ * `global ∧ layer ∧ source ∧ profileAllows` (docs/internal/plan/architecture.md §8): an override or a profile can only switch a
  * feature off where a wider setting has it on, and switching it back on restores the wider setting.
  */
 export class SwitchBoard {

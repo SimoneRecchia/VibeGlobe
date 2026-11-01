@@ -8,7 +8,7 @@ import { ATMOSPHERE_QUALITY } from './atmosphere-model.js';
 const OFF: RendererQuality = { anisotropy: 1, antialias: 'none', atmosphere: 'off', fog: true };
 
 /**
- * The atmosphere of a backend's scene (ADR 0040; the "Atmosphere hook" of docs/parallel-tracks.md): created while the
+ * The atmosphere of a backend's scene (ADR 0040; the "Atmosphere hook" of docs/internal/parallel-tracks.md): created while the
  * quality's atmosphere level is not 'off', its sky in the scene, its settings kept for a rebuild after a device loss,
  * and its frame from the engine's view, the globe's or, during the morph, blended toward the flat map (F393).
  */

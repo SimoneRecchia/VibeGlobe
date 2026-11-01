@@ -1,6 +1,6 @@
 // Anti-aliasing (M11, F397): terrain silhouettes, thin lines and extruded buildings have smooth edges on WebGPU and
 // forced WebGL2 (multisampling, ADR 0010), and a slow pan shows no edge shimmer. The cost of anti-aliasing within the
-// per-frame GPU budget is measured on real GPUs only (docs/hardening-backlog.md).
+// per-frame GPU budget is measured on real GPUs only (docs/internal/hardening-backlog.md).
 import { expect, test, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage, openGlobe, waitForIdle } from './support/globe.ts';

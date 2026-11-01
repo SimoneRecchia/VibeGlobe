@@ -15,6 +15,9 @@ benchmarks/results/ci-*/
 
 # Tarballs of a pre-release, rebuilt with npm run release:pack (release-0.1.0/README.md).
 release-*/*.tgz
+# Guides copied into @vibeglobe/core while it is packed (scripts/release/core-docs.ts).
+packages/core/docs/
+packages/core/llms.txt
 
 # Local build variables (keys of map providers): never committed.
 .env.local

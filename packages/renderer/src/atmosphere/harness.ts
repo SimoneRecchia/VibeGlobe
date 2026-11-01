@@ -3,7 +3,7 @@
 // The atmosphere harness (e2e/support/atmosphere.html installs it as `window.atmosphereHarness`), driven by the
 // atmosphere track's end-to-end tests. Test code, not exported by the package: it sits here because the end-to-end
 // TypeScript project cannot import the renderer's sources. Until the main session wires the atmosphere into the engine's frame loop
-// (docs/parallel-tracks.md, "Atmosphere hook"), it draws the WGS84 ellipsoid with the playground's base imagery the way
+// (docs/internal/parallel-tracks.md, "Atmosphere hook"), it draws the WGS84 ellipsoid with the playground's base imagery the way
 // the engine does (eye-relative vertices, reversed-Z, the engine's camera) and the atmosphere exactly as the hook
 // describes: the sky mesh in the scene, the surface color wrapped, `update` before each render.
 import { Camera, geodeticToEcef, MorphFrame, type CameraPose, type FrameView } from '@vibeglobe/core';
@@ -183,7 +183,7 @@ async function readFrame(canvas: HTMLCanvasElement): Promise<Frame> {
   return { widthPx: capture.widthPx, heightPx: capture.heightPx, base64: btoa(binary) };
 }
 
-/** The harness on a page: the ellipsoid with imagery, and the atmosphere wired as `docs/parallel-tracks.md` says. */
+/** The harness on a page: the ellipsoid with imagery, and the atmosphere wired as `docs/internal/parallel-tracks.md` says. */
 class HarnessPage implements AtmosphereHarness {
   private renderer: WebGPURenderer | undefined;
   private atmosphere: Atmosphere | undefined;

@@ -61,7 +61,7 @@ export interface EuropeOpenOptions {
   readonly packageManifestUrl?: string;
   /** The package's static tile folders (vector tiles, terrain for the hillshade); by default next to the manifest. */
   readonly packageBaseUrl?: string;
-  /** The deepest level each online source is asked for, by source id (`openfreemap`, `europe-terrain`, …). */
+  /** The deepest level asked of OpenFreeMap (`openfreemap`) and Mapterhorn (`europe-terrain`), by source id. */
   readonly onlineMaxLevel?: Readonly<Record<string, number>>;
   /** Source ids to leave out. */
   readonly exclude?: readonly string[];
@@ -115,7 +115,7 @@ export type PresetMode = 'online' | 'hybrid' | 'offline';
 export interface BaseMap {
   readonly id: 'satellite' | 'hybrid' | 'map' | 'landscape' | 'relief';
   readonly name: string;
-  /** The imagery layers (`Globe.imageryLayers.set`). */
+  /** The imagery layers: switching base maps removes the current ones and adds these (`Globe.imageryLayers.add`). */
   readonly imagery: readonly ImageryLayerOptions[];
   /** The vector style parts drawn over the imagery. */
   readonly style: StyleSelection;
@@ -154,7 +154,7 @@ export interface EuropePreset {
    * The `transformUrl` of `addVectorTiles` for the style's files in a mode: hybrid reads vector and hillshade tiles
    * from the package up to its levels, and over the sea always (a tile it does not hold is drawn from its nearest
    * ancestor), the network beyond on land; offline reads every file from the package's mirror of OpenFreeMap's
-   * style, fonts and sprites (`openfreemap/` next to the manifest) and every tile from the package.
+   * style, fonts and sprites (`openfreemap/` under `packageBaseUrl`) and every tile from the package.
    */
   transformUrl(mode: PresetMode): (url: string) => string;
   /**

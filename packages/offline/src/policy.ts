@@ -12,7 +12,7 @@ export interface PolicyInputs {
 }
 
 /**
- * The built-in {@link NetworkPolicy} (docs/plan/api.md): online only never reads packages (F291), offline only never
+ * The built-in {@link NetworkPolicy} (docs/internal/plan/api.md): online only never reads packages (F291), offline only never
  * touches the network (F292), hybrid uses both (F293); the persistent cache is read and written only where its switch
  * and the provider allow it (F280, F318), and prefetches never touch the network without the prefetch switch.
  */

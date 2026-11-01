@@ -1,6 +1,6 @@
 // The ui package mounted on the playground's globe, for the UI and GIS utilities track's end-to-end tests. The
 // playground stays as it is: the tests import the package's sources through the Vite dev server and use the engine
-// through its public API only (docs/parallel-tracks.md).
+// through its public API only (docs/internal/parallel-tracks.md).
 import { resolve } from 'node:path';
 import type { CDPSession, Page } from '@playwright/test';
 import type * as GisModule from '@vibeglobe/gis';

@@ -41,7 +41,10 @@ export interface RendererOptions {
    * decodes (default: all of them; [] forces RGBA8). For tests, and for drivers that emulate a family (ADR 0020).
    */
   readonly compressedTextures?: readonly string[];
-  /** The glTF loader for `Globe.addModel` (F361): `gltfLoader` from `@vibeglobe/renderer/gltf`; without it, no models. */
+  /**
+   * The glTF loader for `Globe.addModel` and for the model layers of `@vibeglobe/layers/models` (`ModelLayer`,
+   * `ModelSetLayer`): `gltfLoader` from `@vibeglobe/renderer/gltf`. Without it, loading a model fails.
+   */
   readonly gltf?: GltfLoaderFactory;
 }
 

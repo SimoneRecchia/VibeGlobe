@@ -1,7 +1,7 @@
 // Chromium flags for the browser tests and benchmarks. By default (ADR 0012), GPU-less machines render WebGL2 through
 // SwiftShader (ANGLE) and WebGPU through its SwiftShader adapter, so every test can choose a backend with
 // ?backend=webgpu or ?backend=webgl2. With VIBEGLOBE_HARDWARE_GPU=1 the machine's own GPU is used instead
-// (docs/guides/hardware-testing.md).
+// (docs/internal/hardware-testing.md).
 const SOFTWARE_GPU_ARGS = [
   '--use-angle=swiftshader',
   '--enable-unsafe-swiftshader',

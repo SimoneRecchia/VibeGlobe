@@ -31,7 +31,7 @@ export const OSM_PUBLIC_PROFILE: ProviderProfile = Object.freeze({
   respectCacheHeaders: true,
   maxConcurrentRequests: OSM_PUBLIC_MAX_CONCURRENT,
   requiredAttribution: { text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' },
-  termsAdr: 'docs/adr/0032-openstreetmap-tile-usage-policy.md',
+  termsAdr: 'docs/internal/adr/0032-openstreetmap-tile-usage-policy.md',
   warning: OSM_PUBLIC_WARNING,
 });
 
@@ -129,7 +129,7 @@ export const OSM_SELF_HOSTED_PROFILE: ProviderProfile = Object.freeze({
   forbids: new Set<never>(),
   respectCacheHeaders: true,
   requiredAttribution: OSM_ODBL_ATTRIBUTION,
-  termsAdr: 'docs/adr/0032-openstreetmap-tile-usage-policy.md',
+  termsAdr: 'docs/internal/adr/0032-openstreetmap-tile-usage-policy.md',
 });
 
 /** Options of {@link openStreetMapHostedImagery}: an XYZ source, and the commercial provider's profile if any. */

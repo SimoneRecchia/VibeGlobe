@@ -8,10 +8,10 @@ VibeGlobe must be the most optimized, glitch-free web globe engine we can build:
 
 This is the master brief for VibeGlobe: the implementing agent turns it into its own detailed technical plan, then builds everything in it, end to end.
 
-1. Read the whole document before writing any code. Then write your own detailed implementation plan in the repository (for example under `docs/plan/`): architecture, modules, data structures, public APIs and a task breakdown.
+1. Read the whole document before writing any code. Then write your own detailed implementation plan in the repository (for example under `docs/internal/plan/`): architecture, modules, data structures, public APIs and a task breakdown.
 2. The scope is everything in this document. Do not stop after a minimum viable product: complete every milestone until the Definition of done is met.
 3. The Fixed constraints are mandatory. Everything else (libraries, algorithms, formats, file layout, tooling) is your decision. The recommendations here record what was learned while planning: follow them unless you find a better option, and record why. The reasons behind the owner's decisions are in the Decision log.
-4. Record every significant decision as an Architecture Decision Record (for example `docs/adr/`): context, options considered, decision, consequences.
+4. Record every significant decision as an Architecture Decision Record (for example `docs/internal/adr/`): context, options considered, decision, consequences.
 5. Before building each subsystem, complete the Research survey for that area: study how the best-known open-source engines solve the problem, including their issue trackers, tests and benchmarks. Then design a solution that matches or beats them. Never copy code from any project.
 6. Verify each milestone against its acceptance criteria, with automated tests wherever possible, before moving on.
 7. Keep the session state described in Working method (feature list, progress notes, git history) up to date, so work can resume after any interruption.
@@ -144,7 +144,7 @@ How to study them:
 - **Code:** how each one solves the problem areas of this plan: precision, depth, terrain and imagery levels of detail, tile scheduling and caching, globe-to-flat transitions, camera control, picking, labels, atmosphere, GPU resource management, worker usage.
 - **Issue trackers:** their known bugs, glitches and performance complaints, so the same mistakes are avoided from day one.
 - **Tests and benchmarks:** how they test rendering, visual regressions and performance.
-- **Output:** a written survey per problem area in the repository (for example `docs/research/`): the approaches found, their trade-offs and known failure modes, the approach chosen and why. Update it whenever a new subsystem starts.
+- **Output:** a written survey per problem area in the repository (for example `docs/internal/research/`): the approaches found, their trade-offs and known failure modes, the approach chosen and why. Update it whenever a new subsystem starts.
 
 Rules: study only, never copy code. Only open-source projects are studied; source-available projects with restrictive licenses (for example Mapbox GL JS from version 2, or Unreal Engine) are excluded to avoid any license contamination.
 

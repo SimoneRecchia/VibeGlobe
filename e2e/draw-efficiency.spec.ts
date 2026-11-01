@@ -4,7 +4,7 @@ import { fixtureSession } from './support/imagery.js';
 
 /**
  * F103: one draw per surface tile (the documented batching factor), one shared surface pipeline, so draw calls follow
- * the drawn tiles plus the output pass and pipeline changes stay within the material variants (docs/plan/quality.md).
+ * the drawn tiles plus the output pass and pipeline changes stay within the material variants (docs/internal/plan/quality.md).
  */
 
 test.describe.configure({ timeout: 120_000 });

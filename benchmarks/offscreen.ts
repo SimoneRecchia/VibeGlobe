@@ -5,7 +5,7 @@
 // Results go to benchmarks/results/<device>/offscreen-<date>.json (device from VIBEGLOBE_DEVICE, default "local").
 // Options: --browser chromium|firefox|webkit (Playwright engines), --channel chrome|msedge (installed Chrome or Edge),
 // --hardware or VIBEGLOBE_HARDWARE_GPU=1 (the machine's GPU instead of the software GPU of GPU-less CI;
-// docs/guides/hardware-testing.md).
+// docs/internal/hardware-testing.md).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { release } from 'node:os';

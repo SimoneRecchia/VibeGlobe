@@ -66,7 +66,7 @@ export interface PackageManagerOptions {
   readonly onChange?: (event: { packageId: string; sourceIds: readonly string[] }) => void;
 }
 
-/** The package management API (docs/plan/api.md, `PackageManager`). */
+/** The package management API (docs/internal/plan/api.md, `PackageManager`). */
 export interface PackageManager {
   /** Resolves once installed packages are loaded and eviction is checked. */
   readonly ready: Promise<void>;

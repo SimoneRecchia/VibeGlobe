@@ -10,9 +10,11 @@ import { httpChunkLoader, IntegrityError, verifyingFetch, type ChunkLoader } fro
 import { type PackageStorage, versionKey } from './package-storage.js';
 
 /**
- * The PMTiles and MBTiles adapters of `@vibeglobe/sources` (F232, F233), passed in by the application: their
- * signatures, reduced to what packages use. `pmtilesImagery` and `mbtilesImagery` read raster packages; packages of
- * terrain or vector tiles need the adapters that accept any content (`(o) => pmtilesArchive(o, 'any')`, F328).
+ * The PMTiles and MBTiles adapters, passed in by the application: their signatures, reduced to what packages use.
+ * `pmtilesImagery` (from `@vibeglobe/sources`) and `mbtilesImagery` (from `@vibeglobe/sources/mbtiles`) read raster
+ * packages; packages of terrain or vector tiles need the variants that accept any content:
+ * `(o) => pmtilesArchive(o, 'any')` from `@vibeglobe/sources` and `(o) => mbtilesArchive(o, 'any')` from
+ * `@vibeglobe/sources/mbtiles`.
  */
 export interface ArchiveAdapters {
   pmtiles(options: { id: string; archive: string; fetch: typeof fetch }): Promise<TileSource>;

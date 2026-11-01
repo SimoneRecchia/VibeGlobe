@@ -44,7 +44,7 @@ for (const ratio of [1, 2]) {
     test.use({ deviceScaleFactor: ratio });
 
     test(`the ${ratio}x sprite is used and icons are sharp (F448)`, async ({ page }) => {
-      // Four times the pixels at ratio 2: CI's software GPU took over the default 30 s once (docs/test-changes.md).
+      // Four times the pixels at ratio 2: CI's software GPU took over the default 30 s once (docs/internal/test-changes.md).
       test.setTimeout(90_000);
       const sprites = requests(page, '/vector-tiles/sprite');
       await openVector(page, POIS);

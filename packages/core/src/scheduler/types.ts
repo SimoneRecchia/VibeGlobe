@@ -3,7 +3,7 @@
 import type { Attribution } from '../imagery/credits.js';
 /**
  * Contracts between the tile scheduler, the network transport, the worker pool and the caches (ADR 0007, ADR 0011,
- * docs/plan/m3-imagery-streaming.md §2.2). Core stays DOM-free: sources implement the transport with `fetch` and
+ * docs/internal/plan/m3-imagery-streaming.md §2.2). Core stays DOM-free: sources implement the transport with `fetch` and
  * `AbortController`, `@vibeglobe/worker` implements the worker endpoints.
  */
 

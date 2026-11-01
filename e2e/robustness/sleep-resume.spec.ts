@@ -3,7 +3,7 @@
 // requests in flight, the network down during the sleep (the browser's `offline` and `online` events) and its
 // connections dropped, the clock 5 minutes later on resume, and the GPU device or context lost on wake. On resume the
 // engine recovers its GPU state, re-checks connectivity, requests the view's tiles again and renders it at full detail,
-// without a reload. The real devices' sleep is a manual step (docs/hardening-backlog.md).
+// without a reload. The real devices' sleep is a manual step (docs/internal/hardening-backlog.md).
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ROME, sessionId } from '../network/support/network.ts';
 import { HEALTH } from '../network/support/scenarios.ts';

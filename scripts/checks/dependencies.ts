@@ -19,7 +19,7 @@ function allowedFramework(dir: string, name: string): boolean {
 }
 
 /**
- * Architecture dependency rules (docs/plan/architecture.md §1): no framework outside its adapter, nothing depends on
+ * Architecture dependency rules (docs/internal/plan/architecture.md §1): no framework outside its adapter, nothing depends on
  * the consumer application, the rendering library only inside the renderer, and core has no runtime dependencies.
  */
 export function findDependencyViolations(packages: WorkspacePackage[]): string[] {

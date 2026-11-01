@@ -7,7 +7,7 @@ import { outputMetadata } from '../output/metadata.js';
 import { PROVIDER_PROFILES } from './profiles.js';
 
 const docs = new URL('../../../../docs/', import.meta.url);
-const adr = readFileSync(new URL('adr/0025-default-data-licenses.md', docs), 'utf8');
+const adr = readFileSync(new URL('internal/adr/0025-default-data-licenses.md', docs), 'utf8');
 const licensesDoc = readFileSync(new URL('data-licenses.md', docs), 'utf8');
 const configs = readdirSync(CONFIG_DIR)
   .filter((f) => f.endsWith('.json') && !f.endsWith('.lock.json'))

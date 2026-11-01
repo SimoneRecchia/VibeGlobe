@@ -3,7 +3,7 @@
 /**
  * Vector format adapters as the data layers use them (F371): GeoJSON, KML and KMZ, and GPX through the M7 parsers of
  * `@vibeglobe/sources/vector` (ADR 0030). The parsers never throw: they keep the valid features and report the others
- * as issues. They run on the calling thread until the worker program registers `VECTOR_TASKS` (docs/parallel-tracks.md,
+ * as issues. They run on the calling thread until the worker program registers `VECTOR_TASKS` (docs/internal/parallel-tracks.md,
  * hook request of the source adapters track); Mapbox Vector Tiles are tiled data for the vector-tile layer (M13).
  */
 import {

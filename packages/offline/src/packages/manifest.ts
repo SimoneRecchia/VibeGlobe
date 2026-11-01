@@ -8,7 +8,7 @@ export interface PackageAttribution {
   readonly url?: string;
 }
 
-/** One source of a package (docs/plan/api.md, `OfflinePackageManifest`). */
+/** One source of a package (docs/internal/plan/api.md, `OfflinePackageManifest`). */
 export interface PackageSourceEntry {
   /** The engine source whose tiles the package holds. */
   readonly sourceId: string;

@@ -15,7 +15,7 @@ const VIEWS: readonly {
   drawCalls?: number;
   imagery?: boolean;
   crossBackend?: false;
-  /** Streams for longer than the default 60 s on the software GPU (docs/test-changes.md). */
+  /** Streams for longer than the default 60 s on the software GPU (docs/internal/test-changes.md). */
   slow?: true;
   /** Device pixel ratio of the capture (default 1). */
   dpr?: number;

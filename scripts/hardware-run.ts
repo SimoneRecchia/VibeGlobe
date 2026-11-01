@@ -1,4 +1,4 @@
-// Runs the GPU-dependent checks on a machine with a real GPU (docs/guides/hardware-testing.md, F075): the end-to-end
+// Runs the GPU-dependent checks on a machine with a real GPU (docs/internal/hardware-testing.md, F075): the end-to-end
 // tests of both backends, the scenario benchmarks and the OffscreenCanvas measurement (ADR 0019), all on the machine's
 // GPU. Everything lands in benchmarks/results/<device>/hardware-<date>/ with the device, OS, CPU, browser and GPU.
 // Usage: npm run test:hardware -- --device <name> [--browsers chromium,msedge,firefox,webkit] [--software]

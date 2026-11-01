@@ -5,11 +5,11 @@ description: Release the @vibeglobe packages: version bump, changelog, version t
 
 # Release
 
-Releases follow ADR 0171. One version for every published package (`packages/*` without `"private": true`), semantic versioning; a pre-release (`1.0.0-rc.1`) goes to the npm dist-tag `next`, a release to `latest`. Publishing is the owner's: it happens only in the release workflow's publish job, on `main`, after the owner approves it in the `npm-release` environment, with the `NPM_TOKEN` secret of that environment (docs/open-questions.md, question 17). An agent runs dry runs only and never publishes. Run every command from the repository root.
+Releases follow ADR 0171. One version for every published package (`packages/*` without `"private": true`), semantic versioning; a pre-release (`1.0.0-rc.1`) goes to the npm dist-tag `next`, a release to `latest`. Publishing is the owner's: it happens only in the release workflow's publish job, on `main`, after the owner approves it in the `npm-release` environment, with the `NPM_TOKEN` secret of that environment (docs/internal/open-questions.md, question 17). An agent runs dry runs only and never publishes. Run every command from the repository root.
 
 ## 0. Before a release
 
-- `npm run status`: the release gate (PLAN.md) is no open known bug (`docs/known-bugs.md`) and the milestone's entries passing or pending owner steps.
+- `npm run status`: the release gate (PLAN.md) is no open known bug (`docs/internal/known-bugs.md`) and the milestone's entries passing or pending owner steps.
 - `main` is green in CI, the working tree is clean (`git status`), and `npm run verify` passes.
 - Pick the version: breaking changes since the last tag (`git log v<last>..HEAD`, look for `!:` and `BREAKING CHANGE:`) raise the major (the minor before 1.0.0), features the minor, fixes the patch.
 
@@ -60,4 +60,4 @@ It installs the published packages from npm into a fresh project with no `.npmrc
 
 - A tag that already exists stops the run: versions are never reused. A failed publish after some packages went out is finished by re-running the publish job (npm refuses republishing an existing version, so publish the rest by hand from CI) or by releasing the next patch.
 - The dry run needs network access to the npm registry for `npm ci` and `npm publish --dry-run`; it needs no npm login.
-- Consumers using TypeScript install `@types/three` until `@vibeglobe/renderer` declares it (docs/parallel-tracks.md, hook request H (2)).
+- Consumers using TypeScript install `@types/three` until `@vibeglobe/renderer` declares it (docs/internal/parallel-tracks.md, hook request H (2)).

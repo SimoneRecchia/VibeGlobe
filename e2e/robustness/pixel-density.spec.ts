@@ -2,7 +2,7 @@
 // emulation, as when the window moves between a 1x and a 2x monitor), with labelled vector tiles in view. The canvas
 // takes the new resolution within one frame, no frame in between is blank, and the settled frame matches a page that
 // started at the new density. Headless emulation dispatches no media query events, so the spec delivers the ones a
-// real change dispatches; moving a real window between monitors is a manual step (docs/hardening-backlog.md).
+// real change dispatches; moving a real window between monitors is a manual step (docs/internal/hardening-backlog.md).
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { PNG } from 'pngjs';
 import { canvasImage } from '../support/globe.ts';

@@ -8,17 +8,14 @@ import { ROOT_DIR } from '../workspace.ts';
 const ALLOWED = [
   'PLAN.md',
   'feature_list.json',
-  'docs/feature-changes.md',
+  'docs/internal/feature-changes.md',
   // States PLAN.md's rule that nothing depends on Cube.
-  'docs/plan/architecture.md',
+  'docs/internal/plan/architecture.md',
   'scripts/release/check-cube.ts',
   'scripts/release/release.test.ts',
   'scripts/checks/dependencies.ts',
   'scripts/checks/checks.test.ts',
 ];
-/** Integration examples that name Cube as a consumer of the engine. */
-// The quickstart for the first consumer (owner, 2026-10-25) is one of them.
-const INTEGRATION_EXAMPLES = /^docs\/guides\/(?:integration|cube-quickstart)\.md$/;
 /** The product name, a package scope or repository of its owner (not "cube map" or "MeshoptCubeTest"). */
 const CUBE = /\b(?:Vireox|vireox|@vireox\/|Cube(?! ?maps?\b)(?=[\s.,;:)'"`]|$))/;
 
@@ -26,7 +23,7 @@ const CUBE = /\b(?:Vireox|vireox|@vireox\/|Cube(?! ?maps?\b)(?=[\s.,;:)'"`]|$))/
 export function cubeReferences(files: ReadonlyMap<string, string>): string[] {
   const found: string[] = [];
   for (const [path, content] of files) {
-    if (ALLOWED.includes(path) || INTEGRATION_EXAMPLES.test(path)) continue;
+    if (ALLOWED.includes(path)) continue;
     content.split('\n').forEach((line, index) => {
       if (CUBE.test(line)) found.push(`${path}:${index + 1}: ${line.trim()}`);
     });

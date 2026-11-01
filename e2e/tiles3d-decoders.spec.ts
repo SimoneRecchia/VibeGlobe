@@ -1,6 +1,6 @@
 // Compressed 3D Tiles content (F463): the fixture city compressed with Draco and meshopt and textured with KTX2
 // (ETC1S) draws without holes; decoder files load only when a tileset needs them, from the URL the page configures;
-// models decode in workers (the main thread's frame budget on a real GPU is in docs/hardening-backlog.md).
+// models decode in workers (the main thread's frame budget on a real GPU is in docs/internal/hardening-backlog.md).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';

@@ -333,12 +333,12 @@ function axesAt(view: FrameView): Float64Array {
 }
 
 /**
- * Writes a pose's transform at the last anchor into `out`: the local axes, then heading, pitch, roll and scale. glTF's
- * +Y is up and −Z is forward.
+ * Writes a pose's transform at the last anchor into `out`: the local axes, then heading, pitch, roll and scale. The
+ * model's +Y is up and its −Z faces north at heading 0.
  */
 function orient(out: Matrix4, axes: Float64Array, pose: ModelPose): void {
   const a = (i: number): number => axes[i] ?? 0;
-  // Model +X east, +Y up, +Z south (so −Z, glTF's forward, points north at heading 0).
+  // Model +X east, +Y up, +Z south, so −Z points north at heading 0.
   axesToModel.set(a(0), a(6), -a(3), 0, a(1), a(7), -a(4), 0, a(2), a(8), -a(5), 0, 0, 0, 0, 1);
   // Heading turns clockwise seen from above (about −Y), pitch raises the nose (about +X), roll lowers the right side.
   euler.set((pose.pitchDeg ?? 0) * RAD, -(pose.headingDeg ?? 0) * RAD, -(pose.rollDeg ?? 0) * RAD);

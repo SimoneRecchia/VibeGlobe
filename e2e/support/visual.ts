@@ -61,7 +61,7 @@ export async function expectMatchesBaseline(page: Page, testInfo: TestInfo, name
   // the hardware procedure) a mismatch is reported, not failed.
   const advisory = !process.env['CI'] && (baselineBrowserVersion() !== browser || hardwareGpu());
   if (!existsSync(path)) {
-    expect(advisory, `No baseline ${path}: run the "Visual baselines" workflow (docs/guides/visual-tests.md)`).toBe(
+    expect(advisory, `No baseline ${path}: run the "Visual baselines" workflow (docs/internal/visual-tests.md)`).toBe(
       true,
     );
     testInfo.annotations.push({ type: 'advisory', description: `no baseline for ${name} on this browser build` });

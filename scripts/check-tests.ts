@@ -1,6 +1,6 @@
 // Fails when tests were removed or quality gates loosened relative to a base revision (default HEAD; CI passes the
 // commit before the push or the pull request base): `--base <rev>`. Justified changes are listed in
-// docs/test-changes.md.
+// docs/internal/test-changes.md.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,7 +33,7 @@ function readAtBase(revision: string, path: string): string | undefined {
 
 const baseIndex = process.argv.indexOf('--base');
 const base = baseIndex === -1 ? 'HEAD' : (process.argv[baseIndex + 1] as string);
-const log = readFileSync(join(ROOT_DIR, 'docs/test-changes.md'), 'utf8');
+const log = readFileSync(join(ROOT_DIR, 'docs/internal/test-changes.md'), 'utf8');
 
 const baseTests = new Map(
   git('ls-tree', '-r', '--name-only', base)
@@ -61,7 +61,7 @@ for (const gate of GATES) {
 
 for (const violation of violations) console.error(violation);
 if (violations.length > 0) {
-  console.error('Record a justified change in docs/test-changes.md, or restore the test or gate.');
+  console.error('Record a justified change in docs/internal/test-changes.md, or restore the test or gate.');
   process.exit(1);
 }
 console.log(`Test guard OK against ${base} (${currentTests.size} test files).`);

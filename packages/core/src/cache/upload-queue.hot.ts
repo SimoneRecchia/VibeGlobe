@@ -11,7 +11,7 @@ import type { DecodedTile } from '../scheduler/types.js';
 import { UploadCostModel } from './upload-cost.js';
 import { grownArray } from '../collections/typed-arrays.js';
 
-/** Per-frame upload limits (ADR 0007 §Uploads, `docs/plan/quality.md`). */
+/** Per-frame upload limits (ADR 0007 §Uploads, `docs/internal/plan/quality.md`). */
 export interface UploadBudget {
   /** Predicted milliseconds of upload work per frame. */
   readonly maxMs: number;
@@ -19,7 +19,7 @@ export interface UploadBudget {
   readonly maxBytes: number;
 }
 
-/** The budget of `docs/plan/quality.md`: 2 ms and 8 MB (8,000,000 bytes, the stricter reading of "MB") per frame. */
+/** The budget of `docs/internal/plan/quality.md`: 2 ms and 8 MB (8,000,000 bytes, the stricter reading of "MB") per frame. */
 export const DEFAULT_UPLOAD_BUDGET: UploadBudget = Object.freeze({ maxMs: 2, maxBytes: 8_000_000 });
 
 /** Written into `measuredMs[0]` by an upload function that did not upload the tile (a refused admission). */

@@ -14,7 +14,7 @@ import { RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 export type ImageryBlend = 'normal' | 'multiply' | 'screen' | 'night';
 
 /**
- * An imagery layer of `GlobeOptions.imagery` (docs/plan/api.md, "Layer composition"): a chain of sources in priority
+ * An imagery layer of `GlobeOptions.imagery` (docs/internal/plan/api.md, "Layer composition"): a chain of sources in priority
  * order, each tile coming from the first source that has it (F247, F248), drawn with an opacity and a blend mode over
  * the layers below (F244, F246).
  */

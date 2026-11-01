@@ -106,9 +106,9 @@ describe('findSupersessionViolations', () => {
       feature('F003', { status: 'superseded' }),
     );
     expect(findSupersessionViolations(current, record)).toEqual([
-      'F002: superseded but not recorded in docs/feature-changes.md',
-      'F003: superseded but not recorded in docs/feature-changes.md',
-      'F001: recorded in docs/feature-changes.md but its status is "failing"',
+      'F002: superseded but not recorded in docs/internal/feature-changes.md',
+      'F003: superseded but not recorded in docs/internal/feature-changes.md',
+      'F001: recorded in docs/internal/feature-changes.md but its status is "failing"',
       'F001: replacement F003 is itself superseded',
       'F001: replacement F004 does not exist',
     ]);
@@ -117,7 +117,7 @@ describe('findSupersessionViolations', () => {
   it('rejects a recorded entry without a replacement', () => {
     const current = list(feature('F001', { status: 'superseded' }));
     expect(findSupersessionViolations(current, '| F001 | none | 2026-10-20 | Dropped |')).toEqual([
-      'F001: no replacement recorded in docs/feature-changes.md',
+      'F001: no replacement recorded in docs/internal/feature-changes.md',
     ]);
   });
 });
@@ -137,8 +137,8 @@ describe('findPendingViolations', () => {
 
   it('rejects unlisted pending entries and listed entries that are not pending', () => {
     expect(findPendingViolations(list(feature('F001'), feature('F002', { status: 'pending' })), questions)).toEqual([
-      'F002: pending but not listed under "Pending owner steps" in docs/open-questions.md',
-      'F001: listed under "Pending owner steps" in docs/open-questions.md but its status is "failing"',
+      'F002: pending but not listed under "Pending owner steps" in docs/internal/open-questions.md',
+      'F001: listed under "Pending owner steps" in docs/internal/open-questions.md but its status is "failing"',
     ]);
   });
 

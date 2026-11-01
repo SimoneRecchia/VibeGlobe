@@ -198,7 +198,7 @@ async function expectNoJitter(page: Page): Promise<void> {
 }
 
 test('no known bug is open at the end of milestone 2 (F078)', () => {
-  const rows = readFileSync(new URL('../docs/known-bugs.md', import.meta.url), 'utf8')
+  const rows = readFileSync(new URL('../docs/internal/known-bugs.md', import.meta.url), 'utf8')
     .split('\n')
     .filter((line) => /^\| KB-\d+/.test(line));
   expect(rows.length).toBeGreaterThan(0);

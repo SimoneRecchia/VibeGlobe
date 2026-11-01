@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Label placement and collision (F359, F360; docs/research/labels.md, ADR 0029). A placement pass runs at most every
+ * Label placement and collision (F359, F360; docs/internal/research/labels.md, ADR 0029). A placement pass runs at most every
  * `placementIntervalMs` (and at once when labels are added or removed): labels are tried in priority order (lower
  * `symbol-sort-key` first, then feature id, so the result never depends on input order), each kept only when its
  * screen box, padded, overlaps no box already kept; labels behind the globe or off screen are hidden. Between passes
@@ -16,13 +16,13 @@ import type { ScreenProjector, TextMeasurer } from './render-target.js';
 
 /** Placement settings. */
 export interface PlacementOptions {
-  /** Minimum time between placement passes (MapLibre uses 300 ms). */
+  /** Minimum time between placement passes, in milliseconds (default 300, as MapLibre). */
   readonly placementIntervalMs?: number;
-  /** Duration of a full fade in or out. */
+  /** Duration of a full fade in or out, in milliseconds (default 300). */
   readonly fadeDurationMs?: number;
-  /** Extra space kept free around each label, in CSS pixels. */
+  /** Extra space kept free around each label, in CSS pixels (default 2). */
   readonly paddingPx?: number;
-  /** Placement work allowed per frame, in milliseconds; a longer pass continues on the next frames. */
+  /** Placement work allowed per frame, in milliseconds (default 4); a longer pass continues on the next frames. */
   readonly budgetMs?: number;
 }
 

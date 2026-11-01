@@ -1,6 +1,6 @@
 // Quality presets and adaptive quality in the playground (M11, F399, F401; hook C (4) of the models and quality track):
 // `?quality=` applies @vibeglobe/quality's presets through `Globe.setQualitySettings`, `?gpuLoad=` injects a real GPU
-// load (full-screen passes). The reference-desktop frame times of F399 and F401 are owner steps (docs/open-questions.md).
+// load (full-screen passes). The reference-desktop frame times of F399 and F401 are owner steps (docs/internal/open-questions.md).
 import { expect, test, type Page } from '@playwright/test';
 import { QUALITY_PRESETS, type QualityChange, type QualityController } from '@vibeglobe/quality';
 import { openGlobe } from './support/globe.ts';

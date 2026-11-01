@@ -43,7 +43,8 @@ export interface Tiles3DOptions {
   readonly transport?: TileTransport;
   /**
    * A task table with `parse-model` (`createModelTasks()` of `@vibeglobe/models`), run on the main thread when the
-   * engine's worker program does not register the task yet (hook request E (1)); without it such tiles fail.
+   * engine's worker pool cannot run the task (no pool, or a worker program without it) and no `modelWorker` is given;
+   * without either, content then fails to decode.
    */
   readonly modelTasks?: TaskTable;
   /**
@@ -51,7 +52,10 @@ export interface Tiles3DOptions {
    * once a tileset with Draco content needs it (F463).
    */
   readonly dracoWasmUrl?: string;
-  /** A worker of the application's own running `parse-model`, used before `modelTasks` (hook request E (1)). */
+  /**
+   * A worker of the application's own running `parse-model`, used when the engine's worker pool cannot run the task,
+   * before `modelTasks`.
+   */
   readonly modelWorker?: ModelWorker;
   /** The provider profile: `displayOnly` refuses picking and every data access (F323, ADR 0031). */
   readonly profile?: CreditProfile;

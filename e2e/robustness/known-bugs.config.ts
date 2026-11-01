@@ -1,6 +1,6 @@
 // The robustness suite's specs of open engine bugs (track G, ADR 0161): `known-bugs/*.bug.ts`, which the default run
-// (`playwright.config.ts`, `*.spec.ts`) does not match. Each one fails until its bug in docs/known-bugs.md is fixed;
-// the fix renames it to `.spec.ts` (docs/test-changes.md).
+// (`playwright.config.ts`, `*.spec.ts`) does not match. Each one fails until its bug in docs/internal/known-bugs.md is fixed;
+// the fix renames it to `.spec.ts` (docs/internal/test-changes.md).
 // Run: `npx playwright test -c e2e/robustness/known-bugs.config.ts`.
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';

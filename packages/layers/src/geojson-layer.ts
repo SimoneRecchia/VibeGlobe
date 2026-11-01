@@ -1,8 +1,9 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * A layer that loads vector data (GeoJSON now; KML, GPX and MVT through the M7 adapters) from a URL, a File or memory
- * and draws each geometry family with its own batch: polygons at the bottom, lines above, points on top (F371).
+ * A layer that loads vector data (GeoJSON, KML and KMZ, or GPX, through its format adapter) from a URL, a File or
+ * memory and draws each geometry family with its own batch: polygons at the bottom, lines above, points on top. Mapbox
+ * Vector Tiles are for the vector-tile layer of `@vibeglobe/layers/vector-tiles`.
  */
 import { acquireWorkerPool, type WorkerEndpointFactory } from '@vibeglobe/core';
 import { DataLayer } from './data-layer.js';

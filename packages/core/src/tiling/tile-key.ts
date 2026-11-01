@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Packed tile keys (docs/plan/api.md, ADR 0006): one exact integer per tile of a quadtree pyramid, with the root it
+ * Packed tile keys (docs/internal/plan/api.md, ADR 0006): one exact integer per tile of a quadtree pyramid, with the root it
  * belongs to (0 Web Mercator or a source's own scheme, 1 north polar cap, 2 south polar cap). Keys stay exact doubles
  * up to level {@link MAX_TILE_LEVEL} for pyramids of at most two root tiles.
  */

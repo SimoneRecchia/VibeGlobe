@@ -1,7 +1,7 @@
 // 3D Tiles requests through the engine's request pool (F462): screen-center tiles first, at most the host's limit in
 // flight, requests the view stops needing cancelled during a flight, and loaded content kept within its budget by
 // LRU eviction during randomized navigation, evicted tiles loading again on return. The navigation runs
-// `TILES3D_NAVIGATION_S` seconds (default 60; the 10-minute run is in docs/hardening-backlog.md).
+// `TILES3D_NAVIGATION_S` seconds (default 60; the 10-minute run is in docs/internal/hardening-backlog.md).
 import { expect, test, type Page } from '@playwright/test';
 import { CITY, cityPoint, openCity, redraw, settleTiles, startCoverage, stopCoverage } from './support/tiles3d.ts';
 

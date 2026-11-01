@@ -48,7 +48,7 @@ export function isQuotaError(error: unknown): boolean {
   return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED';
 }
 
-/** Time limit of opening the database: some Safari builds never answer (docs/research/offline-and-network.md). */
+/** Time limit of opening the database: some Safari builds never answer (docs/internal/research/offline-and-network.md). */
 const OPEN_TIMEOUT_MS = 10_000;
 
 /** Opens (and creates or upgrades) the database. */

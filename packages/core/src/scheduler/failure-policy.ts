@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * Failure classes and retry rules of ADR 0007 (§Failures and timeouts; docs/plan/m3-imagery-streaming.md §3): which
+ * Failure classes and retry rules of ADR 0007 (§Failures and timeouts; docs/internal/plan/m3-imagery-streaming.md §3): which
  * transport results mean no data, which are worth a retry and when, and which are final. Classes are small integers so
  * the scheduler can keep them in its typed-array tile table; decisions are written into a caller-owned object.
  */
@@ -87,7 +87,7 @@ export function classifyTransportResult(result: TransportResult): FailureClass {
 }
 
 /**
- * The class of a payload the decoder rejected (docs/plan/m3-imagery-streaming.md §5, risk 9): bytes of a format the
+ * The class of a payload the decoder rejected (docs/internal/plan/m3-imagery-streaming.md §5, risk 9): bytes of a format the
  * source declared are corrupt; a content type it did not declare, or a format the browser cannot decode, is no data.
  */
 export function classifyDecodeFailure(formatDeclaredAndSupported: boolean): FailureClass {

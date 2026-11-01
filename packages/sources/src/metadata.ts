@@ -3,8 +3,8 @@
 import type { ImagerySource } from '@vibeglobe/core';
 
 /**
- * Source metadata that the frozen source contract (`ImagerySource`, docs/parallel-tracks.md) does not carry yet:
- * attribution and the provider profile (docs/plan/api.md, "Sources and provider profiles"). The adapters of this
+ * Source metadata that the frozen source contract (`ImagerySource`, docs/internal/parallel-tracks.md) does not carry yet:
+ * attribution and the provider profile (docs/internal/plan/api.md, "Sources and provider profiles"). The adapters of this
  * package return them as extra fields of the source object, so the engine can read them once it consumes them.
  */
 
@@ -15,7 +15,7 @@ export interface Attribution {
   readonly logo?: { readonly src: string; readonly alt: string };
 }
 
-/** The loading features a provider profile can switch off (docs/plan/api.md, "Loading policy and caches"). */
+/** The loading features a provider profile can switch off (docs/internal/plan/api.md, "Loading policy and caches"). */
 export interface LoadingSwitches {
   persistentCache: boolean;
   memoryReuse: boolean;

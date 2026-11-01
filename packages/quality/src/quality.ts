@@ -22,7 +22,7 @@ export interface AppliedQualitySettings extends QualitySettings {
  */
 export interface QualityTarget {
   readonly capabilities: CapabilityProfile | undefined;
-  on(event: 'frame' | 'idle', handler: (payload: { readonly frameNumber: number }) => void): () => void;
+  on(event: 'frame' | 'idle' | 'movestart' | 'move' | 'moveend', handler: (payload: unknown) => void): () => void;
   setResolutionScale(scale: number): void;
   requestRender(): void;
   setQualitySettings?(settings: AppliedQualitySettings): void;
@@ -41,7 +41,7 @@ export interface QualityOptions {
 }
 
 /** Why the quality changed. */
-export type QualityChangeReason = 'start' | 'preset' | 'lower' | 'raise';
+export type QualityChangeReason = 'start' | 'preset' | 'lower' | 'raise' | 'rest' | 'motion';
 
 /** A change of the applied quality. */
 export interface QualityChange {
@@ -98,6 +98,12 @@ function startPreset(
   return { preset: choice.preset, choice };
 }
 
+/**
+ * A camera with no movement for this long and this many frames rests, though frames go on (an animation): the preset
+ * shows in full. The frames keep a slow device's drag, whose frames can come without the input's next move, moving.
+ */
+const REST = { ms: 150, frames: 3 };
+
 class Quality implements QualityController {
   preset: QualityPresetName;
   choice: PresetChoice | undefined;
@@ -111,6 +117,13 @@ class Quality implements QualityController {
   private readonly governorOptions: GovernorOptions;
   /** The device pixel ratio at the start, which the levels' `maxPixelRatio` is measured against. */
   private readonly pixelRatio: number | undefined;
+  /** When a movement event last came, and the frames since; before the first, every frame is judged. */
+  private movedAtMs = Number.NEGATIVE_INFINITY;
+  private stillFrames = 0;
+  /** The rest of a camera that stopped just before the engine idled, due when no movement came for `REST.ms`. */
+  private restTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The camera rests: the preset shows in full and frames are not judged. */
+  private resting = false;
 
   constructor(
     private readonly target: QualityTarget,
@@ -125,18 +138,52 @@ class Quality implements QualityController {
     this.governor = new FrameTimeGovernor(this.ladder.length, this.governorOptions);
     this.settings = resolve(QUALITY_PRESETS[this.preset], target.capabilities, this.pixelRatio);
     this.unsubscribe = [
-      target.on('frame', () => {
-        if (!this.adaptive) return;
-        const decision = this.governor.frame(this.now());
-        if (decision) this.apply(decision.level, decision.direction);
+      target.on('frame', () => this.frame()),
+      target.on('idle', () => {
+        this.governor.idle();
+        this.restAfterIdle();
       }),
-      target.on('idle', () => this.governor.idle()),
+      target.on('movestart', () => this.move()),
+      target.on('move', () => this.move()),
+      target.on('moveend', () => this.move()),
     ];
     this.apply(0, 'start');
   }
 
   get level(): number {
     return this.governor.level;
+  }
+
+  private frame(): void {
+    if (!this.adaptive || this.resting) return;
+    const still = ++this.stillFrames >= REST.frames && this.now() - this.movedAtMs >= REST.ms;
+    if (still && this.movedAtMs > Number.NEGATIVE_INFINITY) return this.rest();
+    const decision = this.governor.frame(this.now());
+    if (decision) this.apply(decision.level, decision.direction);
+  }
+
+  // A still view is drawn once, so its cost does not matter: it turns sharp the moment the camera stops.
+  private rest(): void {
+    if (this.resting || !this.adaptive) return;
+    this.resting = true;
+    if (this.governor.level > 0) this.apply(0, 'rest');
+  }
+
+  private restAfterIdle(): void {
+    if (this.movedAtMs === Number.NEGATIVE_INFINITY || this.resting) return;
+    const waitMs = REST.ms - (this.now() - this.movedAtMs);
+    if (waitMs <= 0) return this.rest();
+    clearTimeout(this.restTimer);
+    this.restTimer = setTimeout(() => this.restAfterIdle(), waitMs);
+  }
+
+  private move(): void {
+    this.movedAtMs = this.now();
+    this.stillFrames = 0;
+    clearTimeout(this.restTimer);
+    if (!this.resting) return;
+    this.resting = false;
+    if (this.adaptive && this.governor.level > 0) this.apply(this.governor.level, 'motion');
   }
 
   private apply(level: number, reason: QualityChangeReason): void {
@@ -176,6 +223,7 @@ class Quality implements QualityController {
   }
 
   destroy(): void {
+    clearTimeout(this.restTimer);
     for (const stop of this.unsubscribe) stop();
     this.handlers.clear();
   }
@@ -184,8 +232,10 @@ class Quality implements QualityController {
 /**
  * Applies a quality preset to a globe and, unless `adaptive` is false, adapts it to the frame time (F399–F402): it
  * measures the interval between drawn frames, lowers one ladder step ({@link adaptiveLadder}) when frames stay slow
- * and raises one step back once they are fast for the governor's stable interval. Create it after `globe.ready`, so
- * the 'auto' preset reads the device's capabilities; an explicit preset overrides detection.
+ * and raises one step back once they are fast for the governor's stable interval. The lowered level applies while the
+ * camera moves: once it rests (the engine idles, or no movement event came for 150 ms while frames go on, as an
+ * animation draws them, three frames at least) the preset shows in full, and the next movement brings the level back at once (F688). Create it after
+ * `globe.ready`, so the 'auto' preset reads the device's capabilities; an explicit preset overrides detection.
  */
 export function createQuality(target: QualityTarget, options: QualityOptions = {}): QualityController {
   return new Quality(target, options);

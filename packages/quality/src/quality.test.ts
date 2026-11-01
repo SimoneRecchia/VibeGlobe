@@ -1,5 +1,5 @@
 import type { Globe } from '@vibeglobe/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createQuality,
   QUALITY_PRESETS,
@@ -128,5 +128,56 @@ describe('createQuality', () => {
     expect(quality.level).toBe(0);
     quality.destroy();
     expect(globe.listeners()).toBe(0);
+  });
+
+  it('shows the preset in full once the camera rests, and the lowered level again from its next movement (F688)', () => {
+    const handlers = new Map<string, Set<() => void>>();
+    const state = { clockMs: 0, scales: [] as number[] };
+    const target: QualityTarget = {
+      capabilities: DESKTOP,
+      on: (event, handler) => {
+        const set = handlers.get(event) ?? new Set();
+        handlers.set(event, set);
+        const h = (): void => handler({ frameNumber: 0 });
+        set.add(h);
+        return () => set.delete(h);
+      },
+      setResolutionScale: (scale) => state.scales.push(scale),
+      requestRender: () => undefined,
+    };
+    const emit = (event: string): void => handlers.get(event)?.forEach((h) => h());
+    // Each frame of a drag carries its own movement, as the controls send it; still frames carry none.
+    const frames = (ms: number, count: number, moving: boolean): void => {
+      for (let i = 0; i < count; i++) {
+        state.clockMs += ms;
+        if (moving) emit(i % 2 ? 'moveend' : 'movestart');
+        emit('frame');
+      }
+    };
+    const quality = createQuality(target, { preset: 'high', now: () => state.clockMs });
+    frames(30, 200, true);
+    const level = quality.level;
+    expect(level).toBeGreaterThan(0);
+    const lowered = state.scales.at(-1);
+    expect(lowered).toBeLessThan(1);
+    // Very slow frames of a drag keep it: each carries a movement.
+    frames(400, 3, true);
+    expect(state.scales.at(-1)).toBe(lowered);
+    // Still frames (inertia over, an animation drawing) show the preset in full from 150 ms on, keep the level and
+    // lower nothing; an idle engine does too.
+    frames(30, 4, false);
+    expect(state.scales.at(-1)).toBe(lowered);
+    frames(30, 100, false);
+    expect([state.scales.at(-1), quality.level]).toEqual([1, level]);
+    // The next movement brings the level back at once; an engine idling within 150 ms of it rests once they passed.
+    emit('movestart');
+    expect(state.scales.at(-1)).toBe(lowered);
+    vi.useFakeTimers();
+    emit('idle');
+    expect(state.scales.at(-1)).toBe(lowered);
+    state.clockMs += 150;
+    vi.advanceTimersByTime(150);
+    expect(state.scales.at(-1)).toBe(1);
+    vi.useRealTimers();
   });
 });

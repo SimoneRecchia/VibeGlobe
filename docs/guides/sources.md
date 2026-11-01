@@ -320,6 +320,8 @@ No parser throws: a malformed document gives an empty result with its issue, and
 
 ## Provider profiles
 
+**Your application is responsible for its map data.** VibeGlobe is an engine: it grants no right to any map, image or elevation data, and its maintainers give no legal advice. The application chooses its sources, holds their keys, accepts their terms (non-commercial, development-only or paid plans included), pays for them and checks that its use is allowed; a profile is the application's own reading of those terms, which the engine then enforces. The records of the presets and of the data pipeline (`docs/data-licenses.md`, ADR 0182) list the terms as they were read on their dates, to help that check, not to replace it.
+
 A provider profile switches off what a provider's terms forbid; it never switches anything on. Every loading feature (persistent cache, memory reuse, prefetch and flight preloading, offline packaging) is on by default; a profile switches off only what its provider forbids, and only for its own source; you can switch off more, globally or per source, with `@vibeglobe/offline`, but nothing switches on what a profile forbids (a warning names the rule).
 
 ### Your own provider's profile

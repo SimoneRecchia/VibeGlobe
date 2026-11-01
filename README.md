@@ -48,7 +48,7 @@ VibeGlobe is open source under the [Mozilla Public License 2.0](LICENSE.md) (SPD
 - **Any use, commercial included:** you may use, change and distribute VibeGlobe, alone or inside larger works under other licenses, at no cost.
 - **Changes to VibeGlobe's own files stay open:** if you distribute a modified VibeGlobe file, its source is available under the MPL 2.0, and its license notice is kept. Your own files that only use VibeGlobe may stay under any license.
 
-Third-party components keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data shown by the engine is licensed by its providers; the default datasets and their attribution rules are documented with the data pipeline.
+Third-party components keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Map data is not part of VibeGlobe: it is licensed by its providers, and the application that shows it chooses its sources, holds their keys and keeps to their terms ([sources guide](docs/guides/sources.md#provider-profiles)). The default datasets and their attribution rules, as read on their dates, are documented with the data pipeline.
 
 External contributions carry a [Developer Certificate of Origin](DCO.md) sign-off on every commit.
 

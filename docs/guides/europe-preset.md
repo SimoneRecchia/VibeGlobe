@@ -101,7 +101,8 @@ Earth's: with another image pass the mean of its rows beyond 85.05° to `globe.s
 ## Satellite by zoom
 
 Satellite and Hybrid change by zoom with no block, hard edge or jump of color or sharpness (F636, F638, F639). Each
-layer fades in over the whole view at once (`fadeIn`, F635). The package's tones match the base image's at the far
+layer fades in over the whole view at once (`fadeIn`, F635), and in time too: its opacity changes no faster than from 0 to
+1 in 600 ms (F670), so a fast zoom crosses a fade as a cross-fade instead of switching it like a light. The package's tones match the base image's at the far
 levels only, and the match fades out by level 9 (`harmonize: 'below'` with `harmonizeFade`, F633, F638):
 
 | Levels (zoom at the center) | Europe's land                                                      | Sea and polar regions     |
@@ -120,8 +121,11 @@ levels only, and the match fades out by level 9 (`harmonize: 'below'` with `harm
 - **The sea** is the base image at every level: smooth and of one color when magnified, with no blotch or stripe
   (KB-237).
 - **The package's WorldCover** covers the package's whole box, Europe and the land around it (European Turkey, North
-  Africa, the Middle East's west): its tiles' flat no-data water (RGB 54, 73, 90) is transparent everywhere, and its
-  edges at the box fade out over 12 tile pixels (KB-231, KB-233, KB-235). From level 9 the package holds Europe's land
+  Africa, the Middle East's west), and its edges at the box fade out over 12 tile pixels (KB-231, KB-235). Its sea is
+  transparent: the composite has real water only in the 1° cells that hold land and a flat no-data color beyond (RGB
+  54, 73, 90), so every pixel of water's colors (blue and green above red, not bright) outside `EUROPE_LAND` is keyed
+  out, fading back in over 4 km inside it (`keySea`, KB-303). The land, its coastline, lakes and shadows stay; beyond
+  Europe's countries (Turkey, North Africa) the lakes go with the sea. From level 9 the package holds Europe's land
   only; elsewhere its level 8 tiles are magnified, so the land keeps the same source and colors.
 - **Tones**: far away WorldCover is brightened toward the base image's tones, cell by cell, and never darkened; the
   match weakens with the zoom and is gone by level 9, where WorldCover shows its own colors (KB-234, KB-236). The online

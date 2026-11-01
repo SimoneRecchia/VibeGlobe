@@ -1,5 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { Camera } from './camera.js';
 import { WGS84 } from '../geodesy/wgs84.js';
 import { clampWebMercatorLatitudeRad } from '../projections/web-mercator.js';
 
@@ -39,4 +40,13 @@ export function mercatorZoomFromGroundZoom(groundZoom: number, latitudeRad: numb
 /** Ground zoom from Web Mercator zoom at a latitude; inverse of {@link mercatorZoomFromGroundZoom}. */
 export function groundZoomFromMercatorZoom(zoom: number, latitudeRad: number): number {
   return zoom - Math.log2(Math.cos(clampWebMercatorLatitudeRad(latitudeRad)));
+}
+
+/** The Web Mercator zoom a camera shows at the screen center. */
+export function cameraZoom(camera: Camera): number {
+  const pose = camera.pose;
+  return mercatorZoomFromGroundZoom(
+    groundZoomForRange(pose.rangeMeters, camera.heightPx, camera.fovYRad),
+    pose.targetLatitudeRad,
+  );
 }

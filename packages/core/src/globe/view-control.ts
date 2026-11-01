@@ -6,12 +6,12 @@ import { validateViewCurves, type ViewCurvesInit } from '../view/curves.js';
 import type { ViewState } from '../view/view-state.js';
 import type { Emitter } from './emitter.js';
 import { dragCamera, zoomCamera } from './navigation.hot.js';
-import type { GeoPosition, GlobeEvents, NavigationApi, ScreenPoint } from './types.js';
+import type { GeoPosition, GlobeEvents, NavigationApi, ScreenPoint, ViewInit } from './types.js';
 import { isScreenPoint } from './validation.js';
 import { positionAt } from './view-geometry.js';
 import { ControlsSlot } from './controls-slot.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 /** The zoom step being limited (ADR 0018: doubles in arrays, not through calls). */
 const step = new Float64Array(1);
 
@@ -43,6 +43,8 @@ export interface ViewHost {
   interruptMovement(): void;
   /** Interrupts the running movement if it eases the tilt: a view mode chosen meanwhile takes over (KB-207). */
   interruptTilt(): void;
+  /** Loads the tiles of a view ahead, as a movement's destination (F672), or stops (undefined). */
+  preloadView(view: ViewInit | undefined): void;
 }
 
 /**
@@ -75,6 +77,7 @@ export class ViewControl {
         host.limitToSurface(point, step);
         if (zoomCamera(host.cam, host.view, point, step[0], this.northUp())) host.requestRender();
       },
+      preloadView: (view) => host.preloadView(view),
       requestUpdate: () => {
         this.updateRequested = true;
         host.requestRender();

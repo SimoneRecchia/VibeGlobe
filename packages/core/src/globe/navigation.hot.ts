@@ -14,8 +14,7 @@ import type { GeoPosition, ScreenPoint } from './types.js';
 import { morphPointInto } from '../view/morph.js';
 import { pickMorphedAt, pickTerrainAt } from '../view/pick.js';
 import type { ViewState } from '../view/view-state.js';
-
-const RAD = Math.PI / 180;
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
 const anchor = new Float64Array(3);
 const pixel = new Float64Array(2);

@@ -23,19 +23,19 @@ Without `connect`, pan and zoom work and the rotate and tilt gestures are off.
 
 ## Gestures
 
-| Input                                   | Movement                                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Drag (primary button, one finger)       | Pans; the grabbed point stays under the pointer. Released with speed, it coasts and slows to rest. |
-| Wheel                                   | Zooms at the cursor; a notch animates over about 100 ms. Over empty sky it zooms about the center. |
-| Trackpad scroll and pinch               | Zoom continuously at the cursor, in proportion to the fingers' motion.                             |
-| Double click, double tap                | Zoom in one level at the point.                                                                    |
-| Two-finger tap                          | Zooms out one level about the fingers' midpoint.                                                   |
-| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view. Escape cancels.                           |
-| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center. No context menu.    |
-| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together; each starts past a small threshold.    |
-| Two fingers side by side, moved up/down | Tilts, on its own (decided within the first 100 ms).                                               |
-| Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                            |
-| Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                        |
+| Input                                   | Movement                                                                                                                                                                      |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drag (primary button, one finger)       | Pans; the grabbed point stays under the pointer. Released with speed, it coasts and slows to rest.                                                                            |
+| Wheel                                   | Zooms at the cursor; a notch animates over about 100 ms, and the view it heads for loads ahead (`NavigationApi.preloadView`, F672). Over empty sky it zooms about the center. |
+| Trackpad scroll and pinch               | Zoom continuously at the cursor, in proportion to the fingers' motion.                                                                                                        |
+| Double click, double tap                | Zoom in one level at the point.                                                                                                                                               |
+| Two-finger tap                          | Zooms out one level about the fingers' midpoint.                                                                                                                              |
+| Shift+drag                              | Draws a zoom box; releasing it fits the box to the view. Escape cancels.                                                                                                      |
+| Right-drag, Ctrl+drag                   | Rotate (horizontal motion) and tilt (vertical motion) about the screen center. No context menu.                                                                               |
+| Pinch, twist and two-finger drag        | Zoom, rotate and pan about the fingers' midpoint, together; each starts past a small threshold.                                                                               |
+| Two fingers side by side, moved up/down | Tilts, on its own (decided within the first 100 ms).                                                                                                                          |
+| Adding or lifting a finger              | The gesture continues from where it is, without a jump.                                                                                                                       |
+| Safari trackpad gestures                | Pinch zooms and rotation turns the heading.                                                                                                                                   |
 
 A new press, touch or key stops inertia and running turns where they are; a wheel zoom still in progress completes, about the point it started at.
 
@@ -95,12 +95,12 @@ controls.setTiltPolicy({ lock2DAboveMeters: 20_000, autoTiltBelowMeters: 2_000, 
 controls.onTiltAvailabilityChange((available) => (button3d.disabled = !available));
 ```
 
-| Field                 | Default       | Effect                                                                                                                                                                                            |
-| --------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lock2DAboveMeters`   | 20,000 m      | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. `tiltAvailable` is false and the UI's 3D button is disabled. |
-| `autoTiltBelowMeters` | 2,000 m       | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.     |
-| `autoTiltMaxDeg`      | 60°           | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                       |
-| `fullTiltBelowMeters` | half the lock | Where the policy's cap ends (F641): from 0° at `lock2DAboveMeters` the largest allowed tilt rises continuously in the distance's logarithm to no cap here. Above 0 and below the lock.            |
+| Field                 | Default       | Effect                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lock2DAboveMeters`   | 20,000 m      | Beyond this distance the tilt is 0° and cannot change: tilt gestures only turn, `jumpTo({ tiltDeg })` and the 3D mode leave it flat. A flight or fit that chooses a tilt keeps it until it ends, so one from afar into a tilted view arrives tilted (KB-310). `tiltAvailable` is false and the UI's 3D button is disabled. |
+| `autoTiltBelowMeters` | 2,000 m       | Within this distance the tilt rises by itself, from 0° here to `autoTiltMaxDeg` at a quarter of it (500 m); zooming out lowers it again. Both follow the distance continuously, with no jump.                                                                                                                              |
+| `autoTiltMaxDeg`      | 60°           | The automatic tilt near the ground, and the tilt the 3D mode chooses; at most `maxTiltDeg`.                                                                                                                                                                                                                                |
+| `fullTiltBelowMeters` | half the lock | Where the policy's cap ends (F641): from 0° at `lock2DAboveMeters` the largest allowed tilt rises continuously in the distance's logarithm to no cap here. Above 0 and below the lock.                                                                                                                                     |
 
 A tilt chosen by hand below the lock stays at every distance until it is changed, or until the camera passes the lock:
 between `fullTiltBelowMeters` and the lock (10 to 20 km by default) the allowed tilt falls continuously to 0°, and beyond

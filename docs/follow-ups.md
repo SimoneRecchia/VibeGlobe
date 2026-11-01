@@ -114,3 +114,7 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 - **Padding per side:** `fitBounds` and `fitObjects` take one `paddingPx` for every side. An application with a panel
   over one side of the map would center an asset in the part left visible with a padding per side (as MapLibre's
   `{ top, right, bottom, left }`), the aim point moved by half the difference. The core entry has 0.09 KB left.
+- **The package's sea keyed when it is built (KB-303):** the pipeline knows the composite's 1° cells and the land, so
+  it could write the sea transparent (WebP with alpha) and the decoder would need no land outline or color test; it
+  needs a rebuilt package. Until then the lakes of the land outside Europe's countries (Turkey, North Africa) are keyed
+  with the sea: `EUROPE_LAND` holds only Europe's countries.

@@ -5,8 +5,8 @@ import { planeCenterOf } from '../surface/surface-mesh.js';
 import type { LayerRenderTarget } from './layer-target.js';
 import type { FrameView } from '../globe/types.js';
 import { cappedMercatorInto, mercatorScaleInto, morphPointInto } from '../view/morph.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 const vertex = new Float64Array(3);
 const at = new Float64Array(2);
 const vertexGeodetic = new Float64Array(3);

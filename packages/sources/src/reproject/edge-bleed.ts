@@ -12,49 +12,62 @@
 /**
  * Gives each pixel that is not opaque, next to an opaque one, the alpha-weighted mean color of its opaque 8-neighbors,
  * `passes` times (each pass reaches one pixel further, covering the coarser mip levels). Alpha stays unchanged, and
- * translucent pixels away from opaque ones (a uniformly translucent layer) keep their color.
+ * translucent pixels away from opaque ones (a uniformly translucent layer) keep their color. Pixels from `opaqueAlpha`
+ * up count as opaque: 1 where translucent pixels hold their exact color (a tile masked per pixel, KB-303).
  */
 export function bleedTransparentEdges(
   rgba: Uint8Array | Uint8ClampedArray,
   widthPx: number,
   heightPx: number,
   passes = 4,
+  opaqueAlpha = 255,
 ): void {
-  // Pixels holding a reliable color: opaque ones, then those filled by earlier passes.
-  const colored = new Uint8Array(widthPx * heightPx);
-  for (let p = 0; p < colored.length; p++) colored[p] = rgba[p * 4 + 3] === 255 ? 1 : 0;
-  const filled: number[] = [];
+  // 1: a reliable color (opaque, or filled by an earlier pass); 2: filled by this pass.
+  const state = new Uint8Array(widthPx * heightPx);
+  for (let p = 0; p < state.length; p++) state[p] = (rgba[p * 4 + 3] ?? 0) >= opaqueAlpha ? 1 : 0;
+  // The first pass looks at every pixel, each later one only at the neighbors of the pixels the pass before filled.
+  let candidates: number[] | undefined;
   for (let pass = 0; pass < passes; pass++) {
-    filled.length = 0;
-    for (let y = 0; y < heightPx; y++) {
-      for (let x = 0; x < widthPx; x++) {
-        const p = y * widthPx + x;
-        if (colored[p]) continue;
-        let [r, g, b, weight] = [0, 0, 0, 0];
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx < 0 || ny < 0 || nx >= widthPx || ny >= heightPx) continue;
-            const q = ny * widthPx + nx;
-            if (!colored[q]) continue;
-            // Earlier passes' pixels may have zero alpha: weight them as barely visible.
-            const w = Math.max(1, rgba[q * 4 + 3] ?? 0);
-            r += (rgba[q * 4] ?? 0) * w;
-            g += (rgba[q * 4 + 1] ?? 0) * w;
-            b += (rgba[q * 4 + 2] ?? 0) * w;
-            weight += w;
-          }
+    const filled: number[] = [];
+    const count = candidates?.length ?? state.length;
+    for (let k = 0; k < count; k++) {
+      const p = candidates ? (candidates[k] ?? 0) : k;
+      if (state[p] !== 0) continue;
+      const x = p % widthPx;
+      const y = (p - x) / widthPx;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let weight = 0;
+      for (let ny = Math.max(0, y - 1); ny <= Math.min(heightPx - 1, y + 1); ny++) {
+        for (let nx = Math.max(0, x - 1); nx <= Math.min(widthPx - 1, x + 1); nx++) {
+          const q = ny * widthPx + nx;
+          if (state[q] !== 1) continue;
+          // Earlier passes' pixels may have zero alpha: weight them as barely visible.
+          const w = Math.max(1, rgba[q * 4 + 3] ?? 0);
+          r += (rgba[q * 4] ?? 0) * w;
+          g += (rgba[q * 4 + 1] ?? 0) * w;
+          b += (rgba[q * 4 + 2] ?? 0) * w;
+          weight += w;
         }
-        if (weight === 0) continue;
-        rgba[p * 4] = Math.round(r / weight);
-        rgba[p * 4 + 1] = Math.round(g / weight);
-        rgba[p * 4 + 2] = Math.round(b / weight);
-        filled.push(p);
       }
+      if (weight === 0) continue;
+      rgba[p * 4] = Math.round(r / weight);
+      rgba[p * 4 + 1] = Math.round(g / weight);
+      rgba[p * 4 + 2] = Math.round(b / weight);
+      state[p] = 2;
+      filled.push(p);
     }
     if (filled.length === 0) break;
-    for (const p of filled) colored[p] = 1;
+    candidates = [];
+    for (const p of filled) {
+      state[p] = 1;
+      const x = p % widthPx;
+      const y = (p - x) / widthPx;
+      for (let ny = Math.max(0, y - 1); ny <= Math.min(heightPx - 1, y + 1); ny++)
+        for (let nx = Math.max(0, x - 1); nx <= Math.min(widthPx - 1, x + 1); nx++)
+          if (state[ny * widthPx + nx] === 0) candidates.push(ny * widthPx + nx);
+    }
   }
 }
 

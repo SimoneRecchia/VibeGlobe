@@ -25,7 +25,7 @@ const BLOCK_PX = 8;
 /**
  * The largest difference of a block's mean color from the base image alone, settled, 0–255: the sources differ from it
  * only by the fixtures' coastline drawn at their own resolution (13.7 at most, measured 2026-10-28); a source in its
- * own tone shows 25 to 35, the package's water inside its box over 100 (KB-231).
+ * own tone shows 25 to 35.
  */
 const MAX_BLOCK_DIFFERENCE = 20;
 /**

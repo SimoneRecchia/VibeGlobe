@@ -223,7 +223,8 @@ function overlaySlots(
         // imagery's, only fading draws sample the second texture.
         const node = own.toVar();
         If(fade.lessThan(1), () => {
-          const from = vec4(0).toVar();
+          // Nothing is the slot's own colors with no coverage: only its coverage grows, never a dark mix (KB-304).
+          const from = vec4(node.xyz, 0).toVar();
           If(hasFrom.greaterThan(0.5), () => {
             from.assign(fromNode);
           });

@@ -24,7 +24,6 @@ import {
   COPERNICUS_GLO30,
   NASA_GIBS_BLUE_MARBLE,
   OPENFREEMAP,
-  WORLDCOVER_WATER_RGB,
   type ExcludedSource,
   type PresetSourceRecord,
   type SourceTiers,
@@ -176,17 +175,16 @@ interface Build {
 }
 
 /**
- * The fade, in pixels of a tile, from the Blue Marble to WorldCover at the edge of Europe's land and of the water keyed
- * out over the sea (KB-231): a few screen pixels at every level, so no border shows between the sources.
+ * The fade, in pixels of a tile, of WorldCover at the package box's edge (F639): a few screen pixels at every level, so
+ * no border shows between it and the base image.
  */
 const FEATHER_PX = 12;
 
 /**
- * How far a pixel of the package's JPEG tiles may be from its water color and still be keyed out, per channel: the
- * key fades back in up to twice this, so the compression's noise around the coast goes too, while the darkest land
- * (forest, about RGB 98, 110, 94) stays.
+ * How far inside `EUROPE_LAND` the package's water fades back in (KB-303): more than the outline's simplification
+ * (0.025°, about 2.8 km) and the gaps it leaves between countries (up to about 3.2 km), so neither shows.
  */
-const WATER_TOLERANCE = 16;
+const SEA_FEATHER_METERS = 4000;
 
 /**
  * A layer's fade with the zoom from imagery levels (F636): the Mercator zoom shows tiles of 256 pixels of about one level
@@ -213,7 +211,7 @@ const PACKAGE_BOX = [
 /**
  * Satellite, by zoom (F636, F639). With a package: the globe's base image (Natural Earth) at the far levels and, below
  * everything at every level, over the sea and the polar caps; the package's WorldCover fading in over it within the
- * package's box, its flat water transparent everywhere, its edges soft; where the package holds Europe's land only
+ * package's box, its water transparent outside the land, its edges soft; where the package holds Europe's land only
  * (from level 9) its level 8 tiles magnified elsewhere, so Turkey's or Morocco's land keeps the same source; above the
  * package's levels the app's finer online sources, fading in over a level. WorldCover's tones match the base image's
  * at the lowest levels, fading to its own by level 9, never darkened (F638); the online sources keep their own. Online
@@ -238,12 +236,14 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
           url: `${build.packageBase}imagery/{z}/{x}/{y}.jpg`,
           minLevel: Math.max(ESA_WORLDCOVER.minLevel, far + 1),
           maxLevel: options.packageLevels?.imagery ?? ESA_WORLDCOVER.maxLevel,
-          // The package's box with a soft edge; its flat water is no imagery: transparent everywhere (F636).
+          // The package's box with a soft edge. Its sea, real water near the coast and a flat no-data color (RGB
+          // 54, 73, 90) beyond, each ending in rectangles, is transparent outside the land; inside it nothing is keyed,
+          // as deep lakes and shadows can have that color too (KB-303).
           area: {
             polygons: [PACKAGE_BOX],
             tiles: 'clip',
             featherPx: FEATHER_PX,
-            keyEverywhere: { rgb: WORLDCOVER_WATER_RGB, tolerance: WATER_TOLERANCE },
+            keySea: { land: EUROPE_LAND, featherMeters: SEA_FEATHER_METERS },
           },
           attribution: ESA_WORLDCOVER.attribution,
         }),

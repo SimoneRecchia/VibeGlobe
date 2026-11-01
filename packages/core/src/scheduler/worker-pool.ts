@@ -16,6 +16,7 @@
  *
  * Every task's `done` callback runs exactly once: with the output, or with a {@link WorkerTaskError}.
  */
+import { messageOf } from '../globe/errors.js';
 import { InlineExecutor } from './inline-executor.js';
 import {
   parseWorkerMessage,
@@ -53,10 +54,6 @@ interface PoolWorker {
   task: TaskRecord | undefined;
   /** Handshake timer while starting, watchdog while busy. */
   timer: unknown;
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function failure(code: WorkerTaskErrorCode, message: string, taskCode?: string): WorkerTaskOutcome {

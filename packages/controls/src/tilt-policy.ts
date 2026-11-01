@@ -6,13 +6,15 @@ import { validTiltPolicy, type TiltPolicy } from './options.js';
 
 /**
  * The controls' side of the tilt policy (F625): the engine applies it each frame from `NavigationApi.tiltPolicy`; the
- * controls write it there, announce when tilting becomes available or not, and end a tilt chosen by hand once the
- * camera passes the lock.
+ * controls write it there, announce when tilting becomes available or not, and end a chosen tilt once the camera passes
+ * the lock, except while the API movement that chose it runs (a flight from afar to a tilted view, KB-310).
  */
 export class TiltPolicyState {
   /** False while the policy's lock keeps the view flat. */
   available = true;
   private readonly listeners = new Set<(available: boolean) => void>();
+  private moving = false;
+  private unfollow: (() => void) | undefined;
 
   constructor(public policy: TiltPolicy | null) {}
 
@@ -42,10 +44,20 @@ export class TiltPolicyState {
   /** Once per frame: back to the zoom-driven tilt beyond the lock, and the listeners told of a change. */
   check(navigation: NavigationApi | undefined, globe: ConnectedGlobe | undefined): void {
     const now = this.policy === null || navigation?.tiltPolicy?.[3] !== 0;
-    if (!now && globe?.viewMode === 'manual') globe.setViewMode?.('auto');
+    if (!now && !this.moving && globe?.viewMode === 'manual') globe.setViewMode?.('auto');
     if (now === this.available) return;
     this.available = now;
     for (const listener of this.listeners) listener(now);
+  }
+
+  /** Follows the globe's API movements, which {@link TiltPolicyState.check} lets finish their tilt. */
+  follow(globe: ConnectedGlobe): void {
+    this.unfollow?.();
+    const offs = [
+      globe.on?.('movestart', ({ cause }) => (this.moving = cause === 'api')),
+      globe.on?.('moveend', () => (this.moving = false)),
+    ];
+    this.unfollow = () => offs.forEach((off) => off?.());
   }
 
   /** Adds a listener of availability changes; returns its removal. */

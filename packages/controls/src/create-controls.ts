@@ -115,7 +115,7 @@ export function createControls(options?: ControlsOptions): NavigationControls {
   const controls = Object.assign(factory, {
     options: resolved,
     connect(target: ConnectedGlobe) {
-      globe = target;
+      tilt.follow((globe = target));
       if (current) current.port.globe = target;
     },
     zoomIn: () => current?.keyboard.zoomBy(1),
@@ -175,7 +175,7 @@ function createContext(element: HTMLElement, port: CameraPort, options: Resolved
     port,
     options,
     inertia: new Inertia(),
-    zoom: new ZoomTarget(),
+    zoom: new ZoomTarget(port),
     heading: new HeadingTarget(),
     keys: new KeyMotion(),
     widthPx: () => element.clientWidth,

@@ -7,7 +7,7 @@ import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/
  * toggle for their keys, and the fit the zoom box uses. Rotation, the clock and the applied camera come through
  * `NavigationApi` itself.
  */
-export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' | 'fitBounds' | 'viewMode'>> & {
+export type ConnectedGlobe = Partial<Pick<Globe, 'camera' | 'timeMs' | 'jumpTo' | 'fitBounds' | 'viewMode' | 'on'>> & {
   /** The home command (F194), used by the Home key when the engine has it. */
   goHome?(): unknown;
   /** The view-mode toggle (F163), used by the 2, 3 and A keys when the engine has it. */
@@ -215,6 +215,26 @@ export class CameraPort {
   /** {@link NavigationApi.zoomAt}, skipped for a zero step. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void {
     if (deltaZoom !== 0) this.navigation.zoomAt(point, deltaZoom);
+  }
+
+  /**
+   * A smoothed zoom heads `levels` from the current view about `point` (F672): the view it will show loads ahead
+   * ({@link NavigationApi.preloadView}), centered where a zoom on a flat map brings it, the position under the point
+   * staying there; none once it has arrived (0).
+   */
+  zoomAhead(point: ScreenPoint, levels: number): void {
+    const camera = this.globe?.camera;
+    const at = levels !== 0 && camera ? this.navigation.grab(point) : undefined;
+    const scale = 2 ** -levels;
+    this.navigation.preloadView(
+      at && camera
+        ? {
+            longitudeDeg: at.longitudeDeg + (((camera.longitudeDeg - at.longitudeDeg + 540) % 360) - 180) * scale,
+            latitudeDeg: at.latitudeDeg + (camera.latitudeDeg - at.latitudeDeg) * scale,
+            zoom: camera.zoom + levels,
+          }
+        : undefined,
+    );
   }
 
   /** The applied heading, in degrees. */

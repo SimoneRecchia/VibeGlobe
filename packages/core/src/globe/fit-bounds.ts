@@ -6,9 +6,8 @@ import { ViewState } from '../view/view-state.js';
 import { GlobeError } from './errors.js';
 import type { GeoBounds, GeoPosition } from './types.js';
 import { screenOf } from './view-geometry.js';
+import { DEG_TO_RAD as RAD, RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
-const DEG = 180 / Math.PI;
 /** Web Mercator's latitude limit, degrees: a fitted center stays within it. */
 const MAX_LATITUDE_DEG = 85.0511287798066;
 /** Samples per bounds edge, corners included. */

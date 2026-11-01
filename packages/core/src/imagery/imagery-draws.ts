@@ -5,7 +5,14 @@ import { projectToScreen } from '../camera/projection.js';
 import { geodeticToEcef } from '../geodesy/ecef.js';
 import { MERCATOR_ROOT, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { MAX_OVERLAYS, TONE_BELOW, type DrawList } from './draw-list.js';
-import { ARRIVING, PREFETCH_CLASS, PRELOAD_CLASS, VISIBLE_CLASS, type ImageryLoader } from './imagery-loader.hot.js';
+import {
+  ARRIVING,
+  COVER_CLASS,
+  PREFETCH_CLASS,
+  PRELOAD_CLASS,
+  VISIBLE_CLASS,
+  type ImageryLoader,
+} from './imagery-loader.hot.js';
 import {
   MAPPING_LEVEL,
   MAPPING_OFFSET_V,
@@ -18,7 +25,7 @@ import {
   mapMercator,
 } from './imagery-mapping.hot.js';
 import { inCoverage, type ImagerySource } from './imagery-source.js';
-import { BLEND_CODES, isOpaque, shownOpacity, type StackEntry } from './imagery-stack.js';
+import { BLEND_CODES, isOpaque, shownAt, shownOpacity, type StackEntry } from './imagery-stack.js';
 import type { VisibleSources } from './credits.js';
 
 /** Where `mapping` keeps the handle of the tile it maps to, after the mapping's own seven numbers. */
@@ -223,6 +230,8 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
   for (let slot = 0; slot < list.overlays.length; slot++) {
     const overlay = list.overlays[slot];
     if (!overlay) continue;
+    // What a new slot fades in from, when it fades in (KB-306): nothing.
+    overlay.fromTextures[index] = -1;
     if (slot >= overlays) {
       overlay.opacities[index] = 0;
       overlay.textures[index] = -1;
@@ -358,15 +367,24 @@ const PREFETCH_MIN_VISIBILITY = 0.5;
 const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFETCH_MIN_VISIBILITY;
 
 /**
+ * Levels from a wanted tile up to its cover, requested first while nothing finer is resident (KB-305): even, so the
+ * cover is one of the every-second ancestors requested anyway.
+ */
+const COVER_LEVELS = 4;
+
+/**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
  * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
- * source of the chain) are neither requested nor looked up.
+ * source of the chain) are neither requested nor looked up. While nothing finer is resident, the ancestor
+ * {@link COVER_LEVELS} up (or the coarsest level), and the coarser ones requested, are requested before every visible
+ * tile, coarse first (KB-305).
  */
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
   const wanted = mapped(MAPPING_LEVEL);
   const lowest = source.minLevel > floor ? source.minLevel : floor;
+  const cover = wanted - COVER_LEVELS > lowest ? wanted - COVER_LEVELS : lowest;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;
   // The level below was found missing: its parent is the finest this source can show there (KB-179).
@@ -378,7 +396,13 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
     // requested; the others are only looked up.
     const handle =
       !arriving && ((wanted - current) % 2 === 0 || current === lowest || belowMissing)
-        ? layer.loader.want(current, x, y, VISIBLE_CLASS + current + 2 * distance, !hazed(tile))
+        ? layer.loader.want(
+            current,
+            x,
+            y,
+            (current > cover ? VISIBLE_CLASS : COVER_CLASS) + current + 2 * distance,
+            !hazed(tile),
+          )
         : layer.loader.readyHandle(current, x, y);
     if (handle >= 0) {
       mapping[MAPPING_HANDLE] = handle;
@@ -404,23 +428,40 @@ export function screenDistance(tile: QuadtreeTile, camera: Camera): number {
 }
 
 /**
- * Wants, from every visible layer, the tiles of a flight's destination (F286): each surface tile's imagery at its own
- * level from the first source of the chain that has it, at the preload class (after every visible tile, before
- * prefetch). Sources whose loading flags forbid prefetch load nothing ahead. Allocates nothing.
+ * Wants, from every layer a view of the movement draws (shown at its deepest zoom, `plan.zoom`: a layer fades in as the
+ * zoom grows, F635), the tiles its plan will draw (F286, F671, KB-308): each surface tile's imagery at its own level from the
+ * first source of the chain that has it, at the preload class (after every visible tile, before prefetch) plus
+ * `keys[i]` (-1: not now) and its level; for the destination's tiles (before `arrival`), their ancestor up to
+ * {@link COVER_LEVELS} levels up, within the source's levels, first. Sources whose loading flags forbid prefetch load
+ * nothing ahead. Allocates nothing.
  */
-export function preloadImagery(stack: readonly StackLayer[], tiles: readonly QuadtreeTile[], count: number): void {
-  for (let index = 0; index < count; index++) {
-    const tile = tiles[index];
-    if (!tile) continue;
-    for (let s = 0; s < stack.length; s++) {
-      const layer = stack[s];
-      if (!layer || !layer.entry.visible || shownOpacity(layer.entry) <= 0) continue;
+export function preloadImagery(
+  stack: readonly StackLayer[],
+  plan: {
+    readonly tiles: readonly QuadtreeTile[];
+    readonly keys: Float64Array;
+    readonly count: number;
+    readonly arrival: number;
+    readonly zoom: number;
+  },
+): void {
+  for (let s = 0; s < stack.length; s++) {
+    const layer = stack[s];
+    if (!layer || !shownAt(layer.entry, plan.zoom)) continue;
+    for (let index = 0; index < plan.count; index++) {
+      const tile = plan.tiles[index];
+      const key = plan.keys[index] ?? -1;
+      if (!tile || key < 0) continue;
       for (let k = 0; k < layer.chain.length; k++) {
         const source = layer.chain[k];
         if (!source || !hasTile(source, tile)) continue;
         const level = mapped(MAPPING_LEVEL);
-        if (source.loader.preloading)
-          source.loader.want(level, mapped(MAPPING_X), mapped(MAPPING_Y), PRELOAD_CLASS + level);
+        const up = Math.min(COVER_LEVELS, level - source.source.minLevel);
+        if (!source.loader.preloading) break;
+        source.loader.want(level, mapped(MAPPING_X), mapped(MAPPING_Y), PRELOAD_CLASS + key + level);
+        if (index >= plan.arrival || up <= 0) break;
+        mapAncestor(mapping, 0, up);
+        source.loader.want(level - up, mapped(MAPPING_X), mapped(MAPPING_Y), PRELOAD_CLASS + level - up);
         break;
       }
     }

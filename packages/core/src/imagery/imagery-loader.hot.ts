@@ -21,6 +21,7 @@ import { NO_SLOT, type HostOptions, type NetworkPool, type NetworkPoolClient } f
 import { PriorityHeap } from '../scheduler/priority-heap.hot.js';
 import type { DecodedTile, TileRequest, TransportResult } from '../scheduler/types.js';
 import type { TileErrorReason } from '../globe/types.js';
+import { messageOf } from '../globe/errors.js';
 import type { Observability } from '../diagnostics/observability.js';
 import { WorkerTaskError, type WorkerPool, type WorkerTaskOutcome } from '../scheduler/worker-pool-types.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type TileSource } from './imagery-source.js';
@@ -41,6 +42,12 @@ import {
 
 /** Priority keys of visible tiles (ADR 0007 class 1) start here: lower keys are the pinned base's. */
 export const VISIBLE_CLASS = 1024;
+/**
+ * Priority keys of a visible tile's cover, its ancestor a few levels up while its layer shows nothing finer there, and
+ * of the coarser ancestors requested with it (KB-305): after the pinned base, before every visible tile, so a layer is
+ * never missing over new ground for long.
+ */
+export const COVER_CLASS = VISIBLE_CLASS - 64;
 /** Priority keys of prefetched tiles start here, after every visible tile (ADR 0007). */
 export const PREFETCH_CLASS = 4 * 1024;
 /** The class of a flight's destination tiles (F286): after every visible tile, before prefetch. */
@@ -53,8 +60,7 @@ function runInline(run: () => DecodedTile): WorkerTaskOutcome {
   try {
     return { ok: true, output: run() };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, error: new WorkerTaskError('task-failed', message, 'undecodable') };
+    return { ok: false, error: new WorkerTaskError('task-failed', messageOf(error), 'undecodable') };
   }
 }
 
@@ -384,7 +390,7 @@ export class ImageryLoader implements NetworkPoolClient {
 
   /** Whether a flight holds back the visible tile in `slot` because it has not been wanted for long enough (F287). */
   private unsettled(slot: number, priority: number): boolean {
-    if (this.settleMs <= 0 || priority < VISIBLE_CLASS || priority >= PRELOAD_CLASS) return false;
+    if (this.settleMs <= 0 || priority < COVER_CLASS || priority >= PRELOAD_CLASS) return false;
     return this.options.now() - (this.table.wantedSince[slot] ?? 0) < this.settleMs;
   }
 

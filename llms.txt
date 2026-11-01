@@ -1,0 +1,44 @@
+# VibeGlobe
+
+> A TypeScript web engine that draws an interactive 3D globe and 2D map (WebGPU with a WebGL2 fallback), with
+> imagery, terrain, vector tiles, glTF models, application data, offline packages and ready-made controls. ESM
+> packages under `@vibeglobe/*`, framework-agnostic, with Vue 3 and Web Component adapters. MPL-2.0.
+
+Start with the integration guide to put a globe in an application, then read the guide of the task at hand. Every
+`ts` example in the guides type-checks against the packages. The TSDoc of each export (in the `.d.ts` files) holds the
+per-option details. Installed, this file and the guides are in `node_modules/@vibeglobe/core/`.
+
+## Start
+
+- [Integration](docs/guides/integration.md): install, create a globe in plain TypeScript, Vue, Nuxt (SSR) or a Web
+  Component, lazy loading, hosting the engine's assets, Content Security Policy, attribution.
+- [Europe preset](docs/guides/europe-preset.md): ready map types (Satellite, Hybrid, Map, Landscape, Relief) from free
+  sources, the offline package of Europe and the world, online detail on top, building and estimating the package.
+
+## Data on the globe
+
+- [Sources](docs/guides/sources.md): imagery, terrain and vector tile adapters (XYZ, WMTS, WMS, PMTiles, MBTiles,
+  GeoTIFF, quantized mesh), source chains, provider profiles and attribution, writing an adapter.
+- [Terrain](docs/guides/terrain.md): elevation sources, height queries, the camera above the ground, geoid grids.
+- [Vector tiles](docs/guides/vector-tiles.md): MapLibre styles from Mapbox Vector Tiles, labels, buildings.
+- [Data layers](docs/guides/data-layers.md): points, markers, labels, lines, polygons, circles, clustering,
+  GeoJSON/KML, picking and styling application data.
+- [Models](docs/guides/models.md): glTF 2.0 models placed on the globe, single or instanced, and 3D Tiles.
+- [Space background](docs/guides/space-background.md): stars and the Milky Way behind the globe.
+
+## Interaction and UI
+
+- [Controls](docs/guides/controls.md): mouse, touch, trackpad and keyboard input turned into camera movement.
+- [UI and GIS](docs/guides/ui-and-gis.md): ready-made controls (search, compass, zoom, measurement, drawing, layer
+  switcher, minimap) and the coordinate, measurement and view-state functions behind them.
+
+## Offline and hosting
+
+- [Offline](docs/guides/offline.md): network modes, the browser tile cache, offline packages and their manifest.
+- [Hosting](docs/guides/hosting.md): serving tiles, offline packages and engine assets from a static server, a CDN or
+  a backend.
+
+## Diagnostics
+
+- [Debugging](docs/guides/debugging.md): overlays and counters that show what a globe is loading and drawing.
+- [Data licenses](docs/data-licenses.md): the default datasets, their licenses and required attribution.

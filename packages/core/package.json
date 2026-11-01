@@ -42,11 +42,17 @@
     "dist",
     "src",
     "LICENSE.md",
+    "docs",
+    "llms.txt",
     "!dist/tsconfig.tsbuildinfo",
     "!src/**/*.test.ts",
     "!src/**/__fixtures__",
     "!src/**/__snapshots__",
     "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
     "!dist/**/__fixtures__"
-  ]
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/release/core-docs.ts",
+    "postpack": "node ../../scripts/release/core-docs.ts --remove"
+  }
 }

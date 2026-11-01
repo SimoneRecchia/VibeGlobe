@@ -68,19 +68,24 @@ function zoomFrames(
 }
 
 /**
- * Warms up, then samples `FRAMES` frames of `frames`: the engine's bytes per frame, its sites, and the frames drawn.
- * The warm-up leaves V8 nothing to compile during the sampled frames (KB-312): its frames run in several calls, so the
- * sampled call enters a driver already optimized as a whole (after one long warm-up call, optimized in place, the
- * sampled call compiled the driver again and then the engine functions it calls, 25 to 30 KB of code at once, charged
- * to whichever engine function ran); then the background compiler finishes, and a few frames install its code.
+ * Under this many bytes per frame on average no frame allocates: any object allocated every frame costs at least 12
+ * bytes (what remains is the test runner's module plumbing re-entering the interpreter now and then).
  */
-async function measured(
+const MAX_BYTES_PER_FRAME = 0.5;
+
+/** A sampled window: the engine's bytes per frame, its allocation sites, and the frames drawn. */
+interface Sample {
+  readonly perFrame: number;
+  readonly sites: string;
+  readonly drawn: number;
+}
+
+/** Samples `FRAMES` frames of `frames` from frame `start`. */
+async function sampled(
   renderer: ReturnType<typeof fakeRenderer>['renderer'],
   frames: (count: number, start: number) => void,
-): Promise<{ perFrame: number; sites: string; drawn: number }> {
-  for (let start = 0; start < 5000; start += 1000) frames(1000, start);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  frames(100, 5000);
+  start: number,
+): Promise<Sample> {
   const session = new Session();
   session.connect();
   await session.post('HeapProfiler.enable');
@@ -90,12 +95,35 @@ async function measured(
     includeObjectsCollectedByMinorGC: true,
   });
   const drawnBefore = renderer.drawCount;
-  frames(FRAMES, 5100);
+  frames(FRAMES, start);
   const drawn = renderer.drawCount - drawnBefore;
   const { profile } = (await session.post('HeapProfiler.stopSampling')) as { profile: { head: SamplingNode } };
   session.disconnect();
   const engine = [...allocationSites(profile.head, new Map())].filter(([site]) => ENGINE_SOURCE.test(site));
   return { perFrame: engine.reduce((sum, [, bytes]) => sum + bytes, 0) / FRAMES, sites: JSON.stringify(engine), drawn };
+}
+
+/**
+ * Warms up, then samples `FRAMES` frames of `frames`, and once more when they pass the limit (KB-312). The warm-up
+ * leaves V8 little to compile during the sampled frames: its frames run in several calls, so the sampled call enters a
+ * driver already optimized as a whole (after one long warm-up call, optimized in place, the sampled call compiled the
+ * driver again and then the engine functions it calls, 25 to 30 KB of code at once, charged to whichever engine
+ * function ran); then the background compiler finishes, and a few frames install its code. V8 may still change a
+ * function's tier inside the window (its first tiers box every double: 80 bytes a call of `solveDrag` until its
+ * optimized code arrives), which happens once, while an allocation every frame shows in the next window too: the lower
+ * window counts.
+ */
+async function measured(
+  renderer: ReturnType<typeof fakeRenderer>['renderer'],
+  frames: (count: number, start: number) => void,
+): Promise<Sample> {
+  for (let start = 0; start < 5000; start += 1000) frames(1000, start);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  frames(100, 5000);
+  const first = await sampled(renderer, frames, 5100);
+  if (first.perFrame < MAX_BYTES_PER_FRAME) return first;
+  const second = await sampled(renderer, frames, 5100 + FRAMES);
+  return second.perFrame < first.perFrame ? second : first;
 }
 
 describe('frame loop allocation (F064)', () => {
@@ -123,9 +151,7 @@ describe('frame loop allocation (F064)', () => {
         dragFrames(globe, renderer, anchor, point, count, start),
       );
       expect(drawn).toBe(FRAMES);
-      // Any object allocated every frame costs at least 12 bytes; under half a byte per frame on average means no frame
-      // allocates (what remains is the test runner's module plumbing re-entering the interpreter now and then).
-      expect(perFrame, sites).toBeLessThan(0.5);
+      expect(perFrame, sites).toBeLessThan(MAX_BYTES_PER_FRAME);
       globe.destroy();
     },
     TIMEOUT_MS,
@@ -147,7 +173,7 @@ describe('frame loop allocation (F064)', () => {
       const { perFrame, sites } = await measured(renderer, (count, start) =>
         dragFrames(globe, renderer, anchor, point, count, start),
       );
-      expect(perFrame, sites).toBeLessThan(0.5);
+      expect(perFrame, sites).toBeLessThan(MAX_BYTES_PER_FRAME);
       globe.destroy();
     },
     TIMEOUT_MS,
@@ -165,7 +191,7 @@ describe('frame loop allocation (F064)', () => {
       const { perFrame, sites } = await measured(renderer, (count, start) =>
         zoomFrames(globe, renderer, point, count, start),
       );
-      expect(perFrame, sites).toBeLessThan(0.5);
+      expect(perFrame, sites).toBeLessThan(MAX_BYTES_PER_FRAME);
       globe.destroy();
     },
     TIMEOUT_MS,
@@ -213,7 +239,7 @@ describe('frame loop allocation (F064)', () => {
       const { perFrame, sites, drawn } = await measured(renderer, frames);
       expect(drawn).toBe(FRAMES);
       expect(seen.zoom).toBeGreaterThan(2);
-      expect(perFrame, sites).toBeLessThan(0.5);
+      expect(perFrame, sites).toBeLessThan(MAX_BYTES_PER_FRAME);
       globe.destroy();
     },
     TIMEOUT_MS,

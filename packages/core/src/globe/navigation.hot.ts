@@ -103,17 +103,18 @@ function writeZoomGuess(camera: Camera): void {
 }
 
 /**
- * Zooms by `deltaZoom` levels keeping the position under a screen point there, or about the target when the point is
- * off the globe; returns false for invalid input (nothing changes). `northUp` never turns the heading.
+ * Zooms by the levels in `step[0]` keeping the position under a screen point there, or about the target when the point
+ * is off the globe; returns false for an invalid point (nothing changes). `northUp` never turns the heading. The step
+ * comes in an array: a double passed to a call V8 does not inline is boxed, every frame of a wheel zoom (KB-312).
  */
 export function zoomCamera(
   camera: Camera,
   view: ViewState | undefined,
   point: unknown,
-  deltaZoom: unknown,
+  step: Float64Array,
   northUp: boolean,
 ): boolean {
-  if (typeof deltaZoom !== 'number' || !(deltaZoom - deltaZoom === 0) || !readPixel(point)) return false;
+  if (!readPixel(point)) return false;
   camera.update();
   // The point under the cursor as the frame shows it (ADR 0008: on the morphed surface).
   view?.update(camera);
@@ -122,7 +123,7 @@ export function zoomCamera(
   anchor[1] = pick.latitudeRad;
   anchor[2] = 0;
   zoomGuess[2] = camera.pose.rangeMeters;
-  camera.pose.rangeMeters *= 2 ** -deltaZoom;
+  camera.pose.rangeMeters *= 2 ** -(step[0] ?? 0);
   clampPoseRange(camera);
   if (anchored) writeZoomGuess(camera);
   camera.update();

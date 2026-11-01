@@ -75,7 +75,7 @@ export class ViewControl {
         if (typeof deltaZoom !== 'number' || !Number.isFinite(deltaZoom)) return;
         step[0] = host.zoomLimited() ? host.limitZoom(deltaZoom) : deltaZoom;
         host.limitToSurface(point, step);
-        if (zoomCamera(host.cam, host.view, point, step[0], this.northUp())) host.requestRender();
+        if (zoomCamera(host.cam, host.view, point, step, this.northUp())) host.requestRender();
       },
       preloadView: (view) => host.preloadView(view),
       requestUpdate: () => {

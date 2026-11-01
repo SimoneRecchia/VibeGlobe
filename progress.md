@@ -18,8 +18,10 @@ KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-3
 (`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
 hosts are refused). Also fixed: `main`'s flaky allocation test (KB-312): V8 compiled the test's own driver, then engine functions, inside
 the sampled frames, because the single warm-up call had been optimized in place; the warm-up now runs in several calls
-and lets the background compiler finish (10 of 10 runs pass, 2 of 4 failed before). Still open: KB-110, KB-208,
-KB-212, KB-240, KB-241 (CI pace), KB-317 (F609 since #93), KB-180, KB-181 (the owner's desktop views).
+and lets the background compiler finish (10 of 10 runs pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
+for `moveend` with the tilt policy off too, which made the engine request every drag frame from inside the previous
+one, so the benchmark sampled frame intervals; they listen only while an API movement runs (F609: about 0 ms again).
+Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's desktop views).
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

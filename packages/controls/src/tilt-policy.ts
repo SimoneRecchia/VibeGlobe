@@ -50,14 +50,27 @@ export class TiltPolicyState {
     for (const listener of this.listeners) listener(now);
   }
 
-  /** Follows the globe's API movements, which {@link TiltPolicyState.check} lets finish their tilt. */
+  /**
+   * Follows the globe's API movements, which {@link TiltPolicyState.check} lets finish their tilt. It listens for their
+   * end only while one runs: a `moveend` listener makes the engine draw every display frame of user input (F200), which
+   * the policy has no use for (KB-317).
+   */
   follow(globe: ConnectedGlobe): void {
     this.unfollow?.();
-    const offs = [
-      globe.on?.('movestart', ({ cause }) => (this.moving = cause === 'api')),
-      globe.on?.('moveend', () => (this.moving = false)),
-    ];
-    this.unfollow = () => offs.forEach((off) => off?.());
+    let offEnd: (() => void) | undefined;
+    const end = (): void => {
+      this.moving = false;
+      offEnd?.();
+      offEnd = undefined;
+    };
+    const offStart = globe.on?.('movestart', ({ cause }) => {
+      this.moving = cause === 'api';
+      if (this.moving) offEnd ??= globe.on?.('moveend', end);
+    });
+    this.unfollow = () => {
+      offStart?.();
+      offEnd?.();
+    };
   }
 
   /** Adds a listener of availability changes; returns its removal. */

@@ -32,19 +32,6 @@ export interface CopernicusDemSource {
   arcSeconds: 1 | 3;
 }
 
-/** Sentinel-2 cloudless original GeoTIFF tiles (EPSG:4326, 512 px, 2×2 metatiles per WMTS-simple level). */
-export interface S2CloudlessSource {
-  type: 's2cloudless';
-  /** Bucket or mirror URL holding `tiles/{level}/{col}/{row}.tif`. */
-  baseUrl: string;
-  /** Mosaic edition (year); only 2016 is accepted (license gate). */
-  edition: number;
-  /** Source level to read, 7–13 (13 is about 10 m per pixel). */
-  level: number;
-  /** Whether the bucket is requester-pays (requests are then signed with the consumer's AWS credentials). */
-  requesterPays: boolean;
-}
-
 /**
  * The ESA WorldCover Sentinel-2 RGBNIR yearly median composite (ADR 0026): one cloud-optimized GeoTIFF per 1° cell in
  * the public bucket `esa-worldcover-s2`, bands B04, B03, B02, B08 as uint16 reflectance × 10,000. Builds read only the
@@ -112,13 +99,7 @@ export interface PmtilesSource {
 
 /** The source of a dataset. */
 export type SourceConfig =
-  | CopernicusDemSource
-  | S2CloudlessSource
-  | WorldCoverSource
-  | GeoTiffSource
-  | OsmExtractSource
-  | XyzSource
-  | PmtilesSource;
+  CopernicusDemSource | WorldCoverSource | GeoTiffSource | OsmExtractSource | XyzSource | PmtilesSource;
 
 /**
  * A fixed colour stretch from reflectance (× 10,000) to 8-bit RGB (ADR 0026):

@@ -276,21 +276,29 @@ if (!fonts.startsWith('https://app.example/maps/europe-1.0.0/openfreemap/fonts/'
 
 `addSources` adds the application's imagery sources to the satellite layer, above the preset's (or below with
 `position: 'bottom'`), with their terms. Give each one an `area` so it is asked only within its borders; the source
-below it is used elsewhere. A customer's Google Maps Platform key is read from the environment or the customer's
-configuration, never committed:
+below it is used elsewhere. A paid provider of the customer's own (Google's Map Tiles API, a national agency's paid
+service, …) is connected from the application's code through the generic adapters, with its key read from the
+environment or the customer's configuration, never committed, and a profile with its terms:
 
 ```ts
 import { createOffline } from '@vibeglobe/offline';
 import { europeOpen } from '@vibeglobe/presets';
-import { googleImagery, xyzImagery } from '@vibeglobe/sources';
+import { fetchTransport, withProfile, xyzImagery } from '@vibeglobe/sources';
 
-const google = await googleImagery({
-  id: 'google',
-  apiKey: customerKey, // the customer's restricted key
-  billingRegion: 'other', // satellite tiles are not offered to EEA billing accounts
-  mapType: 'satellite',
-  logoUrl: '/assets/google-logo.png',
-});
+// The customer's provider: its key added only when a tile is requested, its terms in its profile.
+const provider = withProfile(
+  xyzImagery({
+    id: 'provider',
+    url: 'https://tiles.provider.example/{z}/{x}/{y}.jpg',
+    transport: fetchTransport(undefined, undefined, { secretQuery: () => ({ key: customerKey }) }),
+  }),
+  {
+    id: 'provider',
+    forbids: new Set(['persistentCache', 'offlinePackaging']),
+    respectCacheHeaders: true,
+    requiredAttribution: { text: 'Provider' },
+  },
+);
 // A national orthophoto, asked for only inside its polygon (here a box around South Tyrol).
 const orthophoto = xyzImagery({
   id: 'my-orthophoto',
@@ -331,15 +339,16 @@ const preset = europeOpen({
       record: record('my-orthophoto', 'My orthophoto', 'CC BY 4.0', 'https://ortho.example/terms'),
     },
     {
-      source: google,
-      record: record('google', 'Google', 'Google Maps Platform terms', 'https://cloud.google.com/maps-platform/terms'),
+      source: provider,
+      record: record('provider', 'Provider', "The provider's terms", 'https://provider.example/terms'),
       position: 'bottom',
     },
   ],
 });
 ```
 
-Google's tiles are never packaged or cached persistently (the Google profile, [ADR 0031](../adr/0031-google-maps-platform-terms.md)).
+The provider's tiles are never packaged or cached persistently: its profile says so. The [sources guide](sources.md)
+shows Google's Map Tiles API connected this way.
 
 ## National and regional orthophotos
 

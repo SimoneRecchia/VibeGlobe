@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-01: no Google adapter, no Sentinel-2 cloudless; any provider from the application (F679, ADR 0185)
+
+After an audit of the connected maps (every default source allows commercial use), the owner removed what no default
+uses: the Google adapters (2D tiles, Street View, Photorealistic 3D Tiles, their fixtures, scenario, specs and live
+steps) and the pipeline's Sentinel-2 cloudless reader, whose only accepted edition EOX now reserves to its commercial
+licence. Applications connect any provider from their own code: a transport adds keys and sessions, a profile declares
+the required credit and logo, `displayOnly` and the forbidden loading features (sources guide, "Commercial providers,
+from your own code"). Fifteen entries superseded by F679 and F680 (`docs/feature-changes.md`).
+
 ## 2026-11-01: rows that pass through a panel, terrain switched off at any tilt (F677, F678, owner's request)
 
 An application's panel editor laid its rows at the phase that held the most panels, often half a row off the tables an

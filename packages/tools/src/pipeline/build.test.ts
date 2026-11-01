@@ -103,14 +103,11 @@ describe('runBuild', { timeout: 30_000 }, () => {
       {
         ...terrain,
         kind: 'imagery',
-        profile: 's2cloudless-2016',
+        profile: 'fixture',
         encoding: 'jpeg',
         source: {
-          type: 's2cloudless',
-          baseUrl: 'https://s3.example.test',
-          edition: 2018,
-          level: 13,
-          requesterPays: true,
+          type: 'xyz',
+          url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/{z}/{y}/{x}.jpg',
         },
       },
       /2018 and later editions.*non-commercial/,

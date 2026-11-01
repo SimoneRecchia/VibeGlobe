@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG_DIR } from '../cli.js';
 import { estimateBuild } from '../pipeline/build.js';
 import { configProblems, loadConfig } from './load.js';
-import type { S2CloudlessSource } from './schema.js';
 
 const shipped = readdirSync(CONFIG_DIR).filter((f) => f.endsWith('.json') && !f.endsWith('.lock.json'));
 
@@ -43,19 +42,8 @@ describe('configuration files', () => {
     const estimate = estimateBuild(italy, { sample: false });
     const imagery = estimate.datasets.find((d) => d.dataset === 'imagery');
     expect(imagery?.zooms.map((z) => z.z)).toEqual([9, 10, 11, 12, 13, 14]);
-    // Every default source is free to download (ADR 0026); a requester-pays source is priced.
+    // Every default source is free to download (ADR 0026).
     expect(estimate.cost).toBe(0);
     expect(estimate.downloadBytes).toBeGreaterThan(1e9);
-    const requesterPays: S2CloudlessSource = {
-      type: 's2cloudless',
-      baseUrl: 'https://s3.example.test',
-      edition: 2016,
-      level: 13,
-      requesterPays: true,
-    };
-    const datasets = italy.config.datasets.map((d) => (d.id === 'imagery' ? { ...d, source: requesterPays } : d));
-    expect(estimateBuild({ ...italy, config: { ...italy.config, datasets } }, { sample: false }).cost).toBeGreaterThan(
-      0,
-    );
   });
 });

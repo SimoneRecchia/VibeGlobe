@@ -1,6 +1,6 @@
 # 0031. Google Maps Platform terms and the Google profile
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0185)
 - Date: 2026-10-22
 - Milestone: M7 (source adapters track)
 
@@ -45,3 +45,8 @@ The owner read the pages from an unrestricted network on 2026-10-24 (open questi
 
 - **Map Tiles API in the EEA** ([EEA guide](https://developers.google.com/maps/comms/eea/map-tiles)): for billing accounts in the European Economic Area (projects created or modified after 8 July 2025), 2D satellite tiles are not available, Photorealistic 3D Tiles answer 403, and Street View tiles may not be used with any map; roadmap and terrain remain. `assertAvailableInRegion` makes the adapters refuse these for `billingRegion: 'eea'` with the configuration error `not-available-in-eea`, which names the EEA terms: `googleImagery` with `mapType: 'satellite'` or the `layerStreetview` layer, `googleStreetView`, and `google3dTiles`. The playground shows the error as its configuration message. The live suite (`npm run test:live-sources`) runs as the owner's EEA account by default (`GOOGLE_BILLING_REGION`, `other` for a non-EEA key): it requests only roadmap and terrain, and reports satellite and Street View as skipped with the reason. The 3D Tiles end-to-end tests use the real key only for a non-EEA account and the Map Tiles stand-in otherwise. The owner's billing account is in the EEA, so F468 and F469, which need a real 3D Tiles session, are superseded by F572 (the EEA refusal, and the non-EEA path against the stand-in) and F573 (session renewal against the stand-in).
 - **Attribution policy, updated 2026-10-21:** show the "Google Maps" logo (Google's official assets, 16–19 px high, with clear space of 10 px left, right and top and 5 px below, accessible label "Google Maps"); the text "Google Maps" where space is short. It never overlaps the renderer's logo or the data attributions. The required attribution is now `Google Maps` (`alt` "Google Maps" with `logoUrl`). Provider logos render 16 px high with that clear space, in the engine's credits and in the UI's attribution (`--vg-ui-logo-height`, `--vg-ui-logo-clear`, `--vg-ui-logo-clear-bottom`). Photorealistic 3D Tiles copyrights are aggregated, sorted (most frequent first) and shown in one line (F470, unchanged).
+
+## Update 2026-11-01
+
+The library no longer ships the Google adapters ([ADR 0185](0185-no-proprietary-provider-adapters.md)): an application
+connects Google from its own code through the generic sources and a profile of these terms.

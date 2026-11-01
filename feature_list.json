@@ -8170,6 +8170,27 @@
         "Run a build whose imagery source names a Sentinel-2 cloudless layer and assert it stops at the license gate"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F681",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`layoutPanels` takes `moving`, the panels moved by hand: each takes the place nearest where it is dropped, occupied or not, and the panels in the way shift along the rows one place each toward the nearest free place, so no panel overlaps another, none is lost while a free place is left, and the rows keep their order.",
+      "steps": [
+        "Unit-test that a panel dropped on the first place of a row takes it and the panels after it shift one place along in order",
+        "Unit-test that a panel dragged across a full row leaves every panel placed and none overlapping"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F682",
+      "milestone": 13,
+      "section": "Data layers for applications",
+      "description": "`layoutPanels` takes `spill`: the panels the perimeters cannot hold line up in rows as wide as the perimeters beyond the last row, outside them and apart, instead of coming back undefined, so an editor shows every panel and which ones have no room.",
+      "steps": [
+        "Unit-test that the panels without room stand beyond the last row, outside the perimeter, without overlapping each other or the placed ones"
+      ],
+      "status": "passing"
     }
   ]
 }

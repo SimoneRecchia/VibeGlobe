@@ -99,6 +99,10 @@ find no place come back undefined. A scanline over each row keeps it fast enough
 An `anchor` (a panel seen in an aerial image, or one already placed) lines the rows up with it, every place a whole
 number of steps away (F677); without one the rows take the phase that holds the most panels. Giving every panel its
 current place as `wanted`, in priority order, snaps them back onto even rows after a drag without any overlapping.
+While a panel is dragged, pass its index in `moving` (F681): it takes the place nearest where it is dropped and the
+panels in the way shift along the rows, one place each, toward the nearest free place, keeping their order. With
+`spill` (F682) the panels the perimeters cannot hold line up beyond the last row, outside them, instead of coming
+back undefined: an editor shows every panel and which ones still need room.
 
 ```ts
 import { gridLines, layoutPanels } from '@vibeglobe/gis';

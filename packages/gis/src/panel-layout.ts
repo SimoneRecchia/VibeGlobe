@@ -4,7 +4,8 @@
  * Lays out identical rectangles, such as the tables of a solar park, in rows inside one or more perimeters (F658):
  * rows run along a bearing and fill from the far side across them, panels already placed by hand keep their places
  * and the others go around them, and all the panels shrink alike when the perimeters cannot hold them at their size.
- * A scanline over each row's band keeps it fast enough to run on every drag of a panel.
+ * A panel dragged onto others makes them shift along the rows (F681), and panels left without room line up outside
+ * (F682). A scanline over each row's band keeps it fast enough to run on every drag of a panel.
  */
 import type { LonLat } from './format.js';
 
@@ -38,9 +39,17 @@ export interface PanelLayoutOptions {
    * rows line up with it; by default the rows take the phase that holds the most panels.
    */
   readonly anchor?: LonLat;
+  /**
+   * Panels moved by hand, by index, in the order they are placed (F681): each takes the place nearest its wanted
+   * position, and the panels in the way shift along the rows, in order, toward the nearest free place, so none overlaps
+   * and the rows keep their order. The others take the free places nearest their wanted positions first.
+   */
+  readonly moving?: readonly number[];
+  /** Whether panels left without room line up in rows beyond the last one, outside the perimeters (F682). */
+  readonly spill?: boolean;
 }
 
-/** A layout: each panel's center (undefined when no place was left) and the size share all of them were given. */
+/** A layout: each panel's center (undefined when no place was left and none spill) and the size share they were given. */
 export interface PanelLayout {
   readonly centers: readonly (LonLat | undefined)[];
   readonly scale: number;
@@ -123,12 +132,13 @@ interface Grid {
   readonly rings: readonly (readonly Point[])[];
   readonly fixed: readonly Point[];
   readonly minX: number;
+  readonly maxX: number;
   readonly minY: number;
   readonly maxY: number;
 }
 
 /** Every place a panel fits at a scale and grid phase, rows from the far side, left to right along each row. */
-type Sizes = Required<Omit<PanelLayoutOptions, 'fixed' | 'wanted' | 'anchor'>>;
+type Sizes = Required<Omit<PanelLayoutOptions, 'fixed' | 'wanted' | 'anchor' | 'moving' | 'spill'>>;
 
 function places(grid: Grid, o: Sizes, scale: number, phase: Point) {
   const w = o.widthM * scale;
@@ -142,7 +152,8 @@ function places(grid: Grid, o: Sizes, scale: number, phase: Point) {
     for (const [fx, fy] of grid.fixed)
       if (fy + d / 2 + o.rowGapM > y0 && fy - d / 2 - o.rowGapM < top)
         ranges = subtract(ranges, [fx - w / 2 - o.gapM, fx + w / 2 + o.gapM]);
-    for (const [a, b] of ranges) {
+    // Left to right across every perimeter, so neighbouring places are neighbours in the row.
+    for (const [a, b] of ranges.sort(([a0], [b0]) => a0 - b0)) {
       const first = Math.ceil((a - grid.minX - phase[0]) / pitchX - 1e-9);
       for (let k = first; ; k++) {
         const x = grid.minX + phase[0] + k * pitchX;
@@ -226,9 +237,9 @@ class PlaceIndex {
 
 /**
  * Places `count` panels inside the perimeters (F658): at their size when there is room, else all shrunk alike, never
- * below `minScale`; panels that still find no place come back undefined. Panels with a wanted position take the
- * free place nearest to it, the others the free places in order: rows from the far side of the bearing's left, each
- * from the start of the row.
+ * below `minScale`; panels that still find no place come back undefined, or line up outside with `spill` (F682).
+ * Panels with a wanted position take the free place nearest to it, the others the free places in order: rows from
+ * the far side of the bearing's left, each from the start of the row; `moving` panels push the others along (F681).
  */
 export function layoutPanels(options: PanelLayoutOptions): PanelLayout {
   const o = {
@@ -249,6 +260,7 @@ export function layoutPanels(options: PanelLayoutOptions): PanelLayout {
     rings,
     fixed: (options.fixed ?? []).map((p) => frame.toLocal(p)),
     minX: Math.min(...all.map(([x]) => x)),
+    maxX: Math.max(...all.map(([x]) => x)),
     minY: Math.min(...all.map(([, y]) => y)),
     maxY: Math.max(...all.map(([, y]) => y)),
   };
@@ -266,24 +278,86 @@ export function layoutPanels(options: PanelLayoutOptions): PanelLayout {
       else hi = mid;
     }
   }
-  const taken = new Set<number>();
-  const centers: (LonLat | undefined)[] = new Array<LonLat | undefined>(o.count).fill(undefined);
-  const wanted = options.wanted ?? [];
-  const index = new PlaceIndex(free, (o.widthM + o.gapM) * scale);
-  const order = [...Array(o.count).keys()].sort(
-    (a, b) => Number(wanted[b] !== undefined) - Number(wanted[a] !== undefined),
+  const centers = assign(free, o.count, options, (place) => frame.toLocal(place), (o.widthM + o.gapM) * scale).map(
+    (place) => (place < 0 ? undefined : frame.toLonLat(free[place] as Point)),
   );
+  if (options.spill) spill(centers, grid, o, scale, (point) => frame.toLonLat(point));
+  return { centers, scale };
+}
+
+const NOTHING: ReadonlySet<number> = new Set();
+
+/**
+ * Each panel's place index, or -1: the panels not moving take the free place nearest their wanted position (else the
+ * next free one, in order), then each moving one the place nearest its own, the panels in the way shifting along the
+ * rows one place each toward the nearest free place (F681).
+ */
+function assign(
+  free: readonly Point[],
+  count: number,
+  { wanted = [], moving = [] }: PanelLayoutOptions,
+  toLocal: (p: LonLat) => Point,
+  cellM: number,
+): number[] {
+  const index = new PlaceIndex(free, cellM);
+  const holder = new Array<number>(free.length).fill(-1);
+  const placeOf = new Array<number>(count).fill(-1);
+  const taken = new Set<number>();
+  const put = (panel: number, place: number): void => {
+    holder[place] = panel;
+    placeOf[panel] = place;
+    taken.add(place);
+  };
+  const held = (place: number): boolean => (holder[place] ?? -1) >= 0;
+  const makeRoom = (place: number): boolean => {
+    let after = place;
+    let before = place;
+    while (after < free.length && held(after)) after++;
+    while (before >= 0 && held(before)) before--;
+    const forward = after < free.length && (before < 0 || after - place <= place - before);
+    if (!forward && before < 0) return false;
+    const step = forward ? -1 : 1;
+    for (let at = forward ? after : before; at !== place; at += step) put(holder[at + step] ?? -1, at);
+    return true;
+  };
   let next = 0;
   const nextFree = (): number => {
     while (next < free.length && taken.has(next)) next++;
     return next < free.length ? next : -1;
   };
+  const moved = new Set(moving);
+  const order = [...Array(count).keys()]
+    .filter((panel) => !moved.has(panel))
+    .sort((a, b) => Number(wanted[b] !== undefined) - Number(wanted[a] !== undefined));
   for (const panel of order) {
     const want = wanted[panel];
-    const place = want ? index.nearest(frame.toLocal(want), taken) : nextFree();
-    if (place < 0) continue;
-    taken.add(place);
-    centers[panel] = frame.toLonLat(free[place] as Point);
+    const place = want ? index.nearest(toLocal(want), taken) : nextFree();
+    if (place >= 0) put(panel, place);
   }
-  return { centers, scale };
+  for (const panel of moving) {
+    const want = wanted[panel];
+    const place = want ? index.nearest(toLocal(want), NOTHING) : nextFree();
+    if (place >= 0 && makeRoom(place)) put(panel, place);
+  }
+  return placeOf;
+}
+
+/** Panels without a place, in rows as wide as the perimeters, beyond the last row (F682). */
+function spill(
+  centers: (LonLat | undefined)[],
+  grid: Grid,
+  o: Sizes,
+  scale: number,
+  toLonLat: (point: Point) => LonLat,
+): void {
+  const w = o.widthM * scale;
+  const d = o.depthM * scale;
+  const perRow = Math.max(1, Math.floor((grid.maxX - grid.minX + o.gapM) / (w + o.gapM)));
+  let k = 0;
+  centers.forEach((center, panel) => {
+    if (center) return;
+    const x = grid.minX + w / 2 + (k % perRow) * (w + o.gapM);
+    centers[panel] = toLonLat([x, grid.minY - o.rowGapM - d / 2 - Math.floor(k / perRow) * (d + o.rowGapM)]);
+    k++;
+  });
 }

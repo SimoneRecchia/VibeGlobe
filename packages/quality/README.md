@@ -45,7 +45,9 @@ chooses `ultra`.
 Adaptive quality (`adaptive`, default `true`) judges the median of the last 30 frame intervals against 60 fps. It
 lowers one step after 500 ms above 1.15 × the target, and raises one after 3 s below 0.75 × the target, with at least
 2 s between changes. Steps alternate resolution × 0.85 and screen error × 1.4, down to 0.4 and 8 px; effects stay.
-An object for `adaptive` overrides `GOVERNOR_DEFAULTS`.
+An object for `adaptive` overrides `GOVERNOR_DEFAULTS`. The lowered step applies while the camera moves: once it rests
+(the engine idles, or the camera has been still for 150 ms while an animation draws) the preset shows in full
+(`reason` `'rest'`), and the camera's first move brings the step back at once (`'motion'`); `level` keeps the step.
 
 ## Pitfalls
 

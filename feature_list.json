@@ -8233,6 +8233,16 @@
         "Unit-test that a tile within the reach of the land is requested and one beyond it is not, and that its mask carries the land's reach in pixels at the fade's scale"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F688",
+      "milestone": 13,
+      "section": "Performance and quality targets",
+      "description": "Adaptive quality rests with the camera: the governor's lowered step applies while the camera moves; once it rests (the engine idles, or the camera has been still for 150 ms while an animation draws) the preset shows in full, and the camera's first move brings the step back at once, so a still view is never left blurred by a slow movement.",
+      "steps": [
+        "Unit-test that slow frames during motion lower the level, an idle engine shows the preset in full with the level kept, the first move applies the level again, and frames drawn without camera motion rest after 150 ms without lowering it"
+      ],
+      "status": "passing"
     }
   ]
 }

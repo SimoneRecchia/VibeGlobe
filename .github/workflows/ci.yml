@@ -294,6 +294,9 @@ jobs:
       VIBEGLOBE_DEVICE: ci-swiftshader
     steps:
       - uses: actions/checkout@v7
+      # The reports record the commit; in the container the checkout belongs to another user (git's safe.directory), so
+      # `git rev-parse` failed and no benchmark report was written.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci

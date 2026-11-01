@@ -53,13 +53,19 @@ function createWarmUpScene(materials: readonly Material[]): WarmUpScene {
 /**
  * Compiles every material variant before the frames that draw it (ADR 0010 §4), so no frame waits for a pipeline.
  * Drawing an empty scene once also compiles three.js's output pass, which copies the scene into the canvas; the canvas
- * shows a cleared frame until the first frame.
+ * shows a cleared frame until the first frame. Not once the renderer was released while compiling (`inUse` false): a
+ * draw after `dispose()` registers the output pass on three.js's shared quad geometry, which then keeps the renderer,
+ * its canvas and the engine alive for good (TG-06).
  */
-export async function warmUpPipelines(renderer: WebGPURenderer, materials: readonly Material[]): Promise<void> {
+export async function warmUpPipelines(
+  renderer: WebGPURenderer,
+  materials: readonly Material[],
+  inUse: (renderer: WebGPURenderer) => boolean,
+): Promise<void> {
   const warmUp = createWarmUpScene(materials);
   try {
     await renderer.compileAsync(warmUp.scene, warmUp.camera);
-    renderer.render(new Scene(), warmUp.camera);
+    if (inUse(renderer)) renderer.render(new Scene(), warmUp.camera);
   } finally {
     warmUp.dispose();
   }

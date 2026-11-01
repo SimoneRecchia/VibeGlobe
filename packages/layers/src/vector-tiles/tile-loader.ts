@@ -8,6 +8,7 @@
  * keeps the most recently used ones within its size.
  */
 import type { AbortHandle, NetworkPool, TileTransport, TransportResult, WorkerPool } from '@vibeglobe/core';
+import { FAILURE_TRANSIENT, classifyTransportResult } from '@vibeglobe/core/layers';
 import { layoutDecodable, type Bucket } from './layout-tile.js';
 import type { StyleLayerJson } from './style-layer.js';
 import { tileKey, type TileId } from './tile-pyramid.js';
@@ -19,6 +20,13 @@ export interface LoadedTile {
   readonly buckets: readonly Bucket[];
   /** The layout version these buckets were made for. */
   readonly version: number;
+  /** The layout version of each layer's bucket, where an older one was kept (a relayout of other layers, TD-02). */
+  readonly versions?: ReadonlyMap<string, number>;
+}
+
+/** The layout version a tile's bucket for a layer was made at: its meshes and labels are kept while it holds. */
+export function bucketVersion(loaded: LoadedTile, layerId: string): number {
+  return loaded.versions?.get(layerId) ?? loaded.version;
 }
 
 /** A tile a frame wants, with its URL and priority (lower first). */
@@ -71,6 +79,8 @@ export class VectorTileLoader {
   private readonly entries = new Map<string, Entry>();
   private layers: readonly StyleLayerJson[] = [];
   private version = 0;
+  /** The layers changed since the version `from`: tiles laid out at it lay out those layers alone (TD-02). */
+  private partial: { readonly from: number; readonly layers: ReadonlySet<string> } | undefined;
   private frame = 0;
   private direct = 0;
   private readonly hosts = new Map<string, number>();
@@ -89,10 +99,14 @@ export class VectorTileLoader {
     });
   }
 
-  /** The style layers of this source and the layout version they belong to; a new version lays out tiles again. */
-  setLayers(layers: readonly StyleLayerJson[], version: number): void {
+  /**
+   * The style layers of this source and the layout version they belong to; a new version lays out tiles again, only the
+   * `changed` layers when given (a filter or layout change: the other layers keep their buckets and meshes, TD-02).
+   */
+  setLayers(layers: readonly StyleLayerJson[], version: number, changed?: ReadonlySet<string>): void {
     this.layers = layers;
     if (version === this.version) return;
+    this.partial = changed && changed.size > 0 ? { from: this.version, layers: new Set(changed) } : undefined;
     this.version = version;
     // The tiles the last frame used now; the others when a frame wants them again (`update`).
     for (const entry of this.entries.values())
@@ -281,10 +295,14 @@ export class VectorTileLoader {
     if (result.kind === 'ok' && result.bytes.byteLength > 0 && !result.contentType.startsWith('text/html')) {
       entry.bytes = result.bytes;
       this.layout(entry);
-    } else if (result.kind === 'ok' || (result.kind === 'status' && (result.status === 404 || result.status === 204))) {
-      entry.state = 'missing';
-      this.options.onReady();
-    } else if (result.kind !== 'aborted') this.failed(entry);
+    } else if (result.kind !== 'aborted') {
+      // No data (404, 204, an empty body) or refused for good (401, 403, 410, CORS): a retry would only repeat it.
+      if (classifyTransportResult(result) === FAILURE_TRANSIENT) this.failed(entry);
+      else {
+        entry.state = 'missing';
+        this.options.onReady();
+      }
+    }
     this.pump();
   }
 
@@ -313,13 +331,28 @@ export class VectorTileLoader {
     const bytes = entry.bytes;
     if (bytes === undefined) return;
     const version = this.version;
-    const input = { bytes: bytes.slice(0), layers: this.layers, zoom: entry.tile.z, tile: entry.tile };
+    // Laid out at the version before the change, with nothing else running: only the changed layers again (TD-02).
+    const partial =
+      this.partial !== undefined && entry.loaded?.version === this.partial.from && entry.task === undefined
+        ? this.partial
+        : undefined;
+    const layers = partial ? this.layers.filter((l) => partial.layers.has(l.id)) : this.layers;
+    const input = { bytes: bytes.slice(0), layers, zoom: entry.tile.z, tile: entry.tile };
     if (entry.state !== 'ready') entry.state = 'layout';
-    const finish = (buckets: Bucket[]) => {
+    const finish = (laidOut: Bucket[]) => {
       entry.task = undefined;
       if (this.disposed || this.entries.get(entry.key) !== entry) return;
       if (entry.loaded !== undefined && entry.loaded.version > version) return;
-      entry.loaded = { key: entry.key, tile: entry.tile, buckets, version };
+      const kept = entry.loaded;
+      // Replaced meanwhile: the next frame lays the tile out whole (it is stale).
+      if (partial && kept?.version !== partial.from) return;
+      const buckets =
+        kept && partial ? [...kept.buckets.filter((b) => !partial.layers.has(b.layerId)), ...laidOut] : laidOut;
+      const versions = new Map<string, number>();
+      if (partial && kept)
+        for (const b of kept.buckets)
+          if (!partial.layers.has(b.layerId)) versions.set(b.layerId, bucketVersion(kept, b.layerId));
+      entry.loaded = { key: entry.key, tile: entry.tile, buckets, version, versions };
       entry.state = 'ready';
       this.options.onReady();
     };

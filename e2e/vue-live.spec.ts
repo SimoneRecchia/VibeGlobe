@@ -1,6 +1,6 @@
 // The Vue adapter's reactive props on a running engine (F474) and its child components (F476), on the live example
 // page (apps/adapter-examples/src/LiveApp.vue).
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 import { openExample } from './support/adapters.ts';
 
 test.use({ viewport: { width: 480, height: 360 } });
@@ -67,9 +67,13 @@ test('reactive props change the running engine in place, without a remount or do
   page,
 }) => {
   const tiles: string[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/fixture-tiles/')) tiles.push(new URL(request.url()).pathname);
-  });
+  const downloaded: string[] = [];
+  const record = (list: string[]) => (request: Request) => {
+    if (request.url().includes('/fixture-tiles/')) list.push(new URL(request.url()).pathname);
+  };
+  page.on('request', record(tiles));
+  // A request the engine cancels (its tile left the view or the wanted levels) fails instead of finishing (KB-206).
+  page.on('requestfinished', record(downloaded));
   await openExample(page, 'live.html?backend=webgl2');
   await idle(page);
   await page.evaluate(() => {
@@ -138,13 +142,14 @@ test('reactive props change the running engine in place, without a remount or do
       .poll(() => page.evaluate(() => window.adapterExample?.globes()[0]?.qualitySettings))
       .toMatchObject({ resolutionScale: scale, maxScreenErrorPx: screenError });
   }
-  // Same engine, same canvas; no tile requested twice.
+  // Same engine, same canvas; no tile downloaded twice. A tile cancelled by a change and requested again later is not
+  // downloaded twice (KB-206).
   const same = await page.evaluate(() => {
     const [globe, canvas] = (window as unknown as { kept: unknown[] }).kept;
     return globe === window.adapterExample?.globes()[0] && canvas === document.querySelector('.vibeglobe canvas');
   });
   expect(same).toBe(true);
-  expect(tiles.length).toBe(new Set(tiles).size);
+  expect(downloaded.length).toBe(new Set(downloaded).size);
 });
 
 test('child components add, update and remove data layers, markers and controls (F476)', async ({ page }) => {

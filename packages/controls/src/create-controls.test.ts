@@ -546,6 +546,18 @@ describe('the tilt policy (F625)', () => {
     h.frame();
     expect(globe.viewMode).toBe('auto');
   });
+
+  it('listens for moveend only while an API movement runs: a listener keeps the engine drawing through input (KB-317)', () => {
+    const h = controlsHarness({ tiltPolicy: true });
+    const globe = h.globe as unknown as { handlers: Map<string, unknown>; emit(event: string, payload: unknown): void };
+    expect(globe.handlers.has('moveend')).toBe(false);
+    globe.emit('movestart', { cause: 'user' });
+    expect(globe.handlers.has('moveend')).toBe(false);
+    globe.emit('movestart', { cause: 'api' });
+    expect(globe.handlers.has('moveend')).toBe(true);
+    globe.emit('moveend', { cause: 'api', outcome: 'completed' });
+    expect(globe.handlers.has('moveend')).toBe(false);
+  });
 });
 
 describe('sky drags and overlays laid over the map (F654)', () => {

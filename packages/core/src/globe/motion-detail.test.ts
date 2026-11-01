@@ -37,6 +37,28 @@ describe('motion-aware detail (F288, F301)', () => {
     expect(run(motion, camera, clock, 31, 0)).toBe(1);
   });
 
+  it('takes no coarser detail for a fast zoom out, which coarsens the view by itself, but does for a fast zoom in (KB-309)', () => {
+    const zoom = (scalePerFrame: number): number => {
+      const camera = new Camera();
+      camera.pose.rangeMeters = 2_000;
+      camera.update();
+      const motion = new MotionDetail();
+      const clock = new Float64Array(1);
+      let factor = 1;
+      // From zoom 12.5 to 4 in 1.5 s (about 360 times the range), or the same zoom in.
+      for (let i = 0; i < 90; i++) {
+        clock[0] = (clock[0] ?? 0) + 16;
+        camera.pose.rangeMeters *= scalePerFrame;
+        camera.update();
+        motion.update(camera, clock, undefined);
+        factor = Math.max(factor, motion.factor);
+      }
+      return factor;
+    };
+    expect(zoom(360 ** (1 / 90))).toBe(1);
+    expect(zoom(360 ** (-1 / 90))).toBe(4);
+  });
+
   it('takes a jump as no motion: full detail at once (F085)', () => {
     const camera = new Camera();
     camera.pose.rangeMeters = 50_000;

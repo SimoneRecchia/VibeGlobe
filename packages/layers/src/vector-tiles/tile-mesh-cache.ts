@@ -11,7 +11,7 @@ import type { TileGrounds } from './drape.js';
 import { tileOrigin } from './globe-vertices.js';
 import type { Bucket, BucketFeature } from './layout-tile.js';
 import type { FeatureStateMap, StyleLayer } from './style-layer.js';
-import type { LoadedTile } from './tile-loader.js';
+import { bucketVersion, type LoadedTile } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
 import { tileKey, type TileId } from './tile-pyramid.js';
 import {
@@ -122,7 +122,8 @@ export class TileMeshCache {
     part?: PaintPart,
   ): PaintedMesh | typeof DEFERRED | undefined {
     const { loaded, tile, sourceId } = from;
-    const key = `${sourceId}|${loaded?.key ?? tileKey(tile)}|${layer.id}|${loaded?.version ?? 0}|${part ?? ''}`;
+    const version = loaded ? bucketVersion(loaded, layer.id) : 0;
+    const key = `${sourceId}|${loaded?.key ?? tileKey(tile)}|${layer.id}|${version}|${part ?? ''}`;
     let entry = this.meshes.get(key);
     const state = (f: BucketFeature) => this.stateOf(sourceId, f);
     if (entry === undefined) {

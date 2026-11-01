@@ -96,7 +96,8 @@ export class LayerBatches implements LayerRenderTarget {
   /** Label distance fields (F358), created with the first label. */
   private labels: LabelSdf | undefined;
   private readonly waits = new FieldWaits<Batch>();
-  private contentReady: (() => void) | undefined;
+  /** Asks the engine for another frame: label fields arrived, or work spread over frames goes on (KB-315). */
+  contentReady: (() => void) | undefined;
   /** Images and label fields as the geometry builders read them. */
   private readonly images: QuadImages = {
     text: (text, sizePx, font, feature) => this.labelSdf().quad(text, sizePx, font) ?? this.waits.note(feature),

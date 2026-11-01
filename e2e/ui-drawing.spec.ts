@@ -90,6 +90,33 @@ async function redOnGround(page: Page, lon: number, lat: number): Promise<boolea
   );
 }
 
+/**
+ * How much redder (in r − g and r − b) a ground position is drawn than another one: a polygon's translucent fill (25%
+ * by default) tints its ground red, by about 20 in each over this view's grey-green relief, where bare ground differs by 4 at most.
+ */
+async function redderThan(page: Page, inside: [number, number], outside: [number, number]): Promise<number> {
+  return page.evaluate(
+    async ([a, b]) => {
+      const globe = window.vibeglobePlayground?.globe;
+      if (globe === undefined) throw new Error('no globe');
+      const frame = await globe.captureFrame();
+      const scale = frame.widthPx / (document.getElementById('app')?.clientWidth ?? frame.widthPx);
+      const tint = ([longitudeDeg, latitudeDeg]: [number, number]): number[] => {
+        const heightMeters = globe.elevationAt({ longitudeDeg, latitudeDeg }).heightMeters;
+        const point = globe.geoToScreen({ longitudeDeg, latitudeDeg, heightMeters });
+        if (point === undefined) throw new Error('off screen');
+        const i = (Math.round(point.yPx * scale) * frame.widthPx + Math.round(point.xPx * scale)) * 4;
+        const [r, g, bl] = [frame.rgba[i] ?? 0, frame.rgba[i + 1] ?? 0, frame.rgba[i + 2] ?? 0];
+        return [r - g, r - bl];
+      };
+      const [inR, inB] = tint(a);
+      const [outR, outB] = tint(b);
+      return Math.min((inR ?? 0) - (outR ?? 0), (inB ?? 0) - (outB ?? 0));
+    },
+    [inside, outside] as const,
+  );
+}
+
 const closeTo = (actual: number[] | undefined, expected: number[], digits = 9): void => {
   expect(actual?.[0]).toBeCloseTo(expected[0] ?? NaN, digits);
   expect(actual?.[1]).toBeCloseTo(expected[1] ?? NaN, digits);
@@ -313,11 +340,11 @@ test.describe('drawing polygons (F409)', () => {
     await expect(page.locator('.vg-ui__draw .vg-ui__status')).toHaveText('The polygon crosses itself');
     drawn = await shapes(page);
     expect(drawn).toHaveLength(3);
-    // Draped: the inside of the first polygon is filled on the terrain.
+    // Draped: the inside of the first polygon is tinted by its translucent fill on the terrain, against the ground just
+    // below the polygon (KB-285 made the fill's opacity apply; it was drawn opaque before).
     await page.locator('.vg-ui__button--draw-cancel').click();
     await waitForIdle(page);
-    const inside = await geoAt(page, 225, 190);
-    expect(await redOnGround(page, inside[0], inside[1])).toBe(true);
+    expect(await redderThan(page, await geoAt(page, 225, 190), await geoAt(page, 225, 275))).toBeGreaterThan(12);
   });
 });
 

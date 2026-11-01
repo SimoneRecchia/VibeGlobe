@@ -27,6 +27,30 @@ shows at the middle of the part the padding leaves, measured on screen from how 
 its height (tilt and parallax counted), and the zoom found is the largest where everything shows inside that part. The
 follow-up of #91 is done.
 
+## 2026-11-01: open known bugs and classic engine bugs (owner's request)
+
+The owner asked to close the open questions and known bugs, and to check other globe and map engines' classic bugs
+against VibeGlobe. Open questions have none open (only owner steps remain pending). Fixed, each with a regression
+test: WebGPU engines kept alive after a fast mount and destroy (TG-06: the warm-up's empty frame on a renderer released
+while it compiled pinned it to three.js's shared quad geometry; 120 rapid cycles stay flat and F517 on WebGPU is back in
+the default run), a runtime filter change over 1 s on CI (TD-02: only the changed vector layers are laid out again),
+KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), vector tiles that
+retried 401, 403, 410 and CORS failures every 5 s (KB-313, MapLibre #8733's class), and heightmaps turned to spikes
+where fingerprinting protection adds noise to canvas readback (KB-314, MapLibre #3110: read through a `VideoFrame`
+there, the worker's budget kept by removing duplicate code), a fast zoom out that dropped the orthophotos in one or two
+frames (KB-309: a zoom out no longer counts as motion for motion-aware detail), and an anisotropy change that an idle
+view never applied (KB-315: the refilter now asks for its frames). `main`'s full CI run after #91 failed seven shards;
+the causes were tests left behind by owner decisions (F383 and F128 under the flat relief of KB-293, F409's fill since
+KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-315. Checked and unchanged
+(`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
+hosts are refused). Also fixed: `main`'s flaky allocation test (KB-312): V8 compiled the test's own driver, then engine functions, inside
+the sampled frames, because the single warm-up call had been optimized in place; the warm-up now runs in several calls
+and lets the background compiler finish, a window over the limit gets a second one, and the wheel zoom's step no
+longer crosses a call as a double, which boxed it every frame (18 runs in a row pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
+for `moveend` with the tilt policy off too, which made the engine request every drag frame from inside the previous
+one, so the benchmark sampled frame intervals; they listen only while an API movement runs (F609: about 0 ms again).
+Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's desktop views).
+
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 
 GURS DOF025 (CC BY 4.0) is asked from its WMS layer `SI.GURS.ZPDZ:DOF025_3857`, confirmed in a public application

@@ -5,7 +5,7 @@ import { fillArea, tessellateFill, tileClipRect } from './fill-tessellate.js';
 import { globeVertices, maxEdgeUnits, subdividedFill, tileOrigin, tileToLonLat } from './globe-vertices.js';
 import { BUCKET_BUFFER, BUCKET_EXTENT, layoutVectorTile } from './layout-tile.js';
 import { StyleLayer } from './style-layer.js';
-import { VectorTileLoader } from './tile-loader.js';
+import { bucketVersion, VectorTileLoader } from './tile-loader.js';
 import { backgroundBucket, meshGeometry } from './tile-meshes.js';
 import { tileKey, type TileId } from './tile-pyramid.js';
 import { meshPaint, zoomBracket } from './vector-paint.js';
@@ -249,6 +249,53 @@ describe('tile loading (F442, F450)', () => {
     expect(loader.requestLog).toEqual(['a', 'b', 'html']);
   });
 
+  it('lays out again only the layer whose filter or layout changed, keeping the others and their versions (TD-02)', async () => {
+    const transport = fakeTransport({ a: TILE });
+    const loader = new VectorTileLoader({ transport, onReady: () => undefined });
+    const two = [
+      { id: 'water', type: 'fill', source: 's', 'source-layer': 'water' },
+      { id: 'roads', type: 'line', source: 's', 'source-layer': 'roads' },
+    ] as typeof layers;
+    loader.setLayers(two, 1);
+    const tile = { z: 1, x: 0, y: 0 };
+    loader.update([{ url: 'a', tile, priority: 0 }], new Set());
+    await tick();
+    const first = loader.get(tile);
+    const roads = first?.buckets.find((b) => b.layerId === 'roads');
+    // The roads' filter now drops every feature: only the roads are laid out again.
+    const filtered = [two[0], { ...two[1], filter: ['==', ['get', 'class'], 'none'] }] as typeof layers;
+    loader.setLayers(filtered, 2, new Set(['roads']));
+    await tick();
+    const second = loader.get(tile);
+    if (!first || !second) throw new Error('not laid out');
+    expect(second.version).toBe(2);
+    expect(second.buckets.find((b) => b.layerId === 'water')).toBe(first.buckets.find((b) => b.layerId === 'water'));
+    expect(second.buckets.find((b) => b.layerId === 'roads')).not.toBe(roads);
+    expect(bucketVersion(second, 'water')).toBe(1);
+    expect(bucketVersion(second, 'roads')).toBe(2);
+    // Then the water, kept the first time: its bucket takes the new version, the roads keep theirs.
+    loader.setLayers(
+      [{ ...two[0], filter: ['==', ['get', 'class'], 'none'] }, filtered[1]] as typeof layers,
+      3,
+      new Set(['water']),
+    );
+    await tick();
+    const third = loader.get(tile);
+    if (!third) throw new Error('not laid out');
+    expect(bucketVersion(third, 'water')).toBe(3);
+    expect(bucketVersion(third, 'roads')).toBe(2);
+    // A new order of the layers lays out every layer.
+    loader.setLayers([filtered[1], filtered[0]] as typeof layers, 4);
+    await tick();
+    const fourth = loader.get(tile);
+    if (!fourth) throw new Error('not laid out');
+    expect(bucketVersion(fourth, 'water')).toBe(4);
+    expect(fourth.buckets.find((b) => b.layerId === 'water')).not.toBe(
+      third.buckets.find((b) => b.layerId === 'water'),
+    );
+    expect(loader.requestLog).toEqual(['a']);
+  });
+
   it('takes the answer of a transport that answers before it returns (a cache, a failure on the spot)', async () => {
     const answers: TransportResult[] = [
       { kind: 'ok', bytes: TILE, contentType: 'application/x-protobuf' },
@@ -345,6 +392,42 @@ describe('tile loading (F442, F450)', () => {
       // Another frame is asked for when it is due.
       vi.advanceTimersByTime(100);
       expect(frames).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not request again a tile its server refuses for good (401, 403, 410, CORS), only one that failed for now (500)', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers: Record<string, TransportResult> = {
+        u: { kind: 'status', status: 401, retryAfterMs: undefined },
+        f: { kind: 'status', status: 403, retryAfterMs: undefined },
+        g: { kind: 'status', status: 410, retryAfterMs: undefined },
+        c: { kind: 'network-error', cause: 'cors' },
+        s: { kind: 'status', status: 500, retryAfterMs: undefined },
+      };
+      const requested: string[] = [];
+      const transport: TileTransport = {
+        start(request, _timeouts, done: (result: TransportResult) => void) {
+          requested.push(request.url);
+          queueMicrotask(() => done(answers[request.url] ?? { kind: 'network-error' }));
+          return () => undefined;
+        },
+      };
+      let nowMs = 0;
+      const loader = new VectorTileLoader({ transport, onReady: () => undefined, now: () => nowMs });
+      const wanted = Object.keys(answers).map((url, x) => ({ url, tile: { z: 3, x, y: 0 }, priority: x }));
+      loader.update(wanted, new Set());
+      await Promise.resolve();
+      nowMs = 6_000;
+      vi.advanceTimersByTime(6_000);
+      loader.update(wanted, new Set());
+      await Promise.resolve();
+      expect(requested.sort()).toEqual(['c', 'f', 'g', 's', 's', 'u']);
+      // Only the 500 keeps the loader busy: the refused tiles are missing, as a 404 is.
+      expect(loader.loading).toBe(1);
+      expect(wanted.filter((w) => loader.isMissing(w.tile)).map((w) => w.url)).toEqual(['u', 'f', 'g', 'c']);
     } finally {
       vi.useRealTimers();
     }

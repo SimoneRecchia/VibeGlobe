@@ -136,6 +136,7 @@ export interface Offline {
   destroy(): void;
 }
 
+const FORBIDS_NOTHING: ReadonlySet<LoadingSwitch> = new Set();
 const CACHE_FLAG = 'vibeglobe-offline:cache';
 
 function readFlag(): string | null {
@@ -286,7 +287,9 @@ class OfflineEngine implements Offline {
   }
 
   source<S extends TileSource>(source: S, options: TieredSourceOptions = {}): S {
-    const rules = options.rules ?? (source as unknown as { profile?: ProviderRules }).profile;
+    // A source's own profile may name only its credit (a `CreditProfile`): it then forbids nothing (KB-322).
+    const own = options.rules ?? (source as unknown as { profile?: Partial<ProviderRules> }).profile;
+    const rules = own && { id: source.id, respectCacheHeaders: false, ...own, forbids: own.forbids ?? FORBIDS_NOTHING };
     if (rules) {
       this.rules.set(source.id, rules);
       for (const name of this.enabledGlobally) this.refuseForbidden(source.id, rules, name);

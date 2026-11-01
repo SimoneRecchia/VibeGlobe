@@ -441,6 +441,14 @@ describe('provider profiles (F320)', () => {
             }
   });
 
+  it('takes a source whose profile names only its credit as forbidding nothing (KB-322)', () => {
+    const offline = engine({ switches: { persistentCache: true } });
+    const credit = { text: '© A provider' };
+    const profile = { id: 'provider', requiredAttribution: credit, respectCacheHeaders: true };
+    offline.source(xyzImagery({ id: 'online', url: 'https://tiles.test/{z}/{x}/{y}.png', profile }), { layerId: 'l' });
+    expect(offline.effectiveSwitches('online', 'l').persistentCache).toBe(true);
+  });
+
   it('keeps a forbidden feature off when switched on globally or per source, and warns once naming the profile', () => {
     const warnings: string[] = [];
     const offline = engine({ switches: { persistentCache: true } });

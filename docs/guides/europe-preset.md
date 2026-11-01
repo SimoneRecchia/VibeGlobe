@@ -370,7 +370,7 @@ Denmark's services need a key, free on registration with the National Land Surve
 application's own as `europeOrthophotos({ keys: { 'fi-mml': key, 'dk-geodanmark': key } })`, without one the service
 is left out. A credit carries the year the
 data was read (`© IGN 2026 – BD ORTHO®`): update it with your own reading. The services left out, with why, are
-`preset.excluded`: there is no open orthophoto service yet for Italy (except Alto Adige: AGEA's national imagery is CC BY 4.0 but
+`preset.excluded`: there is no open orthophoto service yet for Italy (except Alto Adige and the city of Bologna: AGEA's national imagery is CC BY 4.0 but
 offered as downloads only, for an application's own package), the United Kingdom, Ireland, Norway, Sweden, most of
 Central and Eastern Europe and the Balkans, nor a Europe-wide one; there the
 package's WorldCover composite is the detail (below).

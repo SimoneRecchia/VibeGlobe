@@ -29,7 +29,7 @@ export const BASE_TEXEL = 4;
  * times the still size, two levels), so a fast pan or a flight loads fewer, coarser tiles it can actually show; on a
  * slow link one level coarser again. Once the camera slows the factor returns to 1 and the tiles refine with their
  * cross-fades. The speed is the eye's motion in view ranges (its distance to the target) per second, remembered with a
- * fast decay so a frame without motion does not refine at once.
+ * fast decay so a frame without motion does not refine at once. A zoom out is not motion here (KB-309).
  */
 export class MotionDetail {
   private readonly lastEye = new Float64Array(3).fill(Number.NaN);
@@ -78,7 +78,11 @@ export class MotionDetail {
       const dx = (eye[0] ?? 0) - (this.lastEye[0] ?? 0);
       const dy = (eye[1] ?? 0) - (this.lastEye[1] ?? 0);
       const dz = (eye[2] ?? 0) - (this.lastEye[2] ?? 0);
-      const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // Motion straight back from the target (a zoom out) does not count: the view coarsens by itself then, and two
+      // levels more would drop at once a layer that starts at a finer level, such as the orthophotos (KB-309).
+      const forward = camera.forward;
+      const back = -(dx * (forward[0] ?? 0) + dy * (forward[1] ?? 0) + dz * (forward[2] ?? 0));
+      const moved = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - (back > 0 ? back * back : 0)));
       const speed = moved / Math.max(1, camera.pose.rangeMeters) / dtS;
       const remembered = (state[SPEED] ?? 0) * SPEED_DECAY_PER_S ** dtS;
       state[SPEED] = speed > remembered ? speed : remembered;

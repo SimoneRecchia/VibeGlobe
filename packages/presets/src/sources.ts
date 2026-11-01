@@ -113,6 +113,16 @@ export const ESA_WORLDCOVER: PresetSourceRecord = {
   coverage: 'europe',
 };
 
+/** The same WorldCover composite over the whole world's land at the package's lower levels (F684). */
+export const WORLD_WORLDCOVER: PresetSourceRecord = {
+  ...ESA_WORLDCOVER,
+  id: 'world-satellite',
+  name: 'ESA WorldCover 2021 Sentinel-2 composite, world',
+  minLevel: 3,
+  maxLevel: 8,
+  coverage: 'world',
+};
+
 /** Mapterhorn's Terrarium tiles (Copernicus GLO-30 in Europe up to level 12, national models beyond). */
 export const MAPTERHORN: PresetSourceRecord = {
   id: 'europe-terrain',
@@ -170,6 +180,7 @@ const NATURAL_EARTH: PresetSourceRecord = {
 export const EUROPE_SOURCES: readonly PresetSourceRecord[] = [
   NASA_GIBS_BLUE_MARBLE,
   ESA_WORLDCOVER,
+  WORLD_WORLDCOVER,
   OPENFREEMAP,
   MAPTERHORN,
   COPERNICUS_GLO30,

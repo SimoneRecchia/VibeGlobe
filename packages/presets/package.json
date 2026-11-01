@@ -20,6 +20,11 @@
       "types": "./dist/orthophotos.d.ts",
       "source": "./src/orthophotos.ts",
       "default": "./dist/orthophotos.js"
+    },
+    "./world-land": {
+      "types": "./dist/world-land.d.ts",
+      "source": "./src/world-land.ts",
+      "default": "./dist/world-land.js"
     }
   },
   "types": "./dist/index.d.ts",

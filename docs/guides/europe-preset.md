@@ -500,6 +500,16 @@ to level 13 (F662). Level 13 holds WorldCover's 10 m detail in full, so where no
 United Kingdom, Scandinavia, the Balkans) zoom 15 shows it magnified four times instead of level 11 sixteen times; the
 orthophotos still fade in from level 12 above it.
 
+### The world at the lower levels
+
+`world-satellite.json` builds the same WorldCover composite over the whole world's land from level 3 to 8, the sea to
+level 6 (about 42,000 tiles; the download reads only overview level 4, 160 m, of the composite). Add it to the package
+next to `europe-satellite` and give the preset the world's land, `WORLD_LAND` of `@vibeglobe/presets/world-land`, a
+module of its own so it is loaded only with it (F684): `europeOpen({ …, farLevels: 2, worldLand: WORLD_LAND })`. The
+world's imagery shows from the level after the far levels to `packageLevels.world` (8), its sea keyed out on that
+land (Natural Earth 1:50m, Antarctica left to the base image, which WorldCover does not cover), and Europe's own levels
+start above it. Beyond level 8 outside Europe, an online source the app adds takes over, or level 8 is magnified.
+
 ## Hosting the package
 
 Publish the build's `output/` folder under a versioned path, for example `https://app.example/maps/europe-1.0.0/`,

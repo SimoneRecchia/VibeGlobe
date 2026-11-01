@@ -10,6 +10,7 @@
 // geojson/ne_10m_admin_1_states_provinces.geojson, geojson/ne_10m_admin_0_map_units.geojson).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { encodePolygons } from '../packages/presets/src/polygons.ts';
+import { area, round, simplify, type Point, type Ring } from './land-rings.ts';
 
 /** West, south, east, north in degrees: mainland Europe, Iceland, the Azores, Madeira and the Canary Islands. */
 const EUROPE_BOUNDS = [-32, 27, 45, 72] as const;
@@ -23,9 +24,6 @@ const isRegion = (code: string): boolean => code.startsWith('DE-') || code === '
 const MAP_UNITS: Readonly<Record<string, string>> = { Flemish: 'BE-VLG', Walloon: 'BE-WAL', Brussels: 'BE-BRU' };
 /** The country borders clip imagery per pixel: about 300 m, near the 1:10m data's own accuracy. */
 const COUNTRY_TOLERANCE_DEG = 0.003;
-
-type Point = [number, number];
-type Ring = Point[];
 
 /** Sutherland–Hodgman clipping of a ring to the bounds. */
 function clipRing(ring: Ring, [west, south, east, north]: readonly number[]): Ring {
@@ -55,48 +53,6 @@ function clipRing(ring: Ring, [west, south, east, north]: readonly number[]): Ri
 function at(a: Point, b: Point, axis: 0 | 1, value: number): Point {
   const t = (value - a[axis]) / (b[axis] - a[axis]);
   return [round(a[0] + (b[0] - a[0]) * t), round(a[1] + (b[1] - a[1]) * t)];
-}
-
-const round = (v: number): number => Math.round(v * 1e3) / 1e3;
-
-/** Douglas–Peucker simplification of an open polyline. */
-function simplify(points: Ring, tolerance: number): Ring {
-  if (points.length < 3) return points;
-  const keep = new Uint8Array(points.length);
-  keep[0] = keep[points.length - 1] = 1;
-  const stack: [number, number][] = [[0, points.length - 1]];
-  while (stack.length > 0) {
-    const [first, last] = stack.pop() as [number, number];
-    const [ax, ay] = points[first] as Point;
-    const [bx, by] = points[last] as Point;
-    let worst = 0;
-    let index = -1;
-    for (let i = first + 1; i < last; i++) {
-      const [px, py] = points[i] as Point;
-      const length = Math.hypot(bx - ax, by - ay);
-      const d =
-        length === 0 ? Math.hypot(px - ax, py - ay) : Math.abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / length;
-      if (d > worst) {
-        worst = d;
-        index = i;
-      }
-    }
-    if (worst > tolerance && index > 0) {
-      keep[index] = 1;
-      stack.push([first, index], [index, last]);
-    }
-  }
-  return points.filter((_, i) => keep[i] === 1);
-}
-
-function area(ring: Ring): number {
-  let sum = 0;
-  for (let i = 0; i < ring.length; i++) {
-    const [x0, y0] = ring[i] as Point;
-    const [x1, y1] = ring[(i + 1) % ring.length] as Point;
-    sum += x0 * y1 - x1 * y0;
-  }
-  return Math.abs(sum) / 2;
 }
 
 const input = process.argv[2];

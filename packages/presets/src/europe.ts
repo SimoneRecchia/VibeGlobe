@@ -7,7 +7,6 @@
  */
 import {
   WEB_MERCATOR_TILING,
-  type CoverageArea,
   type ImageryLayerOptions,
   type PolarCapColors,
   type PolygonDeg,
@@ -17,15 +16,13 @@ import {
   type TileSource,
 } from '@vibeglobe/core';
 import { coverageTest } from '@vibeglobe/core/coverage';
-import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
+import { heightmapTerrain } from '@vibeglobe/sources';
 import { EUROPE_BOUNDS, EUROPE_LAND } from './europe-land.js';
 import {
   EXCLUDED_SOURCES,
   ESA_WORLDCOVER,
-  WORLD_WORLDCOVER,
   MAPTERHORN,
   COPERNICUS_GLO30,
-  NASA_GIBS_BLUE_MARBLE,
   OPENFREEMAP,
   type ExcludedSource,
   type PresetSourceRecord,
@@ -33,7 +30,7 @@ import {
 } from './sources.js';
 import type { OrthophotoLayers } from './orthophotos.js';
 import { composeStyle, type HillshadeSource, type StyleJson, type StyleSelection } from './styles.js';
-import { gibsBlueMarble } from './gibs.js';
+import { baseSource, packageSources } from './package-imagery.js';
 import { LANDSCAPE_COLORS } from './landscape-style.js';
 import { POLITICAL_COLORS } from './political-style.js';
 
@@ -86,6 +83,12 @@ export interface EuropeOpenOptions {
     readonly imagery?: number;
     /** The deepest level of the world's imagery, with `worldLand` (8 by default, as in `world-satellite.json`). */
     readonly world?: number;
+    /**
+     * The deepest level of the package's sea (`world-sea`, NASA's Blue Marble with bathymetry from `world-sea.json`,
+     * F686): when given, it is the satellite's lowest layer at every level, magnified beyond this one, so the water
+     * keyed out of the imagery above shows the sea's depth; without it the globe's base image shows there.
+     */
+    readonly sea?: number;
   };
   /**
    * The world's land (`WORLD_LAND` of `@vibeglobe/presets/world-land`) when the package also holds WorldCover over the
@@ -180,7 +183,7 @@ function levelOf(options: EuropeOpenOptions, record: PresetSourceRecord): number
 }
 
 /** What building the preset shares between its parts. */
-interface Build {
+export interface Build {
   readonly options: EuropeOpenOptions;
   readonly packaged: boolean;
   readonly packageBase: string;
@@ -189,18 +192,6 @@ interface Build {
   /** Lists the source unless excluded; false when excluded. */
   use(record: PresetSourceRecord): boolean;
 }
-
-/**
- * The fade, in pixels of a tile, of WorldCover at the package box's edge (F639): a few screen pixels at every level, so
- * no border shows between it and the base image.
- */
-const FEATHER_PX = 12;
-
-/**
- * How far inside `EUROPE_LAND` the package's water fades back in (KB-303): more than the outline's simplification
- * (0.025°, about 2.8 km) and the gaps it leaves between countries (up to about 3.2 km), so neither shows.
- */
-const SEA_FEATHER_METERS = 4000;
 
 /**
  * A layer's fade with the zoom from imagery levels (F636): the Mercator zoom shows tiles of 256 pixels of about one level
@@ -212,28 +203,6 @@ function levelFade(fromLevel: number, toLevel: number): { readonly fromZoom: num
 
 /** The deepest level of the package's WorldCover: above it, the online sources (F632). */
 const PACKAGE_IMAGERY_LEVEL = ESA_WORLDCOVER.maxLevel;
-
-/** The whole Web Mercator world, the box of the world's imagery (F684). */
-const WORLD_BOX = [
-  [
-    [-180, -85.06],
-    [180, -85.06],
-    [180, 85.06],
-    [-180, 85.06],
-    [-180, -85.06],
-  ],
-] as const;
-
-/** The package's box, as `europe.json`'s region: every level of its imagery up to `seaMaxZoom` covers it, land and sea. */
-const PACKAGE_BOX = [
-  [
-    [-32, 27],
-    [45, 27],
-    [45, 72],
-    [-32, 72],
-    [-32, 27],
-  ],
-] as const;
 
 /**
  * Satellite, by zoom (F636, F639). With a package: the globe's base image (Natural Earth) at the far levels and, below
@@ -258,10 +227,11 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
   satellite.push(...added('bottom', false));
   const online = [...added('top', true), ...added('bottom', true)];
   const layers: ImageryLayerOptions[] = [];
-  if (!build.packaged && use(NASA_GIBS_BLUE_MARBLE))
+  const base = baseSource(build);
+  if (base)
     layers.push({
       id: 'satellite-base',
-      sources: [wrap(gibsBlueMarble(NASA_GIBS_BLUE_MARBLE), 'network', 'satellite')],
+      sources: [base],
       // Its colors stay its own: one gain cannot bring both its sea and its land to the base image's (F636).
       harmonize: false,
       fadeIn: levelFade(far + 0.5, far + 1),
@@ -278,70 +248,6 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
   if (online.length > 0)
     layers.push({ id: 'satellite-online', sources: online, harmonize: false, fadeIn: onlineFade() });
   return layers;
-}
-
-/**
- * The package's WorldCover (F636, F684): Europe's within its box and, with the world's land, the world's at the lower
- * levels below it, Europe's then starting above them.
- */
-function packageSources(build: Build, far: number): ImagerySource[] {
-  const { options } = build;
-  const sources: ImagerySource[] = [];
-  const worldLevel = options.packageLevels?.world ?? WORLD_WORLDCOVER.maxLevel;
-  const world = build.packaged && options.worldLand !== undefined && build.use(WORLD_WORLDCOVER);
-  // The package's box with a soft edge. Its sea, real water near the coast and a flat no-data color (RGB 54, 73, 90)
-  // beyond, each ending in rectangles, is transparent outside the land; inside it nothing is keyed, as deep lakes and
-  // shadows can have that color too (KB-303).
-  if (build.packaged && build.use(ESA_WORLDCOVER))
-    sources.push(
-      packageImagery(
-        build,
-        ESA_WORLDCOVER,
-        'imagery',
-        world ? worldLevel + 1 : Math.max(ESA_WORLDCOVER.minLevel, far + 1),
-        {
-          polygons: [PACKAGE_BOX],
-          tiles: 'clip',
-          featherPx: FEATHER_PX,
-          keySea: { land: EUROPE_LAND, featherMeters: SEA_FEATHER_METERS },
-        },
-      ),
-    );
-  if (world && options.worldLand)
-    sources.push(
-      packageImagery(
-        build,
-        WORLD_WORLDCOVER,
-        'world-imagery',
-        Math.max(WORLD_WORLDCOVER.minLevel, far + 1),
-        {
-          polygons: [WORLD_BOX],
-          keySea: { land: options.worldLand, featherMeters: SEA_FEATHER_METERS },
-        },
-        worldLevel,
-      ),
-    );
-  return sources;
-}
-
-/** A package dataset as imagery: never fetched, the tiles come from the package and the URL only names them. */
-function packageImagery(
-  build: Build,
-  record: PresetSourceRecord,
-  folder: string,
-  minLevel: number,
-  area: CoverageArea,
-  maxLevel = build.options.packageLevels?.imagery ?? record.maxLevel,
-): ImagerySource {
-  const source = xyzImagery({
-    id: record.id,
-    url: `${build.packageBase}${folder}/{z}/{x}/{y}.jpg`,
-    minLevel,
-    maxLevel,
-    area,
-    attribution: record.attribution,
-  });
-  return build.wrap(source, 'package', 'satellite');
 }
 
 /** The fade-in of the online sources above the package's levels, over the level after its last (F636). */

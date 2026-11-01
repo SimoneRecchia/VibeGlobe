@@ -104,6 +104,19 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
+    // F686: the sea below the satellite packages, from GIBS's Web Mercator tiles.
+    id: 'nasa-blue-marble',
+    name: 'NASA Blue Marble, shaded relief and bathymetry (GIBS)',
+    license: 'NASA Earth science data: no restrictions on use; acknowledgement requested',
+    licenseUrl: 'https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api',
+    termsReadDate: '2026-11-01',
+    attribution: "Imagery: NASA Blue Marble, from NASA's Global Imagery Browse Services (GIBS), part of NASA's ESDIS",
+    sourceUrl: 'https://www.earthdata.nasa.gov/gibs',
+    commercialUse: true,
+    redistribution: true,
+    offlinePackaging: true,
+  },
+  {
     // ADR 0182: the weekly planet archive, not the public tile endpoint (limited to 3,000 tiles or 50 MB a download).
     id: 'openfreemap-planet',
     name: 'OpenFreeMap planet vector tiles (OpenStreetMap, OpenMapTiles schema)',

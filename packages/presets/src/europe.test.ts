@@ -234,6 +234,26 @@ describe('europeOpen (F613)', () => {
     expect(sources().map((s) => [s.id, s.minLevel])).toEqual([['europe-satellite', 5]]);
   });
 
+  it("lays the package's sea below the satellite at every level, magnified beyond its own, when it has one (F686)", () => {
+    const manifest = {
+      packageManifestUrl: 'https://app.test/maps/europe/manifest.json',
+      offline: fakeOffline(),
+      farLevels: 2,
+    };
+    const layers = (sea?: number) =>
+      europeOpen({ ...manifest, ...(sea === undefined ? {} : { packageLevels: { sea } }) }).baseMaps[0]?.imagery ?? [];
+    const withSea = layers(7);
+    // It fades in over the base image as the online Blue Marble does, half a level before the WorldCover above it.
+    expect(withSea.map((l) => [l.id, l.fadeIn, l.harmonize])).toEqual([
+      ['satellite-base', { fromZoom: 1.5, toZoom: 2 }, false],
+      ['satellite', { fromZoom: 2, toZoom: 3 }, 'below'],
+    ]);
+    const sea = withSea[0]?.sources[0];
+    expect([sea?.id, sea?.minLevel, sea?.maxLevel]).toEqual(['world-sea', 0, 7]);
+    expect(sea?.request(tile(7, 62, 50), out)).toMatchObject({ url: 'https://app.test/maps/europe/sea/7/62/50.jpg' });
+    expect(layers().map((l) => l.id)).toEqual(['satellite']);
+  });
+
   it("reads the package's satellite imagery to its own deepest level, the orthophotos still fading in from 12 (F662)", () => {
     const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json', offline: fakeOffline() };
     const satellite = (levels?: { imagery: number }) =>

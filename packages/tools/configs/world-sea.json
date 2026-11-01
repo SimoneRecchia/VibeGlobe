@@ -1,0 +1,46 @@
+{
+  "configVersion": "1.0.0",
+  "prices": {
+    "currency": "USD",
+    "readDate": "2026-10-21",
+    "sourceUrl": "https://aws.amazon.com/s3/pricing/ (figures as quoted by https://upstash.com/blog/aws-s3-pricing-explained-2026; the official page was not reachable from the build container)",
+    "requesterPaysTransferPerGB": 0.09,
+    "requesterPaysGetPer1000": 0.0004,
+    "freeTransferPerGB": 0
+  },
+  "tools": {
+    "gdal": "docker.io/osgeo/gdal:ubuntu-small-3.6.3@sha256:398d5aca0ca88295c13ada87e0f382ed409dac13a952461187be72ce3c376513"
+  },
+  "name": "world-sea",
+  "description": "The Europe preset's sea (F686): NASA's Blue Marble with bathymetry over the whole world, levels 0 to 7, below the keyed water of the satellite packages",
+  "region": {
+    "bbox": [-180, -85.0511287798066, 180, 85.0511287798066]
+  },
+  "sampleArea": {
+    "bbox": [11.25, 40.97989806962013, 16.875, 45.08903556483102],
+    "minZoom": 6
+  },
+  "datasets": [
+    {
+      "id": "world-sea",
+      "kind": "imagery",
+      "profile": "nasa-blue-marble",
+      "dataYear": 2004,
+      "sourceVersion": "Blue Marble Next Generation, shaded relief and bathymetry (GIBS BlueMarble_ShadedRelief_Bathymetry)",
+      "source": {
+        "type": "xyz",
+        "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg"
+      },
+      "minZoom": 0,
+      "maxZoom": 7,
+      "encoding": "jpeg",
+      "bytesPerTile": 8000,
+      "downloadBytesPerFile": 1,
+      "outputs": {
+        "static": false,
+        "pmtiles": true,
+        "mbtiles": false
+      }
+    }
+  ]
+}

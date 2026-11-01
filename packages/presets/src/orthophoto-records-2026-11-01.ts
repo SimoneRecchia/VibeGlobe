@@ -52,4 +52,17 @@ export const THIRD_READING_ORTHOPHOTOS: readonly OrthophotoRecord[] = [
       layer: 'DOP20_2023_HB,DOP20_2023_BHV',
     },
   }),
+  ortho({
+    id: 'si-gurs-dof',
+    name: 'GURS DOF025 (Slovenia)',
+    license: 'CC BY 4.0',
+    termsUrl: 'https://eprostor.gov.si/imps/srv/api/records/1e0f54cf-9303-4140-8c20-352d5468c0b3',
+    attribution: [
+      { text: 'Geodetska uprava Republike Slovenije, DOF025, CC BY 4.0', url: 'https://www.e-prostor.gov.si' },
+    ],
+    maxLevel: 19,
+    regions: ['SI'],
+    termsReadDate: THIRD_READING,
+    service: { kind: 'wms', url: 'https://ipi.eprostor.gov.si/wms-si-gurs-dts/ows', layer: 'SI.GURS.ZPDZ:DOF025_3857' },
+  }),
 ];

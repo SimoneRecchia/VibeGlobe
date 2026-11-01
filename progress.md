@@ -19,6 +19,12 @@ KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-3
 hosts are refused). Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's
 desktop views).
 
+## 2026-11-01: Slovenia joins the orthophotos (F675)
+
+GURS DOF025 (CC BY 4.0) is asked from its WMS layer `SI.GURS.ZPDZ:DOF025_3857`, confirmed in a public application
+built on it. Lithuania stays out on conflicting licence readings; Schleswig-Holstein and Valle d'Aosta wait for their
+layers (open question 39).
+
 ## 2026-11-01: Slovakia and Bremen join the orthophotos (F674)
 
 Two services of open question 39 were confirmed from independent sources and added: Slovakia's GKÚ Ortofotomozaika

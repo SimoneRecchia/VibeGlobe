@@ -8105,6 +8105,17 @@
         "Record their terms in ADR 0182 and leave the services still waiting in open question 39"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F675",
+      "milestone": 7,
+      "section": "Sources and composition",
+      "description": "`europeOrthophotos()` covers Slovenia (GURS DOF025, CC BY 4.0, WMS layer `SI.GURS.ZPDZ:DOF025_3857` in EPSG:3857) within its borders to level 19.",
+      "steps": [
+        "Unit-test that Slovenia's tiles are asked over Ljubljana with its layer and not over Rome",
+        "Record its terms in ADR 0182 and update open question 39"
+      ],
+      "status": "passing"
     }
   ]
 }

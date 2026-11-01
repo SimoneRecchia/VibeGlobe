@@ -10,9 +10,14 @@ the default run), a runtime filter change over 1 s on CI (TD-02: only the change
 KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), vector tiles that
 retried 401, 403, 410 and CORS failures every 5 s (KB-311, MapLibre #8733's class), and heightmaps turned to spikes
 where fingerprinting protection adds noise to canvas readback (KB-312, MapLibre #3110: read through a `VideoFrame`
-there, the worker's budget kept by removing duplicate code). F383's spec failed on `main` since #89 stopped loading
-terrain under a flat relief; it now states where relief is drawn. Checked and unchanged (`docs/follow-ups.md`): resize
-during a GPU loss, and 204 or empty tiles.
+there, the worker's budget kept by removing duplicate code), a fast zoom out that dropped the orthophotos in one or two
+frames (KB-309: a zoom out no longer counts as motion for motion-aware detail), and an anisotropy change that an idle
+view never applied (KB-313: the refilter now asks for its frames). `main`'s full CI run after #91 failed seven shards;
+the causes were tests left behind by owner decisions (F383 and F128 under the flat relief of KB-293, F409's fill since
+KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-313. Checked and unchanged
+(`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
+hosts are refused). Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's
+desktop views), KB-302 (its repro shows nothing here).
 
 ## 2026-11-01: map changes fade in time, no blinking in motion, movements load ahead (owner's request, branch `smooth-imagery`)
 

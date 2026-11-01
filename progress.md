@@ -53,6 +53,10 @@ The CI-pace rows, reproduced with the whole browser on one CPU core: KB-241's wh
 frames a software GPU drew at 1280 × 720 (480 × 360 canvases now, and F438 a 6-minute limit), KB-240 was fixed by #93's
 path preloading, KB-208's WebGPU slowness is its uploads (a follow-up). Still open: KB-110 and KB-212 (not reproduced,
 passing in CI), KB-180, KB-181 (the owner's desktop views).
+`main`'s full runs after #101 and #103 then left: the terrain baselines KB-302 had changed (recorded again, #102), the
+offline matrix recording a still camera while its flight was under way on a slow machine (KB-318), F337 after #100
+removed its profile, KB-185's test limit, and F101 on WebGPU, where three.js submitted every tile's mipmaps alone: a
+frame's tile mipmaps now share one submit (KB-319), and an 81-tile burst uploads in 11 to 13 frames instead of 15 to 23.
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

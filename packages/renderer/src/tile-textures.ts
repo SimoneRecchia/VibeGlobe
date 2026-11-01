@@ -62,6 +62,14 @@ function compressedTexture(image: CompressedTileImage): Texture {
 /** Tile textures made again a frame after the anisotropy changed (KB-288): a few milliseconds of uploads at most. */
 const REFILTER_PER_FRAME = 4;
 
+/** The part of three.js r186's WebGPU backend {@link TileTextures} records tile mipmaps through. */
+interface MipmapBackend {
+  readonly isWebGPUBackend?: boolean;
+  readonly device: { createCommandEncoder(): { finish(): unknown }; readonly queue: { submit(work: unknown[]): void } };
+  readonly textureUtils: { generateMipmaps(texture: Texture, encoder: object): void };
+  generateMipmaps(texture: Texture): void;
+}
+
 /** A terrain height grid (`HeightGrid` of `@vibeglobe/core`): (cells + 1)² float32 heights, rows from the north. */
 interface HeightImage {
   readonly cells: number;
@@ -109,6 +117,8 @@ export class TileTextures {
   private compressed = 0;
   /** The handles {@link refilterSome} still has to check after the anisotropy changed. */
   private stale: number[] = [];
+  /** The mipmaps of the tiles uploaded since the last {@link flush}, on WebGPU. */
+  private mipmaps: { finish(): unknown } | undefined;
 
   /** The tone matching of imagery source chains (F249): tile means by handle, gains by source. */
   readonly tones = new ToneMatcher();
@@ -157,7 +167,32 @@ export class TileTextures {
     this.count++;
     this.bytes += tile.gpuBytes;
     if (isCompressed(tile.image)) this.compressed++;
-    renderer.initTexture(entry.texture);
+    this.init(renderer, entry.texture);
+  }
+
+  /**
+   * Uploads a texture; on WebGPU its mipmaps are recorded into one command encoder that {@link refilterSome} submits
+   * before the frame, where three.js submits one per texture: that submit was most of a tile upload's main-thread
+   * time, so a burst of tiles took more frames than the upload budget allows (F101, KB-319). Uses three.js r186's
+   * WebGPU backend (`textureUtils`, `device`), pinned exactly.
+   */
+  private init(renderer: WebGPURenderer, texture: Texture): void {
+    const backend = renderer.backend as unknown as MipmapBackend;
+    if (!backend?.isWebGPUBackend) return renderer.initTexture(texture);
+    backend.generateMipmaps = (t) =>
+      backend.textureUtils.generateMipmaps(t, (this.mipmaps ??= backend.device.createCommandEncoder()));
+    try {
+      renderer.initTexture(texture);
+    } finally {
+      delete (backend as Partial<MipmapBackend>).generateMipmaps;
+    }
+  }
+
+  /** Submits the mipmaps of the tiles uploaded since the last call. */
+  private flush(renderer: WebGPURenderer): void {
+    if (!this.mipmaps) return;
+    (renderer.backend as unknown as MipmapBackend).device.queue.submit([this.mipmaps.finish()]);
+    this.mipmaps = undefined;
   }
 
   /** Disposes the texture under `handle`; `closeImage` also frees the decoded image (an `ImageBitmap`'s memory). */
@@ -180,9 +215,11 @@ export class TileTextures {
 
   /** Creates and uploads every texture again on a new renderer, from the kept images. */
   restore(renderer: WebGPURenderer): void {
+    // An encoder of the lost device is never submitted.
+    this.mipmaps = undefined;
     for (const entry of this.entries.values()) {
       entry.texture = this.create(entry.tile);
-      renderer.initTexture(entry.texture);
+      this.init(renderer, entry.texture);
     }
   }
 
@@ -203,7 +240,8 @@ export class TileTextures {
 
   /**
    * Makes again, with the current anisotropy, up to `count` tile textures that have another one; a frame calls it
-   * until every texture has the level. Returns how many it made.
+   * before it draws, until every texture has the level, and the mipmaps of the tiles uploaded since are submitted then.
+   * Returns how many it made.
    */
   refilterSome(renderer: WebGPURenderer, count = REFILTER_PER_FRAME): number {
     const level = this.anisotropy();
@@ -213,9 +251,10 @@ export class TileTextures {
       if (!entry || isHeights(entry.tile.image) || entry.texture.anisotropy === level) continue;
       entry.texture.dispose();
       entry.texture = this.create(entry.tile);
-      renderer.initTexture(entry.texture);
+      this.init(renderer, entry.texture);
       made++;
     }
+    this.flush(renderer);
     return made;
   }
 

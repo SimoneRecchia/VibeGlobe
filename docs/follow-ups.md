@@ -140,8 +140,7 @@ found and fixed: TG-06, KB-313, KB-314). Not changed:
   when the engine requests its next frame itself (a `moveend` listener during user input, F200; a fade or a load), the
   engine's frame runs before the marker and the sample spans a whole frame interval. Timing the engine's own frame
   (its diagnostics timer, `PHASE_RENDER`) would remove the assumption, for pages that listen for `moveend` too.
-- **Tile uploads cost about 3.5 times more main-thread time on WebGPU than on WebGL2** (KB-208, measured 2026-11-01 under
-  SwiftShader: about 0.5 against 0.14 ms a tile; texture creation and three.js's mipmap passes). Within the 2 ms upload
-  budget a WebGPU frame takes 4 tiles instead of 14, so a view of 400 tiles fills in about 95 frames instead of 25.
-  Mipmaps made in the worker (one bitmap per level) or a mipmap pipeline shared across tiles would bring WebGPU's rate to
-  WebGL2's, which matters most where frames are slow anyway.
+- **Tile uploads still cost more main-thread time on WebGPU than on WebGL2** (KB-208, KB-319): since KB-319 the
+  mipmaps of a frame's uploads share one queue submit, so a WebGPU frame takes 7 to 8 tiles within the 2 ms budget
+  instead of 4 to 5 (WebGL2: about 14). What remains is three.js creating bind groups and render passes for every
+  mip level of every tile; mipmaps made in the worker (one bitmap per level, copied without passes) would remove it.

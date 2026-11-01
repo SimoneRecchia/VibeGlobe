@@ -245,8 +245,7 @@ export function validatePosition(position: unknown): void {
   const { longitudeDeg, latitudeDeg, heightMeters } = position as Partial<GeoPosition>;
   if (!Number.isFinite(longitudeDeg)) finite(longitudeDeg, 'longitudeDeg');
   if (!Number.isFinite(latitudeDeg)) finite(latitudeDeg, 'latitudeDeg');
-  if (heightMeters != null && !Number.isFinite(heightMeters))
-    finite(heightMeters, 'heightMeters');
+  if (heightMeters != null && !Number.isFinite(heightMeters)) finite(heightMeters, 'heightMeters');
   if ((latitudeDeg as number) < -90 || (latitudeDeg as number) > 90) {
     throw new GlobeError(
       'invalid-coordinate',

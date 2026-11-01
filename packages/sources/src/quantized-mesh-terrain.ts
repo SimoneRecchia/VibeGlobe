@@ -12,7 +12,13 @@ import {
   type VerticalDatum,
 } from '@vibeglobe/core';
 import { fetchTransport } from './fetch-transport.js';
-import { type Attribution, CUSTOM_PROFILE, type DescribedSource, type ProviderProfile } from './metadata.js';
+import {
+  type Attribution,
+  CUSTOM_PROFILE,
+  type DescribedSource,
+  type ProviderProfile,
+  SourceConfigError,
+} from './metadata.js';
 
 /** Options of {@link quantizedMeshTerrain}. */
 export interface QuantizedMeshTerrainOptions {
@@ -48,19 +54,40 @@ function acceptHeader(declared: readonly string[]): string {
   return `${type},application/octet-stream;q=0.9`;
 }
 
+/** The source's `layer.json`, or a {@link SourceConfigError} saying whether it could not be loaded or read (KB-327). */
+async function loadLayerJson(id: string, url: string, fetchImpl: typeof fetch) {
+  let text: string;
+  try {
+    const response = await fetchImpl(url, { mode: 'cors', credentials: 'omit' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    text = await response.text();
+  } catch (error) {
+    throw new SourceConfigError(
+      'unreachable-layer',
+      `quantized-mesh source '${id}': cannot load layer.json (${String(error)})`,
+    );
+  }
+  try {
+    return readLayerJson(JSON.parse(text));
+  } catch (error) {
+    throw new SourceConfigError(
+      'invalid-layer',
+      `quantized-mesh source '${id}': invalid layer.json (${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+}
+
 /**
  * A quantized-mesh-1.0 terrain source (F127, F128): reads its `layer.json` (tiling scheme, zoom range, URL templates,
  * extensions, availability), never requests a tile outside the declared availability, learns deeper availability from
- * the metadata extension of loaded tiles, and asks for the declared extensions only. Rejects when `layer.json` cannot
- * be loaded or read.
+ * the metadata extension of loaded tiles, and asks for the declared extensions only. Rejects with a
+ * {@link SourceConfigError} (`unreachable-layer`, `invalid-layer`) when `layer.json` cannot be loaded or read.
  */
 export async function quantizedMeshTerrain(
   options: QuantizedMeshTerrainOptions,
 ): Promise<TerrainSource & DescribedSource> {
   const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
-  const response = await fetchImpl(options.url, { mode: 'cors', credentials: 'omit' });
-  if (!response.ok) throw new Error(`${options.id}: layer.json answered ${response.status}`);
-  const layer = readLayerJson(await response.json());
+  const layer = await loadLayerJson(options.id, options.url, fetchImpl);
   const availability = new TerrainAvailability(layer);
   const tiling = layer.scheme === 'geographic' ? GEOGRAPHIC_TILING : WEB_MERCATOR_TILING;
   const base = new URL(options.url, globalThis.location?.href);

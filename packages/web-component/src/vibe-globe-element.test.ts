@@ -46,6 +46,15 @@ describe('defineVibeGlobe', () => {
     expect(defineVibeGlobe('test-globe')).toBe(element);
   });
 
+  it('styles its shadow tree with a constructed sheet, which a strict style-src allows (KB-325)', () => {
+    defineVibeGlobe('test-globe');
+    const element = document.createElement('test-globe');
+    document.body.append(element);
+    expect(element.shadowRoot?.querySelector('style')).toBeNull();
+    expect(element.shadowRoot?.adoptedStyleSheets).toHaveLength(1);
+    element.remove();
+  });
+
   it('mirrors properties and attributes and starts the engine with them when connected', () => {
     defineVibeGlobe('test-globe');
     const element = document.createElement('test-globe') as InstanceType<ReturnType<typeof defineVibeGlobe>>;

@@ -174,7 +174,6 @@ interface ProviderProfile {
   respectCacheHeaders: boolean;
   maxConcurrentRequests?: number;
   requiredAttribution: Attribution; // text and/or logo, never covered
-  sessionRenewalSeconds?: number; // e.g. Google 3D sessions
   termsAdr: string; // ADR recording the terms reading
 }
 

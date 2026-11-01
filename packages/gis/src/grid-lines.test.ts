@@ -26,4 +26,9 @@ describe('grid lines (F659)', () => {
     const [a, b] = must(gridLines({ center, halfSizeM: 50, spacingM: 10, bearingDeg: 90 })[0]);
     expect(a.latitudeDeg).toBeCloseTo(b.latitudeDeg, 9);
   });
+
+  it('refuses a spacing that is not a positive number of meters, instead of never returning (KB-324)', () => {
+    for (const spacingM of [-5, Number.NaN, 0])
+      expect(() => gridLines({ center, halfSizeM: 100, spacingM }), String(spacingM)).toThrow(RangeError);
+  });
 });

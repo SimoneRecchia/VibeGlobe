@@ -63,7 +63,6 @@ export type PackageErrorCode =
   | 'invalid-manifest'
   | 'download-failed'
   | 'integrity'
-  | 'unreadable'
   | 'not-installed'
   | 'packaging-forbidden'
   | 'packaging-disabled'

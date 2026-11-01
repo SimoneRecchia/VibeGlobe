@@ -57,7 +57,7 @@ export class DrawLayer implements TileDrawLayer {
   skirtMeters: Float32Array;
   /** The source of each draw's imagery for tone matching, `layer × 8 + chain index`, or -1 (F249). */
   toneSources: Int16Array;
-  /** Terrain only: 1 on each edge (north, east, south, west) that samples the stitch texture (KB-178). */
+  /** Terrain only, per edge (north, east, south, west): bit 0 samples the stitch texture (KB-178), `>> 5` mesh levels up (KB-302). */
   stitchEdges: Uint8Array;
   /** Terrain only: the coarser terrain tile a draw's stitched edges sample, or -1 (KB-178). */
   stitchTextures: Int32Array;

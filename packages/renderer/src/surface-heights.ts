@@ -6,6 +6,7 @@
  */
 import {
   clamp,
+  exp2,
   float,
   floor,
   Fn,
@@ -18,6 +19,7 @@ import {
   textureLoad,
   textureSize,
   vec2,
+  vec3,
   vec4,
 } from 'three/tsl';
 import { DataTexture, FloatType, NearestFilter, RedFormat, type Node, type TextureNode } from 'three/webgpu';
@@ -102,14 +104,41 @@ export function terrainHeight(
   tones: Node<'mat4'>,
 ): Node<'float'> {
   const stitch = column(tones, 2);
-  return Fn(() => {
-    const h = sampleHeight(grids.heights, mapUv(tileUv, column(transforms, 2), flag(params.x, 4))).toVar();
+  const at = (uv: Node<'vec3'>): Node<'float'> => {
+    const h = sampleHeight(grids.heights, mapUv(uv, column(transforms, 2), flag(params.x, 4))).toVar();
     If(params.z.lessThan(1), () => {
-      const from = sampleHeight(grids.fromHeights, mapUv(tileUv, column(transforms, 3), flag(params.x, 8)));
+      const from = sampleHeight(grids.fromHeights, mapUv(uv, column(transforms, 3), flag(params.x, 8)));
       h.assign(mix(from, h, params.z));
     });
-    If(onMarkedEdge(tileUv, stitch.x), () => {
-      h.assign(sampleHeight(grids.stitchHeights, mapUv(tileUv, column(tones, 3), flag(params.x, 4))));
+    If(onMarkedEdge(uv, stitch.x), () => {
+      h.assign(sampleHeight(grids.stitchHeights, mapUv(uv, column(tones, 3), flag(params.x, 4))));
+    });
+    return h;
+  };
+  return Fn(() => {
+    const h = at(tileUv).toVar();
+    // An edge next to a coarser mesh follows its segments, a vertex every 2^levels of ours (KB-302), the levels three
+    // bits per edge: north and south edges along u, east and west ones along v (the geographic v moved alike).
+    const { x, y } = tileUv;
+    const bit = select(
+      y.lessThan(ON_EDGE),
+      1,
+      select(
+        x.greaterThan(1 - ON_EDGE),
+        8,
+        select(y.greaterThan(1 - ON_EDGE), 64, select(x.lessThan(ON_EDGE), 512, 4096)),
+      ),
+    );
+    const step = exp2(floor(stitch.y.div(bit)).mod(8))
+      .div(16)
+      .toVar();
+    If(step.greaterThan(0.1), () => {
+      const ns = bit.equal(1).or(bit.equal(64));
+      const along = select(ns, x, y);
+      const start = floor(along.div(step)).mul(step);
+      const axis = select(ns, vec3(1, 0, 0), vec3(0, 1, 1));
+      const moved = (by: Node<'float'>): Node<'float'> => at(tileUv.add(axis.mul(start.add(by).sub(along))));
+      h.assign(mix(moved(float(0)), moved(step), along.sub(start).div(step)));
     });
     return h.mul(mix(stitch.z, stitch.w, tileUv.z));
   })();

@@ -26,6 +26,11 @@
       "source": "./src/tiles3d/index.ts",
       "default": "./dist/tiles3d/index.js"
     },
+    "./gpu-probes": {
+      "types": "./dist/run-gpu-probes.d.ts",
+      "source": "./src/run-gpu-probes.ts",
+      "default": "./dist/run-gpu-probes.js"
+    },
     "./starfield": {
       "types": "./dist/starfield/index.d.ts",
       "source": "./src/starfield/index.ts",

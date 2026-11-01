@@ -1,4 +1,4 @@
-import type { GpuProbeResult } from '@vibeglobe/renderer';
+import type { GpuProbeResult } from '@vibeglobe/renderer/gpu-probes';
 
 declare global {
   interface Window {
@@ -12,7 +12,7 @@ declare global {
  * and exposes the result to tests; the page shows no globe.
  */
 export async function runGpuProbesPage(params: URLSearchParams, status: HTMLElement | null): Promise<void> {
-  const { runGpuProbes } = await import('@vibeglobe/renderer');
+  const { runGpuProbes } = await import('@vibeglobe/renderer/gpu-probes');
   try {
     const result = await runGpuProbes({
       backend: params.get('backend') === 'webgl2' ? 'webgl2' : 'webgpu',

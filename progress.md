@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-01: Bologna's orthophotos, Italy read a third time (owner's request)
+
+Italy's regions still publish no orthophoto service open for commercial use, AGEA's CC BY 4.0 imagery is downloads only,
+and Valle d'Aosta's 2024 flight (CC BY 4.0) has no layer readable from here. The city of Bologna's tile server
+(2017–2026, level 21, CC BY 4.0 in its specification, ODbL on its open data page) joined `europeOrthophotos()` within
+the city's box (F673, `OrthophotoRecord.box`).
+
 ## 2026-11-01: map changes fade in time, no blinking in motion, movements load ahead (owner's request, branch `smooth-imagery`)
 
 Measured first with the Europe preset's fixtures (each source the base image in its own tone) in a 960 × 640 view with
@@ -47,6 +54,17 @@ and on all-water tiles across the Alps and Lake Geneva; no committed end-to-end 
 `e2e/europe-zoom-phases.spec.ts` passes once its package stand-in shows water as imagery (ADR 0026) rather than the
 no-data color; over the coast its zoom 10 and 11 frames now reach 17.0 and 18.4 of the 20 allowed, the stand-in's
 blurred coast partly keyed.
+
+## 2026-10-31: the line along tile edges on maps with 3D terrain fixed (KB-302)
+
+The owner saw the maps glitch with 3D terrain. On the Europe preset's Map over the fixture Alps a line one pixel wide
+ran along tile edges: the meshes' skirts, twice the terrain error deep, won the depth test against the draped vector
+map on part of the MSAA samples. Skirts now keep the flat globe's few meters with terrain (the frame still deepens them
+where coarser terrain or a morph shows), and edges next to a coarser mesh follow its segments in the surface shader
+(`stitchEdges` top bits), which closes the T-junctions the deep skirts used to hide (ADR 0006, update of 2026-10-31).
+A new end-to-end test fails with 176 line pixels on the old skirts and passes now; the crack sweep, morphs and missing
+terrain (F137–F139) pass on both backends. To fit the renderer's budget the GPU readback probes moved to their own entry
+(`@vibeglobe/renderer/gpu-probes`): the main entry fell from 40.46 to 37.97 KB gzip and its budget to 38.5 KB.
 
 ## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
 

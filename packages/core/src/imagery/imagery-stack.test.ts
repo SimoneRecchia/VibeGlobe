@@ -36,6 +36,8 @@ describe('source metadata validation (F220)', () => {
       [{ minLevel: 9, maxLevel: 3 }, 'minimum level 9 above its maximum 3'],
       [{ tileSizePx: 0 }, 'tile size of 0 pixels'],
       [{ coverage: [{ westRad: 0, southRad: 0.5, eastRad: 0.2, northRad: 0.1 }] }, 'coverage rectangle'],
+      // A coverage that is not a list was iterated and threw (KB-311).
+      [{ coverage: {} as never }, 'coverage that is not a list'],
       [{ maxRequestsPerSecond: -1 }, 'rate limit of -1'],
     ];
     for (const [change, message] of cases) expect(sourceProblem({ ...valid, ...change })).toContain(message);

@@ -119,9 +119,10 @@ export function rasterMosaic(dataset: DatasetConfig, files: SourceFile[], paths:
   const source = dataset.source;
   const gapFill = source.type === 'worldcover-s2' ? source.gapFill : undefined;
   const entries: MosaicEntry[] = [];
+  const gapMaps = new Map(files.map((file, i) => [file.gapMapFor, i]));
   files.forEach((file, i) => {
     if (file.gapMapFor !== undefined) return;
-    const map = gapFill ? files.findIndex((f) => f.gapMapFor === file.key) : -1;
+    const map = gapFill ? (gapMaps.get(file.key) ?? -1) : -1;
     entries.push({
       bounds: file.bounds ?? world,
       load: () => {

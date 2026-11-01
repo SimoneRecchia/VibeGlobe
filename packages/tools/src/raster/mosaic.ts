@@ -20,17 +20,32 @@ function contains(raster: Raster, lon: number, lat: number): boolean {
   return lon >= raster.westDeg && lon < east && lat > south && lat <= raster.northDeg;
 }
 
+const MARGIN_DEG = 1e-3;
+const cellKey = (lon: number, lat: number): number => (Math.floor(lat) + 91) * 400 + Math.floor(lon) + 181;
+
 /** A mosaic of rasters with `channels` samples per pixel and a value for areas without data. */
 export class Mosaic {
   private readonly cache = new Map<MosaicEntry, Raster | undefined>();
+  /** The entries by whole-degree cell, in their order: a point looks only at its own cell's (KB-323). */
+  private readonly cells = new Map<number, MosaicEntry[]>();
   private last: Raster | undefined;
 
   constructor(
-    private readonly entries: MosaicEntry[],
+    entries: MosaicEntry[],
     readonly channels: number,
     private readonly fill: number[],
     private readonly cacheSize = 6,
-  ) {}
+  ) {
+    for (const entry of entries) {
+      const { west, south, east, north } = entry.bounds;
+      for (let lat = Math.floor(south - MARGIN_DEG); lat <= north + MARGIN_DEG; lat++)
+        for (let lon = Math.floor(west - MARGIN_DEG); lon <= east + MARGIN_DEG; lon++) {
+          const cell = this.cells.get(cellKey(lon, lat));
+          if (cell) cell.push(entry);
+          else this.cells.set(cellKey(lon, lat), [entry]);
+        }
+    }
+  }
 
   /** The decoded raster of an entry, through the cache. */
   private raster(entry: MosaicEntry): Raster | undefined {
@@ -60,10 +75,14 @@ export class Mosaic {
   }
 
   private searchRaster(lon: number, lat: number): Raster | undefined {
-    const margin = 1e-3;
-    for (const entry of this.entries) {
+    for (const entry of this.cells.get(cellKey(lon, lat)) ?? []) {
       const b = entry.bounds;
-      if (lon < b.west - margin || lon >= b.east + margin || lat <= b.south - margin || lat > b.north + margin)
+      if (
+        lon < b.west - MARGIN_DEG ||
+        lon >= b.east + MARGIN_DEG ||
+        lat <= b.south - MARGIN_DEG ||
+        lat > b.north + MARGIN_DEG
+      )
         continue;
       const raster = this.raster(entry);
       if (raster && contains(raster, lon, lat)) return raster;

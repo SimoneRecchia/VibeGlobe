@@ -144,6 +144,7 @@ describe('Cube search (F559)', () => {
     expect(cubeReferences(files)).toEqual([
       'docs/guides/x.md:1: Consumers such as Cube serve assets.',
       "packages/core/src/a.ts:1: import cube from '@vireox/cube';",
+      'docs/guides/integration.md:1: Integrating into Cube',
     ]);
   });
 });

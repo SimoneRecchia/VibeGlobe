@@ -9,10 +9,10 @@ import { WGS84 } from '../geodesy/wgs84.js';
 import { GlobeError } from './errors.js';
 import { validateBounds } from './fit-bounds.js';
 import type { CameraConstraints } from './types.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
 /** Ground meters per CSS pixel at ground zoom 0 (512 px across the equator, as `camera/zoom.ts`). */
 const METERS_PER_PIXEL_AT_ZERO = (2 * Math.PI * WGS84.semiMajorAxisMeters) / 512;
-const RAD = Math.PI / 180;
 
 /** Slots of the constraints, NaN where none is set. */
 const MIN_ZOOM = 0;

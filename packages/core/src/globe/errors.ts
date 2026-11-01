@@ -21,3 +21,8 @@ export class GlobeError extends Error {
     this.code = code;
   }
 }
+
+/** The message of anything thrown: an error's own, or the value as a string. */
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

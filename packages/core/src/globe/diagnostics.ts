@@ -9,8 +9,8 @@ import {
 } from '../surface/surface-quadtree.hot.js';
 import type { ImageryLoaderStats } from '../imagery/imagery-loader.hot.js';
 import type { RendererStats, ResourceCounts, SurfaceStats, SurfaceTileInfo, TerrainStats } from './types.js';
+import { RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
-const DEG = 180 / Math.PI;
 const ROOTS = ['mercator', 'north-cap', 'south-cap'] as const;
 
 /**

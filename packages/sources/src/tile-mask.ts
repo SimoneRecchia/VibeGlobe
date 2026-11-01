@@ -26,13 +26,15 @@ export function isBlank(rgba: Uint8ClampedArray, { rgb, tolerance }: BlankColor)
  * The decoded tile masked to the area's outline (even-odd: holes and several polygons) on an `OffscreenCanvas`, the
  * input closed; null for a tile of the blank color (also closed); the tile itself where no canvas is available. A
  * feathered mask fades from transparent at the border to opaque `featherPx` inside it; a keyed mask applies only to
- * pixels of its color (KB-231).
+ * pixels of its color (KB-231); the sea's key, to water's colors outside the land (KB-303).
  */
 export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask): ImageBitmap | RgbaTile | null {
   if (typeof OffscreenCanvas !== 'function') return image;
   const { width, height } = image;
   const canvas = new OffscreenCanvas(width, height);
-  const context = canvas.getContext('2d', { willReadFrequently: blank !== undefined || mask?.key !== undefined });
+  const context = canvas.getContext('2d', {
+    willReadFrequently: blank !== undefined || mask?.key !== undefined || mask?.sea !== undefined,
+  });
   if (!context) return image;
   context.drawImage(image, 0, 0);
   if (blank && isBlank(context.getImageData(0, 0, width, height).data, blank)) {
@@ -40,18 +42,24 @@ export function maskTile(image: ImageBitmap, blank?: BlankColor, mask?: TileMask
     return null;
   }
   if (!mask) return image;
-  if ((mask.featherPx ?? 0) <= 0 && !mask.key) {
+  if ((mask.featherPx ?? 0) <= 0 && !mask.key && !mask.sea) {
     context.globalCompositeOperation = 'destination-in';
     tracePath(context, mask, width, height, 0);
     context.fill('evenodd');
   } else {
-    const inside = insideAlpha(mask, width, height);
-    if (!inside) return image;
+    const inside = insideAlpha(mask, width, height, (mask.featherPx ?? 0) / 2, 2);
+    const land =
+      mask.sea &&
+      (mask.sea.ringEnds.length > 0
+        ? insideAlpha(mask.sea, width, height, mask.sea.featherPx * SEA_BLUR, SEA_GAIN)
+        : NO_LAND);
+    if (!inside || (mask.sea && !land)) return image;
     const data = new Uint8Array(context.getImageData(0, 0, width, height).data.buffer);
-    applyAlpha(data, inside, mask.key);
+    applyAlpha(data, inside, mask.key, land);
     // The pixels made transparent take their visible neighbors' color, so filtering shows no dark fringe along the
-    // border; a canvas would drop the color of transparent pixels, so the pixels themselves are the tile (F636).
-    bleedTransparentEdges(data, width, height);
+    // border; a canvas would drop the color of transparent pixels, so the pixels themselves are the tile (F636). The
+    // pixels still visible keep their own color: here it is exact.
+    bleedTransparentEdges(data, width, height, 4, 1);
     image.close();
     return { data, width, height };
   }
@@ -66,10 +74,23 @@ export interface RgbaTile {
   readonly height: number;
 }
 
-/** Adds the mask's rings to the context's path, in pixels, shifted by `offsetPx` on both axes. */
+/** An outline over a tile: rings in tile units ({@link TileMask}). */
+type Outline = Pick<TileMask, 'points' | 'ringEnds'>;
+
+/**
+ * The sea's fade (KB-303): the land blurred by 1.5 feathers and stretched fourfold about its outline, so its share of a
+ * pixel rises from none at the outline to all a feather inside, and gaps narrower than a feather between its polygons
+ * stay land.
+ */
+const SEA_BLUR = 1.5;
+const SEA_GAIN = 4;
+/** The land's share of a tile wholly at sea: none, for every pixel. */
+const NO_LAND = new Uint8ClampedArray(0);
+
+/** Adds the outline's rings to the context's path, in pixels, shifted by `offsetPx` on both axes. */
 function tracePath(
   context: OffscreenCanvasRenderingContext2D,
-  mask: TileMask,
+  mask: Outline,
   width: number,
   height: number,
   offsetPx: number,
@@ -89,65 +110,83 @@ function tracePath(
 }
 
 /**
- * How much of each pixel lies inside the area, 0–255: the area filled on a canvas larger than the tile by the
- * feather's reach (so the fade does not stop at the tile's edges), blurred, and stretched so that the border is 0 and
- * `featherPx` inside it 255. Undefined where no canvas context is available.
+ * How much of each pixel lies inside the outline, 0–255: the outline filled on a canvas larger than the tile by the
+ * blur's reach (so the fade does not stop at the tile's edges), blurred by `blurPx` (σ) and stretched by `gain` about
+ * the outline, where the blurred alpha is a half. A wide blur is drawn smaller and stretched back to the tile: it
+ * varies slowly, and a blur costs as many pixels as its canvas. Undefined where no canvas context is available.
  */
-function insideAlpha(mask: TileMask, width: number, height: number): Uint8ClampedArray | undefined {
-  const feather = mask.featherPx ?? 0;
-  const pad = Math.ceil(feather * 2) + 1;
-  const filled = new OffscreenCanvas(width + 2 * pad, height + 2 * pad);
+function insideAlpha(
+  outline: Outline,
+  width: number,
+  height: number,
+  blurPx: number,
+  gain: number,
+): Uint8ClampedArray | undefined {
+  const pad = Math.ceil(blurPx * 4) + 1;
+  const scale = Math.max(1, Math.floor(blurPx / 8));
+  const filled = new OffscreenCanvas(Math.ceil((width + 2 * pad) / scale), Math.ceil((height + 2 * pad) / scale));
   const fill = filled.getContext('2d');
   if (!fill) return undefined;
-  tracePath(fill, mask, width, height, pad);
+  fill.scale(1 / scale, 1 / scale);
+  tracePath(fill, outline, width, height, pad);
   fill.fill('evenodd');
   let source: OffscreenCanvas = filled;
-  if (feather > 0) {
+  if (blurPx > 0) {
     const blurred = new OffscreenCanvas(filled.width, filled.height);
     const blur = blurred.getContext('2d');
     if (!blur) return undefined;
-    // A Gaussian of σ = feather / 2: the filled area's alpha is 0.5 at the border and nearly 1 a feather inside.
-    blur.filter = `blur(${String(feather / 2)}px)`;
+    blur.filter = `blur(${String(blurPx / scale)}px)`;
     blur.drawImage(filled, 0, 0);
     source = blurred;
   }
-  const read = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
-  const rgba = read.getImageData(pad, pad, width, height).data;
+  let read = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
+  if (scale > 1) {
+    const stretched = new OffscreenCanvas(width, height);
+    read = stretched.getContext('2d') as OffscreenCanvasRenderingContext2D;
+    read.drawImage(source, pad / scale, pad / scale, width / scale, height / scale, 0, 0, width, height);
+  }
+  const at = scale > 1 ? 0 : pad;
+  const rgba = read.getImageData(at, at, width, height).data;
   const alpha = new Uint8ClampedArray(width * height);
   for (let i = 0; i < alpha.length; i++) {
     const a = rgba[i * 4 + 3] ?? 0;
-    alpha[i] = feather > 0 ? 2 * a - 255 : a;
+    alpha[i] = blurPx > 0 ? gain * (a - 127.5) : a;
   }
   return alpha;
 }
 
 /**
- * Scales each pixel's alpha by its inside value; with a key, only the pixels of the key's color; with a key everywhere,
- * every pixel, those of the key's color made transparent, fading back in up to twice its tolerance (F636).
+ * How much a color is water, 0–1: blue and green above red by 6 to 14 levels (sea, lakes, a package's no-data water;
+ * not vegetation, soil, grey, or the land's neutral shadows) and red below 160 to 200 (not snow, ice or cloud).
  */
-function applyAlpha(rgba: Uint8Array, inside: Uint8ClampedArray, key: TileMask['key']): void {
+export function waterShare(r: number, g: number, b: number): number {
+  return Math.max(0, Math.min(1, (Math.min(g - r, b - r) - 6) / 8, (200 - r) / 40));
+}
+
+/**
+ * Scales each pixel's alpha by its inside value (0–255); with a key, only the pixels of the key's color; with a key
+ * everywhere, every pixel, those of the key's color made transparent, fading back in up to twice its tolerance (F636);
+ * with the land's share of each pixel (0–255, none past its end), water's colors by how much of the pixel is sea
+ * (KB-303).
+ */
+export function applyAlpha(
+  rgba: Uint8Array,
+  inside: Uint8ClampedArray,
+  key: TileMask['key'],
+  land?: Uint8ClampedArray,
+): void {
   for (let i = 0; i < inside.length; i++) {
     const at = i * 4;
-    if (key?.everywhere) {
-      const { rgb, tolerance } = key;
-      const distance = Math.max(
-        Math.abs((rgba[at] ?? 0) - rgb[0]),
-        Math.abs((rgba[at + 1] ?? 0) - rgb[1]),
-        Math.abs((rgba[at + 2] ?? 0) - rgb[2]),
-      );
-      const kept = Math.min(1, Math.max(0, (distance - tolerance) / Math.max(1, tolerance)));
-      rgba[at + 3] = Math.round(((rgba[at + 3] ?? 0) * (inside[i] ?? 0) * kept) / 255);
-      continue;
-    }
+    const r = rgba[at] ?? 0;
+    const g = rgba[at + 1] ?? 0;
+    const b = rgba[at + 2] ?? 0;
+    let kept = (inside[i] ?? 0) / 255;
     if (key) {
-      const { rgb, tolerance } = key;
-      if (
-        Math.abs((rgba[at] ?? 0) - rgb[0]) > tolerance ||
-        Math.abs((rgba[at + 1] ?? 0) - rgb[1]) > tolerance ||
-        Math.abs((rgba[at + 2] ?? 0) - rgb[2]) > tolerance
-      )
-        continue;
+      const distance = Math.max(Math.abs(r - key.rgb[0]), Math.abs(g - key.rgb[1]), Math.abs(b - key.rgb[2]));
+      if (key.everywhere) kept *= Math.min(1, Math.max(0, (distance - key.tolerance) / Math.max(1, key.tolerance)));
+      else if (distance > key.tolerance) kept = 1;
     }
-    rgba[at + 3] = Math.round(((rgba[at + 3] ?? 0) * (inside[i] ?? 0)) / 255);
+    if (land) kept *= 1 - waterShare(r, g, b) * (1 - (land[i] ?? 0) / 255);
+    rgba[at + 3] = Math.round((rgba[at + 3] ?? 0) * kept);
   }
 }

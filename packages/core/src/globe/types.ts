@@ -294,6 +294,11 @@ export interface NavigationApi extends NavigationModeSettings {
   /** Zooms by `deltaZoom` levels keeping the position under `point` fixed. */
   zoomAt(point: ScreenPoint, deltaZoom: number): void;
   /**
+   * The view an input is heading for, as a smoothed zoom's target (F672): its tiles load ahead, as a movement's
+   * destination's do, before the camera gets there; undefined when it has arrived. Invalid views are ignored.
+   */
+  preloadView(view: ViewInit | undefined): void;
+  /**
    * Asks for a frame, at whose start the engine calls the controls' {@link Controls.update} (ADR 0009 §3–4); a request
    * made inside `update` asks for the next frame.
    */
@@ -582,30 +587,6 @@ export type { CameraConstraints };
 /** A home view (F194): a view, and optionally the view mode to set on the way. */
 export interface HomeView extends ViewInit {
   readonly viewMode?: '2d' | '3d' | 'auto';
-}
-
-/** A place an application's geocoder found (F208). */
-export interface GeocoderResult {
-  /** What a result list shows. */
-  readonly label: string;
-  readonly longitudeDeg: number;
-  readonly latitudeDeg: number;
-  /** The zoom to show it at; a search box picks one when omitted and no bounds are given. */
-  readonly zoom?: number;
-  /** The area of the place: a search box then fits it to the view. */
-  readonly bounds?: GeoBounds;
-}
-
-/**
- * A search provider the application supplies (F208): the engine and its packages bundle none and make no geocoding
- * request without one. `search` resolves the places matching `query`, empty when none; `signal` aborts a query the
- * user typed past.
- */
-export interface Geocoder {
-  search(
-    query: string,
-    options: { readonly signal: AbortSignalLike; readonly language: string },
-  ): Promise<readonly GeocoderResult[]>;
 }
 
 /** A geographic rectangle in degrees; `eastDeg` below `westDeg` crosses the antimeridian. */

@@ -112,7 +112,7 @@ async function imagePixels(bytes: ArrayBuffer): Promise<{ rgba: Uint8Array; size
 /**
  * Whether a canvas reads back exactly what was drawn (a black fill), checked once. Fingerprinting protection
  * (Safari's private windows, Firefox's resistFingerprinting, Brave) adds noise to `getImageData`, which would turn
- * heights into spikes (MapLibre #3110); the pixels then come from a `VideoFrame` copy, which it leaves alone (KB-304).
+ * heights into spikes (MapLibre #3110); the pixels then come from a `VideoFrame` copy, which it leaves alone (KB-312).
  */
 let exactReadback: boolean | undefined;
 

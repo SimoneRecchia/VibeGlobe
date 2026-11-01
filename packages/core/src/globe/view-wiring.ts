@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { Camera } from '../camera/camera.js';
+import type { MovementPath } from './flight-preload.js';
 import type { ViewState } from '../view/view-state.js';
 import { currentView } from './camera-state.js';
 import type { Constraints } from './constraints.hot.js';
@@ -17,8 +18,7 @@ export interface ViewWiring {
   /** The surface: its view state, and the tiles a flight's destination needs (F286). */
   readonly surface: {
     readonly view: ViewState;
-    preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean): void;
-    preloadAhead(end: Float64Array, camera: Camera): void;
+    preloadView(end: Float64Array | undefined, camera: Camera, flight?: boolean, path?: MovementPath): void;
     cameraJumped(): void;
     /** The terrain's height in memory at a position, NaN without terrain (F383). */
     terrainHeightRad: SurfaceHeight;
@@ -58,6 +58,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
       ),
     interruptMovement: () => movements.interrupt(),
     interruptTilt: () => movements.interruptTilt(),
+    preloadView: (view) => movements.preload(view),
   });
   const movements: Movements = new Movements({
     cam: globe.cam,
@@ -73,8 +74,7 @@ export function wireView(globe: ViewWiring): { viewControl: ViewControl; movemen
     requestRender: () => globe.requestRender(),
     interruptInput: () => viewControl.slot.controls?.interrupt?.(),
     constrainEnd: (end) => globe.constraints.clampEnd(end),
-    preloadView: (end, flight) => globe.surface.preloadView(end, globe.cam, flight),
-    preloadAhead: (end) => globe.surface.preloadAhead(end, globe.cam),
+    preloadView: (end, flight, path) => globe.surface.preloadView(end, globe.cam, flight, path),
     cameraJumped: () => globe.surface.cameraJumped(),
   });
   return { viewControl, movements };

@@ -1,8 +1,10 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { DecodeTask } from '../imagery/imagery-loader.hot.js';
 import type { TileSource } from '../imagery/imagery-source.js';
 import type { TileCoord } from '../tiling/tile-key.js';
 import type { HeightGrid } from './heightmap.js';
+import { heightTile } from './height-tile.js';
 import type { VerticalDatum } from './vertical-datum.js';
 
 /**
@@ -51,4 +53,30 @@ export function heightmapGeometricErrorMeters(
   tilesAtLevel0: number,
 ): number {
   return (0.25 * equatorMeters) / (tilesAtLevel0 * samplesPerSide * 2 ** level);
+}
+
+/** Height-grid cells of a quantized-mesh tile, which has no grid of its own (ADR 0006 §5). */
+const MESH_GRID_CELLS = 64;
+/**
+ * How a terrain source's tiles decode: built-in encodings in the worker pool, their grid adding at most half the
+ * level's geometric error (ADR 0006); a custom decoder inline between frames (ADR 0027, F132).
+ */
+export function terrainDecodeTask(
+  source: TerrainSource,
+): (bytes: ArrayBuffer, contentType: string, coord: TileCoord) => DecodeTask {
+  const decoder = source.decoder;
+  return (bytes, _contentType, coord) => {
+    if (decoder.kind === 'custom') {
+      return { task: 'custom-terrain', input: undefined, run: () => heightTile(decoder.decode(bytes, coord)) };
+    }
+    return {
+      task: 'decode-terrain',
+      input: {
+        bytes,
+        encoding: decoder.kind,
+        maxErrorMeters: source.geometricErrorMeters(coord.level) / 2,
+        meshCells: MESH_GRID_CELLS,
+      },
+    };
+  };
 }

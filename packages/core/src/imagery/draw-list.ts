@@ -129,20 +129,15 @@ export class OverlaySlot extends DrawLayer implements TileDrawOverlay {
  */
 export class DrawList implements TileDrawList {
   count = 0;
-  meshKeys: Float64Array;
-  private imagery: DrawLayer;
-  terrain: DrawLayer;
-  overlays: OverlaySlot[];
+  meshKeys!: Float64Array;
+  private imagery!: DrawLayer;
+  terrain!: DrawLayer;
+  overlays!: OverlaySlot[];
   /** The imagery under each draw's own, with its UV transform and tone source (F633). */
-  below: TileDrawBelow;
+  below!: TileDrawBelow;
 
   constructor(capacity = 256) {
-    this.meshKeys = new Float64Array(capacity);
-    this.below = belowArrays(capacity);
-    this.imagery = new DrawLayer(capacity);
-    this.terrain = new DrawLayer(capacity);
-    this.overlays = [];
-    for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays.push(new OverlaySlot(capacity));
+    this.allocate(capacity);
   }
 
   /** The imagery layer's arrays, for the fades. */
@@ -195,11 +190,17 @@ export class DrawList implements TileDrawList {
     if (count <= this.meshKeys.length) return;
     let capacity = this.meshKeys.length;
     while (capacity < count) capacity *= 2;
+    this.allocate(capacity);
+  }
+
+  /** New arrays for `capacity` draws. */
+  private allocate(capacity: number): void {
     this.meshKeys = new Float64Array(capacity);
     this.below = belowArrays(capacity);
     this.imagery = new DrawLayer(capacity);
     this.terrain = new DrawLayer(capacity);
-    for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays[slot] = new OverlaySlot(capacity);
+    this.overlays = [];
+    for (let slot = 0; slot < MAX_OVERLAYS; slot++) this.overlays.push(new OverlaySlot(capacity));
   }
 }
 

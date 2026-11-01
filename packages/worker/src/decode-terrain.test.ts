@@ -42,7 +42,7 @@ describe('decodeTerrain', () => {
     expect(plain.image.errorMeters).toBeLessThanOrEqual(5);
   });
 
-  it('reads heightmap pixels through a video frame where the canvas adds noise to them (fingerprinting protection, KB-304)', async () => {
+  it('reads heightmap pixels through a video frame where the canvas adds noise to them (fingerprinting protection, KB-312)', async () => {
     const size = 16;
     const close = vi.fn();
     vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: size, height: size, close }));

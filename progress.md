@@ -7,12 +7,60 @@ against VibeGlobe. Open questions have none open (only owner steps remain pendin
 test: WebGPU engines kept alive after a fast mount and destroy (TG-06: the warm-up's empty frame on a renderer released
 while it compiled pinned it to three.js's shared quad geometry; 120 rapid cycles stay flat and F517 on WebGPU is back in
 the default run), a runtime filter change over 1 s on CI (TD-02: only the changed vector layers are laid out again),
-KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), and vector tiles that
-retried 401, 403, 410 and CORS failures every 5 s (KB-303, MapLibre #8733's class). F383's spec failed on `main` since
-#89 stopped loading terrain under a flat relief; it now states where relief is drawn. Checked and unchanged
-(`docs/follow-ups.md`): resize during a GPU loss, 204 and empty tiles, and canvas readback noise (MapLibre #3110), which
-needs Safari or Firefox devices and room in the worker's budget. Still open: CI-pace flakes (KB-110, KB-208, KB-212,
-KB-240, KB-241) and the owner's desktop views (KB-181).
+KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), vector tiles that
+retried 401, 403, 410 and CORS failures every 5 s (KB-311, MapLibre #8733's class), and heightmaps turned to spikes
+where fingerprinting protection adds noise to canvas readback (KB-312, MapLibre #3110: read through a `VideoFrame`
+there, the worker's budget kept by removing duplicate code). F383's spec failed on `main` since #89 stopped loading
+terrain under a flat relief; it now states where relief is drawn. Checked and unchanged (`docs/follow-ups.md`): resize
+during a GPU loss, and 204 or empty tiles.
+
+## 2026-11-01: map changes fade in time, no blinking in motion, movements load ahead (owner's request, branch `smooth-imagery`)
+
+Measured first with the Europe preset's fixtures (each source the base image in its own tone) in a 960 × 640 view with
+400 ms latency on a 1.5 MB/s link, frames read at 60 Hz, before and after on the same machine. A layer's fade by zoom
+now changes no faster than once in 600 ms (F670), and only a change of role or slot cuts cross-fades short (KB-307). The
+blinking had three causes: an overlay's first tile faded in through black, a quarter darker halfway (KB-304); a layer
+with nothing resident over new ground was missing until its tiles came behind every visible one (KB-305: its ancestor
+four levels up now comes first); and a tile appearing by refinement where its parent showed what lies below, or two
+levels finer as a camera stops, popped (KB-306). Movements plan their tiles (F671, replacing the destination and
+look-ahead preloads): the destination with its ancestors first, the path's views in time order, a coarse margin ring,
+terrain, and layers the destination shows though hidden at the start (KB-308). The controls' smoothed zoom gives the
+view it heads for to `NavigationApi.preloadView` (F672; its browser step is still to write).
+
+| Scenario (fixtures, 400 ms, 1.5 MB/s)          | Before                            | After               |
+| ---------------------------------------------- | --------------------------------- | ------------------- |
+| Zoom 4 → 12.5 in 1.5 s: largest step per frame | 10.6 (base image alone 1.9)       | 2.3                 |
+| Zoom 12.5 → 4: largest step per frame          | 13.0                              | 15.2 (KB-309, open) |
+| Ease pan at zoom 13.5: orthophoto missing      | 56 frames, up to 59 % of the land | none                |
+| Same pan: blocks darker than both tones        | 12,736 block-frames               | 0                   |
+| Drag pan at zoom 13.5: orthophoto missing      | 2.0 % of land-frames, up to 30 %  | 0.8 %, up to 20 %   |
+| Flight from zoom 13, last 1.5 s: missing       | 41 % of the land on average       | 7 %                 |
+| Flight from zoom 5, last 1.5 s: missing        | 40 %                              | 3 %                 |
+| Wheel zoom 10 → 14: largest step per frame     | 14.6                              | 2.4                 |
+
+A fast zoom out still drops the orthophotos in two frames: motion-aware detail coarsens the surface below their first
+level (KB-309, open, with its options). Merged with main's #91 and #92, the core's main entry measured 65.37 KB gzip
+on a Mac (about 65.56 in CI, Node 22): back to 64.76 by moving the heading, pitch and roll conversions, which the engine
+never calls, to `@vibeglobe/core/geodesy`, by one pair of degree constants instead of thirteen, one refinement-fade
+seeder and one error-message helper. An application's flight from afar to a plant with `fitObjects(…, { tiltDeg })`
+was interrupted at once by the controls' tilt policy beyond its lock (KB-310): an API movement now keeps the tilt it
+chose until it ends.
+
+## 2026-10-31: one sea along the coasts (an application's screenshot of the Adriatic, branch `smooth-imagery`)
+
+The package's sea showed rectangular steps at zoom 8 to 11: its Sentinel-2 composite has real water only in the 1° cells
+holding land and a flat no-data color beyond, and from level 9 only tiles touching land, while the preset keyed out only
+the flat color, everywhere (inland lakes and shadows near it too). A coverage area's `keySea` (F669, KB-303) now makes
+water's colors transparent outside `EUROPE_LAND`, fading back in over 4 km inside it: a blur 1.5 times the fade
+stretched fourfold, which also closes the gaps of up to 3.2 km that the countries' separately simplified borders leave
+(a lake on a border would otherwise show streaks); a wide fade is blurred on a smaller canvas and stretched back. Tiles
+inside the land are no longer masked (0.6 ms a tile less), coastal ones cost about 1.1 ms instead of 0.5–0.8 on a Mac,
+and the edge bleed visits only pixels next to colored ones (1.65 to 0.54 ms a tile, same output). Checked in Chromium on
+synthetic package tiles of the Adriatic (real water ending at 14° E, sea-only tiles at levels 9–11 drawn from level 8)
+and on all-water tiles across the Alps and Lake Geneva; no committed end-to-end test reproduces the package's colors.
+`e2e/europe-zoom-phases.spec.ts` passes once its package stand-in shows water as imagery (ADR 0026) rather than the
+no-data color; over the coast its zoom 10 and 11 frames now reach 17.0 and 18.4 of the 20 allowed, the stand-in's
+blurred coast partly keyed.
 
 ## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
 

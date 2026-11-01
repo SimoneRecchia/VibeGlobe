@@ -8,6 +8,7 @@
  * Main thread to worker: `run` (`{ id, task, input }`) and `cancel` (`{ id }`). Worker to main thread: one `ready`
  * handshake with the protocol version and build id, then one `reply` (`{ id, ok, output | error }`) per `run`.
  */
+import { messageOf } from '../globe/errors.js';
 
 /** Version of the message protocol; the pool refuses a worker whose `ready` message names another one. */
 export const WORKER_PROTOCOL_VERSION = 1;
@@ -128,6 +129,5 @@ export function parseWorkerMessage(data: unknown): WorkerMessage | undefined {
 /** Turns anything a task threw into a {@link SerializedTaskError}; errors without a string `code` get `task-error`. */
 export function serializeTaskError(error: unknown): SerializedTaskError {
   const code = isRecord(error) && typeof error['code'] === 'string' ? error['code'] : 'task-error';
-  const message = error instanceof Error ? error.message : String(error);
-  return { code, message };
+  return { code, message: messageOf(error) };
 }

@@ -28,13 +28,13 @@ import type {
 } from './types.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import { validateBounds, viewForBounds } from './fit-bounds.js';
-import { FlightLookahead } from './flight-preload.js';
+import type { MovementPath } from './flight-preload.js';
 import { validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
 import type { ViewState } from '../view/view-state.js';
+import { DEG_TO_RAD as RAD } from '../geodesy/geodesic-angles.js';
 
-const RAD = Math.PI / 180;
 /** How long a flight's fade takes under the reduced-motion setting (F214), milliseconds. */
 const REDUCED_MOTION_FADE_MS = 300;
 
@@ -63,12 +63,10 @@ export interface MovementHost {
   /** Moves an end point (longitude, latitude in radians) into the camera bounds (F211). */
   constrainEnd(end: Float64Array): void;
   /**
-   * A movement to `end` starts (its tiles load ahead, F286; a flight also pauses prefetch, F287), or none runs any
-   * more (undefined).
+   * A movement to `end` starts: what it will draw along `path` loads ahead (F286, F671; a flight also pauses prefetch,
+   * F287); or none runs any more (undefined).
    */
-  preloadView?(end: Float64Array | undefined, flight?: boolean): void;
-  /** Each frame of a flight: the pose it will have in about a second, whose tiles load instead of the view's (F287). */
-  preloadAhead?(end: Float64Array): void;
+  preloadView?(end: Float64Array | undefined, flight?: boolean, path?: MovementPath): void;
   /** The camera jumped (`jumpTo`): motion-aware detail does not count it as motion (F085). */
   cameraJumped?(): void;
 }
@@ -96,7 +94,6 @@ export class Movements {
   private running: Running | undefined;
   /** A movement started this frame: it begins at the frame's clock time, not before. */
   private readonly stepIo = new Float64Array(2);
-  private readonly lookahead = new FlightLookahead();
   private readonly moveEvent = { cause: 'api' as MoveCause };
   private userMoving = false;
   /** What the running user movement is: input, or the controls' inertia after it (F200). */
@@ -132,6 +129,33 @@ export class Movements {
     }
     this.interrupt();
     const camera = this.host.cam;
+    const end = this.endOf(view, target.tiltDeg !== undefined);
+    if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
+    const animator =
+      kind === 'fly' && this.reducedMotion
+        ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
+        : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs, options ?? {});
+    this.host.preloadView?.(end, kind === 'fly', animator instanceof CameraAnimator ? animator : undefined);
+    return this.begin(animator, options?.signal);
+  }
+
+  /**
+   * The tiles of the view an input heads for load ahead, as a movement's destination (a smoothed zoom's, F672); none
+   * for undefined. Invalid views are ignored.
+   */
+  preload(target: ViewInit | undefined): void {
+    let end: Float64Array | undefined;
+    try {
+      if (target) end = this.endOf(validateView(target, this.host.currentView()), false);
+    } catch {
+      // Ignored, as navigation input is (KB-029).
+    }
+    this.host.preloadView?.(end);
+  }
+
+  /** A movement's end (radians and meters; a NaN tilt keeps it unless `tilted`), within the camera bounds (F211). */
+  private endOf(view: ValidView, tilted: boolean): Float64Array {
+    const camera = this.host.cam;
     const end = Float64Array.of(
       view.longitudeDeg * RAD,
       view.latitudeDeg * RAD,
@@ -141,18 +165,10 @@ export class Movements {
         camera.fovYRad,
       ),
       view.headingDeg * RAD,
-      target.tiltDeg === undefined ? Number.NaN : view.tiltDeg * RAD,
+      tilted ? view.tiltDeg * RAD : Number.NaN,
     );
     this.host.constrainEnd(end);
-    this.host.preloadView?.(end, kind === 'fly');
-    if (target.tiltDeg !== undefined) this.host.chooseTilt(camera.pose.tiltRad / RAD);
-    const animator =
-      kind === 'fly' && this.reducedMotion
-        ? new FadeJump(camera, end, this.host.timeMs(), REDUCED_MOTION_FADE_MS)
-        : new CameraAnimator(kind, camera, end, this.host.timeMs(), durationMs, options ?? {});
-    if (animator instanceof CameraAnimator && kind === 'fly')
-      this.lookahead.plan(animator, camera, this.host.timeMs(), animator.durationMs);
-    return this.begin(animator, options?.signal);
+    return end;
   }
 
   /**
@@ -364,9 +380,6 @@ export class Movements {
       const opacity = running.animator.opacity;
       if (opacity !== undefined) this.host.setOpacity(opacity);
       this.host.cam.update();
-      const animator = running.animator;
-      if (!done && animator instanceof CameraAnimator && animator.kind === 'fly')
-        this.host.preloadAhead?.(this.lookahead.poseAhead(animator, this.host.cam, this.stepIo[0] ?? 0));
       this.moveEvent.cause = 'api';
       if (this.host.emitter.has('move')) this.host.emitter.emit('move', this.moveEvent);
       if (done) this.finish(running, 'completed');

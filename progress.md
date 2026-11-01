@@ -57,6 +57,10 @@ passing in CI), KB-180, KB-181 (the owner's desktop views).
 offline matrix recording a still camera while its flight was under way on a slow machine (KB-318), F337 after #100
 removed its profile, KB-185's test limit, and F101 on WebGPU, where three.js submitted every tile's mipmaps alone: a
 frame's tile mipmaps now share one submit (KB-319), and an 81-tile burst uploads in 11 to 13 frames instead of 15 to 23.
+KB-110 and KB-212 closed on CI's record: F137's WebGL2 sweep passed 70 full runs in a row with 0 pops, and F367 62 of
+62 since KB-203's fix (the engine idle before labels were drawn), the day after KB-212's only failure. The nightly
+benchmarks job recorded nothing since 2026-10-28 (git refused its checkout, KB-320): fixed. Still open, and the owner's:
+question 39 (the hosts are refused here, also to a web fetch), KB-180 and KB-181 (the exact views).
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

@@ -5,11 +5,7 @@ import { TILE_SEGMENTS } from '../surface/surface-mesh.js';
 import { MERCATOR_ROOT, quadtreeRowLatitudeRad, type QuadtreeTile } from '../surface/surface-quadtree.hot.js';
 import { sampleHeight } from './sample-height.js';
 import type { TerrainHeights } from './terrain-heights.js';
-
-/** Mercator y of a latitude, in units of the whole map's height (0 at the north edge, 1 at the south). */
-function mercatorY(latRad: number): number {
-  return (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
-}
+import { mercatorY } from './vertical-datum.js';
 
 /** The height of one draw layer's grid at tile coordinates, through transform `at` of `transforms`. */
 function layerHeight(

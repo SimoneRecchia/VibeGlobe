@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
-- Milestone: M7, M8, M9, M13 (F676; supersedes F256–F262, F321–F323, F340, F470, F549, F572, F573)
+- Milestone: M7, M8, M9, M13 (F679; supersedes F256–F262, F321–F323, F340, F470, F549, F572, F573)
 
 ## Context
 
@@ -26,7 +26,7 @@ Option 2. The library ships no adapter of a paid or proprietary provider:
 - What a provider's terms need stays generic: `xyzImagery`, `tiles3d` and the other adapters take a `transport` that
   adds keys and session tokens the engine never sees (`fetchTransport`), and a `ProviderProfile` declares the required
   credit and logo, `displayOnly` (pixel readback, tile data, elevation sampling and picking refused), the loading
-  features it forbids, its concurrency and session renewal. The core enforces them for every source (F255, F326, F676).
+  features it forbids, its concurrency and session renewal. The core enforces them for every source (F255, F326, F679).
 - The sources guide shows an application connecting Google Map Tiles this way ("Commercial providers, from your own
   code"); the application reads the provider's terms and owns the key and the billing.
 - The data pipeline no longer reads Sentinel-2 cloudless: `s2cloudless` sources and the `s2cloudless-2016` profile are
@@ -35,7 +35,7 @@ Option 2. The library ships no adapter of a paid or proprietary provider:
 
 ## Consequences
 
-- The superseded entries and their replacement F676 are listed in `docs/feature-changes.md`; the removed tests in
+- The superseded entries and their replacement F679 are listed in `docs/feature-changes.md`; the removed tests in
   `docs/test-changes.md`.
 - ADR 0031's reading of Google's terms stays as a record an application can start from; its adapter settings no longer
   describe library code. ADR 0141's Google sessions are no longer library code either.

@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import type { CameraMovement, GeoBounds, GeoPosition, Globe, MovementOptions } from '@vibeglobe/core';
+import type { CameraMovement, GeoBounds, GeoPosition, Globe, MovementOptions, ScreenInsets } from '@vibeglobe/core';
 import type { Feature } from './geojson.js';
 
 /** What {@link fitObjects} frames: features (their every vertex, at its altitude) and positions (models, points). */
@@ -61,7 +61,7 @@ export function extentOf(objects: readonly FitObject[]): { bounds: GeoBounds; ve
 
 /**
  * Flies (or eases) to the view that frames every object, heights included, inside the viewport minus `paddingPx`
- * (F387): `Globe.fitBounds` centered on their bounds, with every vertex required to show. Whole models come from
+ * (F387; per side, centered in the part it leaves, F676): `Globe.fitBounds` centered on their bounds, with every vertex required to show. Whole models come from
  * `ModelSetLayer.framePositions` (a turbine with its rotor, a plant's every device, F667); `tiltDeg` frames from that
  * tilt instead of the view mode's.
  */
@@ -69,7 +69,7 @@ export function fitObjects(
   globe: Pick<Globe, 'fitBounds'>,
   objects: readonly FitObject[],
   options: MovementOptions & {
-    readonly paddingPx?: number;
+    readonly paddingPx?: number | ScreenInsets;
     readonly movement?: 'fly' | 'ease';
     readonly tiltDeg?: number;
   } = {},

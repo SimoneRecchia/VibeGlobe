@@ -8119,6 +8119,37 @@
     },
     {
       "id": "F676",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "`fitBounds` and `fitObjects` take `paddingPx` per side (`{ top, right, bottom, left }`, `ScreenInsets`), as well as one number for every side: the view frames in the part of the canvas the padding leaves, centered there, in one movement, the aim moved by how the framed middle moves on screen at its height (tilt and parallax counted); a padding that leaves no room is refused with `invalid-option`.",
+      "steps": [
+        "Unit-test a 150 m object framed with a 300 px panel on the left and 60 px on the right, straight down and at 50°: its middle within 3 px of the free part's center and both ends inside it",
+        "Unit-test that a padding wider than the canvas is refused"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F677",
+      "milestone": 10,
+      "section": "Data layers for applications",
+      "description": "`layoutPanels` takes an `anchor`, a panel center its rows pass through: every place lies a whole number of row steps (width and gap) and row pitches (depth and row gap) from it, so a layout lines up with the tables an aerial image shows or with panels already placed; without it the rows keep the phase that holds the most panels.",
+      "steps": [
+        "Unit-test that with an anchor every placed center lies a whole number of steps from it along and across the rows"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F678",
+      "milestone": 4,
+      "section": "Map experience: globe, 2D and 3D",
+      "description": "`ViewCurves.maxRelief` (0–1, default 1) caps the terrain relief any zoom or tilt shows: 0 keeps the surface flat also where a tilted view would raise it (ADR 0034), so an application can switch its terrain off at runtime; a value outside 0–1 is refused with `invalid-option`.",
+      "steps": [
+        "Unit-test that a 50° view from afar shows full relief, and none once the curves set maxRelief 0"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F679",
       "milestone": 7,
       "section": "Map sources: map-agnostic design",
       "description": "An application connects any provider, a paid or proprietary one included (for example Google Map Tiles 2D and 3D Tiles), from its own code: the generic adapters take a transport that adds its key and session, and a profile of its terms declares the required credit and logo, display-only use and the loading features it forbids; the library ships no adapter of such a provider.",
@@ -8130,7 +8161,7 @@
       "status": "passing"
     },
     {
-      "id": "F677",
+      "id": "F680",
       "milestone": 9,
       "section": "Default datasets and data pipeline",
       "description": "The data pipeline reads no Sentinel-2 cloudless edition: a source whose URL names any `s2cloudless` layer, the 2016 edition included, is refused by the license gate under the `eox-s2cloudless` profile with the term that forbids it, recorded in ADR 0025.",

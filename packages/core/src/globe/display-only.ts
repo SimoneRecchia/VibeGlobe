@@ -42,7 +42,7 @@ export function refuseDisplayOnly(
 
 /**
  * Throws when `api` would read the data of `source`, a display-only source that a render extension draws itself, such
- * as a provider's 3D Tiles (F323, F676; track E hook 6).
+ * as a provider's 3D Tiles (F323, F679; track E hook 6).
  */
 export function refuseDisplayOnlySource(api: string, source: ProfiledSource): void {
   if (source.profile?.displayOnly === true) throw refusal(api, source);

@@ -118,16 +118,6 @@ export class ViewState {
 
   constructor(public curves: ViewCurves) {}
 
-  /** Ground zoom at the screen center. */
-  get groundZoom(): number {
-    return this.values[GROUND_ZOOM] ?? 0;
-  }
-
-  /** The automatic tilt the Auto curves give at this zoom, radians. */
-  get autoTiltRad(): number {
-    return this.values[AUTO_TILT] ?? 0;
-  }
-
   /** The tilt the user chose, radians: what manual mode shows wherever no clamp applies. */
   get chosenTiltRad(): number {
     return this.chosen[0] ?? 0;
@@ -342,7 +332,7 @@ export class ViewState {
     anchor[0] = camera.pose.targetLongitudeRad;
     anchor[1] = camera.pose.targetLatitudeRad;
     factors[0] = (curveValues[CURVE_MORPH] ?? 0) + (this.values[MORPH_OFFSET] ?? 0);
-    factors[1] = zoomRelief > tiltRelief ? zoomRelief : tiltRelief;
+    factors[1] = Math.min(zoomRelief > tiltRelief ? zoomRelief : tiltRelief, this.curves.maxRelief);
     for (let i = 0; i < 2; i++) {
       if ((factors[i] ?? 0) < 0) factors[i] = 0;
       if ((factors[i] ?? 0) > 1) factors[i] = 1;

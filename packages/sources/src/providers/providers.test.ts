@@ -108,7 +108,7 @@ describe('openStreetMapImagery (F263–F267)', () => {
   });
 });
 
-describe('a provider the application connects itself (F676)', () => {
+describe('a provider the application connects itself (F679)', () => {
   it('takes a keyed service with session tokens through xyzImagery, its own transport and its own profile', async () => {
     // The application's code: a session created once, its token and key added only by the transport, the provider's
     // logo always shown and its tiles for display only, as a commercial provider's terms ask.

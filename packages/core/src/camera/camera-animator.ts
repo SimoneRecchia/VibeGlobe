@@ -174,37 +174,32 @@ export class CameraAnimator {
   private slerp(f: number, pose: Camera['pose']): void {
     const angle = this.v[ANGLE] ?? 0;
     const a = this.a;
-    const b = this.b;
+    const ax = a[0] ?? 0;
+    const ay = a[1] ?? 0;
+    const az = a[2] ?? 0;
+    let bx = this.b[0] ?? 0;
+    let by = this.b[1] ?? 0;
+    let bz = this.b[2] ?? 0;
     let wa = 1 - f;
     let wb = f;
     // acos resolves angles near π only to about 1.5e-8: wider than that, so every antipodal pair takes this branch.
     if (angle > Math.PI - 1e-6) {
-      // Antipodal ends: every great circle joins them; take the one through the north of the start (KB-128).
-      const ax = a[0] ?? 0;
-      const ay = a[1] ?? 0;
-      const az = a[2] ?? 0;
+      // Antipodal ends: every great circle joins them; take the one through the north of the start (KB-128), turning
+      // from the start toward the northward tangent there; at a pole, toward the direction of longitude 0.
       const horizontal = Math.sqrt(ax * ax + ay * ay);
-      // The northward tangent at the start; at a pole, the direction of longitude 0.
-      const px = horizontal > 1e-12 ? (-az * ax) / horizontal : 1;
-      const py = horizontal > 1e-12 ? (-az * ay) / horizontal : 0;
-      const pz = horizontal > 1e-12 ? horizontal : 0;
-      const cos = Math.cos(f * angle);
-      const sin = Math.sin(f * angle);
-      const x = cos * ax + sin * px;
-      const y = cos * ay + sin * py;
-      const z = cos * az + sin * pz;
-      pose.targetLongitudeRad = Math.atan2(y, x);
-      pose.targetLatitudeRad = Math.atan2(z, Math.sqrt(x * x + y * y));
-      return;
-    }
-    if (angle > 1e-12) {
+      bx = horizontal > 1e-12 ? (-az * ax) / horizontal : 1;
+      by = horizontal > 1e-12 ? (-az * ay) / horizontal : 0;
+      bz = horizontal > 1e-12 ? horizontal : 0;
+      wa = Math.cos(f * angle);
+      wb = Math.sin(f * angle);
+    } else if (angle > 1e-12) {
       const sin = Math.sin(angle);
       wa = Math.sin((1 - f) * angle) / sin;
       wb = Math.sin(f * angle) / sin;
     }
-    const x = wa * (a[0] ?? 0) + wb * (b[0] ?? 0);
-    const y = wa * (a[1] ?? 0) + wb * (b[1] ?? 0);
-    const z = wa * (a[2] ?? 0) + wb * (b[2] ?? 0);
+    const x = wa * ax + wb * bx;
+    const y = wa * ay + wb * by;
+    const z = wa * az + wb * bz;
     pose.targetLongitudeRad = Math.atan2(y, x);
     pose.targetLatitudeRad = Math.atan2(z, Math.sqrt(x * x + y * y));
   }

@@ -1,7 +1,7 @@
 // Provider profiles on the globe: the OpenStreetMap public servers see at most two requests at once during fast
 // navigation, a Referer identifying the application on every request, and the page logs exactly one warning
 // (F265–F267); their credit is linked and their cache headers honored (F264); a provider's required logo and credit,
-// declared by the application's own profile, stay visible and uncovered (F255, F676).
+// declared by the application's own profile, stay visible and uncovered (F255, F679).
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expect, test, type Page } from '@playwright/test';
@@ -129,7 +129,7 @@ async function addEveryControl(page: Page): Promise<void> {
   }, `/@fs${process.cwd()}/packages/ui/src/index.ts`);
 }
 
-test.describe("a provider's required logo and credit (F255, F676)", () => {
+test.describe("a provider's required logo and credit (F255, F679)", () => {
   test.setTimeout(240_000);
   const sizes = [
     { name: 'desktop', width: 1280, height: 800 },

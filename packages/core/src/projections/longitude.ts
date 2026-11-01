@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { WGS84 } from '../geodesy/wgs84.js';
+import type { LonLatDeg, ProjectedPointMeters } from './types.js';
 
 /**
  * Width of one world copy along x, in meters, for every projection whose x is a·λ (Web Mercator and plate carrée):
@@ -81,4 +82,24 @@ export function degToRad(deg: number): number {
 /** Converts radians to degrees as (rad / π) · 180, which maps ±π and ±π/2 exactly onto ±180° and ±90°. */
 export function radToDeg(rad: number): number {
   return (rad / Math.PI) * 180;
+}
+
+/** Runs a projection in radians (`projectWebMercatorRad`, `projectGeographicRad`) on degrees. */
+export function projectDeg(
+  project: (lonRad: number, latRad: number, out: Float64Array) => Float64Array,
+  lonDeg: number,
+  latDeg: number,
+): ProjectedPointMeters {
+  const out = project(degToRad(lonDeg), degToRad(latDeg), new Float64Array(2));
+  return { xMeters: out[0] ?? Number.NaN, yMeters: out[1] ?? Number.NaN };
+}
+
+/** Runs an unprojection to radians on meters, giving the longitude in [-180°, 180°) and the latitude in degrees. */
+export function unprojectDeg(
+  unproject: (xMeters: number, yMeters: number, out: Float64Array) => Float64Array,
+  xMeters: number,
+  yMeters: number,
+): LonLatDeg {
+  const out = unproject(xMeters, yMeters, new Float64Array(2));
+  return { lonDeg: wrapLongitudeDeg(radToDeg(out[0] ?? Number.NaN)), latDeg: radToDeg(out[1] ?? Number.NaN) };
 }

@@ -39,6 +39,14 @@ export interface ScreenPoint {
   readonly yPx: number;
 }
 
+/** CSS pixels kept clear on each side of the canvas, as MapLibre's per-side padding (F676). */
+export interface ScreenInsets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
 /** The screen point showing a WGS84 position ({@link Globe.geoToScreen}). */
 export interface GeoScreenPoint extends ScreenPoint {
   /**
@@ -722,14 +730,15 @@ export interface Globe {
   flyTo(target: ViewInit, options?: MovementOptions): CameraMovement;
   /**
    * Flies (or eases, with `movement: 'ease'`) to the view that shows `bounds` inside the viewport minus `paddingPx`
-   * (default 0) on every side, keeping the heading and the view mode's tilt (F176). Positions in `include`, heights
+   * (default 0) on every side, or per side, centered in the part it leaves (F676: a panel over one side of the map),
+   * keeping the heading and the view mode's tilt (F176). Positions in `include`, heights
    * included, must show inside it too (objects above the ground, F387), the middle of their heights at the view's center
    * and the eye at least 100 m from it (KB-301).
    */
   fitBounds(
     bounds: GeoBounds,
     options?: MovementOptions & {
-      readonly paddingPx?: number;
+      readonly paddingPx?: number | ScreenInsets;
       readonly movement?: 'fly' | 'ease';
       readonly include?: readonly GeoPosition[];
       /** The tilt to frame with, chosen as a view given with a tilt chooses it; the view mode's by default (F667). */

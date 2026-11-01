@@ -1,13 +1,31 @@
 # Progress
 
-## 2026-11-01: no Google adapter, no Sentinel-2 cloudless; any provider from the application (F676, ADR 0185)
+## 2026-11-01: no Google adapter, no Sentinel-2 cloudless; any provider from the application (F679, ADR 0185)
 
 After an audit of the connected maps (every default source allows commercial use), the owner removed what no default
 uses: the Google adapters (2D tiles, Street View, Photorealistic 3D Tiles, their fixtures, scenario, specs and live
 steps) and the pipeline's Sentinel-2 cloudless reader, whose only accepted edition EOX now reserves to its commercial
 licence. Applications connect any provider from their own code: a transport adds keys and sessions, a profile declares
 the required credit and logo, `displayOnly` and the forbidden loading features (sources guide, "Commercial providers,
-from your own code"). Fifteen entries superseded by F676 (`docs/feature-changes.md`).
+from your own code"). Fifteen entries superseded by F679 and F680 (`docs/feature-changes.md`).
+
+## 2026-11-01: rows that pass through a panel, terrain switched off at any tilt (F677, F678, owner's request)
+
+An application's panel editor laid its rows at the phase that held the most panels, often half a row off the tables an
+aerial image showed: `layoutPanels` takes an `anchor`, a panel center its rows pass through (F677). Its terrain
+switch flattened the relief by moving the relief band out of reach, but a tilted view raises the relief by itself
+(ADR 0034), so the terrain stayed at 45°: `ViewCurves.maxRelief` caps the relief any zoom or tilt shows, and 0 keeps
+the surface flat (F678). The core entry stays under its budget after a trim: shared mesh-vertex writers, pure block
+formats, one Web Mercator latitude helper and a shared pool acquisition.
+
+## 2026-11-01: fits frame beside a panel, in one movement (F676, owner's request)
+
+An application with a detail panel over the map's left framed an asset across the whole canvas and then eased it
+beside the panel: the zoom overshot and the view slid sideways. `fitBounds` and `fitObjects` now take `paddingPx` per
+side (`{ top, right, bottom, left }`, MapLibre's shape, `ScreenInsets`): each zoom tried aims so the framed middle
+shows at the middle of the part the padding leaves, measured on screen from how it moves for a step east and north at
+its height (tilt and parallax counted), and the zoom found is the largest where everything shows inside that part. The
+follow-up of #91 is done.
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

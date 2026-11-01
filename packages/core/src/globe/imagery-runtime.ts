@@ -16,8 +16,7 @@ import { ImageryFades } from '../imagery/fades.js';
 import { ImageryLoader, type TileMemory } from '../imagery/imagery-loader.hot.js';
 import { imageryDecodeTask, type ImagerySource } from '../imagery/imagery-source.js';
 import { NetworkPool } from '../scheduler/network-pool.js';
-import { acquireWorkerPool } from '../scheduler/worker-pool.js';
-import { acquireNetworkPool, releaseNetworkPool } from './page-network.js';
+import { acquirePools, releaseNetworkPool } from './page-network.js';
 import type { WorkerPoolLease } from '../scheduler/worker-pool-types.js';
 import type { WorkerEndpointFactory } from '../scheduler/worker-protocol.js';
 import type { QuadtreeTile } from '../surface/surface-quadtree.hot.js';
@@ -145,14 +144,8 @@ export class ImageryRuntime {
   ) {
     const host = renderer.host;
     const sources = entries.flatMap((entry) => entry.sources);
-    this.network = acquireNetworkPool(host);
+    ({ network: this.network, lease: this.lease } = acquirePools(workers, host));
     this.network.bandwidth.adaptive = callbacks.adaptiveRequests !== false;
-    this.lease = acquireWorkerPool(workers, {
-      timers: {
-        set: (callback, delayMs) => host.setTimer(callback, delayMs),
-        clear: (handle) => host.clearTimer(handle),
-      },
-    });
     const gpuBudgetBytes = memory.gpuBudgetBytes ?? DEFAULT_GPU_BUDGET_BYTES;
     this.residency = new Residency({
       budgetBytes: gpuBudgetBytes,

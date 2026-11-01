@@ -29,7 +29,7 @@ import type {
 import type { AbortSignalLike } from './imagery-runtime.js';
 import { validateBounds, viewForBounds } from './fit-bounds.js';
 import type { MovementPath } from './flight-preload.js';
-import { validatePosition, validateView, type ValidView } from './validation.js';
+import { describeInput, validatePosition, validateView, type ValidView } from './validation.js';
 import { applyView, currentView } from './camera-state.js';
 import { keepGroundScale } from './view-geometry.js';
 import type { ViewState } from '../view/view-state.js';
@@ -257,9 +257,15 @@ export class Movements {
     let target;
     try {
       const valid = validateBounds(bounds);
-      const padding = options?.paddingPx ?? 0;
-      if (typeof padding !== 'number' || !(padding >= 0) || 2 * padding >= Math.min(camera.widthPx, camera.heightPx))
-        throw new GlobeError('invalid-option', `paddingPx must leave part of the view, got ${String(padding)}`);
+      const given = options?.paddingPx ?? 0;
+      const padding = typeof given === 'number' ? { top: given, right: given, bottom: given, left: given } : given;
+      const { top, right, bottom, left } = padding;
+      if (
+        !(Math.min(top, right, bottom, left) >= 0) ||
+        left + right >= camera.widthPx ||
+        top + bottom >= camera.heightPx
+      )
+        throw new GlobeError('invalid-option', `paddingPx must leave part of the view, got ${describeInput(given)}`);
       if (options?.movement !== undefined && options.movement !== 'fly' && options.movement !== 'ease')
         throw new GlobeError('invalid-option', `movement must be 'fly' or 'ease', got ${String(options.movement)}`);
       const include = options?.include ?? [];

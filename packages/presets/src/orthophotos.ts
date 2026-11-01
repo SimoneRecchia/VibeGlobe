@@ -2,7 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * `@vibeglobe/presets/orthophotos`: national and regional orthophoto services of Europe whose terms allow commercial
- * use and redistribution, read on 2026-10-26 and 2026-10-31 (ADR 0182). Each is a layer of its own, clipped per pixel to its country's
+ * use and redistribution, read on 2026-10-26, 2026-10-31 and 2026-11-01 (ADR 0182). Each is a layer of its own, clipped per pixel to its country's
  * or region's borders (F618), so the satellite composite below shows outside it and at the borders between services.
  * Their borders load on demand, so this entry is apart from the preset's.
  *
@@ -15,14 +15,16 @@ import { countryBorders } from './countries.js';
 import { onlineFade, type EuropeOpenOptions } from './europe.js';
 import { FIRST_READING_ORTHOPHOTOS, type OrthophotoRecord } from './orthophoto-records.js';
 import { SECOND_READING_ORTHOPHOTOS } from './orthophoto-records-2026-10-31.js';
+import { THIRD_READING_ORTHOPHOTOS } from './orthophoto-records-2026-11-01.js';
 import type { PresetSourceRecord } from './sources.js';
 
 export { ORTHOPHOTO_MIN_LEVEL, type OrthophotoRecord, type OrthophotoService } from './orthophoto-records.js';
 
-/** The orthophoto services included, in ADR 0182's order: those read on 2026-10-26, then those read on 2026-10-31. */
+/** The orthophoto services included, in ADR 0182's order: those read on 2026-10-26, 2026-10-31 and 2026-11-01. */
 export const EUROPE_ORTHOPHOTOS: readonly OrthophotoRecord[] = [
   ...FIRST_READING_ORTHOPHOTOS,
   ...SECOND_READING_ORTHOPHOTOS,
+  ...THIRD_READING_ORTHOPHOTOS,
 ];
 
 /** Options of {@link europeOrthophotos}. */
@@ -45,6 +47,18 @@ export interface OrthophotoLayers {
 /** The polygons of the record's regions, kept within its box when it has one. */
 async function areaOf(record: OrthophotoRecord): Promise<GeoJsonArea> {
   const coordinates: number[][][][] = [];
+  if (record.box) {
+    const [west, south, east, north] = record.box;
+    coordinates.push([
+      [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+        [west, south],
+      ],
+    ]);
+  }
   for (const region of record.regions) {
     const borders = await countryBorders(region);
     if (borders.type === 'MultiPolygon')

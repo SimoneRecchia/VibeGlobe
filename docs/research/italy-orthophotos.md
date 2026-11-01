@@ -122,3 +122,14 @@ Hosts still unreachable (proxy); search quotes only. Changes since the first rea
   Toscana 2023 (CC BY 4.0 vs CC BY-NC-ND 3.0), PCN (orthophotos excluded from CC BY), FVG (IODL 2.0 only in informal
   posts), Puglia, Sicilia, Trentino 2015, Liguria, Lazio, Umbria, Marche, Campania, Calabria, Abruzzo, Molise, Basilicata
   2013 (IODL 2.0, native CRS only, 1:25,000 and larger).
+
+## Third reading, 2026-11-01
+
+- **Bologna** (city, 2017–2026, XYZ in EPSG:3857 to level 21): CC BY 4.0 in the city's tile server specification
+  ("ODbL compliant"), ODbL on its open data page; both allow commercial use and redistribution. Included
+  (`it-bologna-2026`, ADR 0182 amendment of 2026-11-01).
+- **Emilia-Romagna**: Ortofoto Comune di Bologna 2023 and Comune di Modena 2024 (20 cm, CC BY 4.0, regional WMS), the
+  October 2024 flood flight (`servizigis.regione.emilia-romagna.it/wms/apc_emg_202410_rgb`, partial, licence of the
+  RGB layer not seen). Layers and reference systems not readable from here.
+- **Valle d'Aosta 2024**: the regional GeoServer (`geoservizi.regione.vda.it/geoserver`, `sctBaseMap` service) may
+  carry it; its capabilities could not be read.

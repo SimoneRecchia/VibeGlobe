@@ -21,6 +21,8 @@ export interface OrthophotoRecord extends PresetSourceRecord {
   readonly regions: readonly string[];
   /** Only the polygons within this box (west, south, east, north in degrees): mainland Portugal, not its islands. */
   readonly within?: readonly [number, number, number, number];
+  /** A city's service: its area is this box (west, south, east, north in degrees) instead of `regions`' borders. */
+  readonly box?: readonly [number, number, number, number];
   /** Online use limits the provider states. */
   readonly limits?: string;
   /**

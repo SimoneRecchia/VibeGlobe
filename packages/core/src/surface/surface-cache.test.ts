@@ -24,17 +24,16 @@ function skirtExtent(mesh: TileMeshData): { downMeters: number; outMeters: numbe
 }
 
 describe('SurfaceCache skirts', () => {
-  it('deepens skirts by the terrain error but keeps their reach to the flat globe’s, so they stay under steep slopes (KB-178)', () => {
+  it('keeps the flat globe’s skirts with terrain: a few meters deep, reaching out four times as far, so they stay under steep slopes and behind draped maps (KB-178, KB-302)', () => {
     const meshes: TileMeshData[] = [];
     const renderer = { addMesh: (mesh: TileMeshData) => meshes.push(mesh) } as unknown as RendererBackend;
     const tile = quadtreeTileBounds(MERCATOR_ROOT, 12, 2125, 1460, 1, {} as QuadtreeTile);
     new SurfaceCache(renderer).prepare([tile], 1, new Float64Array(1));
-    new SurfaceCache(renderer, new Float64Array(24).fill(50)).prepare([tile], 1, new Float64Array(1));
-    const [flat, terrain] = meshes.map(skirtExtent);
-    // Terrain: twice the error of the tile and its parent, 200 m down; reaching out only as far as without terrain.
-    expect(terrain?.downMeters).toBeCloseTo(200, 0);
-    expect(flat?.downMeters).toBeLessThan(10);
-    expect(terrain?.outMeters).toBeCloseTo(flat?.outMeters ?? NaN, 1);
-    expect(terrain?.outMeters).toBeLessThan(0.1 * (terrain?.downMeters ?? 0));
+    const [skirt] = meshes.map(skirtExtent);
+    // Twice the terrain error deep (200 m here before), they stood in front of the vector maps draped along the edges.
+    expect(skirt?.downMeters).toBeGreaterThan(0.5);
+    expect(skirt?.downMeters).toBeLessThan(10);
+    // Four times as far out along an edge, √2 times that at a corner.
+    expect(skirt?.outMeters).toBeCloseTo(4 * Math.SQRT2 * (skirt?.downMeters ?? NaN), 1);
   });
 });

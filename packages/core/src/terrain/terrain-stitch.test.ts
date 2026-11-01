@@ -65,7 +65,8 @@ describe('stitchTerrainEdges', () => {
     const { layer: terrain, drawn } = layer('EPSG:3857');
     stitchTerrainEdges(draws, tiles, 3, terrain);
     const t = draws.terrain;
-    expect([...t.stitchEdges.subarray(0, 4)]).toEqual([0, 1, 0, 0]);
+    // Bit 0: the stitch texture; the top three bits: the neighbor's mesh one level coarser (KB-302).
+    expect([...t.stitchEdges.subarray(0, 4)]).toEqual([0, 1 + (1 << 5), 0, 0]);
     // Terrain tile 9/(0, 0) holds 10/(1, 1) in its south-east quarter.
     expect(t.stitchTextures[0]).toBe(9 * 10000);
     expect([...t.stitchTransforms.subarray(0, 4)]).toEqual([0.125, 0.125, 0.625, 0.75]);
@@ -73,6 +74,17 @@ describe('stitchTerrainEdges', () => {
     // The coarser tile and the west neighbor of the same detail keep their edges.
     expect([...t.stitchEdges.subarray(4, 12)]).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
     expect([t.stitchTextures[1], t.stitchTextures[2]]).toEqual([-1, -1]);
+  });
+
+  it('marks an edge next to a coarser mesh showing the same terrain with the levels between them, at most four (KB-302)', () => {
+    // Level 12 tile (64, 64); its north neighbor is the level 11 tile (32, 31), its west one the level 6 tile (0, 1),
+    // six levels coarser; all three show the same terrain tile, so no edge takes the stitch texture.
+    const tiles = [tile(MERCATOR_ROOT, 12, 64, 64), tile(MERCATOR_ROOT, 11, 32, 31), tile(MERCATOR_ROOT, 6, 0, 1)];
+    const own = 6 * 10000 + 1 * 100 + 1;
+    const draws = list([own, own, own], [[1 / 64, 1 / 64, 0, 0]]);
+    stitchTerrainEdges(draws, tiles, 3, layer('EPSG:3857').layer);
+    expect([...draws.terrain.stitchEdges.subarray(0, 4)]).toEqual([1 << 5, 0, 0, 4 << 5]);
+    expect(draws.terrain.stitchTextures[0]).toBe(-1);
   });
 
   it('stitches only to the coarsest neighbor, and not at all when its terrain tile is not resident (KB-178)', () => {

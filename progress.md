@@ -8,16 +8,23 @@ test: WebGPU engines kept alive after a fast mount and destroy (TG-06: the warm-
 while it compiled pinned it to three.js's shared quad geometry; 120 rapid cycles stay flat and F517 on WebGPU is back in
 the default run), a runtime filter change over 1 s on CI (TD-02: only the changed vector layers are laid out again),
 KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), vector tiles that
-retried 401, 403, 410 and CORS failures every 5 s (KB-311, MapLibre #8733's class), and heightmaps turned to spikes
-where fingerprinting protection adds noise to canvas readback (KB-312, MapLibre #3110: read through a `VideoFrame`
+retried 401, 403, 410 and CORS failures every 5 s (KB-313, MapLibre #8733's class), and heightmaps turned to spikes
+where fingerprinting protection adds noise to canvas readback (KB-314, MapLibre #3110: read through a `VideoFrame`
 there, the worker's budget kept by removing duplicate code), a fast zoom out that dropped the orthophotos in one or two
 frames (KB-309: a zoom out no longer counts as motion for motion-aware detail), and an anisotropy change that an idle
-view never applied (KB-313: the refilter now asks for its frames). `main`'s full CI run after #91 failed seven shards;
+view never applied (KB-315: the refilter now asks for its frames). `main`'s full CI run after #91 failed seven shards;
 the causes were tests left behind by owner decisions (F383 and F128 under the flat relief of KB-293, F409's fill since
-KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-313. Checked and unchanged
+KB-285, F440 read before its tiles were drawn, KB-206's status wording) and KB-315. Checked and unchanged
 (`docs/follow-ups.md`): resize during a GPU loss, and 204 or empty tiles. Open question 39 still needs the owner (the
 hosts are refused). Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's
-desktop views), KB-302 (its repro shows nothing here).
+desktop views).
+
+## 2026-11-01: Bologna's orthophotos, Italy read a third time (owner's request)
+
+Italy's regions still publish no orthophoto service open for commercial use, AGEA's CC BY 4.0 imagery is downloads only,
+and Valle d'Aosta's 2024 flight (CC BY 4.0) has no layer readable from here. The city of Bologna's tile server
+(2017–2026, level 21, CC BY 4.0 in its specification, ODbL on its open data page) joined `europeOrthophotos()` within
+the city's box (F673, `OrthophotoRecord.box`).
 
 ## 2026-11-01: map changes fade in time, no blinking in motion, movements load ahead (owner's request, branch `smooth-imagery`)
 
@@ -66,6 +73,17 @@ and on all-water tiles across the Alps and Lake Geneva; no committed end-to-end 
 `e2e/europe-zoom-phases.spec.ts` passes once its package stand-in shows water as imagery (ADR 0026) rather than the
 no-data color; over the coast its zoom 10 and 11 frames now reach 17.0 and 18.4 of the 20 allowed, the stand-in's
 blurred coast partly keyed.
+
+## 2026-10-31: the line along tile edges on maps with 3D terrain fixed (KB-302)
+
+The owner saw the maps glitch with 3D terrain. On the Europe preset's Map over the fixture Alps a line one pixel wide
+ran along tile edges: the meshes' skirts, twice the terrain error deep, won the depth test against the draped vector
+map on part of the MSAA samples. Skirts now keep the flat globe's few meters with terrain (the frame still deepens them
+where coarser terrain or a morph shows), and edges next to a coarser mesh follow its segments in the surface shader
+(`stitchEdges` top bits), which closes the T-junctions the deep skirts used to hide (ADR 0006, update of 2026-10-31).
+A new end-to-end test fails with 176 line pixels on the old skirts and passes now; the crack sweep, morphs and missing
+terrain (F137–F139) pass on both backends. To fit the renderer's budget the GPU readback probes moved to their own entry
+(`@vibeglobe/renderer/gpu-probes`): the main entry fell from 40.46 to 37.97 KB gzip and its budget to 38.5 KB.
 
 ## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
 

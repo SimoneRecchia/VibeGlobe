@@ -12,6 +12,8 @@ import type { TerrainLayer } from './terrain-draws.js';
 
 /** Levels up from a tile's own that a coarser neighbor is looked for. */
 const MAX_LEVELS_UP = 8;
+/** The bits of `stitchEdges` that hold the levels a neighbor's mesh is coarser by (KB-302). */
+const MESH_BITS = 224;
 
 const drawOf = new IntegerKeyMap<number>(512);
 const keyAt = new Float64Array(1);
@@ -31,7 +33,8 @@ function drawAt(root: number, level: number, x: number, y: number): number {
  * gets, in `stitchTextures` and `stitchTransforms`, the ancestor of its own terrain tile at the coarsest of those
  * neighbors' levels, and `stitchEdges` marks the edges that sample it. That ancestor is the neighbor's terrain tile or
  * the one next to it (whose edge heights the data matches), so the edge follows the neighbor's heights exactly instead
- * of leaving a wall of skirt. Polar cap tiles over a Web Mercator terrain get `heightScales` fading the 85.05° edge
+ * of leaving a wall of skirt; the top three bits of `stitchEdges` hold how many levels coarser (up to 4) the
+ * neighbor's mesh is, whose straight segments the edge's vertices follow (KB-302). Polar cap tiles over a Web Mercator terrain get `heightScales` fading the 85.05° edge
  * row's heights to the ellipsoid at the pole (KB-180).
  */
 export function stitchTerrainEdges(
@@ -71,19 +74,25 @@ export function stitchTerrainEdges(
       let x = tile.x + (edge === 1 ? tile.span : (DX[edge] ?? 0));
       x = x < 0 ? x + n : x >= n ? x - n : x;
       let other = -1;
-      for (let up = 0; up <= MAX_LEVELS_UP && up <= tile.level; up++) {
+      let up = 0;
+      for (; up <= MAX_LEVELS_UP && up <= tile.level; up++) {
         other = drawAt(tile.root, tile.level - up, x, y);
         if (other >= 0) break;
         x >>= 1;
         y >>= 1;
       }
+      // A coarser neighbor's mesh has a vertex every 2^up of ours along the edge (up to 16): ours follow its segments
+      // between them, in the top three bits, or T-junctions open cracks its skirts show as dashes (KB-302).
+      const at = index * 4 + edge;
+      if (other >= 0) edges[at] = (up < 4 ? up : 4) << 5;
       const theirs = other < 0 ? own : (terrain.levels[other] ?? own);
       if (theirs >= own) continue;
       // The neighbor's level plus one until the stitch texture is known (0 stays "no coarser neighbor").
-      edges[index * 4 + edge] = theirs + 1;
+      edges[at] = (edges[at] ?? 0) + theirs + 1;
       if (theirs < coarsest) coarsest = theirs;
     }
-    if (coarsest === own || !stitchTo(list, index, coarsest, loader)) edges.fill(0, index * 4, index * 4 + 4);
+    if (coarsest === own || !stitchTo(list, index, coarsest, loader))
+      for (let at = index * 4; at < index * 4 + 4; at++) edges[at] = (edges[at] ?? 0) & MESH_BITS;
   }
 }
 
@@ -113,7 +122,8 @@ function stitchTo(list: DrawList, index: number, level: number, loader: TerrainL
   transforms[at + 3] = ((own[at + 3] ?? 0) + coord.y - y * 2 ** up) * factor;
   const edges = terrain.stitchEdges;
   for (let edge = 0; edge < 4; edge++) {
-    edges[at + edge] = edges[at + edge] === level + 1 ? 1 : 0;
+    const e = edges[at + edge] ?? 0;
+    edges[at + edge] = (e & MESH_BITS) + ((e & ~MESH_BITS) === level + 1 ? 1 : 0);
   }
   return true;
 }

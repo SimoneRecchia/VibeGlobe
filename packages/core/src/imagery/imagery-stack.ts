@@ -386,6 +386,7 @@ export function sourceProblem(source: ImagerySource): string | undefined {
   if (!isPositiveInteger(source.tileSizePx)) return `has a tile size of ${shown(source.tileSizePx)} pixels`;
   if (!isFiniteNumber(source.pixelRatio) || source.pixelRatio < 1)
     return `has a pixel ratio of ${shown(source.pixelRatio)}`;
+  if (source.coverage !== undefined && !Array.isArray(source.coverage)) return 'has a coverage that is not a list';
   for (const area of source.coverage ?? []) {
     const { westRad, southRad, eastRad, northRad } = area;
     if (![westRad, southRad, eastRad, northRad].every(isFiniteNumber) || southRad >= northRad || westRad === eastRad)

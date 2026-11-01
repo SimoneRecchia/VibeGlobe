@@ -18,14 +18,7 @@ export class SurfaceCache {
   private readonly lastUsed = new IntegerKeyMap<number>(CACHE_LIMIT);
   private frame = 0;
 
-  /**
-   * `terrainErrorMeters`: the error of the terrain each surface level shows (ADR 0006 §6), which deepens the skirts;
-   * none without terrain.
-   */
-  constructor(
-    private readonly renderer: RendererBackend,
-    private readonly terrainErrorMeters?: Float64Array,
-  ) {}
+  constructor(private readonly renderer: RendererBackend) {}
 
   /** Number of meshes held. */
   get size(): number {
@@ -53,18 +46,13 @@ export class SurfaceCache {
 
   private build(tile: QuadtreeTile): TileMeshData {
     const size = tile.northRad - tile.southRad;
-    // Skirts deeper than the chord sag of the coarser neighbor hide every crack between levels; with terrain, at least
-    // twice the terrain error of the tile and its parent, which bounds the height step to a coarser or morphing
-    // neighbor (ADR 0006 §6, F137).
-    const errors = this.terrainErrorMeters;
-    const terrainDepth = errors
-      ? 2 * ((errors[tile.level] ?? 0) + (errors[tile.level > 0 ? tile.level - 1 : 0] ?? 0))
-      : 0;
-    const flatDepth = Math.max(1, 6378137 * size * size * 0.1);
-    // They reach out four times the flat depth, which closes the corners between levels (KB-069), and no further: a
-    // reach of four times the terrain's depth made nearly flat sheets that stood above every slope falling away from
-    // an edge more steeply than 14° (KB-178).
-    return buildQuadtreeTileMesh(tile, Math.max(flatDepth, terrainDepth), 4 * flatDepth);
+    // Skirts deeper than the chord sag of the coarser neighbor hide every crack between levels, and reach out four
+    // times as far, which closes the corners between levels (KB-069). With terrain they stay as deep: edges next to
+    // coarser terrain or a coarser mesh follow it (KB-178, KB-302), and the frame deepens a draw's skirts while it or
+    // a neighbor shows coarser terrain (`skirtMeters`). Skirts twice the terrain error deep stood in front of the
+    // vector maps draped along the tile edges, a line on every Map with 3D terrain (KB-302).
+    const depth = Math.max(1, 6378137 * size * size * 0.1);
+    return buildQuadtreeTileMesh(tile, depth);
   }
 
   private evict(): void {

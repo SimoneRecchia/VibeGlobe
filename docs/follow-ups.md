@@ -122,10 +122,10 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
 ## Classic bugs of other engines, checked 2026-10-31
 
 Checked against VibeGlobe from the issue trackers of MapLibre, Cesium and deck.gl (`docs/known-bugs.md` has the ones
-found and fixed: TG-06, KB-311, KB-312). Not changed:
+found and fixed: TG-06, KB-313, KB-314). Not changed:
 
 - **Canvas readback noise in masked imagery (MapLibre #3110):** heightmaps read through a `VideoFrame` where the canvas
-  adds noise (KB-312); the masked imagery tiles of `@vibeglobe/sources/tile-mask` (track B's package) still read
+  adds noise (KB-314); the masked imagery tiles of `@vibeglobe/sources/tile-mask` (track B's package) still read
   pixels with `getImageData` for blank tiles and keyed masks, so a blank tile could show instead of being no data
   there. The same check and `VideoFrame` read would fix it, in that package.
 - **Resize during a device or context loss (MapLibre #8837):** checked on both backends: a resize while the GPU

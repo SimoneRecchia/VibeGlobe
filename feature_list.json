@@ -8083,6 +8083,17 @@
         "In the browser, a wheel zoom of several notches over the fixture imagery with 400 ms latency requests the tiles of the view it heads for before the camera gets there"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F673",
+      "milestone": 7,
+      "section": "Sources and composition",
+      "description": "`europeOrthophotos()` covers the city of Bologna with its own orthophotos of 2026 (Comune di Bologna, CC BY 4.0 or ODbL, both allowing commercial use and redistribution) to level 21, asked only within the city's box (`OrthophotoRecord.box`, for services that cover a city rather than a region with borders).",
+      "steps": [
+        "Unit-test that Bologna's tiles are asked over the city to level 21 and not over Rome",
+        "Record its terms in ADR 0182 and the Italian research"
+      ],
+      "status": "passing"
     }
   ]
 }

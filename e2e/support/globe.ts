@@ -1,7 +1,7 @@
 // Helpers for end-to-end tests that drive the engine through the playground's test hooks (public API only).
 import { expect, type Page } from '@playwright/test';
 import type { Globe } from '@vibeglobe/core';
-import type { GpuProbeResult } from '@vibeglobe/renderer';
+import type { GpuProbeResult } from '@vibeglobe/renderer/gpu-probes';
 import { PNG } from 'pngjs';
 import { hardwareGpu } from '../../scripts/browser/gpu-args.ts';
 

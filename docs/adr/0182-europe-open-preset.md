@@ -269,3 +269,14 @@ AGEA imagery (Veneto, Lombardia, Piemonte, Sardegna, Liguria, Trentino, Emilia-R
 terms; Toscana's records conflict; the others publish no open licence. Emilia-Romagna's own flights (CC BY 4.0) cover
 part of the region with no confirmed reference system; Bologna's (CC BY 4.0 or ODbL) and Bergamo's (IODL 2.0) cover one
 city each.
+
+## Amendment, 2026-11-01: the city of Bologna
+
+The Comune di Bologna publishes its yearly orthophotos (2017 to 2026, up to level 21) as an EPSG:3857 tile server. Its
+specification states CC BY 4.0 ("ODbL compliant") and its open data page names ODbL: either allows commercial use and
+redistribution with a credit, so the conflict is only which credit form applies, and `© Comune di Bologna, Ortofoto
+2026` names the city as both ask. The service (`it-bologna-2026`, XYZ, level 21) covers the city only; Natural Earth has
+no municipal borders, so a record may give a box instead of regions (`OrthophotoRecord.box`), and white or missing tiles
+outside the city stay no data. The Emilia-Romagna region's own 2023–2024 flights over Bologna and Modena (CC BY 4.0)
+and its October 2024 flood flight cover cities or flooded areas only, through WMS services whose layers could not be
+read here.

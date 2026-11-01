@@ -173,3 +173,18 @@ M2's geographic surface quadtree had no polar rule, and zooming in at a pole sel
 - **Same-level edges** differed where each heightmap tile extrapolated its outer half pixel (§5): up to 275 m at level 8 in the Alps. The pipeline now writes terrain tiles of 258 px, 256 of their own and a ring of the neighbors' pixels, and the decoder reads any heightmap of a power of two (16 or more) plus 2 pixels that way, interpolating its edges between its own and its neighbors' pixels, so neighbors give the shared edge the same heights. Other sources keep §5's extrapolation.
 - **Skirts reach out four times the flat globe's skirt depth, not their own.** KB-069 made skirts reach out four times as far as they hang down; with terrain they hang down twice the terrain error, hundreds of meters, so they reached out up to a kilometer as nearly flat sheets above every slope that fell away from an edge more steeply than 14°. On the Alps those were the walls and sheets on screen. The reach now stays the flat globe's (four times the chord-sag depth, a few meters), which closes KB-069's corners as before, and the terrain only deepens the skirts. A quarter of the depth everywhere was tried first: it reopened KB-069's holes on the flat globe (F105, F110).
 - **Polar caps fade Mercator terrain to the ellipsoid.** §7 continued the 85.0511° edge heights unchanged up to the pole, which raised the cap into blocks of the edge row's relief, with walls between cap tiles of different levels (KB-180). The caps now scale those heights linearly in latitude, from 1 at 85.0511° to 0 at the pole, in the shader and in the CPU height queries alike, so the join at 85.0511° stays without a step.
+
+## Update 2026-10-31: skirts stay shallow with terrain, edges follow a coarser mesh (KB-302)
+
+- **The terrain no longer deepens the meshes' skirts.** With 3D terrain, a vector base map (the Europe preset's Map)
+  showed a line one pixel wide along tile edges: skirts twice the terrain error deep (hundreds of meters) won the depth
+  test against the map draped over the surface on part of the MSAA samples, whatever the drape's pull toward the eye (up
+  to 6% of the distance was tried), and without MSAA or without those skirts the line was gone. The skirts are now the
+  flat globe's, a few meters deep, with or without terrain (`surface-cache.ts`): edges next to coarser terrain follow
+  it (stitching, above), and the frame still deepens a draw's skirts, and its neighbors', while it shows terrain coarser
+  than its level or morphs from it (`TileDrawLayer.skirtMeters`).
+- **Edges next to a coarser mesh follow its segments.** Shallow skirts no longer hid the T-junctions between a tile and
+  a neighbor one or more levels coarser showing the same terrain: the crack sweep found holes on WebGPU. `stitchEdges`
+  now also holds, in its top three bits, how many levels coarser (up to four) the neighbor's mesh is, and the surface
+  shader moves each vertex of that edge onto the straight segment between the vertices it shares with the neighbor, a
+  vertex every 2^levels of its own. F137, F138 and F139 pass on both backends.

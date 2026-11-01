@@ -11,7 +11,7 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     for (const r of EUROPE_ORTHOPHOTOS) {
       expect(r.license).not.toBe('');
       expect(r.attribution[0]?.text).not.toBe('');
-      expect(['2026-10-26', '2026-10-31']).toContain(r.termsReadDate);
+      expect(['2026-10-26', '2026-10-31', '2026-11-01']).toContain(r.termsReadDate);
     }
     // No service is both included and excluded.
     const excluded = new Set(EXCLUDED_SOURCES.map((s) => s.id));
@@ -129,6 +129,17 @@ describe('national and regional orthophotos (ADR 0182, F618)', () => {
     // Brussels' service is not asked for Ghent, in Flanders.
     const brussels = layers.find((l) => l.id === 'be-bru-urbis')?.sources[0];
     expect(brussels?.request(tile(14, 8361, 5471), { ...out })).toBe('noData');
+  });
+
+  it('adds the city of Bologna, asked only within its box, to its own level (F673)', async () => {
+    const { layers } = await europeOrthophotos();
+    const bologna = layers.find((l) => l.id === 'it-bologna-2026')?.sources[0];
+    // Level 14 over Piazza Maggiore (11.343° E, 44.494° N), and over Rome.
+    expect(bologna?.request(tile(14, 8708, 5926), { ...out })).toMatchObject({
+      url: 'https://sitmappe.comune.bologna.it/tms/tileserver/Ortofoto2026/14/8708/5926.png',
+    });
+    expect(bologna?.request(tile(14, 8760, 6088), { ...out })).toBe('noData');
+    expect(bologna?.maxLevel).toBe(21);
   });
 
   it('passes every orthophoto through the offline engine as a network source, so an offline mode never asks for one (KB-291)', async () => {

@@ -79,10 +79,11 @@ export class MotionDetail {
       const dy = (eye[1] ?? 0) - (this.lastEye[1] ?? 0);
       const dz = (eye[2] ?? 0) - (this.lastEye[2] ?? 0);
       // Motion straight back from the target (a zoom out) does not count: the view coarsens by itself then, and two
-      // levels more would drop at once a layer that starts at a finer level, such as the orthophotos (KB-309).
-      const forward = camera.forward;
-      const back = -(dx * (forward[0] ?? 0) + dy * (forward[1] ?? 0) + dz * (forward[2] ?? 0));
-      const moved = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - (back > 0 ? back * back : 0)));
+      // levels more would drop at once a layer that starts at a finer level, such as the orthophotos (KB-309). A
+      // rounding below zero gives NaN, which the speed below ignores.
+      const f = camera.forward;
+      const along = dx * (f[0] ?? 0) + dy * (f[1] ?? 0) + dz * (f[2] ?? 0);
+      const moved = Math.sqrt(dx * dx + dy * dy + dz * dz - (along < 0 ? along * along : 0));
       const speed = moved / Math.max(1, camera.pose.rangeMeters) / dtS;
       const remembered = (state[SPEED] ?? 0) * SPEED_DECAY_PER_S ** dtS;
       state[SPEED] = speed > remembered ? speed : remembered;

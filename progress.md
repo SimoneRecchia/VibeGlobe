@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-11-01: open known bugs and classic engine bugs (owner's request)
+
+The owner asked to close the open questions and known bugs, and to check other globe and map engines' classic bugs
+against VibeGlobe. Open questions have none open (only owner steps remain pending). Fixed, each with a regression
+test: WebGPU engines kept alive after a fast mount and destroy (TG-06: the warm-up's empty frame on a renderer released
+while it compiled pinned it to three.js's shared quad geometry; 120 rapid cycles stay flat and F517 on WebGPU is back in
+the default run), a runtime filter change over 1 s on CI (TD-02: only the changed vector layers are laid out again),
+KB-221 (already fixed by KB-290, its mark removed), F474's count of cancelled requests (KB-206), and vector tiles that
+retried 401, 403, 410 and CORS failures every 5 s (KB-303, MapLibre #8733's class). F383's spec failed on `main` since
+#89 stopped loading terrain under a flat relief; it now states where relief is drawn. Checked and unchanged
+(`docs/follow-ups.md`): resize during a GPU loss, 204 and empty tiles, and canvas readback noise (MapLibre #3110), which
+needs Safari or Firefox devices and room in the worker's budget. Still open: CI-pace flakes (KB-110, KB-208, KB-212,
+KB-240, KB-241) and the owner's desktop views (KB-181).
+
 ## 2026-10-31: three more orthophoto services, Italy read again, a terrain seam found (owner's request)
 
 The owner asked for the missing free and resellable maps of Europe to zoom 15, Italy first, and for the glitches seen

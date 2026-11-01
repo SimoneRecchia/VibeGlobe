@@ -99,4 +99,31 @@ describe('coverage areas (polygon coverage of a source)', () => {
     // Across the border: the area's outline with its feather, and the key.
     expect(area.mask(rect(15, 46, 17, 49), true)).toMatchObject({ featherPx: 8, key });
   });
+
+  it('keys the sea outside the land with a fade in meters, every tile but those inside the land beyond it (KB-303)', () => {
+    const box: PolygonDeg = [
+      [
+        [0, 30],
+        [40, 30],
+        [40, 60],
+        [0, 60],
+      ],
+    ];
+    const sea = { land: [COUNTRY], featherMeters: 2000 };
+    const area = coverageTest({ polygons: [box], tiles: 'clip', featherPx: 8, keySea: sea });
+    // Inside the land, more than the fade from its border and its lake: no mask.
+    expect(area.mask(rect(14, 46.5, 15, 47.5), false)).toBeUndefined();
+    // Across its east border: the land's rings, the fade in pixels of the tile (1° is 75.2 km at 47.5° N), twice as
+    // many on a tile half as wide, and the whole tile inside the box.
+    const border = area.mask(rect(15.5, 47, 16.5, 48), false);
+    expect(Array.from(border?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    expect(border?.sea?.ringEnds.length).toBe(2);
+    expect(border?.sea?.featherPx).toBeCloseTo(6.81, 2);
+    expect(area.mask(rect(15.5, 47, 16, 48), false)?.sea?.featherPx).toBeCloseTo(13.62, 2);
+    // At sea, far from the land: no ring, the whole tile is sea.
+    expect(area.mask(rect(30, 40, 31, 41), false)?.sea?.ringEnds.length).toBe(0);
+    // Without a clip the area's own outline masks nothing: the whole tile.
+    const unclipped = coverageTest({ polygons: [box], keySea: sea }).mask(rect(39.5, 40, 40.5, 41), false);
+    expect(Array.from(unclipped?.points ?? [])).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+  });
 });

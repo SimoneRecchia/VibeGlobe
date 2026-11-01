@@ -2,8 +2,9 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { rgba8Bytes } from '../cache/byte-size.js';
 import type { Camera } from '../camera/camera.js';
-import { groundZoomForRange, mercatorZoomFromGroundZoom } from '../camera/zoom.js';
+import { cameraZoom } from '../camera/zoom.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
+import { RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
 /**
  * How a layer combines with the layers below it (F246). `'night'` adds the layer as light on the night side of the
@@ -94,8 +95,6 @@ export interface ImageryLayerState {
   readonly sources: readonly ImagerySourceInfo[];
 }
 
-const DEG = 180 / Math.PI;
-
 /** The metadata of a source, in degrees (F220). */
 export function sourceInfo(source: ImagerySource): ImagerySourceInfo {
   const flags = source.loadingFlags?.() ?? LOAD_ALL;
@@ -168,7 +167,7 @@ export interface StackEntry {
   blend: ImageryBlend;
   harmonize: Harmonize;
   fadeIn?: ZoomFade;
-  /** The share of its opacity the layer shows at the frame's zoom (its `fadeIn`), set each frame (F635). */
+  /** The share of its opacity the layer shows at the frame's zoom (its `fadeIn`), set each frame (F635, F670). */
   zoomOpacity?: number;
   harmonizeFade?: ZoomFade;
   /** The strength of its matching to the imagery below at the frame's zoom (its `harmonizeFade`), each frame (F638). */
@@ -194,7 +193,6 @@ export function stackEntries(inputs: readonly ImageryLayerInput[]): StackEntry[]
       visible: true,
       blend: 'normal',
       harmonize: true,
-      zoomOpacity: 1,
     };
     if (!layer) return entry;
     applyChanges(entry, layer);
@@ -247,22 +245,59 @@ export function shownOpacity(entry: StackEntry): number {
 }
 
 /**
- * Sets each layer's share of its opacity at the camera's Mercator zoom (F635). Returns true when a layer was shown,
- * hidden, or turned opaque or translucent by it: the draws then change layers at once, with no cross-fade from what
- * they showed, which was already the same imagery. Allocates nothing.
+ * The least time a layer's zoom fade takes to go from one end to the other, milliseconds (F670): a fast zoom through a
+ * fade changes the layer's opacity no faster, so a layer never turns on or off like a light; a slower zoom moves it with
+ * the zoom, as before. (Tone matching fades over several levels, `harmonizeFade`: slow enough at any zoom speed.)
  */
-export function fadeByZoom(entries: readonly { readonly entry: StackEntry }[], camera: Camera): boolean {
-  const ground = groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
-  const zoom = mercatorZoomFromGroundZoom(ground, camera.pose.targetLatitudeRad);
-  let changed = false;
+export const LAYER_FADE_MS = 600;
+
+/**
+ * Sets each layer's tone matching at the camera's Mercator zoom (F638) and moves its share of its opacity toward its value
+ * there (F635), by at most the time since the last call (`time[0]` now, `time[1]` the last call, written here, engine
+ * milliseconds; no time moves it at once) over {@link LAYER_FADE_MS} (F670). When a layer turns opaque or
+ * translucent, every draw changes layers: `snaps` (the imagery's cross-fades, then each overlay slot's) show the next
+ * frame at once, with no cross-fade from what they showed, which was the same imagery; when a layer appears or vanishes
+ * under a shown one, whose overlay slot moves, the overlay slots' do (KB-307). Returns true while an opacity has not
+ * reached its value. Allocates nothing.
+ */
+export function fadeByZoom(
+  entries: readonly { readonly entry: StackEntry }[],
+  camera: Camera,
+  time?: Float64Array,
+  snaps: readonly { snapNext: boolean }[] = [],
+): boolean {
+  const zoom = cameraZoom(camera);
+  // NaN (no time) moves every value to its own at once.
+  const most = time ? ((time[0] ?? 0) - (time[1] ?? Number.NaN)) / LAYER_FADE_MS : Number.NaN;
+  if (time) time[1] = time[0] ?? 0;
+  let fading = false;
+  let appeared = false;
+  // The first snap to set: 0 every draw's, 1 the overlay slots', past the end none.
+  let snap = snaps.length;
   for (const { entry } of entries) {
     entry.toneStrength = 1 - ramp(entry.harmonizeFade, zoom, 0);
-    const before = entry.zoomOpacity ?? 1;
-    const after = ramp(entry.fadeIn, zoom, 1);
-    entry.zoomOpacity = after;
-    if (before <= 0 !== after <= 0 || before >= 1 !== after >= 1) changed = true;
+    const target = ramp(entry.fadeIn, zoom, 1);
+    // A layer's first frame starts at its value: a layer added on a running globe does not fade from full.
+    const before = (entry.zoomOpacity ??= target);
+    const opaque = isOpaque(entry);
+    const after = (entry.zoomOpacity = toward(before, target, most));
+    if (after !== target) fading = true;
+    if (opaque !== isOpaque(entry)) snap = 0;
+    else if (before <= 0 !== after <= 0) appeared = true;
+    else if (appeared && after > 0 && snap > 1) snap = 1;
   }
-  return changed;
+  for (; snap < snaps.length; snap++) (snaps[snap] as { snapNext: boolean }).snapNext = true;
+  return fading;
+}
+
+/** Whether a view at Mercator zoom `zoom` draws the layer: visible, not transparent, and within its fade (F671). */
+export function shownAt(entry: StackEntry, zoom: number): boolean {
+  return entry.visible && entry.opacity > 0 && ramp(entry.fadeIn, zoom, 1) > 0;
+}
+
+/** `value` moved toward `target` by at most `most` (NaN: all the way). */
+function toward(value: number, target: number, most: number): number {
+  return value < target - most ? value + most : value > target + most ? value - most : target;
 }
 
 /** Where `zoom` lies across a fade, 0 to 1; `absent` without one. */
@@ -351,6 +386,7 @@ export function sourceProblem(source: ImagerySource): string | undefined {
   if (!isPositiveInteger(source.tileSizePx)) return `has a tile size of ${shown(source.tileSizePx)} pixels`;
   if (!isFiniteNumber(source.pixelRatio) || source.pixelRatio < 1)
     return `has a pixel ratio of ${shown(source.pixelRatio)}`;
+  if (source.coverage !== undefined && !Array.isArray(source.coverage)) return 'has a coverage that is not a list';
   for (const area of source.coverage ?? []) {
     const { westRad, southRad, eastRad, northRad } = area;
     if (![westRad, southRad, eastRad, northRad].every(isFiniteNumber) || southRad >= northRad || westRad === eastRad)

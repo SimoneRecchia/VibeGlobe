@@ -20,6 +20,7 @@ import { ViewState } from '../view/view-state.js';
 import { mercatorScaleInto, type MorphFrame } from '../view/morph.js';
 import { describeSurfaceTiles, surfaceStats } from './diagnostics.js';
 import { ImageryRuntime, type AbortSignalLike } from './imagery-runtime.js';
+import type { MovementPath } from './flight-preload.js';
 import type { ImageryCallbacks } from './runtime-credits.js';
 import { validStack } from '../imagery/imagery-stack.js';
 import { GlobeError } from './errors.js';
@@ -40,8 +41,8 @@ import type {
   TileDrawList,
   ReloadOptions,
 } from './types.js';
+import { DEG_TO_RAD } from '../geodesy/geodesic-angles.js';
 
-const DEG_TO_RAD = Math.PI / 180;
 /** The eye's default clearance above the displayed terrain (F146). */
 const DEFAULT_CLEARANCE_METERS = 10;
 
@@ -287,7 +288,7 @@ export class SurfaceFrame {
     const timed = imagery?.heights !== undefined;
     const selectionStart = timed ? imagery.now() : 0;
     // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
-    motionOf(this).flying = imagery?.preload.flying === true;
+    motionOf(this).flying = imagery?.plan.flying === true;
     motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
     const motion = motionOf(this).state[FACTOR] ?? 1;
     // Written only when it changes: a new double in the options' field would allocate every frame (F064).
@@ -295,9 +296,9 @@ export class SurfaceFrame {
     if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
     if (imagery)
       for (const layer of imagery.layers) {
-        layer.loader.prefetchPaused = motion > 1 || imagery.preload.flying;
-        // A flight requests no visible tile: the view ahead and the destination load instead (F287).
-        layer.loader.settleMs = imagery.preload.flying ? Number.POSITIVE_INFINITY : 0;
+        layer.loader.prefetchPaused = motion > 1 || imagery.plan.flying;
+        // A flight requests no visible tile: its plan loads the path and the destination instead (F287, F671).
+        layer.loader.settleMs = imagery.plan.flying ? Number.POSITIVE_INFINITY : 0;
       }
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
@@ -325,18 +326,28 @@ export class SurfaceFrame {
     this.observability.tracer.record('camera', 'move', subject);
   }
 
-  /** Loads a movement's destination tiles ahead while it runs (F286), or stops (undefined). */
-  preloadView(end: Float64Array | undefined, camera: Camera, flight = false): void {
-    if (!this.imagery) return;
-    this.imagery.preload.flying = end !== undefined && flight;
-    if (end) this.imagery.preload.select(camera, end, this.selection);
-    else this.imagery.preload.clear();
-    this.imagery.ahead.clear();
-  }
-
-  /** Each frame of a flight: loads the tiles of the pose it will have in about a second (F287). */
-  preloadAhead(end: Float64Array, camera: Camera): void {
-    this.imagery?.ahead.select(camera, end, this.selection);
+  /**
+   * Loads what a movement to `end` will draw ahead while it runs, along `path` when it has one (F286, F671), or stops
+   * (undefined).
+   */
+  preloadView(end: Float64Array | undefined, camera: Camera, flight = false, path?: MovementPath): void {
+    const imagery = this.imagery;
+    if (!imagery) return;
+    const plan = imagery.plan;
+    plan.clear();
+    if (!end) return;
+    plan.flying = flight;
+    this.clock.timeInto(this.nowMs);
+    // The detail at rest: the destination's; the views along the path take the moving camera's (F288).
+    plan.plan(
+      camera,
+      end,
+      this.selection,
+      motionOf(this).baseTexelErrorPx,
+      this.nowMs[0] ?? 0,
+      path,
+      imagery.network.bandwidth,
+    );
   }
 
   /** The camera jumped: no motion for motion-aware detail (F085). */

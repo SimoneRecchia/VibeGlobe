@@ -8038,6 +8038,51 @@
         "Record their terms in ADR 0182 and the services still waiting for an endpoint in docs/open-questions.md"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F669",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "A coverage area's `keySea` (`land` polygons and `featherMeters`) makes water's colors outside the land transparent, fading back in over that distance inside it, with gaps narrower than it between the land's polygons counted as land, so imagery whose water is real near the coast and a flat fill farther out shows one sea from the layer below while its land, lakes and shadows stay; the Europe preset keys its package's sea this way.",
+      "steps": [
+        "Unit-test the water colors keyed and kept, the land's share fading the key, the sea masks of coastal, inland and open-sea tiles with the fade in meters, and the preset's area",
+        "In a browser, package-style coastal tiles (real water ending at a 1° cell's edge, no-data water beyond, sea-only tiles drawn from level 8) masked by the preset's area show one sea up to the coast with no step, inland lakes and shadows kept and no gap along inland borders, the frames saved"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F670",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "An imagery layer's fade with the zoom (`fadeIn`) follows the zoom in time too: its opacity changes no faster than from 0 to 1 in 600 ms (`LAYER_FADE_MS`), so a fast zoom through a fade crosses it as a cross-fade instead of turning the layer on or off like a light, while a slower zoom moves it with the zoom as before; a layer reaching full opacity or none cuts no cross-fade short unless it turns opaque or translucent (every draw's) or appears under a shown layer (the overlay slots').",
+      "steps": [
+        "Unit-test the opacity's largest change per frame, a slow zoom followed exactly, a layer added on a running globe starting at its value, and which cross-fades a change of role or slot cuts short",
+        "In the browser, the Europe preset's fixtures zoomed from 4 to 12.5 in 1.5 s with 400 ms tile latency on a 1.5 MB/s link, frames read at 60 Hz: no frame's mean luminance changes by more than 3 from the one before (the base image alone moves it by 2), and the zoom phases scenario (F636, F638) still passes"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F671",
+      "milestone": 8,
+      "section": "Tiles, level of detail and streaming",
+      "description": "A movement's tiles load in the order it needs them (`FlightPlan`): when a flight or an ease starts, its destination's view at the arrival's detail with each tile's ancestor up to four levels up first, the views at twelve times along its path at the detail a moving camera shows (narrowed a quarter, as the next views cover their edges), each tile with the time it is first shown, and a margin ring around the destination three levels coarser (none on a slow link); each frame the destination counts as needed within a second and every other tile from two seconds before its time until it has passed, at the preload class, terrain included, every layer the movement's deepest zoom shows included; a movement that ends, is interrupted or is replaced drops its plan.",
+      "steps": [
+        "Unit-test the plan's tiles and keys over time, the destination's ancestors first, the path's detail on a fast and a slow link, and the layers preloaded by the movement's deepest zoom",
+        "In the browser, with the Europe preset's fixtures, 400 ms latency and a 1.5 MB/s link, flights into the orthophoto stand-in from zoom 13 and from zoom 5: during the last second and a half the stand-in is missing from under a tenth of the land on average, and the arrival is complete",
+        "The flight, path, slow-link and prefetch scenarios (F286, F287, F301, F302) pass"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F672",
+      "milestone": 8,
+      "section": "Tiles, level of detail and streaming",
+      "description": "The view a smoothed zoom heads for loads ahead: at each wheel notch, zoom key or double click the controls give it to `NavigationApi.preloadView` (centered where a zoom on a flat map brings it, the position under the cursor staying there), and undefined on arrival; the engine loads its tiles as a movement's destination's.",
+      "steps": [
+        "Unit-test the views the controls report for two notches and on arrival, and the engine's preload of a reported view, invalid ones ignored",
+        "In the browser, a wheel zoom of several notches over the fixture imagery with 400 ms latency requests the tiles of the view it heads for before the camera gets there"
+      ],
+      "status": "failing"
     }
   ]
 }

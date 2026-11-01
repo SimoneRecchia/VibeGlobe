@@ -1,6 +1,9 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-/** Angle helpers of the geodesic solvers: exact degree reductions so that 90°, 180° and the poles stay exact. */
+/**
+ * Degrees and radians, the one conversion constant each for the whole engine, and the angle helpers of the geodesic
+ * solvers: exact degree reductions so that 90°, 180° and the poles stay exact.
+ */
 
 /** Radians per degree. */
 export const DEG_TO_RAD = Math.PI / 180;

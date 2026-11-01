@@ -77,13 +77,12 @@ export type {
   MoveOutcome,
   MovementOptions,
   GeoBounds,
-  Geocoder,
-  GeocoderResult,
   TourWaypoint,
   HomeView,
   CameraConstraints,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
+export type { Geocoder, GeocoderResult } from './globe/geocoder-types.js';
 export { BASE_TEXTURE as BASE_TEXTURE_HANDLE, TONE_BELOW } from './imagery/draw-list.js';
 export type { TileDrawBelow } from './imagery/draw-list.js';
 export type { NavigationMode } from './globe/view-control.js';
@@ -94,15 +93,7 @@ export type { GroundZoomRange, ViewCurves, ViewCurvesInit } from './view/curves.
 export type { ViewMode, ViewPhase } from './view/view-state.js';
 export { IntegerKeyMap } from './collections/integer-key-map.hot.js';
 export type { TileMeshData } from './surface/surface-mesh.js';
-export {
-  enuFrame,
-  enuFrameDeg,
-  headingPitchRollToRotationDeg,
-  headingPitchRollToRotationRad,
-  rotationToHeadingPitchRollDeg,
-  rotationToHeadingPitchRollRad,
-} from './geodesy/enu.js';
-export type { HeadingPitchRollDeg } from './geodesy/enu.js';
+export { enuFrame, enuFrameDeg } from './geodesy/enu.js';
 export {
   nearestWorldCopyXMeters,
   WORLD_WIDTH_METERS,

@@ -45,7 +45,7 @@ The engine must run smoothly on the weakest PC there is: an old SCADA workstatio
 - Hot paths: performance-critical modules are named `*.hot.ts` and open with a TSDoc header `@hotpath <reason>` and `@benchmark <path>`; they are exempt from the function and module length limits (`npm run check`).
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
 - VibeGlobe is under the Mozilla Public License 2.0 (`LICENSE.md`, ADR 0043); every package.json declares `MPL-2.0` and every source file under `packages/*/src` opens with the MPL notice (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
-- The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys (`GOOGLE_MAPS_API_KEY` comes from the environment).
+- The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys. The library ships no adapter of a paid or proprietary provider (owner, 2026-11-01): an application connects one (Google, …) from its own code through the generic adapters and a profile of its terms.
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/adr/README.md` has the conventions). Survey prior art first (`docs/research/`).
 - Owner-only blockers go to `docs/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/follow-ups.md`.

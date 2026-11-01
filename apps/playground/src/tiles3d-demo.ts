@@ -4,10 +4,7 @@
  * through the 3D Tiles render extension. URL parameters: `tiles3d=plain|draco|meshopt|ktx2` (the variant),
  * `tileset=<url>` (another tileset), `sse=<px>` (maximum screen-space error), `budgetMb=<n>` (content budget),
  * `decoders=<url>` (where `draco_decoder.wasm` is hosted, F463), `debug3dtiles` (each drawn tile's level and
- * screen-space error over it). `3dtiles-google` streams Google Photorealistic 3D Tiles over Rome with the key of
- * `googleKey=` (the customer's own, never committed; without it a configuration message shows and the globe runs on),
- * `googleRegion=eea|other` (billing region, default `other`), `googleBase=` (a Map Tiles API stand-in) and
- * `googleSessionMs=` (session lifetime). Clicks pick features. `window.vibeglobeTiles3d` exposes the extension.
+ * screen-space error over it). Clicks pick features. `window.vibeglobeTiles3d` exposes the extension.
  */
 import { ecefToGeodetic, type GeodeticRad, type Globe } from '@vibeglobe/core';
 import { threeTileMeshes } from '@vibeglobe/renderer/tiles3d';
@@ -37,7 +34,7 @@ declare global {
   }
 }
 
-/** The city's center (that of the fixture), Rome's for Google's tiles too. */
+/** The city's center (that of the fixture). */
 const CITY = { longitudeDeg: 12.4922, latitudeDeg: 41.8902 };
 
 /** Shows each drawn tile's level and screen-space error at its center, updated every frame. */
@@ -95,10 +92,7 @@ async function devDecoding(dracoWasm: string): Promise<Pick<Tiles3DOptions, 'mod
   return { modelWorker: devModelWorker(dracoWasm) };
 }
 
-/**
- * Adds the scenario's tileset to the globe and frames the city unless the URL sets a view. Google's scenario loads
- * its own module (`tiles3d-google-provider.ts`), so the other scenarios carry no Google code.
- */
+/** Adds the scenario's tileset to the globe and frames the city unless the URL sets a view. */
 export async function showTiles3DScenario(
   globe: Globe,
   app: HTMLElement,
@@ -108,12 +102,7 @@ export async function showTiles3DScenario(
   const picks: (Tiles3DPick | undefined)[] = [];
   const errors: string[] = [];
   let extension: Tiles3DExtension | undefined;
-  const google =
-    params.get('scenario') === '3dtiles-google'
-      ? (await import('./tiles3d-google-provider.js')).googleScenario(params, app)
-      : undefined;
-  const chosen = google ? google.options : tilesetOptions(params, import.meta.env.BASE_URL);
-  if (!chosen) return undefined;
+  const chosen = tilesetOptions(params, import.meta.env.BASE_URL);
   const dracoWasm = new URL(params.get('decoders') ?? dracoWasmUrl, location.href).href;
   const options = { ...chosen, dracoWasmUrl: dracoWasm, ...(await devDecoding(dracoWasm)) };
   globe.addRenderExtension(
@@ -129,14 +118,13 @@ export async function showTiles3DScenario(
   if (!extension) throw new Error('the 3D Tiles extension was not created');
   if (!params.has('lon')) void globe.jumpTo({ ...CITY, zoom: 15.5, tiltDeg: 45 });
   if (params.has('debug3dtiles')) debugOverlay(globe, app, extension);
-  google?.showCredits(globe, extension);
   const ext = extension;
   app.addEventListener('click', (event) => {
     const box = app.getBoundingClientRect();
     try {
       picks.push(ext.pick(event.clientX - box.left, event.clientY - box.top));
     } catch (error) {
-      // Google's tiles are display only: picking them is refused (F323).
+      // A display-only source's tiles refuse picking (F326).
       errors.push(error instanceof Error ? error.message : String(error));
     }
   });

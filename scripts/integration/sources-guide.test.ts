@@ -13,7 +13,6 @@ import * as vector from '@vibeglobe/sources/vector';
 import { PNG } from 'pngjs';
 import ts from 'typescript';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { GOOGLE_FIXTURE_KEY, googleFixture } from '../../packages/sources/src/__fixtures__/google-server.ts';
 import { geoImageTiff } from '../../packages/sources/src/__fixtures__/georeferenced.ts';
 import { writeMbtiles } from '../../packages/sources/src/__fixtures__/mbtiles-writer.ts';
 import { writePmtiles } from '../../packages/sources/src/__fixtures__/pmtiles-writer.ts';
@@ -51,7 +50,6 @@ function ranged(bytes: Uint8Array, init?: RequestInit): Response {
 }
 
 async function guideFetch(): Promise<typeof fetch> {
-  const google = googleFixture(() => PNG_TILE);
   const archives: Record<string, Uint8Array> = {
     'https://cdn.example.com/italy.pmtiles': writePmtiles(tile(PNG_TILE)),
     'https://cdn.example.com/alps.pmtiles': writePmtiles(tile(TERRARIUM)),
@@ -61,7 +59,6 @@ async function guideFetch(): Promise<typeof fetch> {
   };
   return async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
-    if (url.startsWith('https://tile.googleapis.com/')) return google.fetch(input, init);
     const archive = archives[url];
     if (archive) return ranged(archive, init);
     if (url === 'https://images.example.com/survey.tif') return new Response(SURVEY.slice(0));
@@ -92,7 +89,7 @@ function application(fetchImpl: typeof fetch) {
     renderer: {},
     baseImageryUrl: '/imagery/base.jpg',
     workers: {},
-    myRestrictedKey: GOOGLE_FIXTURE_KEY,
+    myRestrictedKey: 'restricted-key',
     text: JSON.stringify({ type: 'Point', coordinates: [12.5, 41.9] }),
     kmzBytes: new TextEncoder().encode(
       '<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><Point><coordinates>12.5,41.9</coordinates></Point></Placemark></kml>',
@@ -182,7 +179,7 @@ it(
       '## Vector formats',
       '## Provider profiles',
       "### Your own provider's profile",
-      '### Google Maps Platform',
+      '### Commercial providers, from your own code',
       '### OpenStreetMap public servers',
       '### Self-hosted OpenStreetMap tiles',
       '## Keeping secrets out of URLs',

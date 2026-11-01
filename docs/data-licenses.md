@@ -24,4 +24,4 @@ Consumers host these outputs themselves (ADR 0015) and must show the attribution
 
 ## Refused sources
 
-The pipeline and the offline package builder refuse these before downloading anything (F333): Sentinel-2 cloudless 2018 and later editions (CC BY-NC-SA 4.0, non-commercial), the public OpenStreetMap tile servers (their usage policies forbid bulk downloading and offline use) and Google Maps Platform tiles (no pre-fetching, caching or redistribution). `vibeglobe-data licenses` lists every built-in profile and whether it is allowed.
+The pipeline and the offline package builder refuse these before downloading anything (F333): Sentinel-2 cloudless by EOX, every edition (2018 on CC BY-NC-SA 4.0, non-commercial; no longer supported since 2026-11-01), the public OpenStreetMap tile servers (their usage policies forbid bulk downloading and offline use) and Google Maps Platform tiles (no pre-fetching, caching or redistribution). `vibeglobe-data licenses` lists every built-in profile and whether it is allowed.

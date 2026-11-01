@@ -101,7 +101,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
 }
 
 /** Waits until every Mercator tile of the mounted globe shows imagery of its level (or the source's deepest one). */
-export async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
+async function waitForSourceImagery(page: Page, maxLevel: number): Promise<void> {
   await expect
     .poll(
       () =>

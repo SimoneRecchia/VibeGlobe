@@ -18,7 +18,7 @@ test('the documentation site publishes the sources guide with every section (F26
     'Writing and testing a custom adapter',
   ])
     await expect(page.getByRole('heading', { level: 2, name: section })).toBeVisible();
-  for (const section of ["Your own provider's profile", 'Google Maps Platform', 'Apple map data'])
+  for (const section of ["Your own provider's profile", 'Commercial providers, from your own code', 'Apple map data'])
     await expect(page.getByRole('heading', { level: 3, name: section })).toBeVisible();
   await expect(page.getByText("Apple's map data may only be used through Apple's own MapKit")).toBeVisible();
 });

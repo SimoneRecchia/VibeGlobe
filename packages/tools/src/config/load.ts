@@ -20,7 +20,7 @@ const ENCODINGS: Record<DatasetConfig['kind'], DatasetConfig['encoding'][]> = {
 };
 const SOURCES: Record<DatasetConfig['kind'], string[]> = {
   terrain: ['copernicus-dem', 'pmtiles'],
-  imagery: ['worldcover-s2', 's2cloudless', 'geotiff', 'xyz', 'pmtiles'],
+  imagery: ['worldcover-s2', 'geotiff', 'xyz', 'pmtiles'],
   vector: ['osm-extract', 'pmtiles'],
 };
 const MAX_ZOOM = 22;

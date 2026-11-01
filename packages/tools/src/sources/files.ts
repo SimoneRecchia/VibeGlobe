@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /** The source files a dataset build downloads, computed from its area without touching the network. */
-import type { CopernicusDemSource, DatasetConfig, S2CloudlessSource, WorldCoverSource } from '../config/schema.js';
+import type { CopernicusDemSource, DatasetConfig, WorldCoverSource } from '../config/schema.js';
 import { type Area, intersectBBox } from '../tiles/area.js';
 import type { BBoxDeg } from '../tiles/mercator.js';
 
@@ -49,41 +49,6 @@ function copernicusFiles(source: CopernicusDemSource, bbox: BBoxDeg): SourceFile
         bounds: { west: lon, south: lat, east: lon + 1, north: lat + 1 },
         requesterPays: false,
         mayBeMissing: true,
-      });
-    }
-  }
-  return files;
-}
-
-/**
- * Extent of one Sentinel-2 cloudless original file at `level`: the files are 2×2 metatiles of the EPSG:4326
- * WMTS-simple grid (level L has 2^(L+1) × 2^L tiles of 256 px), indexed by the column and row of level L − 1.
- */
-export function s2FileExtentDeg(level: number): number {
-  return 180 / 2 ** (level - 1);
-}
-
-function s2Files(source: S2CloudlessSource, bbox: BBoxDeg): SourceFile[] {
-  const extent = s2FileExtentDeg(source.level);
-  const files: SourceFile[] = [];
-  const col0 = Math.floor((bbox.west + 180) / extent);
-  const col1 = Math.ceil((bbox.east + 180) / extent) - 1;
-  const row0 = Math.floor((90 - bbox.north) / extent);
-  const row1 = Math.ceil((90 - bbox.south) / extent) - 1;
-  for (let row = row0; row <= row1; row++) {
-    for (let col = col0; col <= col1; col++) {
-      const key = `tiles/${source.level}/${col}/${row}.tif`;
-      files.push({
-        url: `${source.baseUrl.replace(/\/$/, '')}/${key}`,
-        key,
-        bounds: {
-          west: col * extent - 180,
-          east: (col + 1) * extent - 180,
-          north: 90 - row * extent,
-          south: 90 - (row + 1) * extent,
-        },
-        requesterPays: source.requesterPays,
-        mayBeMissing: false,
       });
     }
   }
@@ -144,8 +109,6 @@ export function sourceFiles(dataset: DatasetConfig, area: Area): SourceFile[] {
       const bbox = intersectBBox(area.bbox, { west: -180, south: -90, east: 180, north: 90 });
       return bbox ? copernicusFiles(source, bbox) : [];
     }
-    case 's2cloudless':
-      return s2Files(source, area.bbox);
     case 'worldcover-s2': {
       const bbox = intersectBBox(area.bbox, { west: -180, south: -90, east: 180, north: 90 });
       return bbox ? worldCoverFiles(source, bbox) : [];

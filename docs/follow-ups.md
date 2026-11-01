@@ -115,6 +115,9 @@ Ideas beyond `PLAN.md`'s scope go here, not into the code (`PLAN.md`, Working me
   it could write the sea transparent (WebP with alpha) and the decoder would need no land outline or color test; it
   needs a rebuilt package. Until then the lakes of the land outside Europe's countries (Turkey, North Africa) are keyed
   with the sea: `EUROPE_LAND` holds only Europe's countries.
+- **Requester-pays pricing without a source (ADR 0185):** since the Sentinel-2 cloudless reader is gone, no source type
+  sets `requesterPays`; the estimate's `requesterPays*` prices and fields (`packages/tools/src/estimate.ts`, the
+  configurations' `prices`) could go, which changes every shipped configuration file.
 
 ## Classic bugs of other engines, checked 2026-10-31
 

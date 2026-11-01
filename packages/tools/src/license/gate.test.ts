@@ -26,15 +26,6 @@ describe('license gate', () => {
     expect(checkSource('d', 'fixture', xyz('https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}'))?.profile).toBe(
       'google-maps-platform',
     );
-    const s2 = (edition: number): SourceConfig => ({
-      type: 's2cloudless',
-      baseUrl: 'https://b.test',
-      edition,
-      level: 13,
-      requesterPays: true,
-    });
-    expect(checkSource('d', 's2cloudless-2016', s2(2016))).toBeUndefined();
-    expect(checkSource('d', 's2cloudless-2016', s2(2020))?.term).toMatch(/2018 and later editions/);
     expect(
       checkSource('d', 'openstreetmap-extract', {
         type: 'osm-extract',
@@ -45,9 +36,11 @@ describe('license gate', () => {
 });
 
 describe('license gate and EOX layer URLs', () => {
-  it('refuses a 2018-or-later s2cloudless layer named in a URL, whatever the profile (PT-23)', () => {
+  it('refuses every s2cloudless layer named in a URL, the 2016 edition too, whatever the profile (PT-23)', () => {
     const url = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg';
-    expect(checkSource('d', 's2cloudless-2016', xyz(url))?.profile).toBe('s2cloudless-2018-or-later');
-    expect(checkSource('d', 's2cloudless-2016', xyz(url.replace('s2cloudless-2020', 's2cloudless')))).toBeUndefined();
+    expect(checkSource('d', 'fixture', xyz(url))?.profile).toBe('eox-s2cloudless');
+    expect(checkSource('d', 'fixture', xyz(url.replace('s2cloudless-2020', 's2cloudless')))?.term).toMatch(
+      /commercial licence/,
+    );
   });
 });

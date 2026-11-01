@@ -1,4 +1,4 @@
-// Pipeline outputs in the playground (F336, F338, F340): a build from fixture sources is served by a plain static
+// Pipeline outputs in the playground (F336, F338): a build from fixture sources is served by a plain static
 // HTTP server and loaded through the engine's XYZ adapter and as its pinned base image. With
 // VIBEGLOBE_TOOLS_FALLBACK=<folder> the base-image check also runs on a real global fallback build.
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -28,7 +28,7 @@ function dataset(fixture: string): DatasetConfig[] {
       ...common,
       id: 'imagery',
       kind: 'imagery',
-      source: { type: 's2cloudless', baseUrl: `${fixture}/s2`, edition: 2016, level: 13, requesterPays: false },
+      source: { type: 'geotiff', url: `${fixture}/world.tif` },
       minZoom: 10,
       maxZoom: 14,
       encoding: 'jpeg',

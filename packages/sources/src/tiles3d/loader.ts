@@ -8,7 +8,7 @@
  * the engine's worker pool (`context.workers`; Draco, meshopt), keeps loaded content within a byte budget (LRU), and
  * places the selected tiles' meshes relative to the eye, rigidly through the globe-to-flat morph. Picking returns the
  * feature, its batch table or `EXT_structural_metadata` properties and its position; for a display-only source
- * (Google, ADR 0031) every data access is refused (F323).
+ * (its provider profile says so, F326) every data access is refused.
  */
 import {
   ecefToGeodetic,

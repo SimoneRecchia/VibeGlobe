@@ -77,30 +77,19 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     offlinePackaging: true,
   },
   {
-    id: 's2cloudless-2016',
-    name: 'Sentinel-2 cloudless 2016 by EOX',
-    license: 'CC-BY-4.0',
-    licenseUrl: 'https://eox.at/2025/03/sentinel-2-cloudless-2024/',
-    termsReadDate: '2026-10-21',
-    attribution:
-      'Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)',
-    sourceUrl: 'https://s2maps.eu',
-    commercialUse: true,
-    redistribution: true,
-    offlinePackaging: true,
-  },
-  {
-    id: 's2cloudless-2018-or-later',
-    name: 'Sentinel-2 cloudless 2018 and later editions by EOX',
-    license: 'CC-BY-NC-SA-4.0',
-    licenseUrl: 'https://cloudless.eox.at/license-non-commercial',
-    termsReadDate: '2026-10-21',
+    id: 'eox-s2cloudless',
+    name: 'Sentinel-2 cloudless by EOX, every edition',
+    license: 'CC-BY-NC-SA-4.0 (2018 on); CC-BY-4.0 or EOX Commercial (2016)',
+    licenseUrl: 'https://cloudless.eox.at/documentation/license',
+    termsReadDate: '2026-11-01',
     attribution: 'Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH',
     sourceUrl: 'https://s2maps.eu',
     commercialUse: false,
     redistribution: false,
     offlinePackaging: false,
-    forbiddingTerm: 'the 2018 and later editions are licensed CC BY-NC-SA 4.0: non-commercial use only',
+    forbiddingTerm:
+      'the 2018 and later editions are licensed CC BY-NC-SA 4.0 (non-commercial use only), and EOX asks its ' +
+      'commercial licence for any commercial use of the 2016 edition',
   },
   {
     id: 'natural-earth',
@@ -213,11 +202,11 @@ export const FORBIDDEN_HOSTS: readonly { pattern: RegExp; profile: string }[] = 
 ];
 
 /**
- * Layers whose terms forbid packaging, recognised in any source URL: EOX's Sentinel-2 cloudless editions from 2018 on
- * (`s2cloudless-2018`, `s2cloudless-2020_3857`, …) are CC BY-NC-SA, whatever profile a configuration names.
+ * Layers whose terms forbid packaging, recognised in any source URL: EOX's Sentinel-2 cloudless, every edition
+ * (`s2cloudless`, `s2cloudless-2020_3857`, …), whatever profile a configuration names.
  */
 export const FORBIDDEN_URLS: readonly { pattern: RegExp; profile: string }[] = [
-  { pattern: /s2cloudless-20(1[89]|[2-9]\d)/i, profile: 's2cloudless-2018-or-later' },
+  { pattern: /s2cloudless/i, profile: 'eox-s2cloudless' },
 ];
 
 /** Looks up a profile by id. */

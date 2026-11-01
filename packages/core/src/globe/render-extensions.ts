@@ -147,7 +147,7 @@ export interface RenderExtensionContext {
   /**
    * The sources whose content the extension draws now, each with its attribution and provider profile: their credits
    * join `Globe.credits()`, `credits-change` and the attribution element, a profile's required credit (a logo) pinned
-   * as for imagery (F254, F255; F470 for Google's 3D Tiles). Replaces the extension's previous ones; `[]` clears them.
+   * as for imagery (F254, F255; F679 for a provider's 3D Tiles). Replaces the extension's previous ones; `[]` clears them.
    */
   setCredits(sources: readonly CreditedSource[]): void;
   /**

@@ -258,23 +258,13 @@ building packages, storage quotas and LAN setups.
 
 Keys belong to your application and never to the code you publish:
 
-- Read them from your build environment (`import.meta.env.VITE_GOOGLE_MAPS_API_KEY`, Nuxt's `runtimeConfig.public`),
-  never from a committed file, and restrict each key to your site's referrers in the provider's console.
-- Google's 2D tiles need your own Map Tiles API key and billing region:
+- Read them from your build environment (`import.meta.env.VITE_MAPS_KEY`, Nuxt's `runtimeConfig.public`), never
+  from a committed file, and restrict each key to your site's referrers in the provider's console.
+- A paid provider (Google's Map Tiles API, for example) is connected from your code with the generic adapters, your
+  key added by the transport only when a tile is requested, and a profile with its terms: the
+  [sources guide](sources.md) shows how.
 
-```ts
-import { googleImagery } from '@vibeglobe/sources';
-
-const google = googleImagery({
-  id: 'google',
-  mapType: 'satellite',
-  apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-  billingRegion: 'eea', // 'eea' or 'other'
-  logoUrl: '/static/vibeglobe/google-logo.png', // your copy of Google's logo, from Google's brand resources
-});
-```
-
-Attribution: give each source its `attribution` (and its provider profile, which the provider adapters set). The
+Attribution: give each source its `attribution` (and its provider profile, with the credit and logo its terms require). The
 engine shows the credits of the sources in view in its own attribution element, at the bottom right of the map,
 always including the credits and logos a provider requires; `globe.credits()` and the `credits-change` event give you
 the list for your own display, and `@vibeglobe/ui`'s `AttributionControl` shows it with the other controls, never

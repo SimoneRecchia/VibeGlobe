@@ -1,10 +1,8 @@
 // Provider profiles in the browser (M8, track B): a profile switches off only what its provider forbids and only for
-// its own source, nothing switches it back on (F320); the Google profile stores, packages and prefetches nothing
-// (F321, F322); the OpenStreetMap public servers are neither packaged nor prefetched (F324); self-hosted OpenStreetMap
+// its own source, nothing switches it back on (F320); the OpenStreetMap public servers are neither packaged nor prefetched (F324); self-hosted OpenStreetMap
 // enables everything with the ODbL credit, under a commercial provider's rules when one serves it (F325); any adapter's
 // own profile is enforced the same way (F326).
-import { expect, test, type Page, type Route } from '@playwright/test';
-import { googleFixture } from '../packages/sources/src/__fixtures__/google-server.ts';
+import { expect, test, type Page } from '@playwright/test';
 import {
   emptyPixels,
   openHarness,
@@ -14,7 +12,6 @@ import {
   tileHeaders,
   type HarnessConfig,
 } from './support/offline.ts';
-import { tilePng } from './support/sources.ts';
 
 test.beforeEach(() => test.setTimeout(180_000));
 // Routes still fetching when a test ends must not fail the run outside any test (KB-213).
@@ -22,11 +19,6 @@ test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
 
 const ROME = { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 };
 const PAN = [12.5, 14, 15.5];
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, POST',
-};
 
 type Bounds = [number, number, number, number];
 
@@ -79,32 +71,6 @@ async function panRome(page: Page): Promise<void> {
     expect(await emptyPixels(page)).toBe(0);
   }
 }
-
-/** Serves the Google fixture at tile.googleapis.com; returns the paths of the 2D tiles requested. */
-async function serveGoogle(page: Page): Promise<string[]> {
-  const server = googleFixture(tilePng);
-  const tiles: string[] = [];
-  await page.route('https://tile.googleapis.com/**', async (route: Route) => {
-    const request = route.request();
-    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-    if (request.url().includes('/2dtiles/')) tiles.push(new URL(request.url()).pathname);
-    const body = request.postData();
-    const response = await server.fetch(request.url(), {
-      method: request.method(),
-      ...(body === null ? {} : { body }),
-    });
-    return route.fulfill({
-      status: response.status,
-      headers: { ...Object.fromEntries(response.headers), ...CORS },
-      body: Buffer.from(await response.arrayBuffer()),
-    });
-  });
-  return tiles;
-}
-
-/** True when some frame since `recordDrawn` measured a slow link, on which no source prefetches (F302, KB-138). */
-const linkWasSlow = (page: Page): Promise<boolean> =>
-  page.evaluate(() => (window as unknown as { slowestLinkBps: number }).slowestLinkBps < 1.5e6);
 
 const effective = (page: Page, sourceId: string) =>
   page.evaluate((id) => window.offlineHarness?.offline?.effectiveSwitches(id), sourceId);
@@ -198,65 +164,6 @@ test('a profile switches off only what its provider forbids, for its own source,
     "persistentCache stays off for source 'strict': its provider profile 'strict-provider' forbids it",
     "prefetch stays off for source 'strict': its provider profile 'strict-provider' forbids it",
   ]);
-});
-
-test('the Google profile persists and packages nothing, whatever the global settings (F321)', async ({ page }) => {
-  const google = await serveGoogle(page);
-  await start(page, {
-    switches: ALL_ON,
-    sources: [{ id: 'google', provider: 'google', maxLevel: 18 }],
-  });
-  await panRome(page);
-  expect(google.length).toBeGreaterThan(0);
-  expect(await storedTileKeys(page)).toEqual([]);
-  const build = await page.evaluate(() =>
-    window.offlineHarness?.buildArea({
-      id: 'with-google',
-      version: '1',
-      area: { westDeg: 12, southDeg: 41.5, eastDeg: 13, northDeg: 42.2 },
-      minLevel: 0,
-      maxLevel: 6,
-      sources: [{ id: 'google', provider: 'google' }],
-    }),
-  );
-  expect(build?.error).toMatch(/provider profile 'google' forbids offline packaging/);
-  expect(google.filter((p) => p.includes('/2dtiles/')).length).toBe(google.length);
-});
-
-test('Google tiles are never prefetched or preloaded, while other sources in the view still are (F322)', async ({
-  page,
-}) => {
-  const google = await serveGoogle(page);
-  const requests = await start(page, {
-    switches: ALL_ON,
-    sources: [
-      { id: 'world', pattern: 'world', session: 'f322-world' },
-      { id: 'google', provider: 'google', maxLevel: 18 },
-    ],
-  });
-  await panRome(page);
-  // A long flight: Google tiles are requested only where some frame draws them.
-  await page.evaluate(async () => {
-    await window.offlineHarness?.globe?.flyTo(
-      { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 7 },
-      { durationMs: 3000 },
-    );
-  });
-  expect(await emptyPixels(page)).toBe(0);
-  const seen = await drawn(page);
-  expect(google.length).toBeGreaterThan(0);
-  expect(beyondView(google, seen), 'Google tiles requested outside every drawn view').toEqual([]);
-  // The other source keeps prefetch; it prefetches unless some frame judged the link slow (F302: under 1.5 Mbps
-  // no source prefetches, and a busy page on a software GPU measures that even from the local server; KB-138).
-  expect((await effective(page, 'world'))?.prefetch).toBe(true);
-  expect((await effective(page, 'google'))?.prefetch).toBe(false);
-  if (!(await linkWasSlow(page)))
-    expect(
-      beyondView(
-        requests.filter((p) => p.includes('/f322-world/')),
-        seen,
-      ).length,
-    ).toBeGreaterThan(0);
 });
 
 test('the OpenStreetMap public servers are neither prefetched in bulk nor packaged (F324)', async ({ page }) => {

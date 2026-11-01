@@ -342,32 +342,43 @@ const strictest = combineProfiles(acme, { id: 'reseller', forbids: new Set(['pre
 
 The engine and `@vibeglobe/offline` enforce a declared profile exactly as they enforce the built-in ones, and the conformance suite checks it.
 
-### Google Maps Platform
+### Commercial providers, from your own code
+
+VibeGlobe ships no adapter of a paid or proprietary service: an application that has its own contract with one (Google's Map Tiles API, a national mapping agency's paid service, …) connects it from its own code through the generic adapters, with its own key and a profile that states the provider's terms. The key and the session stay in the transport, which adds them only when a request is made; the profile makes the engine and `@vibeglobe/offline` keep those terms. For Google's 2D tiles, for example:
 
 ```ts
-import { googleImagery, googleStreetView } from '@vibeglobe/sources';
+import { fetchTransport, withProfile, xyzImagery, type ProviderProfile } from '@vibeglobe/sources';
 
-const google = await googleImagery({
+// Your reading of the provider's terms: here Google's Map Tiles API policies.
+const googleTerms: ProviderProfile = {
   id: 'google',
-  apiKey: myRestrictedKey, // the customer's own key, restricted to their sites
-  billingRegion: 'eea', // or 'other': the terms differ, and there is no default
-  mapType: 'roadmap', // EEA accounts get roadmap and terrain only
-  language: 'it-IT',
-  region: 'IT',
-  logoUrl: '/assets/google-logo.png',
-});
-const copyright = await google.viewportCopyright({
-  zoom: 12,
-  westDeg: 12.3,
-  southDeg: 41.8,
-  eastDeg: 12.6,
-  northDeg: 42,
-});
+  forbids: new Set(['persistentCache', 'prefetch', 'offlinePackaging']),
+  respectCacheHeaders: true,
+  displayOnly: true,
+  requiredAttribution: { text: 'Google Maps', logo: { src: '/assets/google-logo.png', alt: 'Google Maps' } },
+  termsAdr: 'docs/terms/google.md',
+};
+// A session started on the first tile, with your restricted key.
+let session: Promise<string> | undefined;
+const sessionToken = (): Promise<string> =>
+  (session ??= fetch(`https://tile.googleapis.com/v1/createSession?key=${myRestrictedKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mapType: 'roadmap', language: 'it-IT', region: 'IT' }),
+  })
+    .then((response) => response.json() as Promise<{ session: string }>)
+    .then((answer) => answer.session));
+// The session and the key are added inside the transport: the URLs the engine sees, logs and shows carry neither.
+const transport = fetchTransport(async (input, init) =>
+  fetch(`${String(input)}?session=${await sessionToken()}&key=${myRestrictedKey}`, init),
+);
+const google = withProfile(
+  xyzImagery({ id: 'google', url: 'https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}', transport }),
+  googleTerms,
+);
 ```
 
-The adapter creates and renews Map Tiles API sessions itself. `followGoogleCopyrights(globe, google)` keeps the credits on the copyrights Google returns for each settled view: one viewport request per settled view, never per frame, shown after the logo through `globe.refreshCredits()`. The Google profile forbids the persistent cache, prefetch and offline packaging, reuses tiles in memory only while Google's cache headers allow it, and requires Google's logo and the viewport's copyrights to stay visible ([ADR 0031](../adr/0031-google-maps-platform-terms.md)). `googleStreetView` reads Street View metadata and panorama tiles under the same profile. The logo and its text say "Google Maps", 16 px high with 10 px of clear space (5 px below).
-
-Billing accounts in the European Economic Area get neither 2D satellite tiles, Street View nor Photorealistic 3D Tiles ([Map Tiles API EEA guide](https://developers.google.com/maps/comms/eea/map-tiles)): with `billingRegion: 'eea'`, `mapType: 'satellite'`, the `layerStreetview` layer, `googleStreetView` and `google3dTiles` throw a `SourceConfigError` (`not-available-in-eea`) that names those terms.
+The same pattern serves Photorealistic 3D Tiles: `tiles3d({ url, transport, profile })` of `@vibeglobe/sources/tiles3d` takes the root tileset's URL, your transport and your profile, and its `copyrights()` lists the credits of the tiles in view. A provider whose credits change with the view (Google's viewport endpoint) updates the source's `attribution` and calls `globe.refreshCredits()` when the view settles (`globe.on('idle', …)`). Which terms apply, in which billing region, and whether a key may be used in a browser are between you and the provider.
 
 ### OpenStreetMap public servers
 
@@ -405,7 +416,7 @@ Apple's map data may only be used through Apple's own MapKit, so VibeGlobe offer
 
 ## Keeping secrets out of URLs
 
-Send credentials in headers where the provider supports it (`headers` on the PMTiles and MBTiles adapters). Where a provider requires a key in the URL, as Google's Map Tiles API does, the adapter adds the key and the session inside its own transport: the URLs the engine sees, coalesces, logs and shows in the debug overlay carry neither.
+Send credentials in headers where the provider supports it (`headers` on the PMTiles and MBTiles adapters). Where a provider requires a key in the URL, the transport adds the key (and a session) only when the request is made: the URLs the engine sees, coalesces, logs and shows in the debug overlay carry neither.
 
 Any tiled adapter that takes a `transport` gets the same protection from `fetchTransport`'s third argument:
 
@@ -467,5 +478,5 @@ const terrainResults = await runTerrainConformance({
   decodeImage: myPngDecoder, // RGBA of a heightmap tile; the browser decodes images in the engine
 });
 expect(failures(terrainResults)).toEqual([]);
-``` `runParserConformance` checks a parser against fixtures and fuzzes it. The opt-in live run (`npm run test:live-sources`, or the manual "Live sources" workflow in CI) contacts only endpoints whose terms allow automated tests, Google only with `GOOGLE_MAPS_API_KEY` set, and stops at the first quota error.
+``` `runParserConformance` checks a parser against fixtures and fuzzes it. The opt-in live run (`npm run test:live-sources`, or the manual "Live sources" workflow in CI) contacts only endpoints whose terms allow automated tests and stops at the first quota error.
 ````

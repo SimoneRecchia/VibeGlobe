@@ -25,7 +25,7 @@ export interface LoadingSwitches {
 
 /** What a provider's terms require of the engine; a profile can only switch features off (PLAN.md). */
 export interface ProviderProfile {
-  /** 'custom', 'google', 'osm-public', … */
+  /** 'custom', 'osm-public', … */
   readonly id: string;
   readonly forbids: ReadonlySet<keyof LoadingSwitches>;
   /** Reuse responses only while their HTTP cache headers allow it. */
@@ -34,6 +34,8 @@ export interface ProviderProfile {
   readonly maxConcurrentRequests?: number;
   /** The credit that must always be visible and never covered. */
   readonly requiredAttribution?: Attribution;
+  /** The terms allow drawing only: pixel readback, tile data, elevation sampling and picking are refused. */
+  readonly displayOnly?: boolean;
   /** Sessions are renewed after this many seconds. */
   readonly sessionRenewalSeconds?: number;
   /** The ADR that records the reading of the provider's terms. */

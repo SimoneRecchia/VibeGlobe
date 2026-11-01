@@ -184,7 +184,7 @@ async function fixturesCommand(parsed: ParsedArgs, io: CliIo): Promise<number> {
     port: Number(parsed.options.get('port') ?? 8710),
     ...(typeof staticFolder === 'string' ? { staticFolder } : {}),
   });
-  io.out(`Fixture server on ${url}: /s2/tiles/{level}/{col}/{row}.tif, /osm/<name>.osm.pbf, /xyz/{z}/{x}/{y}.png`);
+  io.out(`Fixture server on ${url}: /osm/<name>.osm.pbf, /xyz/{z}/{x}/{y}.png, /world.tif`);
   if (typeof staticFolder === 'string') io.out(`  /static/ serves ${staticFolder}`);
   return 0;
 }

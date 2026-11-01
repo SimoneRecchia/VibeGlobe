@@ -1,6 +1,6 @@
 # 0141. 3D Tiles drawn by a render extension: per-tile rigid placement, a relative depth pull and Google sessions
 
-- Status: Accepted (decided by agent; owner may revisit)
+- Status: Accepted (partly superseded by 0185)
 - Date: 2026-10-23
 - Milestone: M13
 
@@ -67,3 +67,8 @@ main thread. KTX2 textures transcode with the worker program's `transcode-ktx2` 
   their own bundles.
 - Credits of render extensions cannot reach the engine's attribution yet (hook request E (2)); the playground's
   Google scenario shows the logo and copyrights in its own pinned element meanwhile.
+
+## Update 2026-11-01
+
+The Google sessions and the playground's Google scenario are removed ([ADR 0185](0185-no-proprietary-provider-adapters.md)):
+an application passes its own transport and profile to `tiles3d`.

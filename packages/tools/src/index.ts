@@ -17,7 +17,6 @@ export type {
   OsmExtractSource,
   OutputsConfig,
   PricesConfig,
-  S2CloudlessSource,
   SampleAreaConfig,
   SourceConfig,
   ToolsConfig,

@@ -48,6 +48,7 @@ test('line widths change continuously through integer zooms (F440)', async ({ pa
   const widths: [number, number][] = [];
   for (let zoom = 10; zoom <= 16.001; zoom += 0.25) {
     await jump(page, zoom, center);
+    await settle(page);
     widths.push([zoom, await avenueWidth(page)]);
   }
   // Wider as the zoom grows, a little at a time.
@@ -56,9 +57,9 @@ test('line widths change continuously through integer zooms (F440)', async ({ pa
     const previous = widths[i - 1]?.[1] ?? 0;
     expect(width, `zoom ${zoom}: ${JSON.stringify(widths)}`).toBeGreaterThanOrEqual(previous - 1);
   }
-  // Just below and just above each integer zoom: the same width (no step where the paint's zoom pair changes), each
-  // once the view's tiles are drawn: a source's tiles load when a layer draws at the zoom (KB-292), and the check is
-  // about the paint, not the loading.
+  // Just below and just above each integer zoom: the same width (no step where the paint's zoom pair changes). Every
+  // width here and above is read once the view's tiles are drawn: a source's tiles load when a layer draws at the zoom
+  // (KB-292), and the check is about the paint, not the loading.
   for (const zoom of [11, 12, 13, 14, 15]) {
     await jump(page, zoom - 0.01, center);
     await settle(page);

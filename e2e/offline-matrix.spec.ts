@@ -112,13 +112,18 @@ async function scenario(page: Page): Promise<{ worst: number; pops: number }> {
     pops += (await recordPath(page, [{ hold: 8 }], 0)).pops;
   }
   await page.evaluate((v) => {
-    void window.offlineHarness?.globe?.flyTo(v, { durationMs: 1000 });
+    const holder = window as unknown as { flown?: boolean };
+    holder.flown = false;
+    void window.offlineHarness?.globe?.flyTo(v, { durationMs: 1000 }).finally(() => (holder.flown = true));
   }, LAST_VIEW);
   for (let k = 0; k < 4; k++) {
     await nextFrame(page);
     worst = Math.max(worst, await emptyPixelsMoving(page));
   }
-  await page.waitForTimeout(2000);
+  // The flight runs on the engine clock, one step per drawn frame: a slow machine draws few frames in two seconds, and
+  // a camera still flying is no still camera to check for pops (KB-318).
+  await page.waitForFunction(() => (window as unknown as { flown?: boolean }).flown === true);
+  await page.waitForTimeout(1000);
   pops += (await recordPath(page, [{ hold: 20 }], 0)).pops;
   return { worst: Math.max(worst, await emptyPixelsMoving(page)), pops };
 }

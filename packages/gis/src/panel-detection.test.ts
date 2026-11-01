@@ -125,6 +125,17 @@ describe('detectPanels (F664)', () => {
     expect(found?.centers.length).toBeGreaterThan(110);
   });
 
+  it('takes a dark patch far deeper than a table, such as a wood, for no panels (KB-321)', () => {
+    const data = new Uint8Array(SIDE_PX * SIDE_PX * 4);
+    for (let row = 0; row < SIDE_PX; row++)
+      for (let column = 0; column < SIDE_PX; column++) {
+        const dark = row > 80 && row < 400 && column > 80 && column < 400;
+        data.set([...(dark ? DARK_BLUE.table : DARK_BLUE.ground), 255], (row * SIDE_PX + column) * 4);
+      }
+    const image = { data, width: SIDE_PX, height: SIDE_PX };
+    expect(detectPanels({ image, bounds: BOUNDS, perimeters: [PERIMETER] })).toBeUndefined();
+  });
+
   it('finds nothing in bare ground', () => {
     const ground = new Uint8Array(SIDE_PX * SIDE_PX * 4).fill(150);
     expect(

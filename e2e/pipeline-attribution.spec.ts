@@ -37,9 +37,9 @@ test.beforeAll(async () => {
         {
           id: 'imagery',
           kind: 'imagery',
-          profile: 's2cloudless-2016',
-          dataYear: 2016,
-          sourceVersion: '2016',
+          profile: 'esa-worldcover-s2-2021',
+          dataYear: 2021,
+          sourceVersion: '2021',
           source: { type: 'geotiff', url: 'https://tif.test/rgb.tif' },
           minZoom: 3,
           maxZoom: 6,
@@ -85,12 +85,17 @@ test('the pipeline records license and attribution, and the engine shows the rec
   // The static folder's metadata file carries every field the entry names.
   expect(metadata).toMatchObject({
     license: 'CC-BY-4.0',
-    attribution: expect.stringContaining('Sentinel-2 cloudless'),
-    dataYear: 2016,
+    attribution: expect.stringContaining('ESA WorldCover'),
+    dataYear: 2021,
     configName: 'f337',
     configVersion: '1.0.0',
     pipelineVersion: expect.any(String),
-    sources: [expect.objectContaining({ url: 'https://s2maps.eu', license: 'CC-BY-4.0' })],
+    sources: [
+      expect.objectContaining({
+        url: 'https://registry.opendata.aws/esa-worldcover-vito-composites/',
+        license: 'CC-BY-4.0',
+      }),
+    ],
   });
   // The PMTiles output, loaded through the engine's PMTiles adapter.
   await openSources(page, 'lon=13&lat=41&zoom=5');

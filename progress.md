@@ -1,6 +1,6 @@
 # Progress
 
-## 2026-11-01: map data is the application's responsibility; online imagery of your choice in the playground (F681)
+## 2026-11-01: map data is the application's responsibility; online imagery of your choice in the playground (F683)
 
 The sources guide and the README now say that VibeGlobe grants no right to map data: the application chooses its
 sources, holds their keys and keeps to their terms. The playground's Europe preset reads `VITE_ONLINE_IMAGERY_URL` and
@@ -57,7 +57,18 @@ and lets the background compiler finish, a window over the limit gets a second o
 longer crosses a call as a double, which boxed it every frame (18 runs in a row pass, 2 of 4 failed before). And F609's measured cost of the space background since #93 (KB-317): the controls listened
 for `moveend` with the tilt policy off too, which made the engine request every drag frame from inside the previous
 one, so the benchmark sampled frame intervals; they listen only while an API movement runs (F609: about 0 ms again).
-Still open: KB-110, KB-208, KB-212, KB-240, KB-241 (CI pace), KB-180, KB-181 (the owner's desktop views).
+The CI-pace rows, reproduced with the whole browser on one CPU core: KB-241's wheel tests waited behind
+frames a software GPU drew at 1280 × 720 (480 × 360 canvases now, and F438 a 6-minute limit), KB-240 was fixed by #93's
+path preloading, KB-208's WebGPU slowness is its uploads (a follow-up). Still open: KB-110 and KB-212 (not reproduced,
+passing in CI), KB-180, KB-181 (the owner's desktop views).
+`main`'s full runs after #101 and #103 then left: the terrain baselines KB-302 had changed (recorded again, #102), the
+offline matrix recording a still camera while its flight was under way on a slow machine (KB-318), F337 after #100
+removed its profile, KB-185's test limit, and F101 on WebGPU, where three.js submitted every tile's mipmaps alone: a
+frame's tile mipmaps now share one submit (KB-319), and an 81-tile burst uploads in 11 to 13 frames instead of 15 to 23.
+KB-110 and KB-212 closed on CI's record: F137's WebGL2 sweep passed 70 full runs in a row with 0 pops, and F367 62 of
+62 since KB-203's fix (the engine idle before labels were drawn), the day after KB-212's only failure. The nightly
+benchmarks job recorded nothing since 2026-10-28 (git refused its checkout, KB-320): fixed. Still open, and the owner's:
+question 39 (the hosts are refused here, also to a web fetch), KB-180 and KB-181 (the exact views).
 
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 

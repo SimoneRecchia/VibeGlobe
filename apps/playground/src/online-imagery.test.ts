@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { onlineImagery } from './online-imagery.js';
 
-describe('online imagery of your choice (F681)', () => {
+describe('online imagery of your choice (F683)', () => {
   it('adds nothing without a URL, and the URL with its required credit from level 12 to 19, online only', () => {
     expect(onlineImagery({})).toBeUndefined();
     const added = onlineImagery({

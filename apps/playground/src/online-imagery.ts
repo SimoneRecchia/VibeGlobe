@@ -4,7 +4,7 @@ import type { AddedSource } from '@vibeglobe/presets';
 import { xyzImagery } from '@vibeglobe/sources';
 
 /**
- * The online imagery the person running the playground connects through its build variables (F681):
+ * The online imagery the person running the playground connects through its build variables (F683):
  * `VITE_ONLINE_IMAGERY_URL`, a tile URL template with `{z}`, `{x}` and `{y}` and their own key (in `.env.local`, never
  * committed), and `VITE_ONLINE_IMAGERY_CREDIT`, the credit the provider's terms ask for. It shows worldwide from level
  * 12 to 19 above the preset's sources; below level 12 the preset's free sources (and the app's offline package) show.

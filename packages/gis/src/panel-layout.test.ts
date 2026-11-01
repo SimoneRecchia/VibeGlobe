@@ -111,3 +111,37 @@ describe('panel layout at the size of a park (F658)', () => {
     expect(elapsed).toBeLessThan(400);
   });
 });
+
+describe('panels moved by hand (F681) and panels without room (F682)', () => {
+  const row = [rectangle(60, 4.5)];
+  const sizes = { perimeters: row, widthM: 10, depthM: 4 };
+  const xs = (centers: readonly (LonLat | undefined)[]) => centers.map((c) => meters(must(c))[0]);
+
+  it('shifts the panels in the way along the row toward the nearest free place, in order', () => {
+    const start = layoutPanels({ ...sizes, count: 4 }).centers.map(must);
+    const before = xs(start);
+    const wanted = [...start.slice(0, 3), must(start[0])];
+    const moved = layoutPanels({ ...sizes, count: 4, wanted, moving: [3], anchor: must(start[0]) });
+    const after = xs(moved.centers);
+    expect(after[3]).toBeCloseTo(must(before[0]), 3);
+    for (const panel of [0, 1, 2]) expect(after[panel]).toBeCloseTo(must(before[panel + 1]), 3);
+  });
+
+  it('keeps every panel placed, none overlapping, when one is dragged across a full row', () => {
+    const start = layoutPanels({ ...sizes, count: 5 }).centers.map(must);
+    const wanted = [...start.slice(0, 4), at(8, 2)];
+    const moved = layoutPanels({ ...sizes, count: 5, wanted, moving: [4], anchor: must(start[0]) });
+    const placed = moved.centers.map(must);
+    for (let i = 0; i < placed.length; i++)
+      for (let j = i + 1; j < placed.length; j++) expect(overlap(must(placed[i]), must(placed[j]), 10, 4)).toBe(false);
+    expect(xs(placed)[4]).toBeCloseTo(Math.min(...xs(placed)), 3);
+  });
+
+  it('lines up the panels without room beyond the last row, outside the perimeter and apart', () => {
+    const layout = layoutPanels({ ...sizes, count: 8, minScale: 1, spill: true });
+    const placed = layout.centers.map(must);
+    expect(placed.filter((c) => meters(c)[1] < 0)).toHaveLength(3);
+    for (let i = 0; i < placed.length; i++)
+      for (let j = i + 1; j < placed.length; j++) expect(overlap(must(placed[i]), must(placed[j]), 10, 4)).toBe(false);
+  });
+});

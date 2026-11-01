@@ -5,7 +5,7 @@
  * maps and overlays (F617), online only. `&presetBase=satellite|hybrid|map|relief` and `&presetOverlays=labels,roads,…`
  * set the start; `&presetStyle=<url>` replaces OpenFreeMap's style (tests use the fixture streets style, in the same
  * OpenMapTiles schema); `&presetExclude=<id>,…` leaves sources out. `VITE_ONLINE_IMAGERY_URL` adds online imagery of
- * the person's own choice from level 12 (F681, `src/online-imagery.ts`). 3D terrain is chosen when the globe is created, so
+ * the person's own choice from level 12 (F683, `src/online-imagery.ts`). 3D terrain is chosen when the globe is created, so
  * switching it reloads the page. Hooks in `window.vibeglobeEuropePreset`.
  */
 import type { Globe, GlobeOptions, TileSource } from '@vibeglobe/core';

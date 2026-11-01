@@ -97,7 +97,7 @@ async function sourceOf(record: OrthophotoRecord, maxLevel: number, key?: string
   const source = await wmsImagery({
     ...common,
     url: record.service.url,
-    layers: [record.service.layer],
+    layers: record.service.layer.split(','),
     format: 'image/jpeg',
     transparent: false,
     // Orthophotos carry no labels to keep whole across tile edges.

@@ -3418,7 +3418,7 @@
         "Confirm every rule that affects caching, prefetch, offline packaging, display-only use, logo and attribution placement and session tokens is mapped to a profile setting",
         "Confirm the profile's code references the ADR and the conformance suite checks each mapped setting"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F257",
@@ -3431,7 +3431,7 @@
         "Make the fixture expire the session and assert a new session is created transparently with zero black pixels",
         "With the owner's API key, run the opt-in live test for roadmap, satellite and terrain and capture screenshots; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F258",
@@ -3443,7 +3443,7 @@
         "Assert the viewport information request is made for each settled view and not on every frame",
         "Assert the displayed attribution always matches the copyrights returned for the current viewport"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F259",
@@ -3456,7 +3456,7 @@
         "Assert through element hit-testing that the logo and attribution are fully visible and no other element overlaps them",
         "Try to hide or cover them through configuration and app CSS and assert they stay visible"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F260",
@@ -3468,7 +3468,7 @@
         "Pan away and back before and after expiry",
         "Assert tiles are reused from memory before expiry and requested again after expiry, with parent fallback and zero black pixels meanwhile"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F261",
@@ -3480,7 +3480,7 @@
         "Assert the effective profile settings match the respective rules recorded in the Google terms ADR",
         "Assert a missing billing region produces a configuration error rather than a silent default"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F262",
@@ -3493,7 +3493,7 @@
         "Assert the attribution and logo rules of the Google profile apply wherever the tiles are displayed",
         "With the owner's API key, run the opt-in live test; without a key the fixture run is the pass condition and the pending live run is recorded in the open-questions file"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F549",
@@ -3507,7 +3507,7 @@
         "Make the fixture server answer with a quota error and confirm the live suite stops at once with a clear message",
         "With the owner's key, run the live suite once and confirm it passes under the EEA terms"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F263",
@@ -4234,7 +4234,7 @@
         "Inspect browser storage and assert no Google tile is persisted beyond what the Google terms ADR allows",
         "Request an offline package with the Google source and assert it is refused with an error naming the Google profile"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F322",
@@ -4246,7 +4246,7 @@
         "Assert through request interception that Google tiles are requested only within the limits recorded in the Google terms ADR",
         "Assert other sources in the same view still prefetch and preload normally"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F323",
@@ -4257,7 +4257,7 @@
         "Call each data-access API (tile data access, pixel readback, elevation sampling, package export) on a Google fixture source",
         "Assert each call is refused with an error naming the Google profile rule"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F324",
@@ -4501,7 +4501,7 @@
         "Load the pyramid in the playground and verify imagery displays at about 10 m per pixel at the highest level, with no seams between source tiles",
         "Verify the output carries the EOX and Copernicus attribution text recorded in the license ADR"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F341",
@@ -6195,7 +6195,7 @@
         "Assert the persistent cache holds no Google 3D tile and the offline package builder refuses the source",
         "Assert features the terms reading ADR marks as forbidden for Google content (for example export) are disabled for it"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F471",
@@ -7249,7 +7249,7 @@
         "Run the non-EEA flow against the Map Tiles stand-in: a session is created and photorealistic tiles stream and render over Rome",
         "Without a key, assert the playground shows a clear configuration message and the rest of the engine keeps working"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F573",
@@ -7261,7 +7261,7 @@
         "Assert a new session is requested before or at expiry and no tile request fails because of the expired token",
         "Record frames across the renewal and assert no holes or blank frames"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F574",
@@ -8114,6 +8114,29 @@
       "steps": [
         "Unit-test that Slovenia's tiles are asked over Ljubljana with its layer and not over Rome",
         "Record its terms in ADR 0182 and update open question 39"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F676",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "An application connects any provider, a paid or proprietary one included (for example Google Map Tiles 2D and 3D Tiles), from its own code: the generic adapters take a transport that adds its key and session, and a profile of its terms declares the required credit and logo, display-only use and the loading features it forbids; the library ships no adapter of such a provider.",
+      "steps": [
+        "Unit-test an `xyzImagery` source whose transport adds a session and key the engine never sees, with a display-only profile and a required credit with a logo",
+        "Show such a source in the playground and assert the credit and logo are visible and its tiles refuse readback",
+        "Type-check the sources guide example that connects Google Map Tiles from the application"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F677",
+      "milestone": 9,
+      "section": "Default datasets and data pipeline",
+      "description": "The data pipeline reads no Sentinel-2 cloudless edition: a source whose URL names any `s2cloudless` layer, the 2016 edition included, is refused by the license gate under the `eox-s2cloudless` profile with the term that forbids it, recorded in ADR 0025.",
+      "steps": [
+        "Unit-test the license gate on a 2016 and a 2020 Sentinel-2 cloudless layer URL",
+        "Run a build whose imagery source names a Sentinel-2 cloudless layer and assert it stops at the license gate"
       ],
       "status": "passing"
     }

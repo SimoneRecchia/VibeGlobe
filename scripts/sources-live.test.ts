@@ -1,83 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { GOOGLE_FIXTURE_KEY, googleFixture } from '../packages/sources/src/__fixtures__/google-server.ts';
-import { GOOGLE_FREE_MONTHLY, GOOGLE_REQUESTS_PER_RUN, LIVE_RUNS_PER_MONTH, runLiveSuite } from './sources-live.ts';
+import { runLiveSuite } from './sources-live.ts';
 
-const GOOGLE = 'https://google.fixture.test/';
 const OSM = 'https://osm.fixture.test/{z}/{x}/{y}.png';
 
-/** The fixture Google server and a fixture OpenStreetMap raster server behind one fetch. */
-function servers() {
-  const google = googleFixture((z, x, y) => new TextEncoder().encode(`${z}/${x}/${y}`), GOOGLE);
-  const fetchImpl: typeof fetch = (input, init) => {
-    const url = input instanceof Request ? input.url : String(input);
-    if (url.startsWith('https://osm.fixture.test/')) return Promise.resolve(new Response(new Uint8Array([1, 2, 3])));
-    return google.fetch(input, init);
-  };
-  return { google, fetch: fetchImpl };
+/** A fixture OpenStreetMap raster server, answering `status` (200 by default). */
+function osmServer(status = 200): typeof fetch {
+  return () => Promise.resolve(status === 200 ? new Response(new Uint8Array([1, 2, 3])) : new Response('', { status }));
 }
 
-describe('live source suite (F223, F549)', () => {
-  it('does not run Google without a key, says so, and records every skipped endpoint with its reason', async () => {
-    const { fetch } = servers();
-    const report = await runLiveSuite({ fetch, googleBaseUrl: GOOGLE, osmUrl: OSM });
+describe('live source suite (F223)', () => {
+  it('runs the endpoints whose terms allow it and records every skipped endpoint with its reason', async () => {
+    const report = await runLiveSuite({ fetch: osmServer(), osmUrl: OSM });
     expect(report.ran).toEqual(['OpenStreetMap public raster servers (3 tiles)']);
-    expect(report.skipped.map((s) => s.endpoint)).toEqual([
-      'WMTS, WMS',
-      'PMTiles, MBTiles',
-      'vector formats',
-      'Google Map Tiles API',
-    ]);
-    expect(report.skipped.at(-1)?.reason).toMatch(/GOOGLE_MAPS_API_KEY is not set/);
-    expect(report.requests['google.fixture.test']).toBeUndefined();
+    expect(report.skipped.map((s) => s.endpoint)).toEqual(['WMTS, WMS', 'PMTiles, MBTiles', 'vector formats']);
+    expect(report.skipped.every((s) => s.reason.length > 0)).toBe(true);
     expect(report.requests['osm.fixture.test']).toBe(3);
   });
 
-  it('runs Google with a key within the request budget, which stays far below the free monthly caps', async () => {
-    const { fetch } = servers();
-    const report = await runLiveSuite({
-      googleApiKey: GOOGLE_FIXTURE_KEY,
-      googleBillingRegion: 'other',
-      fetch,
-      googleBaseUrl: GOOGLE,
-      osmUrl: OSM,
-    });
-    expect([report.failed, report.stoppedBy]).toEqual([[], undefined]);
-    expect(report.ran).toHaveLength(3);
-    const budget =
-      GOOGLE_REQUESTS_PER_RUN.tiles2d + GOOGLE_REQUESTS_PER_RUN.streetViewTiles + GOOGLE_REQUESTS_PER_RUN.other;
-    expect(report.requests['google.fixture.test']).toBeLessThanOrEqual(budget);
-    expect(GOOGLE_REQUESTS_PER_RUN.tiles2d * LIVE_RUNS_PER_MONTH).toBeLessThan(GOOGLE_FREE_MONTHLY.tiles2d / 10);
-    expect(GOOGLE_REQUESTS_PER_RUN.streetViewTiles * LIVE_RUNS_PER_MONTH).toBeLessThan(
-      GOOGLE_FREE_MONTHLY.streetViewTiles / 10,
-    );
-  });
-
   it('stops at the first quota error with a clear message', async () => {
-    const { google, fetch } = servers();
-    google.exhaustQuota();
-    const report = await runLiveSuite({ googleApiKey: GOOGLE_FIXTURE_KEY, fetch, googleBaseUrl: GOOGLE, osmUrl: OSM });
-    expect(report.stoppedBy).toMatch(/quota error from google\.fixture\.test \(HTTP 429\): the live run stops here/);
-    expect(report.requests).toEqual({ 'google.fixture.test': 1 });
-  });
-
-  it('never requests satellite tiles or Street View for an EEA billing account, and says why (ADR 0031)', async () => {
-    const { fetch } = servers();
-    const requested: string[] = [];
-    const spy: typeof fetch = (input, init) => {
-      requested.push(String(input instanceof Request ? input.url : input));
-      return fetch(input, init);
-    };
-    const report = await runLiveSuite({
-      googleApiKey: GOOGLE_FIXTURE_KEY,
-      fetch: spy,
-      googleBaseUrl: GOOGLE,
-      osmUrl: OSM,
-    });
-    expect([report.failed, report.stoppedBy]).toEqual([[], undefined]);
-    expect(report.ran[0]).toBe('Google Map Tiles API 2D (roadmap, terrain)');
-    expect(report.skipped.map((s) => s.endpoint)).toEqual(
-      expect.arrayContaining(['Google Map Tiles API 2D satellite', 'Google Map Tiles API Street View']),
-    );
-    expect(requested.some((url) => /streetview|satellite/i.test(url))).toBe(false);
+    const report = await runLiveSuite({ fetch: osmServer(429), osmUrl: OSM });
+    expect(report.stoppedBy).toMatch(/quota error from osm\.fixture\.test \(HTTP 429\): the live run stops here/);
+    expect(report.requests).toEqual({ 'osm.fixture.test': 1 });
   });
 });

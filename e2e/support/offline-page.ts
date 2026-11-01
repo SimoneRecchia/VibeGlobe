@@ -24,7 +24,6 @@ import { createDebugOverlay, type DebugOverlay } from '@vibeglobe/ui';
 import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
 import {
-  googleImagery,
   heightmapTerrain,
   openStreetMapHostedImagery,
   openStreetMapImagery,
@@ -55,10 +54,10 @@ interface HarnessSource {
   };
   readonly cachePolicy?: SourceCachePolicy;
   /**
-   * A provider adapter instead of the plain XYZ one: Google 2D tiles (the test routes tile.googleapis.com to its
-   * fixture), the OpenStreetMap public servers or self-hosted OpenStreetMap tiles (both at `url` or the fixture tiles).
+   * A provider adapter instead of the plain XYZ one: the OpenStreetMap public servers or self-hosted OpenStreetMap
+   * tiles (both at `url` or the fixture tiles).
    */
-  readonly provider?: 'google' | 'osm-public' | 'osm-hosted';
+  readonly provider?: 'osm-public' | 'osm-hosted';
   /** A profile the source declares (F326), or the commercial provider's profile of `osm-hosted` (F325). */
   readonly profile?: {
     readonly id: string;
@@ -181,14 +180,6 @@ function profileOf(s: HarnessSource): ProviderProfile | undefined {
 async function adapterOf(s: HarnessSource): Promise<ImagerySource> {
   const levels = { minLevel: s.minLevel ?? 0, maxLevel: s.maxLevel ?? 18 };
   const profile = profileOf(s);
-  if (s.provider === 'google')
-    return googleImagery({
-      id: s.id,
-      apiKey: 'fixture-key',
-      billingRegion: 'eea',
-      mapType: 'roadmap',
-      maxLevel: levels.maxLevel,
-    });
   if (s.provider === 'osm-public')
     return openStreetMapImagery({ id: s.id, appName: 'VibeGlobe tests', appUrl: location.origin, url: urlOf(s) });
   if (s.provider === 'osm-hosted')

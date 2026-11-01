@@ -1,13 +1,11 @@
-// The Google and OpenStreetMap provider profiles on the globe: a Google session that expires is renewed without a blank
-// pixel (F257); the OpenStreetMap public servers see at most two requests at once during fast navigation, a Referer
-// identifying the application on every request, and the page logs exactly one warning (F265–F267); their credit is
-// linked and their cache headers honored (F264); the Google logo and credits stay visible and uncovered (F259).
+// Provider profiles on the globe: the OpenStreetMap public servers see at most two requests at once during fast
+// navigation, a Referer identifying the application on every request, and the page logs exactly one warning
+// (F265–F267); their credit is linked and their cache headers honored (F264); a provider's required logo and credit,
+// declared by the application's own profile, stay visible and uncovered (F255, F676).
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { expect, test, type Page, type Route } from '@playwright/test';
-import { GOOGLE_FIXTURE_KEY, googleFixture } from '../packages/sources/src/__fixtures__/google-server.ts';
+import { expect, test, type Page } from '@playwright/test';
 import {
-  expectCenterTileColor,
   expectNoEmptyPixels,
   mountSource,
   openSources,
@@ -22,19 +20,6 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, POST',
 };
 
-/** Answers a routed request from a fixture `fetch`, adding CORS headers. */
-async function fulfillFrom(route: Route, fixture: typeof fetch): Promise<void> {
-  const request = route.request();
-  if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-  const body = request.postData();
-  const response = await fixture(request.url(), { method: request.method(), ...(body === null ? {} : { body }) });
-  return route.fulfill({
-    status: response.status,
-    headers: { ...Object.fromEntries(response.headers), ...CORS },
-    body: Buffer.from(await response.arrayBuffer()),
-  });
-}
-
 async function jump(page: Page, view: { longitudeDeg: number; latitudeDeg: number; zoom: number }): Promise<void> {
   await page.evaluate((v) => window.vibeglobeSources?.globe?.jumpTo(v), view);
 }
@@ -42,31 +27,6 @@ async function jump(page: Page, view: { longitudeDeg: number; latitudeDeg: numbe
 test.describe('provider profiles on the globe', () => {
   // Several settled views on the container's software GPU.
   test.setTimeout(240_000);
-
-  test('an expired Google session is renewed transparently with zero empty pixels (F257)', async ({ page }) => {
-    const server = googleFixture(tilePng);
-    await page.route('https://tile.googleapis.com/**', (route) => fulfillFrom(route, server.fetch));
-    await openSources(page, 'lon=12.5&lat=41.9&zoom=3.4');
-    await mountSource(
-      page,
-      `(s, key) => s.googleImagery({ id: 'google', apiKey: key, billingRegion: 'eea', mapType: 'roadmap' })`,
-      GOOGLE_FIXTURE_KEY,
-    );
-    const first = await settledSourceFrame(page, 18);
-    await expectCenterTileColor(page, first);
-    server.expireSessions();
-    await jump(page, { longitudeDeg: -74, latitudeDeg: 40.7, zoom: 4.2 });
-    // While the session is renewed, the parents and the base keep every pixel covered.
-    for (let i = 0; i < 3; i++) await expectNoEmptyPixels(page, await sourceFrame(page));
-    const renewed = await settledSourceFrame(page, 18);
-    await expectCenterTileColor(page, renewed);
-    await expectNoEmptyPixels(page, renewed);
-    const sessions = server.requests.filter((r) => r.url.includes('/v1/createSession'));
-    expect(sessions.length).toBe(2);
-    expect(
-      server.requests.filter((r) => r.url.includes('/2dtiles/')).every((r) => /session=session-\d+&key=/.test(r.url)),
-    ).toBe(true);
-  });
 
   test('the OpenStreetMap public servers: two requests at most, the Referer on each, one warning (F265–F267)', async ({
     page,
@@ -117,12 +77,12 @@ test.describe('provider profiles on the globe', () => {
   });
 });
 
-/** A 1 × 1 PNG standing in for the application's copy of the Google logo. */
+/** A 1 × 1 PNG standing in for the application's copy of a provider's logo. */
 const LOGO =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==';
 
 /** Each credit item and its logo: fully inside the viewport, visible, and the topmost element at its corners. */
-async function googleCredits(page: Page) {
+async function credits(page: Page) {
   return page.evaluate(() => {
     const unobstructed = (element: Element): boolean => {
       const box = element.getBoundingClientRect();
@@ -169,20 +129,37 @@ async function addEveryControl(page: Page): Promise<void> {
   }, `/@fs${process.cwd()}/packages/ui/src/index.ts`);
 }
 
-test.describe('the Google logo and credits (F259)', () => {
+test.describe("a provider's required logo and credit (F255, F676)", () => {
   test.setTimeout(240_000);
   const sizes = [
     { name: 'desktop', width: 1280, height: 800 },
     { name: 'tablet', width: 1024, height: 768 },
     { name: 'phone', width: 390, height: 844 },
   ];
-  const mountGoogle = async (page: Page, hiddenCredits?: readonly string[]) => {
-    const server = googleFixture(tilePng);
-    await page.route('https://tile.googleapis.com/**', (route) => fulfillFrom(route, server.fetch));
+  // The application's own provider: its tiles from a stand-in host, its logo and credit required by its profile.
+  const mountProvider = async (page: Page, hiddenCredits?: readonly string[]) => {
+    await page.route('https://tiles.provider.test/**', (route) => {
+      const [z = 0, x = 0, y = 0] =
+        /\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(route.request().url())?.slice(1).map(Number) ?? [];
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        headers: CORS,
+        body: Buffer.from(tilePng(z, x, y)),
+      });
+    });
     await openSources(page, 'lon=12.5&lat=41.9&zoom=4');
     await mountSource(
       page,
-      `(s, logo) => s.googleImagery({ id: 'google', apiKey: '${GOOGLE_FIXTURE_KEY}', billingRegion: 'eea', mapType: 'roadmap', logoUrl: logo })`,
+      `(s, logo) => {
+        const credit = { text: 'Provider', logo: { src: logo, alt: 'Provider' } };
+        return s.xyzImagery({
+          id: 'provider',
+          url: 'https://tiles.provider.test/{z}/{x}/{y}.png',
+          attribution: [credit],
+          profile: { id: 'provider', requiredAttribution: credit, displayOnly: true },
+        });
+      }`,
       LOGO,
       hiddenCredits ? { hiddenCredits } : {},
     );
@@ -199,19 +176,17 @@ test.describe('the Google logo and credits (F259)', () => {
         page,
       }) => {
         await page.setViewportSize({ width, height });
-        await mountGoogle(page);
-        await expect
-          .poll(() => googleCredits(page))
-          .toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
-        for (const credit of await googleCredits(page)) expect(credit, credit.text).toMatchObject({ shown: true });
+        await mountProvider(page);
+        await expect.poll(() => credits(page)).toContainEqual({ text: 'Provider', shown: true, logo: 'shown' });
+        for (const credit of await credits(page)) expect(credit, credit.text).toMatchObject({ shown: true });
       });
     }
 
   test('stay visible when configuration or the page CSS tries to hide or cover them', async ({ page }) => {
     // The regression test of TB-02 (docs/known-bugs.md): the logo inside the credits element stays pinned.
     await page.setViewportSize({ width: 800, height: 600 });
-    await mountGoogle(page, ['google']);
-    await expect.poll(() => googleCredits(page)).toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
+    await mountProvider(page, ['provider']);
+    await expect.poll(() => credits(page)).toContainEqual({ text: 'Provider', shown: true, logo: 'shown' });
     await page.addStyleTag({
       content:
         '.vg-credits, .vg-credit img { display: none !important; visibility: hidden !important; opacity: 0 !important; }' +
@@ -219,8 +194,16 @@ test.describe('the Google logo and credits (F259)', () => {
     });
     await page.evaluate(() => window.vibeglobeSources?.globe?.requestRender());
     await expect
-      .poll(() => googleCredits(page), { message: 'after the page CSS' })
-      .toContainEqual({ text: 'Google Maps', shown: true, logo: 'shown' });
+      .poll(() => credits(page), { message: 'after the page CSS' })
+      .toContainEqual({ text: 'Provider', shown: true, logo: 'shown' });
+    // The profile declares display-only use: reading the drawn pixels back is refused.
+    const refusal = await page.evaluate(() =>
+      window.vibeglobeSources?.globe?.captureView({ widthPx: 64, heightPx: 64 }).then(
+        () => 'captured',
+        (error: unknown) => (error as { code?: string }).code,
+      ),
+    );
+    expect(refusal).toBe('display-only');
   });
 });
 
@@ -280,58 +263,4 @@ test('the OpenStreetMap public profile: the linked credit while its tiles show, 
   } finally {
     server.close();
   }
-});
-
-test('the Google copyrights of each settled view are requested once and shown, following the view (F258)', async ({
-  page,
-}) => {
-  test.setTimeout(240_000);
-  const server = googleFixture(tilePng);
-  await page.route('https://tile.googleapis.com/**', (route) => fulfillFrom(route, server.fetch));
-  await openSources(page, 'lon=12.5&lat=41.9&zoom=4');
-  await mountSource(
-    page,
-    `async (s, key) => {
-      const source = await s.googleImagery({ id: 'google', apiKey: key, billingRegion: 'eea', mapType: 'roadmap' });
-      window.googleSource = source;
-      return source;
-    }`,
-    GOOGLE_FIXTURE_KEY,
-  );
-  await page.evaluate(() => {
-    const handle = window.vibeglobeSources;
-    const source = (
-      window as unknown as {
-        googleSource: Parameters<NonNullable<typeof handle>['sources']['followGoogleCopyrights']>[1];
-      }
-    ).googleSource;
-    const globe = handle?.globe;
-    if (!handle || !globe) throw new Error('no globe');
-    const counters = { idle: 0 };
-    (window as unknown as { counters: typeof counters }).counters = counters;
-    globe.on('idle', () => counters.idle++);
-    handle.sources.followGoogleCopyrights(globe, source);
-  });
-  const shown = () =>
-    page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>('.vg-credits .vg-credit')].map((e) => e.textContent?.trim()),
-    );
-  const viewportRequests = () => server.requests.filter((r) => r.url.includes('/tile/v1/viewport')).length;
-  const frames = () => page.evaluate(() => window.vibeglobeSources?.globe?.frameNumber ?? 0);
-  const firstFrame = await frames();
-  // East of 0° the fixture's data come from the eastern provider, west of it from the western one.
-  for (const [view, provider] of [
-    [{ longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 }, 'Map data ©2026 Eastern Provider'],
-    [{ longitudeDeg: -74, latitudeDeg: 40.7, zoom: 6 }, 'Map data ©2026 Western Provider'],
-    [{ longitudeDeg: 13.4, latitudeDeg: 52.5, zoom: 7 }, 'Map data ©2026 Eastern Provider'],
-  ] as const) {
-    await jump(page, view);
-    await expectNoEmptyPixels(page, await settledSourceFrame(page, 18));
-    await expect.poll(shown).toEqual(['Google Maps', provider]);
-  }
-  const idle = await page.evaluate(() => (window as unknown as { counters: { idle: number } }).counters.idle);
-  // One request per settled view (and the first view), never one per drawn frame.
-  expect(viewportRequests()).toBeLessThanOrEqual(idle + 1);
-  expect(viewportRequests()).toBeGreaterThanOrEqual(3);
-  expect((await frames()) - firstFrame).toBeGreaterThan(viewportRequests() * 3);
 });

@@ -7,7 +7,6 @@
  */
 import { deflateSync } from 'node:zlib';
 import { encodePng } from '../encode/png.js';
-import { s2FileExtentDeg } from '../sources/files.js';
 import { tileXToLon, tileYToLat } from '../tiles/mercator.js';
 import { ProtoWriter } from '../vector/protobuf.js';
 
@@ -94,12 +93,6 @@ function syntheticGeoTiff(west: number, north: number, step: number, width: numb
 /** A synthetic whole-world raster (EPSG:4326, 2:1), the fixture of the global fallback. */
 export function syntheticWorld(width: number): Uint8Array {
   return syntheticGeoTiff(-180, 90, 360 / width, width, width / 2);
-}
-
-/** The synthetic Sentinel-2 cloudless original file `tiles/{level}/{col}/{row}.tif` (512 px metatiles). */
-export function syntheticS2File(level: number, col: number, row: number): Uint8Array {
-  const extent = s2FileExtentDeg(level);
-  return syntheticGeoTiff(col * extent - 180, 90 - row * extent, extent / 512, 512, 512);
 }
 
 /** A synthetic XYZ tile (PNG) for the package builder's fixture source. */

@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-01: no Google adapter, no Sentinel-2 cloudless; any provider from the application (F676, ADR 0185)
+
+After an audit of the connected maps (every default source allows commercial use), the owner removed what no default
+uses: the Google adapters (2D tiles, Street View, Photorealistic 3D Tiles, their fixtures, scenario, specs and live
+steps) and the pipeline's Sentinel-2 cloudless reader, whose only accepted edition EOX now reserves to its commercial
+licence. Applications connect any provider from their own code: a transport adds keys and sessions, a profile declares
+the required credit and logo, `displayOnly` and the forbidden loading features (sources guide, "Commercial providers,
+from your own code"). Fifteen entries superseded by F676 (`docs/feature-changes.md`).
+
 ## 2026-11-01: Slovenia joins the orthophotos (F675)
 
 GURS DOF025 (CC BY 4.0) is asked from its WMS layer `SI.GURS.ZPDZ:DOF025_3857`, confirmed in a public application

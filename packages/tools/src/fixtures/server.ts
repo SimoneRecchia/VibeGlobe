@@ -9,7 +9,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { syntheticOsmExtract } from './osm-sample.js';
-import { syntheticS2File, syntheticWorld, syntheticXyzTile } from './synthetic.js';
+import { syntheticWorld, syntheticXyzTile } from './synthetic.js';
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -81,8 +81,6 @@ export function startFixtureServer(
       response.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'range' }).end();
       return;
     }
-    const s2 = /^\/s2\/tiles\/(\d+)\/(\d+)\/(\d+)\.tif$/.exec(path);
-    if (s2) return send(request, response, syntheticS2File(Number(s2[1]), Number(s2[2]), Number(s2[3])), 'image/tiff');
     const xyz = /^\/xyz\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(path);
     if (xyz)
       return send(request, response, syntheticXyzTile(Number(xyz[1]), Number(xyz[2]), Number(xyz[3])), 'image/png');

@@ -1,8 +1,8 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * What the 3D Tiles loader reads from a glTF besides its meshes (F466, F470; ADR 0141): the copyright of its asset
- * (the provider credits of Google Photorealistic 3D Tiles) and its `EXT_structural_metadata` property tables with
+ * What the 3D Tiles loader reads from a glTF besides its meshes (F466; ADR 0141): the copyright of its asset (the
+ * provider credits some tilesets carry per tile) and its `EXT_structural_metadata` property tables with
  * the buffer views they read, for feature picking. The glTF JSON is untrusted: anything malformed is ignored.
  */
 import type { MetadataSchema, PropertyTable } from './metadata.js';

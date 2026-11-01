@@ -62,7 +62,7 @@ export async function fetchRange(
  * The body of `response`, raising {@link NetworkError} when the connection drops while it is read, so the transport
  * reports a retryable network error instead of a tile without data.
  */
-export async function readBody(response: Response, signal: AbortSignal | null | undefined): Promise<ArrayBuffer> {
+async function readBody(response: Response, signal: AbortSignal | null | undefined): Promise<ArrayBuffer> {
   try {
     return await response.arrayBuffer();
   } catch (error) {

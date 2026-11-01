@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StepLog, sha256 } from '../pipeline/step-log.js';
 import { type DownloadContext, downloadFile } from './download.js';
-import { type SourceFile, copernicusDemName, s2FileExtentDeg } from './files.js';
+import { type SourceFile, copernicusDemName } from './files.js';
 import { signS3Get } from './sigv4.js';
 
 const folders: string[] = [];
@@ -38,10 +38,9 @@ function server(requests: (string | null)[]): typeof fetch {
 }
 
 describe('sources', () => {
-  it('names Copernicus DEM tiles and Sentinel-2 cloudless metatiles', () => {
+  it('names Copernicus DEM tiles', () => {
     expect(copernicusDemName(45, 6)).toBe('Copernicus_DSM_COG_10_N45_00_E006_00_DEM');
     expect(copernicusDemName(-1, -71, 3)).toBe('Copernicus_DSM_COG_30_S01_00_W071_00_DEM');
-    expect(s2FileExtentDeg(13)).toBeCloseTo(180 / 4096, 12);
   });
 
   it('resumes a partial download with a range request and skips a verified file', async () => {

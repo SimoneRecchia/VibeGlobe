@@ -80,7 +80,7 @@ if (traffic.persistentCache || traffic.prefetch || !traffic.offlinePackaging) th
 offline.destroy();
 ```
 
-A source adapter's `profile` (for example the Google profile, which forbids persistent caching and packaging) is
+A source adapter's `profile` (for example a paid provider's, which forbids persistent caching and packaging) is
 read from the source; you can also pass rules yourself with `offline.source(source, { rules })`.
 
 ## Offline setup 1: a server on the local network

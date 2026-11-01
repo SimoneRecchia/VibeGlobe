@@ -19,7 +19,6 @@ export interface LicenseViolation {
 function sourceUrls(source: SourceConfig): string[] {
   switch (source.type) {
     case 'copernicus-dem':
-    case 's2cloudless':
       return [source.baseUrl];
     case 'worldcover-s2':
       return source.gapFill ? [source.baseUrl, source.gapFill.mapBaseUrl] : [source.baseUrl];
@@ -39,7 +38,7 @@ function hostOf(url: string): string {
   }
 }
 
-/** The profile a source effectively falls under: forbidden hosts and editions override the configured profile. */
+/** The profile a source effectively falls under: forbidden hosts and layers override the configured profile. */
 function effectiveProfile(profileId: string, source: SourceConfig): ProviderProfile | undefined {
   for (const url of sourceUrls(source)) {
     const host = hostOf(url);
@@ -48,7 +47,6 @@ function effectiveProfile(profileId: string, source: SourceConfig): ProviderProf
     const layer = FORBIDDEN_URLS.find((entry) => entry.pattern.test(url));
     if (layer) return findProfile(layer.profile);
   }
-  if (source.type === 's2cloudless' && source.edition !== 2016) return findProfile('s2cloudless-2018-or-later');
   return findProfile(profileId);
 }
 

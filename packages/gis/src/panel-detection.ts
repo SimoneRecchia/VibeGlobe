@@ -25,6 +25,8 @@ const MIN_ROW_M = 1;
 const MIN_TABLE_M = 1.5;
 /** Single tables are told from continuous rows by length: between these, meters. */
 const TABLE_LENGTH_M: readonly [number, number] = [2, 30];
+/** Rows deeper than this across are no tables but a wood, a roof or water darker than the ground, meters. */
+const MAX_TABLE_DEPTH_M = 10;
 /** Below or above these shares of the area, panels cannot be told from the ground. */
 const MIN_PANEL_SHARE = 0.03;
 const MAX_PANEL_SHARE = 0.97;
@@ -126,6 +128,7 @@ export function detectPanels(options: PanelDetectionOptions): DetectedPanels | u
   const middles = rows.map(([v0, v1]) => (v0 + v1) / 2);
   const pitches = middles.slice(1).map((v, k) => v - (middles[k] ?? v));
   const depthM = median(depths) ?? 0;
+  if (depthM > MAX_TABLE_DEPTH_M) return undefined;
   return {
     rowBearingDeg: ((bearing % 180) + 180) % 180,
     widthM,

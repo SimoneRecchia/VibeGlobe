@@ -202,6 +202,7 @@ class Runtime implements VectorTileLayer {
       () => context.requestRender(),
       target,
       this.options.localFontFamily,
+      this.options.fontFamily,
     );
     void glyphs.loadSprite(this.style.sprite, globalThis.devicePixelRatio ?? 1);
     this.glyphs = glyphs;

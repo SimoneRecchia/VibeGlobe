@@ -28,6 +28,11 @@ export interface VectorTilesOptions {
   readonly transformUrl?: (url: string) => string;
   /** A CSS font family drawn locally for characters the style's glyphs lack (CJK, F448). */
   readonly localFontFamily?: string;
+  /**
+   * A CSS font family every label draws in, locally, with the weight and style its font stack names ("… Bold Italic"):
+   * the application's own font, offline too, and the style's glyphs are never fetched (F689).
+   */
+  readonly fontFamily?: string;
 }
 
 /** A vector tile layer on a globe. */

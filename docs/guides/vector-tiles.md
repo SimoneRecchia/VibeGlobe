@@ -92,7 +92,9 @@ shows names as `name:it`, else `name_it`, else `name`, in every symbol layer who
   grow from the ground as their layer fades in, and on the flat map scale their height by the Mercator scale factor.
 - Labels: point labels and labels along lines, with collision in style priority, fades, and no duplicates across tile
   edges. Glyph ranges are requested only for the characters in use. Characters the style's glyphs lack are drawn
-  locally in `localFontFamily` when given, else left out.
+  locally in `localFontFamily` when given, else left out. With `fontFamily` every label draws locally in that CSS
+  font family, the application's own, with the weight and style its font stack names (`Noto Sans Bold Italic` is
+  italic 700): no glyph is fetched, offline included.
 - Hillshade and color-relief images are made on the main thread's CPU, once per DEM tile and paint. As finer terrain
   arrives, their meshes take the new ground in place.
 
@@ -155,6 +157,7 @@ if (italy) marker.style.transform = `translate(${italy.screenPoint.xPx}px, ${ita
 | `transport`       | `TileTransport`                  | `fetchTransport()` | Tile requests                                                  |
 | `fetch`           | `typeof fetch`                   | the global `fetch` | Style, TileJSON, glyph and sprite documents                    |
 | `localFontFamily` | `string`                         | none               | CSS font family for characters the glyphs lack                 |
+| `fontFamily`      | `string`                         | none               | CSS font family every label draws in, no glyphs fetched        |
 
 ## Rules and pitfalls
 

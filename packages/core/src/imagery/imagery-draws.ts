@@ -372,12 +372,16 @@ const hazed = (tile: QuadtreeTile): boolean => (tile.fogVisibility ?? 1) < PREFE
  */
 const COVER_LEVELS = 4;
 
+/** Room in the cover class for a tile's levels below its wanted one: more than any pyramid is deep. */
+const COVER_SPAN = 32;
+
 /**
  * Wants a layer's tiles for a surface tile and returns the handle of the deepest resident one, its mapping left in
  * `mapping`; -1 when none is resident or the layer cannot cover the tile. Levels below `floor` (served by an earlier
  * source of the chain) are neither requested nor looked up. While nothing finer is resident, the ancestor
  * {@link COVER_LEVELS} up (or the coarsest level), and the coarser ones requested, are requested before every visible
- * tile, coarse first (KB-305).
+ * tile, coarse first (KB-305). In both classes a request ranks by its levels below the tile's wanted one, not by its
+ * own level: where half a view wants deeper levels than the other half, both halves sharpen together (KB-330).
  */
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
@@ -400,7 +404,9 @@ function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, fl
             current,
             x,
             y,
-            (current > cover ? VISIBLE_CLASS : COVER_CLASS) + current + 2 * distance,
+            (current > cover ? VISIBLE_CLASS + COVER_LEVELS : COVER_CLASS + COVER_SPAN) -
+              (wanted - current) +
+              2 * distance,
             !hazed(tile),
           )
         : layer.loader.readyHandle(current, x, y);

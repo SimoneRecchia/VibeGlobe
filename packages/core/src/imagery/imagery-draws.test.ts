@@ -115,6 +115,26 @@ describe('drawImagery', () => {
     expect(requests({ 7: 42 }).map(([level]) => level)).toEqual([9, 7]);
   });
 
+  it('ranks a tile by its levels still to come, so tiles wanting different levels sharpen together (KB-330)', () => {
+    const keys = (surface: QuadtreeTile): Map<number, number> => {
+      const found = new Map<number, number>();
+      const { layer } = fakeLayer({});
+      const want = (level: number, _x: number, _y: number, key: number): number => {
+        if (key < PRELOAD_CLASS) found.set(level, key);
+        return -1;
+      };
+      draw({ ...layer, loader: { ...layer.loader, want } as unknown as ImageryLoader }, surface);
+      return found;
+    };
+    // Half a view on level 9 tiles, half on their level 10 children: the wanted tiles at one rank, and their covers
+    // four levels up at one rank too, each tile's ancestors first.
+    const coarse = keys(tile(9, 300, 170));
+    const fine = keys(tile(10, 600, 340));
+    expect(Math.abs((fine.get(10) ?? 0) - (coarse.get(9) ?? 0))).toBeLessThan(0.5);
+    expect(Math.abs((fine.get(6) ?? 0) - (coarse.get(5) ?? 0))).toBeLessThan(0.5);
+    expect(fine.get(8)).toBeLessThan(coarse.get(9) ?? 0);
+  });
+
   it("preloads a plan's tiles from every layer its deepest view draws, the destination's ancestors first (F671, KB-308)", () => {
     const keys: [number, number][] = [];
     const recording = (): ImageryLayer => {

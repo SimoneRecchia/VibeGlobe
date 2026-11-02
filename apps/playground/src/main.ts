@@ -37,6 +37,9 @@ const reprojected = params.has('utm') ? await import('./reprojected-layers.js') 
 const europe = params.get('preset') === 'europe' ? await import('./europe-preset.js') : undefined;
 const montBlanc = SHOWCASE || params.get('scenario') === 'mont-blanc' ? await import('./mont-blanc.js') : undefined;
 const custom = params.get('custom') === 'quadkey' ? await import('./custom-adapters.js') : undefined;
+// The showcase tour's online terrain (`?showcase=1&terrain=mapterhorn`, its Real terrain scene, after consent).
+const tourTerrain =
+  SHOWCASE && params.get('terrain') === 'mapterhorn' ? await import('./tour/online-terrain.js') : undefined;
 
 /**
  * Terrain scenarios (M4): URL parameters each one sets unless the URL gives them, over the fixture server's analytic
@@ -285,9 +288,27 @@ function fixtureLayers(): Pick<GlobeOptions, 'imagery' | 'terrain' | 'workers' |
   // them too, or a production build has nothing to decode with (F463).
   const tiles3dWorkers = params.get('scenario')?.startsWith('3dtiles-') ? { workers: createWorkers() } : {};
   const wrapped = offlineDemo && imagery.imagery ? { imagery: imagery.imagery.map(offlineDemo.wrap) } : {};
+  // The showcase's scenes add imagery layers at runtime, which needs a globe started with workers and an imagery layer:
+  // the base image's tiles from the fixture server, credited, so the credits follow every scene's layers (a removed
+  // layer's credits stay shown while no credited source is drawn).
+  const showcaseStart = SHOWCASE
+    ? {
+        workers: createWorkers(),
+        imagery: [
+          xyzImagery({
+            id: 'showcase-start',
+            url: `${import.meta.env.BASE_URL}fixture-tiles/showcase/earth/mercator/{z}/{x}/{y}.png`,
+            maxLevel: 6,
+            attribution: [{ text: 'Made with Natural Earth', url: 'https://www.naturalearthdata.com/' }],
+          }),
+        ],
+      }
+    : {};
   return {
+    ...showcaseStart,
     ...tiles3dWorkers,
     ...terrain,
+    ...tourTerrain?.onlineTerrain,
     ...imagery,
     ...wrapped,
     ...custom?.customAdapters(params),
@@ -330,6 +351,8 @@ function startGlobe(
     ...(params.has('fadeMs') ? { imageryFadeMs: Number(params.get('fadeMs')) } : {}),
     // `?adaptive=0` keeps every host at its own request limit, whatever the link (F303).
     ...(params.get('adaptive') === '0' ? { adaptiveRequests: false } : {}),
+    // The showcase's attribution control shows the credits in place of the engine's own element.
+    ...(SHOWCASE && PAGE_UI ? { creditsElement: false } : {}),
     // `?hiddenCredits=<source id>,…` leaves those sources' optional credits out (F255).
     ...(params.has('hiddenCredits') ? { hiddenCredits: (params.get('hiddenCredits') ?? '').split(',') } : {}),
     // `?logSink=1` collects the engine's log messages for the test hooks instead of the console (F120).

@@ -36,7 +36,7 @@ function outline(globe: Globe, tile: SurfaceTileInfo): string {
 }
 
 /** Shows the tile view over `host` while `enabled`; returns a function that turns it on or off. */
-function createTileView(globe: Globe, host: HTMLElement, sourceId: string | undefined): (on: boolean) => void {
+export function createTileView(globe: Globe, host: HTMLElement, sourceId: string | undefined): (on: boolean) => void {
   let layer: HTMLDivElement | undefined;
   let timer: number | undefined;
   const draw = (): void => {

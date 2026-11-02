@@ -20,10 +20,8 @@ const WEST_DEG = 9.0;
 const SOUTH_DEG = 45.2;
 const SPACING_METERS = 500;
 
-/** Adds the wind farm to the globe and announces it once its model has loaded. */
-export async function showWindFarm(globe: Globe, params: URLSearchParams): Promise<void> {
-  const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
-  const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
+/** The farm's 2,000 turbines as one model set; `visibleBelowMeters` as the layer's default when undefined. */
+export function windFarmLayer(base: string, visibleBelowMeters?: number): ModelSetLayer {
   const models = [];
   const dLat = SPACING_METERS / 111_320;
   const dLon = SPACING_METERS / (111_320 * Math.cos(SOUTH_DEG * (Math.PI / 180)));
@@ -36,16 +34,21 @@ export async function showWindFarm(globe: Globe, params: URLSearchParams): Promi
         headingDeg: 270 + ((row * 7 + column * 3) % 20) - 10,
         properties: { row, column },
       });
+  return new ModelSetLayer({
+    id: 'wind-farm',
+    url: `${base}models/turbine.gltf`,
+    models,
+    ...(visibleBelowMeters === undefined ? {} : { visibleBelowMeters }),
+    placeholder: { color: [0.2, 0.45, 0.9], sizePx: 8 },
+  });
+}
+
+/** Adds the wind farm to the globe and announces it once its model has loaded. */
+export async function showWindFarm(globe: Globe, params: URLSearchParams): Promise<void> {
+  const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
+  const { stack, interaction } = createGlobeLayers(globe, element ? { element } : {});
   const below = params.get('visibleBelow');
-  const farm = stack.add(
-    new ModelSetLayer({
-      id: 'wind-farm',
-      url: `${import.meta.env.BASE_URL}models/turbine.gltf`,
-      models,
-      ...(below === null ? {} : { visibleBelowMeters: Number(below) }),
-      placeholder: { color: [0.2, 0.45, 0.9], sizePx: 8 },
-    }),
-  );
+  const farm = stack.add(windFarmLayer(import.meta.env.BASE_URL, below === null ? undefined : Number(below)));
   await farm.ready;
   window.vibeglobeWindFarm = { stack, interaction, farm };
 }

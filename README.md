@@ -8,7 +8,7 @@ packages under `@vibeglobe/*`. Framework-agnostic, with Vue 3 and Web Component 
 **For AI agents:** [llms.txt](llms.txt) is the index of the guides by task. Installed, the index and the guides
 matching the version are in `node_modules/@vibeglobe/core/` (`llms.txt`, `docs/guides/`).
 
-![The playground's showcase: the globe over the space background with every control and the settings panel open](docs/images/playground-showcase.png)
+![The playground's showcase: the tour's chapters and the panel of its first scene beside the globe, with the demo data and every control](docs/images/playground-showcase.png)
 
 ## The smallest globe
 

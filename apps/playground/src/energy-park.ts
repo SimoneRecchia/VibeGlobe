@@ -35,33 +35,38 @@ function at(east: number, north: number): { longitudeDeg: number; latitudeDeg: n
   return { longitudeDeg: WEST_DEG + east / M_PER_DEG_LON, latitudeDeg: SOUTH_DEG + north / M_PER_DEG_LAT };
 }
 
-/** Adds the turbines and the solar park, then the sliders of the wind. */
-export async function showEnergyPark(globe: Globe, app: HTMLElement, params: URLSearchParams): Promise<void> {
-  const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
-  const { stack } = createGlobeLayers(globe, element ? { element } : {});
-  const rpm = Math.min(20, Math.max(0, Number(params.get('rpm') ?? 15)));
-  const wind = Number(params.get('wind') ?? 270);
-  const base = import.meta.env.BASE_URL;
+/** How the park starts: rotor speed, wind direction and the nacelles' and rotors' rates of change. */
+interface ParkSettings {
+  readonly rpm: number;
+  readonly wind: number;
+  readonly yawSpeed?: number;
+  readonly ramp?: number;
+}
+
+/** The park's two model sets: ten turbines and 720 solar tables. */
+export function energyParkLayers(
+  base: string,
+  settings: ParkSettings,
+): { turbines: ModelSetLayer; solar: ModelSetLayer } {
+  const { rpm, wind } = settings;
   // Two staggered rows of five, 320 m apart (4 rotor diameters) and 560 m between rows, every tower door facing south,
   // the rotors facing the wind, each turning a little faster or slower than the others, as a farm's machines do.
-  const turbines = stack.add(
-    new ModelSetLayer({
-      id: 'turbines',
-      url: `${base}models/wind-turbine.glb`,
-      models: Array.from({ length: 10 }, (_, i) => ({
-        id: `turbine-${String(i + 1)}`,
-        position: at(200 + (i % 5) * 320 + (i >= 5 ? 160 : 0), 700 + (i >= 5 ? 560 : 0)),
-        headingDeg: 180,
-        yawDeg: wind - 4 + ((i * 7) % 9),
-        spinRpm: rpm * (0.94 + ((i * 3) % 5) * 0.03),
-        properties: { name: `Turbine ${String(i + 1)}` },
-      })),
-      visibleBelowMeters: 30_000,
-      placeholder: { sizePx: 0 },
-      yaw: { node: 'nacelle', ...(params.has('yawSpeed') ? { degPerSecond: Number(params.get('yawSpeed')) } : {}) },
-      spin: { node: 'rotor', rpm, ...(params.has('ramp') ? { rampSeconds: Number(params.get('ramp')) } : {}) },
-    }),
-  );
+  const turbines = new ModelSetLayer({
+    id: 'turbines',
+    url: `${base}models/wind-turbine.glb`,
+    models: Array.from({ length: 10 }, (_, i) => ({
+      id: `turbine-${String(i + 1)}`,
+      position: at(200 + (i % 5) * 320 + (i >= 5 ? 160 : 0), 700 + (i >= 5 ? 560 : 0)),
+      headingDeg: 180,
+      yawDeg: wind - 4 + ((i * 7) % 9),
+      spinRpm: rpm * (0.94 + ((i * 3) % 5) * 0.03),
+      properties: { name: `Turbine ${String(i + 1)}` },
+    })),
+    visibleBelowMeters: 30_000,
+    placeholder: { sizePx: 0 },
+    yaw: { node: 'nacelle', ...(settings.yawSpeed === undefined ? {} : { degPerSecond: settings.yawSpeed }) },
+    spin: { node: 'rotor', rpm, ...(settings.ramp === undefined ? {} : { rampSeconds: settings.ramp }) },
+  });
   // In front of the turbines, 24 rows of 30 tables 14 m apart along a row, 10 m between rows, all facing south.
   const tables = [];
   for (let row = 0; row < 24; row++)
@@ -71,15 +76,30 @@ export async function showEnergyPark(globe: Globe, app: HTMLElement, params: URL
         position: at(600 + column * 14, row * 10),
         headingDeg: 180,
       });
-  const solar = stack.add(
-    new ModelSetLayer({
-      id: 'solar',
-      url: `${base}models/solar-table.glb`,
-      models: tables,
-      visibleBelowMeters: 2500,
-      placeholder: { color: [0.12, 0.17, 0.3], sizePx: 4 },
-    }),
-  );
+  const solar = new ModelSetLayer({
+    id: 'solar',
+    url: `${base}models/solar-table.glb`,
+    models: tables,
+    visibleBelowMeters: 2500,
+    placeholder: { color: [0.12, 0.17, 0.3], sizePx: 4 },
+  });
+  return { turbines, solar };
+}
+
+/** Adds the turbines and the solar park, then the sliders of the wind. */
+export async function showEnergyPark(globe: Globe, app: HTMLElement, params: URLSearchParams): Promise<void> {
+  const element = document.querySelector<HTMLElement>('#globe') ?? undefined;
+  const { stack } = createGlobeLayers(globe, element ? { element } : {});
+  const rpm = Math.min(20, Math.max(0, Number(params.get('rpm') ?? 15)));
+  const wind = Number(params.get('wind') ?? 270);
+  const layers = energyParkLayers(import.meta.env.BASE_URL, {
+    rpm,
+    wind,
+    ...(params.has('yawSpeed') ? { yawSpeed: Number(params.get('yawSpeed')) } : {}),
+    ...(params.has('ramp') ? { ramp: Number(params.get('ramp')) } : {}),
+  });
+  const turbines = stack.add(layers.turbines);
+  const solar = stack.add(layers.solar);
   if (!params.has('lon')) globe.jumpTo({ ...at(820, 380), zoom: 15.6, tiltDeg: 68, headingDeg: 0 });
   await Promise.all([turbines.ready, solar.ready]);
   // A turbine from the view's own tilt; the whole park from 45°, so its far row shows as well as the near one.

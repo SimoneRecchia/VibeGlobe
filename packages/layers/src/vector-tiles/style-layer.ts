@@ -159,7 +159,8 @@ export class StyleLayer {
     this.source = json.source;
     this.sourceLayer = json['source-layer'];
     this.minzoom = json.minzoom ?? 0;
-    this.maxzoom = json.maxzoom ?? 24;
+    // The specification's 24 is a web map's deepest zoom; the globe zooms further, so no maxzoom means no bound (KB-336).
+    this.maxzoom = json.maxzoom ?? Infinity;
     this.json = json;
     this.setFilter(json.filter);
     for (const group of ['paint', 'layout'] as const) {

@@ -195,7 +195,7 @@ const field = stack.add(
 );
 ```
 
-## Framing a model or a whole plant
+## Framing a model or a group of copies
 
 `framePositions(ids)` gives the corners of copies' model boxes as the frame draws them, at each copy's scale: the
 tower's foot, the rotor's tip and the reach of the blades round the tower, a nacelle turned any way included. `ids`

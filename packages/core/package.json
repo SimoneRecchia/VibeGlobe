@@ -49,7 +49,9 @@
     "!src/**/__fixtures__",
     "!src/**/__snapshots__",
     "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
-    "!dist/**/__fixtures__"
+    "!dist/**/__fixtures__",
+    "!src/globe/test-renderer.ts",
+    "!dist/globe/test-renderer.*"
   ],
   "scripts": {
     "prepack": "node ../../scripts/release/core-docs.ts",

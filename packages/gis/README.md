@@ -2,8 +2,7 @@
 
 Pure GIS functions, usable without the renderer or the UI: coordinate formatting and parsing (decimal degrees,
 degrees-minutes-seconds, UTM), reference-system transforms through proj4js, geodesic measurement on WGS84, the camera's
-view state in URLs and JSON, and the layout and detection of identical panels in rows (`layoutPanels`, `detectPanels`,
-`gridLines`). `@vibeglobe/ui` uses it for its readout, search box and measurement; an application calls it directly
+view state in URLs and JSON, and grids on the ground (`gridLines`). `@vibeglobe/ui` uses it for its readout, search box and measurement; an application calls it directly
 for its own coordinate fields, measurements, shareable links or layout editors.
 
 ## Install
@@ -12,9 +11,9 @@ Needs `@vibeglobe/core` and `proj4` (dependencies).
 
 ## Entry points
 
-| Import path      | What                                                                                                 |
-| ---------------- | ---------------------------------------------------------------------------------------------------- |
-| `@vibeglobe/gis` | Coordinates, reference systems, measurement, view state, `layoutPanels`, `detectPanels`, `gridLines` |
+| Import path      | What                                                                 |
+| ---------------- | -------------------------------------------------------------------- |
+| `@vibeglobe/gis` | Coordinates, reference systems, measurement, view state, `gridLines` |
 
 ## Example
 
@@ -35,8 +34,6 @@ if (milan) {
   geographic systems.
 - `formatCoordinate` returns undefined for UTM outside 80°S to 84°N. It and `transformCoordinates` throw a
   `RangeError` for invalid input or an unknown code.
-- `detectPanels` takes `{ data, width, height }`: map a `globe.captureView` result (`rgba`, `widthPx`, `heightPx`)
-  onto it.
 - `gridLines` needs a `spacingM` above 0 and returns at most 2000 lines.
 
 ## Guides

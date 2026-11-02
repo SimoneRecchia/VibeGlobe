@@ -17,7 +17,7 @@ export interface DecodeImageInput {
   /** The source's area over the tile, in tile units (core's `TileMask`): pixels outside it become transparent. */
   readonly mask?: { readonly points: Float64Array; readonly ringEnds: Uint32Array };
   /** A color that, filling the whole tile, means no data: the task then fails with `no-data`. */
-  readonly blank?: { readonly rgb: readonly number[]; readonly tolerance: number };
+  readonly blank?: { readonly rgb: readonly number[]; readonly tolerance: number; readonly share?: number };
 }
 
 /** Output of `decode-image`; its shape is core's `DecodedTile`, with the bitmap transferred. */

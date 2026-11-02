@@ -329,7 +329,9 @@ GeoJSON is a `Polygon`, `MultiPolygon`, `Feature` or `FeatureCollection`. A clip
 layer below shows outside the area instead of the white or black filler many national services send. Put such a
 source in its own layer above the fallback: a layer draws each tile from one source. `countryBorders('AT')` of
 `@vibeglobe/presets/countries` resolves a European country's borders as GeoJSON. `blankTile` is the fallback when the
-area is not known: a tile of that color alone counts as no data.
+area is not known: a tile of that color alone counts as no data. `blankShare` below 1 counts a tile mostly of that
+color as no data too: a filler with a caption, such as Esri's "Map data not yet available" (`#cccccc`, `0.9`). The
+engine then shows the deepest level the service has, magnified.
 
 `keySea: { land, featherMeters }` in an `area` keys the sea out of imagery: pixels of water's colors outside `land`
 (polygons in degrees, such as `WORLD_LAND` of `@vibeglobe/presets/world-land`) become transparent, so one sea, the
@@ -631,6 +633,7 @@ The options of `xyzImagery`, the adapter most layers use. The TSDoc of each adap
 | `coverage`             | `TileRectangleRad[]`          | none               | rectangles in radians; tiles outside are never requested    |
 | `area`                 | `CoverageArea \| GeoJsonArea` | none               | polygons in degrees (table above)                           |
 | `blankTile`            | `#rrggbb` or `[r, g, b]`      | none               | a tile of this color alone counts as no data                |
+| `blankShare`           | `number` in (0, 1]            | `1`                | the share of a tile's pixels of `blankTile` for no data     |
 | `transparent`          | `boolean`                     | `false`            | the tiles have transparent areas                            |
 | `headers`              | `Record<string, string>`      | none               | sent with every request by the default transport            |
 | `transport`            | `TileTransport`               | `fetchTransport()` | replaces `headers`                                          |
@@ -665,21 +668,21 @@ The options of `xyzImagery`, the adapter most layers use. The TSDoc of each adap
 
 The asynchronous factories reject with a `SourceConfigError`: a stable `code` and a message naming the source.
 
-| Code                                                          | When                                                                           | What to do                                    |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
-| `invalid-url-template`                                        | `xyzImagery`: unknown field, unpaired brace, no `{z}`/`{x}`/`{y}`              | fix the template                              |
-| `invalid-option`                                              | `xyzImagery` `blankTile` not `#rrggbb`; `mercatorImage` `maxLevel` out of 0–22 | fix the option                                |
-| `unreachable-capabilities`, `invalid-capabilities`            | WMS or WMTS capabilities cannot be loaded or parsed                            | check the URL, CORS and the document          |
-| `unknown-layer`, `no-layers`                                  | the layer is not in the capabilities, or none is named                         | use an identifier from the capabilities       |
-| `no-resource-url`, `no-kvp-endpoint`, `no-getmap-url`         | the service lacks the endpoint the request needs                               | pick the other `encoding`, or pass `url`      |
-| `needs-reprojection`                                          | the service or image uses another reference system                             | pass `transforms`                             |
-| `unreadable-archive`, `not-raster`, `invalid-levels`          | PMTiles: unreadable, not raster tiles, or minimum zoom above maximum           | check the archive and its range requests      |
-| `unreachable-package`, `unreadable-package`                   | MBTiles: download failed, or not an MBTiles file                               | check the URL and `wasmUrl`                   |
-| `invalid-bounds`, `invalid-world-file`, `rotated-image`       | single image: bad bounds, bad world file, or a rotated world file              | fix the placement; rotation is not supported  |
-| `missing-georeference`                                        | single image without `bounds` or a world file of six numbers                   | pass one of them                              |
-| `unreachable-image`, `unreadable-image`, `unreadable-geotiff` | the image cannot be downloaded or decoded                                      | check the URL, CORS and the format            |
-| `missing-app-identity`, `osm-subdomains`                      | OpenStreetMap public servers without `appName`/`appUrl`, or with `{s}`         | identify the application; use the single host |
-| `unreachable-layer`, `invalid-layer`                          | quantized-mesh terrain: `layer.json` cannot be loaded, or is not a valid one   | check the URL, CORS and the file              |
+| Code                                                          | When                                                                                                       | What to do                                    |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `invalid-url-template`                                        | `xyzImagery`: unknown field, unpaired brace, no `{z}`/`{x}`/`{y}`                                          | fix the template                              |
+| `invalid-option`                                              | `xyzImagery` `blankTile` not `#rrggbb`, `blankShare` not in (0, 1]; `mercatorImage` `maxLevel` out of 0–22 | fix the option                                |
+| `unreachable-capabilities`, `invalid-capabilities`            | WMS or WMTS capabilities cannot be loaded or parsed                                                        | check the URL, CORS and the document          |
+| `unknown-layer`, `no-layers`                                  | the layer is not in the capabilities, or none is named                                                     | use an identifier from the capabilities       |
+| `no-resource-url`, `no-kvp-endpoint`, `no-getmap-url`         | the service lacks the endpoint the request needs                                                           | pick the other `encoding`, or pass `url`      |
+| `needs-reprojection`                                          | the service or image uses another reference system                                                         | pass `transforms`                             |
+| `unreadable-archive`, `not-raster`, `invalid-levels`          | PMTiles: unreadable, not raster tiles, or minimum zoom above maximum                                       | check the archive and its range requests      |
+| `unreachable-package`, `unreadable-package`                   | MBTiles: download failed, or not an MBTiles file                                                           | check the URL and `wasmUrl`                   |
+| `invalid-bounds`, `invalid-world-file`, `rotated-image`       | single image: bad bounds, bad world file, or a rotated world file                                          | fix the placement; rotation is not supported  |
+| `missing-georeference`                                        | single image without `bounds` or a world file of six numbers                                               | pass one of them                              |
+| `unreachable-image`, `unreadable-image`, `unreadable-geotiff` | the image cannot be downloaded or decoded                                                                  | check the URL, CORS and the format            |
+| `missing-app-identity`, `osm-subdomains`                      | OpenStreetMap public servers without `appName`/`appUrl`, or with `{s}`                                     | identify the application; use the single host |
+| `unreachable-layer`, `invalid-layer`                          | quantized-mesh terrain: `layer.json` cannot be loaded, or is not a valid one                               | check the URL, CORS and the file              |
 
 The engine reports a display-only source's refused data access as a `GlobeError` with code `display-only`.
 

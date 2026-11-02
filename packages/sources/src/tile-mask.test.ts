@@ -10,6 +10,17 @@ describe('decode-image blank tiles (F618)', () => {
     expect(isBlank(new Uint8ClampedArray([...tile([255, 255, 255, 255], 3), 200, 255, 255, 255]), white)).toBe(false);
     expect(isBlank(tile([255, 255, 255, 0]), white)).toBe(false);
   });
+
+  it("counts a service's filler with a caption as blank when enough of it is the color (F691)", () => {
+    // A grey filler with 4 of 100 pixels of caption, as Esri's "Map data not yet available".
+    const filler = new Uint8ClampedArray(
+      Array.from({ length: 100 }, (_, i) => (i % 25 === 0 ? [255, 255, 255, 255] : [204, 204, 204, 255])).flat(),
+    );
+    const grey = { rgb: [204, 204, 204], tolerance: 2 };
+    expect(isBlank(filler, grey)).toBe(false);
+    expect(isBlank(filler, { ...grey, share: 0.9 })).toBe(true);
+    expect(isBlank(filler, { ...grey, share: 0.97 })).toBe(false);
+  });
 });
 
 describe('the sea key (KB-303)', () => {

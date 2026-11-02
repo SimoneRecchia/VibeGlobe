@@ -9,16 +9,24 @@
 import type { TileMask } from '@vibeglobe/core';
 import { bleedTransparentEdges } from './reproject/edge-bleed.js';
 
-/** A color that, filling a whole tile, means no data: sRGB channels and the tolerance per channel. */
+/**
+ * A color that, filling a tile, means no data: sRGB channels, the tolerance per channel, and the share of the pixels
+ * that must be that color (1 by default: every one; less for a filler with a caption, F691).
+ */
 export interface BlankColor {
   readonly rgb: readonly number[];
   readonly tolerance: number;
+  readonly share?: number;
 }
 
-/** True when every pixel is within `tolerance` of the opaque color in each channel. */
-export function isBlank(rgba: Uint8ClampedArray, { rgb, tolerance }: BlankColor): boolean {
-  for (let i = 0; i < rgba.length; i++)
-    if (Math.abs((rgba[i] ?? 0) - (i % 4 === 3 ? 255 : (rgb[i % 4] ?? 0))) > tolerance) return false;
+/** True when at least `share` of the pixels are within `tolerance` of the opaque color in each channel. */
+export function isBlank(rgba: Uint8ClampedArray, { rgb, tolerance, share = 1 }: BlankColor): boolean {
+  let others = Math.floor((rgba.length / 4) * (1 - share));
+  for (let i = 0; i < rgba.length; i += 4) {
+    let off = Math.abs((rgba[i + 3] ?? 0) - 255) > tolerance;
+    for (let c = 0; c < 3 && !off; c++) off = Math.abs((rgba[i + c] ?? 0) - (rgb[c] ?? 0)) > tolerance;
+    if (off && --others < 0) return false;
+  }
   return true;
 }
 

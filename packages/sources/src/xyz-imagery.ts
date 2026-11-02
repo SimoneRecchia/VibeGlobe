@@ -57,6 +57,11 @@ export interface XyzImageryOptions {
    * partly blank still show it: prefer `area`.
    */
   blankTile?: string | readonly [number, number, number];
+  /**
+   * The share of a tile's pixels that must be the `blankTile` color, in (0, 1] (default 1): below 1, a filler with a
+   * caption, such as Esri's "Map data not yet available", is no data too, and the level above shows magnified (F691).
+   */
+  blankShare?: number;
   decoder?: 'image' | 'ktx2';
   /** The network transport; `fetchTransport()` by default. */
   transport?: TileTransport;
@@ -113,6 +118,9 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
   const extent: TileRectangleRad = { westRad: 0, southRad: 0, eastRad: 0, northRad: 0 };
   const area = sourceArea(options.area, tiling, options.tileSizePx ?? 256);
   const blank = blankColor(options.blankTile);
+  const share = options.blankShare;
+  if (share !== undefined && !(share > 0 && share <= 1))
+    throw new SourceConfigError('invalid-option', `blankShare ${String(share)} is not in (0, 1].`);
   return {
     id: options.id,
     tiling,
@@ -135,7 +143,7 @@ export function xyzImagery(options: XyzImageryOptions): ImagerySource {
     ...(options.attribution ? { attribution: options.attribution } : {}),
     ...(options.transparent || area?.clip ? { transparent: true } : {}),
     ...(area?.tileMask ? { tileMask: area.tileMask } : {}),
-    ...(blank ? { blankTile: { rgb: blank } } : {}),
+    ...(blank ? { blankTile: { rgb: blank, ...(share === undefined ? {} : { share }) } } : {}),
     ...(options.profile ? { profile: options.profile } : {}),
     ...(options.url.includes('{r}') ? { highDpi: true } : {}),
     request(coord: TileCoord, out: TileRequest, pixelRatio = 1): TileRequest | 'noData' {

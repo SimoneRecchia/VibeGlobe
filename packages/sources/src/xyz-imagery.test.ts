@@ -200,6 +200,13 @@ describe('xyzImagery coverage area', () => {
     expect(source.tileMask?.(tile(10, 540, 354))?.ringEnds.length).toBe(1);
     expect(source.tileMask?.(tile(10, 550, 354))).toBeUndefined();
     expect(() => xyzImagery({ id: 'x', url: 'https://t/{z}/{x}/{y}.jpg', blankTile: 'white' })).toThrow(/#rrggbb/);
+    // A filler with a caption: the share of its pixels that are the color (F691).
+    const captioned = xyzImagery({ id: 'x', url: 'https://t/{z}/{x}/{y}.jpg', blankTile: '#cccccc', blankShare: 0.9 });
+    expect(captioned.blankTile).toEqual({ rgb: [204, 204, 204], share: 0.9 });
+    for (const blankShare of [0, 1.5, Number.NaN])
+      expect(() => xyzImagery({ id: 'x', url: 'https://t/{z}/{x}/{y}.jpg', blankTile: '#cccccc', blankShare })).toThrow(
+        /blankShare/,
+      );
   });
 
   it('keys the sea of an area with keySea alone: the source transparent, every tile with the land over it (KB-329)', () => {

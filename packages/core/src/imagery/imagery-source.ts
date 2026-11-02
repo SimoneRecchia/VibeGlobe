@@ -108,6 +108,8 @@ export interface BlankTile {
   readonly rgb: readonly [number, number, number];
   /** The largest difference per channel still counted as that color (default 2: JPEG noise). */
   readonly tolerance?: number;
+  /** The share of the tile's pixels that must be that color (default 1; less for a filler with a caption, F691). */
+  readonly share?: number;
 }
 
 /**
@@ -129,7 +131,7 @@ export function imageryDecodeTask(
         bytes,
         contentType,
         ...(mask ? { mask } : {}),
-        ...(blank ? { blank: { rgb: blank.rgb, tolerance: blank.tolerance ?? 2 } } : {}),
+        ...(blank ? { blank: { rgb: blank.rgb, tolerance: blank.tolerance ?? 2, share: blank.share ?? 1 } } : {}),
       },
     };
   };

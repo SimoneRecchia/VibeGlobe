@@ -302,6 +302,14 @@ describe('drawImagery', () => {
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([60, 8]);
   });
 
+  it("magnifies a source's own ancestor where its tile is no data but its parent's is not, before a coarser later source (KB-331)", () => {
+    // Esri answers its filler at levels 18 and 19 here and has a real tile at 17; the package below stops at 8.
+    const esri = fakeLayer({ 17: 90 }, [18, 19], 19);
+    const world = fakeLayer({ 8: 60 }, [], 8);
+    const list = drawStack([stacked([esri.layer, world.layer])], tile(19, 307200, 174080));
+    expect([list.textures[0], list.imageryLevels[0]]).toEqual([90, 17]);
+  });
+
   it("magnifies a lone source's ancestor where its own tile fails, with no other source (KB-149, F242)", () => {
     // Tiles from level 6 on fail to decode: the level-5 tile is magnified, not nothing.
     const only = fakeLayer({ 5: 70 }, [6, 7, 8]);

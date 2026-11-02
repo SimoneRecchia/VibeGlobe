@@ -8263,6 +8263,16 @@
         "Unit-test that the license records list the Protomaps profile in ADR 0025 and the configuration's dataset in the data licenses"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F691",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "`xyzImagery` takes `blankShare`: a tile with at least that share of its pixels in the `blankTile` color is no data, so a service's filler with a caption (Esri's \"Map data not yet available\") gives way to the deepest level the service has, magnified.",
+      "steps": [
+        "Unit-test that a filler with a caption counts as blank at a share its color reaches and not above it, and that `blankShare` outside (0, 1] throws `invalid-option`"
+      ],
+      "status": "passing"
     }
   ]
 }

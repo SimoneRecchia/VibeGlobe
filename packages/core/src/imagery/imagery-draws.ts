@@ -259,16 +259,20 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
  */
 function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance: number): number {
   let fallback = -1;
+  // The first source with no tile here: its own ancestors may still be finer than another source's (KB-331).
+  let missing = -1;
   // Levels an earlier source serves are its own: a later source is asked only for finer ones (F247).
   let floor = 0;
   for (let k = 0; k < chain.length; k++) {
     const layer = chain[k];
     if (!layer) continue;
     if (!hasTile(layer, tile)) {
-      // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless no later
-      // source can map the tile: then its ancestors are the last resort (KB-149).
-      if (fallback < 0 && mapInto(layer, tile) && !(unavailableAtMapping(layer) && laterMaps(chain, k, tile)))
-        fallback = k;
+      // A source that answered "no tile" here shows its ancestors only where no other source serves finer ones (KB-142,
+      // KB-149, KB-331).
+      if (fallback < 0 && mapInto(layer, tile)) {
+        if (!unavailableAtMapping(layer)) fallback = k;
+        else if (missing < 0) missing = k;
+      }
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -280,6 +284,9 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     }
     return -1;
   }
+  const own = chain[missing];
+  // Its own ancestors when finer than anything another source serves there (Esri's filler, F691).
+  if (own && wantLayer(own, tile, distance, floor) >= 0) return missing;
   const covering = chain[fallback];
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }
@@ -306,15 +313,6 @@ function mapInto(layer: ImageryLayer, tile: QuadtreeTile): boolean {
 /** True when some source of the chain covers the tile (overwrites `mapping`). */
 function coversTile(chain: readonly ImageryLayer[], tile: QuadtreeTile): boolean {
   for (const layer of chain) if (mapInto(layer, tile)) return true;
-  return false;
-}
-
-/** True when a source after `k` in the chain can map the tile (overwrites `mapping`). */
-function laterMaps(chain: readonly ImageryLayer[], k: number, tile: QuadtreeTile): boolean {
-  for (let j = k + 1; j < chain.length; j++) {
-    const later = chain[j];
-    if (later && mapInto(later, tile)) return true;
-  }
   return false;
 }
 

@@ -259,6 +259,8 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
  */
 function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance: number): number {
   let fallback = -1;
+  // The first source with no tile here although later sources map it: its own ancestors may still be finer (KB-331).
+  let missing = -1;
   // Levels an earlier source serves are its own: a later source is asked only for finer ones (F247).
   let floor = 0;
   for (let k = 0; k < chain.length; k++) {
@@ -267,8 +269,10 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     if (!hasTile(layer, tile)) {
       // A source that answered "no tile" here does not cover it, coverage declared or not (KB-142), unless no later
       // source can map the tile: then its ancestors are the last resort (KB-149).
-      if (fallback < 0 && mapInto(layer, tile) && !(unavailableAtMapping(layer) && laterMaps(chain, k, tile)))
-        fallback = k;
+      if (fallback < 0 && mapInto(layer, tile)) {
+        if (!(unavailableAtMapping(layer) && laterMaps(chain, k, tile))) fallback = k;
+        else if (missing < 0) missing = k;
+      }
       const top = topLevel(layer);
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
@@ -280,8 +284,46 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     }
     return -1;
   }
+  const own = chain[missing];
+  if (own && ownAncestor(own, tile, laterTop(chain, missing, tile), distance) >= 0) return missing;
   const covering = chain[fallback];
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
+}
+
+/** The finest surface level a source after `k` serves for the tile, -1 when none maps it (overwrites `mapping`). */
+function laterTop(chain: readonly ImageryLayer[], k: number, tile: QuadtreeTile): number {
+  let top = -1;
+  for (let j = k + 1; j < chain.length; j++) {
+    const later = chain[j];
+    if (later && mapInto(later, tile) && topLevel(later) > top) top = topLevel(later);
+  }
+  return top;
+}
+
+/**
+ * A source's tile missing here may have an ancestor with data, as a service's filler beyond its levels does (Esri's
+ * "Map data not yet available", F691): the first ancestor not known missing is wanted, when finer than `finest`, the
+ * level a later source could show instead (KB-331). Returns its handle once resident (mapping in `mapping`), or -1.
+ */
+function ownAncestor(layer: ImageryLayer, tile: QuadtreeTile, finest: number, distance: number): number {
+  if (!mapInto(layer, tile)) return -1;
+  const wanted = mapped(MAPPING_LEVEL);
+  for (
+    let current = wanted;
+    current + layer.loader.levelShift > finest && current >= layer.source.minLevel;
+    current--
+  ) {
+    const x = mapped(MAPPING_X);
+    const y = mapped(MAPPING_Y);
+    if (!layer.loader.unavailable(current, x, y)) {
+      const rank = VISIBLE_CLASS + COVER_LEVELS - (wanted - current) + 2 * distance;
+      const handle = layer.loader.want(current, x, y, rank, !hazed(tile));
+      if (handle >= 0) mapping[MAPPING_HANDLE] = handle;
+      return handle >= 0 ? handle : -1;
+    }
+    if (current > layer.source.minLevel) mapAncestor(mapping, 0, 1);
+  }
+  return -1;
 }
 
 /** The finest surface level a layer's source serves: its finest level, deeper by the layer's level shift (F240). */

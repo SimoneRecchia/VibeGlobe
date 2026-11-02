@@ -73,8 +73,12 @@ export interface StarfieldUniforms {
   readonly rayCenter: { value: Vector3 };
   readonly rayX: { value: Vector3 };
   readonly rayY: { value: Vector3 };
-  /** The halo's strength, 0 none (`SpaceBackgroundOptions.glow`). */
+  /** The halo's strength, 0 none (`SpaceBackgroundOptions.glow`), and its color at the limb and farther out. */
   readonly glow: { value: number };
+  readonly glowEdge: { value: Vector3 };
+  readonly glowFar: { value: Vector3 };
+  /** The sky's color behind the globe, linear light (`SpaceBackgroundOptions.sky`). */
+  readonly sky: { value: Vector3 };
   /** The eye's position from the globe's center, km, and the direction to the Sun, galactic axes. */
   readonly eyeKm: { value: Vector3 };
   readonly sun: { value: Vector3 };
@@ -245,7 +249,7 @@ function glowColor(direction: Vec3Node, u: StarfieldUniforms): Vec3Node {
     .mul(0.45)
     .add(exp(heightKm.div(-GLOW_SOFT_KM)).mul(0.55));
   const day = mix(float(1), smoothstep(-0.2, 0.3, dot(normalize(closest), n<'vec3'>(u.sun))), n<'float'>(u.sunLit));
-  const tint = mix(vec3(0.4, 0.65, 1), vec3(0.1, 0.3, 0.95), smoothstep(0, GLOW_SOFT_KM, heightKm));
+  const tint = mix(n<'vec3'>(u.glowEdge), n<'vec3'>(u.glowFar), smoothstep(0, GLOW_SOFT_KM, heightKm));
   return tint.mul(light.mul(day).mul(n<'float'>(u.glow)).mul(0.5));
 }
 
@@ -256,7 +260,7 @@ function milkyWayMaterial(u: StarfieldUniforms, depthPath: DepthPath): MeshBasic
   material.vertexNode = vec4(ndc, 0, 1);
   const visibility = n<'float'>(u.visibility);
   const direction = normalize(ray);
-  const light = milkyWayColor(direction).mul(n<'float'>(u.milkyWay)).add(glowColor(direction, u));
+  const light = milkyWayColor(direction).mul(n<'float'>(u.milkyWay)).add(glowColor(direction, u)).add(n<'vec3'>(u.sky));
   material.colorNode = vec4(light.mul(visibility), visibility);
   return material;
 }
@@ -283,6 +287,9 @@ export function createStarfieldMeshes(catalog: StarCatalog, depthPath: DepthPath
     rayX: uniform(new Vector3(1, 0, 0)),
     rayY: uniform(new Vector3(0, 1, 0)),
     glow: uniform(0),
+    glowEdge: uniform(new Vector3(0.4, 0.65, 1)),
+    glowFar: uniform(new Vector3(0.1, 0.3, 0.95)),
+    sky: uniform(new Vector3(0, 0, 0)),
     eyeKm: uniform(new Vector3(0, 0, 20_000)),
     sun: uniform(new Vector3(0, 0, 1)),
     sunLit: uniform(0),

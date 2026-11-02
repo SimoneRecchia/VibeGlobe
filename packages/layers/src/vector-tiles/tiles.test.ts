@@ -3,7 +3,7 @@ import { encodeMvt } from '../__fixtures__/mvt-writer.js';
 import { fillArea } from './fill-tessellate.js';
 import { layoutVectorTile, VECTOR_TILE_TASKS, type Bucket } from './layout-tile.js';
 import { StyleLayer } from './style-layer.js';
-import { inCoverage, overzoom, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
+import { coverTiles, inCoverage, overzoom, tileKey, tilesToDraw, tilesToRequest, type TileId } from './tile-pyramid.js';
 
 const square = (x0: number, y0: number, x1: number, y1: number) => [
   [
@@ -164,6 +164,18 @@ describe('overzoom, coverage and parent fallback (F442)', () => {
       ['10/545/368', '11/1091/737', true],
     ]);
     expect(new Set(draws.map((d) => tileKey(d.target))).size).toBe(visible.length);
+  });
+
+  it("asks first for the ancestor three levels up while nothing of a tile's area is ready (KB-335)", () => {
+    const tiles = children({ z: 12, x: 2180, y: 1472 });
+    // A new view at level 13: nothing ready, so one ancestor at 10 covers all four before their own tiles.
+    expect(coverTiles(tiles, coverage, () => false).map(tileKey)).toEqual(['10/545/368']);
+    // An ancestor within three levels is ready: it already stands in, no cover is asked.
+    expect(coverTiles(tiles, coverage, (t) => t.z === 11)).toEqual([]);
+    // Never below the source's minzoom.
+    expect(coverTiles([{ z: 9, x: 272, y: 184 }], { ...coverage, minzoom: 8 }, () => false).map(tileKey)).toEqual([
+      '8/136/92',
+    ]);
   });
 
   it('never leaves a covered target empty while any ancestor is ready', () => {

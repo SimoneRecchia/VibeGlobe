@@ -81,14 +81,48 @@ export function inCoverage(tile: TileId, coverage: SourceCoverage): boolean {
   );
 }
 
-/** The tiles to request for the visible target tiles: overzoomed to `maxzoom`, in coverage, without duplicates. */
-export function tilesToRequest(visible: readonly TileId[], coverage: SourceCoverage): TileId[] {
+/** Levels above a tile whose ancestor is asked for first while nothing of the tile's area is ready (KB-335). */
+const COVER_LEVELS = 3;
+
+/**
+ * The ancestors to request before `tiles`: for each tile with nothing ready from itself up to {@link COVER_LEVELS}
+ * levels above (within `minzoom`), that ancestor, so a view the camera jumps or flies to fills coarse at once and then
+ * sharpens, instead of showing empty squares until each tile arrives (KB-335).
+ */
+export function coverTiles(
+  tiles: readonly TileId[],
+  coverage: SourceCoverage,
+  isReady: (tile: TileId) => boolean,
+): TileId[] {
+  const out = new Map<string, TileId>();
+  for (const tile of tiles) {
+    const lowest = Math.max(coverage.minzoom, tile.z - COVER_LEVELS);
+    let ready = false;
+    for (let z = tile.z; z >= lowest && !ready; z--) ready = isReady(ancestorAt(tile, z));
+    if (ready || lowest === tile.z) continue;
+    const cover = ancestorAt(tile, lowest);
+    out.set(tileKey(cover), cover);
+  }
+  return [...out.values()];
+}
+
+/**
+ * The tiles to request for the visible target tiles: overzoomed to `maxzoom`, in coverage, without duplicates; with
+ * `isReady`, their {@link coverTiles} first (KB-335).
+ */
+export function tilesToRequest(
+  visible: readonly TileId[],
+  coverage: SourceCoverage,
+  isReady?: (tile: TileId) => boolean,
+): TileId[] {
   const out = new Map<string, TileId>();
   for (const target of visible) {
     const { source } = overzoom(target, coverage);
     if (inCoverage(source, coverage)) out.set(tileKey(source), source);
   }
-  return [...out.values()];
+  const own = [...out.values()];
+  if (!isReady) return own;
+  return [...new Map([...coverTiles(own, coverage, isReady), ...own].map((tile) => [tileKey(tile), tile])).values()];
 }
 
 /** One draw: a ready source tile, drawn clipped to the square of `target`. */

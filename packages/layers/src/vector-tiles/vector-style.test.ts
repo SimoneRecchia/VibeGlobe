@@ -139,6 +139,13 @@ describe('layer order, zoom ranges and visibility (F447)', () => {
     expect(style.layersFor('osm', 'transportation').map((l) => l.id)).toEqual(['roads']);
   });
 
+  it("keeps a layer without maxzoom down to the globe's deepest zoom, past the web map default of 24 (KB-336)", () => {
+    const style = VectorStyle.load(STYLE);
+    const background = style.layer('background');
+    expect([24, 24.5, 25].map((z) => background?.inZoomRange(z))).toEqual([true, true, true]);
+    expect(style.serialize()['layers']).toContainEqual(expect.not.objectContaining({ maxzoom: expect.anything() }));
+  });
+
   it('fades a layer across its minzoom and on a visibility change instead of popping', () => {
     const style = VectorStyle.load(STYLE);
     const fader = new LayerFader(300);

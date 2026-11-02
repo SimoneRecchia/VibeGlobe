@@ -215,7 +215,11 @@ export class VectorStyle {
       sources: this.sources,
       ...(this.sprite === undefined ? {} : { sprite: this.sprite }),
       ...(this.glyphs === undefined ? {} : { glyphs: this.glyphs }),
-      layers: this.ordered.map((layer) => ({ ...layer.json, minzoom: layer.minzoom, maxzoom: layer.maxzoom })),
+      layers: this.ordered.map(({ json, minzoom, maxzoom }) => ({
+        ...json,
+        minzoom,
+        ...(Number.isFinite(maxzoom) ? { maxzoom } : {}),
+      })),
     };
   }
 

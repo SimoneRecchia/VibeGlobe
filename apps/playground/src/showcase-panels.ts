@@ -6,7 +6,8 @@
  * so they sit in the UI's corners with its theme; their texts follow the UI's language (English or Italian).
  */
 import type { AtmosphereLevel, Globe, NavigationMode } from '@vibeglobe/core';
-import type { ControlContext, ControlPosition, Ui, UiControl } from '@vibeglobe/ui';
+import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
+import type { ControlContext, ControlPosition, ThemeName, Ui, UiControl } from '@vibeglobe/ui';
 
 type Language = 'en' | 'it';
 
@@ -84,12 +85,16 @@ const TEXT = {
   },
 } as const;
 
-/** What the settings panel changes beyond the UI itself. */
+/** What the settings panel and the tour's scenes change beyond the UI itself. */
 export interface ShowcaseHooks {
   /** Sets the quality preset (loads `@vibeglobe/quality` on first use). */
   setQuality(preset: 'low' | 'medium' | 'high' | 'ultra'): void;
   /** Shows or hides the space background. */
   setSpace(on: boolean): void;
+  /** The space background, added when it is not shown. */
+  space(): Promise<SpaceBackground>;
+  /** Sets the theme of the controls and of the tour. */
+  setTheme(theme: ThemeName): void;
   /** How a drag moves the camera now. */
   navigationMode(): NavigationMode;
   setNavigationMode(mode: NavigationMode): void;
@@ -189,7 +194,7 @@ export class SettingsControl extends PanelControl {
       ],
       ui?.theme ?? 'light',
     );
-    theme.addEventListener('change', () => ui?.setTheme(theme.value === 'dark' ? 'dark' : 'light'));
+    theme.addEventListener('change', () => this.#hooks.setTheme(theme.value === 'dark' ? 'dark' : 'light'));
     const language = select(
       [
         ['en', 'English'],

@@ -62,6 +62,73 @@ test('the showcase shows every control, the settings change theme, language and 
   expect(errors).toEqual([]);
 });
 
+/** The tour's scenes that run on the bundled data and the fixture server, in the catalog's order. */
+const OFFLINE_SCENES = [
+  'globe',
+  'sky',
+  'sun',
+  'poles',
+  'view-modes',
+  'navigation',
+  'camera',
+  'limits',
+  'adapters',
+  'composition',
+  'relief',
+  'vector-styles',
+  'buildings',
+  'markers',
+  'shapes',
+  'live',
+  'files',
+  'energy-park',
+  'instancing',
+  '3d-tiles',
+  'measure',
+  'coordinates',
+  'share',
+  'offline',
+  'quality',
+  'diagnostics',
+  'integrations',
+];
+
+/** The scene the tour shows once it has started; undefined while one loads or the page reloads. */
+async function sceneShown(page: Page): Promise<string | undefined> {
+  return page.evaluate(() => window.vibeglobeShowcase?.tour?.scene).catch(() => undefined);
+}
+
+test('the tour opens every scene without the network and without errors; online scenes wait for consent', async ({
+  page,
+}) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  const outside: string[] = [];
+  await page.route(
+    (url) => url.hostname !== 'localhost' && url.protocol.startsWith('http'),
+    (route) => {
+      outside.push(route.request().url());
+      return route.abort();
+    },
+  );
+  await openShowcase(page, 'showcase=1&ui=1&lang=en');
+  for (const scene of OFFLINE_SCENES) {
+    await page.evaluate((id) => (location.hash = `#scene=${id}`), scene).catch(() => undefined);
+    await expect.poll(() => sceneShown(page), { timeout: 90_000, message: scene }).toBe(scene);
+  }
+  for (const scene of ['europe', 'openfreemap', 'real-terrain']) {
+    await page.evaluate((id) => (location.hash = `#scene=${id}`), scene);
+    await expect(page.getByRole('button', { name: 'Load online data' })).toBeVisible();
+  }
+  expect(await sceneShown(page)).toBeUndefined();
+  expect(outside).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('?ui=0 hides the controls of the showcase, which keeps its data', async ({ page }) => {
   await openShowcase(page, 'showcase=1&ui=0');
   await expect(page.locator('.vg-ui')).toHaveCount(0);
@@ -92,6 +159,7 @@ declare global {
       ui?: { theme: string; controls(): { id: string }[] };
       layers?: { stack: { order: readonly string[]; size: number } };
       space?: unknown;
+      tour?: { scene: string | undefined };
     };
   }
 }

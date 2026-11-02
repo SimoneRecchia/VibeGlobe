@@ -5,7 +5,10 @@
  * geocoder stub over the same cities, so the search box shows the place-search interface without a service.
  */
 import type { Geocoder, GeocoderResult, Globe } from '@vibeglobe/core';
-import type { Feature, Geometry, GlobeLayers } from '@vibeglobe/layers';
+import type { Feature, Geometry, Layer } from '@vibeglobe/layers';
+
+/** Adds a layer to the page's stack, for as long as the scene that adds it is shown. */
+type AddLayer = <L extends Layer>(layer: L) => L;
 
 /** Demo places: the markers, their labels and the geocoder stub's index. */
 const CITIES: readonly (readonly [name: string, longitudeDeg: number, latitudeDeg: number])[] = [
@@ -62,7 +65,7 @@ function feature(id: string, geometry: Geometry, properties: Record<string, unkn
 }
 
 /** The polygon, the line and the labels. */
-async function shapes(layers: GlobeLayers): Promise<void> {
+async function shapes(add: AddLayer): Promise<void> {
   const { DataLayer, LabelLayer } = await import('@vibeglobe/layers');
   const ring = [
     [6.7, 45.75],
@@ -71,7 +74,7 @@ async function shapes(layers: GlobeLayers): Promise<void> {
     [6.7, 45.98],
     [6.7, 45.75],
   ];
-  layers.stack.add(
+  add(
     new DataLayer('polygon', {
       id: 'demo-area',
       data: [feature('alps', { type: 'Polygon', coordinates: [ring] }, { name: 'Mont Blanc massif' })],
@@ -83,14 +86,14 @@ async function shapes(layers: GlobeLayers): Promise<void> {
     [11.2558, 43.7696],
     [12.4964, 41.9028],
   ];
-  layers.stack.add(
+  add(
     new DataLayer('polyline', {
       id: 'demo-route',
       data: [feature('milano-roma', { type: 'LineString', coordinates: route })],
       style: { 'line-color': '#e53935', 'line-width': 3 },
     }),
   );
-  layers.stack.add(
+  add(
     new LabelLayer({
       id: 'demo-labels',
       data: CITIES.map(([name, lon, lat]) => feature(name, { type: 'Point', coordinates: [lon, lat] }, { name })),
@@ -110,10 +113,10 @@ async function shapes(layers: GlobeLayers): Promise<void> {
  * Adds the demo layers to the page's layer stack: a click on a cluster zooms to its markers, one on a marker flies to
  * its city.
  */
-export async function addDemoLayers(globe: Globe, layers: GlobeLayers): Promise<void> {
+export async function addDemoLayers(globe: Globe, add: AddLayer): Promise<void> {
   const { ClusterLayer } = await import('@vibeglobe/layers');
-  await shapes(layers);
-  const clusters = layers.stack.add(
+  await shapes(add);
+  const clusters = add(
     new ClusterLayer({
       id: 'demo-markers',
       data: markers(40),

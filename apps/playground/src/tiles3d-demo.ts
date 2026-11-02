@@ -86,7 +86,7 @@ export function tilesetOptions(params: URLSearchParams, base: string): Tiles3DOp
  * decoder, whose Blob-worker code production bundles refuse (F100), so a production playground decodes 3D Tiles
  * content once the worker program registers the task.
  */
-async function devDecoding(dracoWasm: string): Promise<Pick<Tiles3DOptions, 'modelWorker'>> {
+export async function devDecoding(dracoWasm: string): Promise<Pick<Tiles3DOptions, 'modelWorker'>> {
   if (!import.meta.env.DEV) return {};
   const { devModelWorker } = await import('./tiles3d-dev-decoding.js');
   return { modelWorker: devModelWorker(dracoWasm) };

@@ -3,25 +3,37 @@
 /**
  * The playground's UI (owner, 2026-10-25; `page-mode.ts` decides when): on every page the default controls of
  * `@vibeglobe/ui` (compass, zoom, tilt, 2D / 3D / Auto, home); on the showcase every control and tool of the package,
- * the settings panel and the help overlay, over the demo data layers and the space background. Loaded only when shown.
+ * the settings panel and the help overlay over the space background, and the tour of the library's capabilities
+ * (`tour/`), one scene at a time, its first scene the demo data layers. Loaded only when shown.
  */
 import type { Globe } from '@vibeglobe/core';
 import type { NavigationControls } from '@vibeglobe/controls';
 import type { GlobeLayers } from '@vibeglobe/layers';
 import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
-import type { Ui } from '@vibeglobe/ui';
+import type { ThemeName, Ui } from '@vibeglobe/ui';
 import { HelpControl, SettingsControl, type ShowcaseHooks } from './showcase-panels.js';
+import type { Shell } from './tour/shell.js';
+import type { Tour } from './tour/tour.js';
 
 /** The showcase's parts, for tests (`window.vibeglobeShowcase`). */
 export interface ShowcaseHandle {
   readonly ui: Ui | undefined;
   readonly layers: GlobeLayers | undefined;
   space: SpaceBackground | undefined;
+  /** The tour, on the showcase. */
+  readonly tour: Tour | undefined;
 }
 
 /** The UI's language: `?lang=`, else the browser's when Italian, else English. */
 function language(params: URLSearchParams): string {
   return params.get('lang') ?? (navigator.language.toLowerCase().startsWith('it') ? 'it' : 'en');
+}
+
+/** The UI's theme: `?theme=`, else the system's. */
+function theme(params: URLSearchParams): ThemeName {
+  const asked = params.get('theme');
+  if (asked === 'dark' || asked === 'light') return asked;
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 /** The default controls of every page. */
@@ -68,9 +80,22 @@ async function addShowcaseControls(
   ui.add(new HelpControl());
 }
 
-/** The quality preset, the space background and the navigation mode, as the settings panel changes them. */
-function showcaseHooks(globe: Globe, handle: ShowcaseHandle, navigation?: NavigationControls): ShowcaseHooks {
+/** The quality preset, the space background, the navigation mode and the theme, as the panels change them. */
+function showcaseHooks(
+  globe: Globe,
+  handle: ShowcaseHandle,
+  shell: () => Shell | undefined,
+  navigation?: NavigationControls,
+): ShowcaseHooks {
   let quality: { setPreset(preset: 'low' | 'medium' | 'high' | 'ultra'): void } | undefined;
+  let adding: Promise<SpaceBackground> | undefined;
+  const space = (): Promise<SpaceBackground> =>
+    handle.space
+      ? Promise.resolve(handle.space)
+      : (adding ??= import('@vibeglobe/renderer/starfield').then(({ addSpaceBackground }) => {
+          adding = undefined;
+          return (handle.space ??= addSpaceBackground(globe));
+        }));
   return {
     navigationMode: () => navigation?.navigationMode ?? 'free',
     setNavigationMode: (mode) => navigation?.setNavigationMode(mode),
@@ -79,20 +104,40 @@ function showcaseHooks(globe: Globe, handle: ShowcaseHandle, navigation?: Naviga
       else void import('@vibeglobe/quality').then(({ createQuality }) => (quality = createQuality(globe, { preset })));
     },
     setSpace(on) {
-      if (!on) {
-        handle.space?.remove();
-        handle.space = undefined;
-      } else if (!handle.space)
-        void import('@vibeglobe/renderer/starfield').then(({ addSpaceBackground }) => {
-          handle.space ??= addSpaceBackground(globe);
-        });
+      if (on) return void space();
+      handle.space?.remove();
+      handle.space = undefined;
+    },
+    space,
+    setTheme(next) {
+      handle.ui?.setTheme(next);
+      shell()?.setTheme(next);
+      handle.ui?.get('showcase-settings')?.localize?.();
     },
   };
 }
 
+/** The tour's frame and the tour, from the fragment's scene. */
+async function showTour(
+  globe: Globe,
+  container: HTMLElement,
+  parts: { layers: GlobeLayers; ui: Ui | undefined; hooks: ShowcaseHooks; navigation: NavigationControls | undefined },
+  setShell: (shell: Shell) => void,
+): Promise<Tour> {
+  let shell: Shell | undefined;
+  if (parts.ui) {
+    const { createShell } = await import('./tour/shell.js');
+    shell = createShell(container, parts.ui.theme, parts.hooks.setTheme);
+    shell.setBackend(globe.backend === 'webgpu' ? 'WebGPU' : 'WebGL2');
+    setShell(shell);
+  }
+  const { startTour } = await import('./tour/tour.js');
+  return startTour({ globe, container, shell, ...parts });
+}
+
 /**
- * Shows the page's UI once the globe is ready: the showcase's data, space background and every control when
- * `showcase`, else the default controls; no controls when `ui` is false.
+ * Shows the page's UI once the globe is ready: on the showcase every control, the space background and the tour,
+ * else the default controls; no controls when `ui` is false (the showcase's tour still shows its scene's data).
  */
 export async function showPageUi(
   globe: Globe,
@@ -101,32 +146,43 @@ export async function showPageUi(
   { showcase, ui: withUi, navigation }: { showcase: boolean; ui: boolean; navigation?: NavigationControls },
 ): Promise<ShowcaseHandle> {
   await globe.ready;
-  let layers: GlobeLayers | undefined;
-  const handle: ShowcaseHandle = { ui: undefined, layers: undefined, space: undefined };
-  const hooks = showcaseHooks(globe, handle, navigation);
+  const handle: { -readonly [K in keyof ShowcaseHandle]: ShowcaseHandle[K] } = {
+    ui: undefined,
+    layers: undefined,
+    space: undefined,
+    tour: undefined,
+  };
+  let shell: Shell | undefined;
+  const hooks = showcaseHooks(globe, handle, () => shell, navigation);
   if (showcase) {
     const { createGlobeLayers } = await import('@vibeglobe/layers');
-    layers = createGlobeLayers(globe, { element: container });
-    await (await import('./showcase-data.js')).addDemoLayers(globe, layers);
+    handle.layers = createGlobeLayers(globe, { element: container });
     hooks.setSpace(true);
+    // The atmosphere the settings panel starts with.
+    globe.setQualitySettings({ atmosphere: 'high' });
   }
-  let ui: Ui | undefined;
   if (withUi) {
     // The readout and the attribution control take the place of the page's own status and cursor lines.
     for (const id of ['#status', '#cursor'])
       document.querySelector<HTMLElement>(id)?.style.setProperty('display', 'none');
     const { createUi } = await import('@vibeglobe/ui');
-    ui = createUi(globe, container, {
+    handle.ui = createUi(globe, container, {
       language: language(params),
-      theme: params.get('theme') === 'dark' ? 'dark' : 'light',
-      ...(layers ? { layers } : {}),
+      theme: theme(params),
+      ...(handle.layers ? { layers: handle.layers } : {}),
     });
-    if (showcase && layers) await addShowcaseControls(globe, ui, layers, hooks, navigation);
-    else await addPageControls(ui, navigation);
+    if (showcase && handle.layers) await addShowcaseControls(globe, handle.ui, handle.layers, hooks, navigation);
+    else await addPageControls(handle.ui, navigation);
   }
-  const shown: ShowcaseHandle = Object.assign(handle, { ui, layers });
-  window.vibeglobeShowcase = shown;
-  return shown;
+  if (showcase && handle.layers)
+    handle.tour = await showTour(
+      globe,
+      container,
+      { layers: handle.layers, ui: handle.ui, hooks, navigation },
+      (made) => (shell = made),
+    );
+  window.vibeglobeShowcase = handle;
+  return handle;
 }
 
 declare global {

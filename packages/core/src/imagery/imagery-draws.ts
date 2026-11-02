@@ -285,7 +285,8 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     return -1;
   }
   const own = chain[missing];
-  if (own && ownAncestor(own, tile, laterTop(chain, missing, tile), distance) >= 0) return missing;
+  // Its own ancestors when finer than anything a later source serves there (Esri's filler, F691).
+  if (own && wantLayer(own, tile, distance, laterTop(chain, missing, tile) + 1) >= 0) return missing;
   const covering = chain[fallback];
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }
@@ -298,32 +299,6 @@ function laterTop(chain: readonly ImageryLayer[], k: number, tile: QuadtreeTile)
     if (later && mapInto(later, tile) && topLevel(later) > top) top = topLevel(later);
   }
   return top;
-}
-
-/**
- * A source's tile missing here may have an ancestor with data, as a service's filler beyond its levels does (Esri's
- * "Map data not yet available", F691): the first ancestor not known missing is wanted, when finer than `finest`, the
- * level a later source could show instead (KB-331). Returns its handle once resident (mapping in `mapping`), or -1.
- */
-function ownAncestor(layer: ImageryLayer, tile: QuadtreeTile, finest: number, distance: number): number {
-  if (!mapInto(layer, tile)) return -1;
-  const wanted = mapped(MAPPING_LEVEL);
-  for (
-    let current = wanted;
-    current + layer.loader.levelShift > finest && current >= layer.source.minLevel;
-    current--
-  ) {
-    const x = mapped(MAPPING_X);
-    const y = mapped(MAPPING_Y);
-    if (!layer.loader.unavailable(current, x, y)) {
-      const rank = VISIBLE_CLASS + COVER_LEVELS - (wanted - current) + 2 * distance;
-      const handle = layer.loader.want(current, x, y, rank, !hazed(tile));
-      if (handle >= 0) mapping[MAPPING_HANDLE] = handle;
-      return handle >= 0 ? handle : -1;
-    }
-    if (current > layer.source.minLevel) mapAncestor(mapping, 0, 1);
-  }
-  return -1;
 }
 
 /** The finest surface level a layer's source serves: its finest level, deeper by the layer's level shift (F240). */

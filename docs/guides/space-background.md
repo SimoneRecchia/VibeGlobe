@@ -49,6 +49,9 @@ background color and a halo in a tone of it. With the atmosphere off (`Globe.set
 give the page behind it the same color.
 
 ```ts
+import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
+
+declare const space: SpaceBackground;
 space.setOptions({ stars: false, milkyWay: false, sky: '#f4f4f4', glow: 1, glowColor: '#cfd3d4' });
 ```
 

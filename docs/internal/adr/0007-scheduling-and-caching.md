@@ -35,6 +35,7 @@ The [scheduling and caching survey](../research/scheduling-and-caching.md) studi
 **Priority key** (lower is sooner): `class × 1024 + level + w · d`.
 
 - `class`: 0 pinned base, 1 visible, 2 flight destination, 3 flight path (including the current view during a flight), 4 prefetch.
+- `level`: for an imagery request of a visible tile (its cover included, KB-305), a rank that falls by one for each level the request lies above the level the tile wants, in place of the level itself: every part of a view gains a level at the same pace, so a view whose tiles want different levels does not sharpen one part at a time (KB-330).
 - `d` ∈ [0, 1]: the screen distance of the tile from the focus point (the screen center, or the cursor during anchored zoom), normalized to the farthest viewport corner.
 - `w` = 2 (tuned in M3).
 - A tile wanted by several consumers takes the best key.

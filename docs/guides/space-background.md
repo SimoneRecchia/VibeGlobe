@@ -37,9 +37,24 @@ and the star catalog load when it is added, not before.
 | `timeMs`     | the engine's   | The sky's date and time (Unix ms, UTC); unset, it follows `Globe.atmosphere.timeMs` |
 | `fade`       | `true`         | Fades the background out under the atmosphere's daytime sky near the ground         |
 | `glow`       | `0`            | A halo around the globe seen from space, 0 to 4; 1 is a virtual globe's             |
+| `glowColor`  | `''`           | The halo's color, `#rrggbb`; empty keeps the built-in whitish blue                  |
+| `sky`        | `#000000`      | The color behind the globe, `#rrggbb`: space by default                             |
 | `catalogUrl` | next to module | Where the star catalog is hosted; only at creation                                  |
 
 Every option but `catalogUrl` changes with `setOptions`; `timeMs: undefined` follows the engine again.
+
+A styled map, light or dark, can have a sky of its own instead of space: stars and Milky Way off, `sky` in the map's
+background color and a halo in a tone of it. With the atmosphere off (`Globe.setQualitySettings({ atmosphere: 'off'
+})`) the physical rim goes too. Where the background does not show (a flat 2D view), the canvas stays transparent:
+give the page behind it the same color.
+
+```ts
+import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
+
+declare const space: SpaceBackground;
+space.setOptions({ stars: false, milkyWay: false, sky: '#f4f4f4', glow: 1, glowColor: '#cfd3d4' });
+```
+
 `space.options` reads them back, and `space.visibility` is the background's opacity in the last frame (0 to 1).
 
 ## How it moves and fades

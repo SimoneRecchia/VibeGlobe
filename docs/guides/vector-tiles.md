@@ -79,7 +79,9 @@ shows names as `name:it`, else `name_it`, else `name`, in every symbol layer who
 
 - Vector tiles are chosen from the surface's tiles and the ground scale on screen (512-pixel tiles). Beyond a
   source's `maxzoom` its deepest tiles are overzoomed. While a tile loads, or where a source has no tile, its nearest
-  ready ancestor is drawn clipped to the missing square.
+  ready ancestor is drawn clipped to the missing square. Where nothing of a tile's area is ready yet (a jump or a
+  flight to a new place), its ancestor three levels up is requested first, so the view fills coarse at once and then
+  sharpens.
 - Line widths, dashes, circle radii and text sizes are in CSS pixels on the screen, in every phase and at every tilt.
   Paint between two integer zooms is mixed continuously.
 - Meshes are built and repainted within 6 ms of main-thread time per frame, at least one per frame. Tiles past the

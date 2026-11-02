@@ -8283,6 +8283,16 @@
         "Unit-test that `@vibeglobe/gis` exports its generic functions and no name of one application domain"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F693",
+      "milestone": 13,
+      "section": "Rendering and visual quality",
+      "description": "The space background takes `sky`, the color behind the globe, and `glowColor`, the halo's color, both `#rrggbb` and changeable at runtime: a styled map, light or dark, gets a sky and a halo of its own instead of space and the built-in blue.",
+      "steps": [
+        "Unit-test that the space background keeps space and the built-in halo by default, takes #rrggbb colors at runtime and refuses other values"
+      ],
+      "status": "passing"
     }
   ]
 }

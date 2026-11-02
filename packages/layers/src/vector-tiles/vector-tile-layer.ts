@@ -457,7 +457,7 @@ class Runtime implements VectorTileLayer {
  */
 function wantedTiles(source: ResolvedSource, targets: readonly TileId[]): TileId[] {
   const out = new Map<string, TileId>();
-  for (const tile of tilesToRequest(targets, source.coverage)) {
+  for (const tile of tilesToRequest(targets, source.coverage, (t) => source.loader.get(t) !== undefined)) {
     let t: TileId | undefined = tile;
     while (t !== undefined && source.loader.isMissing(t))
       t = t.z > source.coverage.minzoom ? ancestorAt(t, t.z - 1) : undefined;

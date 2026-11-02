@@ -37,6 +37,13 @@ export interface SpaceBackgroundOptions {
    * sky (F643). 1 is a virtual globe's; with sun lighting on it shows only on the day side.
    */
   readonly glow?: number;
+  /**
+   * The sky's color behind the globe, `#rrggbb` (default `#000000`, space). With the stars and the Milky Way off, a
+   * flat or styled map gets a sky of its own, light or dark, instead of space (F693).
+   */
+  readonly sky?: string;
+  /** The halo's color, `#rrggbb`; empty (the default) keeps the built-in whitish blue at the limb, deeper farther out. */
+  readonly glowColor?: string;
 }
 
 /** What {@link addSpaceBackground} takes: the options, and where the star catalog is hosted. */
@@ -70,9 +77,30 @@ export type SpaceBackgroundGlobe = Pick<
 >;
 
 type Settings = SpaceBackground['options'];
+type Rgb = readonly [number, number, number];
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const BUILT_IN_GLOW: readonly [Rgb, Rgb] = [
+  [0.4, 0.65, 1],
+  [0.1, 0.3, 0.95],
+];
+
+/** A `#rrggbb` CSS color in linear light, as the renderer blends. */
+function linear(hex: string): Rgb {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const channel = (shift: number): number => {
+    const c = ((value >> shift) & 255) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return [channel(16), channel(8), channel(0)];
+}
 
 function validate(options: SpaceBackgroundOptions): void {
-  const { brightness, glow, timeMs } = options;
+  const { brightness, glow, timeMs, sky, glowColor } = options;
+  if (sky !== undefined && !HEX_COLOR.test(sky))
+    throw new GlobeError('invalid-option', `sky must be a #rrggbb color, got ${sky}`);
+  if (glowColor !== undefined && glowColor !== '' && !HEX_COLOR.test(glowColor))
+    throw new GlobeError('invalid-option', `glowColor must be a #rrggbb color or empty, got ${glowColor}`);
   if (brightness !== undefined && !(brightness >= 0 && brightness <= 8))
     throw new GlobeError('invalid-option', `brightness must be 0 to 8, got ${String(brightness)}`);
   if (glow !== undefined && !(glow >= 0 && glow <= 4))
@@ -91,6 +119,10 @@ class SkyState {
   readonly sun = new Float64Array(3);
   readonly clip = new Float32Array(16);
   private readonly scratch = new Float64Array(3);
+  /** The settings the colors below were read from: they change only with `setOptions`. */
+  private colorsOf: Settings | undefined;
+  private sky: Rgb = [0, 0, 0];
+  private glow = BUILT_IN_GLOW;
 
   constructor(
     private readonly globe: SpaceBackgroundGlobe,
@@ -104,6 +136,8 @@ class SkyState {
       brightness: 1,
       fade: true,
       glow: 0,
+      sky: '#000000',
+      glowColor: '',
       timeMs: undefined,
       ...options,
     };
@@ -134,6 +168,15 @@ class SkyState {
     u.visibility.value = this.visibility;
     u.brightness.value = this.settings.brightness;
     u.glow.value = this.settings.glow;
+    if (this.colorsOf !== this.settings) {
+      this.colorsOf = this.settings;
+      this.sky = linear(this.settings.sky);
+      const tint = this.settings.glowColor ? linear(this.settings.glowColor) : undefined;
+      this.glow = tint ? [tint, tint] : BUILT_IN_GLOW;
+    }
+    u.sky.value.set(...this.sky);
+    u.glowEdge.value.set(...this.glow[0]);
+    u.glowFar.value.set(...this.glow[1]);
     u.sunLit.value = sky.sunLighting ? 1 : 0;
     this.galacticOf(view.eyeEcef, 0.001, u.eyeKm.value);
     this.galacticOf(this.sun, 1, u.sun.value);

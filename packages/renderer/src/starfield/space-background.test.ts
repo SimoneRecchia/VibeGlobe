@@ -20,3 +20,16 @@ describe('the space background halo (F643)', () => {
     expect(() => addSpaceBackground(globe, { glow: -1 })).toThrow(/glow must be 0 to 4/);
   });
 });
+
+describe('the space background sky and halo colors (F693)', () => {
+  it('keeps space and the built-in halo by default, takes #rrggbb colors at runtime and refuses others', () => {
+    const background = addSpaceBackground(globe);
+    expect([background.options.sky, background.options.glowColor]).toEqual(['#000000', '']);
+    background.setOptions({ sky: '#f4f4f4', glowColor: '#cfd3d4', stars: false, milkyWay: false });
+    expect([background.options.sky, background.options.glowColor]).toEqual(['#f4f4f4', '#cfd3d4']);
+    background.setOptions({ glowColor: '' });
+    expect(background.options.glowColor).toBe('');
+    expect(() => background.setOptions({ sky: 'white' })).toThrow(/sky must be a #rrggbb color/);
+    expect(() => addSpaceBackground(globe, { glowColor: '#fff' })).toThrow(/glowColor must be a #rrggbb color/);
+  });
+});

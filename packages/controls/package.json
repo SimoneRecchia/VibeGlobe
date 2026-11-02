@@ -22,7 +22,9 @@
     "!src/**/__fixtures__",
     "!src/**/__snapshots__",
     "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
-    "!dist/**/__fixtures__"
+    "!dist/**/__fixtures__",
+    "!src/test-harness.ts",
+    "!dist/test-harness.*"
   ],
   "dependencies": {
     "@vibeglobe/core": "0.1.0"

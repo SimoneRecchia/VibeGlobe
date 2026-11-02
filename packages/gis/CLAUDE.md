@@ -6,7 +6,6 @@ GIS utilities: coordinate formatting and parsing (decimal degrees, DMS, UTM), re
 
 - Pure functions, no DOM and no engine instance: the ui package's readout, search box and measurement tools call them, and so can applications.
 - Geodesy comes from `@vibeglobe/core` (Karney's geodesics); projections other than core's go through proj4js, with definitions kept in this package's registry, never proj4's global one.
-- Owned by the UI and GIS utilities track (docs/internal/parallel-tracks.md).
 
 ## Commands
 

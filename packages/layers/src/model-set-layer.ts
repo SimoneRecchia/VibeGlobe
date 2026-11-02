@@ -330,7 +330,7 @@ export class ModelSetLayer extends LayerEmitter implements Layer {
 
   /**
    * The corners of copies' model boxes as the frame draws them (F667), to frame whole models with `fitObjects`: a
-   * turbine with its tower, nacelle and rotor, or a plant's every device. Round the vertical axis the box takes its
+   * turbine with its tower, nacelle and rotor, or a whole group of copies. Round the vertical axis the box takes its
    * largest reach, so a nacelle turned any way stays inside. `ids` default to every copy; empty before the model has
    * loaded. `reliefFactor` as for {@link ModelSetLayer.markerPosition}.
    */

@@ -7927,7 +7927,7 @@
         "Unit-test rows inside the perimeter without overlaps from the far row, shrinking alike and its floor, panels around fixed ones, wanted positions, the bearing and several perimeters",
         "In an application's editor, 2,000 panels in a drawn perimeter follow a dragged panel at 60 fps on a mid-range laptop"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F659",
@@ -7993,7 +7993,7 @@
         "Unit-test on drawn parks at several bearings that it finds the bearing within a degree, the depth, the spacing, the table length and centers within a meter of the real ones, and nothing in bare ground",
         "On a capture of a real park, the tables found lie on the tables seen"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F665",
@@ -8136,7 +8136,7 @@
       "steps": [
         "Unit-test that with an anchor every placed center lies a whole number of steps from it along and across the rows"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F678",
@@ -8180,7 +8180,7 @@
         "Unit-test that a panel dropped on the first place of a row takes it and the panels after it shift one place along in order",
         "Unit-test that a panel dragged across a full row leaves every panel placed and none overlapping"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F682",
@@ -8190,7 +8190,7 @@
       "steps": [
         "Unit-test that the panels without room stand beyond the last row, outside the perimeter, without overlapping each other or the placed ones"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F683",
@@ -8271,6 +8271,16 @@
       "description": "`xyzImagery` takes `blankShare`: a tile with at least that share of its pixels in the `blankTile` color is no data, so a service's filler with a caption (Esri's \"Map data not yet available\") gives way to the deepest level the service has, magnified.",
       "steps": [
         "Unit-test that a filler with a caption counts as blank at a share its color reaches and not above it, and that `blankShare` outside (0, 1] throws `invalid-option`"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F692",
+      "milestone": 13,
+      "section": "Map sources: map-agnostic design",
+      "description": "The library is a generic engine with nothing of one application's domain: `@vibeglobe/gis` holds coordinates, reference systems, measurement, view state and `gridLines`; laying out or detecting an application's objects (such as solar tables) is the application's own code.",
+      "steps": [
+        "Unit-test that `@vibeglobe/gis` exports its generic functions and no name of one application domain"
       ],
       "status": "passing"
     }

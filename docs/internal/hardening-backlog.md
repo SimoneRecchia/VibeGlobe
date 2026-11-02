@@ -70,7 +70,7 @@ This row replaces track B's F315 row above: popping is now checked.
 
 ## 3D Tiles track (track E: `packages/renderer/src/tiles3d`, `packages/sources/src/tiles3d`)
 
-Each remaining step and what it waits for (hook requests E (1)–(6) in `docs/internal/parallel-tracks.md`, ADR 0141).
+Each remaining step and what it waits for (ADR 0141).
 
 | Entry | Remaining step                                                                                    | Waits for                                       | Built and tested meanwhile                                                                                                                                                      |
 | ----- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

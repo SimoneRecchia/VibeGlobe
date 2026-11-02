@@ -7,7 +7,7 @@ title: UI controls and GIS utilities
 The engine runs without any UI. `@vibeglobe/ui` adds ready-made controls over a globe (`createUi`), styled by CSS
 variables and translated; `@vibeglobe/ui/minimap` holds the overview minimap. `@vibeglobe/gis` holds the pure
 functions behind them, usable without the renderer or the UI: coordinate formats and parsing, reference-system
-transforms, geodesic measurement, view state in URLs, and the layout and detection of panels in rows. Mouse, touch
+transforms, geodesic measurement, view state in URLs and grids on the ground. Mouse, touch
 and keyboard navigation is in the [controls guide](controls.md); in Vue, add a control with `<VibeControl>`
 ([integration guide](integration.md#vue-3)).
 
@@ -217,60 +217,17 @@ Built-in reference systems: EPSG:4326, EPSG:3857, EPSG:4258 (ETRS89), EPSG:25832
 (EPSG:326zz north, EPSG:327zz south); `crsCodes()` lists them with those defined. `formatCoordinate` returns undefined
 for UTM outside 80°S to 84°N.
 
-## Panels in rows
-
-Three functions serve an editor of identical rectangles in rows, such as the tables of a solar park.
-
-`layoutPanels` places `count` panels of `widthM` × `depthM` metres in rows inside one or more perimeters:
-
-- Rows run along `rowBearingDeg` (default 90: east–west), `gapM` (default 0.5) apart in a row and `rowGapM` (default
-  the panel's depth) between rows; they fill from the far side, each from its start.
-- A panel with a `wanted` position takes the free place nearest to it; the others take the next free places, so a list
-  ordered by group stays together. Giving every panel its current place as `wanted` snaps them back onto even rows.
-- `fixed` panels keep their places and the rest go around them. `anchor` lines the rows up with one panel (seen in an
-  image, or already placed); without it the rows take the phase that holds the most panels.
-- `moving` lists, by index, the panels dragged by hand: each takes the place nearest where it is dropped and the panels
-  in the way shift along the rows toward the nearest free place, in order.
-- When the perimeters cannot hold every panel, all shrink alike down to `minScale` (default 0.85); the result's `scale`
-  says how much. Panels still without a place are undefined, or line up beyond the last row with `spill: true`.
-
-```ts
-import { gridLines, layoutPanels } from '@vibeglobe/gis';
-
-const corner = { longitudeDeg: 13.0, latitudeDeg: 52.3 };
-const field = [
-  corner,
-  { longitudeDeg: 13.004, latitudeDeg: 52.3 },
-  { longitudeDeg: 13.004, latitudeDeg: 52.302 },
-  { longitudeDeg: 13.0, latitudeDeg: 52.302 },
-];
-const { centers, scale } = layoutPanels({ perimeters: [field], count: 120, widthM: 13.6, depthM: 4.6 });
-const lines = gridLines({ center: corner, halfSizeM: 400, spacingM: 10 }); // segments for a line layer
-```
+## Grid lines
 
 `gridLines` returns the segments of a square grid on the ground, each as its two ends, turned to `bearingDeg`
-(default 0). It returns at most 2000 lines: a finer grid over a larger square has its spacing doubled until it fits.
-It throws a `RangeError` when `spacingM` is not a positive number of meters.
-
-`detectPanels` finds the tables already built in a top-down image of the area, with image arithmetic and no trained
-model: blue pixels (or, for black modules, pixels darker than the ground; never green or warm tones) are panels.
-It returns the rows' bearing, the row pitch, a table's size and every table's center inside the perimeters, or
-undefined when no rows stand out. The image must look straight down, north up, with its edges in degrees:
+(default 0), for a line layer under an editor or a measurement. It returns at most 2000 lines: a finer grid over a
+larger square has its spacing doubled until it fits. It throws a `RangeError` when `spacingM` is not a positive number
+of meters.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { detectPanels } from '@vibeglobe/gis';
+import { gridLines } from '@vibeglobe/gis';
 
-declare const globe: Globe;
-declare const field: { longitudeDeg: number; latitudeDeg: number }[];
-declare const bounds: { westDeg: number; eastDeg: number; southDeg: number; northDeg: number };
-
-const view = await globe.captureView({ widthPx: 1600, heightPx: 1000 });
-const found = detectPanels({
-  image: { data: view.rgba, width: view.widthPx, height: view.heightPx },
-  bounds,
-  perimeters: [field],
-});
+const lines = gridLines({ center: { longitudeDeg: 13.0, latitudeDeg: 52.3 }, halfSizeM: 400, spacingM: 10 });
 ```
 
 ## Rules and pitfalls

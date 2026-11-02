@@ -28,8 +28,8 @@ export class SpinMotion {
   constructor(rpms: readonly number[], rampSeconds: number) {
     if (!(rampSeconds >= 0 && Number.isFinite(rampSeconds)))
       throw new RangeError('spin.rampSeconds must be a number ≥ 0');
-    // A third of a turn apart at most: three blades look the same every 120°.
-    this.angles = Float32Array.from(rpms, (_, i) => (i * PHASE_STEP) % (TURN / 3));
+    // Copies start at different angles, so a field of parts never turns in step.
+    this.angles = Float32Array.from(rpms, (_, i) => (i * PHASE_STEP) % TURN);
     this.#targets = Float64Array.from(rpms, (rpm) => finite(rpm, 'A spin speed') * RPM);
     this.#rates = Float64Array.from(this.#targets);
     this.#rampMs = rampSeconds * 1000;

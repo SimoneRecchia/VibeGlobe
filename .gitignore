@@ -22,3 +22,4 @@ packages/core/llms.txt
 # Local build variables (keys of map providers): never committed.
 .env.local
 .env.*.local
+.DS_Store

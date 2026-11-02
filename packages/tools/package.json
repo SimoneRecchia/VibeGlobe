@@ -23,7 +23,10 @@
     "!src/**/__snapshots__",
     "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
     "configs",
-    "!dist/**/__fixtures__"
+    "!dist/**/__fixtures__",
+    "!src/**/*.spec.ts",
+    "!dist/**/*.spec.*",
+    "!configs/test-*"
   ],
   "bin": {
     "vibeglobe-data": "./dist/bin.js"

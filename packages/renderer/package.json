@@ -47,7 +47,9 @@
     "!src/**/__fixtures__",
     "!src/**/__snapshots__",
     "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
-    "!dist/**/__fixtures__"
+    "!dist/**/__fixtures__",
+    "!src/atmosphere/harness.ts",
+    "!dist/atmosphere/harness.*"
   ],
   "dependencies": {
     "@types/three": "0.186.0",

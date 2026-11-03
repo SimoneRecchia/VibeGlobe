@@ -103,17 +103,18 @@ const stop = watchClicks(container, globe, ({ point, position }) => {
 
 How a drag moves the camera: the `navigationMode` option at start, `setNavigationMode` at runtime.
 
-| Mode               | A drag                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| `'free'` (default) | Turns the globe like a trackball: it passes over the poles and the heading turns with the globe |
-| `'north-up'`       | Keeps north up: horizontal motion turns about the polar axis, vertical motion changes latitude  |
+| Mode               | A drag                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `'free'` (default) | Turns the globe like a trackball: it passes over the poles and the heading turns with the globe                                      |
+| `'north-up'`       | Keeps north up: horizontal motion turns about the polar axis, vertical motion changes latitude; rotation gestures and keys only tilt |
 
 - In `'free'` mode the flat map, at regional and street scale, keeps the heading during a drag.
 - In `'north-up'` mode the point the camera looks at stops at `northUpMaxLatitudeDeg` (default 85, from 1 to 89.9):
   vertical motion beyond it is ignored and horizontal motion still turns the globe. A camera placed beyond the limit
   stays there.
-- In both modes inertia, zoom to the cursor, the rotate and tilt gestures and `resetNorth` work the same, and a wheel
-  zoom never turns the heading.
+- In both modes inertia, zoom to the cursor, the tilt gestures and `resetNorth` work the same, and a wheel zoom never
+  turns the heading. In `'north-up'` the rotate gestures and keys turn nothing: a turn goes through only back toward
+  north.
 
 ## Tilt policy
 

@@ -370,6 +370,21 @@ describe('rotate and tilt drags (F182, F183)', () => {
     expect(results[1]).toEqual(results[0]);
   });
 
+  it("holds north up in 'north-up': a right-drag only tilts, and a turn goes through only back toward north (KB-342)", () => {
+    const h = controlsHarness({ navigationMode: 'north-up' });
+    h.pointer('pointerdown', { x: 400, y: 300, t: 0, button: 2 });
+    h.pointer('pointermove', { x: 600, y: 150, t: 500, button: 2 });
+    h.frame();
+    h.pointer('pointerup', { x: 600, y: 150, t: 600, button: 2 });
+    h.run(2000);
+    expect([h.camera.headingDeg, h.camera.tiltDeg]).toEqual([0, 22.5]);
+    // A heading from before the lock returns to north.
+    h.camera.headingDeg = 30;
+    h.key('keydown', 'n');
+    h.run(h.globe.timeMs + 3000);
+    expect(h.camera.headingDeg).toBeCloseTo(0, 6);
+  });
+
   it('ends a Ctrl+drag rotation when Ctrl is released, without starting a pan', () => {
     const h = controlsHarness();
     h.pointer('pointerdown', { x: 400, y: 300, t: 0, ctrlKey: true });

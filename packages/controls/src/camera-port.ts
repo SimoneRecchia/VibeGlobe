@@ -1,6 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition, Globe, NavigationApi, ScreenPoint } from '@vibeglobe/core';
+import { shortestArcDeg } from './animators.js';
 
 /**
  * The part of the engine's public API the controls use beyond `NavigationApi`: the home command and the view-mode
@@ -286,6 +287,13 @@ export class CameraPort {
   rotate(deltaHeadingDeg: number, deltaTiltDeg: number, maxTiltDeg: number): void {
     // Beyond the tilt policy's lock the view stays flat (F625): gestures and keys turn it but do not tilt it.
     if (this.navigation.tiltPolicy?.[3] === 0) deltaTiltDeg = 0;
+    // 'North-up' holds the heading: gestures and keys only tilt, and a turn goes through only back toward north (KB-342).
+    const heading = this.navigation.headingDeg;
+    if (
+      this.navigation.navigationMode === 'north-up' &&
+      Math.abs(shortestArcDeg(heading + deltaHeadingDeg, 0)) > Math.abs(shortestArcDeg(heading, 0))
+    )
+      deltaHeadingDeg = 0;
     if (deltaHeadingDeg === 0 && deltaTiltDeg === 0) return;
     const tilt = this.navigation.tiltDeg;
     const clamped = Math.min(Math.max(tilt + deltaTiltDeg, 0), maxTiltDeg) - tilt;

@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-03: 'north-up' holds the heading against every input (KB-342)
+
+'North-up' held north up only for drags: a right-drag, a two-finger turn (Safari's trackpad gesture, a touch screen)
+and the turn keys still turned the view. `CameraPort.rotate`, which they all go through, now drops a turn that would
+take the heading further from north in that mode; the reset to north still turns, and tilting is unchanged.
+
 ## 2026-11-03: maps by distance at every latitude, north-up drags at the pole (KB-340, KB-341)
 
 Two bugs an application's owner found over the north. KB-340: the satellite's layers faded in with the Web Mercator

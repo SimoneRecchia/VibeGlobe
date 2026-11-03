@@ -151,6 +151,20 @@ describe('trackpad flicks on a zoomed-out globe (KB-202)', () => {
     expect(glide(run)[0]?.angle ?? 0).toBeGreaterThan(0.6 * releaseSpeed(run));
   });
 
+  it('a slow drag from the center past the edge turns the globe at most twice as fast as at the center (KB-338)', () => {
+    // 0.25 px/ms from the center to 400 px right, past the edge at 250 px: about 2 px a frame at 120 Hz.
+    const run = play(
+      { name: 'to the edge', speed: () => 0.25, durationMs: 1600, startX: CX, liftAfterMs: 2 },
+      120,
+      120,
+      0,
+    );
+    const drag = run.steps.filter((s) => s.down && s.angle > 0);
+    const atCenter = drag[1]?.angle ?? 0;
+    expect(atCenter).toBeGreaterThan(0);
+    for (const [i, step] of drag.entries()) expect(step.angle, `frame ${i}`).toBeLessThan(2.05 * atCenter);
+  });
+
   it('a release on empty space after holding still ends without a glide', () => {
     const h = controlsHarness(undefined, { globeRadiusPx: RADIUS_PX });
     const globe = h.camera as OrthoGlobe;

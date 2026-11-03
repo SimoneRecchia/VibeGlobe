@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition } from '@vibeglobe/core';
 import type { MutablePoint, ReleaseVelocity } from './animators.js';
+import { EDGE_TURN } from './camera-port.js';
 import { type GestureContext, TapDetector } from './gesture-context.js';
 import { SampleRing } from './samples.js';
 
@@ -40,6 +41,9 @@ export class TouchGestures {
   private anchor: GeoPosition | undefined;
   /** The pan turns the globe about the screen center: the fingers left the globe's disc (KB-202). */
   private trackball = false;
+  /** How much faster than a drag at the center the trackball turns: {@link EDGE_TURN} once the fingers held the globe. */
+  private turn = 1;
+  private carriedTurn = 1;
   private readonly mid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly applied: MutablePoint = { xPx: 0, yPx: 0 };
   /** The midpoint when the fingers last changed, where the next frame grabs the anchor. */
@@ -160,6 +164,7 @@ export class TouchGestures {
   private reset(): void {
     this.anchor = undefined;
     this.trackball = false;
+    this.turn = 1;
     this.dirty = false;
     this.rebaseline = false;
     this.carriedMs = -Infinity;
@@ -260,13 +265,16 @@ export class TouchGestures {
   private applyPan(): void {
     const { port, options } = this.context;
     if (options.gestures.dragPan) {
-      if (this.anchor && port.grab(this.mid)) {
+      const dx = this.mid.xPx - this.applied.xPx;
+      const dy = this.mid.yPx - this.applied.yPx;
+      const widthPx = this.context.widthPx();
+      const heightPx = this.context.heightPx();
+      if (this.anchor && port.grab(this.mid) && port.pivotScale(this.mid, dx, dy, widthPx, heightPx) <= EDGE_TURN) {
         port.dragTo(this.anchor, this.mid);
         this.trackball = false;
+        this.turn = EDGE_TURN;
       } else {
-        const dx = this.mid.xPx - this.applied.xPx;
-        const dy = this.mid.yPx - this.applied.yPx;
-        if (dx !== 0 || dy !== 0) port.pivotPan(dx, dy, this.context.widthPx(), this.context.heightPx());
+        if (dx !== 0 || dy !== 0) port.pivotPan(dx * this.turn, dy * this.turn, widthPx, heightPx);
         this.anchor = port.grab(this.mid);
         this.trackball = true;
       }
@@ -347,6 +355,7 @@ export class TouchGestures {
     this.carriedMs = timeMs;
     // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
     this.carriedTrackball = this.trackball;
+    this.carriedTurn = this.turn;
     this.carriedPixel.xPx = this.applied.xPx;
     this.carriedPixel.yPx = this.applied.yPx;
   }
@@ -377,6 +386,7 @@ export class TouchGestures {
     const quick = timeMs - this.sessionStartMs <= tapMaxMs && !this.sessionMoved;
     const carried = timeMs - this.carriedMs <= LIFT_TOGETHER_MS;
     const trackball = carried ? this.carriedTrackball : this.trackball;
+    const turn = carried ? this.carriedTurn : this.turn;
     const pixel = carried ? this.carriedPixel : this.applied;
     this.reset();
     if (quick && this.sessionFingers === 2) {
@@ -402,7 +412,9 @@ export class TouchGestures {
     const heightPx = this.context.heightPx();
     // The glide turns the globe about the screen center as fast as the fingers did where they lifted (KB-202).
     const release = this.release;
-    const pivot = trackball ? 1 : port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx);
+    const pivot = trackball
+      ? turn
+      : Math.min(port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx), EDGE_TURN);
     const speed = Math.hypot(release.panXPx, release.panYPx) * pivot;
     const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
     release.panXPx *= scale;

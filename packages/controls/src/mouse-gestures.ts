@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GeoPosition } from '@vibeglobe/core';
 import type { MutablePoint, ReleaseVelocity } from './animators.js';
+import { EDGE_TURN } from './camera-port.js';
 import { type GestureContext, TapDetector } from './gesture-context.js';
 import { SampleRing } from './samples.js';
 import type { ZoomBox } from './zoom-box.js';
@@ -33,8 +34,10 @@ export class MouseGestures {
   /** Started with Ctrl: releasing Ctrl ends the rotation. */
   private ctrlRotate = false;
   private anchor: GeoPosition | undefined;
-  /** The pan turns the globe about the screen center: the pointer left the globe's disc (KB-202). */
+  /** The pan turns the globe about the screen center: the pointer left the globe's disc (KB-202) or its middle (KB-338). */
   private trackball = false;
+  /** How much faster than a drag at the center the trackball turns: {@link EDGE_TURN} once the drag held the globe. */
+  private turn = 1;
   private grabPending = false;
   private movePending = false;
   private releasePending = false;
@@ -78,6 +81,7 @@ export class MouseGestures {
     this.moved = false;
     this.grabPending = mode === 'pan' && gestures.dragPan;
     this.trackball = false;
+    this.turn = 1;
     this.movePending = false;
     this.releasePending = false;
     this.samples.clear();
@@ -176,13 +180,20 @@ export class MouseGestures {
         return;
       }
     }
-    if (this.anchor && port.grab(this.pointer)) {
+    const dx = this.pointer.xPx - this.applied.xPx;
+    const dy = this.pointer.yPx - this.applied.yPx;
+    const widthPx = this.context.widthPx();
+    const heightPx = this.context.heightPx();
+    if (
+      this.anchor &&
+      port.grab(this.pointer) &&
+      port.pivotScale(this.pointer, dx, dy, widthPx, heightPx) <= EDGE_TURN
+    ) {
       port.dragTo(this.anchor, this.pointer);
       this.trackball = false;
+      this.turn = EDGE_TURN;
     } else {
-      const dx = this.pointer.xPx - this.applied.xPx;
-      const dy = this.pointer.yPx - this.applied.yPx;
-      if (dx !== 0 || dy !== 0) port.pivotPan(dx, dy, this.context.widthPx(), this.context.heightPx());
+      if (dx !== 0 || dy !== 0) port.pivotPan(dx * this.turn, dy * this.turn, widthPx, heightPx);
       this.anchor = port.grab(this.pointer);
       this.trackball = true;
     }
@@ -226,7 +237,9 @@ export class MouseGestures {
     if (mode === 'pan') {
       // The glide turns the globe about the screen center as fast as the drag did at the release point (KB-202); a
       // drag off the globe already turned it about the center.
-      const pivot = trackball ? 1 : port.pivotScale(this.applied, vx, vy, widthPx, heightPx);
+      const pivot = trackball
+        ? this.turn
+        : Math.min(port.pivotScale(this.applied, vx, vy, widthPx, heightPx), EDGE_TURN);
       const speed = Math.hypot(vx, vy) * pivot;
       const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
       release.panXPx = vx * scale;

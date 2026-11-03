@@ -255,6 +255,9 @@ const preset = europeOpen({
   `position: 'top'` (the default) asks a source before the preset's; `'bottom'` only where nothing above has data.
 - A source with `minLevel` above 11 goes into its own layer, `satellite-online`, fading in over levels 12 to 13 in its
   own colors. A source with a lower `minLevel` joins the `satellite` layer, its tones matched like WorldCover's.
+- `online: true` puts a source on `satellite-online` even with lower levels. A moving camera asks for imagery up to two
+  levels coarser: an online source that also serves levels 10 and 11 keeps showing while the view moves, instead of
+  giving way to WorldCover in patches (KB-339).
 - Give each source an `area`, so it is asked only where it has data.
 - A paid provider's key stays out of the code: `secretQuery` adds it to tile requests only, and the profile's `forbids`
   keeps its tiles out of packages and the persistent cache. The [sources guide](sources.md) connects Google's Map Tiles

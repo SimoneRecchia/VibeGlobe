@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONTROLS_OPTIONS } from './options.js';
-import { controlsHarness, type PointerInit } from './test-harness.js';
+import { controlsHarness, type OrthoGlobe, type PointerInit } from './test-harness.js';
 
 type Harness = ReturnType<typeof controlsHarness>;
 
@@ -47,6 +47,26 @@ describe('touch gestures (ADR 0009 §4)', () => {
       h.frame();
       expect(h.camera.pixelOf(grabbed).xPx).toBeCloseTo(200 + 20 * i, 9);
     }
+  });
+
+  it('a one-finger drag past the edge of a zoomed-out globe turns it at most twice as fast as at the center (KB-338)', () => {
+    const h = controlsHarness(undefined, { globeRadiusPx: 250 });
+    const globe = h.camera as OrthoGlobe;
+    touch(h, 'pointerdown', 1, 400, 300, 0);
+    h.frame(8);
+    const angles: number[] = [];
+    let previous = globe.centerVector();
+    // 2 px a frame from the center to 400 px right, past the edge at 250 px.
+    for (let i = 1; i <= 200; i++) {
+      touch(h, 'pointermove', 1, 400 + 2 * i, 300, i * 8);
+      h.frame(8);
+      const now = globe.centerVector();
+      angles.push(Math.hypot(now[0] - previous[0], now[1] - previous[1], now[2] - previous[2]));
+      previous = now;
+    }
+    const atCenter = angles[1] ?? 0;
+    expect(atCenter).toBeGreaterThan(0);
+    for (const [i, angle] of angles.entries()) expect(angle, `frame ${i}`).toBeLessThan(2.05 * atCenter);
   });
 
   it('pinches about the finger midpoint, continuously, once past the threshold (F173)', () => {

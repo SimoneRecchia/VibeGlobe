@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-03: drags at the globe's edge and online imagery in motion (KB-338, KB-339)
+
+Two bugs an application's owner found on its satellite page. KB-338: a free drag on a zoomed-out globe turned it ever faster toward its edge (6 times the center's turn per pixel just inside it) and dropped to the center's rate past it, so a drag over a pole spun and jumped; mouse and touch drags now grab the globe while a pixel turns it at most twice as much as at the center, and go on at that rate beyond. KB-339: the preset's online layer starts above the package's last level, so a moving camera, which asks for imagery up to two levels coarser, fell back to the package in patches; an added source now takes `online: true` to bring its coarser levels onto the online layer.
+
 ## 2026-11-03: motion blur taken out (F695, owner's decision)
 
 After trying it in an application, the owner asked to take the motion blur out: #127 and #128 are reverted, F694 is superseded by F695 (no motion blur), and the tests of the pass, the setting and the prop are recorded in `docs/internal/test-changes.md`. KB-337, found on the way, stays recorded.

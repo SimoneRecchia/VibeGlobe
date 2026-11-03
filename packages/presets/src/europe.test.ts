@@ -194,6 +194,36 @@ describe('europeOpen (F613)', () => {
     expect(alone.map((layer) => layer.sources.map((s) => s.maxLevel))).toEqual([[11]]);
   });
 
+  it("puts an added source marked online on the online layer, its levels below the package's last included, so a moving camera keeps it (KB-339)", () => {
+    const fine = xyzImagery({ id: 'fine', url: 'https://fine.test/{z}/{x}/{y}.jpg', minLevel: 10, maxLevel: 19 });
+    const record = {
+      id: 'fine',
+      name: 'Fine imagery',
+      kind: 'imagery' as const,
+      tiers: 'network' as const,
+      license: 'CC BY 4.0',
+      termsUrl: 'https://fine.test/terms',
+      termsReadDate: '2026-11-03',
+      attribution: [{ text: '© Fine' }],
+      minLevel: 10,
+      maxLevel: 19,
+      coverage: 'europe-land' as const,
+    };
+    const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json' };
+    const preset = europeOpen({
+      ...manifest,
+      offline: fakeOffline(),
+      addSources: [{ source: fine, record, online: true }],
+    });
+    const imagery = preset.baseMaps[0]?.imagery ?? [];
+    expect(imagery.map((layer) => layer.id)).toEqual(['satellite', 'satellite-online']);
+    // A camera that moves asks for imagery up to two levels coarser: at level 10 the online layer still has its tile.
+    expect(imagery[1]?.sources[0]?.request(tile(10, 540, 360), out)).toMatchObject({
+      url: 'https://fine.test/10/540/360.jpg',
+    });
+    expect(imagery[0]?.sources.map((source) => source.id)).not.toContain('fine');
+  });
+
   it('shows the base image far away, fades the package in by zoom with tones matched only at the lowest levels, the Blue Marble only online (F636, F638, F639)', () => {
     const manifest = { packageManifestUrl: 'https://app.test/maps/europe/manifest.json', offline: fakeOffline() };
     const layers = europeOpen(manifest).baseMaps[0]?.imagery ?? [];

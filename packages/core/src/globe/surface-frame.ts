@@ -94,6 +94,8 @@ export class SurfaceFrame {
     imageryTexelsPerTile: 0,
     imageryMaxLevel: 0,
     maxTexelErrorPx: MAX_TEXEL_ERROR_PX,
+    imageryStartLevels: new Float64Array(0),
+    imageryStartCount: 0,
     terrainErrorMeters: undefined as Float64Array | undefined,
     terrainMercator: false,
     terrainMaxLevel: 0,
@@ -176,8 +178,7 @@ export class SurfaceFrame {
     );
     this.imagery = imagery;
     imagery.setPixelRatio(resolutionOf(this)[0] ?? 1);
-    this.selection.imageryTexelsPerTile = imagery.texelsPerTile;
-    this.selection.imageryMaxLevel = imagery.maxLevel;
+    this.imageryChanged();
     if (terrain) {
       this.selection.terrainErrorMeters = terrainErrorsBySurfaceLevel(terrain, MAX_LEVEL);
       this.selection.terrainMercator = terrain.tiling.crs === 'EPSG:3857';
@@ -300,6 +301,7 @@ export class SurfaceFrame {
         // A flight requests no visible tile: its plan loads the path and the destination instead (F287, F671).
         layer.loader.settleMs = imagery.plan.flying ? Number.POSITIVE_INFINITY : 0;
       }
+    if (imagery) this.selection.imageryStartCount = imagery.startLevelsInto(this.selection.imageryStartLevels);
     const count = selectQuadtreeTiles(camera, this.selection, this.tiles);
     if (timed) imagery.chargeTerrainMs(imagery.now() - selectionStart);
     this.draws.reserve(count);
@@ -360,6 +362,7 @@ export class SurfaceFrame {
     if (!this.imagery) return;
     this.selection.imageryTexelsPerTile = this.imagery.texelsPerTile;
     this.selection.imageryMaxLevel = this.imagery.maxLevel;
+    this.selection.imageryStartLevels = new Float64Array(this.imagery.stack.length);
   }
 
   /**

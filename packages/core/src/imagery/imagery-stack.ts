@@ -2,7 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { rgba8Bytes } from '../cache/byte-size.js';
 import type { Camera } from '../camera/camera.js';
-import { cameraZoom } from '../camera/zoom.js';
+import { cameraGroundZoom } from '../camera/zoom.js';
 import { coveredTiles, LOAD_ALL, LOAD_KEEP_IN_MEMORY, LOAD_PREFETCH, type ImagerySource } from './imagery-source.js';
 import { RAD_TO_DEG as DEG } from '../geodesy/geodesic-angles.js';
 
@@ -51,7 +51,10 @@ export interface ImageryLayerOptions {
   readonly harmonizeFade?: ZoomFade;
 }
 
-/** A fade with the camera's Mercator zoom (`ImageryLayerOptions.fadeIn`, F635). */
+/**
+ * A fade with the camera's zoom (`ImageryLayerOptions.fadeIn`, F635), its ground zoom: the Web Mercator zoom it would
+ * show on the equator, so a layer comes in at the same distance at every latitude (KB-340).
+ */
 export interface ZoomFade {
   readonly fromZoom: number;
   readonly toZoom: number;
@@ -252,7 +255,7 @@ export function shownOpacity(entry: StackEntry): number {
 export const LAYER_FADE_MS = 600;
 
 /**
- * Sets each layer's tone matching at the camera's Mercator zoom (F638) and moves its share of its opacity toward its value
+ * Sets each layer's tone matching at the camera's ground zoom (F638, KB-340) and moves its share of its opacity toward its value
  * there (F635), by at most the time since the last call (`time[0]` now, `time[1]` the last call, written here, engine
  * milliseconds; no time moves it at once) over {@link LAYER_FADE_MS} (F670). When a layer turns opaque or
  * translucent, every draw changes layers: `snaps` (the imagery's cross-fades, then each overlay slot's) show the next
@@ -266,7 +269,7 @@ export function fadeByZoom(
   time?: Float64Array,
   snaps: readonly { snapNext: boolean }[] = [],
 ): boolean {
-  const zoom = cameraZoom(camera);
+  const zoom = cameraGroundZoom(camera);
   // NaN (no time) moves every value to its own at once.
   const most = time ? ((time[0] ?? 0) - (time[1] ?? Number.NaN)) / LAYER_FADE_MS : Number.NaN;
   if (time) time[1] = time[0] ?? 0;
@@ -290,7 +293,7 @@ export function fadeByZoom(
   return fading;
 }
 
-/** Whether a view at Mercator zoom `zoom` draws the layer: visible, not transparent, and within its fade (F671). */
+/** Whether a view at ground zoom `zoom` draws the layer: visible, not transparent, and within its fade (F671). */
 export function shownAt(entry: StackEntry, zoom: number): boolean {
   return entry.visible && entry.opacity > 0 && ramp(entry.fadeIn, zoom, 1) > 0;
 }

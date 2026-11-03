@@ -65,7 +65,7 @@ export function writeFramePayload(
 ): void {
   out.frameNumber = frameNumber;
   out.tiles = tiles;
-  // Written out rather than `cameraZoom`: one more call level is not inlined in the browser's frame loop and boxes the
+  // Written out rather than in a helper: one more call level is not inlined in the browser's frame loop and boxes the
   // zoom and the clamped latitude every frame (F064, KB-316).
   out.zoom = mercatorZoomFromGroundZoom(
     groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad),

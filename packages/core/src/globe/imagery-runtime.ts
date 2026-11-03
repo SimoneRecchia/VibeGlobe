@@ -9,7 +9,7 @@ import { RamTier } from '../cache/ram-tier.js';
 import { Residency } from '../cache/residency.hot.js';
 import type { Camera } from '../camera/camera.js';
 import { drawImagery, preloadImagery, stackOf, type ImageryLayer, type StackLayer } from '../imagery/imagery-draws.js';
-import { fadeByZoom, pinnedLevels, type StackEntry } from '../imagery/imagery-stack.js';
+import { fadeByZoom, pinnedLevels, shownOpacity, type StackEntry } from '../imagery/imagery-stack.js';
 import { runtimeCredits, warnOfProfile, type ImageryCallbacks, type RuntimeCredits } from './runtime-credits.js';
 import type { DrawList } from '../imagery/draw-list.js';
 import { ImageryFades } from '../imagery/fades.js';
@@ -314,6 +314,22 @@ export class ImageryRuntime {
     if (this.elevationQueries.length > 0) return true;
     for (const layer of this.layers) if (layer.loader.busy) return true;
     return this.terrain?.loader.busy ?? false;
+  }
+
+  /**
+   * The first level of each layer drawn at the last frame's zoom, into `out` (KB-340): the selection refines tiles to
+   * them. Returns how many. Allocates nothing.
+   */
+  startLevelsInto(out: Float64Array): number {
+    let count = 0;
+    for (let s = 0; s < this.stack.length && count < out.length; s++) {
+      const entry = this.stack[s]?.entry;
+      if (!entry?.visible || shownOpacity(entry) <= 0) continue;
+      let start = Number.POSITIVE_INFINITY;
+      for (let k = 0; k < entry.sources.length; k++) start = Math.min(start, entry.sources[k]?.minLevel ?? 0);
+      out[count++] = start;
+    }
+    return count;
   }
 
   /** True once every layer's pinned base is resident: the globe is complete when zoomed out (F084). */

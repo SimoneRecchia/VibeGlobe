@@ -127,13 +127,67 @@ function restoreStart(camera: Camera): void {
 }
 
 /**
- * The target stopped at the north-up limit nearest the pole the solve headed for, with the longitude of its last step:
- * the camera halts at the pole while the cursor goes on. True when the anchor is still in front of the eye.
+ * The target stopped at the north-up limit, the camera halting at the pole while the cursor goes on (KB-341): on the
+ * pole of the start when it was already nearer a pole than the equator, else of the solve's last step, whose longitude
+ * an unreachable pixel makes arbitrary; the globe then turns about the pole until the anchor lies toward the cursor
+ * from it on screen. True when the anchor is still in front of the eye.
  */
 function holdAtLimit(camera: Camera): boolean {
-  // Past the limit, the target's latitude is nonzero.
-  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * (northUpLimitRad[1] ?? 0);
+  const pose = camera.pose;
+  const limit = northUpLimitRad[1] ?? 0;
+  const startLat = start[1] ?? 0;
+  const side = 2 * Math.abs(startLat) >= limit ? startLat : pose.targetLatitudeRad;
+  pose.targetLatitudeRad = side < 0 ? -limit : limit;
+  pose.targetLongitudeRad = start[0] ?? 0;
+  poleGeodetic[1] = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+  geodeticArrayToEcef(poleGeodetic, poleEcef);
+  if (!(solveMorph && (solveMorph.factors[0] ?? 0) > 0)) turnTowardPixel(camera);
   return residual(camera, r0);
+}
+
+const poleGeodetic = new Float64Array(3);
+const poleEcef = new Float64Array(3);
+const poleScreen = new Float64Array(2);
+/** The turn about the pole that brings the anchor's screen direction from it to the pixel's, radians (KB-341). */
+const turn = new Float64Array(2);
+/** Within this many pixels of the pole on screen a direction from it is too unsteady to follow. */
+const POLE_DEAD_PX = 12;
+/**
+ * A larger turn is a cursor gone past the pole, not around it: the camera halts there rather than spinning the anchor
+ * over to its side.
+ */
+const MAX_TURN_RAD = Math.PI / 2;
+const TURN_ITERATIONS = 4;
+const TURN_STEP_RAD = 1e-4;
+
+/** Newton on the target longitude alone, turning the anchor about the pole toward the pixel; stays put where unsteady. */
+function turnTowardPixel(camera: Camera): void {
+  const pose = camera.pose;
+  for (let iteration = 0; iteration < TURN_ITERATIONS; iteration++) {
+    const lon = pose.targetLongitudeRad;
+    if (!turnInto(camera, 0) || (turn[0] ?? 0) > MAX_TURN_RAD || (turn[0] ?? 0) < -MAX_TURN_RAD) break;
+    pose.targetLongitudeRad = lon + TURN_STEP_RAD;
+    const stepped = turnInto(camera, 1);
+    pose.targetLongitudeRad = lon;
+    const slope = ((turn[1] ?? 0) - (turn[0] ?? 0)) / TURN_STEP_RAD;
+    if (!stepped || (slope < 1e-6 && slope > -1e-6)) break;
+    const next = lon - (turn[0] ?? 0) / slope;
+    pose.targetLongitudeRad = next >= -Math.PI && next < Math.PI ? next : wrapLongitudeRad(next);
+  }
+}
+
+/** The angle from the anchor's direction to the pixel's, seen from the pole on screen, into `turn[slot]`. */
+function turnInto(camera: Camera, slot: number): boolean {
+  camera.update();
+  if (!projectToScreen(camera, poleEcef, poleScreen) || !projectToScreen(camera, anchorEcef, screen)) return false;
+  const ax = (screen[0] ?? 0) - (poleScreen[0] ?? 0);
+  const ay = (screen[1] ?? 0) - (poleScreen[1] ?? 0);
+  const px = (targetPx[0] ?? 0) - (poleScreen[0] ?? 0);
+  const py = (targetPx[1] ?? 0) - (poleScreen[1] ?? 0);
+  const dead = POLE_DEAD_PX * POLE_DEAD_PX;
+  if (ax * ax + ay * ay < dead || px * px + py * py < dead) return false;
+  turn[slot] = Math.atan2(ax * py - ay * px, ax * px + ay * py);
+  return true;
 }
 
 /**

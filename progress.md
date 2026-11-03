@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-11-03: maps by distance at every latitude, north-up drags at the pole (KB-340, KB-341)
+
+Two bugs an application's owner found over the north. KB-340: the satellite's layers faded in with the Web Mercator
+zoom, up to 3.5 lower near a pole for the same distance, and Mercator tiles toward the poles stopped a level or more
+coarser than on the equator, below WorldCover's first level, so the far image stayed near the poles and the row above
+66.5° north looked darker. Fades now follow the camera's ground zoom (`cameraGroundZoom`, which replaces the unused
+`cameraZoom`), and the selection refines a tile one level to the first level of a drawn layer where a tile on the
+equator would at its distance (`imageryStartLevels`, from `ImageryRuntime.startLevelsInto`). One level at most: toward
+the poles a Mercator tile covers less ground at each level, and following the equator's level further would multiply
+the tiles. KB-341: a north-up drag beside the pole at the limit spun the globe and could flip it to the other pole;
+held at the limit, the target now turns about the pole until the anchor lies toward the cursor from it, and halts when
+the cursor goes past the pole.
+
 ## 2026-11-03: drags at the globe's edge and online imagery in motion (KB-338, KB-339)
 
 Two bugs an application's owner found on its satellite page. KB-338: a free drag on a zoomed-out globe turned it ever faster toward its edge (6 times the center's turn per pixel just inside it) and dropped to the center's rate past it, so a drag over a pole spun and jumped; mouse and touch drags now grab the globe while a pixel turns it at most twice as much as at the center, and go on at that rate beyond. KB-339: the preset's online layer starts above the package's last level, so a moving camera, which asks for imagery up to two levels coarser, fell back to the package in patches; an added source now takes `online: true` to bring its coarser levels onto the online layer.

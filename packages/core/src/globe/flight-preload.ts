@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { Camera } from '../camera/camera.js';
-import { cameraZoom } from '../camera/zoom.js';
+import { cameraGroundZoom } from '../camera/zoom.js';
 import { MAX_FACTOR, SLOW_LINK_BPS_HERE } from './motion-detail.js';
 import {
   selectQuadtreeTiles,
@@ -50,7 +50,7 @@ export class FlightPlan {
   readonly tiles: QuadtreeTile[] = [];
   /** Each tile's key in the preload class at the last {@link FlightPlan.keysAt}, -1 while not wanted. */
   readonly keys = new Float64Array(MAX_TILES);
-  /** The deepest Mercator zoom of the movement, at its start or its end: the layers its views draw (F635). */
+  /** The deepest ground zoom of the movement, at its start or its end: the layers its views draw (F635). */
   zoom = 0;
   count = 0;
   /** Tiles before this index are the destination's view. */
@@ -97,7 +97,7 @@ export class FlightPlan {
     this.spacingMs = (endMs - startMs) / SAMPLES;
     this.add(this.pose(current, end), texelPx, endMs);
     this.arrival = this.count;
-    this.zoom = Math.max(cameraZoom(current), cameraZoom(this.camera));
+    this.zoom = Math.max(cameraGroundZoom(current), cameraGroundZoom(this.camera));
     for (let k = 1; path && k < SAMPLES; k++) {
       const camera = this.pose(current, end, PATH_VIEW);
       io[0] = startMs + k * this.spacingMs;

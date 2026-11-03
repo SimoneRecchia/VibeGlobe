@@ -19,6 +19,8 @@ export interface GlobeConfig {
   readonly controls: boolean | ControlsOptions;
   /** The glTF loader for models and model sets (F627), passed to the renderer. */
   readonly gltf?: RendererOptions['gltf'] | undefined;
+  /** The motion blur pass (F694), passed to the renderer; `QualitySettings.motionBlur` turns it on. */
+  readonly motionBlur?: RendererOptions['motionBlur'] | undefined;
   readonly view: ViewInit;
   readonly imagery?: readonly ImagerySource[] | undefined;
   readonly workers?: GlobeOptions['workers'];
@@ -39,7 +41,11 @@ export function globeOptions(
   return {
     ...config.options,
     container,
-    renderer: createRenderer({ backend: config.backend, ...(config.gltf ? { gltf: config.gltf } : {}) }),
+    renderer: createRenderer({
+      backend: config.backend,
+      ...(config.gltf ? { gltf: config.gltf } : {}),
+      ...(config.motionBlur ? { motionBlur: config.motionBlur } : {}),
+    }),
     ...(controls ? { controls } : {}),
     baseImageryUrl: config.baseImageryUrl,
     view: config.view,

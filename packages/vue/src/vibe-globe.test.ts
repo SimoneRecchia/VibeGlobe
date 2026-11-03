@@ -45,10 +45,10 @@ vi.mock('@vibeglobe/core', async (original) => ({
   },
 }));
 
-const renderers: { gltf?: unknown }[] = [];
+const renderers: { gltf?: unknown; motionBlur?: unknown }[] = [];
 vi.mock('@vibeglobe/renderer', async (original) => ({
   ...(await original<object>()),
-  createRenderer: (options: { gltf?: unknown }) => {
+  createRenderer: (options: { gltf?: unknown; motionBlur?: unknown }) => {
     renderers.push(options);
     return () => undefined;
   },
@@ -183,6 +183,16 @@ describe('controls options, exposed controls and the glTF loader (F628, F629)', 
     expect(on.controls()?.tiltPolicy).toBeNull();
     expect(renderers[1]).not.toHaveProperty('gltf');
     on.unmount();
+  });
+
+  it('passes the motion blur to the renderer, and none by default', () => {
+    const motionBlur = (): Promise<never> => new Promise(() => undefined);
+    const on = mountGlobe({ motionBlur });
+    expect(renderers.at(-1)?.motionBlur).toBe(motionBlur);
+    on.unmount();
+    const off = mountGlobe({});
+    expect(renderers.at(-1)).not.toHaveProperty('motionBlur');
+    off.unmount();
   });
 
   it("useTiltAvailable follows the controls' tilt availability, and is true without controls", async () => {

@@ -44,8 +44,8 @@ export const ZoomReadout = defineComponent({
 ## Pitfalls
 
 - `VibeGlobe` fills its parent: the parent must have a height.
-- `baseImageryUrl`, `imagery`, `backend`, `controls`, `gltf`, `workers` and `options` are read once, at start; the
-  camera props, `viewMode`, `layers`, `networkMode` and `qualityPreset` change the running engine.
+- `baseImageryUrl`, `imagery`, `backend`, `controls`, `gltf`, `motionBlur`, `workers` and `options` are read once, at
+  start; the camera props, `viewMode`, `layers`, `networkMode` and `qualityPreset` change the running engine.
 - The composables and child components work inside `VibeGlobe`'s default slot.
 - The component creates workers only for `imagery`: with `terrain` in `options` and no `imagery`, pass `workers`.
 

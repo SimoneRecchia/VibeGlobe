@@ -19,7 +19,6 @@ const QUALITY_RULES: Readonly<Record<keyof QualitySettings, Rule>> = {
   atmosphere: ['off', 'low', 'medium', 'high', 'ultra'],
   fog: true,
   fogAwareDetail: true,
-  motionBlur: [0, 1],
 };
 
 const ATMOSPHERE_RULES: Readonly<Record<keyof AtmosphereSettings, Rule>> = {
@@ -83,7 +82,6 @@ export class EngineQuality {
       atmosphere: quality.atmosphere ?? 'off',
       fog: quality.fog ?? true,
       fogAwareDetail: quality.fogAwareDetail ?? true,
-      motionBlur: quality.motionBlur ?? 0,
     };
     this.sky = {
       sunLighting: false,
@@ -98,7 +96,10 @@ export class EngineQuality {
 
   /** The quality settings in effect. */
   get settings(): Required<QualitySettings> {
-    return { ...this.rendererQuality(this.parts.renderer()), resolutionScale: this.parts.resolutionScale() };
+    // The anisotropy applied: the device's maximum caps the level asked for (F398).
+    const max = this.parts.renderer()?.capabilities.maxAnisotropy;
+    const anisotropy = max === undefined ? this.quality.anisotropy : Math.min(this.quality.anisotropy, max);
+    return { ...this.quality, anisotropy, resolutionScale: this.parts.resolutionScale() };
   }
 
   /** The atmosphere's scene settings in effect. */
@@ -155,9 +156,8 @@ export class EngineQuality {
     this.parts.surface().setFog(on ? this.sky.haze : undefined);
   }
 
-  /** The settings in effect: the device's maximum caps the anisotropy asked for (F398). */
-  private rendererQuality(renderer?: RendererBackend): typeof this.quality & RendererQuality {
-    const quality = this.quality;
-    return { ...quality, anisotropy: Math.min(quality.anisotropy, renderer?.capabilities.maxAnisotropy ?? 64) };
+  private rendererQuality(renderer: RendererBackend): RendererQuality {
+    const { anisotropy, antialias, atmosphere, fog } = this.quality;
+    return { anisotropy: Math.min(anisotropy, renderer.capabilities.maxAnisotropy), antialias, atmosphere, fog };
   }
 }

@@ -26,11 +26,6 @@
       "source": "./src/tiles3d/index.ts",
       "default": "./dist/tiles3d/index.js"
     },
-    "./motion-blur": {
-      "types": "./dist/motion-blur.d.ts",
-      "source": "./src/motion-blur.ts",
-      "default": "./dist/motion-blur.js"
-    },
     "./gpu-probes": {
       "types": "./dist/run-gpu-probes.d.ts",
       "source": "./src/run-gpu-probes.ts",

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-03: motion blur taken out (F695, owner's decision)
+
+After trying it in an application, the owner asked to take the motion blur out: #127 and #128 are reverted, F694 is superseded by F695 (no motion blur), and the tests of the pass, the setting and the prop are recorded in `docs/internal/test-changes.md`. KB-337, found on the way, stays recorded.
+
 ## 2026-11-03: the Vue component passes the motion blur on (F694)
 
 `VibeGlobe` takes a `motionBlur` prop, passed to `createRenderer` like `gltf`: without it an app using the component

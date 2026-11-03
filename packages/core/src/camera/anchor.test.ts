@@ -163,32 +163,33 @@ describe('navigation modes: free and north-up drags', () => {
     }
   });
   it('north-up: a drag beside the pole at the limit turns the globe about it, without a jump or a flip to the other pole (KB-341)', () => {
-    const c = camera(-40, 85, 8e6);
-    const [poleX, poleY] = screenOf(c, 0, 90);
-    const from: [number, number] = [poleX, poleY + 40];
-    const to: [number, number] = [poleX + 350, poleY + 45];
-    const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
-    expect(c.pickEllipsoid(from[0], from[1], hit)).toBe(true);
-    const anchor = Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0);
-    const longitudes = [c.pose.targetLongitudeRad / DEG];
-    for (let i = 1; i <= 60; i++) {
-      const t = i / 60;
-      const pixel = Float64Array.of(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t);
-      solveAnchor(c, anchor, pixel, undefined, undefined, ANCHOR_NORTH_UP);
-      expect(c.pose.targetLatitudeRad / DEG).toBeCloseTo(85, 9);
-      longitudes.push(c.pose.targetLongitudeRad / DEG);
+    for (const latitude of [85, -85]) {
+      const c = camera(-40, latitude, 8e6);
+      const side = Math.sign(latitude);
+      const [poleX, poleY] = screenOf(c, 0, 90 * side);
+      // Between the pole and the target, dragged sideways past the pole.
+      const from: [number, number] = [poleX, poleY + 40 * side];
+      const to: [number, number] = [poleX + 350, poleY + 45 * side];
+      const hit = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      expect(c.pickEllipsoid(from[0], from[1], hit)).toBe(true);
+      const anchor = Float64Array.of(hit.longitudeRad, hit.latitudeRad, 0);
+      const longitudes = [c.pose.targetLongitudeRad / DEG];
+      for (let i = 1; i <= 60; i++) {
+        const t = i / 60;
+        const pixel = Float64Array.of(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t);
+        solveAnchor(c, anchor, pixel, undefined, undefined, ANCHOR_NORTH_UP);
+        expect(c.pose.targetLatitudeRad / DEG).toBeCloseTo(latitude, 9);
+        longitudes.push(c.pose.targetLongitudeRad / DEG);
+      }
+      // One way, in steps of at most a few degrees.
+      const steps = longitudes.slice(1).map((value, i) => value - (longitudes[i] ?? 0));
+      expect(steps.every((step) => step <= 0 && step > -10)).toBe(true);
+      // The anchor ends on the meridian under the cursor: about a quarter turn, as the cursor turned about the pole.
+      const under = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
+      expect(c.pickEllipsoid(to[0], to[1], under)).toBe(true);
+      expect(under.longitudeRad).toBeCloseTo(hit.longitudeRad, 9);
+      expect(Math.abs((longitudes[0] ?? 0) - (longitudes.at(-1) ?? 0))).toBeGreaterThan(70);
     }
-    const steps = longitudes.slice(1).map((value, i) => value - (longitudes[i] ?? 0));
-    expect(steps.every((step) => step <= 0 && step > -10)).toBe(true);
-    // The anchor ends toward the cursor from the pole: a quarter turn, as the cursor's direction from it turned.
-    const [x, y] = screenOf(c, hit.longitudeRad / DEG, hit.latitudeRad / DEG);
-    const [px, py] = screenOf(c, 0, 90);
-    const off = Math.atan2(
-      (x - px) * (to[1] - py) - (y - py) * (to[0] - px),
-      (x - px) * (to[0] - px) + (y - py) * (to[1] - py),
-    );
-    expect(Math.abs(off)).toBeLessThan(0.01);
-    expect((longitudes[0] ?? 0) - (longitudes.at(-1) ?? 0)).toBeGreaterThan(70);
   });
 });
 

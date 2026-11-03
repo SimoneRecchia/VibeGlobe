@@ -3,16 +3,16 @@
 ## 2026-11-03: maps by distance at every latitude, north-up drags at the pole (KB-340, KB-341)
 
 Two bugs an application's owner found over the north. KB-340: the satellite's layers faded in with the Web Mercator
-zoom, up to 3.5 lower near a pole for the same distance, and Mercator tiles toward the poles stopped a level or more
-coarser than on the equator, below WorldCover's first level, so the far image stayed near the poles and the row above
-66.5° north looked darker. Fades now follow the camera's ground zoom (`cameraGroundZoom`, which replaces the unused
-`cameraZoom`), and the selection refines a tile one level to the first level of a drawn layer where a tile on the
-equator would at its distance (`imageryStartLevels`, from `ImageryRuntime.startLevelsInto`). One level at most: toward
-the poles a Mercator tile covers less ground at each level, and following the equator's level further would multiply
-the tiles. KB-341: a north-up drag beside the pole at the limit spun the globe and could flip it to the other pole;
-held at the limit, the target now turns about the pole until the anchor lies toward the cursor from it, and halts when
-the cursor goes past the pole. The glide after it spun too, five times faster than the drag: it turned the globe as a
-drag at the center would; it now turns it no faster than the drag's last step did there (`CameraPort.dragToMeasured`).
+zoom, up to 3.5 lower near a pole for the same distance, so the far image stayed near the poles. Fades now follow the
+camera's ground zoom (`cameraGroundZoom`, which replaces the unused `cameraZoom`). The darker north above 66.5° was the
+level-2 row: Mercator tiles toward the poles stop coarser than on the equator, below WorldCover's first level; the
+application sets `minSurfaceLevel: 3`. A selection rule refining such tiles in the engine cost the core 0.2 KB over its
+budget. KB-341: a north-up drag beside the pole at the limit spun the globe and could flip it to the other pole; held at
+the limit of the start's hemisphere, the target now turns about the pole until the anchor is on the meridian under the
+cursor, and halts when the cursor goes past the pole. The glide after it spun too, five times faster than the drag: it
+turned the globe as a drag at the center would; it now turns it no faster than the drag's last step did there
+(`CameraPort.dragToMeasured`). The core stays at 64.81 KB locally, 8 bytes under `main`: the solver copies its anchor and
+pixel with `set`.
 
 ## 2026-11-03: drags at the globe's edge and online imagery in motion (KB-338, KB-339)
 

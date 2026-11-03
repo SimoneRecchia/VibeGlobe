@@ -207,30 +207,6 @@ describe('selectQuadtreeTiles', () => {
       expect(coarse?.level ?? 99).toBeLessThan(level);
     });
 
-    it('refines to the first level of a drawn layer at the distance it begins on the equator, one level at most (KB-340)', () => {
-      const range = 1.5e6;
-      const levelUnder = (latDeg: number, options: QuadtreeSelectionOptions): number | undefined => {
-        const count = selectQuadtreeTiles(camera(12.5, latDeg, range), options, out);
-        return out.slice(0, count).find((t) => t.root === MERCATOR_ROOT && contains(t, 12.5 * DEG, latDeg * DEG))
-          ?.level;
-      };
-      const from = (start: number) => ({
-        ...imagery,
-        imageryStartLevels: Float64Array.of(start),
-        imageryStartCount: 1,
-      });
-      // Near the pole a Mercator tile of each level covers less ground: the texels alone stop sooner than on the equator.
-      const equator = levelUnder(0, imagery) ?? 0;
-      const north = levelUnder(80, imagery) ?? 99;
-      expect(north).toBeLessThan(equator - 1);
-      // A layer from the next level, which the equator reaches at this distance, begins here too.
-      expect(levelUnder(80, from(north + 1))).toBe(north + 1);
-      expect(levelUnder(0, from(north + 1))).toBe(equator);
-      // Not two levels further, nor a layer the equator would reach only nearer.
-      expect(levelUnder(80, from(north + 2))).toBe(north);
-      expect(levelUnder(80, from(equator + 1))).toBe(north);
-    });
-
     it('draws finer tiles near the camera than toward the horizon in a tilted view', () => {
       const count = selectQuadtreeTiles(camera(12.5, 41.9, 2e4, 70), imagery, out);
       const drawn = out.slice(0, count);

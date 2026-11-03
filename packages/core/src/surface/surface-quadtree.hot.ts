@@ -65,13 +65,6 @@ export interface QuadtreeSelectionOptions {
   /** Largest texel size on screen, in pixels (ADR 0006's τ_imagery); default 1.5. */
   maxTexelErrorPx?: number;
   /**
-   * The first level of each imagery layer drawn, the first {@link imageryStartCount} entries (KB-340): a tile of the
-   * level before one refines to it where a tile on the equator would at its distance, so a layer begins at the same
-   * distance at every latitude, though toward the poles a Mercator tile of each level covers less ground.
-   */
-  imageryStartLevels?: Float64Array;
-  imageryStartCount?: number;
-  /**
    * Terrain (M4, ADR 0006 §2): the geometric error in meters of the terrain a surface tile of each level shows, indexed
    * by level (undefined without terrain). A tile refines while this error exceeds {@link maxTerrainErrorPx} pixels, up
    * to {@link terrainMaxLevel}.
@@ -189,10 +182,6 @@ const TEXEL = 3;
  * shows, within the global range); from {@link QuadtreeSelectionOptions.terrainRange}.
  */
 const tileRange = new Float64Array(4);
-/** The tile's distance as its errors divide it, for {@link reachesLayerStart}. */
-const startDistance = new Float64Array(1);
-/** The equator's length, meters: an equator tile of level k is this over 2^k on a side. */
-const EQUATOR_METERS = 2 * Math.PI * A;
 /**
  * Per-tile terrain measures, in an array because a double stored in a module variable or returned from a call is boxed
  * (ADR 0018).
@@ -371,7 +360,6 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
     fogged = visibility < FULL_FOG_VISIBILITY;
   }
   const screenError = ((measure[SAG] ?? 0) / errorDistance) * state.pixelsPerRadian;
-  startDistance[0] = errorDistance;
   const maxLevel = options.maxLevel < MAX_TILE_LEVEL ? options.maxLevel : MAX_TILE_LEVEL;
   const refine =
     level < (options.minLevel ?? MIN_LEVEL) ||
@@ -385,8 +373,7 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
           (((options.terrainErrorMeters?.[level] ?? 0) * (relief[ERROR_SCALE] ?? 1) * (relief[HEIGHT_SCALE] ?? 1)) /
             errorDistance) *
             state.pixelsPerRadian >
-            (options.maxTerrainErrorPx ?? 2)) ||
-        (root === MERCATOR_ROOT && reachesLayerStart(level))));
+            (options.maxTerrainErrorPx ?? 2))));
   if (!refine) {
     tile.fogVisibility = visibility;
     state.count++;
@@ -400,24 +387,6 @@ function visit(root: 0 | 1 | 2, level: number, x: number, y: number, span: numbe
     visit(root, level + 1, 2 * x, 2 * y, 2 * span);
     visit(root, level + 1, 2 * x, 2 * y + 1, 2 * span);
   }
-}
-
-/**
- * Whether a Mercator tile refines to the next level because a drawn imagery layer begins there and a tile on the
- * equator would at its distance, its texels still too large (KB-340). One level at most: toward the poles a Mercator
- * tile covers less ground at each level, and matching the equator's level further would multiply the tiles. The
- * distance comes through {@link startDistance}, a double argument being boxed (ADR 0018).
- */
-function reachesLayerStart(level: number): boolean {
-  const { options } = state;
-  const starts = options.imageryStartLevels;
-  const texels = options.imageryTexelsPerTile ?? 0;
-  if (!starts || texels <= 0) return false;
-  const equatorTexelPx = (EQUATOR_METERS / 2 ** level / texels / (startDistance[0] ?? 1)) * state.pixelsPerRadian;
-  if (equatorTexelPx <= (options.maxTexelErrorPx ?? 1.5)) return false;
-  const count = options.imageryStartCount ?? 0;
-  for (let i = 0; i < count; i++) if (starts[i] === level + 1) return true;
-  return false;
 }
 
 /**

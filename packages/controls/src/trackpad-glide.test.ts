@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { controlsHarness, OrthoGlobe } from './test-harness.js';
+import { controlsHarness, FlatCamera, OrthoGlobe } from './test-harness.js';
 
 // KB-202: flicks on a zoomed-out globe, as a trackpad sends them, glide to rest: no instant stop, no jerk, no reversal,
 // and drags that leave the globe's disc keep turning it. The globe of the harness is 250 px in radius at the center of
@@ -180,5 +180,34 @@ describe('trackpad flicks on a zoomed-out globe (KB-202)', () => {
     h.run(h.globe.timeMs + 1000, 8);
     const after = globe.centerVector();
     expect(Math.hypot(after[0] - before[0], after[1] - before[1], after[2] - before[2])).toBeLessThan(1e-9);
+  });
+
+  it('glides no faster than the drag turned the view where the camera could not follow the pointer (KB-341)', () => {
+    const h = controlsHarness();
+    const camera = h.camera as FlatCamera;
+    camera.zoom = 6;
+    const scale = 2 ** camera.zoom;
+    // As beside a pole in 'north-up': far from the center the view follows a fifth of the pointer, the center's drags
+    // all of it.
+    const { dragTo } = camera.navigation;
+    let last = { xPx: CX + 150, yPx: CY };
+    camera.navigation.dragTo = (anchor, point) => {
+      if (Math.abs(point.xPx - CX) < 100) return dragTo(anchor, point);
+      camera.centerX -= (point.xPx - last.xPx) / scale / 5;
+      last = { ...point };
+    };
+    h.pointer('pointerdown', { x: CX + 150, y: CY, t: 0 });
+    let step = 0;
+    for (let t = 8; t <= 400; t += 8) {
+      const before = camera.centerX;
+      h.pointer('pointermove', { x: CX + 150 + 0.5 * t, y: CY, t });
+      h.frame(8);
+      step = Math.abs(camera.centerX - before);
+    }
+    h.pointer('pointerup', { x: CX + 350, y: CY, t: 400 });
+    const before = camera.centerX;
+    h.frame(8);
+    expect(step).toBeGreaterThan(0);
+    expect(Math.abs(camera.centerX - before)).toBeLessThan(1.5 * step);
   });
 });

@@ -42,11 +42,10 @@ export function groundZoomFromMercatorZoom(zoom: number, latitudeRad: number): n
   return zoom - Math.log2(Math.cos(clampWebMercatorLatitudeRad(latitudeRad)));
 }
 
-/** The Web Mercator zoom a camera shows at the screen center. */
-export function cameraZoom(camera: Camera): number {
-  const pose = camera.pose;
-  return mercatorZoomFromGroundZoom(
-    groundZoomForRange(pose.rangeMeters, camera.heightPx, camera.fovYRad),
-    pose.targetLatitudeRad,
-  );
+/**
+ * The ground zoom a camera shows at the screen center: the Web Mercator zoom it would show on the equator, a function
+ * of its distance alone, so the same at every latitude.
+ */
+export function cameraGroundZoom(camera: Camera): number {
+  return groundZoomForRange(camera.pose.rangeMeters, camera.heightPx, camera.fovYRad);
 }

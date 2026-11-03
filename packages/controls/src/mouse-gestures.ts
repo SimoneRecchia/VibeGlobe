@@ -38,6 +38,8 @@ export class MouseGestures {
   private trackball = false;
   /** How much faster than a drag at the center the trackball turns: {@link EDGE_TURN} once the drag held the globe. */
   private turn = 1;
+  /** How far the last drag step turned the point at the screen center, radians per pixel ({@link CameraPort.dragToMeasured}). */
+  private dragTurn = Number.POSITIVE_INFINITY;
   private grabPending = false;
   private movePending = false;
   private releasePending = false;
@@ -82,6 +84,7 @@ export class MouseGestures {
     this.grabPending = mode === 'pan' && gestures.dragPan;
     this.trackball = false;
     this.turn = 1;
+    this.dragTurn = Number.POSITIVE_INFINITY;
     this.movePending = false;
     this.releasePending = false;
     this.samples.clear();
@@ -189,7 +192,8 @@ export class MouseGestures {
       port.grab(this.pointer) &&
       port.pivotScale(this.pointer, dx, dy, widthPx, heightPx) <= EDGE_TURN
     ) {
-      port.dragTo(this.anchor, this.pointer);
+      const turned = port.dragToMeasured(this.anchor, this.pointer, dx, dy, widthPx, heightPx);
+      if (!Number.isNaN(turned)) this.dragTurn = turned;
       this.trackball = false;
       this.turn = EDGE_TURN;
     } else {
@@ -239,7 +243,7 @@ export class MouseGestures {
       // drag off the globe already turned it about the center.
       const pivot = trackball
         ? this.turn
-        : Math.min(port.pivotScale(this.applied, vx, vy, widthPx, heightPx), EDGE_TURN);
+        : Math.min(port.pivotScale(this.applied, vx, vy, widthPx, heightPx, this.dragTurn), EDGE_TURN);
       const speed = Math.hypot(vx, vy) * pivot;
       const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
       release.panXPx = vx * scale;

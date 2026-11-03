@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-11-03: maps by distance at every latitude, north-up drags at the pole (KB-340, KB-341)
+
+Two bugs an application's owner found over the north. KB-340: the satellite's layers faded in with the Web Mercator
+zoom, up to 3.5 lower near a pole for the same distance, so the far image stayed near the poles. Fades now follow the
+camera's ground zoom (`cameraGroundZoom`, which replaces the unused `cameraZoom`). The darker north above 66.5° was the
+level-2 row: Mercator tiles toward the poles stop coarser than on the equator, below WorldCover's first level; the
+application sets `minSurfaceLevel: 3`. A selection rule refining such tiles in the engine cost the core 0.2 KB over its
+budget. KB-341: a north-up drag beside the pole at the limit spun the globe and could flip it to the other pole; held at
+the limit of the start's hemisphere, the target now turns about the pole until the anchor is on the meridian under the
+cursor, and halts when the cursor goes past the pole. The glide after it spun too, five times faster than the drag: it
+turned the globe as a drag at the center would; it now turns it no faster than the drag's last step did there
+(`CameraPort.dragToMeasured`). The core stays at 64.81 KB locally, 8 bytes under `main`: the solver copies its anchor and
+pixel with `set`.
+
 ## 2026-11-03: drags at the globe's edge and online imagery in motion (KB-338, KB-339)
 
 Two bugs an application's owner found on its satellite page. KB-338: a free drag on a zoomed-out globe turned it ever faster toward its edge (6 times the center's turn per pixel just inside it) and dropped to the center's rate past it, so a drag over a pole spun and jumped; mouse and touch drags now grab the globe while a pixel turns it at most twice as much as at the center, and go on at that rate beyond. KB-339: the preset's online layer starts above the package's last level, so a moving camera, which asks for imagery up to two levels coarser, fell back to the package in patches; an added source now takes `online: true` to bring its coarser levels onto the online layer.

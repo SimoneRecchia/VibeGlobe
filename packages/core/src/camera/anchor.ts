@@ -92,12 +92,9 @@ export function solveAnchor(
   mode: number = ANCHOR_HOLD_HEADING,
 ): boolean {
   geodeticArrayToEcef(anchor, anchorEcef);
-  anchorGeodetic[0] = anchor[0] ?? 0;
-  anchorGeodetic[1] = anchor[1] ?? 0;
-  anchorGeodetic[2] = anchor[2] ?? 0;
+  anchorGeodetic.set(anchor);
   solveMorph = morph;
-  targetPx[0] = pixel[0] ?? 0;
-  targetPx[1] = pixel[1] ?? 0;
+  targetPx.set(pixel);
   const pose = camera.pose;
   start[0] = pose.targetLongitudeRad;
   start[1] = pose.targetLatitudeRad;
@@ -127,12 +124,21 @@ function restoreStart(camera: Camera): void {
 }
 
 /**
- * The target stopped at the north-up limit nearest the pole the solve headed for, with the longitude of its last step:
- * the camera halts at the pole while the cursor goes on. True when the anchor is still in front of the eye.
+ * The target stopped at the north-up limit of the start's hemisphere, the camera halting at the pole while the cursor
+ * goes on (KB-341): not where the solve's last step went, which an unreachable pixel makes arbitrary. The globe turns
+ * about the pole until the anchor is on the meridian under the cursor, and halts where that takes more than a quarter
+ * turn, a cursor gone past the pole. True when the anchor is still in front of the eye.
  */
 function holdAtLimit(camera: Camera): boolean {
-  // Past the limit, the target's latitude is nonzero.
-  camera.pose.targetLatitudeRad = Math.sign(camera.pose.targetLatitudeRad) * (northUpLimitRad[1] ?? 0);
+  restoreStart(camera);
+  const pose = camera.pose;
+  pose.targetLatitudeRad = Math.sign(pose.targetLatitudeRad) * (northUpLimitRad[1] ?? 0);
+  camera.update();
+  if (camera.pickEllipsoidAt(targetPx, rotatedTarget)) {
+    const turn = wrapLongitudeRad((anchorGeodetic[0] ?? 0) - rotatedTarget.longitudeRad);
+    // The caller wraps the longitude.
+    if (Math.abs(turn) < Math.PI / 2) pose.targetLongitudeRad += turn;
+  }
   return residual(camera, r0);
 }
 
@@ -208,6 +214,7 @@ const enu = new Float64Array(9);
 const vector = new Float64Array(3);
 /** The sphere test's radius in, the distance along the ray out ({@link sphereHit}). */
 const sphere = new Float64Array(2);
+/** The rotated target; in {@link holdAtLimit}, the position under the pixel. */
 const rotatedTarget = { longitudeRad: 0, latitudeRad: 0, heightMeters: 0 };
 /** A target's longitude and latitude for {@link enuFrameAtArray}. */
 const position = new Float64Array(2);

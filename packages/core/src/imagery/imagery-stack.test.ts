@@ -113,6 +113,19 @@ describe('fading a layer in with the zoom (F635)', () => {
     expect(at(6)).toEqual([1, true]);
     expect(() => stackEntries([{ sources: [valid], fadeIn: { fromZoom: 5, toZoom: 5 } }])).toThrow(RangeError);
   });
+
+  it('fades at the same distance at every latitude, by the zoom it would show on the equator (KB-340)', () => {
+    const [entry] = stackEntries([{ id: 'marble', sources: [valid], fadeIn: { fromZoom: 4, toZoom: 4.5 } }]);
+    if (!entry) throw new Error('no layer');
+    const camera = new Camera();
+    camera.heightPx = 600;
+    camera.pose.rangeMeters = rangeForGroundZoom(4.25, camera.heightPx, camera.fovYRad);
+    for (const latitudeDeg of [0, 60, 85]) {
+      camera.pose.targetLatitudeRad = (latitudeDeg * Math.PI) / 180;
+      fadeByZoom([{ entry }], camera);
+      expect(shownOpacity(entry)).toBeCloseTo(0.5, 9);
+    }
+  });
 });
 
 describe('fading a layer with the zoom in time (F670)', () => {

@@ -44,6 +44,9 @@ export class TouchGestures {
   /** How much faster than a drag at the center the trackball turns: {@link EDGE_TURN} once the fingers held the globe. */
   private turn = 1;
   private carriedTurn = 1;
+  /** How far the last drag step turned the point at the screen center, radians per pixel ({@link CameraPort.dragToMeasured}). */
+  private dragTurn = Number.POSITIVE_INFINITY;
+  private carriedDragTurn = Number.POSITIVE_INFINITY;
   private readonly mid: MutablePoint = { xPx: 0, yPx: 0 };
   private readonly applied: MutablePoint = { xPx: 0, yPx: 0 };
   /** The midpoint when the fingers last changed, where the next frame grabs the anchor. */
@@ -165,6 +168,7 @@ export class TouchGestures {
     this.anchor = undefined;
     this.trackball = false;
     this.turn = 1;
+    this.dragTurn = Number.POSITIVE_INFINITY;
     this.dirty = false;
     this.rebaseline = false;
     this.carriedMs = -Infinity;
@@ -270,7 +274,8 @@ export class TouchGestures {
       const widthPx = this.context.widthPx();
       const heightPx = this.context.heightPx();
       if (this.anchor && port.grab(this.mid) && port.pivotScale(this.mid, dx, dy, widthPx, heightPx) <= EDGE_TURN) {
-        port.dragTo(this.anchor, this.mid);
+        const turned = port.dragToMeasured(this.anchor, this.mid, dx, dy, widthPx, heightPx);
+        if (!Number.isNaN(turned)) this.dragTurn = turned;
         this.trackball = false;
         this.turn = EDGE_TURN;
       } else {
@@ -356,6 +361,7 @@ export class TouchGestures {
     // A frame may re-anchor at the remaining finger before it lifts too: inertia continues the two-finger gesture.
     this.carriedTrackball = this.trackball;
     this.carriedTurn = this.turn;
+    this.carriedDragTurn = this.dragTurn;
     this.carriedPixel.xPx = this.applied.xPx;
     this.carriedPixel.yPx = this.applied.yPx;
   }
@@ -387,6 +393,7 @@ export class TouchGestures {
     const carried = timeMs - this.carriedMs <= LIFT_TOGETHER_MS;
     const trackball = carried ? this.carriedTrackball : this.trackball;
     const turn = carried ? this.carriedTurn : this.turn;
+    const dragTurn = carried ? this.carriedDragTurn : this.dragTurn;
     const pixel = carried ? this.carriedPixel : this.applied;
     this.reset();
     if (quick && this.sessionFingers === 2) {
@@ -414,7 +421,7 @@ export class TouchGestures {
     const release = this.release;
     const pivot = trackball
       ? turn
-      : Math.min(port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx), EDGE_TURN);
+      : Math.min(port.pivotScale(pixel, release.panXPx, release.panYPx, widthPx, heightPx, dragTurn), EDGE_TURN);
     const speed = Math.hypot(release.panXPx, release.panYPx) * pivot;
     const scale = speed > 0 ? (pivot * Math.min(speed, options.inertia.maxPanSpeedPxPerS / 1000)) / speed : 0;
     release.panXPx *= scale;

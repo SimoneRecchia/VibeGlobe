@@ -6,10 +6,7 @@ describe('SceneAtmosphere', () => {
   it('keeps surface meshes before the sky, so the sky is drawn only where the globe left the background', () => {
     const scene = new Scene();
     const atmosphere = new SceneAtmosphere(scene);
-    atmosphere.setQuality(
-      { anisotropy: 1, antialias: 'none', atmosphere: 'low', fog: true, motionBlur: 0 },
-      'reversed-z',
-    );
+    atmosphere.setQuality({ anisotropy: 1, antialias: 'none', atmosphere: 'low', fog: true }, 'reversed-z');
     const [first, second] = [new Mesh(), new Mesh()];
     atmosphere.addBelowSky(first);
     atmosphere.addBelowSky(second);

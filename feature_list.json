@@ -8303,6 +8303,16 @@
         "Unit-test that the matrix made from two frames' camera matrices carries a pixel's screen position and depth to where the previous frame showed it (far ground, ground a few meters away, the sky), that only a camera that keeps moving is smeared, that a still camera's frames are drawn as without motion blur, and that `motionBlur` is off by default and refuses values outside 0 to 1",
         "Playwright test on WebGPU and forced WebGL2, with each anti-aliasing mode: a pan smears the frame along its direction and more at a higher level, while a jump and the frame after the camera stops are sharp"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F695",
+      "milestone": 13,
+      "section": "Rendering and visual quality",
+      "description": "No motion blur (owner's decision of 2026-11-03, after trying it in an application): the renderer has no motion blur pass and no `motion-blur` entry point, the quality settings have no `motionBlur`, and `@vibeglobe/vue` takes no `motionBlur` prop; every frame is drawn through the anti-aliasing mode alone.",
+      "steps": [
+        "Unit-test that the quality settings in effect have no `motionBlur`"
+      ],
       "status": "passing"
     }
   ]

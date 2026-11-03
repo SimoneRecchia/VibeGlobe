@@ -185,11 +185,6 @@ export const VibeGlobe = defineComponent({
      * `@vibeglobe/renderer/gltf`. Without it the renderer draws no models. Read when the engine starts.
      */
     gltf: { type: Function as PropType<NonNullable<RendererOptions['gltf']>>, default: undefined },
-    /**
-     * The motion blur pass (F694), as `createRenderer` takes it: `motionBlur` from `@vibeglobe/renderer/motion-blur`.
-     * The quality setting `motionBlur` turns it on and sets its level. Read when the engine starts.
-     */
-    motionBlur: { type: Function as PropType<NonNullable<RendererOptions['motionBlur']>>, default: undefined },
     /** The workers that decode tiles; by default the engine's bundled workers when imagery is set. */
     workers: { type: Object as PropType<WorkerEndpointFactory>, default: undefined },
     /** Further engine options (resolution scale, memory budgets, logging). Read when the engine starts. */

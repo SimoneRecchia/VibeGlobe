@@ -152,6 +152,29 @@ export class CameraPort {
   }
 
   /**
+   * {@link dragTo} for a drag of (dx, dy) pixels, returning how far it turned the point at the screen center, radians
+   * per pixel: NaN without motion or without globe there. Where the camera cannot follow the pointer, as beside a pole
+   * in 'north-up', a pixel turns the globe less than at the center, and the glide after it must not turn it faster (KB-341).
+   */
+  dragToMeasured(
+    anchor: GeoPosition,
+    point: ScreenPoint,
+    dxPx: number,
+    dyPx: number,
+    widthPx: number,
+    heightPx: number,
+  ): number {
+    const center = this.pivot;
+    center.xPx = widthPx / 2;
+    center.yPx = heightPx / 2;
+    const before = this.navigation.grab(center);
+    this.navigation.dragTo(anchor, point);
+    const after = this.navigation.grab(center);
+    const length = Math.hypot(dxPx, dyPx);
+    return before && after && length > 0 ? angleRad(before, after) / length : Number.NaN;
+  }
+
+  /**
    * Moves the globe like a drag of (dx, dy) pixels at the screen center, whatever lies under the pointer (KB-202): the
    * point under the center is grabbed again at every step of at most {@link PIVOT_STEP_PX}, so the motion turns the
    * globe about its center (a virtual trackball, as Google Earth does when a drag leaves the globe) and never runs off
@@ -174,17 +197,25 @@ export class CameraPort {
 
   /**
    * The factor that turns a pan velocity at `point`, along (dx, dy), into the velocity at the screen center that turns
-   * the globe as fast (KB-202): near the globe's edge a pixel is a larger turn than at the center. 1 when either point
-   * shows no globe.
+   * the globe as fast (KB-202): near the globe's edge a pixel is a larger turn than at the center. A drag's measured turn
+   * ({@link dragToMeasured}) bounds the turn at `point`, so a glide is no faster than the drag (KB-341). 1 when either
+   * point shows no globe.
    */
-  pivotScale(point: ScreenPoint, dxPx: number, dyPx: number, widthPx: number, heightPx: number): number {
+  pivotScale(
+    point: ScreenPoint,
+    dxPx: number,
+    dyPx: number,
+    widthPx: number,
+    heightPx: number,
+    dragTurnPerPx = Number.POSITIVE_INFINITY,
+  ): number {
     const length = Math.hypot(dxPx, dyPx);
     if (length === 0) return 1;
     const ux = (PROBE_PX * dxPx) / length;
     const uy = (PROBE_PX * dyPx) / length;
     const at = this.turnPerPx(point.xPx, point.yPx, ux, uy);
     const center = this.turnPerPx(widthPx / 2, heightPx / 2, ux, uy);
-    return at > 0 && center > 0 ? at / center : 1;
+    return at > 0 && center > 0 ? Math.min(at, dragTurnPerPx) / center : 1;
   }
 
   /** Radians the globe turns for a pixel of drag at (x, y) along (ux, uy) of {@link PROBE_PX}; 0 off the globe. */

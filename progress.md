@@ -11,7 +11,8 @@ equator would at its distance (`imageryStartLevels`, from `ImageryRuntime.startL
 the poles a Mercator tile covers less ground at each level, and following the equator's level further would multiply
 the tiles. KB-341: a north-up drag beside the pole at the limit spun the globe and could flip it to the other pole;
 held at the limit, the target now turns about the pole until the anchor lies toward the cursor from it, and halts when
-the cursor goes past the pole.
+the cursor goes past the pole. The glide after it spun too, five times faster than the drag: it turned the globe as a
+drag at the center would; it now turns it no faster than the drag's last step did there (`CameraPort.dragToMeasured`).
 
 ## 2026-11-03: drags at the globe's edge and online imagery in motion (KB-338, KB-339)
 

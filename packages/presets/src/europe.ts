@@ -47,6 +47,12 @@ export interface AddedSource {
   readonly record: PresetSourceRecord;
   /** `top` (default): asked first, above the preset's; `bottom`: only where nothing else has data. */
   readonly position?: 'top' | 'bottom';
+  /**
+   * On the satellite's online layer, faded in above the package's levels, rather than in the package's chain; by
+   * default a source finer than the package goes there. A source that also serves the two levels below the package's
+   * last keeps showing while the camera moves, when the engine asks for imagery up to two levels coarser (KB-339).
+   */
+  readonly online?: boolean;
 }
 
 /** Options of {@link europeOpen}. */
@@ -220,7 +226,9 @@ function satelliteLayers(build: Build): ImageryLayerOptions[] {
   const used = (options.addSources ?? []).filter((a) => use(a.record));
   const added = (position: 'top' | 'bottom', online: boolean) =>
     used
-      .filter((a) => (a.position ?? 'top') === position && a.source.minLevel > PACKAGE_IMAGERY_LEVEL === online)
+      .filter(
+        (a) => (a.position ?? 'top') === position && (a.online ?? a.source.minLevel > PACKAGE_IMAGERY_LEVEL) === online,
+      )
       .map((a) => wrap(a.source, 'network', 'satellite'));
   const satellite: ImagerySource[] = [...added('top', false)];
   satellite.push(...packageSources(build, far));

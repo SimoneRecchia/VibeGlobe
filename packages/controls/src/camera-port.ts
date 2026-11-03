@@ -19,6 +19,12 @@ const NOMINAL_FRAME_MS = 1000 / 60;
 
 /** The longest step of a pivot pan: each step grabs again, so the pivot never runs off the globe (KB-202). */
 const PIVOT_STEP_PX = 16;
+/**
+ * A drag holds the grabbed point under the pointer while a pixel there turns the globe at most this many times as much
+ * as at the screen center; nearer the edge of a zoomed-out globe, and past it, it goes on at that rate about the center
+ * (KB-338): exact grabbing there spun the globe ever faster toward the edge, then dropped to the center's rate off it.
+ */
+export const EDGE_TURN = 2;
 /** The probe length that measures how fast the globe turns per pixel at a screen point (KB-202). */
 const PROBE_PX = 2;
 

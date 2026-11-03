@@ -5,8 +5,6 @@ import type { MeshBasicNodeMaterial, Object3D, Scene } from 'three/webgpu';
 import { Atmosphere, createAtmosphereFrame, globeFrame, morphFrame } from './atmosphere.js';
 import { ATMOSPHERE_QUALITY } from './atmosphere-model.js';
 
-const OFF: RendererQuality = { anisotropy: 1, antialias: 'none', atmosphere: 'off', fog: true };
-
 /**
  * The atmosphere of a backend's scene (ADR 0040; the "Atmosphere hook" of docs/internal/parallel-tracks.md): created while the
  * quality's atmosphere level is not 'off', its sky in the scene, its settings kept for a rebuild after a device loss,
@@ -14,7 +12,7 @@ const OFF: RendererQuality = { anisotropy: 1, antialias: 'none', atmosphere: 'of
  */
 export class SceneAtmosphere {
   private atmosphere: Atmosphere | undefined;
-  private quality = OFF;
+  private quality: Pick<RendererQuality, 'atmosphere' | 'fog'> = { atmosphere: 'off', fog: true };
   private sky: Required<AtmosphereSettings> | undefined;
   private readonly globe = createAtmosphereFrame();
   private readonly frame = createAtmosphereFrame();

@@ -1,5 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import type { motionBlur } from './motion-blur.js';
 import type { BackendChoice, DepthChoice } from './three-backend.js';
 
 /** How a backend is set up: the `RendererOptions` it uses. */
@@ -12,4 +13,6 @@ export interface BackendSettings {
   readonly antialias: boolean;
   /** The compressed families KTX2 imagery may use, among the device's; undefined for all of them. */
   readonly compressedTextures: readonly string[] | undefined;
+  /** The motion blur's loader (F694), if the application gave it. */
+  readonly motionBlur: typeof motionBlur | undefined;
 }

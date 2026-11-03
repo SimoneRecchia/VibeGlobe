@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EngineQuality } from './engine-quality.js';
+import type { RendererQuality } from './quality-types.js';
+import type { RendererBackend } from './types.js';
 
 /** Quality settings over fake parts, recording the fog haze the surface selection receives. */
 function quality(initial: unknown): { engine: EngineQuality; fog: (number | undefined)[] } {
@@ -38,5 +40,19 @@ describe('day and night settings (F647)', () => {
     expect([engine.atmosphere.dayNight, engine.atmosphere.airlight]).toEqual([0.5, 0.4]);
     expect(() => engine.setAtmosphere({ dayNight: 1.01 })).toThrow(/dayNight/);
     expect(() => engine.setAtmosphere({ airlight: -0.1 })).toThrow(/airlight/);
+  });
+});
+
+describe('motion blur (F694)', () => {
+  it('is off by default, reaches the renderer, and refuses values outside 0 to 1', () => {
+    const { engine } = quality({});
+    expect(engine.settings.motionBlur).toBe(0);
+    engine.set({ motionBlur: 0.5 });
+    expect(engine.settings.motionBlur).toBe(0.5);
+    let applied: RendererQuality | undefined;
+    engine.attach({ capabilities: { maxAnisotropy: 16 }, setQuality: (q) => void (applied = q) } as RendererBackend);
+    expect(applied?.motionBlur).toBe(0.5);
+    expect(() => engine.set({ motionBlur: 1.5 })).toThrow(/motionBlur/);
+    expect(() => engine.set({ motionBlur: -0.1 })).toThrow(/motionBlur/);
   });
 });

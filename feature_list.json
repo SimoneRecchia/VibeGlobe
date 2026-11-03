@@ -8293,6 +8293,17 @@
         "Unit-test that the space background keeps space and the built-in halo by default, takes #rrggbb colors at runtime and refuses other values"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F694",
+      "milestone": 13,
+      "section": "Rendering and visual quality",
+      "description": "Motion blur, off by default (owner's request): `createRenderer({ motionBlur })` with `motionBlur` of `@vibeglobe/renderer/motion-blur` makes it available, and `QualitySettings.motionBlur`, 0 to 1, turns it on and sets its level at runtime. A camera that keeps moving smears each pixel along its path on screen, found from its depth and the two frames' camera matrices; the frames of a still camera, a jump and the frame after the camera stops are drawn sharp and cost nothing more, and an application without it bundles none of it.",
+      "steps": [
+        "Unit-test that the matrix made from two frames' camera matrices carries a pixel's screen position and depth to where the previous frame showed it (far ground, ground a few meters away, the sky), that only a camera that keeps moving is smeared, that a still camera's frames are drawn as without motion blur, and that `motionBlur` is off by default and refuses values outside 0 to 1",
+        "Playwright test on WebGPU and forced WebGL2, with each anti-aliasing mode: a pan smears the frame along its direction and more at a higher level, while a jump and the frame after the camera stops are sharp"
+      ],
+      "status": "passing"
     }
   ]
 }

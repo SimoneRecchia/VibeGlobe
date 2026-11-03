@@ -7,5 +7,12 @@
  * @module @vibeglobe/renderer/motion-blur
  */
 
+import type { createMotionBlur } from './motion-blur-pass.js';
+
+/** The motion blur's pass as the renderer loads it, named so that wrappers (`@vibeglobe/vue`) can pass it on. */
+export interface MotionBlurPass {
+  readonly createMotionBlur: typeof createMotionBlur;
+}
+
 /** Loads the motion blur's pass when the quality settings first turn it on. */
-export const motionBlur = (): Promise<typeof import('./motion-blur-pass.js')> => import('./motion-blur-pass.js');
+export const motionBlur = (): Promise<MotionBlurPass> => import('./motion-blur-pass.js');

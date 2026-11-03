@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-03: the Vue component passes the motion blur on (F694)
+
+`VibeGlobe` takes a `motionBlur` prop, passed to `createRenderer` like `gltf`: without it an app using the component
+could not turn the blur on. Its type is now `() => Promise<MotionBlurPass>`, an interface of
+`@vibeglobe/renderer/motion-blur`, so a wrapper's declarations can name it (the module type of the internal pass file
+could not be named from another package, TS2883). Sizes: vue 3.92 → 3.93 KB, renderer unchanged.
+
 ## 2026-11-03: motion blur, off by default, with its level at run time (F694, owner's request)
 
 `QualitySettings.motionBlur`, 0 (default, off) to 1, smears each pixel of a moving camera's frame along its path on

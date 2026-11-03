@@ -201,7 +201,7 @@ export class ZoomTarget {
 }
 
 /** Shortest signed arc from `fromDeg` to `toDeg`, in (−180, 180]. */
-function shortestArcDeg(fromDeg: number, toDeg: number): number {
+export function shortestArcDeg(fromDeg: number, toDeg: number): number {
   const d = ((((toDeg - fromDeg) % 360) + 540) % 360) - 180;
   return d === -180 ? 180 : d;
 }

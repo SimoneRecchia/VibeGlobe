@@ -34,7 +34,9 @@ export const quality: SceneModule = {
 
 const quality = createQuality(globe, { preset: 'auto', adaptive: true });
 quality.onChange(({ reason, level, settings }) => console.log(reason, level, settings.resolutionScale));
-quality.setPreset('low');`,
+quality.setPreset('low');
+// Motion blur, with createRenderer({ motionBlur }) of '@vibeglobe/renderer/motion-blur':
+globe.setQualitySettings({ motionBlur: 0.5 });`,
   async start(context) {
     const { globe, panel } = context;
     const { createQuality } = await import('@vibeglobe/quality');
@@ -62,6 +64,8 @@ quality.setPreset('low');`,
       (preset) => controller.setPreset(preset),
     );
     panel.toggle('Adaptive quality', true, (on) => controller.setAdaptive(on));
+    const blur = { min: 0, max: 1, step: 0.05, value: before.motionBlur, format: (v: number) => v.toFixed(2) };
+    panel.slider('Motion blur', blur, (v) => globe.setQualitySettings({ motionBlur: v }));
     panel.slider(
       'Artificial GPU load',
       { min: 0, max: 40, step: 1, value: 0, format: (v) => `${String(v)} passes` },

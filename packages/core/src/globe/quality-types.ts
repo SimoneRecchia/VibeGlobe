@@ -28,6 +28,13 @@ export interface QualitySettings {
    * detail under the fog too.
    */
   readonly fogAwareDetail?: boolean;
+  /**
+   * Motion blur while the camera moves (F694; default 0, off), 0 to 1, with a renderer given it
+   * (`createRenderer({ motionBlur })` of `@vibeglobe/renderer`): each pixel is smeared along its path on screen over
+   * this share of the motion between two frames (0.5 looks like a film camera's half-open shutter). The frames of a
+   * still camera, a jump (`jumpTo` after a still frame) and the frame after the camera stops stay sharp.
+   */
+  readonly motionBlur?: number;
 }
 
 /** The atmosphere's scene settings (F394, F396); its level is a quality setting. Fields not given keep their value. */
@@ -57,4 +64,5 @@ export interface RendererQuality {
   readonly antialias: AntialiasMode;
   readonly atmosphere: AtmosphereLevel;
   readonly fog: boolean;
+  readonly motionBlur: number;
 }

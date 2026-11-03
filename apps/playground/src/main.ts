@@ -16,6 +16,7 @@ import { showCameraControls } from './camera-controls.js';
 import { showViewModeControls } from './view-mode-controls.js';
 import { createWorkers } from '@vibeglobe/worker';
 import { createRenderer, type BackendChoice, type DepthChoice } from '@vibeglobe/renderer';
+import { motionBlur } from '@vibeglobe/renderer/motion-blur';
 import { startDragLoop, startFrameLoop, startMeasuredLoop, type FrameLoop } from './frame-loop.js';
 import { runScenario } from './scenarios.js';
 import { float32Terrain, rgb24Terrain } from './terrain-adapters.js';
@@ -336,6 +337,8 @@ function startGlobe(
       antialias: params.get('antialias') !== '0',
       // Models (F361) load the glTF loader on the first model only.
       gltf: async () => (await import('@vibeglobe/renderer/gltf')).gltfLoader(),
+      // Motion blur (F694), off until `QualitySettings.motionBlur` turns it on (the tour's Speed chapter).
+      motionBlur,
       // `?compressed=bc,etc2` limits the compressed families KTX2 tiles may use; `?compressed=` forces RGBA8 (F104).
       ...(params.has('compressed')
         ? { compressedTextures: (params.get('compressed') ?? '').split(',').filter(Boolean) }

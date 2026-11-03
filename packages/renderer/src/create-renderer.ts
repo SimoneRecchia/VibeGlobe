@@ -2,6 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { GltfLoaderFactory } from './layer-models.js';
 import { GlobeError, type RendererFactory, type RenderHost } from '@vibeglobe/core';
+import type { motionBlur } from './motion-blur.js';
 import type { BackendChoice, DepthChoice } from './three-backend.js';
 
 /** Options of {@link createRenderer}. */
@@ -46,6 +47,11 @@ export interface RendererOptions {
    * `ModelSetLayer`): `gltfLoader` from `@vibeglobe/renderer/gltf`. Without it, loading a model fails.
    */
   readonly gltf?: GltfLoaderFactory;
+  /**
+   * Motion blur (F694): `motionBlur` from `@vibeglobe/renderer/motion-blur`, which `QualitySettings.motionBlur` turns on
+   * and sets the level of. Without it the renderer draws no motion blur and the application bundles none of it.
+   */
+  readonly motionBlur?: typeof motionBlur;
 }
 
 /**
@@ -60,6 +66,7 @@ export function createRenderer(options: RendererOptions = {}): RendererFactory {
     gpuTiming: options.gpuTiming ?? false,
     antialias: options.antialias ?? true,
     compressedTextures: options.compressedTextures,
+    motionBlur: options.motionBlur,
   } as const;
   return async (container, events) => {
     const canvas = options.canvas;

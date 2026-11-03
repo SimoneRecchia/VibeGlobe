@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-11-03: motion blur, off by default, with its level at run time (F694, owner's request)
+
+`QualitySettings.motionBlur`, 0 (default, off) to 1, smears each pixel of a moving camera's frame along its path on
+screen over that share of the motion between two frames. The renderer finds the path from the pixel's depth (near / d
+on both depth paths) and one matrix per frame, made in float64 from the engine's absolute matrices of this frame and
+the one before; the pass samples at most 16 taps (one every 2 px, 32 px at most) and one for a pixel that moved under a
+pixel, which shows the anti-aliasing mode's own color (FXAA in a branch). Only a camera that keeps moving blurs: still
+frames, a jump and the frame after the camera stops are drawn as without, and every moving frame asks for one more so
+the last one is sharp. The pass is an entry of its own, `@vibeglobe/renderer/motion-blur`, passed as
+`createRenderer({ motionBlur })` like `gltf`: an application without it bundles none of it. The playground passes it,
+and the tour's Speed chapter has a slider.
+
+Measured: the renderer's main entry 38.11 → 38.28 KB (budget 38.5; the pass in the main entry's lazy chunks was 38.72,
+over budget, hence its own entry); the core 64.99 → 64.98 KB (the anisotropy cap, computed twice, is now shared). With
+`motionBlur` 0 or a still camera a frame draws exactly as before. Tests: `motion-blur-pass.test.ts` (the reprojection
+against two frames' projections, Earth-sized offsets with ground 3 m away, the sky; jump and stop), the frame path in
+`antialiasing.test.ts`, validation in `engine-quality.test.ts`, and `e2e/motion-blur.spec.ts` on WebGPU and WebGL2 with
+every anti-aliasing mode. Found on the way and recorded: KB-337 (`?scenario=data-lines` and `data-extrusions` draw no
+data, on `main` too, which fails the KB-140 anti-aliasing spec).
+
 ## 2026-11-01: map data is the application's responsibility; online imagery of your choice in the playground (F683)
 
 The sources guide and the README now say that VibeGlobe grants no right to map data: the application chooses its

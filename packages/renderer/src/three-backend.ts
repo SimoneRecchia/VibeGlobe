@@ -128,7 +128,7 @@ export class ThreeBackend implements RendererBackend {
   private lossWatch: LossWatch = { held: () => false, stop: () => undefined };
   /** The active depth path (ADR 0005 §4). */
   private depthPath: DepthPath = 'reversed-z';
-  /** Multisampling or the FXAA pass (KB-140). */
+  /** Multisampling or the FXAA pass (KB-140), and the motion blur (F694). */
   private readonly antialiasing = new Antialiasing();
 
   private constructor(
@@ -340,7 +340,8 @@ export class ThreeBackend implements RendererBackend {
     this.atmosphere.update(view);
     this.beginFrame();
     this.counters.beforeRender();
-    this.antialiasing.render(this.renderer, this.scene, this.camera);
+    // A moving camera's frame asks for one more: the camera may have stopped, and its last frame shows sharp (F694).
+    if (this.antialiasing.render(this.renderer, this.scene, this.camera, view)) this.layers.contentReady?.();
     this.counters.afterRender(this.renderer, this.settings.gpuTiming);
     return true;
   }
@@ -370,15 +371,15 @@ export class ThreeBackend implements RendererBackend {
   readonly capture = (): Promise<FrameCapture> => captureCanvas(this.canvases.drawingCanvas);
 
   /**
-   * Applies the effects of the engine's quality settings (F398, F399, KB-140): anisotropy, the atmosphere level and the
-   * anti-aliasing.
+   * Applies the effects of the engine's quality settings (F398, F399, KB-140, F694): anisotropy, the atmosphere level,
+   * the anti-aliasing and the motion blur.
    */
   setQuality(quality: RendererQuality): Promise<void> | undefined {
     this.anisotropy = quality.anisotropy;
     if (!this.destroyed) this.tileTextures.refilter(this.imageryTexture);
     const atmosphereChanged = this.atmosphere.setQuality(quality, this.depthPath);
     if (this.destroyed || this.failed) return undefined;
-    this.antialiasing.set(quality.antialias);
+    this.antialiasing.set(quality.antialias, quality.motionBlur, this.settings.motionBlur);
     // A recovering backend loads the pass with its new renderer; the atmosphere appearing or going away rebuilds the
     // surface material that it shades.
     const pass = this.recovering ? undefined : this.antialiasing.prepare(this.renderer, this.scene, this.camera);

@@ -1,6 +1,6 @@
 # 0171. Packaging and release: checked tarballs, consumer projects, a dry-run release and an approved CI publish
 
-- Status: Accepted (decided by agent; owner may revisit)
+- Status: Accepted (decided by agent; owner may revisit); partly superseded by [ADR 0190](0190-release-builds-and-publishes.md): the release only builds and publishes
 - Date: 2026-10-24
 - Milestone: M15
 

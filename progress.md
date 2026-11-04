@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-04: the release only builds and publishes (F708)
+
+The owner's brief: the release pipeline only compiles the npm package and publishes it. The Release workflow is one
+job, started by hand with a version, in the `npm-release` environment with its `NPM_TOKEN`: `release.ts` builds,
+packs `vibeglobe` at that version and publishes it (ADR 0190). The changelog, the version bump in the repository,
+the release commit and tag, the dry run and the post-release job are gone (F526 and F704 superseded by F708); the
+package checks run in `package-checks.yml` on pull requests that change the packaging.
+
 ## 2026-11-04: one npm package, `vibeglobe`; no maps, no providers, no consumer named (F701–F707)
 
 The owner's briefs of 2026-11-04, after the services: the library ships no map and no provider

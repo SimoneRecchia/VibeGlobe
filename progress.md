@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-04: a published GitHub release publishes `vibeglobe` (F710)
+
+The owner's brief: the release starts from a GitHub release and takes the version from it. `release.yml` runs on
+published releases and passes the release's tag; `release.ts` reads the version from it (`v1.2.3` or `1.2.3`) and
+refuses any other event (ADR 0192, F710 replacing F709). The `npm-release` environment's deployment rules must allow the
+`v*` tags.
+
 ## 2026-11-04: publishing with no token, through npm's trusted publishing (F709)
 
 The owner's brief: no npm token. The Release workflow publishes with its GitHub OIDC identity (`id-token: write`, npm

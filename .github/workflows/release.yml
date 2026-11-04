@@ -1,16 +1,12 @@
 name: Release
 
-# ADR 0190, ADR 0191. Started by hand on main with the version to publish: builds the engine, packs `vibeglobe` at that
-# version and publishes it to the public npm registry through npm's trusted publishing: GitHub's OIDC identity of this
-# workflow, no token, provenance attached by npm. The `npm-release` environment's required reviewers, when set, approve
-# the job first. Nothing else: no changelog, commit or tag.
+# ADR 0190, ADR 0191, ADR 0192. Runs when a GitHub release is published: builds the engine at the release's tag, packs
+# `vibeglobe` at the version the tag names (v1.2.3 or 1.2.3) and publishes it to the public npm registry through npm's
+# trusted publishing: GitHub's OIDC identity of this workflow, no token, provenance attached by npm. The `npm-release`
+# environment's required reviewers, when set, approve the job first. Nothing else: no changelog or commit.
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (semantic version; a pre-release such as 1.0.0-rc.1 goes to the "next" dist-tag)'
-        required: true
-        type: string
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -22,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-release
     env:
-      VERSION: ${{ inputs.version }}
+      TAG: ${{ github.event.release.tag_name }}
     steps:
       - uses: actions/checkout@v7
       # No dependency cache in a release build (npm's trusted publishing guide).
@@ -35,4 +31,4 @@ jobs:
       - run: npm install --global npm@11.21.1
       - run: npm ci
       - name: Build, pack and publish vibeglobe
-        run: node scripts/release/release.ts "$VERSION"
+        run: node scripts/release/release.ts "$TAG"

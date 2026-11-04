@@ -1,6 +1,6 @@
 ---
 name: release
-description: Release VibeGlobe: build the single `vibeglobe` package and publish it to the public npm registry from the Release workflow. Use when asked to release, publish or pack a version, or to check a published one.
+description: Release VibeGlobe: a published GitHub release builds the single `vibeglobe` package and publishes it to the public npm registry, at the version of the release's tag. Use when asked to release, publish or pack a version, or to check a published one.
 ---
 
 # Release
@@ -20,18 +20,19 @@ token anywhere. npm configures a trusted publisher only for a package that exist
    repository `VibeGlobe`, workflow `release.yml`, environment `npm-release`. Then Settings → Publishing access →
    "Require two-factor authentication and disallow tokens", and delete the `NPM_TOKEN` secret and its token.
 
-Every release after that:
+Every release after that is a GitHub release (ADR 0192):
 
 1. Merge what goes in the release into `main`; CI green.
-2. GitHub → Actions → **Release** → Run workflow on `main` with the version (semantic; a pre-release such as
-   `1.0.0-rc.1` goes to the npm dist-tag `next`, a release to `latest`).
-3. The **Publish to npm** job runs in the `npm-release` environment (required reviewers, when set, approve it first)
-   with `id-token: write` and npm 11.21.1. It runs `node scripts/release/release.ts <version>`: `tsc -b`, the Web
-   Component's browser build, the pack (`scripts/release/tarballs.ts`, at the version given) and
+2. GitHub → Releases → Draft a new release → a tag naming the version, `v1.2.3` (or `1.2.3`), on `main` → Publish
+   release. A pre-release version such as `v1.0.0-rc.1` goes to the npm dist-tag `next`, a release to `latest`.
+3. The Release workflow's **Publish to npm** job runs on the published release, in the `npm-release` environment
+   (required reviewers, when set, approve it first; its deployment rules must allow the `v*` tags) with
+   `id-token: write` and npm 11.21.1. It runs `node scripts/release/release.ts <tag>`: the version from the tag,
+   `tsc -b`, the Web Component's browser build, the pack (`scripts/release/tarballs.ts`, at that version) and
    `npm publish <tarball> --access public --tag <next|latest>`; npm attaches the provenance. It refuses outside that
-   job (not CI, not `main`, not `release.yml`, or no OIDC identity).
+   job (not CI, not a release, not `release.yml`, or no OIDC identity) and a tag that names no version.
 
-Nothing else happens: no changelog, commit or tag. npm refuses a version that was already published: choose the next.
+Nothing else happens: no changelog or commit. npm refuses a version that was already published: choose the next.
 
 ## Before and after (agent or owner)
 

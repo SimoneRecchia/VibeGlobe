@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-04: CI only on pull requests and by hand (F709)
+
+The owner's brief: the checks run on pull requests, and nothing starts on `main`, after a merge or a push. `ci.yml`
+triggers on pull requests and manual runs only; the full matrix (end-to-end shards, measurements, Firefox and WebKit,
+benchmarks) is a manual run; no workflow has a schedule, and the visual baselines' push trigger skips `main`
+(ADR 0191; F027 and F565 superseded by F709). `scripts/checks/ci-triggers.test.ts` keeps the triggers so.
+
 ## 2026-11-04: the release only builds and publishes (F708)
 
 The owner's brief: the release pipeline only compiles the npm package and publishes it. The Release workflow is one

@@ -374,7 +374,7 @@
         "Push a commit with a type error in a scratch branch and confirm CI fails",
         "Confirm the latest CI run on the main branch is green"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F028",
@@ -613,7 +613,7 @@
         "Confirm a pull request from the same repository shows the fast job of its head commit and starts no duplicate run of the checks",
         "Confirm the latest run on main is green, and that a run of the full workflow, scheduled (nightly) or started by hand (workflow_dispatch), contains the fast, end-to-end and benchmark jobs and is green"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F041",
@@ -8468,6 +8468,19 @@
         "Run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry"
       ],
       "status": "pending"
+    },
+    {
+      "id": "F709",
+      "milestone": 1,
+      "section": "Testing and verification",
+      "description": "CI runs only on pull requests and when started by hand, never on a push or a merge to main nor on a schedule: every pull request runs one fast job with the type check, lint, format check, repository checks and guards, the unit tests its changes reach, the license audit, the API documentation build and the bundle-size checks; a manual run adds the whole unit suite with coverage, the end-to-end tests, the isolated measurements, Firefox and WebKit and the recorded benchmarks.",
+      "steps": [
+        "Unit-test that the CI workflow triggers on pull requests and by hand only, and that no workflow has a schedule or a push trigger for main",
+        "Open a pull request and confirm its run contains only the fast job and every listed check runs",
+        "Merge it and confirm no workflow starts on main",
+        "Start the CI workflow by hand and confirm it contains the fast, end-to-end, measurement, cross-browser and benchmark jobs"
+      ],
+      "status": "passing"
     }
   ]
 }

@@ -1,17 +1,12 @@
 name: CI
 
-# Saves minutes (ADR 0015): every push and every pull request run one job with every fast check (pull requests
-# run only the unit tests their changes reach; builds are cached). Pushes to main, the nightly schedule and manual
-# runs add the end-to-end suite in sixteen shards and (nightly and manual) the isolated measurements; the recorded
-# benchmarks run nightly and Firefox and WebKit weekly. Each browser job runs alone on its runner (ADR 0022), inside
-# Playwright's image, on one build made once per run (ADR 0035).
+# Runs only on pull requests and when started by hand (owner, 2026-11-04, ADR 0191): nothing on a push or a merge to
+# main, nor on a schedule. A pull request runs one job with every fast check, the unit tests its changes reach and
+# cached builds (ADR 0015). A manual run (workflow_dispatch) adds the end-to-end suite in sixteen shards, the isolated
+# measurements, Firefox and WebKit, and the recorded benchmarks. Each browser job runs alone on its runner (ADR 0022),
+# inside Playwright's image, on one build made once per run (ADR 0035).
 on:
-  push:
   pull_request:
-  schedule:
-    # Nightly: the full matrix. Weekly (Monday): Firefox and WebKit (ADR 0023).
-    - cron: '23 2 * * *'
-    - cron: '41 3 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -55,14 +50,14 @@ jobs:
         run: npm run deadcode
       - name: Feature list and test guards against the previous state
         run: |
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          base="${{ github.event.pull_request.base.sha }}"
           if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             base=$(git merge-base origin/main HEAD)
           fi
           npm run check:features -- --base "$base"
           npm run check:tests -- --base "$base"
-      # Pull requests run the tests of what they change (Vitest follows the import graph); pushes run the whole suite
-      # with its coverage minima.
+      # Pull requests run the tests of what they change (Vitest follows the import graph); a manual run runs the whole
+      # suite with its coverage minima.
       - name: Unit tests of the changed code (pull requests)
         if: github.event_name == 'pull_request'
         run: npx vitest run --changed "${{ github.event.pull_request.base.sha }}"
@@ -87,7 +82,7 @@ jobs:
   build:
     # ADR 0035: one build per run, handed to every browser job as an artifact instead of a build in each.
     name: Build for the browser jobs
-    if: github.event.schedule == '23 2 * * *' || github.event.schedule == '41 3 * * 1' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -119,7 +114,7 @@ jobs:
 
   e2e:
     name: End-to-end tests (Chromium, shard ${{ matrix.shard }}/16)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.
@@ -160,7 +155,7 @@ jobs:
 
   lan:
     name: Offline package over a LAN host (Docker, F284)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     # ADR 0035: the one test that starts Docker containers runs on the runner, where Docker is, not in the image.
@@ -185,7 +180,7 @@ jobs:
 
   measurements:
     name: Isolated measurements (allocation, rendering probes)
-    if: github.event.schedule == '23 2 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.
@@ -234,7 +229,7 @@ jobs:
   cross-browser:
     name: Firefox and WebKit (WebGL2, informational until F504)
     # Weekly only (simplification item 11, ADR 0035).
-    if: github.event.schedule == '41 3 * * 1'
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     # Recorded, not gating: headless Firefox gets no WebGL context on the runner and software WebKit fails some
@@ -283,7 +278,7 @@ jobs:
   benchmarks:
     name: Benchmarks (recorded, not gated)
     # Recorded, not gated, on SwiftShader: nightly only (ADR 0035).
-    if: github.event.schedule == '23 2 * * *'
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     # ADR 0035: Playwright's image for the pinned Playwright version holds the browsers and their system libraries.

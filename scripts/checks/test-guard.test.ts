@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { findAddedExclusions, findLoosenedGates, findRemovedTests, testTitles } from './test-guard.ts';
 
@@ -67,6 +68,12 @@ describe('findRemovedTests', () => {
     const log =
       '| 2026-10-20 | a.test.ts "two" | removed | duplicate of "one" |\n| 2026-10-20 | b.test.ts | deleted | moved |';
     expect(findRemovedTests(base, current, log)).toEqual([]);
+  });
+
+  it('accepts a removal recorded by the hash of its title (ADR 0188)', () => {
+    const current = new Map([['a.test.ts', "it('one', () => {});"], ...[...base].slice(1)]);
+    const hash = createHash('sha256').update('two').digest('hex');
+    expect(findRemovedTests(base, current, `| 2026-11-04 | a.test.ts sha256:${hash} | renamed |`)).toEqual([]);
   });
 
   it('reports a duplicated title that lost one occurrence', () => {

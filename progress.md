@@ -670,7 +670,7 @@ packages' `package.json` (ADR 0171; numbers 0171–0179).
   meanwhile). Known bug TH-01 (a failed transcoder load is cached for the session) is the worker package's.
 - Commands: `node scripts/release/check-tarballs.ts`, `node scripts/release/check-consumers.ts [F503] [F531] [F532]`
   (`VIBEGLOBE_CHROMIUM_PATH` in cloud containers, `VIBEGLOBE_RELEASE_KEEP=1` keeps the built projects),
-  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-cube.ts`.
+  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-consumer-names.ts`.
 - About 3 hours of agent time.
 
 ## Track F, network simulation suite (2026-10-23)

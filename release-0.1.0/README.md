@@ -38,6 +38,6 @@ d3dedbbcc97ec0983c0172f9cce8f0506d01238d11ce11a19d4ab69b1212b3b2  vibeglobe-vue-
 945889dea8f99fd80cf75111d66be24b2e233aa89c4b6b6df778b94654ad892c  vibeglobe-worker-0.1.0.tgz
 ```
 
-To use them in an application (Nuxt 3, Vue 3), follow [docs/guides/cube-quickstart.md](../docs/guides/cube-quickstart.md):
+To use them in an application (Nuxt 3, Vue 3), follow the [integration guide](../docs/guides/integration.md):
 copy the folder into the application and install the tarballs with `file:` dependencies and `overrides`.
 Publishing to npm stays the owner's step (docs/open-questions.md, question 17; `.claude/skills/release/SKILL.md`).

@@ -76,3 +76,4 @@ Conventions:
 | [0185](0185-no-proprietary-provider-adapters.md)     | No adapter of a paid or proprietary provider                                                                     | Accepted (partly superseded by 0186)                              |
 | [0186](0186-provider-services.md)                    | Provider services: tile, terrain and geocoder services; ready providers in their own package                     | Accepted (partly superseded by 0187)                              |
 | [0187](0187-no-maps-in-the-library.md)               | No maps in the library: no provider package, the Europe preset is the playground's own                           | Accepted                                                          |
+| [0188](0188-no-consumer-named.md)                    | No consumer application named in the repository                                                                  | Accepted                                                          |

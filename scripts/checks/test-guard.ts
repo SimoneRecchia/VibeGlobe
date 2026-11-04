@@ -1,5 +1,6 @@
 // Detects removed tests and loosened quality gates between two versions of the repository (PLAN.md: tests protect
 // the work). Anything named in the test-changes log is accepted as a recorded, justified change.
+import { createHash } from 'node:crypto';
 
 /**
  * Titles of the test cases and suites declared in a test file: `it`, `test` and `describe` with any chained modifiers
@@ -18,6 +19,13 @@ function counts(values: string[]): Map<string, number> {
   return result;
 }
 
+/**
+ * Whether `log` names a test title: as it is, or as `sha256:<hex>` of it, for a title that named what the repository
+ * must not name (ADR 0188).
+ */
+const logged = (log: string, title: string): boolean =>
+  log.includes(title) || log.includes(`sha256:${createHash('sha256').update(title).digest('hex')}`);
+
 /** Test files (path → content) removed or missing test cases relative to `base`, unless recorded in `log`. */
 export function findRemovedTests(base: Map<string, string>, current: Map<string, string>, log: string): string[] {
   const violations: string[] = [];
@@ -29,7 +37,7 @@ export function findRemovedTests(base: Map<string, string>, current: Map<string,
     }
     const currentCounts = counts(testTitles(currentContent));
     for (const [title, count] of counts(testTitles(baseContent))) {
-      if ((currentCounts.get(title) ?? 0) < count && !(log.includes(path) && log.includes(title))) {
+      if ((currentCounts.get(title) ?? 0) < count && !(log.includes(path) && logged(log, title))) {
         violations.push(`${path}: test "${title}" removed`);
       }
     }

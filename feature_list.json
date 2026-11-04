@@ -513,12 +513,12 @@
       "id": "F038",
       "milestone": 1,
       "section": "Fixed constraints",
-      "description": "The code lives in a private GitHub repository named VibeGlobeEngine, fully separate from Vireox Cube: it contains no Cube code, submodule or dependency.",
+      "description": "The code lives in a private GitHub repository named VibeGlobeEngine, fully separate from its first consumer application: it contains no consumer code, submodule or dependency.",
       "steps": [
         "Query the repository through the GitHub API and confirm it is private and named VibeGlobeEngine (case-insensitive)",
-        "Confirm the repository has no git submodules referring to Cube",
-        "Run the dependency-rule check and confirm no package depends on or refers to Cube",
-        "Search the source tree and confirm it contains no Cube code (PLAN.md and docs may name Cube as the first consumer)"
+        "Confirm the repository has no git submodules referring to a consumer application",
+        "Run the dependency-rule check and confirm no package depends on or refers to a consumer application",
+        "Search the source tree and confirm it contains no consumer application code"
       ],
       "status": "superseded"
     },
@@ -552,12 +552,12 @@
       "id": "F542",
       "milestone": 1,
       "section": "Fixed constraints",
-      "description": "The repository is SimoneRecchia/VibeGlobe on GitHub, under the owner's personal account and fully separate from Vireox Cube, and the project is named VibeGlobe everywhere: package metadata, documentation, code identifiers, the `<vibe-globe>` Web Component tag and the VIBEGLOBE_ environment-variable prefix.",
+      "description": "The repository is SimoneRecchia/VibeGlobe on GitHub, under the owner's personal account and fully separate from its first consumer application, and the project is named VibeGlobe everywhere: package metadata, documentation, code identifiers, the `<vibe-globe>` Web Component tag and the VIBEGLOBE_ environment-variable prefix.",
       "steps": [
         "Query the repository through the GitHub API and confirm its full name is SimoneRecchia/VibeGlobe (case-insensitive) and the git remote of the working copy points to it",
         "Search the tracked files case-insensitively for VibeGlobeEngine and for vge used as a prefix (VGE_, vge-, vge:, vgePlayground) and confirm the only matches are frozen feature-list text and the documents that record the rename (ADR 0015, ADR 0016, docs/feature-changes.md, docs/open-questions.md, docs/test-changes.md, progress.md)",
         "Confirm the root package is named vibeglobe, every library uses the @vibeglobe/ scope, the Web Component tag is <vibe-globe>, and init.sh, the Playwright configuration, the benchmark runner and CI read VIBEGLOBE_ variables",
-        "Confirm the repository has no git submodule referring to Cube and the dependency-rule check finds no package depending on or referring to Cube",
+        "Confirm the repository has no git submodule referring to a consumer application and the dependency-rule check finds no package depending on or referring to one",
         "Run ./init.sh from a fresh clone and confirm it passes"
       ],
       "status": "passing"
@@ -6318,9 +6318,9 @@
       "id": "F480",
       "milestone": 14,
       "section": "Fixed constraints",
-      "description": "The Vue adapter depends only on the engine packages and on Vue 3 as a peer dependency, with no Nuxt, React or Cube dependency, and type-checks under vue-tsc in strict mode.",
+      "description": "The Vue adapter depends only on the engine packages and on Vue 3 as a peer dependency, with no Nuxt, React or consumer-application dependency, and type-checks under vue-tsc in strict mode.",
       "steps": [
-        "Inspect the Vue adapter's package.json and assert Vue is a peer dependency and no Nuxt, React or Cube package is listed",
+        "Inspect the Vue adapter's package.json and assert Vue is a peer dependency and no Nuxt, React or consumer-application package is listed",
         "Run the dependency-rule check in CI and assert it passes",
         "Run vue-tsc in strict mode on the example and assert no errors"
       ],
@@ -6431,12 +6431,12 @@
       "id": "F489",
       "milestone": 14,
       "section": "Documentation and distribution",
-      "description": "An integration guide for consumers such as Cube explains installation from the private registry, Vue and Nuxt setup with SSR, worker and WebAssembly asset URLs, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "description": "An integration guide for consumer applications explains installation from the private registry, Vue and Nuxt setup with SSR, worker and WebAssembly asset URLs, CSP, offline packages and provider keys, and a new project following only the guide works.",
       "steps": [
         "Open the integration guide in the documentation site",
         "Check it covers registry setup, Vue and Nuxt setup with SSR, asset URLs, CSP, network modes and offline packages, provider keys and attribution",
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
-        "Assert the guide never names Cube-specific code or configuration as a requirement"
+        "Assert the guide never names a consumer application's code or configuration as a requirement"
       ],
       "status": "superseded"
     },
@@ -6444,12 +6444,12 @@
       "id": "F555",
       "milestone": 14,
       "section": "Documentation and distribution",
-      "description": "An integration guide for consumers such as Cube explains installation from the public npm registry (@vibeglobe), licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "description": "An integration guide for consumer applications explains installation from the public npm registry (@vibeglobe), licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
       "steps": [
         "Open the integration guide in the documentation site",
         "Check it covers npm installation, licensing, Vue and Nuxt setup with SSR, lazy loading, asset hosting and base path, CSP, network modes and offline packages, provider keys and attribution",
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
-        "Assert the guide never names Cube-specific code or configuration as a requirement"
+        "Assert the guide never names a consumer application's code or configuration as a requirement"
       ],
       "status": "pending"
     },
@@ -7054,11 +7054,11 @@
       "id": "F536",
       "milestone": 15,
       "section": "Documentation and distribution",
-      "description": "A separate consumer project installs the packages from the private registry like any other dependency, and nothing in the engine refers to Cube.",
+      "description": "A separate consumer project installs the packages from the private registry like any other dependency, and nothing in the engine refers to a consumer application.",
       "steps": [
         "Install the published packages from the private registry into a fresh project with only registry credentials configured",
         "Assert the globe renders",
-        "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
+        "Search the repository's code, packages and documentation and assert no dependency on or reference to a consumer application"
       ],
       "status": "superseded"
     },
@@ -7066,11 +7066,11 @@
       "id": "F559",
       "milestone": 15,
       "section": "Documentation and distribution",
-      "description": "A separate consumer project installs the packages from the public npm registry like any other dependency, with no registry credentials, and nothing in the engine refers to Cube.",
+      "description": "A separate consumer project installs the packages from the public npm registry like any other dependency, with no registry credentials, and nothing in the engine refers to a consumer application.",
       "steps": [
         "Install the published packages from npm into a fresh project with no registry configuration or credentials",
         "Assert the globe renders",
-        "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
+        "Search the repository's code, packages and documentation and assert no dependency on or reference to a consumer application"
       ],
       "status": "pending"
     },
@@ -7694,7 +7694,7 @@
       "description": "One documented option turns on every online source of the Europe preset: `europeOpen(await withAllOnlineSources(options))` adds the national and regional orthophotos, each to its own deepest level, to the options given.",
       "steps": [
         "Unit-test that the options keep the ones given and add every orthophoto layer",
-        "Document it with Cube's options in the preset's guide"
+        "Document it with an application's options in the preset's guide"
       ],
       "status": "passing"
     },

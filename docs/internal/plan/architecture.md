@@ -25,7 +25,7 @@ npm workspaces monorepo ([ADR 0002](../adr/0002-monorepo-and-tooling.md)). All p
 
 Dependency rules (checked in CI from M1):
 
-- No package depends on Vue, Nuxt, React or Cube, except `@vibeglobe/vue` on Vue. Nothing anywhere refers to Cube.
+- No package depends on Vue, Nuxt, React or a consumer application, except `@vibeglobe/vue` on Vue. Nothing anywhere names a consumer application.
 - `core` has no runtime dependencies and compiles without the DOM library, so nothing in it can touch `window`, `document` or the GPU at import time. Browser APIs are reached only through plug-ins created by the application at runtime.
 - three.js is imported only inside `renderer` (and `layers` through the renderer's exported helpers). Swapping the backend never touches globe logic.
 - Every package is ESM, `sideEffects: false`, with no top-level side effects: importing it under SSR is always safe (tested for every package).

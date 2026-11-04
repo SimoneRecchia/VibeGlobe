@@ -6,6 +6,8 @@ interface PackageManifest {
   name?: string;
   version?: string;
   description?: string;
+  /** Where npm's trusted publishing and provenance check the package comes from. */
+  repository?: { type: string; url: string };
   exports?: unknown;
   types?: string;
   bin?: Record<string, string>;

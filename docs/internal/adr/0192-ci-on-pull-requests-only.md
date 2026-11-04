@@ -1,8 +1,8 @@
-# 0191. CI only on pull requests and by hand
+# 0192. CI only on pull requests and by hand
 
 - Status: Accepted
 - Date: 2026-11-04
-- Milestone: M1 (F709; partly supersedes ADR 0015 and ADR 0022 on when CI runs)
+- Milestone: M1 (F710; partly supersedes ADR 0015 and ADR 0022 on when CI runs)
 
 ## Context
 

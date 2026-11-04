@@ -1,11 +1,19 @@
 # Progress
 
-## 2026-11-04: CI only on pull requests and by hand (F709)
+## 2026-11-04: CI only on pull requests and by hand (F710)
 
 The owner's brief: the checks run on pull requests, and nothing starts on `main`, after a merge or a push. `ci.yml`
 triggers on pull requests and manual runs only; the full matrix (end-to-end shards, measurements, Firefox and WebKit,
 benchmarks) is a manual run; no workflow has a schedule, and the visual baselines' push trigger skips `main`
-(ADR 0191; F027 and F565 superseded by F709). `scripts/checks/ci-triggers.test.ts` keeps the triggers so.
+(ADR 0192; F027 and F565 superseded by F710). `scripts/checks/ci-triggers.test.ts` keeps the triggers so.
+
+## 2026-11-04: publishing with no token, through npm's trusted publishing (F709)
+
+The owner's brief: no npm token. The Release workflow publishes with its GitHub OIDC identity (`id-token: write`, npm
+11.21.1, no cache, no secret); `release.ts` refuses without that identity and lets npm attach the provenance;
+`vibeglobe`'s manifest carries the `repository` npm checks (ADR 0191, F709 replacing F708). For the owner: publish the
+first version once by hand, set the trusted publisher on npmjs.com (`SimoneRecchia/VibeGlobe`, `release.yml`,
+`npm-release`), then delete the `NPM_TOKEN` secret and its token.
 
 ## 2026-11-04: the release only builds and publishes (F708)
 

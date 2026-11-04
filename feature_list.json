@@ -8467,10 +8467,22 @@
         "Assert the workflow is started by hand and has one job, in the `npm-release` environment with the NPM_TOKEN secret, that runs the release script",
         "Run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F709",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The Release workflow, started by hand on main with a version, builds the engine, packs `vibeglobe` at that version and publishes it to the public npm registry through npm's trusted publishing: the workflow's GitHub OIDC identity, no npm token anywhere, provenance attached by npm. It does nothing else: no changelog, commit or tag.",
+      "steps": [
+        "Unit-test that the release script publishes only from the release workflow on main in CI with an OIDC identity, and sends pre-releases to the next dist-tag",
+        "Assert the workflow is started by hand, has one job in the `npm-release` environment with `id-token: write` and npm 11.5.1 or later, and names no token or secret",
+        "Configure the trusted publisher of `vibeglobe` on npmjs.com, run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry with its provenance"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F710",
       "milestone": 1,
       "section": "Testing and verification",
       "description": "CI runs only on pull requests and when started by hand, never on a push or a merge to main nor on a schedule: every pull request runs one fast job with the type check, lint, format check, repository checks and guards, the unit tests its changes reach, the license audit, the API documentation build and the bundle-size checks; a manual run adds the whole unit suite with coverage, the end-to-end tests, the isolated measurements, Firefox and WebKit and the recorded benchmarks.",

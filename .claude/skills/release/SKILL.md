@@ -10,14 +10,26 @@ under subpaths (ADR 0189). Publishing is the owner's: an agent never publishes, 
 
 ## Publish (owner)
 
+The workflow publishes through npm's trusted publishing (ADR 0191): GitHub's OIDC identity of `release.yml`, no npm
+token anywhere. npm configures a trusted publisher only for a package that exists, so the first time:
+
+1. Publish the first version by hand: `npm run build && npm run release:pack`, then
+   `npm publish release-<version>/vibeglobe-<version>.tgz --access public`, logged in (`npm login`) with two-factor
+   authentication.
+2. On npmjs.com, `vibeglobe` → Settings → Trusted publisher → GitHub Actions: organization or user `SimoneRecchia`,
+   repository `VibeGlobe`, workflow `release.yml`, environment `npm-release`. Then Settings → Publishing access →
+   "Require two-factor authentication and disallow tokens", and delete the `NPM_TOKEN` secret and its token.
+
+Every release after that:
+
 1. Merge what goes in the release into `main`; CI green.
 2. GitHub → Actions → **Release** → Run workflow on `main` with the version (semantic; a pre-release such as
    `1.0.0-rc.1` goes to the npm dist-tag `next`, a release to `latest`).
-3. The **Publish to npm** job runs in the `npm-release` environment, whose `NPM_TOKEN` secret is an npm token that can
-   publish `vibeglobe` (required reviewers, when set, approve it first). It runs `node scripts/release/release.ts
-<version>`: `tsc -b`, the Web Component's browser build, the pack (`scripts/release/tarballs.ts`, at the version
-   given) and `npm publish <tarball> --access public --tag <next|latest> --provenance`. It refuses outside that job
-   (not CI, not `main`, not `release.yml`, or no token).
+3. The **Publish to npm** job runs in the `npm-release` environment (required reviewers, when set, approve it first)
+   with `id-token: write` and npm 11.21.1. It runs `node scripts/release/release.ts <version>`: `tsc -b`, the Web
+   Component's browser build, the pack (`scripts/release/tarballs.ts`, at the version given) and
+   `npm publish <tarball> --access public --tag <next|latest>`; npm attaches the provenance. It refuses outside that
+   job (not CI, not `main`, not `release.yml`, or no OIDC identity).
 
 Nothing else happens: no changelog, commit or tag. npm refuses a version that was already published: choose the next.
 

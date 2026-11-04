@@ -102,7 +102,7 @@ function stagePackage(root: string, stage: string, release: string | undefined):
   }
   for (const path of ['docs/guides', 'docs/data-licenses.md', 'llms.txt'])
     cpSync(join(root, path), join(stage, path), { recursive: true });
-  const { name, description, license, type, sideEffects, types } = entry.manifest;
+  const { name, description, license, repository, type, sideEffects, types } = entry.manifest;
   const version = release ?? entry.manifest.version;
   const dependencies = thirdPartyDependencies(packages.map((pkg) => pkg.manifest));
   const peers = { peerDependencies: { vue: '^3.5.0' }, peerDependenciesMeta: { vue: { optional: true } } };
@@ -111,6 +111,7 @@ function stagePackage(root: string, stage: string, release: string | undefined):
     version,
     description,
     license,
+    repository,
     type,
     sideEffects,
     exports,

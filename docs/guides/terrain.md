@@ -5,17 +5,17 @@ title: Terrain
 # Terrain
 
 A globe takes one terrain source in `GlobeOptions.terrain` and displaces its surface to the source's heights; imagery
-drapes over it at its own levels. The adapters are in `@vibeglobe/sources`, geoid grids are read with
-`@vibeglobe/core/decoders`, and the heights are queried on the `Globe`. You host the tiles and any geoid grid
+drapes over it at its own levels. The adapters are in `vibeglobe/sources`, geoid grids are read with
+`vibeglobe/core/decoders`, and the heights are queried on the `Globe`. You host the tiles and any geoid grid
 ([hosting guide](hosting.md)); every adapter and its options are in the [sources guide](sources.md#terrain-adapters).
 
 ## Quick start
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
-import { heightmapTerrain } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker';
+import { createGlobe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
+import { heightmapTerrain } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker';
 
 const terrain = heightmapTerrain({
   id: 'terrain',
@@ -45,7 +45,7 @@ Without `terrain` the surface is the WGS84 ellipsoid. Where the source has no da
   outside the declared availability, including availability declared in parent tiles' metadata, are never requested.
 - **Packages** (`pmtilesTerrain`, `mbtilesTerrain`): the same encodings in a PMTiles archive or an MBTiles package.
 - **Any other encoding**: a `TerrainSource` whose `decoder` is `{ kind: 'custom', decode(bytes, coord) }`, returning a
-  `heightGrid(pixelHeights, sizePx, cells)` of `@vibeglobe/core/decoders` and throwing on undecodable bytes. It runs on
+  `heightGrid(pixelHeights, sizePx, cells)` of `vibeglobe/core/decoders` and throwing on undecodable bytes. It runs on
   the main thread between frames, so keep it cheap. The playground's
   [terrain adapters](https://github.com/SimoneRecchia/VibeGlobe/blob/main/apps/playground/src/terrain-adapters.ts)
   are two complete examples (a 24-bit RGB formula and raw float32 tiles).
@@ -60,8 +60,8 @@ DEM uses EGM2008. Geoid heights H become ellipsoidal heights h = H + N before me
 bilinearly in a geoid grid you host:
 
 ```ts
-import { readGeoidFile } from '@vibeglobe/core/decoders';
-import { heightmapTerrain } from '@vibeglobe/sources';
+import { readGeoidFile } from 'vibeglobe/core/decoders';
+import { heightmapTerrain } from 'vibeglobe/sources';
 
 const model = readGeoidFile(await (await fetch('/geoid/egm2008-15m.bin')).arrayBuffer());
 const terrain = heightmapTerrain({
@@ -88,7 +88,7 @@ node scripts/geoid-grid.ts check egm2008-15m.bin egm2008-reference.txt 1
 ## Elevation queries
 
 ```ts
-import type { ElevationSample, Globe } from '@vibeglobe/core';
+import type { ElevationSample, Globe } from 'vibeglobe/core';
 
 declare const globe: Globe;
 

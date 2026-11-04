@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { bundle } from './bundle.ts';
-import { ROOT_DIR, readWorkspace } from './workspace.ts';
+import { ROOT_DIR, enginePackages } from './workspace.ts';
 
 interface Budgets {
   bundleExternal: string[];
@@ -23,7 +23,7 @@ import { createControls } from '@vibeglobe/controls';
 createGlobe({ container: document.body, renderer: createRenderer(), controls: createControls(), baseImageryUrl: 'a.jpg' });`;
 
 const budgets = JSON.parse(readFileSync(join(ROOT_DIR, 'quality/budgets.json'), 'utf8')) as Budgets;
-const published = readWorkspace().filter((pkg) => pkg.dir.startsWith('packages/') && !pkg.manifest.private);
+const published = enginePackages();
 
 let failed = false;
 for (const pkg of published) {

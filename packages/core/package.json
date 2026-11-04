@@ -1,6 +1,7 @@
 {
   "name": "@vibeglobe/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "VibeGlobe core: math, geodesy, camera, tiling, scheduling, cache and events.",
   "license": "MPL-2.0",
   "type": "module",
@@ -42,8 +43,6 @@
     "dist",
     "src",
     "LICENSE.md",
-    "docs",
-    "llms.txt",
     "!dist/tsconfig.tsbuildinfo",
     "!src/**/*.test.ts",
     "!src/**/__fixtures__",
@@ -52,9 +51,5 @@
     "!dist/**/__fixtures__",
     "!src/globe/test-renderer.ts",
     "!dist/globe/test-renderer.*"
-  ],
-  "scripts": {
-    "prepack": "node ../../scripts/release/core-docs.ts",
-    "postpack": "node ../../scripts/release/core-docs.ts --remove"
-  }
+  ]
 }

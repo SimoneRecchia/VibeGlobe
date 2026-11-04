@@ -5,20 +5,20 @@ title: Sources and adapters
 # Sources and adapters
 
 A globe reads every tiled layer through a source: an object that implements `ImagerySource` or `TerrainSource` of
-`@vibeglobe/core`. `@vibeglobe/sources` builds sources from URL templates, OGC services, PMTiles and MBTiles packages
+`vibeglobe/core`. `vibeglobe/sources` builds sources from URL templates, OGC services, PMTiles and MBTiles packages
 and single images, attaches their credits and provider profiles, and ships conformance suites for your own adapters.
-Use `@vibeglobe/offline` to cache and package tiles ([offline guide](offline.md)), the [terrain guide](terrain.md) for
+Use `vibeglobe/offline` to cache and package tiles ([offline guide](offline.md)), the [terrain guide](terrain.md) for
 heights and the camera, the [hosting guide](hosting.md) to serve the files, and the
 [vector tiles guide](vector-tiles.md) for styled vector maps.
 
 ## Quick start
 
 ```ts
-import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import { createGlobe, type WorkerEndpointFactory } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
 
 declare const baseImageryUrl: string;
-declare const workers: WorkerEndpointFactory; // createWorkers() of @vibeglobe/worker
+declare const workers: WorkerEndpointFactory; // createWorkers() of vibeglobe/worker
 
 const base = xyzImagery({ id: 'base', url: 'https://tiles.example.com/{z}/{x}/{y}.png', maxLevel: 18 });
 createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [base] });
@@ -31,8 +31,8 @@ createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [base] });
 A tiled source is a plain object; the engine needs nothing else from it:
 
 ```ts
-import { WEB_MERCATOR_TILING, type ImagerySource } from '@vibeglobe/core';
-import { CUSTOM_PROFILE, fetchTransport, withProfile } from '@vibeglobe/sources';
+import { WEB_MERCATOR_TILING, type ImagerySource } from 'vibeglobe/core';
+import { CUSTOM_PROFILE, fetchTransport, withProfile } from 'vibeglobe/sources';
 
 const plain: ImagerySource = {
   id: 'my-tiles', // unique per engine instance
@@ -63,9 +63,9 @@ const mine = withProfile(plain, CUSTOM_PROFILE, [{ text: '© My tiles', url: 'ht
 ## Imagery adapters
 
 ```ts
-import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
-import { pmtilesImagery, wmsImagery, wmtsImagery, xyzImagery } from '@vibeglobe/sources';
-import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+import { createGlobe, type WorkerEndpointFactory } from 'vibeglobe/core';
+import { pmtilesImagery, wmsImagery, wmtsImagery, xyzImagery } from 'vibeglobe/sources';
+import { mbtilesImagery } from 'vibeglobe/sources/mbtiles';
 
 declare const baseImageryUrl: string;
 declare const workers: WorkerEndpointFactory;
@@ -91,15 +91,15 @@ const lan = await mbtilesImagery({
 createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [xyz, wmts, archive, lan, wms] });
 ```
 
-| Adapter                                         | Reads                                                                 | Returns                           |
-| ----------------------------------------------- | --------------------------------------------------------------------- | --------------------------------- |
-| `xyzImagery`                                    | an XYZ or TMS URL template                                            | `ImagerySource`                   |
-| `wmtsImagery`                                   | WMTS 1.0.0 capabilities (URL or XML text), RESTful or KVP tiles       | `Promise<DescribedImagerySource>` |
-| `wmsImagery`                                    | WMS 1.1.1 or 1.3.0 GetMap, one image per tile                         | `Promise<DescribedImagerySource>` |
-| `pmtilesImagery`                                | a PMTiles v3 raster archive: a URL (range requests), `File`, `Blob`   | `Promise<DescribedImagerySource>` |
-| `mbtilesImagery` (`@vibeglobe/sources/mbtiles`) | an MBTiles package: a URL downloaded whole, `File`, `Blob`            | `Promise<DescribedImagerySource>` |
-| `singleImage`, `geotiffImage`, `mercatorImage`  | one georeferenced image ([below](#single-georeferenced-images))       | see below                         |
-| `reprojectedImagery`                            | an image service in another reference system ([below](#reprojection)) | `ImagerySource`                   |
+| Adapter                                        | Reads                                                                 | Returns                           |
+| ---------------------------------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| `xyzImagery`                                   | an XYZ or TMS URL template                                            | `ImagerySource`                   |
+| `wmtsImagery`                                  | WMTS 1.0.0 capabilities (URL or XML text), RESTful or KVP tiles       | `Promise<DescribedImagerySource>` |
+| `wmsImagery`                                   | WMS 1.1.1 or 1.3.0 GetMap, one image per tile                         | `Promise<DescribedImagerySource>` |
+| `pmtilesImagery`                               | a PMTiles v3 raster archive: a URL (range requests), `File`, `Blob`   | `Promise<DescribedImagerySource>` |
+| `mbtilesImagery` (`vibeglobe/sources/mbtiles`) | an MBTiles package: a URL downloaded whole, `File`, `Blob`            | `Promise<DescribedImagerySource>` |
+| `singleImage`, `geotiffImage`, `mercatorImage` | one georeferenced image ([below](#single-georeferenced-images))       | see below                         |
+| `reprojectedImagery`                           | an image service in another reference system ([below](#reprojection)) | `ImagerySource`                   |
 
 - `wmtsImagery` takes the layer's default style, the first format of PNG, JPEG and WebP, and the first tile matrix
   set that lines up with `preferredCrs` (`EPSG:3857` by default, or `EPSG:4326`). `dimensions` sets values such as
@@ -116,8 +116,8 @@ createGlobe({ container, renderer, baseImageryUrl, workers, imagery: [xyz, wmts,
 ## Terrain adapters
 
 ```ts
-import { heightmapTerrain, pmtilesTerrain, quantizedMeshTerrain } from '@vibeglobe/sources';
-import { mbtilesTerrain } from '@vibeglobe/sources/mbtiles';
+import { heightmapTerrain, pmtilesTerrain, quantizedMeshTerrain } from 'vibeglobe/sources';
+import { mbtilesTerrain } from 'vibeglobe/sources/mbtiles';
 
 const terrarium = heightmapTerrain({
   id: 'dem',
@@ -152,8 +152,8 @@ const onTheNas = await mbtilesTerrain({
 ## Vector tiles in packages
 
 ```ts
-import { pmtilesVector } from '@vibeglobe/sources';
-import { decodeMvt } from '@vibeglobe/sources/vector';
+import { pmtilesVector } from 'vibeglobe/sources';
+import { decodeMvt } from 'vibeglobe/sources/vector';
 
 const roads = await pmtilesVector({ id: 'roads', archive: 'https://cdn.example.com/roads.pmtiles' });
 const request = roads.request({ root: 0, level: 3, x: 4, y: 2 }, { url: '', hostIndex: 0 });
@@ -169,8 +169,8 @@ local file or, wrapped by `offline.source()`, browser storage.
 ## Single georeferenced images
 
 ```ts
-import { singleImage } from '@vibeglobe/sources';
-import { geotiffImage } from '@vibeglobe/sources/geotiff';
+import { singleImage } from 'vibeglobe/sources';
+import { geotiffImage } from 'vibeglobe/sources/geotiff';
 
 // Bounds are west, south, east, north in the units of `crs` (EPSG:4326 degrees by default).
 const flood = await singleImage({
@@ -202,7 +202,7 @@ levels 0 to `maxLevel` (0 to 22) from it; the engine enlarges finer levels. A fa
 next tile. For an image of part of the world, use `singleImage` with `crs: 'EPSG:3857'`.
 
 ```ts
-import { mercatorImage } from '@vibeglobe/sources';
+import { mercatorImage } from 'vibeglobe/sources';
 
 // 2048 pixels wide: levels 0 to 3 are cut at full resolution.
 const lights = mercatorImage({
@@ -221,8 +221,8 @@ and 33N (`EPSG:32632`, `EPSG:32633`) or a custom WMTS tile matrix set, is reproj
 asks for the source image covering it (a WMS GetMap, or WMTS tiles composed in place) and warps it piecewise-affinely.
 
 ```ts
-import { transformCoordinates } from '@vibeglobe/gis';
-import { reprojectedImagery, wmsGetMapUrl, wmtsImagery } from '@vibeglobe/sources';
+import { transformCoordinates } from 'vibeglobe/gis';
+import { reprojectedImagery, wmsGetMapUrl, wmtsImagery } from 'vibeglobe/sources';
 
 const transforms = (crs: string) =>
   crs === 'EPSG:32632'
@@ -268,7 +268,7 @@ source that covers them fills them; otherwise each cap shows one color, `#78a9cd
 south (the sea and the ice of the default base image).
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
+import { createGlobe } from 'vibeglobe/core';
 
 declare const baseImageryUrl: string;
 
@@ -286,8 +286,8 @@ with sources in priority order: each tile comes from the first source that has i
 timeouts, offline) leaves its tiles to the next one.
 
 ```ts
-import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import { createGlobe, type WorkerEndpointFactory } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
 
 declare const baseImageryUrl: string;
 declare const workers: WorkerEndpointFactory;
@@ -341,8 +341,8 @@ outline's precision, and the tiles within that distance of the land are requeste
 transparent.
 
 ```ts
-import { createGlobe, type WorkerEndpointFactory } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
+import { createGlobe, type WorkerEndpointFactory } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
 
 declare const baseImageryUrl: string;
 declare const workers: WorkerEndpointFactory;
@@ -382,10 +382,10 @@ createGlobe({
 
 ## Vector formats
 
-`@vibeglobe/sources/vector` exports the parsers and `VECTOR_TASKS`, the task table the worker program registers.
+`vibeglobe/sources/vector` exports the parsers and `VECTOR_TASKS`, the task table the worker program registers.
 
 ```ts
-import { decodeMvt, parseGeoJson, parseGpx, parseKml } from '@vibeglobe/sources/vector';
+import { decodeMvt, parseGeoJson, parseGpx, parseKml } from 'vibeglobe/sources/vector';
 
 declare const text: string;
 declare const kmzBytes: Uint8Array;
@@ -408,24 +408,24 @@ the library then enforces. [Data licenses](../data-licenses.md) lists the terms 
 their dates, to help that check.
 
 A profile only switches features off, and only for its own source. Every loading feature (persistent cache, memory
-reuse, prefetch and flight preloading, offline packaging) is on by default. `@vibeglobe/offline` can switch off more,
+reuse, prefetch and flight preloading, offline packaging) is on by default. `vibeglobe/offline` can switch off more,
 globally or per source, and switches on nothing a profile forbids.
 
-| `ProviderProfile` field | Effect                                                                    | Enforced by                      |
-| ----------------------- | ------------------------------------------------------------------------- | -------------------------------- |
-| `id`                    | names the profile in warnings and errors                                  | —                                |
-| `forbids`               | `persistentCache`, `memoryReuse`, `prefetch`, `offlinePackaging` stay off | `@vibeglobe/offline` only        |
-| `respectCacheHeaders`   | responses are reused only while their cache headers allow it              | the engine, `@vibeglobe/offline` |
-| `maxConcurrentRequests` | caps the source's `maxRequestsPerHost`                                    | `withProfile`                    |
-| `requiredAttribution`   | a credit always shown, also when the source is in `hiddenCredits`         | the engine                       |
-| `displayOnly`           | pixel readback, tile data and elevation sampling throw `display-only`     | the engine                       |
-| `warning`               | logged once per engine instance                                           | the engine                       |
-| `termsAdr`              | recorded for the application                                              | —                                |
+| `ProviderProfile` field | Effect                                                                    | Enforced by                     |
+| ----------------------- | ------------------------------------------------------------------------- | ------------------------------- |
+| `id`                    | names the profile in warnings and errors                                  | —                               |
+| `forbids`               | `persistentCache`, `memoryReuse`, `prefetch`, `offlinePackaging` stay off | `vibeglobe/offline` only        |
+| `respectCacheHeaders`   | responses are reused only while their cache headers allow it              | the engine, `vibeglobe/offline` |
+| `maxConcurrentRequests` | caps the source's `maxRequestsPerHost`                                    | `withProfile`                   |
+| `requiredAttribution`   | a credit always shown, also when the source is in `hiddenCredits`         | the engine                      |
+| `displayOnly`           | pixel readback, tile data and elevation sampling throw `display-only`     | the engine                      |
+| `warning`               | logged once per engine instance                                           | the engine                      |
+| `termsAdr`              | recorded for the application                                              | —                               |
 
 ### Your own provider's profile
 
 ```ts
-import { combineProfiles, withProfile, xyzImagery, type ProviderProfile } from '@vibeglobe/sources';
+import { combineProfiles, withProfile, xyzImagery, type ProviderProfile } from 'vibeglobe/sources';
 
 const acme: ProviderProfile = {
   id: 'acme',
@@ -452,7 +452,7 @@ profile of the provider's terms. The key and the session stay in the transport, 
 is made. For Google's 2D tiles, for example:
 
 ```ts
-import { fetchTransport, withProfile, xyzImagery, type ProviderProfile } from '@vibeglobe/sources';
+import { fetchTransport, withProfile, xyzImagery, type ProviderProfile } from 'vibeglobe/sources';
 
 declare const myRestrictedKey: string;
 
@@ -486,8 +486,8 @@ const google = withProfile(
 ```
 
 Photorealistic 3D Tiles follow the same pattern: `tiles3d({ url, meshes, transport, profile })` of
-`@vibeglobe/sources/tiles3d`, added with `globe.addRenderExtension`, takes the root tileset's URL, the meshes of
-`@vibeglobe/renderer/tiles3d` (`threeTileMeshes`), your transport and your profile; its `copyrights()` lists the
+`vibeglobe/sources/tiles3d`, added with `globe.addRenderExtension`, takes the root tileset's URL, the meshes of
+`vibeglobe/renderer/tiles3d` (`threeTileMeshes`), your transport and your profile; its `copyrights()` lists the
 credits of the tiles drawn. A provider whose credits change with the view updates the source's `attribution` and calls
 `globe.refreshCredits()` when the view settles (`globe.on('idle', …)`). Which terms apply, in which billing region, and
 whether a key may be used in a browser are between you and the provider.
@@ -503,7 +503,7 @@ Send credentials in headers where the provider supports them (`headers` on `xyzI
 key the provider requires in the URL only when the request is made:
 
 ```ts
-import { fetchTransport, xyzImagery } from '@vibeglobe/sources';
+import { fetchTransport, xyzImagery } from 'vibeglobe/sources';
 
 declare const session: { token: string; renew(): Promise<void> };
 declare const myRestrictedKey: string;
@@ -529,12 +529,12 @@ named like keys, tokens, signatures and sessions with `***`.
 ## Writing and testing a custom adapter
 
 An adapter is any object that implements `ImagerySource`; `withProfile` turns it into a `DescribedImagerySource`, so
-the engine credits it and the library enforces its terms. `@vibeglobe/sources/conformance` runs the shared checks
+the engine credits it and the library enforces its terms. `vibeglobe/sources/conformance` runs the shared checks
 without a test framework and returns every check with its outcome; `failures(results)` lists the failed ones:
 
 ```ts
-import type { DescribedImagerySource } from '@vibeglobe/sources';
-import { failures, runTiledConformance } from '@vibeglobe/sources/conformance';
+import type { DescribedImagerySource } from 'vibeglobe/sources';
+import { failures, runTiledConformance } from 'vibeglobe/sources/conformance';
 
 declare const myAdapter: (options: { fetch: typeof fetch }) => DescribedImagerySource;
 declare const myRecordedService: typeof fetch; // answers like the real service
@@ -554,8 +554,8 @@ payloads, cancellation, attribution and the profile's rules (concurrency, requir
 `profileChecks`). `runTerrainConformance` adds decoded heights at reference points:
 
 ```ts
-import { fetchTransport, heightmapTerrain } from '@vibeglobe/sources';
-import { failures, runTerrainConformance } from '@vibeglobe/sources/conformance';
+import { fetchTransport, heightmapTerrain } from 'vibeglobe/sources';
+import { failures, runTerrainConformance } from 'vibeglobe/sources/conformance';
 
 declare const myRecordedService: typeof fetch;
 // RGBA of a heightmap tile, for tests in Node; in the browser the engine decodes images.
@@ -613,7 +613,7 @@ The options of `xyzImagery`, the adapter most layers use. The TSDoc of each adap
 - `coverage` is in radians and `area` in degrees: degrees in `coverage` make the source request almost nothing.
 - A plain `area: { polygons }` requests only tiles wholly inside it: give GeoJSON or `tiles: 'clip'` to draw the
   source up to the border.
-- `forbids` takes effect only for sources wrapped by `offline.source()`: without `@vibeglobe/offline` the engine keeps
+- `forbids` takes effect only for sources wrapped by `offline.source()`: without `vibeglobe/offline` the engine keeps
   tiles in memory and prefetches whatever the profile says.
 - `xyzImagery`'s `profile` option is a `CreditProfile`; `withProfile` adds the full `ProviderProfile`, caps the
   concurrency and adds the required credit.

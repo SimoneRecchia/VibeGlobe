@@ -1,4 +1,4 @@
-# @vibeglobe/worker
+# vibeglobe/worker
 
 The worker program of the engine's worker pool and `createWorkers`, the factory that starts it. The program decodes
 imagery, terrain and KTX2 tiles and parses vector formats off the main thread; the full program also runs data-layer
@@ -8,25 +8,25 @@ imagery or terrain needs it (`GlobeOptions.workers`).
 
 ## Install
 
-Needs `@vibeglobe/core` and `@vibeglobe/sources` (dependencies). The main entry's program also needs the optional peer
-dependencies `@vibeglobe/layers` and `@vibeglobe/models`; `@vibeglobe/worker/basic` needs neither.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/worker`. The main entry's program decodes
+models and vector tiles too; `vibeglobe/worker/basic` holds imagery and terrain only.
 
 ## Entry points
 
-| Import path                                   | What                                                                     |
-| --------------------------------------------- | ------------------------------------------------------------------------ |
-| `@vibeglobe/worker`                           | `createWorkers` with every task; `WorkerConfigError`                     |
-| `@vibeglobe/worker/basic`                     | `createWorkers` with imagery, terrain, KTX2 and vector-parser tasks only |
-| `@vibeglobe/worker/transcode-ktx2`            | `createTranscodeKtx2`, for tests and tools with their own transcoder     |
-| `@vibeglobe/worker/vibeglobe-worker.js`       | The full worker program                                                  |
-| `@vibeglobe/worker/vibeglobe-worker-basic.js` | The basic worker program                                                 |
+| Import path                                  | What                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `vibeglobe/worker`                           | `createWorkers` with every task; `WorkerConfigError`                     |
+| `vibeglobe/worker/basic`                     | `createWorkers` with imagery, terrain, KTX2 and vector-parser tasks only |
+| `vibeglobe/worker/transcode-ktx2`            | `createTranscodeKtx2`, for tests and tools with their own transcoder     |
+| `vibeglobe/worker/vibeglobe-worker.js`       | The full worker program                                                  |
+| `vibeglobe/worker/vibeglobe-worker-basic.js` | The basic worker program                                                 |
 
 ## Example
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker/basic';
+import { createGlobe } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker/basic';
 
 createGlobe({
   container,

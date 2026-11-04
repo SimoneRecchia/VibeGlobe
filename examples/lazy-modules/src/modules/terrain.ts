@@ -1,8 +1,8 @@
 // Terrain: restarts the globe with a terrain source, decoded by the worker program.
-import { createGlobe, type Globe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
-import { heightmapTerrain } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker';
+import { createGlobe, type Globe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
+import { heightmapTerrain } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker';
 
 export async function enable(
   globe: Globe,

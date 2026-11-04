@@ -4,9 +4,9 @@ title: 3D models
 
 # 3D models
 
-glTF 2.0 models stand on the globe as features of two layers from `@vibeglobe/layers/models`: `ModelLayer` for a few
+glTF 2.0 models stand on the globe as features of two layers from `vibeglobe/layers/models`: `ModelLayer` for a few
 models, each with its own file and pose, and `ModelSetLayer` for many copies of one model, drawn instanced. Both need
-the renderer's glTF loader: `createRenderer({ gltf: gltfLoader })` with `gltfLoader` from `@vibeglobe/renderer/gltf`
+the renderer's glTF loader: `createRenderer({ gltf: gltfLoader })` with `gltfLoader` from `vibeglobe/renderer/gltf`
 (in Vue, the `gltf` prop of `VibeGlobe`). `globe.addModel` places one model without a layer stack, and OGC 3D Tiles
 stream through `tiles3d` (see [3D Tiles](#3d-tiles)). Points, lines and other data are in the
 [data layers guide](data-layers.md).
@@ -14,11 +14,11 @@ stream through `tiles3d` (see [3D Tiles](#3d-tiles)). Points, lines and other da
 ## Quick start
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
-import { createGlobeLayers } from '@vibeglobe/layers';
-import { ModelLayer } from '@vibeglobe/layers/models';
-import { createRenderer } from '@vibeglobe/renderer';
-import { gltfLoader } from '@vibeglobe/renderer/gltf';
+import { createGlobe } from 'vibeglobe/core';
+import { createGlobeLayers } from 'vibeglobe/layers';
+import { ModelLayer } from 'vibeglobe/layers/models';
+import { createRenderer } from 'vibeglobe/renderer';
+import { gltfLoader } from 'vibeglobe/renderer/gltf';
 
 const globe = createGlobe({
   container,
@@ -70,9 +70,9 @@ size on screen. Copies outside the view, or behind the globe, are not drawn. Eac
 clicked and selected like the others, and moved with `setFeaturePosition`; copies cannot be dragged.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { createGlobeLayers } from '@vibeglobe/layers';
-import { ModelSetLayer, type ModelSetItem } from '@vibeglobe/layers/models';
+import type { Globe } from 'vibeglobe/core';
+import { createGlobeLayers } from 'vibeglobe/layers';
+import { ModelSetLayer, type ModelSetItem } from 'vibeglobe/layers/models';
 
 declare const globe: Globe;
 
@@ -112,8 +112,8 @@ rotor, and a node that turns about its own Y axis to face a direction, such as t
 the glTF file, the rotor inside the nacelle, and give their names to the layer:
 
 ```ts
-import type { LayerStack } from '@vibeglobe/layers';
-import { ModelSetLayer, type ModelSetItem } from '@vibeglobe/layers/models';
+import type { LayerStack } from 'vibeglobe/layers';
+import { ModelSetLayer, type ModelSetItem } from 'vibeglobe/layers/models';
 
 declare const stack: LayerStack;
 declare const turbines: readonly ModelSetItem[];
@@ -145,9 +145,9 @@ request, and are sampled again when finer terrain arrives and when the relief ri
 read (display-only terrain) emits `error` once, and the copies stay where they were.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import type { LayerStack } from '@vibeglobe/layers';
-import { ModelSetLayer, type ModelSetItem } from '@vibeglobe/layers/models';
+import type { Globe } from 'vibeglobe/core';
+import type { LayerStack } from 'vibeglobe/layers';
+import { ModelSetLayer, type ModelSetItem } from 'vibeglobe/layers/models';
 
 declare const globe: Globe;
 declare const stack: LayerStack;
@@ -177,9 +177,9 @@ along it, scaled with the copy. Each copy then stands level at the highest groun
 center; give the model legs that reach below its base, so each meets the lower ground.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import type { LayerStack } from '@vibeglobe/layers';
-import { ModelSetLayer, type ModelSetItem } from '@vibeglobe/layers/models';
+import type { Globe } from 'vibeglobe/core';
+import type { LayerStack } from 'vibeglobe/layers';
+import { ModelSetLayer, type ModelSetItem } from 'vibeglobe/layers/models';
 
 declare const globe: Globe;
 declare const stack: LayerStack;
@@ -199,13 +199,13 @@ const field = stack.add(
 
 `framePositions(ids)` gives the corners of copies' model boxes as the frame draws them, at each copy's scale: the
 tower's foot, the rotor's tip and the reach of the blades round the tower, a nacelle turned any way included. `ids`
-default to every copy; the list is empty until the model has loaded. `fitObjects` of `@vibeglobe/layers` flies to the
+default to every copy; the list is empty until the model has loaded. `fitObjects` of `vibeglobe/layers` flies to the
 view that shows them all, the middle of their heights at the view's center:
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { fitObjects } from '@vibeglobe/layers';
-import type { ModelSetLayer } from '@vibeglobe/layers/models';
+import type { Globe } from 'vibeglobe/core';
+import { fitObjects } from 'vibeglobe/layers';
+import type { ModelSetLayer } from 'vibeglobe/layers/models';
 
 declare const globe: Globe;
 declare const farm: ModelSetLayer;
@@ -246,13 +246,13 @@ triangles and compresses with meshopt.
 
 `gltfLoader` decodes neither meshopt (`EXT_meshopt_compression`) nor Draco (`KHR_draco_mesh_compression`). For
 compressed models, give `createRenderer` a loader factory of your own that sets both decoders on three.js's
-`GLTFLoader`. meshopt decodes with meshoptimizer's WebAssembly module, shipped in `@vibeglobe/worker` as
-`wasm/meshopt-decoder.wasm`, compiled by `meshoptWasmDecoder` of `@vibeglobe/models`. Draco decodes with three.js's
+`GLTFLoader`. meshopt decodes with meshoptimizer's WebAssembly module, shipped in `vibeglobe/worker` as
+`wasm/meshopt-decoder.wasm`, compiled by `meshoptWasmDecoder` of `vibeglobe/models`. Draco decodes with three.js's
 `DRACOLoader` and its decoder files. The application hosts both; each loads with the first model that needs it.
 
 ```ts
-import { meshoptWasmDecoder } from '@vibeglobe/models';
-import { createRenderer, type GltfLoaderFactory } from '@vibeglobe/renderer';
+import { meshoptWasmDecoder } from 'vibeglobe/models';
+import { createRenderer, type GltfLoaderFactory } from 'vibeglobe/renderer';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -269,14 +269,14 @@ const modelRenderer = createRenderer({ gltf: compressedGltf });
 
 ## 3D Tiles
 
-OGC 3D Tiles stream into a globe as a render extension: `tiles3d` of `@vibeglobe/sources/tiles3d` loads and traverses
-the tileset, and `threeTileMeshes` of `@vibeglobe/renderer/tiles3d` turns its content into meshes. glTF content parses
-in the globe's `workers` (`createWorkers` of `@vibeglobe/worker`).
+OGC 3D Tiles stream into a globe as a render extension: `tiles3d` of `vibeglobe/sources/tiles3d` loads and traverses
+the tileset, and `threeTileMeshes` of `vibeglobe/renderer/tiles3d` turns its content into meshes. glTF content parses
+in the globe's `workers` (`createWorkers` of `vibeglobe/worker`).
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { threeTileMeshes } from '@vibeglobe/renderer/tiles3d';
-import { tiles3d, type Tiles3DExtension } from '@vibeglobe/sources/tiles3d';
+import type { Globe } from 'vibeglobe/core';
+import { threeTileMeshes } from 'vibeglobe/renderer/tiles3d';
+import { tiles3d, type Tiles3DExtension } from 'vibeglobe/sources/tiles3d';
 
 declare const globe: Globe;
 
@@ -331,8 +331,8 @@ A `ModelSetItem` has `id`, `position`, `headingDeg`, `pitchDeg`, `rollDeg`, `sca
 - `spin.node` and `yaw.node` must match node names in the glTF file exactly; a name that is not found does not move.
 - The yawing node holds the spinning one: the rotor inside the nacelle.
 - Removing a model layer from its stack frees its models and drops its event handlers.
-- 3D Tiles content needs the `parse-model` task: the globe's `workers` from `@vibeglobe/worker` have it,
-  `@vibeglobe/worker/basic` has not. Without it, `modelTasks: createModelTasks()` of `@vibeglobe/models` parses on the
+- 3D Tiles content needs the `parse-model` task: the globe's `workers` from `vibeglobe/worker` have it,
+  `vibeglobe/worker/basic` has not. Without it, `modelTasks: createModelTasks()` of `vibeglobe/models` parses on the
   main thread; otherwise such tiles fail through `onTileError`.
 - Draco content of 3D Tiles needs `dracoWasmUrl`, the absolute URL of `draco_decoder.wasm` that the application hosts.
 - three.js's `DRACOLoader` starts its workers from Blob URLs, which a Content Security Policy must allow

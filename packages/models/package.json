@@ -1,6 +1,7 @@
 {
   "name": "@vibeglobe/models",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "VibeGlobe models: glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding in workers, node transforms and a renderer-neutral model description.",
   "license": "MPL-2.0",
   "type": "module",
@@ -25,7 +26,7 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/core": "0.2.0",
     "draco3d": "1.5.9"
   }
 }

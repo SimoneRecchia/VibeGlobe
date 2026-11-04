@@ -4,8 +4,8 @@ title: Integrating VibeGlobe into an application
 
 # Integrating VibeGlobe into an application
 
-This guide puts a globe in a web application: with plain TypeScript (`@vibeglobe/core`, `@vibeglobe/renderer`), with
-Vue 3 or Nuxt (`@vibeglobe/vue`), or with the `<vibe-globe>` custom element (`@vibeglobe/web-component`). It covers
+This guide puts a globe in a web application: with plain TypeScript (`vibeglobe/core`, `vibeglobe/renderer`), with
+Vue 3 or Nuxt (`vibeglobe/vue`), or with the `<vibe-globe>` custom element (`vibeglobe/web-component`). It covers
 installation, the base image, server-side rendering, lazy loading, the engine's assets, a Content Security Policy and
 attribution. VibeGlobe ships no map: for what goes on the globe read the [sources](sources.md),
 [terrain](terrain.md) and [data layers](data-layers.md) guides; for input and ready-made controls, the
@@ -13,31 +13,35 @@ attribution. VibeGlobe ships no map: for what goes on the globe read the [source
 
 ## Install
 
-Every package is an ES module with TypeScript declarations. Install the set of your integration (until the first
-release, the [root README](https://github.com/SimoneRecchia/VibeGlobe/blob/main/README.md) says how to obtain them):
+```sh
+npm install vibeglobe
+```
 
-| Integration     | Install                                                                                                    |
-| --------------- | ---------------------------------------------------------------------------------------------------------- |
-| Plain TS        | `@vibeglobe/core`, `@vibeglobe/renderer`, `@vibeglobe/controls`, `@vibeglobe/worker`, `@vibeglobe/sources` |
-| Vue 3, Nuxt 4   | `@vibeglobe/vue`, `@vibeglobe/sources`, and `vue` 3.5 or later (a peer dependency)                         |
-| Web Component   | `@vibeglobe/web-component`                                                                                 |
-| Offline, add-on | `@vibeglobe/offline` (network modes, tile cache, offline packages)                                         |
+One package holds the whole engine, as ES modules with TypeScript declarations, one subpath for each part; the
+bundler takes only the subpaths the application imports. `vue` 3.5 or later is a peer dependency of `vibeglobe/vue`
+only. Until a version is on the npm registry, the
+[root README](https://github.com/SimoneRecchia/VibeGlobe/blob/main/README.md) says how to obtain its tarball.
 
-`@vibeglobe/vue` brings `@vibeglobe/controls`, `core`, `layers`, `quality`, `renderer`, `ui` and `worker` as
-dependencies; `@vibeglobe/web-component` brings `controls`, `core`, `renderer`, `sources`, `ui` and `worker`.
+| Integration     | Import                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| One call        | `vibeglobe` (`createVibeGlobe`) and the sources of `vibeglobe/sources`                                |
+| Plain TS        | `vibeglobe/core`, `vibeglobe/renderer`, `vibeglobe/controls`, `vibeglobe/worker`, `vibeglobe/sources` |
+| Vue 3, Nuxt 4   | `vibeglobe/vue`, `vibeglobe/sources`                                                                  |
+| Web Component   | `vibeglobe/web-component`                                                                             |
+| Offline, add-on | `vibeglobe/offline` (network modes, tile cache, offline packages)                                     |
 
-| Package                    | What it adds                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `@vibeglobe/core`          | `createGlobe`, the camera, view modes, streaming, events, every plug-in type    |
-| `@vibeglobe/renderer`      | `createRenderer`: WebGPU with an automatic WebGL2 fallback                      |
-| `@vibeglobe/controls`      | `createControls`: mouse, touch, trackpad and keyboard navigation                |
-| `@vibeglobe/worker`        | `createWorkers`: the worker program that decodes tiles off the main thread      |
-| `@vibeglobe/sources`       | imagery, terrain and vector tile sources (XYZ, WMS, WMTS, PMTiles, MBTiles, …)  |
-| `@vibeglobe/layers`        | data layers: points, markers, labels, lines, polygons, clusters, models         |
-| `@vibeglobe/ui`            | ready-made controls: zoom, compass, search, layers, drawing, measurement, …     |
-| `@vibeglobe/gis`           | coordinate formats, reference systems, geodesic measurement, view state in URLs |
-| `@vibeglobe/vue`           | the `VibeGlobe` component, composables and child components                     |
-| `@vibeglobe/web-component` | the `<vibe-globe>` custom element                                               |
+| Subpath                   | What it adds                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `vibeglobe/core`          | `createGlobe`, the camera, view modes, streaming, events, every plug-in type    |
+| `vibeglobe/renderer`      | `createRenderer`: WebGPU with an automatic WebGL2 fallback                      |
+| `vibeglobe/controls`      | `createControls`: mouse, touch, trackpad and keyboard navigation                |
+| `vibeglobe/worker`        | `createWorkers`: the worker program that decodes tiles off the main thread      |
+| `vibeglobe/sources`       | imagery, terrain and vector tile sources (XYZ, WMS, WMTS, PMTiles, MBTiles, …)  |
+| `vibeglobe/layers`        | data layers: points, markers, labels, lines, polygons, clusters, models         |
+| `vibeglobe/ui`            | ready-made controls: zoom, compass, search, layers, drawing, measurement, …     |
+| `vibeglobe/gis`           | coordinate formats, reference systems, geodesic measurement, view state in URLs |
+| `vibeglobe/vue`           | the `VibeGlobe` component, composables and child components                     |
+| `vibeglobe/web-component` | the `<vibe-globe>` custom element                                               |
 
 ## One call
 
@@ -55,11 +59,11 @@ when it fails to load. The [hosting guide](hosting.md) shows how to build one fr
 ## Plain TypeScript
 
 ```ts
-import { createControls } from '@vibeglobe/controls';
-import { createGlobe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
-import { xyzImagery } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker/basic';
+import { createControls } from 'vibeglobe/controls';
+import { createGlobe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
+import { xyzImagery } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker/basic';
 
 const globe = createGlobe({
   container, // an element with a size: the globe fills it and follows its size changes
@@ -85,9 +89,9 @@ globe.flyTo({ longitudeDeg: 9.19, latitudeDeg: 45.46, zoom: 11 });
 reported through `globe.ready` and the `error` event. It attaches the controls to its canvas and connects them to the
 globe itself. `globe.destroy()` frees the GPU memory, workers and listeners.
 
-`@vibeglobe/worker/basic` runs the imagery, terrain, KTX2 and vector-parser tasks. Data-layer clustering, vector tile
-layout and glTF models need `createWorkers` from `@vibeglobe/worker`, whose program needs `@vibeglobe/layers` and
-`@vibeglobe/models` installed (`@vibeglobe/renderer` brings `@vibeglobe/models`).
+`vibeglobe/worker/basic` runs the imagery, terrain, KTX2 and vector-parser tasks. Data-layer clustering, vector tile
+layout and glTF models need `createWorkers` from `vibeglobe/worker`, whose program needs `vibeglobe/layers` and
+`vibeglobe/models` installed (`vibeglobe/renderer` brings `vibeglobe/models`).
 
 ### The globe's API at a glance
 
@@ -115,8 +119,8 @@ reused objects: read them inside the handler.
 
 ```html
 <script setup lang="ts">
-  import { xyzImagery } from '@vibeglobe/sources';
-  import { VibeGlobe } from '@vibeglobe/vue';
+  import { xyzImagery } from 'vibeglobe/sources';
+  import { VibeGlobe } from 'vibeglobe/vue';
   import { ref } from 'vue';
 
   const imagery = [
@@ -143,22 +147,22 @@ reused objects: read them inside the handler.
 ```
 
 `VibeGlobe` fills its parent (`width: 100%; height: 100%`): the parent must have a height. It creates the renderer,
-the controls and, when `imagery` is set, the workers (`createWorkers()` of `@vibeglobe/worker`) itself.
+the controls and, when `imagery` is set, the workers (`createWorkers()` of `vibeglobe/worker`) itself.
 
-| Prop                                                           | Applied         | Effect                                                                      |
-| -------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------- |
-| `baseImageryUrl`                                               | at start        | Required: the base image                                                    |
-| `imagery`                                                      | at start        | Imagery sources, bottom first                                               |
-| `backend`                                                      | at start        | `'auto'` (default), `'webgpu'` or `'webgl2'`                                |
-| `controls`                                                     | at start        | `true` (default), `false`, or the options of `createControls`               |
-| `gltf`                                                         | at start        | The glTF loader for models: `gltfLoader` of `@vibeglobe/renderer/gltf`      |
-| `workers`                                                      | at start        | Workers of your own, in place of the default                                |
-| `options`                                                      | at start        | Any other `GlobeOptions` (`terrain`, `constraints`, `memory`, …)            |
-| `longitudeDeg`, `latitudeDeg`, `zoom`, `headingDeg`, `tiltDeg` | live (`jumpTo`) | The camera; only the props that changed move it                             |
-| `viewMode`                                                     | live            | `'2d'`, `'3d'` or `'auto'`                                                  |
-| `layers`                                                       | live            | Opacity, visibility, blend and order of the imagery layers, by id           |
-| `offline`, `networkMode`                                       | live            | The `createOffline()` engine and its network mode                           |
-| `qualityPreset`                                                | live            | `'low'`, `'medium'`, `'high'`, `'ultra'` or `'auto'` (`@vibeglobe/quality`) |
+| Prop                                                           | Applied         | Effect                                                                     |
+| -------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------- |
+| `baseImageryUrl`                                               | at start        | Required: the base image                                                   |
+| `imagery`                                                      | at start        | Imagery sources, bottom first                                              |
+| `backend`                                                      | at start        | `'auto'` (default), `'webgpu'` or `'webgl2'`                               |
+| `controls`                                                     | at start        | `true` (default), `false`, or the options of `createControls`              |
+| `gltf`                                                         | at start        | The glTF loader for models: `gltfLoader` of `vibeglobe/renderer/gltf`      |
+| `workers`                                                      | at start        | Workers of your own, in place of the default                               |
+| `options`                                                      | at start        | Any other `GlobeOptions` (`terrain`, `constraints`, `memory`, …)           |
+| `longitudeDeg`, `latitudeDeg`, `zoom`, `headingDeg`, `tiltDeg` | live (`jumpTo`) | The camera; only the props that changed move it                            |
+| `viewMode`                                                     | live            | `'2d'`, `'3d'` or `'auto'`                                                 |
+| `layers`                                                       | live            | Opacity, visibility, blend and order of the imagery layers, by id          |
+| `offline`, `networkMode`                                       | live            | The `createOffline()` engine and its network mode                          |
+| `qualityPreset`                                                | live            | `'low'`, `'medium'`, `'high'`, `'ultra'` or `'auto'` (`vibeglobe/quality`) |
 
 Events: `ready` (first frame, with the backend), `load` (the first view finished loading), `camera-change`,
 `globe-click` (`{ point, position }`) and `error`. A template ref exposes `globe`, `controls` and `extras`.
@@ -166,12 +170,12 @@ Events: `ready` (first frame, with the backend), `load` (the first view finished
 Components rendered in the default slot read the globe through composables, updated at most once per frame:
 `useGlobe()`, `useCamera()`, `useLoading()`, `useViewMode()`, `useControls()` and `useTiltAvailable()`. The child
 components `VibeImageryLayer`, `VibeDataLayer`, `VibeMarker` and `VibeControl` add an imagery layer, a data layer, a
-marker or a `@vibeglobe/ui` control, follow their props and are removed when unmounted. `@vibeglobe/layers` and
-`@vibeglobe/ui` load with the first child that needs them.
+marker or a `vibeglobe/ui` control, follow their props and are removed when unmounted. `vibeglobe/layers` and
+`vibeglobe/ui` load with the first child that needs them.
 
 ## Nuxt and server-side rendering
 
-`@vibeglobe/vue` is safe to import and render on the server: the server renders the `placeholder` slot, and the engine
+`vibeglobe/vue` is safe to import and render on the server: the server renders the `placeholder` slot, and the engine
 starts in `onMounted` after hydration, so no `<ClientOnly>` wrapper is needed.
 
 ```html
@@ -179,7 +183,7 @@ starts in `onMounted` after hydration, so no `<ClientOnly>` wrapper is needed.
 <script setup lang="ts">
   import { defineAsyncComponent } from 'vue';
 
-  const VibeGlobe = defineAsyncComponent(async () => (await import('@vibeglobe/vue')).VibeGlobe);
+  const VibeGlobe = defineAsyncComponent(async () => (await import('vibeglobe/vue')).VibeGlobe);
 </script>
 
 <template>
@@ -200,7 +204,7 @@ starts in `onMounted` after hydration, so no `<ClientOnly>` wrapper is needed.
 
 ```html
 <script type="module">
-  import { defineVibeGlobe } from '@vibeglobe/web-component';
+  import { defineVibeGlobe } from 'vibeglobe/web-component';
   defineVibeGlobe(); // registers <vibe-globe>; importing the package registers nothing
 </script>
 <vibe-globe
@@ -214,16 +218,16 @@ starts in `onMounted` after hydration, so no `<ClientOnly>` wrapper is needed.
 ></vibe-globe>
 ```
 
-| Attribute                                                      | Applied    | Effect                                                              |
-| -------------------------------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `base-imagery-url`                                             | at connect | Required: the base image                                            |
-| `imagery-url`, `imagery-max-level`                             | at connect | One XYZ imagery source on top of the `imagery` property's           |
-| `backend`                                                      | at connect | `auto` (default), `webgpu` or `webgl2`                              |
-| `no-controls`                                                  | at connect | Leaves navigation off                                               |
-| `center` (`"<lon>, <lat>"`), `zoom`, `heading-deg`, `tilt-deg` | live       | The camera; only the attribute that changed moves it                |
-| `view-mode`                                                    | live       | `auto`, `2d` or `3d`                                                |
-| `ui`                                                           | once       | `default` or `all`: the `@vibeglobe/ui` controls in the shadow tree |
-| `theme`, `lang`                                                | live       | `light` or `dark`; a registered language of the controls            |
+| Attribute                                                      | Applied    | Effect                                                             |
+| -------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| `base-imagery-url`                                             | at connect | Required: the base image                                           |
+| `imagery-url`, `imagery-max-level`                             | at connect | One XYZ imagery source on top of the `imagery` property's          |
+| `backend`                                                      | at connect | `auto` (default), `webgpu` or `webgl2`                             |
+| `no-controls`                                                  | at connect | Leaves navigation off                                              |
+| `center` (`"<lon>, <lat>"`), `zoom`, `heading-deg`, `tilt-deg` | live       | The camera; only the attribute that changed moves it               |
+| `view-mode`                                                    | live       | `auto`, `2d` or `3d`                                               |
+| `ui`                                                           | once       | `default` or `all`: the `vibeglobe/ui` controls in the shadow tree |
+| `theme`, `lang`                                                | live       | `light` or `dark`; a registered language of the controls           |
 
 Properties: `globe` (the engine, undefined while disconnected), `ui` (a promise of the UI layer), `imagery` (sources,
 read at connect), and `center`, `zoom`, `headingDeg`, `tiltDeg`, `viewMode`, which mirror their attributes. Events
@@ -232,23 +236,23 @@ engine starts when the element is connected and stops when it leaves the documen
 
 The controls are themed from the page through the `ui` part and the `--vg-ui-*` variables of the
 [UI guide](ui-and-gis.md#theming): `vibe-globe::part(ui) { --vg-ui-background: #faf0e6; }`. A page without a bundler
-loads `@vibeglobe/web-component/browser` (`dist/browser/vibe-globe.js`), one ES module with the engine bundled and
+loads `vibeglobe/web-component/browser` (`dist/browser/vibe-globe.js`), one ES module with the engine bundled and
 the worker program next to it; serve that folder as it is.
 
 ## Lazy loading
 
-- `createRenderer` imports three.js when the globe starts, so importing `@vibeglobe/renderer` costs no rendering code.
+- `createRenderer` imports three.js when the globe starts, so importing `vibeglobe/renderer` costs no rendering code.
 - Import the rest where the map shows: `defineAsyncComponent` in Vue (as in the Nuxt example), a dynamic `import()`
   elsewhere.
-- Optional parts load on first use: the glTF loader with the first model, `@vibeglobe/layers` and `@vibeglobe/ui` with
-  the first Vue child or UI control that needs them, `@vibeglobe/quality` when `qualityPreset` is set, the KTX2
+- Optional parts load on first use: the glTF loader with the first model, `vibeglobe/layers` and `vibeglobe/ui` with
+  the first Vue child or UI control that needs them, `vibeglobe/quality` when `qualityPreset` is set, the KTX2
   transcoder with the first KTX2 tile.
 
 ```ts
 async function showMap(element: HTMLElement): Promise<void> {
   const [{ createGlobe }, { createRenderer }] = await Promise.all([
-    import('@vibeglobe/core'),
-    import('@vibeglobe/renderer'),
+    import('vibeglobe/core'),
+    import('vibeglobe/renderer'),
   ]);
   createGlobe({ container: element, renderer: createRenderer(), baseImageryUrl: '/vibeglobe/fallback-base.jpg' });
 }
@@ -285,16 +289,16 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self
 - A worker follows the policy of its own script's response: KTX2 imagery needs `'wasm-unsafe-eval'` in the
   `script-src` of the policy sent with the worker program. MBTiles packages read in the browser run sql.js on the page
   and need it in the page's policy.
-- `@vibeglobe/ui` and the `<vibe-globe>` element style the page and the shadow tree with constructed stylesheets,
+- `vibeglobe/ui` and the `<vibe-globe>` element style the page and the shadow tree with constructed stylesheets,
   which `style-src 'self'` allows.
 
 ## Network modes and offline packages
 
-`@vibeglobe/offline` wraps sources with a persistent cache and decides per request whether the network may be used:
+`vibeglobe/offline` wraps sources with a persistent cache and decides per request whether the network may be used:
 
 ```ts
-import { createOffline } from '@vibeglobe/offline';
-import { xyzImagery } from '@vibeglobe/sources';
+import { createOffline } from 'vibeglobe/offline';
+import { xyzImagery } from 'vibeglobe/sources';
 
 const offline = createOffline({ mode: 'hybrid' }); // 'online', 'offline' or 'hybrid' (the default)
 const imagery = [
@@ -317,7 +321,7 @@ offline packages, storage quotas and LAN setups.
   map, always with the credits and logos a provider requires. `globe.credits()` and the `credits-change` event give
   the list.
 - `creditsElement: false` hands the credits to the application, which must then show every credit, required ones
-  included: `@vibeglobe/ui`'s `AttributionControl` does.
+  included: `vibeglobe/ui`'s `AttributionControl` does.
 
 ## Licensing
 

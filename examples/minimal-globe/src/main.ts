@@ -2,10 +2,10 @@
 // nothing else.
 // The imagery is KTX2, so its tiles go through the worker's WebAssembly transcoder. `?assets=<base path>` loads the
 // engine assets (the worker program and its WebAssembly) from there instead of where the bundler emitted them (F531).
-import { createGlobe, type Globe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
-import { xyzImagery } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker/basic';
+import { createGlobe, type Globe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
+import { xyzImagery } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker/basic';
 
 declare global {
   interface Window {

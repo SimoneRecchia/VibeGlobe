@@ -4,16 +4,16 @@ title: Offline packages
 
 # Offline packages
 
-`@vibeglobe/offline` keeps tiles in browser storage, reads offline packages, and decides per tile whether the network
+`vibeglobe/offline` keeps tiles in browser storage, reads offline packages, and decides per tile whether the network
 may be used. `createOffline` makes the engine that wraps sources, `createPackageManager` installs and reads packages,
-and `createManifest` writes a package's manifest. Sources come from `@vibeglobe/sources` ([sources guide](sources.md));
+and `createManifest` writes a package's manifest. Sources come from `vibeglobe/sources` ([sources guide](sources.md));
 serving packages and tile folders is in the [hosting guide](hosting.md).
 
 ## Quick start
 
 ```ts
-import { createOffline } from '@vibeglobe/offline';
-import { xyzImagery } from '@vibeglobe/sources';
+import { createOffline } from 'vibeglobe/offline';
+import { xyzImagery } from 'vibeglobe/sources';
 
 const offline = createOffline();
 const imagery = offline.source(xyzImagery({ id: 'osm', url: 'https://tiles.example.com/{z}/{x}/{y}.png' }));
@@ -50,7 +50,7 @@ for requests not to count (glyphs, sprites). Only delivered tiles count.
 | `offline`          | yes            | never, not even health checks (air-gapped sites)       |
 
 ```ts
-import { createOffline } from '@vibeglobe/offline';
+import { createOffline } from 'vibeglobe/offline';
 
 const offline = createOffline({ mode: 'online' });
 offline.setMode('offline');
@@ -73,7 +73,7 @@ Four switches, all on by default: `persistentCache`, `memoryReuse`, `prefetch` (
 global value, the layer's, the source's and the provider's profile all allow it.
 
 ```ts
-import { createOffline } from '@vibeglobe/offline';
+import { createOffline } from 'vibeglobe/offline';
 
 const offline = createOffline({ switches: { prefetch: false } });
 offline.setSwitches({ persistentCache: false }, { sourceId: 'live-traffic' });
@@ -85,7 +85,7 @@ offline.destroy();
 - `offline.source(source)` reads the source's `profile`: its `forbids` stay off for that source. Switching a forbidden
   feature on leaves it off and emits one `warning` with code `profile-rule`.
 - A profile that names only a credit (a `CreditProfile`, such as `xyzImagery`'s `profile` option) forbids nothing.
-  Apply a `ProviderProfile` with `withProfile` of `@vibeglobe/sources` to have its `forbids` enforced.
+  Apply a `ProviderProfile` with `withProfile` of `vibeglobe/sources` to have its `forbids` enforced.
 - `offline.source(source, { rules })` replaces the source's profile with `rules` (any `ProviderProfile`).
 - `{ layerId }` names the layer the source belongs to, for per-layer switches and modes (default: the source id).
 - `{ tiers: 'package' }` serves the source only from the cache and packages, never the network; `'network'` never
@@ -114,9 +114,9 @@ packages/offline/lan-server/lan-server.sh --site apps/playground/dist --packages
 MBTiles files with the adapters you pass it; give `mbtilesImagery` the URL where you host `sql-wasm.wasm` of `sql.js`:
 
 ```ts
-import { createOffline, createPackageManager } from '@vibeglobe/offline';
-import { pmtilesImagery } from '@vibeglobe/sources';
-import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+import { createOffline, createPackageManager } from 'vibeglobe/offline';
+import { pmtilesImagery } from 'vibeglobe/sources';
+import { mbtilesImagery } from 'vibeglobe/sources/mbtiles';
 
 const offline = createOffline({ mode: 'hybrid' });
 const packages = createPackageManager(offline, {
@@ -141,9 +141,9 @@ with no network. Installs report progress, resume after the page was closed (the
 skips what was stored), and verify every chunk against the manifest's SHA-256.
 
 ```ts
-import { createOffline, createPackageManager } from '@vibeglobe/offline';
-import { pmtilesImagery } from '@vibeglobe/sources';
-import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+import { createOffline, createPackageManager } from 'vibeglobe/offline';
+import { pmtilesImagery } from 'vibeglobe/sources';
+import { mbtilesImagery } from 'vibeglobe/sources/mbtiles';
 
 const offline = createOffline();
 const packages = createPackageManager(offline, {
@@ -179,7 +179,7 @@ and `--estimate-only` stops after the estimate. `vibeglobe-data licenses` lists 
 CLI refuses a profile whose terms forbid packaging.
 
 ```ts
-import { createManifest } from '@vibeglobe/offline';
+import { createManifest } from 'vibeglobe/offline';
 
 const file = await (await fetch('https://lan.example/packages/rome/rome.pmtiles')).blob();
 const manifest = await createManifest({
@@ -218,9 +218,9 @@ it returns the installed package when the version is unchanged. A running globe 
 when the manager tells it which sources changed:
 
 ```ts
-import { createOffline, createPackageManager } from '@vibeglobe/offline';
-import { pmtilesImagery } from '@vibeglobe/sources';
-import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+import { createOffline, createPackageManager } from 'vibeglobe/offline';
+import { pmtilesImagery } from 'vibeglobe/sources';
+import { mbtilesImagery } from 'vibeglobe/sources/mbtiles';
 
 // A stand-in for the running globe, recording what the manager tells it.
 const reloaded = new Array();
@@ -245,7 +245,7 @@ is emitted, and the engine keeps working from memory, packages and the network. 
 `storage-lost` says what was lost (`cache`, `packages`, `reason`).
 
 ```ts
-import { createOffline, createPackageManager } from '@vibeglobe/offline';
+import { createOffline, createPackageManager } from 'vibeglobe/offline';
 
 const offline = createOffline({ cacheBytes: 64 * 1024 * 1024 });
 offline.on('storage-lost', (event) => console.info('lost', event.cache, event.packages));
@@ -285,7 +285,7 @@ empties the cache of one source or all of them.
 
 - Only sources wrapped by `offline.source()` go through the tiers and obey the switches and the profile's `forbids`;
   the engine prefetches and keeps tiles in memory for every other source.
-- The default store runs IndexedDB in the module worker `@vibeglobe/offline/cache-worker.js`, which the bundler
+- The default store runs IndexedDB in the module worker `vibeglobe/offline/cache-worker.js`, which the bundler
   emits. Where it cannot start (no bundler, a Content Security Policy), pass `store: 'main-thread'`; the engine emits
   `storage-unavailable` and keeps rendering without a persistent cache otherwise.
 - `store: 'memory'` keeps nothing across sessions: for kiosks and shared machines.

@@ -1,4 +1,4 @@
-# @vibeglobe/vue
+# vibeglobe/vue
 
 The Vue 3 adapter of VibeGlobe: the `VibeGlobe` component, composables (`useGlobe`, `useCamera`, `useLoading`,
 `useViewMode`, `useControls`, `useTiltAvailable`) and child components (`VibeImageryLayer`, `VibeDataLayer`,
@@ -7,15 +7,14 @@ engine starts after mount, so it works in Nuxt without `<ClientOnly>`. Use it fo
 
 ## Install
 
-Needs `vue` 3.5 or later (a peer dependency). It brings `@vibeglobe/controls`, `@vibeglobe/core`,
-`@vibeglobe/layers`, `@vibeglobe/quality`, `@vibeglobe/renderer`, `@vibeglobe/ui` and `@vibeglobe/worker`; install
-`@vibeglobe/sources` for the imagery sources.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/vue`. Needs `vue` 3.5 or later (a peer
+dependency); the imagery sources come from `vibeglobe/sources`.
 
 ## Entry points
 
-| Import path      | What                                                      |
-| ---------------- | --------------------------------------------------------- |
-| `@vibeglobe/vue` | `VibeGlobe`, the composables, the child components, types |
+| Import path     | What                                                      |
+| --------------- | --------------------------------------------------------- |
+| `vibeglobe/vue` | `VibeGlobe`, the composables, the child components, types |
 
 ## Example
 
@@ -29,7 +28,7 @@ Needs `vue` 3.5 or later (a peer dependency). It brings `@vibeglobe/controls`, `
 ```
 
 ```ts
-import { useCamera, useGlobe } from '@vibeglobe/vue';
+import { useCamera, useGlobe } from 'vibeglobe/vue';
 import { defineComponent, h } from 'vue';
 
 export const ZoomReadout = defineComponent({

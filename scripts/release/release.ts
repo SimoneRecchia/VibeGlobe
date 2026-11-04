@@ -1,5 +1,5 @@
-// The release (F558, ADR 0171): sets one version on every published package, adds the changelog entry, builds,
-// checks the tarballs, commits, tags and publishes to the public npm registry under @vibeglobe.
+// The release (F704, ADR 0171, ADR 0189): sets one version on every engine package, adds the changelog entry, builds,
+// packs and checks the single `vibeglobe` package, commits, tags and publishes it to the public npm registry.
 //
 //   node scripts/release/release.ts <version>             dry run (default): in a temporary git worktree, so this
 //                                                         checkout is untouched; `npm publish --dry-run`; the tag is
@@ -14,9 +14,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT_DIR } from '../workspace.ts';
 import { writeChangelog } from './changelog.ts';
+import { packAll } from './tarballs.ts';
 
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 const SCOPE = '@vibeglobe/';
+/** The one package published (ADR 0189). */
+const PACKAGE = 'vibeglobe';
 
 /** Why publishing is refused in this environment, or undefined when it may go ahead (F558). */
 export function publishRefusal(env: Readonly<Record<string, string | undefined>>): string | undefined {
@@ -61,21 +64,6 @@ export function bumpManifest(manifest: Manifest, version: string): Manifest {
   };
 }
 
-/** Published packages in an order where each comes after the engine packages it depends on. */
-export function publishOrder(manifests: readonly Manifest[]): string[] {
-  const order: string[] = [];
-  const visit = (name: string, path: string[]): void => {
-    if (order.includes(name)) return;
-    if (path.includes(name)) throw new Error(`dependency cycle: ${[...path, name].join(' → ')}`);
-    const manifest = manifests.find((candidate) => candidate.name === name);
-    if (!manifest) return;
-    for (const dep of Object.keys(manifest.dependencies ?? {})) visit(dep, [...path, name]);
-    order.push(name);
-  };
-  for (const manifest of [...manifests].sort((a, b) => a.name.localeCompare(b.name))) visit(manifest.name, []);
-  return order;
-}
-
 function run(cwd: string, command: string, args: readonly string[], env: NodeJS.ProcessEnv = process.env): string {
   console.log(`$ ${command} ${args.join(' ')}`);
   const output = execFileSync(command, args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
@@ -88,8 +76,10 @@ function readManifests(cwd: string): { path: string; manifest: Manifest }[] {
   return execFileSync('git', ['ls-files', 'packages/*/package.json'], { cwd, encoding: 'utf8' })
     .trim()
     .split('\n')
-    .map((path) => ({ path: join(cwd, path), manifest: JSON.parse(readFileSync(join(cwd, path), 'utf8')) as Manifest }))
-    .filter(({ manifest }) => !manifest.private);
+    .map((path) => ({
+      path: join(cwd, path),
+      manifest: JSON.parse(readFileSync(join(cwd, path), 'utf8')) as Manifest,
+    }));
 }
 
 interface Publication {
@@ -111,7 +101,7 @@ function prepare(
 ): { manifests: { path: string; manifest: Manifest }[]; commit: string } {
   if (run(cwd, 'git', ['status', '--porcelain']).trim() !== '') throw new Error('the working tree is not clean');
   const tag = `v${version}`;
-  // 1. Version: one version for every published package, engine dependencies pinned to it.
+  // 1. Version: one version for every engine package, their dependencies on each other pinned to it.
   const manifests = readManifests(cwd);
   for (const { path, manifest } of manifests)
     writeFileSync(path, `${JSON.stringify(bumpManifest(manifest, version), null, 2)}\n`);
@@ -136,29 +126,23 @@ function prepare(
   return { manifests, commit };
 }
 
-/** Step 5: every package, dependencies first, to the public registry with public access (`--dry-run` unless publishing). */
-function publishAll(cwd: string, manifests: readonly Manifest[], version: string, publish: boolean): Publication[] {
-  return publishOrder(manifests).map((name) => {
-    const args = [
-      'publish',
-      '-w',
-      name,
-      '--access',
-      'public',
-      '--tag',
-      distTag(version),
-      '--registry',
-      REGISTRY,
-      '--json',
-    ];
-    args.push(publish ? '--provenance' : '--dry-run');
-    type Result = { name: string; version: string; entryCount: number };
-    const output = JSON.parse(run(cwd, 'npm', args)) as Record<string, Result> & Partial<Result>;
-    const result = output[name] ?? (output as Result);
-    if (result.name !== name || !name.startsWith(SCOPE) || result.version !== version)
-      throw new Error(`npm would publish ${result.name}@${result.version}, not ${name}@${version}`);
-    return { name, version, tag: distTag(version), access: 'public', registry: REGISTRY, files: result.entryCount };
-  });
+/** Step 5: the single package, packed from the release commit, to the public registry (`--dry-run` unless publishing). */
+function publishPackage(cwd: string, version: string, publish: boolean): Publication {
+  const [packed] = packAll(join(cwd, '.release/tarballs'), cwd);
+  if (!packed) throw new Error('nothing was packed');
+  const args = ['publish', packed.tarball, '--access', 'public', '--tag', distTag(version), '--registry', REGISTRY];
+  args.push('--json', publish ? '--provenance' : '--dry-run');
+  const result = JSON.parse(run(cwd, 'npm', args)) as { name: string; version: string; entryCount: number };
+  if (result.name !== PACKAGE || result.version !== version)
+    throw new Error(`npm would publish ${result.name}@${result.version}, not ${PACKAGE}@${version}`);
+  return {
+    name: PACKAGE,
+    version,
+    tag: distTag(version),
+    access: 'public',
+    registry: REGISTRY,
+    files: result.entryCount,
+  };
 }
 
 function release(version: string, publish: boolean): void {
@@ -176,20 +160,13 @@ function release(version: string, publish: boolean): void {
   const reportDir = join(ROOT_DIR, '.release');
   mkdirSync(reportDir, { recursive: true });
   try {
-    const { manifests, commit } = prepare(cwd, version, reportDir);
-    const publications = publishAll(
-      cwd,
-      manifests.map(({ manifest }) => manifest),
-      version,
-      publish,
-    );
+    const { commit } = prepare(cwd, version, reportDir);
+    const publications = [publishPackage(cwd, version, publish)];
     if (publish) run(cwd, 'git', ['push', 'origin', 'HEAD:refs/heads/main', tag]);
     const report = { version, tag, commit, dryRun: !publish, publications };
     writeFileSync(join(reportDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     if (!publish) cpSync(join(cwd, 'CHANGELOG.md'), join(reportDir, 'CHANGELOG.md'));
-    console.log(
-      `\n${publish ? 'Published' : 'Dry run of'} ${tag}: ${publications.length} packages, dist-tag ${distTag(version)}`,
-    );
+    console.log(`\n${publish ? 'Published' : 'Dry run of'} ${tag}: ${PACKAGE}, dist-tag ${distTag(version)}`);
     for (const { name, files } of publications) console.log(`  ${name}@${version} (${files} files, public)`);
   } finally {
     if (!publish) {

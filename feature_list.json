@@ -6451,7 +6451,7 @@
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
         "Assert the guide never names a consumer application's code or configuration as a requirement"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F490",
@@ -6998,7 +6998,7 @@
         "Assert installation pulls no layers, UI, offline, Vue or Web Component packages",
         "Assert the app renders the globe and navigates"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F533",
@@ -7036,7 +7036,7 @@
         "Assert publishing happens only from CI with the npm token stored as a CI secret",
         "Assert the workflow publishes only after the owner has approved the release"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F535",
@@ -7199,7 +7199,7 @@
         "Copy the minimal example into a new project that installs the packages from npm and assert the globe renders",
         "Assert every link in the README resolves"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F569",
@@ -7224,7 +7224,7 @@
         "Assert every package is available at version 1.0.0 on the public npm registry under @vibeglobe with the MPL-2.0 license",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F571",
@@ -8392,7 +8392,70 @@
         "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider or map",
         "Install the tarball in a project outside the repository and start a globe with `createVibeGlobe` and fixture XYZ tiles in Chromium"
       ],
+      "status": "passing"
+    },
+    {
+      "id": "F703",
+      "milestone": 15,
+      "section": "Vision and goals",
+      "description": "Applications use only the modules they need: an app that imports only `vibeglobe/core`, `vibeglobe/renderer`, one imagery source and the basic worker bundles none of the other modules, though the whole engine is one package.",
+      "steps": [
+        "Build a consumer that installs `vibeglobe` and imports only the core, the renderer, one imagery source and the basic worker",
+        "Assert from its bundle's source maps that no module of `vibeglobe/layers`, `vibeglobe/ui`, `vibeglobe/offline`, `vibeglobe/vue` or `vibeglobe/web-component` is in it",
+        "Assert the app renders the globe and navigates"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F704",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "Release automation generates the changelog, creates version tags and publishes the single `vibeglobe` package from CI to the public npm registry, only after the owner's approval.",
+      "steps": [
+        "Run the release workflow for a version as a dry run",
+        "Assert the changelog is updated, a version tag is created and `vibeglobe` would be published to the public npm registry with public access and the version given",
+        "Assert publishing happens only from CI with the npm token stored as a CI secret",
+        "Assert the workflow publishes only after the owner has approved the release"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F705",
+      "milestone": 14,
+      "section": "Documentation and distribution",
+      "description": "An integration guide for consumer applications explains installing `vibeglobe` from the public npm registry, licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "steps": [
+        "Open the integration guide in the documentation site",
+        "Check it covers npm installation, licensing, Vue and Nuxt setup with SSR, lazy loading, asset hosting and base path, CSP, network modes and offline packages, provider keys and attribution",
+        "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
+        "Assert the guide never names a consumer application's code or configuration as a requirement"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F706",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The README explains what VibeGlobe is, how to install `vibeglobe` from the public npm registry, the licensing (MPL-2.0, no separate commercial license), a minimal usage example, and links to every guide.",
+      "steps": [
+        "Open README.md and confirm the npm installation and licensing sections",
+        "Copy the minimal example into a new project that installs `vibeglobe` from npm and assert the globe renders",
+        "Assert every link in the README resolves"
+      ],
       "status": "failing"
+    },
+    {
+      "id": "F707",
+      "milestone": 15,
+      "section": "Milestones (all must be completed)",
+      "description": "Version 1.0.0 of `vibeglobe` is published to npm with the MPL-2.0 license.",
+      "steps": [
+        "Obtain the owner's approval to publish 1.0.0, as PLAN.md requires for externally visible actions",
+        "Run the release workflow for 1.0.0",
+        "Assert `vibeglobe` is available at version 1.0.0 on the public npm registry with the MPL-2.0 license",
+        "Install 1.0.0 into a fresh consumer project and assert the globe renders"
+      ],
+      "status": "pending"
     }
   ]
 }

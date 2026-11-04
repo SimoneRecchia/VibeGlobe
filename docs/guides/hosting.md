@@ -13,9 +13,9 @@ are in the [sources guide](sources.md), packages in the [offline guide](offline.
 ## Quick start
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker';
+import { createGlobe } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
+import { createWorkers } from 'vibeglobe/worker';
 
 const assets = '/static/vibeglobe/'; // your base path
 createGlobe({
@@ -37,7 +37,7 @@ The page loads the worker program and the base image from its own origin and the
 | PMTiles packages      | `vibeglobe-data build` (`output/<dataset>.pmtiles`), `vibeglobe-data pack`   | one file per dataset or area, read with range requests        |
 | MBTiles packages      | `outputs.mbtiles: true` in a dataset, `vibeglobe-data pack --format mbtiles` | one SQLite file, downloaded whole by `mbtilesImagery`         |
 | The global base image | `vibeglobe-data build world-low.json --dataset fallback`                     | `output/fallback-base.jpg`, for `GlobeOptions.baseImageryUrl` |
-| Engine assets         | `@vibeglobe/worker` through your bundler                                     | the worker program, its WebAssembly and chunks                |
+| Engine assets         | `vibeglobe/worker` through your bundler                                      | the worker program, its WebAssembly and chunks                |
 
 - Tile extensions follow the dataset: `.png` for Terrarium terrain and PNG imagery, `.jpg` for JPEG imagery, `.pbf`
   for vector tiles, `.webp` for WebP extracts.
@@ -47,19 +47,19 @@ The page loads the worker program and the base image from its own origin and the
 
 ## Engine assets on your own origin
 
-- `createWorkers()` without `url` starts the worker program your bundler emitted from `@vibeglobe/worker` (Vite,
+- `createWorkers()` without `url` starts the worker program your bundler emitted from `vibeglobe/worker` (Vite,
   webpack 5 and Parcel find it). It is served with your build; there is nothing else to copy.
 - `createWorkers({ url })` starts a program you host. The URL must be same-origin and neither `blob:` nor `data:`,
   else `createWorkers` throws a `WorkerConfigError` (`cross-origin-url`, `unsupported-url`). The program must be one
   self-contained module, such as the `vibeglobe-worker-<hash>.js` your bundler emits. The files in
-  `node_modules/@vibeglobe/worker/dist/` import other packages by name and cannot be served as they are.
+  `node_modules/vibeglobe/worker/dist/` import other packages by name and cannot be served as they are.
 - The worker program loads its WebAssembly (`vibeglobe-basis-<hash>.wasm`, `meshopt-decoder-<hash>.wasm`) from its own
   directory. Vite's default `base: '/'` writes those URLs as `/assets/…`; build with `base: './'` to serve the emitted
   `assets/` folder under another path, as the
   [minimal-globe example](https://github.com/SimoneRecchia/VibeGlobe/blob/main/examples/minimal-globe/vite.config.ts)
   does.
-- An application with only imagery and terrain imports `createWorkers` from `@vibeglobe/worker/basic`, whose program
-  (`vibeglobe-worker-basic-<hash>.js`) needs neither `@vibeglobe/layers` nor `@vibeglobe/models`.
+- An application with only imagery and terrain imports `createWorkers` from `vibeglobe/worker/basic`, whose program
+  (`vibeglobe-worker-basic-<hash>.js`) needs neither `vibeglobe/layers` nor `vibeglobe/models`.
 
 ## HTTP requirements
 

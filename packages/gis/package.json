@@ -1,6 +1,7 @@
 {
   "name": "@vibeglobe/gis",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "VibeGlobe gis: coordinate parsing and formatting, reference-system transforms, geodesic measurement and view-state serialization.",
   "license": "MPL-2.0",
   "type": "module",
@@ -25,7 +26,7 @@
     "!dist/**/__fixtures__"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/core": "0.2.0",
     "proj4": "2.22.0"
   }
 }

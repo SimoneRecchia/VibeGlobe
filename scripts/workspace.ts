@@ -4,6 +4,11 @@ import { join, relative } from 'node:path';
 
 interface PackageManifest {
   name?: string;
+  version?: string;
+  description?: string;
+  exports?: unknown;
+  types?: string;
+  bin?: Record<string, string>;
   license?: string;
   private?: boolean;
   type?: string;
@@ -73,6 +78,11 @@ export function readWorkspace(rootDir: string = ROOT_DIR): WorkspacePackage[] {
     }
   }
   return packages;
+}
+
+/** The engine's packages, under `packages/`: built and tested one by one, published together as `vibeglobe` (ADR 0189). */
+export function enginePackages(rootDir: string = ROOT_DIR): WorkspacePackage[] {
+  return readWorkspace(rootDir).filter((pkg) => pkg.dir.startsWith('packages/'));
 }
 
 /** Module specifiers imported by a source file (static, dynamic and side-effect imports, and re-exports). */

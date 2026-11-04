@@ -2,18 +2,18 @@
 
 A TypeScript web engine that draws an interactive 3D globe and 2D map: a globe when zoomed out, a flat map at mid
 zoom, an oblique 3D view up close. WebGPU with an automatic WebGL2 fallback, built to run smoothly on weak hardware.
-Imagery, terrain, vector tiles, glTF models, application data, offline packages and ready-made controls, as ESM
-packages under `@vibeglobe/*`. Framework-agnostic, with Vue 3 and Web Component adapters.
+Imagery, terrain, vector tiles, glTF models, application data, offline packages and ready-made controls, in one ESM
+package, `vibeglobe`, with a subpath for each part. Framework-agnostic, with Vue 3 and Web Component adapters.
 
 **For AI agents:** [llms.txt](llms.txt) is the index of the guides by task. Installed, the index and the guides
-matching the version are in `node_modules/@vibeglobe/core/` (`llms.txt`, `docs/guides/`).
+matching the version are in `node_modules/vibeglobe/` (`llms.txt`, `docs/guides/`).
 
 ![The playground's showcase: the tour's chapters and the panel of its first scene beside the globe, with the demo data and every control](docs/images/playground-showcase.png)
 
 ## The smallest globe
 
 ```ts
-import { xyzImagery } from '@vibeglobe/sources';
+import { xyzImagery } from 'vibeglobe/sources';
 import { createVibeGlobe } from 'vibeglobe';
 
 const { globe } = await createVibeGlobe(document.getElementById('map') as HTMLElement, {
@@ -28,33 +28,39 @@ your own included, plugs in through the generic sources ([services guide](docs/g
 [integration guide](docs/guides/integration.md) assembles the engine piece by piece, with Vue, Nuxt and the Web
 Component.
 
-## Packages
+## What is in it
 
-| Package                    | What it does                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| `vibeglobe`                | `createVibeGlobe`: the globe in one call with the application's services              |
-| `@vibeglobe/core`          | `createGlobe`, camera, tiling, scheduling, cache, events, geodesy, service interfaces |
-| `@vibeglobe/renderer`      | The WebGPU and WebGL2 backends; glTF, vector tile and starfield renderers by subpath  |
-| `@vibeglobe/worker`        | The worker pool that decodes tiles and models off the main thread                     |
-| `@vibeglobe/sources`       | Generic imagery, terrain, vector and 3D source adapters, provider profiles            |
-| `@vibeglobe/controls`      | Mouse, touch, trackpad and keyboard navigation                                        |
-| `@vibeglobe/layers`        | Application data: markers, labels, lines, polygons, models, vector tile styles        |
-| `@vibeglobe/models`        | glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding                   |
-| `@vibeglobe/offline`       | Network modes, the browser tile cache, offline packages                               |
-| `@vibeglobe/ui`            | Optional ready-made controls, themes and translations                                 |
-| `@vibeglobe/gis`           | Coordinates, reference systems, measurement, view state, panel detection              |
-| `@vibeglobe/quality`       | Quality presets and the adaptive frame-time governor                                  |
-| `@vibeglobe/vue`           | Vue 3 components and composables, SSR-safe                                            |
-| `@vibeglobe/web-component` | The `<vibe-globe>` custom element                                                     |
-| `@vibeglobe/tools`         | Command-line data pipeline and offline package builder                                |
+One package, one install; the bundler takes only the subpaths an application imports.
 
-Each package's README lists its entry points and pitfalls.
+| Subpath                   | What it does                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `vibeglobe`               | `createVibeGlobe`: the globe in one call with the application's services              |
+| `vibeglobe/core`          | `createGlobe`, camera, tiling, scheduling, cache, events, geodesy, service interfaces |
+| `vibeglobe/renderer`      | The WebGPU and WebGL2 backends; glTF, vector tile and starfield renderers by subpath  |
+| `vibeglobe/worker`        | The worker pool that decodes tiles and models off the main thread                     |
+| `vibeglobe/sources`       | Generic imagery, terrain, vector and 3D source adapters, provider profiles            |
+| `vibeglobe/controls`      | Mouse, touch, trackpad and keyboard navigation                                        |
+| `vibeglobe/layers`        | Application data: markers, labels, lines, polygons, models, vector tile styles        |
+| `vibeglobe/models`        | glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding                   |
+| `vibeglobe/offline`       | Network modes, the browser tile cache, offline packages                               |
+| `vibeglobe/ui`            | Optional ready-made controls, themes and translations                                 |
+| `vibeglobe/gis`           | Coordinates, reference systems, measurement, view state, panel detection              |
+| `vibeglobe/quality`       | Quality presets and the adaptive frame-time governor                                  |
+| `vibeglobe/vue`           | Vue 3 components and composables, SSR-safe                                            |
+| `vibeglobe/web-component` | The `<vibe-globe>` custom element                                                     |
+| `vibeglobe/tools`         | Command-line data pipeline and offline package builder                                |
+
+Each part's README (`packages/<name>/README.md`) lists its entry points and pitfalls.
 
 ## Install
 
-Node.js 22.18 or later for the tools. The packages are not on the npm registry yet: build the tarballs from a tag
-(`npm ci && npm run build && npm run release:pack`) and install them from files. Once published, they install as
-`npm install @vibeglobe/core @vibeglobe/renderer …`.
+```sh
+npm install vibeglobe
+```
+
+One package holds the whole engine; `vue` 3.5 or later is needed only for `vibeglobe/vue`. Node.js 22.18 or later for
+the tools (`npx vibeglobe-data`). Before a version is on the npm registry, build its tarball from a tag
+(`npm ci && npm run build && npm run release:pack`) and install it from the file.
 
 ## Licensing
 

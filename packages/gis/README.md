@@ -1,24 +1,24 @@
-# @vibeglobe/gis
+# vibeglobe/gis
 
 Pure GIS functions, usable without the renderer or the UI: coordinate formatting and parsing (decimal degrees,
 degrees-minutes-seconds, UTM), reference-system transforms through proj4js, geodesic measurement on WGS84, the camera's
-view state in URLs and JSON, and grids on the ground (`gridLines`). `@vibeglobe/ui` uses it for its readout, search box and measurement; an application calls it directly
+view state in URLs and JSON, and grids on the ground (`gridLines`). `vibeglobe/ui` uses it for its readout, search box and measurement; an application calls it directly
 for its own coordinate fields, measurements, shareable links or layout editors.
 
 ## Install
 
-Needs `@vibeglobe/core` and `proj4` (dependencies).
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/gis`.
 
 ## Entry points
 
-| Import path      | What                                                                 |
-| ---------------- | -------------------------------------------------------------------- |
-| `@vibeglobe/gis` | Coordinates, reference systems, measurement, view state, `gridLines` |
+| Import path     | What                                                                 |
+| --------------- | -------------------------------------------------------------------- |
+| `vibeglobe/gis` | Coordinates, reference systems, measurement, view state, `gridLines` |
 
 ## Example
 
 ```ts
-import { formatCoordinate, formatLength, measureDistance, parseCoordinate } from '@vibeglobe/gis';
+import { formatCoordinate, formatLength, measureDistance, parseCoordinate } from 'vibeglobe/gis';
 
 const milan = parseCoordinate('45°27′51.1″N 9°11′24.0″E');
 const rome = { longitudeDeg: 12.4964, latitudeDeg: 41.9028 };

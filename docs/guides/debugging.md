@@ -4,15 +4,15 @@ title: Debugging and observability
 
 # Debugging and observability
 
-What `@vibeglobe/core` offers to see what a globe is loading and drawing: leveled logging, counters, phase timing and
-event traces through `Globe.diagnostics`. `@vibeglobe/ui` shows the main figures in a panel (`DebugToggleControl`),
-and `@vibeglobe/core/diagnostics` has `FrameStats` for frame times of your own. Everything is off or quiet by default
+What `vibeglobe/core` offers to see what a globe is loading and drawing: leveled logging, counters, phase timing and
+event traces through `Globe.diagnostics`. `vibeglobe/ui` shows the main figures in a panel (`DebugToggleControl`),
+and `vibeglobe/core/diagnostics` has `FrameStats` for frame times of your own. Everything is off or quiet by default
 and then costs one branch.
 
 ## Quick start
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
+import { createGlobe } from 'vibeglobe/core';
 
 const globe = createGlobe({
   container,
@@ -70,7 +70,7 @@ oldest first, as plain objects ready for `JSON.stringify`. The trace keeps the n
 runs, nothing is recorded or allocated.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
+import type { Globe } from 'vibeglobe/core';
 
 declare const globe: Globe;
 
@@ -82,11 +82,11 @@ console.log(JSON.stringify(trace.filter((event) => event.kind === 'request')));
 
 ## The debug panel
 
-`DebugToggleControl` of `@vibeglobe/ui` adds a button that shows a panel with the frame time and rate, the backend,
+`DebugToggleControl` of `vibeglobe/ui` adds a button that shows a panel with the frame time and rate, the backend,
 the surface tiles, draw calls and the imagery cache, refreshed four times a second while shown.
 `addDefaultControls(ui, { debug: true })` adds it. For a panel of your own figures, `createDebugOverlay(container)`
 returns an overlay with `update({ frameTimeMs, framesPerSecond })` and `setInfo(rows)`, and `FrameStats` of
-`@vibeglobe/core/diagnostics` computes frame times and rates over a window.
+`vibeglobe/core/diagnostics` computes frame times and rates over a window.
 
 ## See also
 

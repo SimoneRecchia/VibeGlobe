@@ -4,17 +4,17 @@ title: Navigation controls
 
 # Navigation controls
 
-`@vibeglobe/controls` turns mouse, trackpad, touch and keyboard input into camera movement: `createControls()` returns
+`vibeglobe/controls` turns mouse, trackpad, touch and keyboard input into camera movement: `createControls()` returns
 the factory that `GlobeOptions.controls` takes, with commands for an application's buttons. The Vue component takes
 the same options in its `controls` prop and the `<vibe-globe>` element creates default controls (see the
 [integration guide](integration.md)). Ready-made buttons (zoom, compass, 2D / 3D / Auto, tilt slider) are in
-`@vibeglobe/ui` ([UI and GIS guide](ui-and-gis.md)); camera movements from code are `Globe` methods (`flyTo`, …).
+`vibeglobe/ui` ([UI and GIS guide](ui-and-gis.md)); camera movements from code are `Globe` methods (`flyTo`, …).
 
 ## Quick start
 
 ```ts
-import { createControls } from '@vibeglobe/controls';
-import { createGlobe } from '@vibeglobe/core';
+import { createControls } from 'vibeglobe/controls';
+import { createGlobe } from 'vibeglobe/core';
 
 declare const zoomInButton: HTMLButtonElement;
 declare const zoomOutButton: HTMLButtonElement;
@@ -69,7 +69,7 @@ HTML laid over the canvas (markers, labels, a panel) takes the wheel events over
 `forwardWheel` hands them to the map:
 
 ```ts
-import type { NavigationControls } from '@vibeglobe/controls';
+import type { NavigationControls } from 'vibeglobe/controls';
 
 declare const controls: NavigationControls;
 declare const markers: HTMLElement;
@@ -87,8 +87,8 @@ scrolling is not needed: the page does not scroll over them.
 `watchClicks` reports a press and release in place (primary button, under 4 px and 500 ms) with its position:
 
 ```ts
-import { watchClicks } from '@vibeglobe/controls';
-import type { Globe } from '@vibeglobe/core';
+import { watchClicks } from 'vibeglobe/controls';
+import type { Globe } from 'vibeglobe/core';
 
 declare const globe: Globe;
 
@@ -123,7 +123,7 @@ The tilt policy ties the tilt to the distance from the eye to the point it looks
 looking straight down):
 
 ```ts
-import { createControls } from '@vibeglobe/controls';
+import { createControls } from 'vibeglobe/controls';
 
 declare const button3d: HTMLButtonElement;
 
@@ -145,7 +145,7 @@ controls.onTiltAvailabilityChange((available) => (button3d.disabled = !available
 - A tilt chosen by hand below the lock stays until it is changed or the camera passes the lock; beyond the lock the
   view returns to Auto.
 - A flight or fit that chooses a tilt keeps it until it ends, so one from afar into a tilted view arrives tilted.
-- `tiltAvailable` is false beyond the lock. `ViewModeControl` and `addAllControls` of `@vibeglobe/ui` take the
+- `tiltAvailable` is false beyond the lock. `ViewModeControl` and `addAllControls` of `vibeglobe/ui` take the
   controls as their `tilt` option and disable 3D then; in Vue, `useTiltAvailable()` returns it as a ref.
 - `setTiltPolicy(false)` or `setTiltPolicy(null)` turns the policy off.
 
@@ -156,8 +156,8 @@ policy's cap, or the tilt the terrain clearance holds the camera at (90 before t
 when the camera changes:
 
 ```ts
-import type { NavigationControls } from '@vibeglobe/controls';
-import type { Globe } from '@vibeglobe/core';
+import type { NavigationControls } from 'vibeglobe/controls';
+import type { Globe } from 'vibeglobe/core';
 
 declare const globe: Globe;
 declare const controls: NavigationControls;

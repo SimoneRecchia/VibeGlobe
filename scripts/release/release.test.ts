@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
 import { CHANGELOG_HEADER, addEntry, changelogEntry, writeChangelog, type Commit } from './changelog.ts';
 import { consumerReferences, trackedTextFiles } from './check-consumer-names.ts';
-import { bumpManifest, distTag, publishOrder, publishRefusal } from './release.ts';
+import { bumpManifest, distTag, publishRefusal } from './release.ts';
 
 const commit = (subject: string, body = ''): Commit => ({ hash: 'abc1234def', subject, body });
 
@@ -88,7 +88,7 @@ describe('release (F558)', () => {
     expect(publishRefusal({ ...ci, NODE_AUTH_TOKEN: '' })).toMatch(/NPM_TOKEN/);
   });
 
-  it('gives every package the version, pins engine dependencies, and orders dependencies first', () => {
+  it('gives every package the version and pins engine dependencies', () => {
     const renderer = {
       devDependencies: { '@vibeglobe/sources': '0.0.0' },
       name: '@vibeglobe/renderer',
@@ -102,10 +102,6 @@ describe('release (F558)', () => {
     });
     expect(distTag('1.0.0-rc.1')).toBe('next');
     expect(distTag('1.0.0')).toBe('latest');
-    expect(publishOrder([renderer, { name: '@vibeglobe/core', version: '0.0.0' }])).toEqual([
-      '@vibeglobe/core',
-      '@vibeglobe/renderer',
-    ]);
   });
 
   it('holds publishing for the owner: the publish job runs in the approval environment with the npm secret', () => {

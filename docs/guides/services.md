@@ -7,13 +7,13 @@ title: Services
 `createVibeGlobe` of `vibeglobe` starts a globe in one call with the application's services: a `TileService`
 (required), a terrain (`TerrainSource`) and a `GeocoderService` (optional). VibeGlobe ships no map and no provider:
 the application brings its own, whether a commercial service, a private map or tiles of its own, through the generic
-sources of `@vibeglobe/sources`. To assemble the engine piece by piece instead, read the
+sources of `vibeglobe/sources`. To assemble the engine piece by piece instead, read the
 [integration guide](integration.md); for the sources a service holds, the [sources guide](sources.md).
 
 ## Quick start
 
 ```ts
-import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
+import { heightmapTerrain, xyzImagery } from 'vibeglobe/sources';
 import { createVibeGlobe, type GeocoderService } from 'vibeglobe';
 
 const geocoder: GeocoderService = {

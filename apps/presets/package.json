@@ -30,8 +30,8 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@vibeglobe/core": "0.1.0",
-    "@vibeglobe/sources": "0.1.0"
+    "@vibeglobe/core": "*",
+    "@vibeglobe/sources": "*"
   },
   "devDependencies": {
     "@maplibre/maplibre-gl-style-spec": "26.4.4"

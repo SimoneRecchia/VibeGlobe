@@ -1,4 +1,4 @@
-# @vibeglobe/layers
+# vibeglobe/layers
 
 Application data on a VibeGlobe globe: points, markers, labels, lines, polygons, extrusions and geodesic circles from
 GeoJSON, KML or GPX, styled with MapLibre Style Specification properties and expressions, clustered, picked, dragged
@@ -7,25 +7,25 @@ tiles. An application needs it to show its own data, models or a vector map on t
 
 ## Install
 
-`@vibeglobe/core` and `@vibeglobe/sources` install with it; there are no peer dependencies. Drawing needs a globe
-with `@vibeglobe/renderer`: its `@vibeglobe/renderer/gltf` entry for models, its `@vibeglobe/renderer/vector-tiles`
-entry for vector tiles.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/layers`. Drawing needs a globe with
+`vibeglobe/renderer`: its `vibeglobe/renderer/gltf` entry for models, its `vibeglobe/renderer/vector-tiles` entry for
+vector tiles.
 
 ## Entry points
 
-| Import                             | What                                                                                         |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- |
-| `@vibeglobe/layers`                | `createGlobeLayers`, `DataLayer`, `LabelLayer`, `ClusterLayer`, `GeoJsonLayer`, `fitObjects` |
-| `@vibeglobe/layers/models`         | `ModelLayer` and `ModelSetLayer`: glTF models as features                                    |
-| `@vibeglobe/layers/vector-tiles`   | `addVectorTiles`, `VectorStyle`, building heights                                            |
-| `@vibeglobe/layers/cluster-worker` | `workerClusterEngine`: a `ClusterLayer` index built in a worker                              |
-| `@vibeglobe/layers/testing`        | `RecordingRenderTarget`: a render target that records uploads, for tests                     |
+| Import                            | What                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `vibeglobe/layers`                | `createGlobeLayers`, `DataLayer`, `LabelLayer`, `ClusterLayer`, `GeoJsonLayer`, `fitObjects` |
+| `vibeglobe/layers/models`         | `ModelLayer` and `ModelSetLayer`: glTF models as features                                    |
+| `vibeglobe/layers/vector-tiles`   | `addVectorTiles`, `VectorStyle`, building heights                                            |
+| `vibeglobe/layers/cluster-worker` | `workerClusterEngine`: a `ClusterLayer` index built in a worker                              |
+| `vibeglobe/layers/testing`        | `RecordingRenderTarget`: a render target that records uploads, for tests                     |
 
 ## Example
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { createGlobeLayers, DataLayer } from '@vibeglobe/layers';
+import type { Globe } from 'vibeglobe/core';
+import { createGlobeLayers, DataLayer } from 'vibeglobe/layers';
 
 declare const globe: Globe;
 

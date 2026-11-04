@@ -2,7 +2,7 @@
 // browser or GPU globals at import time. Each guarded global throws when touched while the packages are imported.
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { readWorkspace } from './workspace.ts';
+import { enginePackages } from './workspace.ts';
 
 const BROWSER_GLOBALS = [
   'window',
@@ -48,9 +48,7 @@ afterAll(() => {
   }
 });
 
-const packageNames = readWorkspace()
-  .filter((pkg) => pkg.dir.startsWith('packages/') && !pkg.manifest.private)
-  .map((pkg) => pkg.manifest.name as string);
+const packageNames = enginePackages().map((pkg) => pkg.manifest.name as string);
 
 describe('server-side rendering import safety', () => {
   it('covers every library package', () => {

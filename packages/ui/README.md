@@ -1,4 +1,4 @@
-# @vibeglobe/ui
+# vibeglobe/ui
 
 Ready-made controls over a VibeGlobe globe: search, zoom, compass, 2D / 3D / Auto, tilt, home, geolocation, layer
 switcher, coordinates readout, scale bar, attribution, drawing, measurement, bookmarks, screenshot, minimap and a debug
@@ -8,20 +8,20 @@ runs without it.
 
 ## Install
 
-Needs `@vibeglobe/core`, `@vibeglobe/gis` and `@vibeglobe/layers` (dependencies).
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/ui`.
 
 ## Entry points
 
-| Import path             | What                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `@vibeglobe/ui`         | `createUi`, `addDefaultControls`, `addAllControls`, every control class, the drawing tool, `THEME_VARIABLES` |
-| `@vibeglobe/ui/minimap` | `MinimapControl`, kept apart so applications without it never load it                                        |
+| Import path            | What                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `vibeglobe/ui`         | `createUi`, `addDefaultControls`, `addAllControls`, every control class, the drawing tool, `THEME_VARIABLES` |
+| `vibeglobe/ui/minimap` | `MinimapControl`, kept apart so applications without it never load it                                        |
 
 ## Example
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addAllControls, createUi, ScaleBarControl } from '@vibeglobe/ui';
+import type { Globe } from 'vibeglobe/core';
+import { addAllControls, createUi, ScaleBarControl } from 'vibeglobe/ui';
 
 declare const globe: Globe;
 

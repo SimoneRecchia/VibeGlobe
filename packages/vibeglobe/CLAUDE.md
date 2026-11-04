@@ -1,7 +1,9 @@
 # vibeglobe
 
-The public entry of VibeGlobe (ADR 0186): `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })` starts a globe
-with the application's services and wires the renderer, the workers, the navigation and the ready-made controls.
+The public entry of VibeGlobe and its one published package (ADR 0186, ADR 0189): the release packs every other engine
+package into it under subpaths (`scripts/release/tarballs.ts`). `createVibeGlobe(container, { tiles, terrain?,
+geocoder?, … })` starts a globe with the application's services and wires the renderer, the workers, the navigation and
+the ready-made controls.
 
 ## Rules
 

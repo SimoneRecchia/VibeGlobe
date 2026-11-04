@@ -1,6 +1,6 @@
 name: CI
 
-# Runs only on pull requests and when started by hand (owner, 2026-11-04, ADR 0192): nothing on a push or a merge to
+# Runs only on pull requests and when started by hand (owner, 2026-11-04, ADR 0193): nothing on a push or a merge to
 # main, nor on a schedule. A pull request runs one job with every fast check, the unit tests its changes reach and
 # cached builds (ADR 0015). A manual run (workflow_dispatch) adds the end-to-end suite in sixteen shards, the isolated
 # measurements, Firefox and WebKit, and the recorded benchmarks. Each browser job runs alone on its runner (ADR 0022),

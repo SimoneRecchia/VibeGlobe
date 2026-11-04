@@ -1,11 +1,18 @@
 # Progress
 
-## 2026-11-04: CI only on pull requests and by hand (F710)
+## 2026-11-04: CI only on pull requests and by hand (F711)
 
 The owner's brief: the checks run on pull requests, and nothing starts on `main`, after a merge or a push. `ci.yml`
 triggers on pull requests and manual runs only; the full matrix (end-to-end shards, measurements, Firefox and WebKit,
 benchmarks) is a manual run; no workflow has a schedule, and the visual baselines' push trigger skips `main`
-(ADR 0192; F027 and F565 superseded by F710). `scripts/checks/ci-triggers.test.ts` keeps the triggers so.
+(ADR 0193; F027 and F565 superseded by F711). `scripts/checks/ci-triggers.test.ts` keeps the triggers so.
+
+## 2026-11-04: a published GitHub release publishes `vibeglobe` (F710)
+
+The owner's brief: the release starts from a GitHub release and takes the version from it. `release.yml` runs on
+published releases and passes the release's tag; `release.ts` reads the version from it (`v1.2.3` or `1.2.3`) and
+refuses any other event (ADR 0192, F710 replacing F709). The `npm-release` environment's deployment rules must allow the
+`v*` tags.
 
 ## 2026-11-04: publishing with no token, through npm's trusted publishing (F709)
 

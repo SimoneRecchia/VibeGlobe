@@ -1,5 +1,5 @@
-// F710: the checks run on pull requests and when started by hand, never on a push or a merge to main nor on a
-// schedule (owner, 2026-11-04, ADR 0192).
+// F711: the checks run on pull requests and when started by hand, never on a push or a merge to main nor on a
+// schedule (owner, 2026-11-04, ADR 0193).
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { ROOT_DIR } from '../workspace.ts';
 const WORKFLOWS = join(ROOT_DIR, '.github/workflows');
 const workflow = (name: string): string => readFileSync(join(WORKFLOWS, name), 'utf8');
 
-describe('workflow triggers (F710)', () => {
+describe('workflow triggers (F711)', () => {
   it('runs CI on pull requests and by hand only', () => {
     expect(workflow('ci.yml')).toMatch(/^on:\n {2}pull_request:\n {2}workflow_dispatch:\n\n/m);
   });

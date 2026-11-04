@@ -6,25 +6,31 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
 import { consumerReferences, trackedTextFiles } from './check-consumer-names.ts';
-import { distTag, publishRefusal } from './release.ts';
+import { distTag, publishRefusal, versionOf } from './release.ts';
 
-describe('release (F709)', () => {
+describe('release (F710)', () => {
   const ci = {
     CI: 'true',
     GITHUB_ACTIONS: 'true',
-    GITHUB_REF: 'refs/heads/main',
-    GITHUB_WORKFLOW_REF: 'SimoneRecchia/VibeGlobe/.github/workflows/release.yml@refs/heads/main',
+    GITHUB_EVENT_NAME: 'release',
+    GITHUB_WORKFLOW_REF: 'SimoneRecchia/VibeGlobe/.github/workflows/release.yml@refs/tags/v1.0.0',
     ACTIONS_ID_TOKEN_REQUEST_URL: 'https://token.actions.example/',
   };
 
-  it('publishes only from the release workflow on main in CI, with its OIDC identity', () => {
+  it('publishes only for a GitHub release, from the release workflow in CI, with its OIDC identity', () => {
     expect(publishRefusal(ci)).toBeUndefined();
     expect(publishRefusal({ ...ci, CI: undefined, GITHUB_ACTIONS: undefined })).toMatch(/only from CI/);
-    expect(publishRefusal({ ...ci, GITHUB_REF: 'refs/heads/feature' })).toMatch(/from main/);
+    expect(publishRefusal({ ...ci, GITHUB_EVENT_NAME: 'push' })).toMatch(/GitHub release/);
     expect(publishRefusal({ ...ci, GITHUB_WORKFLOW_REF: 'x/.github/workflows/ci.yml@refs/heads/main' })).toMatch(
       /release\.yml/,
     );
     expect(publishRefusal({ ...ci, ACTIONS_ID_TOKEN_REQUEST_URL: undefined })).toMatch(/id-token: write/);
+  });
+
+  it("takes the version from the release's tag, with or without a v", () => {
+    expect(versionOf('v1.2.3')).toBe('1.2.3');
+    expect(versionOf('1.2.3-rc.1')).toBe('1.2.3-rc.1');
+    expect(() => versionOf('release-7')).toThrow(/v<semantic version>/);
   });
 
   it('sends a pre-release to the next dist-tag and a release to latest', () => {
@@ -32,11 +38,13 @@ describe('release (F709)', () => {
     expect(distTag('1.0.0')).toBe('latest');
   });
 
-  it('publishes with no token: one job in the approval environment, with an OIDC identity and npm 11.5.1 or later', () => {
+  it('publishes for a published release with no token: one job in the approval environment, with an OIDC identity and npm 11.5.1 or later', () => {
     const workflow = readFileSync(join(ROOT_DIR, '.github/workflows/release.yml'), 'utf8');
-    // Started by hand only, one job: in the approval environment, with the OIDC identity npm trusts and no token.
-    expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:/m);
-    expect(workflow.match(/^ {2}[a-z-]+:$/gm)).toEqual(['  publish:']);
+    // Started by a published release only, one job: in the approval environment, with the OIDC identity npm trusts and
+    // no token, the version from the release's tag.
+    expect(workflow).toMatch(/^on:\n {2}release:\n {4}types: \[published\]$/m);
+    expect(workflow).toMatch(/TAG: \$\{\{ github\.event\.release\.tag_name \}\}/);
+    expect(workflow.slice(workflow.indexOf('\njobs:')).match(/^ {2}[a-z-]+:$/gm)).toEqual(['  publish:']);
     expect(workflow).toMatch(/environment: npm-release/);
     expect(workflow).toMatch(/^ {2}id-token: write$/m);
     expect(workflow).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN|secrets\./);

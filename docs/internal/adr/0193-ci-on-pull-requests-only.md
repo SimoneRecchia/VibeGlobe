@@ -1,8 +1,8 @@
-# 0192. CI only on pull requests and by hand
+# 0193. CI only on pull requests and by hand
 
 - Status: Accepted
 - Date: 2026-11-04
-- Milestone: M1 (F710; partly supersedes ADR 0015 and ADR 0022 on when CI runs)
+- Milestone: M1 (F711; partly supersedes ADR 0015 and ADR 0022 on when CI runs)
 
 ## Context
 
@@ -16,7 +16,7 @@ push (so twice for a pull request's branch), on every push to `main` with the fu
   check, the unit tests its changes reach); a manual run adds the whole unit suite with coverage, the sixteen
   end-to-end shards, the isolated measurements, Firefox and WebKit and the benchmarks.
 - No workflow has a schedule; `visual-baselines.yml` keeps its push trigger on the request file for branches other
-  than `main`. `package-checks.yml` runs on pull requests, `release.yml` by hand (ADR 0190).
+  than `main`. `package-checks.yml` runs on pull requests, `release.yml` on a published GitHub release (ADR 0192).
 - The fast job compares the feature list and the tests with the pull request's base.
 - `scripts/checks/ci-triggers.test.ts` keeps it so.
 

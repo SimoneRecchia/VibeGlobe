@@ -8479,10 +8479,22 @@
         "Assert the workflow is started by hand, has one job in the `npm-release` environment with `id-token: write` and npm 11.5.1 or later, and names no token or secret",
         "Configure the trusted publisher of `vibeglobe` on npmjs.com, run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry with its provenance"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F710",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "Publishing a GitHub release publishes `vibeglobe`: the Release workflow runs on the published release, takes the version from its tag (`v1.2.3` or `1.2.3`), builds the engine at that tag, packs `vibeglobe` at that version and publishes it to the public npm registry through npm's trusted publishing (the workflow's GitHub OIDC identity, no npm token, provenance attached by npm). It does nothing else.",
+      "steps": [
+        "Unit-test that the release script publishes only for a GitHub release from the release workflow in CI with an OIDC identity, reads the version from the tag with or without a v, and sends pre-releases to the next dist-tag",
+        "Assert the workflow runs on published releases, has one job in the `npm-release` environment with `id-token: write` and npm 11.5.1 or later, passes the release's tag and names no token or secret",
+        "Configure the trusted publisher of `vibeglobe` on npmjs.com, publish a GitHub release tagged with a version and assert `vibeglobe@<version>` is on the public npm registry with its provenance"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F711",
       "milestone": 1,
       "section": "Testing and verification",
       "description": "CI runs only on pull requests and when started by hand, never on a push or a merge to main nor on a schedule: every pull request runs one fast job with the type check, lint, format check, repository checks and guards, the unit tests its changes reach, the license audit, the API documentation build and the bundle-size checks; a manual run adds the whole unit suite with coverage, the end-to-end tests, the isolated measurements, Firefox and WebKit and the recorded benchmarks.",

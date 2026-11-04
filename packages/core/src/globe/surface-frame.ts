@@ -102,7 +102,7 @@ export class SurfaceFrame {
     terrainRange: undefined as ((tile: QuadtreeTile, out: Float64Array) => boolean) | undefined,
     fogHaze: undefined as number | undefined,
   };
-  /** The imagery runtime, once `startImagery` ran with imagery or terrain. */
+  /** The imagery runtime, once `startImagery` ran on a globe with workers. */
   imagery: ImageryRuntime | undefined;
 
   private readonly fadeMs: number;
@@ -137,8 +137,9 @@ export class SurfaceFrame {
   }
 
   /**
-   * Starts the options' tiled imagery, if any: from now on tiles refine until their texels are small enough (F081) and
-   * are textured with the layers' tiles.
+   * Starts the tiled imagery of a globe with workers, with the options' layers if any: from now on tiles refine until
+   * their texels are small enough (F081) and are textured with the layers' tiles. Without layers or terrain it still
+   * runs the pools and the credits of render extensions and of layers added later (KB-343).
    */
   startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
     const { imagery: inputs = [], terrain, workers } = options;
@@ -148,7 +149,7 @@ export class SurfaceFrame {
       logger.log('error', message);
       callbacks.sourceError?.(new GlobeError('invalid-option', message));
     });
-    if ((entries.length === 0 && !terrain) || !workers) return;
+    if (!workers) return;
     const blockedByCors = new Set<string>();
     const imagery = new ImageryRuntime(
       entries,
@@ -307,12 +308,13 @@ export class SurfaceFrame {
     drawOnBaseImage(this.draws, this.tiles, count);
     drawWithoutTerrain(this.draws, count);
     timer.end(PHASE_SELECTION);
-    if (this.imagery) {
-      this.imagery.relief = this.view.morph.factors[1] !== 0;
-      this.imagery.draw(this.draws, this.tiles, count, camera, this.nowMs, this.fadeMs, timer);
+    if (imagery && !imagery.empty) {
+      imagery.relief = this.view.morph.factors[1] !== 0;
+      imagery.draw(this.draws, this.tiles, count, camera, this.nowMs, this.fadeMs, timer);
     } else {
       timer.end(PHASE_SCHEDULING);
       timer.end(PHASE_UPLOAD);
+      imagery?.lease.pool.update();
     }
     return this.draws;
   }
@@ -481,7 +483,7 @@ export class SurfaceFrame {
    */
   get fading(): boolean {
     const imagery = this.imagery;
-    return imagery !== undefined && (imagery.fading || (motionOf(this).state[FACTOR] ?? 1) > 1);
+    return imagery !== undefined && !imagery.empty && (imagery.fading || (motionOf(this).state[FACTOR] ?? 1) > 1);
   }
 
   /** True while imagery the view wants is still loading. */

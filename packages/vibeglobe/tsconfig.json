@@ -14,11 +14,11 @@
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"],
   "references": [
-    {
-      "path": "../core"
-    },
-    {
-      "path": "../sources"
-    }
+    { "path": "../core" },
+    { "path": "../controls" },
+    { "path": "../renderer" },
+    { "path": "../layers" },
+    { "path": "../ui" },
+    { "path": "../worker" }
   ]
 }

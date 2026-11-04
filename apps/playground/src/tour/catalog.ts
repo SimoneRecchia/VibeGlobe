@@ -135,7 +135,7 @@ export const SCENES: readonly SceneEntry[] = [
     summary:
       'Satellite, hybrid, map, landscape and relief map types of Europe built only from free sources that allow ' +
       'commercial use, with their exact credits.',
-    guide: 'europe-preset.md',
+    guide: 'apps/presets/europe-preset.md',
     online: 'NASA GIBS, ESA WorldCover, national orthophotos, OpenFreeMap and Mapterhorn tiles',
     load: async () => (await import('./scenes/europe.js')).europe,
   },

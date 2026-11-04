@@ -1,13 +1,15 @@
 # @vibeglobe/presets
 
-Ready map types built only from free sources whose terms allow commercial use and redistribution. `europeOpen` returns
+The playground's own maps, not published: VibeGlobe ships no map, and an application brings its own (ADR 0187). Ready
+map types built only from free sources whose terms allow commercial use and redistribution. `europeOpen` returns
 Europe's base maps (Satellite, Hybrid, Map, Landscape, Relief), overlays and 3D terrain, with each source's licence and
 exact credit, read from an offline package the application hosts, from the network, or both. Use it for a Google
 Earth-like map of Europe without vetting providers yourself.
 
 ## Install
 
-Depends on `@vibeglobe/core` and `@vibeglobe/sources`. Drawing the map types also takes `@vibeglobe/renderer` and
+A private workspace package of the repository, used by the playground. Depends on `@vibeglobe/core` and
+`@vibeglobe/sources`. Drawing the map types also takes `@vibeglobe/renderer` and
 `@vibeglobe/worker`; the vector map types take `@vibeglobe/layers`; a package takes `@vibeglobe/offline` and is built
 with `@vibeglobe/tools`. No peer dependencies.
 
@@ -51,5 +53,5 @@ const globe = createGlobe({
 
 ## Guides
 
-- [The Europe preset](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/guides/europe-preset.md)
+- [The Europe preset](europe-preset.md)
 - [Sources](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/guides/sources.md)

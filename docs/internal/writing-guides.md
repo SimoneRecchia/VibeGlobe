@@ -57,7 +57,7 @@ sections, not into prose: an agent jumps to the heading it needs.
 
 ## How to write
 
-- Exact names in backticks, as they are exported: `europeOpen`, `GlobeOptions.baseImageryUrl`, `@vibeglobe/presets`.
+- Exact names in backticks, as they are exported: `createVibeGlobe`, `GlobeOptions.baseImageryUrl`, `@vibeglobe/sources`.
   Never a paraphrase of a name.
 - Short declarative sentences in the present tense. One statement per sentence. Units in the words: "in metres",
   "levels 3 to 8", "from level 12 on".

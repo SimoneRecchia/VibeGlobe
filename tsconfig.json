@@ -56,10 +56,10 @@
       "path": "./packages/quality/tsconfig.test.json"
     },
     {
-      "path": "./packages/presets"
+      "path": "./apps/presets"
     },
     {
-      "path": "./packages/presets/tsconfig.test.json"
+      "path": "./apps/presets/tsconfig.test.json"
     },
     {
       "path": "./packages/models"
@@ -90,6 +90,12 @@
     },
     {
       "path": "./packages/web-component/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/vibeglobe"
+    },
+    {
+      "path": "./packages/vibeglobe/tsconfig.test.json"
     },
     {
       "path": "./packages/tools"

@@ -61,7 +61,7 @@ Each control is a class taking an options object with `id` and `position`; `ui.a
   and fullscreen (top right), the readout and the scale bar (bottom left) and attribution (bottom right).
 - Both take `geocoder` and `debug`; `addAllControls` also takes `layers` (the layer switcher's options) and `tilt`.
 - `MinimapControl` is imported from `@vibeglobe/ui/minimap`, so an application without it never loads it.
-- The search box makes no request without a `geocoder`: the application supplies one implementing `Geocoder`
+- The search box makes no request without a `geocoder`: the application supplies one implementing `GeocoderService`
   (`search(query, { signal, language })` resolving `GeocoderResult[]`).
 
 ### Your own controls

@@ -31,7 +31,7 @@ export type { DebugToggleControlOptions } from './controls/debug-toggle.js';
 export { CoordinateReadoutControl } from './controls/readout.js';
 export type { CoordinateReadoutOptions, ElevationProvider } from './controls/readout.js';
 export { SearchControl } from './controls/search.js';
-export type { Geocoder, GeocoderResult, GoTo, SearchControlOptions } from './controls/search.js';
+export type { GeocoderService, GeocoderResult, GoTo, SearchControlOptions } from './controls/search.js';
 export { ViewModeControl, choiceOf } from './controls/view-mode.js';
 export type { ViewModeChoice, ViewModeControlOptions } from './controls/view-mode.js';
 export { TiltControl } from './controls/tilt.js';

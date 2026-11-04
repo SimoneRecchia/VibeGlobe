@@ -107,11 +107,11 @@
     "quality": {
       "bundleGzipKB": 5
     },
-    "presets": {
-      "bundleGzipKB": 30
-    },
     "tools": {
       "bundleGzipKB": 100
+    },
+    "vibeglobe": {
+      "bundleGzipKB": 2
     }
   },
   "streaming": {

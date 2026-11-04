@@ -4,7 +4,7 @@
 //   node scripts/world-land.ts <ne_50m_land.geojson>
 // The input comes from https://github.com/nvkelso/natural-earth-vector (geojson/ne_50m_land.geojson).
 import { readFileSync, writeFileSync } from 'node:fs';
-import { encodePolygons } from '../packages/presets/src/polygons.ts';
+import { encodePolygons } from '../apps/presets/src/polygons.ts';
 import { area, round, simplify, type Point, type Ring } from './land-rings.ts';
 
 /** Douglas–Peucker tolerance in degrees of the pipeline's mask (about 1 km in latitude). */
@@ -51,7 +51,7 @@ writeFileSync(
   `${JSON.stringify({ type: 'Feature', properties: { source: header }, geometry: { type: 'MultiPolygon', coordinates: landPolygons(TOLERANCE_DEG) } })}\n`,
 );
 writeFileSync(
-  'packages/presets/src/world-land.ts',
+  'apps/presets/src/world-land.ts',
   `// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**

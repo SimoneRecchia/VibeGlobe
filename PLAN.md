@@ -51,7 +51,7 @@ Rules that hold throughout:
 VibeGlobe is a generic, modular web engine that renders an interactive 3D globe and map with the feel of Google Earth, Google Maps and Apple Maps, and it must be extremely optimized: visual quality and fluidity come before everything else.
 
 - **What it is:** a TypeScript library for the browser. One continuous camera shows a 3D globe when zoomed out, a flat 2D map at mid zoom and an oblique 3D view up close.
-- **Who uses it:** any web application. The first consumer is Vireox Cube, a commercial web platform (Vue/Nuxt, TypeScript) with a GIS module. The engine lives in its own repository and Cube consumes it later as a library. Nothing in the engine may depend on Cube.
+- **Who uses it:** any web application. The first consumer is a commercial web platform (Vue/Nuxt, TypeScript) with a GIS module. The engine lives in its own repository and its consumers use it as a library. Nothing in the engine may depend on, or name, a consumer application.
 
 Primary goals:
 
@@ -72,11 +72,11 @@ These decisions are final; the agent must not change them without the owner's ap
 | Area | Decision |
 | --- | --- |
 | Name | VibeGlobe (repository and product name). Packages are published on the public npm registry under the npm organization @vibeglobe, for example @vibeglobe/core and @vibeglobe/vue. |
-| Repository | GitHub repository under the owner's personal account (simonerecchia/VibeGlobe), fully separate from Vireox Cube. VibeGlobe is a public, source-available project, and the repository is public (the owner made it public on 2026-10-21). License: PolyForm Noncommercial 1.0.0, so anyone may use, change and share it free of charge for noncommercial purposes, while any commercial use, resale included, needs a separate commercial license from the owner. External contributions require a contributor license agreement, so they can be offered under both licenses. |
+| Repository | GitHub repository under the owner's personal account (simonerecchia/VibeGlobe), fully separate from any consumer application. VibeGlobe is a public, source-available project, and the repository is public (the owner made it public on 2026-10-21). License: PolyForm Noncommercial 1.0.0, so anyone may use, change and share it free of charge for noncommercial purposes, while any commercial use, resale included, needs a separate commercial license from the owner. External contributions require a contributor license agreement, so they can be offered under both licenses. |
 | Language | TypeScript in strict mode, ES modules. Code, comments, documentation and commit messages in English. |
 | Platforms | Every major operating system (Windows, macOS, Linux, ChromeOS, iPadOS, Android) in current browsers: Chrome, Edge, Firefox and Safari, current and previous major versions. Any GPU vendor. Desktop is the primary target; tablets with touch must be fully supported; phones are best effort. |
 | Graphics | WebGPU as the primary backend, with an automatic WebGL2 fallback. Devices without WebGL2 are out of scope. |
-| Core | Framework-agnostic: no dependency on Vue, Nuxt, React or Cube. Integrations are separate adapter packages; a Vue 3 adapter and a framework-neutral Web Component wrapper are required. |
+| Core | Framework-agnostic: no dependency on Vue, Nuxt, React or a consumer application. Integrations are separate adapter packages; a Vue 3 adapter and a framework-neutral Web Component wrapper are required. |
 | Server-side rendering | Importing any package must be safe under SSR (Nuxt): no access to window, document or the GPU at import time. |
 | Network mode | Configurable: online only, offline only, or hybrid (both). Default: hybrid. |
 | Cache | Every loading feature (persistent cache, memory reuse, prefetch and flight preloading, offline packaging) is enabled by default and can be disabled globally or per source. Built-in provider profiles for Google Maps Platform and OpenStreetMap switch off automatically what each provider's terms forbid. |
@@ -278,7 +278,7 @@ When implementing a profile, read the provider's current terms and usage policy 
 The engine works with no internet, with a fast connection and anything in between, choosing for each tile the best source it can get without causing lag.
 
 - **Cache hierarchy:** GPU, then RAM, then persistent browser storage (for example IndexedDB or OPFS), then offline packages, then the network.
-- **Offline mode 1, local-network server:** offline packages are served over HTTP by a server on the LAN, for example Cube installed at a customer site with no internet.
+- **Offline mode 1, local-network server:** offline packages are served over HTTP by a server on the LAN, for example an application installed at a customer site with no internet.
 - **Offline mode 2, device:** packages or cached tiles live in the browser. Handle storage quotas and possible eviction by the browser, and let apps request persistent storage.
 - **Mixed mode (default when online):** a fixed low-detail package gives an instant start and smooth flights; higher detail is fetched online on demand.
 - **Connectivity detection:** health checks against the tile endpoints, not the browser's online flag alone (it reports online behind captive portals). Switch seamlessly when connectivity drops or returns.
@@ -301,7 +301,7 @@ Provider profiles (see Map sources) switch off, for their own source, any of the
 
 ## Data layers for applications
 
-Applications such as Cube draw their own data on top of the map, with picking, styling and live updates at interactive speed.
+Applications draw their own data on top of the map, with picking, styling and live updates at interactive speed.
 
 - **Primitives:** points, markers and billboards, labels, polylines, polygons, extruded polygons, circles and ellipses, 3D models (glTF).
 - **Placement:** lines and polygons draped on terrain; markers and models clamped to the ground and re-adjusted when terrain detail changes; or placed at an absolute altitude.
@@ -412,7 +412,7 @@ Default data is free, commercially usable and hosted by each consumer on their o
 Pipeline requirements:
 
 - Command-line tools (TypeScript; may call GDAL or other tools, for example through Docker) to download, convert and tile each dataset: DEM to terrain tiles, imagery to tile pyramids, OSM extracts to vector tiles and, if useful, raster tiles.
-- Region-based builds: low detail for the whole world, high detail for chosen regions (Italy first, for Cube).
+- Region-based builds: low detail for the whole world, high detail for chosen regions (Italy first, for the first consumer).
 - Output both offline packages and static tile folders, ready for any HTTP server or CDN.
 - Record license and attribution with every output; refuse to package sources whose terms forbid it.
 - Reproducible from versioned configuration files; resumable; size estimates before building.
@@ -490,7 +490,7 @@ Work proceeds through these 15 milestones; each closes only when its acceptance 
     - Done when: every control works with mouse, touch and keyboard alone.
 13. **Vector tiles, buildings and 3D Tiles:** MVT rendering on the globe and the flat map, OpenStreetMap building extrusions, 3D Tiles streaming.
     - Done when: a city view with roads, labels and buildings meets the performance targets.
-14. **Framework adapters:** the Vue adapter (components and composables, SSR-safe), the Web Component wrapper, a Nuxt example app, an integration guide for consumers such as Cube.
+14. **Framework adapters:** the Vue adapter (components and composables, SSR-safe), the Web Component wrapper, a Nuxt example app, an integration guide for consumer applications.
     - Done when: the Nuxt example builds with SSR and runs every feature on the client, and the Web Component works in a plain HTML page.
 15. **Hardening and release:** performance pass on the reference devices, the full hardware and OS matrix, soak and chaos tests, cross-browser fixes, complete documentation, API review, version 1.0.0 published to npm under @vibeglobe.
     - Done when: every item in Definition of done is ticked.
@@ -503,7 +503,7 @@ The library ships with documentation good enough that a new project can integrat
 - **Examples:** the playground covers every feature, plus a minimal example per feature.
 - **Distribution:** the public npm registry under the @vibeglobe organization; semantic versioning; ESM builds with type declarations; tree-shakeable packages; workers, WebAssembly and shader assets resolvable by common bundlers (Vite, Nuxt) or from configurable URLs.
 - **Release automation:** changelog generation, version tags, publishing from CI.
-- **Consumption by Cube:** Cube installs the packages from npm like any other dependency, under a commercial license granted by the owner; nothing in the engine refers to Cube.
+- **Consumption by applications:** an application installs the packages from npm like any other dependency, under a commercial license granted by the owner; nothing in the engine refers to a consumer application.
 
 ## Definition of done
 
@@ -532,7 +532,7 @@ These choices were made with the owner before implementation; the reasons are ke
 | Extreme optimization, mandatory research survey, zero-defect policy | The owner's requirement: the engine must be as optimized as possible, learn from every major engine, and ship without bugs or glitches |
 | Readable, minimal code; abstraction only at extension points | The owner's requirement: optimized but readable, without over-engineering, so Claude can keep working on it across sessions |
 | Working method with feature list, progress notes, git and end-to-end checks | Follows Anthropic's published practice for long-running coding agents, so the build stays coherent across many sessions |
-| TypeScript | The engine runs on browser APIs; types are the library's contract; same stack as Cube (Vue/Nuxt with TypeScript) |
+| TypeScript | The engine runs on browser APIs; types are the library's contract; same stack as the first consumer (Vue/Nuxt with TypeScript) |
 | Globe-to-flat morph rather than an always-round globe | At mid zoom the view must be a true flat 2D map, as in Google Maps; most tile sources are Web Mercator and fit the flat phase without reprojection |
 | Automatic globe, 2D and 3D by zoom, with a persistent manual override | The owner's requirement, modeled on Google Earth: a chosen tilt or heading stays until the user changes it |
 | three.js recommended as the rendering base | WebGPU with automatic WebGL2 fallback and single-source shaders save months; fluidity depends mostly on engine logic; hot paths remain replaceable |
@@ -543,9 +543,9 @@ These choices were made with the owner before implementation; the reasons are ke
 | No hosted infrastructure | Every consumer hosts tiles, packages and engine assets in their own backend and frontend |
 | Public, source-available project under PolyForm Noncommercial 1.0.0 | The owner's choice: anyone may use VibeGlobe for free, nobody may sell it or use it commercially without the owner's commercial license |
 | Repository under the owner's name, packages as @vibeglobe on npm | npm scopes are independent of GitHub, so the project keeps its own name while the repository stays under the owner's account |
-| Only free, commercially redistributable data and dependencies by default | Commercial licensees, Cube first, must be able to ship everything; paid tiers (Google, Mapbox, MapTiler, Cesium ion) are optional adapters, not defaults |
+| Only free, commercially redistributable data and dependencies by default | Commercial licensees must be able to ship everything; paid tiers (Google, Mapbox, MapTiler, Cesium ion) are optional adapters, not defaults |
 | Apple MapKit rejected | Its terms forbid using Apple map data outside Apple's own MapKit and storing it, and add commercial restrictions on non-Apple hardware |
-| Both offline modes | Cube runs at customer sites without internet and on devices without network |
+| Both offline modes | Applications run at customer sites without internet and on devices without network |
 | Desktop first, tablets supported | The owner's priority |
 | English throughout | Standard for a public library |
 

@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-11-04: the engine knows no provider; one call starts it with the application's services (F699, F700, KB-343)
+
+The owner's brief: VibeGlobe depends only on interfaces, and anyone starts it on a page with one object of services
+and settings. `@vibeglobe/core` declares `TileService`, plain data `{ imagery, style? }` (required), and
+`GeocoderService` (the former `Geocoder`); the terrain is the engine's own `TerrainSource` (the 3D view's data is the
+relief; buildings come in the style). The new `vibeglobe` package exports
+`createVibeGlobe(container, { tiles, terrain?, geocoder?, ui?, controls?, language?, … })`: it refuses a missing tile
+service and wires renderer, workers, navigation, the ready-made controls and, for a style, the vector tile modules on
+demand; a missing optional service turns off its feature without error. The optional `@vibeglobe/providers` holds
+functions returning those services: `mapTilerTiles`, `mapTilerTerrain`, `esriTiles`, `openFreeMapTiles`,
+`photonGeocoder`, and the OpenStreetMap sources moved out of `@vibeglobe/sources` (ADR 0186; ADR 0185 partly
+superseded). A first version with provider classes, a `TerrainService` wrapper and the options `backend`,
+`transformUrl` and `ui: 'all'` was simplified at the owner's request (F696 and F697 superseded by F699 and F700).
+KB-343, found on the way: a globe with workers but no imagery or terrain never showed its render extensions' credits,
+so a style-only map had no attribution; the imagery runtime now starts with the workers (only its pools run while it
+has no layers or terrain), and the separate extension pools are gone (core 64.99 → 64.61 KB). Tests:
+`create-vibe-globe.test.ts`, `providers.test.ts`, the KB-343 regression, `e2e/services.spec.ts`, the services guide's
+examples. Still open: F698, VibeGlobe as one npm package, and the providers' terms read from an unrestricted network
+(open question 40).
+
 ## 2026-11-03: 'north-up' holds the heading against every input (KB-342)
 
 'North-up' held north up only for drags: a right-drag, a two-finger turn (Safari's trackpad gesture, a touch screen)
@@ -650,7 +670,7 @@ packages' `package.json` (ADR 0171; numbers 0171–0179).
   meanwhile). Known bug TH-01 (a failed transcoder load is cached for the session) is the worker package's.
 - Commands: `node scripts/release/check-tarballs.ts`, `node scripts/release/check-consumers.ts [F503] [F531] [F532]`
   (`VIBEGLOBE_CHROMIUM_PATH` in cloud containers, `VIBEGLOBE_RELEASE_KEEP=1` keeps the built projects),
-  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-cube.ts`.
+  `node scripts/release/release.ts <version>` (dry run), `node scripts/release/check-consumer-names.ts`.
 - About 3 hours of agent time.
 
 ## Track F, network simulation suite (2026-10-23)

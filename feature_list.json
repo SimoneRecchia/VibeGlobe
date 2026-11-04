@@ -513,12 +513,12 @@
       "id": "F038",
       "milestone": 1,
       "section": "Fixed constraints",
-      "description": "The code lives in a private GitHub repository named VibeGlobeEngine, fully separate from Vireox Cube: it contains no Cube code, submodule or dependency.",
+      "description": "The code lives in a private GitHub repository named VibeGlobeEngine, fully separate from its first consumer application: it contains no consumer code, submodule or dependency.",
       "steps": [
         "Query the repository through the GitHub API and confirm it is private and named VibeGlobeEngine (case-insensitive)",
-        "Confirm the repository has no git submodules referring to Cube",
-        "Run the dependency-rule check and confirm no package depends on or refers to Cube",
-        "Search the source tree and confirm it contains no Cube code (PLAN.md and docs may name Cube as the first consumer)"
+        "Confirm the repository has no git submodules referring to a consumer application",
+        "Run the dependency-rule check and confirm no package depends on or refers to a consumer application",
+        "Search the source tree and confirm it contains no consumer application code"
       ],
       "status": "superseded"
     },
@@ -552,12 +552,12 @@
       "id": "F542",
       "milestone": 1,
       "section": "Fixed constraints",
-      "description": "The repository is SimoneRecchia/VibeGlobe on GitHub, under the owner's personal account and fully separate from Vireox Cube, and the project is named VibeGlobe everywhere: package metadata, documentation, code identifiers, the `<vibe-globe>` Web Component tag and the VIBEGLOBE_ environment-variable prefix.",
+      "description": "The repository is SimoneRecchia/VibeGlobe on GitHub, under the owner's personal account and fully separate from its first consumer application, and the project is named VibeGlobe everywhere: package metadata, documentation, code identifiers, the `<vibe-globe>` Web Component tag and the VIBEGLOBE_ environment-variable prefix.",
       "steps": [
         "Query the repository through the GitHub API and confirm its full name is SimoneRecchia/VibeGlobe (case-insensitive) and the git remote of the working copy points to it",
         "Search the tracked files case-insensitively for VibeGlobeEngine and for vge used as a prefix (VGE_, vge-, vge:, vgePlayground) and confirm the only matches are frozen feature-list text and the documents that record the rename (ADR 0015, ADR 0016, docs/feature-changes.md, docs/open-questions.md, docs/test-changes.md, progress.md)",
         "Confirm the root package is named vibeglobe, every library uses the @vibeglobe/ scope, the Web Component tag is <vibe-globe>, and init.sh, the Playwright configuration, the benchmark runner and CI read VIBEGLOBE_ variables",
-        "Confirm the repository has no git submodule referring to Cube and the dependency-rule check finds no package depending on or referring to Cube",
+        "Confirm the repository has no git submodule referring to a consumer application and the dependency-rule check finds no package depending on or referring to one",
         "Run ./init.sh from a fresh clone and confirm it passes"
       ],
       "status": "passing"
@@ -3519,7 +3519,7 @@
         "Confirm every rule on bulk download, offline use, concurrency, application identification, caching headers and attribution is mapped to a profile setting",
         "Confirm the profile's code references the ADR"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F264",
@@ -3532,7 +3532,7 @@
         "Assert the profile honors the servers' cache headers and never sends no-cache request headers",
         "Run the opt-in live test at low volume, as the policy allows"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F265",
@@ -3544,7 +3544,7 @@
         "Log open connections per host and assert they never exceed the profile's limit",
         "Assert the view keeps showing parent-tile fallback with zero black pixels"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F266",
@@ -3556,7 +3556,7 @@
         "Configure it with an identifier and assert every request carries a valid Referer identifying the application (the referrer policy never strips it)",
         "Assert the identification method matches the one recorded in the OpenStreetMap terms ADR"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F267",
@@ -3567,7 +3567,7 @@
         "Open the sources guide and confirm it states that the public OpenStreetMap servers are unsuitable for production and points to the self-hosted alternative",
         "Use the profile in the playground and assert exactly one console warning is logged per engine instance"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F268",
@@ -4269,7 +4269,7 @@
         "Run a pan and a long flight scenario and assert prefetch and flight preloading of its tiles stay within the limits recorded in the OpenStreetMap terms ADR (no bulk prefetch)",
         "Request an offline package with the source and assert it is refused with an error naming the profile rule"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F325",
@@ -4281,7 +4281,7 @@
         "Assert '© OpenStreetMap contributors' with ODbL licensing is shown whenever its tiles are visible",
         "Configure the same data through a fixture provider profile with its own restrictions and assert both the ODbL attribution and the provider's rules apply"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F326",
@@ -6318,9 +6318,9 @@
       "id": "F480",
       "milestone": 14,
       "section": "Fixed constraints",
-      "description": "The Vue adapter depends only on the engine packages and on Vue 3 as a peer dependency, with no Nuxt, React or Cube dependency, and type-checks under vue-tsc in strict mode.",
+      "description": "The Vue adapter depends only on the engine packages and on Vue 3 as a peer dependency, with no Nuxt, React or consumer-application dependency, and type-checks under vue-tsc in strict mode.",
       "steps": [
-        "Inspect the Vue adapter's package.json and assert Vue is a peer dependency and no Nuxt, React or Cube package is listed",
+        "Inspect the Vue adapter's package.json and assert Vue is a peer dependency and no Nuxt, React or consumer-application package is listed",
         "Run the dependency-rule check in CI and assert it passes",
         "Run vue-tsc in strict mode on the example and assert no errors"
       ],
@@ -6431,12 +6431,12 @@
       "id": "F489",
       "milestone": 14,
       "section": "Documentation and distribution",
-      "description": "An integration guide for consumers such as Cube explains installation from the private registry, Vue and Nuxt setup with SSR, worker and WebAssembly asset URLs, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "description": "An integration guide for consumer applications explains installation from the private registry, Vue and Nuxt setup with SSR, worker and WebAssembly asset URLs, CSP, offline packages and provider keys, and a new project following only the guide works.",
       "steps": [
         "Open the integration guide in the documentation site",
         "Check it covers registry setup, Vue and Nuxt setup with SSR, asset URLs, CSP, network modes and offline packages, provider keys and attribution",
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
-        "Assert the guide never names Cube-specific code or configuration as a requirement"
+        "Assert the guide never names a consumer application's code or configuration as a requirement"
       ],
       "status": "superseded"
     },
@@ -6444,12 +6444,12 @@
       "id": "F555",
       "milestone": 14,
       "section": "Documentation and distribution",
-      "description": "An integration guide for consumers such as Cube explains installation from the public npm registry (@vibeglobe), licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
+      "description": "An integration guide for consumer applications explains installation from the public npm registry (@vibeglobe), licensing, Vue and Nuxt setup with SSR, lazy loading with a dynamic import, hosting worker, WebAssembly and other engine assets on the app's own origin, CSP, offline packages and provider keys, and a new project following only the guide works.",
       "steps": [
         "Open the integration guide in the documentation site",
         "Check it covers npm installation, licensing, Vue and Nuxt setup with SSR, lazy loading, asset hosting and base path, CSP, network modes and offline packages, provider keys and attribution",
         "Have a fresh-context agent create a new Nuxt project following only the guide and assert the globe renders with SSR",
-        "Assert the guide never names Cube-specific code or configuration as a requirement"
+        "Assert the guide never names a consumer application's code or configuration as a requirement"
       ],
       "status": "pending"
     },
@@ -7054,11 +7054,11 @@
       "id": "F536",
       "milestone": 15,
       "section": "Documentation and distribution",
-      "description": "A separate consumer project installs the packages from the private registry like any other dependency, and nothing in the engine refers to Cube.",
+      "description": "A separate consumer project installs the packages from the private registry like any other dependency, and nothing in the engine refers to a consumer application.",
       "steps": [
         "Install the published packages from the private registry into a fresh project with only registry credentials configured",
         "Assert the globe renders",
-        "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
+        "Search the repository's code, packages and documentation and assert no dependency on or reference to a consumer application"
       ],
       "status": "superseded"
     },
@@ -7066,11 +7066,11 @@
       "id": "F559",
       "milestone": 15,
       "section": "Documentation and distribution",
-      "description": "A separate consumer project installs the packages from the public npm registry like any other dependency, with no registry credentials, and nothing in the engine refers to Cube.",
+      "description": "A separate consumer project installs the packages from the public npm registry like any other dependency, with no registry credentials, and nothing in the engine refers to a consumer application.",
       "steps": [
         "Install the published packages from npm into a fresh project with no registry configuration or credentials",
         "Assert the globe renders",
-        "Search the repository's code, packages and documentation (excluding PLAN.md and integration examples naming Cube as a consumer) and assert no dependency on or reference to Cube code"
+        "Search the repository's code, packages and documentation and assert no dependency on or reference to a consumer application"
       ],
       "status": "pending"
     },
@@ -7694,7 +7694,7 @@
       "description": "One documented option turns on every online source of the Europe preset: `europeOpen(await withAllOnlineSources(options))` adds the national and regional orthophotos, each to its own deepest level, to the options given.",
       "steps": [
         "Unit-test that the options keep the ones given and add every orthophoto layer",
-        "Document it with Cube's options in the preset's guide"
+        "Document it with an application's options in the preset's guide"
       ],
       "status": "passing"
     },
@@ -8314,6 +8314,85 @@
         "Unit-test that the quality settings in effect have no `motionBlur`"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F696",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The engine depends only on service interfaces, and starts on any page in one call: `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })` of `vibeglobe` takes a `TileService` (required: its imagery layers and optionally a MapLibre style), a `TerrainService` and a `GeocoderService` (optional) with the engine's options, and sets up the renderer, the workers, navigation and the ready-made controls. Without a tile service it refuses to start; without terrain the surface is flat and without a geocoder the search box takes coordinates only, with no error.",
+      "steps": [
+        "Unit-test that `createVibeGlobe` refuses a missing tile service, passes the services' imagery and terrain to the engine, gives the search box the geocoder, draws a tile service's style, and stops everything when the style fails to load",
+        "Playwright test: a globe started with fixture tiles alone draws them on a flat surface with a search box for coordinates; with a terrain and a geocoder service it draws terrain and lists the geocoder's places; a style-only tile service draws its vector map"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F697",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "No engine package holds a provider: an application connects any provider, a paid or proprietary one included, by implementing the service interfaces with the generic adapters and a profile of the provider's terms. The optional `@vibeglobe/providers` holds ready implementations: `MapTilerTiles` and `MapTilerTerrain` (with the application's key), `EsriTiles`, `OpenFreeMapTiles`, `PhotonGeocoder`, and the OpenStreetMap sources, each with its credits and the loading features its terms forbid.",
+      "steps": [
+        "Unit-test each provider's requests (URL, key or token, tile size, levels), credits and profile, and Photon's query and results against a stubbed `fetch`",
+        "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
+        "Assert that no engine package exports a provider's adapter"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F698",
+      "milestone": 15,
+      "section": "Packaging and release",
+      "description": "VibeGlobe is published as one npm package, `vibeglobe`, holding the engine, the interfaces and the generic adapters under subpaths (`vibeglobe`, `vibeglobe/renderer`, `vibeglobe/vue`, …) and no provider; the optional `@vibeglobe/providers` is the only other package an application installs.",
+      "steps": [
+        "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider",
+        "Install the two tarballs in a project outside the repository and start a globe with `createVibeGlobe` and `MapTilerTiles` in Chromium"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F699",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The engine depends only on interfaces and starts on any page in one call: `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })` of `vibeglobe` takes a `TileService` (required: `{ imagery, style? }`, its raster layers and optionally a MapLibre style), a terrain (`TerrainSource`) and a `GeocoderService` (optional) with the engine's options, and sets up the renderer, the workers, navigation and the ready-made controls. Without a tile service it refuses to start; without terrain the surface is flat and without a geocoder the search box takes coordinates only, with no error.",
+      "steps": [
+        "Unit-test that `createVibeGlobe` refuses a missing tile service, passes the tiles and the terrain to the engine, gives the search box the geocoder, draws a tile service's style in the language asked, and stops everything when the style fails to load",
+        "Playwright test: a globe started with fixture tiles alone draws them on a flat surface with a search box for coordinates; with a terrain and a geocoder it draws terrain and lists the geocoder's places; a style-only tile service draws its vector map"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F700",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "No engine package holds a provider: an application connects any provider, a paid or proprietary one included, through the interfaces with the generic adapters and a profile of the provider's terms. The optional `@vibeglobe/providers` holds ready services as functions: `mapTilerTiles` and `mapTilerTerrain` (with the application's key), `esriTiles`, `openFreeMapTiles`, `photonGeocoder`, and the OpenStreetMap sources, each with its credits and the loading features its terms forbid.",
+      "steps": [
+        "Unit-test each provider's requests (URL, key or token, tile size, levels), credits and profile, and Photon's query and results against a stubbed `fetch`",
+        "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
+        "Assert that no engine package exports a provider's adapter"
+      ],
+      "status": "superseded"
+    },
+    {
+      "id": "F701",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The library ships no map and no provider: no published package holds a provider adapter, a ready service or a map's sources, and an application passes its own tiles, terrain and geocoder through the service interfaces and the generic sources. The Europe preset is the playground's own maps, outside the published packages.",
+      "steps": [
+        "Assert that no published package is a provider or preset package, and that no published package's code names a map or geocoding host",
+        "Start a globe with `createVibeGlobe` and fixture XYZ tiles of the application's own, with no other package"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F702",
+      "milestone": 15,
+      "section": "Packaging and release",
+      "description": "VibeGlobe is published as one npm package, `vibeglobe`, holding the engine, the interfaces and the generic adapters under subpaths (`vibeglobe`, `vibeglobe/renderer`, `vibeglobe/vue`, …), with no provider and no map: an application installs it alone.",
+      "steps": [
+        "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider or map",
+        "Install the tarball in a project outside the repository and start a globe with `createVibeGlobe` and fixture XYZ tiles in Chromium"
+      ],
+      "status": "failing"
     }
   ]
 }

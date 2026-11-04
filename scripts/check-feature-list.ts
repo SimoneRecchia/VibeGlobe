@@ -5,12 +5,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadFeatureList } from './feature-list.ts';
 import { featureListViolationsSince } from './checks/feature-list-history.ts';
-import { findPendingViolations, findSupersessionViolations } from './checks/feature-list-integrity.ts';
+import { findPendingViolations, findSupersessionViolations, redactedEntries } from './checks/feature-list-integrity.ts';
 import { ROOT_DIR } from './workspace.ts';
 
 const baseIndex = process.argv.indexOf('--base');
 const baseRevision = baseIndex === -1 ? 'HEAD' : (process.argv[baseIndex + 1] as string);
-const { compared, violations } = featureListViolationsSince(ROOT_DIR, baseRevision);
+const redacted = redactedEntries(readFileSync(join(ROOT_DIR, 'docs', 'internal', 'feature-redactions.md'), 'utf8'));
+const { compared, violations } = featureListViolationsSince(ROOT_DIR, baseRevision, redacted);
 const recordPath = join(ROOT_DIR, 'docs', 'internal', 'feature-changes.md');
 const record = existsSync(recordPath) ? readFileSync(recordPath, 'utf8') : '';
 const list = loadFeatureList();

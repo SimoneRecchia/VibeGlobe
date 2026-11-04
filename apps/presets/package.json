@@ -1,7 +1,8 @@
 {
   "name": "@vibeglobe/presets",
   "version": "0.1.0",
-  "description": "VibeGlobe presets: ready map types from free, redistributable sources (europeOpen).",
+  "private": true,
+  "description": "The playground's own maps: the Europe preset of free, redistributable sources (europeOpen). Not part of the published library (ADR 0187).",
   "license": "MPL-2.0",
   "type": "module",
   "sideEffects": false,
@@ -28,17 +29,6 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "src",
-    "LICENSE.md",
-    "!dist/tsconfig.tsbuildinfo",
-    "!src/**/*.test.ts",
-    "!src/**/__fixtures__",
-    "!src/**/__snapshots__",
-    "!src/**/fixtures/**/*.{json,txt,md,gz,tif,terrain}",
-    "!dist/**/__fixtures__"
-  ],
   "dependencies": {
     "@vibeglobe/core": "0.1.0",
     "@vibeglobe/sources": "0.1.0"

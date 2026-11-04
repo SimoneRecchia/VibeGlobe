@@ -28,6 +28,7 @@ function fileAt(rootDir: string, revision: string): string | undefined {
 export function featureListViolationsSince(
   rootDir: string,
   baseRevision: string,
+  redacted: ReadonlySet<string> = new Set(),
 ): { compared: string[]; violations: string[] } {
   try {
     git(rootDir, 'rev-parse', '--verify', '--quiet', `${baseRevision}^{commit}`);
@@ -42,7 +43,7 @@ export function featureListViolationsSince(
     const base = revision ? fileAt(rootDir, revision) : undefined;
     if (!revision || base === undefined) continue;
     compared.push(revision);
-    for (const violation of findFeatureListViolations(parseFeatureList(base), current)) {
+    for (const violation of findFeatureListViolations(parseFeatureList(base), current, redacted)) {
       violations.push(`feature_list.json vs ${revision.slice(0, 12)}: ${violation}`);
     }
   }

@@ -180,8 +180,6 @@ it(
       '## Provider profiles',
       "### Your own provider's profile",
       '### Commercial providers, from your own code',
-      '### OpenStreetMap public servers',
-      '### Self-hosted OpenStreetMap tiles',
       '## Keeping secrets out of URLs',
       '## Writing and testing a custom adapter',
     ])

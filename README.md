@@ -13,55 +13,40 @@ matching the version are in `node_modules/@vibeglobe/core/` (`llms.txt`, `docs/g
 ## The smallest globe
 
 ```ts
-import { createControls } from '@vibeglobe/controls';
-import { createGlobe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
 import { xyzImagery } from '@vibeglobe/sources';
-import { createWorkers } from '@vibeglobe/worker';
+import { createVibeGlobe } from 'vibeglobe';
 
-const controls = createControls();
-const globe = createGlobe({
-  container: document.getElementById('map') as HTMLElement,
-  renderer: createRenderer(),
-  controls,
-  baseImageryUrl: '/static/vibeglobe/fallback-base.jpg',
-  workers: createWorkers({ url: '/static/vibeglobe/vibeglobe-worker.js' }),
-  imagery: [
-    xyzImagery({
-      id: 'imagery',
-      url: 'https://tiles.example.com/imagery/{z}/{x}/{y}.jpg',
-      maxLevel: 14,
-      attribution: [{ text: 'Imagery © Example', url: 'https://example.com/terms' }],
-    }),
-  ],
+const { globe } = await createVibeGlobe(document.getElementById('map') as HTMLElement, {
+  tiles: { imagery: [xyzImagery({ id: 'imagery', url: 'https://tiles.example.com/{z}/{x}/{y}.jpg', maxLevel: 18 })] },
   view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 5 },
 });
-await globe.ready;
 ```
 
-The [integration guide](docs/guides/integration.md) explains each line, the assets to host, Vue, Nuxt and the Web
-Component. For ready map types of Europe and the world from free sources, use the
-[Europe preset](docs/guides/europe-preset.md) instead of listing sources by hand.
+VibeGlobe ships no map and no provider: it takes the application's services, a `TileService` (required), a terrain
+and a `GeocoderService` (optional), and turns off what a missing optional service would serve. Any provider, tiles of
+your own included, plugs in through the generic sources ([services guide](docs/guides/services.md)). The
+[integration guide](docs/guides/integration.md) assembles the engine piece by piece, with Vue, Nuxt and the Web
+Component.
 
 ## Packages
 
-| Package                    | What it does                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------ |
-| `@vibeglobe/core`          | `createGlobe`, camera, tiling, scheduling, cache, events, geodesy                    |
-| `@vibeglobe/renderer`      | The WebGPU and WebGL2 backends; glTF, vector tile and starfield renderers by subpath |
-| `@vibeglobe/worker`        | The worker pool that decodes tiles and models off the main thread                    |
-| `@vibeglobe/sources`       | Imagery, terrain, vector and 3D source adapters, provider profiles                   |
-| `@vibeglobe/controls`      | Mouse, touch, trackpad and keyboard navigation                                       |
-| `@vibeglobe/layers`        | Application data: markers, labels, lines, polygons, models, vector tile styles       |
-| `@vibeglobe/models`        | glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding                  |
-| `@vibeglobe/offline`       | Network modes, the browser tile cache, offline packages                              |
-| `@vibeglobe/presets`       | `europeOpen`: ready map types from free, redistributable sources                     |
-| `@vibeglobe/ui`            | Optional ready-made controls, themes and translations                                |
-| `@vibeglobe/gis`           | Coordinates, reference systems, measurement, view state, panel detection             |
-| `@vibeglobe/quality`       | Quality presets and the adaptive frame-time governor                                 |
-| `@vibeglobe/vue`           | Vue 3 components and composables, SSR-safe                                           |
-| `@vibeglobe/web-component` | The `<vibe-globe>` custom element                                                    |
-| `@vibeglobe/tools`         | Command-line data pipeline and offline package builder                               |
+| Package                    | What it does                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `vibeglobe`                | `createVibeGlobe`: the globe in one call with the application's services              |
+| `@vibeglobe/core`          | `createGlobe`, camera, tiling, scheduling, cache, events, geodesy, service interfaces |
+| `@vibeglobe/renderer`      | The WebGPU and WebGL2 backends; glTF, vector tile and starfield renderers by subpath  |
+| `@vibeglobe/worker`        | The worker pool that decodes tiles and models off the main thread                     |
+| `@vibeglobe/sources`       | Generic imagery, terrain, vector and 3D source adapters, provider profiles            |
+| `@vibeglobe/controls`      | Mouse, touch, trackpad and keyboard navigation                                        |
+| `@vibeglobe/layers`        | Application data: markers, labels, lines, polygons, models, vector tile styles        |
+| `@vibeglobe/models`        | glTF 2.0 and GLB parsing and validation, Draco and meshopt decoding                   |
+| `@vibeglobe/offline`       | Network modes, the browser tile cache, offline packages                               |
+| `@vibeglobe/ui`            | Optional ready-made controls, themes and translations                                 |
+| `@vibeglobe/gis`           | Coordinates, reference systems, measurement, view state, panel detection              |
+| `@vibeglobe/quality`       | Quality presets and the adaptive frame-time governor                                  |
+| `@vibeglobe/vue`           | Vue 3 components and composables, SSR-safe                                            |
+| `@vibeglobe/web-component` | The `<vibe-globe>` custom element                                                     |
+| `@vibeglobe/tools`         | Command-line data pipeline and offline package builder                                |
 
 Each package's README lists its entry points and pitfalls.
 

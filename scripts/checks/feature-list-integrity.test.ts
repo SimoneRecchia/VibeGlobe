@@ -4,6 +4,7 @@ import {
   findFeatureListViolations,
   findPendingViolations,
   findSupersessionViolations,
+  redactedEntries,
 } from './feature-list-integrity.ts';
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
@@ -60,6 +61,19 @@ describe('findFeatureListViolations', () => {
       'F001: description changed',
       'F002: steps changed',
       'F003: milestone changed',
+    ]);
+  });
+
+  it("accepts the owner's redaction of an entry's wording, and nothing else of it (ADR 0188)", () => {
+    const current = list(
+      feature('F001', { description: 'Behavior, redacted', steps: ['a'], milestone: 2 }),
+      feature('F002', { description: 'Reworded' }),
+      feature('F003', { milestone: 2 }),
+    );
+    const redacted = redactedEntries('| Entry | Date |\n| ----- | ---- |\n| F001  | 2026-11-04 |\n');
+    expect(findFeatureListViolations(base, current, redacted)).toEqual([
+      'F001: milestone changed',
+      'F002: description changed',
     ]);
   });
 

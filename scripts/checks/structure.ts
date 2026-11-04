@@ -51,7 +51,8 @@ export function findStructureViolations(packages: WorkspacePackage[]): string[] 
     const has = (file: string): boolean => pkg.files.includes(`${pkg.dir}/${file}`);
     const isLibrary = pkg.dir.startsWith('packages/');
     const folder = pkg.dir.split('/')[1] ?? '';
-    const expectedName = `@vibeglobe/${folder}`;
+    // The public entry is the unscoped `vibeglobe` (ADR 0186); every other package is `@vibeglobe/<folder>`.
+    const expectedName = folder === 'vibeglobe' ? 'vibeglobe' : `@vibeglobe/${folder}`;
     if (!has('package.json')) violations.push(`${pkg.dir}: missing package.json`);
     if (!has('CLAUDE.md')) violations.push(`${pkg.dir}: missing CLAUDE.md`);
     if (!pkg.files.some((file) => file.startsWith(`${pkg.dir}/src/`))) violations.push(`${pkg.dir}: missing src/`);

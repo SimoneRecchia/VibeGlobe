@@ -1,11 +1,11 @@
-// F616: the Europe preset guide (docs/guides/europe-preset.md) has a section for each use, the maximum online zoom per
+// F616: the Europe preset guide (apps/presets/europe-preset.md) has a section for each use, the maximum online zoom per
 // area and an example output of `estimate`, and every `ts` example type-checks against the packages' sources.
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
 
-const GUIDE = readFileSync('docs/guides/europe-preset.md', 'utf8');
+const GUIDE = readFileSync('apps/presets/europe-preset.md', 'utf8');
 const EXAMPLES = [...GUIDE.matchAll(/```ts\n([\s\S]*?)```/g)].map((match) => match[1] ?? '');
 /** The values the examples take from the application. */
 const PREAMBLE = [

@@ -1,7 +1,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import { requestingTarget } from '../layers/layer-geometry.js';
-import { extendGlobe, releaseExtensionPools, type ExtensionParts } from './render-extensions.js';
+import { extendGlobe, type ExtensionParts } from './render-extensions.js';
 import { addModel } from '../layers/models.js';
 import { Camera } from '../camera/camera.js';
 import { SurfaceCache } from '../surface/surface-cache.js';
@@ -135,7 +135,6 @@ class GlobeEngine implements Globe {
       frameView: () => this.frameView,
       surface: () => this.surfaceFrame,
       resolutionScale: () => this.resolutionScale,
-      workers: options.workers,
       report: (error) => (this.diag.logger.log('error', error.message), this.emitter.emit('error', error)),
     };
     const quality = new EngineQuality(parts, options);
@@ -459,7 +458,6 @@ class GlobeEngine implements Globe {
     this.surfaceFrame.destroy();
     this.surface?.clear();
     this.renderer?.destroy();
-    releaseExtensionPools(this.helpers.parts);
     this.captureWaits.end(new GlobeError('destroyed', 'The globe was destroyed'));
     this.emitter.clear();
   }

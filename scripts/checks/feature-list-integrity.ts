@@ -1,14 +1,20 @@
 import { FEATURE_STATUSES, type Feature, type FeatureList } from '../feature-list.ts';
 
 const FROZEN_FIELDS = ['milestone', 'section', 'description', 'steps'] as const;
+/** The fields an owner's redaction may reword (docs/internal/feature-redactions.md, ADR 0188). */
+const REDACTABLE_FIELDS: ReadonlySet<string> = new Set(['description', 'steps']);
 const KNOWN_FIELDS = new Set(['id', ...FROZEN_FIELDS, 'status']);
 
 /**
  * Lists the ways `current` breaks the feature-list rules relative to an earlier `base` version (ADR 0003):
  * entries are never deleted, reordered or reworded, only `status` changes (ADR 0016 adds `superseded`), and new entries
- * may be added.
+ * may be added. The entries in `redacted` may also have their wording changed, by the owner's decision (ADR 0188).
  */
-export function findFeatureListViolations(base: FeatureList, current: FeatureList): string[] {
+export function findFeatureListViolations(
+  base: FeatureList,
+  current: FeatureList,
+  redacted: ReadonlySet<string> = new Set(),
+): string[] {
   const violations: string[] = [];
   const currentById = new Map<string, Feature>();
   for (const feature of current.features) {
@@ -34,6 +40,7 @@ export function findFeatureListViolations(base: FeatureList, current: FeatureLis
       continue;
     }
     for (const field of FROZEN_FIELDS) {
+      if (redacted.has(baseFeature.id) && REDACTABLE_FIELDS.has(field)) continue;
       if (JSON.stringify(feature[field]) !== JSON.stringify(baseFeature[field])) {
         violations.push(`${baseFeature.id}: ${field} changed`);
       }
@@ -101,4 +108,9 @@ export function findPendingViolations(current: FeatureList, openQuestions: strin
     if (status !== 'pending') violations.push(`${id}: listed ${where} but its status is "${status ?? 'missing'}"`);
   }
   return violations;
+}
+
+/** The entries whose wording the owner redacted: the ids in the rows of docs/internal/feature-redactions.md. */
+export function redactedEntries(record: string): Set<string> {
+  return new Set([...record.matchAll(/^\|\s*(F\d+)\s*\|/gm)].map((match) => match[1] as string));
 }

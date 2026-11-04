@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
 import { CHANGELOG_HEADER, addEntry, changelogEntry, writeChangelog, type Commit } from './changelog.ts';
-import { candidateFiles, cubeReferences } from './check-cube.ts';
+import { consumerReferences, trackedTextFiles } from './check-consumer-names.ts';
 import { bumpManifest, distTag, publishOrder, publishRefusal } from './release.ts';
 
 const commit = (subject: string, body = ''): Commit => ({ hash: 'abc1234def', subject, body });
@@ -121,14 +122,17 @@ describe('release (F558)', () => {
   });
 });
 
-describe('Cube search (F559)', () => {
+describe('consumer name search (F559)', () => {
+  // Stand-in consumers: the real names are kept only as hashes (ADR 0188).
+  const names = new Set(['Acme', 'acmeco'].map((name) => createHash('sha256').update(name).digest('hex')));
+
   it('reads tracked files larger than 1 MB that may name the consumer (KB-197)', () => {
-    const repo = mkdtempSync(join(tmpdir(), 'vibeglobe-cube-'));
+    const repo = mkdtempSync(join(tmpdir(), 'vibeglobe-consumer-'));
     try {
-      writeFileSync(join(repo, 'results.json'), `${'x'.repeat(2_000_000)}\n"title": "Cube"\n`);
+      writeFileSync(join(repo, 'results.json'), `${'x'.repeat(2_000_000)}\n"title": "Acme"\n`);
       execFileSync('git', ['init', '-q'], { cwd: repo });
       execFileSync('git', ['add', 'results.json'], { cwd: repo });
-      expect(cubeReferences(candidateFiles(repo))).toEqual(['results.json:2: "title": "Cube"']);
+      expect(consumerReferences(trackedTextFiles(repo), names)).toEqual(['results.json:2']);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -136,15 +140,10 @@ describe('Cube search (F559)', () => {
 
   it('finds the consumer named in code or documentation, but not cube maps or test models', () => {
     const files = new Map([
-      ['docs/guides/x.md', 'Consumers such as Cube serve assets.\ncube maps and MeshoptCubeTest.glb'],
-      ['packages/core/src/a.ts', "import cube from '@vireox/cube';"],
-      ['PLAN.md', 'The first consumer is Vireox Cube.'],
-      ['docs/guides/integration.md', 'Integrating into Cube'],
+      ['docs/guides/x.md', 'Consumers such as Acme serve assets.\nAcme maps and MeshoptAcmeTest.glb'],
+      ['packages/core/src/a.ts', "import portal from '@acmeco/portal';"],
+      ['PLAN.md', 'The first consumer is Acme.'],
     ]);
-    expect(cubeReferences(files)).toEqual([
-      'docs/guides/x.md:1: Consumers such as Cube serve assets.',
-      "packages/core/src/a.ts:1: import cube from '@vireox/cube';",
-      'docs/guides/integration.md:1: Integrating into Cube',
-    ]);
+    expect(consumerReferences(files, names)).toEqual(['docs/guides/x.md:1', 'packages/core/src/a.ts:1', 'PLAN.md:1']);
   });
 });

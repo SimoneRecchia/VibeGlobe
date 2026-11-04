@@ -2,7 +2,7 @@
 
 Every dataset the `vibeglobe-data` pipeline of `@vibeglobe/tools` builds with its shipped configurations, and the optional fresher Sentinel-2 mosaic: its license, the exact attribution its outputs carry, its source and the day its terms were read. Every output carries the same fields in its metadata (`metadata.json`, the PMTiles metadata, the MBTiles metadata table).
 
-The application hosts these outputs itself and shows each attribution wherever the data is displayed. The online sources of the Europe preset are not pipeline outputs: `europeOpen(…).sources` lists them with their terms ([Europe preset](guides/europe-preset.md)).
+The application hosts these outputs itself and shows each attribution wherever the data is displayed. Online sources are not pipeline outputs: the application that adds them keeps to their terms.
 
 ## Default datasets
 

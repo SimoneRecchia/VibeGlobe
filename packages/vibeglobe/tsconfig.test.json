@@ -4,16 +4,9 @@
     "composite": true,
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"],
+    "types": [],
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo"
   },
   "include": ["src"],
-  "references": [
-    {
-      "path": "../core"
-    },
-    {
-      "path": "../sources"
-    }
-  ]
+  "references": [{ "path": "." }]
 }

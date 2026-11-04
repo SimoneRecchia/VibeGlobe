@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { WorkspacePackage } from '../workspace.ts';
 import { importSpecifiers, packageNameOf } from '../workspace.ts';
@@ -137,17 +138,19 @@ describe('findDependencyViolations', () => {
         manifest: {
           name: '@vibeglobe/web-component',
           type: 'module',
-          dependencies: { react: '19.0.0', '@vireox/cube': '1.0.0' },
+          dependencies: { react: '19.0.0', '@acmeco/portal': '1.0.0' },
         },
       }),
     ];
-    expect(findDependencyViolations(workspace)).toEqual([
+    // A stand-in consumer: the real names are kept only as hashes (ADR 0188).
+    const consumers = new Set([createHash('sha256').update('acmeco').digest('hex')]);
+    expect(findDependencyViolations(workspace, consumers)).toEqual([
       'packages/core/src/a.ts: "three" may only be used inside packages/renderer',
       'packages/core/src/a.ts: framework "vue" is only allowed in its adapter package',
       'packages/core/package.json: core must have no runtime dependencies ("lodash")',
       'packages/core/src/a.ts: core must not import "vue" at runtime',
       'packages/core/src/a.ts: core must not import "three" at runtime',
-      'packages/web-component/package.json: "@vireox/cube" refers to a consumer application; the engine must not depend on it',
+      'packages/web-component/package.json: "@acmeco/portal" refers to a consumer application; the engine must not depend on it',
       'packages/web-component/package.json: framework "react" is only allowed in its adapter package',
     ]);
   });

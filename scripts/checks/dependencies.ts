@@ -1,7 +1,7 @@
+import { isConsumerPackage, PACKAGE_HASHES } from '../release/check-consumer-names.ts';
 import { importSpecifiers, packageNameOf, type WorkspacePackage } from '../workspace.ts';
 
 const FRAMEWORK_PACKAGE = /^(vue|nuxt|react|react-dom|preact|svelte|solid-js|@vue\/.*|@nuxt\/.*|@angular\/.*)$/;
-const CONSUMER_PACKAGE = /cube|vireox/i;
 /** The only framework a package may use, by package directory. */
 const ALLOWED_FRAMEWORKS: Record<string, string[]> = {
   'packages/vue': ['vue', '@vue/*'],
@@ -22,7 +22,10 @@ function allowedFramework(dir: string, name: string): boolean {
  * Architecture dependency rules (docs/internal/plan/architecture.md §1): no framework outside its adapter, nothing depends on
  * the consumer application, the rendering library only inside the renderer, and core has no runtime dependencies.
  */
-export function findDependencyViolations(packages: WorkspacePackage[]): string[] {
+export function findDependencyViolations(
+  packages: WorkspacePackage[],
+  consumers: ReadonlySet<string> = PACKAGE_HASHES,
+): string[] {
   const violations: string[] = [];
   for (const pkg of packages) {
     const declared = {
@@ -42,7 +45,7 @@ export function findDependencyViolations(packages: WorkspacePackage[]): string[]
       const where = used.get(name) ?? `${pkg.dir}/package.json`;
       if (FRAMEWORK_PACKAGE.test(name) && !allowedFramework(pkg.dir, name))
         violations.push(`${where}: framework "${name}" is only allowed in its adapter package`);
-      if (CONSUMER_PACKAGE.test(name))
+      if (isConsumerPackage(name, consumers))
         violations.push(`${where}: "${name}" refers to a consumer application; the engine must not depend on it`);
       if (name === RENDERING_LIBRARY && pkg.dir !== RENDERER_DIR && pkg.dir.startsWith('packages/')) {
         violations.push(`${where}: "${name}" may only be used inside ${RENDERER_DIR}`);

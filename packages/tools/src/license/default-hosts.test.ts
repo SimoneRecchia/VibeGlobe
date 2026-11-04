@@ -4,13 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * F344: the engine's default configuration and its built bundles reference no paid or restricted service. Optional
- * adapters for such services (provider profiles, added in M7) live in files named `*-provider*` and are allowed to.
+ * F344: the engine's default configuration and its built bundles reference no paid or restricted service: the library
+ * ships no provider and no map (ADR 0187).
  */
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const RESTRICTED =
   /\b[\w.-]*(google(apis)?\.com|gstatic\.com|mapbox\.com|maptiler\.com|cesium\.com|apple\.com|arcgisonline\.com|arcgis\.com|virtualearth\.net|here\.com|hereapi\.com|tomtom\.com|tile\.openstreetmap\.org)\b/gi;
-const OPTIONAL_ADAPTER = /-provider/;
 
 function files(dir: string, extensions: RegExp): string[] {
   if (!existsSync(dir)) return [];
@@ -21,7 +20,7 @@ function files(dir: string, extensions: RegExp): string[] {
   });
 }
 
-/** The engine's shipped code: each package's build when present, else its sources (the tools CLI is not shipped). */
+/** The engine's shipped code: each package's build when present, else its sources (not the tools CLI). */
 function engineCode(): string[] {
   return readdirSync(join(ROOT, 'packages'))
     .filter((name) => name !== 'tools')
@@ -32,11 +31,9 @@ function engineCode(): string[] {
 }
 
 function hits(paths: string[]): string[] {
-  return paths
-    .filter((path) => !OPTIONAL_ADAPTER.test(path))
-    .flatMap((path) =>
-      [...readFileSync(path, 'utf8').matchAll(RESTRICTED)].map((m) => `${path.slice(ROOT.length)}: ${m[0]}`),
-    );
+  return paths.flatMap((path) =>
+    [...readFileSync(path, 'utf8').matchAll(RESTRICTED)].map((m) => `${path.slice(ROOT.length)}: ${m[0]}`),
+  );
 }
 
 describe('default configuration and bundles', () => {

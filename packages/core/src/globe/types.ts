@@ -819,7 +819,7 @@ export interface Globe {
   surfaceTiles(): SurfaceTileInfo[];
   /** Diagnostics: counters of the last drawn frame's surface selection. */
   surfaceStats(): SurfaceStats;
-  /** Counters of the imagery streaming; undefined without imagery layers or before the renderer starts. */
+  /** Counters of the imagery streaming; undefined without workers or before the renderer starts. */
   imageryStats(): ImageryStats | undefined;
   /** Counters of the terrain streaming; undefined without terrain or before the renderer starts (F134). */
   terrainStats(): TerrainStats | undefined;

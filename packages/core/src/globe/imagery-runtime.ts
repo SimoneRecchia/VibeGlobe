@@ -393,6 +393,11 @@ export class ImageryRuntime {
     this.lease.pool.update();
   }
 
+  /** True without layers or terrain: a globe with workers alone runs only its pools (KB-343). */
+  get empty(): boolean {
+    return this.layers.length === 0 && !this.terrain;
+  }
+
   /** Terrain tiles uploaded so far (0 without terrain), without allocating: it is read every frame. */
   terrainUploads(): number {
     return this.terrain?.loader.uploadedCount ?? 0;

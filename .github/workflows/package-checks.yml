@@ -1,14 +1,9 @@
 name: Package checks
 
-# The single package's checks, on pull requests that change what is packed or how (ADR 0189, ADR 0190): the tarball
+# The single package's checks, started by hand (ADR 0189, ADR 0190, ADR 0193): the tarball
 # (F519, F530), the consumer projects installed from it (F503, F531, F702, F703) and the consumer name search (F559).
 on:
-  pull_request:
-    paths:
-      - 'scripts/release/**'
-      - 'examples/**'
-      - '.github/workflows/package-checks.yml'
-      - 'packages/*/package.json'
+  workflow_dispatch:
 
 permissions:
   contents: read

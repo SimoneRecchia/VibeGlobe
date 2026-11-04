@@ -8497,10 +8497,10 @@
       "id": "F711",
       "milestone": 1,
       "section": "Testing and verification",
-      "description": "CI runs only on pull requests and when started by hand, never on a push or a merge to main nor on a schedule: every pull request runs one fast job with the type check, lint, format check, repository checks and guards, the unit tests its changes reach, the license audit, the API documentation build and the bundle-size checks; a manual run adds the whole unit suite with coverage, the end-to-end tests, the isolated measurements, Firefox and WebKit and the recorded benchmarks.",
+      "description": "CI runs only on pull requests and when started by hand, never on a push or a merge to main nor on a schedule: every pull request runs one job, the only workflow on pull requests, with the build and its type check and the unit tests its changes reach; a manual run adds the whole unit suite with coverage, the end-to-end tests, the isolated measurements, Firefox and WebKit and the recorded benchmarks. Lint, format, the repository checks and the other gates run locally.",
       "steps": [
-        "Unit-test that the CI workflow triggers on pull requests and by hand only, and that no workflow has a schedule or a push trigger for main",
-        "Open a pull request and confirm its run contains only the fast job and every listed check runs",
+        "Unit-test that the CI workflow triggers on pull requests and by hand only, that no other workflow runs on pull requests, and that no workflow has a schedule or a push trigger for main",
+        "Open a pull request and confirm its run contains only the fast job, with the build, the type check and the changed code's unit tests",
         "Merge it and confirm no workflow starts on main",
         "Start the CI workflow by hand and confirm it contains the fast, end-to-end, measurement, cross-browser and benchmark jobs"
       ],

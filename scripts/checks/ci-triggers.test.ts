@@ -9,8 +9,10 @@ const WORKFLOWS = join(ROOT_DIR, '.github/workflows');
 const workflow = (name: string): string => readFileSync(join(WORKFLOWS, name), 'utf8');
 
 describe('workflow triggers (F711)', () => {
-  it('runs CI on pull requests and by hand only', () => {
+  it('runs CI on pull requests and by hand only, and no other workflow on pull requests', () => {
     expect(workflow('ci.yml')).toMatch(/^on:\n {2}pull_request:\n {2}workflow_dispatch:\n\n/m);
+    const others = readdirSync(WORKFLOWS).filter((name) => name !== 'ci.yml');
+    for (const name of others) expect(workflow(name), name).not.toMatch(/^ {2}pull_request:/m);
   });
 
   it('starts nothing on main: no schedule, and a push trigger only for other branches', () => {

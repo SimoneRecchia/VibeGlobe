@@ -12,16 +12,19 @@ push (so twice for a pull request's branch), on every push to `main` with the fu
 
 ## Decision
 
-- `ci.yml` triggers on `pull_request` and `workflow_dispatch` only. A pull request runs the fast job (every non-browser
-  check, the unit tests its changes reach); a manual run adds the whole unit suite with coverage, the sixteen
-  end-to-end shards, the isolated measurements, Firefox and WebKit and the benchmarks.
+- `ci.yml` triggers on `pull_request` and `workflow_dispatch` only, and is the only workflow on pull requests. A pull
+  request runs one job: the build with its type check (`tsc -b`) and the unit tests its changes reach. A manual run adds
+  the whole unit suite with coverage, the sixteen end-to-end shards, the isolated measurements, Firefox and WebKit and
+  the benchmarks.
+- Lint, format, the repository checks, dead code, the feature and test guards, the licenses, the API documentation, the
+  bundle sizes and the package checks leave the pull requests: they run locally (`npm run verify`), and
+  `package-checks.yml` by hand.
 - No workflow has a schedule; `visual-baselines.yml` keeps its push trigger on the request file for branches other
-  than `main`. `package-checks.yml` runs on pull requests, `release.yml` on a published GitHub release (ADR 0192).
-- The fast job compares the feature list and the tests with the pull request's base.
+  than `main`; `release.yml` runs on a published GitHub release (ADR 0192).
 - `scripts/checks/ci-triggers.test.ts` keeps it so.
 
 ## Consequences
 
-- One run per pull request update instead of two, and none after the merge.
+- One short run per pull request update instead of two long ones, and none after the merge.
 - The full matrix runs only when started by hand: run the affected end-to-end specs locally before opening or updating
   a pull request, and start a manual run for long suites.

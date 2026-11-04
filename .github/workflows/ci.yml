@@ -1,8 +1,8 @@
 name: CI
 
 # Runs only on pull requests and when started by hand (owner, 2026-11-04, ADR 0193): nothing on a push or a merge to
-# main, nor on a schedule. A pull request runs one job with every fast check, the unit tests its changes reach and
-# cached builds (ADR 0015). A manual run (workflow_dispatch) adds the end-to-end suite in sixteen shards, the isolated
+# main, nor on a schedule. A pull request runs one job: the build with its type check and the unit tests its changes
+# reach, on cached builds. Lint, format, the repository checks and the other gates run locally (`npm run verify`). A manual run (workflow_dispatch) adds the end-to-end suite in sixteen shards, the isolated
 # measurements, Firefox and WebKit, and the recorded benchmarks. Each browser job runs alone on its runner (ADR 0022),
 # inside Playwright's image, on one build made once per run (ADR 0035).
 on:
@@ -38,24 +38,8 @@ jobs:
             node_modules/.cache
           key: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      - name: Type check
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Format check
-        run: npm run format:check
-      - name: Repository checks
-        run: npm run check
-      - name: Dead code
-        run: npm run deadcode
-      - name: Feature list and test guards against the previous state
-        run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            base=$(git merge-base origin/main HEAD)
-          fi
-          npm run check:features -- --base "$base"
-          npm run check:tests -- --base "$base"
+      - name: Build and type check
+        run: npx tsc -b
       # Pull requests run the tests of what they change (Vitest follows the import graph); a manual run runs the whole
       # suite with its coverage minima.
       - name: Unit tests of the changed code (pull requests)
@@ -64,20 +48,6 @@ jobs:
       - name: Unit tests with coverage
         if: github.event_name != 'pull_request'
         run: npm run coverage
-      - name: License audit
-        run: npm run licenses
-      - name: Third-party notices up to date
-        run: npm run notices -- --check
-      - name: API documentation
-        run: npm run docs
-      - name: Build
-        run: npm run build
-      - name: Consumer check
-        run: npm run check:consumer
-      - name: Bundle size
-        run: npm run size
-      - name: Tree shaking
-        run: npm run treeshake
 
   build:
     # ADR 0035: one build per run, handed to every browser job as an artifact instead of a build in each.

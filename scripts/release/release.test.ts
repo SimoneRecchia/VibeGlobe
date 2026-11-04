@@ -5,71 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROOT_DIR } from '../workspace.ts';
-import { CHANGELOG_HEADER, addEntry, changelogEntry, writeChangelog, type Commit } from './changelog.ts';
 import { consumerReferences, trackedTextFiles } from './check-consumer-names.ts';
-import { bumpManifest, distTag, publishRefusal } from './release.ts';
+import { distTag, publishRefusal } from './release.ts';
 
-const commit = (subject: string, body = ''): Commit => ({ hash: 'abc1234def', subject, body });
-
-describe('changelog (F526)', () => {
-  it('sorts the commits of a release into categories and marks breaking changes first', () => {
-    const entry = changelogEntry('1.1.0', '2026-11-02', [
-      commit('feat(core)!: rename GlobeOptions.view'),
-      commit('fix: tiles stay black after a context loss'),
-      commit('F503: lazily loaded optional modules'),
-      commit('Engine: KB-133 boxed doubles in elevation queries'),
-      commit('perf: fewer allocations per frame'),
-      commit('docs: hosting guide'),
-      commit('Renderer: new sampler', 'BREAKING CHANGE: the sampler option is gone'),
-      commit("Merge branch 'main' into feature"),
-    ]);
-    expect(entry).toBe(
-      [
-        '## 1.1.0 (2026-11-02)\n',
-        '### Breaking changes\n',
-        '- **Breaking:** rename GlobeOptions.view (abc1234)',
-        '- **Breaking:** Renderer: new sampler (abc1234)\n',
-        '### Features\n',
-        '- **Breaking:** rename GlobeOptions.view (abc1234)',
-        '- F503: lazily loaded optional modules (abc1234)\n',
-        '### Bug fixes\n',
-        '- tiles stay black after a context loss (abc1234)',
-        '- Engine: KB-133 boxed doubles in elevation queries (abc1234)\n',
-        '### Performance\n',
-        '- fewer allocations per frame (abc1234)\n',
-        '### Documentation\n',
-        '- hosting guide (abc1234)\n',
-        '### Other changes\n',
-        '- **Breaking:** Renderer: new sampler (abc1234)\n',
-      ].join('\n'),
-    );
-  });
-
-  it('reads a history of more than 1 MB of commit messages before the first release (KB-191)', () => {
-    const repo = mkdtempSync(join(tmpdir(), 'vibeglobe-changelog-'));
-    try {
-      const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
-      git('init', '-q');
-      const message = join(repo, '.message');
-      writeFileSync(message, `feat: a long one\n\n${'x'.repeat(1_200_000)}\n`);
-      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-F', message);
-      const entry = writeChangelog('0.0.1', '2026-10-25', repo);
-      expect(entry).toContain('a long one');
-    } finally {
-      rmSync(repo, { recursive: true, force: true });
-    }
-  });
-
-  it('keeps one entry per released version, newest first, and refuses a version twice', () => {
-    const first = addEntry('', '1.0.0', changelogEntry('1.0.0', '2026-11-01', [commit('feat: globe')]));
-    const second = addEntry(first, '1.1.0', changelogEntry('1.1.0', '2026-11-02', [commit('fix: tiles')]));
-    expect(second.startsWith(CHANGELOG_HEADER)).toBe(true);
-    expect(second.indexOf('## 1.1.0 (2026-11-02)')).toBeLessThan(second.indexOf('## 1.0.0 (2026-11-01)'));
-    expect(() => addEntry(second, '1.0.0', '## 1.0.0 (x)\n')).toThrow(/already has an entry/);
-  });
-});
-
-describe('release (F558)', () => {
+describe('release (F708)', () => {
   const ci = {
     CI: 'true',
     GITHUB_ACTIONS: 'true',
@@ -88,33 +27,20 @@ describe('release (F558)', () => {
     expect(publishRefusal({ ...ci, NODE_AUTH_TOKEN: '' })).toMatch(/NPM_TOKEN/);
   });
 
-  it('gives every package the version and pins engine dependencies', () => {
-    const renderer = {
-      devDependencies: { '@vibeglobe/sources': '0.0.0' },
-      name: '@vibeglobe/renderer',
-      version: '0.0.0',
-      dependencies: { '@vibeglobe/core': '0.0.0', three: '0.186.1' },
-    };
-    expect(bumpManifest(renderer, '1.0.0-rc.1').devDependencies).toEqual({ '@vibeglobe/sources': '1.0.0-rc.1' });
-    expect(bumpManifest(renderer, '1.0.0-rc.1').dependencies).toEqual({
-      '@vibeglobe/core': '1.0.0-rc.1',
-      three: '0.186.1',
-    });
+  it('sends a pre-release to the next dist-tag and a release to latest', () => {
     expect(distTag('1.0.0-rc.1')).toBe('next');
     expect(distTag('1.0.0')).toBe('latest');
   });
 
   it('holds publishing for the owner: the publish job runs in the approval environment with the npm secret', () => {
     const workflow = readFileSync(join(ROOT_DIR, '.github/workflows/release.yml'), 'utf8');
-    const publishJob = workflow.slice(workflow.indexOf('\n  publish:'), workflow.indexOf('\n  post-release:'));
-    expect(publishJob).toMatch(/needs: dry-run/);
-    expect(publishJob).toMatch(/environment: npm-release/);
-    expect(publishJob).toMatch(/github\.ref == 'refs\/heads\/main'/);
-    expect(publishJob).toMatch(/NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
-    // The token appears nowhere else, and only the publish job runs the release with --publish.
+    // Started by hand only, one job: in the environment that holds the token, it builds, packs and publishes.
+    expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:/m);
+    expect(workflow.match(/^ {2}[a-z-]+:$/gm)).toEqual(['  publish:']);
+    expect(workflow).toMatch(/environment: npm-release/);
+    expect(workflow).toMatch(/NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
     expect(workflow.match(/secrets\.NPM_TOKEN/g)).toHaveLength(1);
-    expect(workflow.match(/--publish/g)).toHaveLength(1);
-    expect(publishJob).toMatch(/--publish/);
+    expect(workflow.match(/scripts\/release\/release\.ts/g)).toHaveLength(1);
   });
 });
 

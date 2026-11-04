@@ -75,7 +75,7 @@ function thirdPartyDependencies(
 }
 
 /** Writes the single package into `stage`: the engine packages' published files, the guides and the manifest. */
-function stagePackage(root: string, stage: string): void {
+function stagePackage(root: string, stage: string, release: string | undefined): void {
   const packages = enginePackages(root);
   const entry = packages.find((pkg) => pkg.manifest.name === ENTRY);
   if (!entry) throw new Error(`no ${ENTRY} package in packages/`);
@@ -102,7 +102,8 @@ function stagePackage(root: string, stage: string): void {
   }
   for (const path of ['docs/guides', 'docs/data-licenses.md', 'llms.txt'])
     cpSync(join(root, path), join(stage, path), { recursive: true });
-  const { name, version, description, license, type, sideEffects, types } = entry.manifest;
+  const { name, description, license, type, sideEffects, types } = entry.manifest;
+  const version = release ?? entry.manifest.version;
   const dependencies = thirdPartyDependencies(packages.map((pkg) => pkg.manifest));
   const peers = { peerDependencies: { vue: '^3.5.0' }, peerDependenciesMeta: { vue: { optional: true } } };
   const manifest = {
@@ -124,14 +125,15 @@ function stagePackage(root: string, stage: string): void {
 /**
  * Packs VibeGlobe as one npm package into `outDir` (the engine packages' `dist/` must be built): `vibeglobe` at the
  * root, every other engine package under its folder (`vibeglobe/core`, `vibeglobe/layers/vector-tiles`, …), with the
- * guides and `llms.txt`, and no import that leaves the package (ADR 0189, F702).
+ * guides and `llms.txt`, and no import that leaves the package (ADR 0189, F702). `version`, when given, is the one
+ * written in the package, else the facade's.
  */
-export function packAll(outDir: string = TARBALL_DIR, root: string = ROOT_DIR): PackedPackage[] {
+export function packAll(outDir: string = TARBALL_DIR, root: string = ROOT_DIR, version?: string): PackedPackage[] {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
   const stage = join(root, '.release/package');
   rmSync(stage, { recursive: true, force: true });
-  stagePackage(root, stage);
+  stagePackage(root, stage, version);
   const args = ['pack', stage, '--json', '--ignore-scripts', '--pack-destination', outDir];
   const output = execFileSync('npm', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
   const packed = JSON.parse(output) as { name: string; version: string; filename: string }[];

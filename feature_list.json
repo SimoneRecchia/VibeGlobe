@@ -6914,7 +6914,7 @@
         "Assert CHANGELOG.md has an entry for each released version with categorized changes",
         "Assert breaking changes are marked"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F527",
@@ -8417,7 +8417,7 @@
         "Assert publishing happens only from CI with the npm token stored as a CI secret",
         "Assert the workflow publishes only after the owner has approved the release"
       ],
-      "status": "pending"
+      "status": "superseded"
     },
     {
       "id": "F705",
@@ -8454,6 +8454,18 @@
         "Run the release workflow for 1.0.0",
         "Assert `vibeglobe` is available at version 1.0.0 on the public npm registry with the MPL-2.0 license",
         "Install 1.0.0 into a fresh consumer project and assert the globe renders"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "F708",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "The Release workflow, started by hand on main with a version, builds the engine, packs `vibeglobe` at that version and publishes it to the public npm registry with the npm token kept as a secret of the `npm-release` environment, and does nothing else: no changelog, commit or tag.",
+      "steps": [
+        "Unit-test that the release script publishes only from the release workflow on main in CI with the token, and sends pre-releases to the next dist-tag",
+        "Assert the workflow is started by hand and has one job, in the `npm-release` environment with the NPM_TOKEN secret, that runs the release script",
+        "Run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry"
       ],
       "status": "pending"
     }

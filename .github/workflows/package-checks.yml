@@ -1,0 +1,38 @@
+name: Package checks
+
+# The single package's checks, on pull requests that change what is packed or how (ADR 0189, ADR 0190): the tarball
+# (F519, F530), the consumer projects installed from it (F503, F531, F702, F703) and the consumer name search (F559).
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/**'
+      - 'examples/**'
+      - '.github/workflows/package-checks.yml'
+      - 'packages/*/package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Package checks
+    runs-on: ubuntu-latest
+    # Playwright's image for the pinned Playwright version runs the consumer projects' browser checks (ADR 0035).
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    env:
+      CI: true
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v7
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npx tsc -b && npm run build:browser -w @vibeglobe/web-component
+      - name: The tarball (F519, F530)
+        run: node scripts/release/check-tarballs.ts
+      - name: Consumer projects from the tarball (F503, F531, F702, F703)
+        run: node scripts/release/check-consumers.ts F503 F531 F702 F703
+      - name: No consumer named (F559)
+        run: node scripts/release/check-consumer-names.ts

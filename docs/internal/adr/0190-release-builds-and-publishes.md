@@ -1,6 +1,6 @@
 # 0190. The release only builds the package and publishes it
 
-- Status: Accepted
+- Status: Accepted (partly superseded by [ADR 0191](0191-npm-trusted-publishing.md): no token, npm's trusted publishing)
 - Date: 2026-11-04
 - Milestone: M15 (F708; partly supersedes ADR 0171)
 

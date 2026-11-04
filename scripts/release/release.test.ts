@@ -8,23 +8,23 @@ import { ROOT_DIR } from '../workspace.ts';
 import { consumerReferences, trackedTextFiles } from './check-consumer-names.ts';
 import { distTag, publishRefusal } from './release.ts';
 
-describe('release (F708)', () => {
+describe('release (F709)', () => {
   const ci = {
     CI: 'true',
     GITHUB_ACTIONS: 'true',
     GITHUB_REF: 'refs/heads/main',
     GITHUB_WORKFLOW_REF: 'SimoneRecchia/VibeGlobe/.github/workflows/release.yml@refs/heads/main',
-    NODE_AUTH_TOKEN: 'from-the-secret',
+    ACTIONS_ID_TOKEN_REQUEST_URL: 'https://token.actions.example/',
   };
 
-  it('publishes only from the release workflow on main in CI, with the token from the CI secret', () => {
+  it('publishes only from the release workflow on main in CI, with its OIDC identity', () => {
     expect(publishRefusal(ci)).toBeUndefined();
     expect(publishRefusal({ ...ci, CI: undefined, GITHUB_ACTIONS: undefined })).toMatch(/only from CI/);
     expect(publishRefusal({ ...ci, GITHUB_REF: 'refs/heads/feature' })).toMatch(/from main/);
     expect(publishRefusal({ ...ci, GITHUB_WORKFLOW_REF: 'x/.github/workflows/ci.yml@refs/heads/main' })).toMatch(
       /release\.yml/,
     );
-    expect(publishRefusal({ ...ci, NODE_AUTH_TOKEN: '' })).toMatch(/NPM_TOKEN/);
+    expect(publishRefusal({ ...ci, ACTIONS_ID_TOKEN_REQUEST_URL: undefined })).toMatch(/id-token: write/);
   });
 
   it('sends a pre-release to the next dist-tag and a release to latest', () => {
@@ -32,14 +32,16 @@ describe('release (F708)', () => {
     expect(distTag('1.0.0')).toBe('latest');
   });
 
-  it('holds publishing for the owner: the publish job runs in the approval environment with the npm secret', () => {
+  it('publishes with no token: one job in the approval environment, with an OIDC identity and npm 11.5.1 or later', () => {
     const workflow = readFileSync(join(ROOT_DIR, '.github/workflows/release.yml'), 'utf8');
-    // Started by hand only, one job: in the environment that holds the token, it builds, packs and publishes.
+    // Started by hand only, one job: in the approval environment, with the OIDC identity npm trusts and no token.
     expect(workflow).toMatch(/^on:\n {2}workflow_dispatch:/m);
     expect(workflow.match(/^ {2}[a-z-]+:$/gm)).toEqual(['  publish:']);
     expect(workflow).toMatch(/environment: npm-release/);
-    expect(workflow).toMatch(/NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
-    expect(workflow.match(/secrets\.NPM_TOKEN/g)).toHaveLength(1);
+    expect(workflow).toMatch(/^ {2}id-token: write$/m);
+    expect(workflow).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN|secrets\./);
+    const npm = /npm install --global npm@(\d+)\.(\d+)\.(\d+)/.exec(workflow);
+    expect(Number(npm?.[1]) * 1000 + Number(npm?.[2])).toBeGreaterThanOrEqual(11005);
     expect(workflow.match(/scripts\/release\/release\.ts/g)).toHaveLength(1);
   });
 });

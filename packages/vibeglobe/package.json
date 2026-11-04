@@ -3,6 +3,10 @@
   "version": "0.2.0",
   "description": "VibeGlobe: a 3D globe and 2D map engine for the web, started in one call with the application's tile, terrain and geocoder services.",
   "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimoneRecchia/VibeGlobe.git"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {

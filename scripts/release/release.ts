@@ -1,5 +1,6 @@
-// The release (F708, ADR 0190): builds the engine, packs `vibeglobe` at the version given and publishes it to the
-// public npm registry, nothing else. Only in the release workflow on main, with the npm token of its environment.
+// The release (F709, ADR 0190, ADR 0191): builds the engine, packs `vibeglobe` at the version given and publishes it to
+// the public npm registry through npm's trusted publishing (the workflow's OIDC identity, no token), nothing else. Only
+// in the release workflow on main.
 //
 //   node scripts/release/release.ts <version>
 import { execFileSync } from 'node:child_process';
@@ -15,7 +16,8 @@ export function publishRefusal(env: Readonly<Record<string, string | undefined>>
   if (env['GITHUB_REF'] !== 'refs/heads/main') return `releases are published from main, not ${env['GITHUB_REF']}`;
   if (env['GITHUB_WORKFLOW_REF']?.includes('/.github/workflows/release.yml@') !== true)
     return 'packages are published only by .github/workflows/release.yml';
-  if (!env['NODE_AUTH_TOKEN']) return 'NODE_AUTH_TOKEN is not set: the npm token comes from the NPM_TOKEN CI secret';
+  if (!env['ACTIONS_ID_TOKEN_REQUEST_URL'])
+    return "no OIDC identity: npm's trusted publishing needs the workflow's `id-token: write` permission";
   return undefined;
 }
 
@@ -38,5 +40,6 @@ if (import.meta.main) {
   run('npm', ['run', 'build:browser', '-w', '@vibeglobe/web-component']);
   const [packed] = packAll(undefined, ROOT_DIR, version);
   if (!packed) throw new Error('nothing was packed');
-  run('npm', ['publish', packed.tarball, '--access', 'public', '--tag', distTag(version), '--provenance']);
+  // npm attaches the provenance itself when it publishes through a trusted publisher.
+  run('npm', ['publish', packed.tarball, '--access', 'public', '--tag', distTag(version)]);
 }

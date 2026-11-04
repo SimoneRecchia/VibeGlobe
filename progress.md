@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-04: publishing with no token, through npm's trusted publishing (F709)
+
+The owner's brief: no npm token. The Release workflow publishes with its GitHub OIDC identity (`id-token: write`, npm
+11.21.1, no cache, no secret); `release.ts` refuses without that identity and lets npm attach the provenance;
+`vibeglobe`'s manifest carries the `repository` npm checks (ADR 0191, F709 replacing F708). For the owner: publish the
+first version once by hand, set the trusted publisher on npmjs.com (`SimoneRecchia/VibeGlobe`, `release.yml`,
+`npm-release`), then delete the `NPM_TOKEN` secret and its token.
+
 ## 2026-11-04: the release only builds and publishes (F708)
 
 The owner's brief: the release pipeline only compiles the npm package and publishes it. The Release workflow is one

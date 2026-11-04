@@ -6,9 +6,8 @@ title: Vector tiles
 
 `addVectorTiles` of `@vibeglobe/layers/vector-tiles` draws a [MapLibre Style Specification](https://maplibre.org/maplibre-style-spec/)
 style from Mapbox Vector Tiles on the globe, through the globe-to-flat morph and on the flat map, draped on terrain.
-`createVectorTileTarget` of `@vibeglobe/renderer/vector-tiles` is its renderer side. For ready map types of Europe
-and the world, use the [Europe preset](europe-preset.md); for application data from GeoJSON, use
-[data layers](data-layers.md).
+`createVectorTileTarget` of `@vibeglobe/renderer/vector-tiles` is its renderer side. The style and its tiles are the
+application's: VibeGlobe ships no map. For application data from GeoJSON, use [data layers](data-layers.md).
 
 ## Quick start
 
@@ -187,6 +186,5 @@ if (italy) marker.style.transform = `translate(${italy.screenPoint.xPx}px, ${ita
 
 ## See also
 
-- [Europe preset](europe-preset.md): ready vector map types and their offline package.
 - [Sources](sources.md): vector tile sources, PMTiles and MBTiles, provider profiles.
 - [Data layers](data-layers.md): building heights and application data.

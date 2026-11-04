@@ -5,8 +5,8 @@ with the application's services and wires the renderer, the workers, the navigat
 
 ## Rules
 
-- No provider here, nor anywhere in the engine: only the service interfaces of `@vibeglobe/core` (`TileService`,
-  `TerrainSource`, `GeocoderService`). Ready implementations live in `@vibeglobe/providers`.
+- No map and no provider here, nor anywhere in the library (ADR 0187): only the service interfaces of
+  `@vibeglobe/core` (`TileService`, `TerrainSource`, `GeocoderService`); the application brings its own.
 - `tiles` is required (refused with 'invalid-option'); a missing optional service only turns its feature off, never an
   error.
 - What the first frame does not need loads later: the vector tile modules are imported only for a tile service with a

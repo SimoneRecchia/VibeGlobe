@@ -15,10 +15,10 @@
   "exclude": ["src/**/*.test.ts"],
   "references": [
     {
-      "path": "../core"
+      "path": "../../packages/core"
     },
     {
-      "path": "../sources"
+      "path": "../../packages/sources"
     }
   ]
 }

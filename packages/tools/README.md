@@ -3,8 +3,8 @@
 The `vibeglobe-data` command line, also usable as a Node library: the data pipeline that builds tile folders, PMTiles
 and MBTiles packages from open datasets (imagery, terrain, vector tiles, the global base image), and the offline
 package builder that packs an area of a tile source. Every output records its sources' licence and attribution, and a
-license gate refuses sources whose terms forbid packaging. An application needs it to build the data it hosts, such as
-the Europe preset's package; the browser never loads it.
+license gate refuses sources whose terms forbid packaging. An application needs it to build the data it hosts; the
+browser never loads it.
 
 ## Install
 
@@ -43,7 +43,6 @@ console.log(formatEstimate(estimateBuild(loaded, { sample: false })));
 
 ## Guides
 
-- [The Europe preset](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/guides/europe-preset.md): building and estimating its package
 - [Hosting](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/guides/hosting.md): serving the outputs
 - [Offline](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/guides/offline.md): `pack` and package manifests
 - [Data licenses](https://github.com/SimoneRecchia/VibeGlobe/blob/main/docs/data-licenses.md): the datasets and their credits

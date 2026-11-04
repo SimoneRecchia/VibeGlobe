@@ -11,12 +11,10 @@ per-option details. Installed, this file and the guides are in `node_modules/@vi
 
 ## Start
 
-- [Services and providers](docs/guides/services.md): a globe in one call with `createVibeGlobe` and the
-  application's tile, terrain and geocoder services; ready MapTiler, Esri, OpenFreeMap and Photon services.
+- [Services](docs/guides/services.md): a globe in one call with `createVibeGlobe` and the application's tile,
+  terrain and geocoder services; VibeGlobe ships no map and no provider, any one plugs in.
 - [Integration](docs/guides/integration.md): install, create a globe in plain TypeScript, Vue, Nuxt (SSR) or a Web
   Component, lazy loading, hosting the engine's assets, Content Security Policy, attribution.
-- [Europe preset](docs/guides/europe-preset.md): ready map types (Satellite, Hybrid, Map, Landscape, Relief) from free
-  sources, the offline package of Europe and the world, online detail on top, building and estimating the package.
 
 ## Data on the globe
 

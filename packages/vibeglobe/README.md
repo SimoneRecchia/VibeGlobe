@@ -2,8 +2,8 @@
 
 VibeGlobe in one call. `createVibeGlobe` starts a 3D globe and 2D map in an element with the application's services:
 a `TileService` (required), a terrain and a `GeocoderService` (optional). It sets up the renderer (WebGPU, else
-WebGL2), the workers, navigation and the ready-made controls. The engine knows no map provider: any provider plugs
-in by implementing the interfaces, or through the ready implementations of `@vibeglobe/providers`.
+WebGL2), the workers, navigation and the ready-made controls. VibeGlobe ships no map and no provider: any provider
+plugs in by implementing the interfaces with the generic sources.
 
 ## Install
 

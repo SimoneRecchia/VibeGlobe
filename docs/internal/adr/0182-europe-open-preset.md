@@ -1,6 +1,6 @@
 # 0182. The Europe preset: free sources that allow commercial use and redistribution, re-verified
 
-- Status: Accepted
+- Status: Accepted (partly superseded by [ADR 0187](0187-no-maps-in-the-library.md): the preset is the playground's own, unpublished)
 - Date: 2026-10-26
 - Milestone: M7
 

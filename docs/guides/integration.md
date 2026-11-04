@@ -7,8 +7,8 @@ title: Integrating VibeGlobe into an application
 This guide puts a globe in a web application: with plain TypeScript (`@vibeglobe/core`, `@vibeglobe/renderer`), with
 Vue 3 or Nuxt (`@vibeglobe/vue`), or with the `<vibe-globe>` custom element (`@vibeglobe/web-component`). It covers
 installation, the base image, server-side rendering, lazy loading, the engine's assets, a Content Security Policy and
-attribution. For what goes on the globe read the [sources](sources.md), [terrain](terrain.md),
-[data layers](data-layers.md) and [Europe preset](europe-preset.md) guides; for input and ready-made controls, the
+attribution. VibeGlobe ships no map: for what goes on the globe read the [sources](sources.md),
+[terrain](terrain.md) and [data layers](data-layers.md) guides; for input and ready-made controls, the
 [controls](controls.md) and [UI and GIS](ui-and-gis.md) guides.
 
 ## Install
@@ -21,7 +21,7 @@ release, the [root README](https://github.com/SimoneRecchia/VibeGlobe/blob/main/
 | Plain TS        | `@vibeglobe/core`, `@vibeglobe/renderer`, `@vibeglobe/controls`, `@vibeglobe/worker`, `@vibeglobe/sources` |
 | Vue 3, Nuxt 4   | `@vibeglobe/vue`, `@vibeglobe/sources`, and `vue` 3.5 or later (a peer dependency)                         |
 | Web Component   | `@vibeglobe/web-component`                                                                                 |
-| Offline, add-on | `@vibeglobe/offline` (network modes, tile cache, offline packages), `@vibeglobe/presets` (ready map types) |
+| Offline, add-on | `@vibeglobe/offline` (network modes, tile cache, offline packages)                                         |
 
 `@vibeglobe/vue` brings `@vibeglobe/controls`, `core`, `layers`, `quality`, `renderer`, `ui` and `worker` as
 dependencies; `@vibeglobe/web-component` brings `controls`, `core`, `renderer`, `sources`, `ui` and `worker`.

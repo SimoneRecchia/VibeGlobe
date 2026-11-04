@@ -1,7 +1,5 @@
 // Provider profiles in the browser (M8, track B): a profile switches off only what its provider forbids and only for
-// its own source, nothing switches it back on (F320); the OpenStreetMap public servers are neither packaged nor prefetched (F324); self-hosted OpenStreetMap
-// enables everything with the ODbL credit, under a commercial provider's rules when one serves it (F325); any adapter's
-// own profile is enforced the same way (F326).
+// its own source, nothing switches it back on (F320); any adapter's own profile is enforced the same way (F326).
 import { expect, test, type Page } from '@playwright/test';
 import {
   emptyPixels,
@@ -164,86 +162,6 @@ test('a profile switches off only what its provider forbids, for its own source,
     "persistentCache stays off for source 'strict': its provider profile 'strict-provider' forbids it",
     "prefetch stays off for source 'strict': its provider profile 'strict-provider' forbids it",
   ]);
-});
-
-test('the OpenStreetMap public servers are neither prefetched in bulk nor packaged (F324)', async ({ page }) => {
-  const requests = await start(page, {
-    switches: ALL_ON,
-    sources: [
-      { id: 'osm', provider: 'osm-public', session: 'f324-osm', pattern: 'world' },
-      { id: 'world', pattern: 'levels', session: 'f324-world' },
-    ],
-  });
-  await panRome(page);
-  await page.evaluate(async () => {
-    await window.offlineHarness?.globe?.flyTo(
-      { longitudeDeg: 2.35, latitudeDeg: 48.85, zoom: 7 },
-      { durationMs: 3000 },
-    );
-  });
-  expect(await emptyPixels(page)).toBe(0);
-  const seen = await drawn(page);
-  const osm = requests.filter((p) => p.includes('/f324-osm/'));
-  expect(osm.length).toBeGreaterThan(0);
-  expect(beyondView(osm, seen), 'OpenStreetMap tiles prefetched').toEqual([]);
-  expect(
-    beyondView(
-      requests.filter((p) => p.includes('/f324-world/')),
-      seen,
-    ).length,
-  ).toBeGreaterThan(0);
-  const build = await page.evaluate(() =>
-    window.offlineHarness?.buildArea({
-      id: 'with-osm',
-      version: '1',
-      area: { westDeg: 12, southDeg: 41.5, eastDeg: 13, northDeg: 42.2 },
-      minLevel: 0,
-      maxLevel: 6,
-      sources: [{ id: 'osm', provider: 'osm-public', session: 'f324-osm', pattern: 'world' }],
-    }),
-  );
-  expect(build?.error).toMatch(/provider profile 'osm-public' forbids offline packaging/);
-});
-
-test('self-hosted OpenStreetMap enables everything with the ODbL credit; a provider adds its own rules and credit (F325)', async ({
-  page,
-}) => {
-  await start(page, {
-    sources: [{ id: 'osm', provider: 'osm-hosted', session: 'f325-hosted', pattern: 'world' }],
-  });
-  expect(await effective(page, 'osm')).toEqual(ALL_ON);
-  await panRome(page);
-  await expect.poll(async () => (await storedTileKeys(page)).length).toBeGreaterThan(0);
-  const credits = await creditTexts(page);
-  expect(credits).toContainEqual({
-    text: '© OpenStreetMap contributors, ODbL',
-    href: 'https://www.openstreetmap.org/copyright',
-  });
-
-  // The same data through a commercial provider whose profile forbids persistent caching and asks for its credit.
-  await startHarness(page, {
-    view: ROME,
-    sources: [
-      {
-        id: 'osm-provider',
-        provider: 'osm-hosted',
-        session: 'f325-provider',
-        pattern: 'world',
-        profile: {
-          id: 'maps-inc',
-          forbids: ['persistentCache'],
-          respectCacheHeaders: true,
-          requiredAttribution: { text: '© Maps Inc.', url: 'https://maps.example/terms' },
-        },
-      },
-    ],
-  });
-  expect(await effective(page, 'osm-provider')).toEqual({ ...ALL_ON, persistentCache: false });
-  await panRome(page);
-  expect((await storedTileKeys(page)).filter((k) => k.startsWith('osm-provider/'))).toEqual([]);
-  const texts = (await creditTexts(page)).map((c) => c.text);
-  expect(texts).toContain('© OpenStreetMap contributors, ODbL');
-  expect(texts).toContain('© Maps Inc.');
 });
 
 test('an adapter declaring its own profile is enforced like the built-in ones (F326)', async ({ page }) => {

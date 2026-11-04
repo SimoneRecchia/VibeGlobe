@@ -1,6 +1,6 @@
 # @vibeglobe/presets
 
-Ready map types built only from free sources whose terms allow commercial use and redistribution: `europeOpen` (ADR 0182) gives Europe's Google Earth-like base maps (Satellite, Hybrid, Map, Landscape, Relief) and overlays (labels and borders, roads, 3D buildings, borders, country names, sea names, 3D terrain), each source with its coverage, levels, licence, exact attribution and the day its terms were read.
+The playground's own maps, private and never packed: the library ships no map (ADR 0187). Ready map types built only from free sources whose terms allow commercial use and redistribution: `europeOpen` (ADR 0182) gives Europe's Google Earth-like base maps (Satellite, Hybrid, Map, Landscape, Relief) and overlays (labels and borders, roads, 3D buildings, borders, country names, sea names, 3D terrain), each source with its coverage, levels, licence, exact attribution and the day its terms were read.
 
 ## Rules
 
@@ -14,7 +14,7 @@ Ready map types built only from free sources whose terms allow commercial use an
 
 ## Commands
 
-- `npx vitest run packages/presets` runs this package's tests.
+- `npx vitest run apps/presets` runs this package's tests.
 - `npm run build` (root) builds it with `tsc -b` to `dist/` (ESM + declarations).
 
-See the root `CLAUDE.md` for the workflow and `docs/guides/europe-preset.md` for its use.
+See the root `CLAUDE.md` for the workflow and `europe-preset.md` here for its use.

@@ -1,6 +1,6 @@
 # 0186. Provider services: the engine takes a tile, a terrain and a geocoder service; ready providers in their own package
 
-- Status: Accepted
+- Status: Accepted (partly superseded by [ADR 0187](0187-no-maps-in-the-library.md): no providers package)
 - Date: 2026-11-04
 - Milestone: M7, M15 (F698, F699, F700; partly supersedes ADR 0185)
 

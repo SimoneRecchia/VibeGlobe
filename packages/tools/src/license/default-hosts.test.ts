@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * F344: the engine's default configuration and its built bundles reference no paid or restricted service. Ready
- * implementations for such services live only in the optional `@vibeglobe/providers`, outside the engine (ADR 0186).
+ * F344: the engine's default configuration and its built bundles reference no paid or restricted service: the library
+ * ships no provider and no map (ADR 0187).
  */
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const RESTRICTED =
@@ -20,10 +20,10 @@ function files(dir: string, extensions: RegExp): string[] {
   });
 }
 
-/** The engine's shipped code: each package's build when present, else its sources (not the tools CLI or providers). */
+/** The engine's shipped code: each package's build when present, else its sources (not the tools CLI). */
 function engineCode(): string[] {
   return readdirSync(join(ROOT, 'packages'))
-    .filter((name) => name !== 'tools' && name !== 'providers')
+    .filter((name) => name !== 'tools')
     .flatMap((name) => {
       const dist = join(ROOT, 'packages', name, 'dist');
       return existsSync(dist) ? files(dist, /\.js$/) : files(join(ROOT, 'packages', name, 'src'), /\.ts$/);

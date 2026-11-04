@@ -3519,7 +3519,7 @@
         "Confirm every rule on bulk download, offline use, concurrency, application identification, caching headers and attribution is mapped to a profile setting",
         "Confirm the profile's code references the ADR"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F264",
@@ -3532,7 +3532,7 @@
         "Assert the profile honors the servers' cache headers and never sends no-cache request headers",
         "Run the opt-in live test at low volume, as the policy allows"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F265",
@@ -3544,7 +3544,7 @@
         "Log open connections per host and assert they never exceed the profile's limit",
         "Assert the view keeps showing parent-tile fallback with zero black pixels"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F266",
@@ -3556,7 +3556,7 @@
         "Configure it with an identifier and assert every request carries a valid Referer identifying the application (the referrer policy never strips it)",
         "Assert the identification method matches the one recorded in the OpenStreetMap terms ADR"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F267",
@@ -3567,7 +3567,7 @@
         "Open the sources guide and confirm it states that the public OpenStreetMap servers are unsuitable for production and points to the self-hosted alternative",
         "Use the profile in the playground and assert exactly one console warning is logged per engine instance"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F268",
@@ -4269,7 +4269,7 @@
         "Run a pan and a long flight scenario and assert prefetch and flight preloading of its tiles stay within the limits recorded in the OpenStreetMap terms ADR (no bulk prefetch)",
         "Request an offline package with the source and assert it is refused with an error naming the profile rule"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F325",
@@ -4281,7 +4281,7 @@
         "Assert '© OpenStreetMap contributors' with ODbL licensing is shown whenever its tiles are visible",
         "Configure the same data through a fixture provider profile with its own restrictions and assert both the ODbL attribution and the provider's rules apply"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F326",
@@ -8347,7 +8347,7 @@
         "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider",
         "Install the two tarballs in a project outside the repository and start a globe with `createVibeGlobe` and `MapTilerTiles` in Chromium"
       ],
-      "status": "failing"
+      "status": "superseded"
     },
     {
       "id": "F699",
@@ -8370,7 +8370,29 @@
         "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
         "Assert that no engine package exports a provider's adapter"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F701",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The library ships no map and no provider: no published package holds a provider adapter, a ready service or a map's sources, and an application passes its own tiles, terrain and geocoder through the service interfaces and the generic sources. The Europe preset is the playground's own maps, outside the published packages.",
+      "steps": [
+        "Assert that no published package is a provider or preset package, and that no published package's code names a map or geocoding host",
+        "Start a globe with `createVibeGlobe` and fixture XYZ tiles of the application's own, with no other package"
+      ],
       "status": "passing"
+    },
+    {
+      "id": "F702",
+      "milestone": 15,
+      "section": "Packaging and release",
+      "description": "VibeGlobe is published as one npm package, `vibeglobe`, holding the engine, the interfaces and the generic adapters under subpaths (`vibeglobe`, `vibeglobe/renderer`, `vibeglobe/vue`, …), with no provider and no map: an application installs it alone.",
+      "steps": [
+        "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider or map",
+        "Install the tarball in a project outside the repository and start a globe with `createVibeGlobe` and fixture XYZ tiles in Chromium"
+      ],
+      "status": "failing"
     }
   ]
 }

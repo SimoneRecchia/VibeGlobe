@@ -4,11 +4,14 @@ title: The Europe preset
 
 # The Europe preset
 
+The playground's own maps, not part of the published library: VibeGlobe ships no map, and an application brings its
+own (ADR 0187). This preset shows how one application assembles them from free sources.
+
 `europeOpen(options)` of `@vibeglobe/presets` returns ready map types of Europe made only from free sources whose terms
 allow commercial use and redistribution: five base maps, seven overlays, the 3D terrain, and every source's licence and
 exact credit. It is built for hybrid use: an offline package of Europe that the application builds with
 `@vibeglobe/tools` and serves itself, plus online detail over land beyond the package's levels. Other providers join
-through `addSources` and the [sources guide](sources.md); packages of other areas are in the [offline guide](offline.md).
+through `addSources` and the [sources guide](../../docs/guides/sources.md); packages of other areas are in the [offline guide](../../docs/guides/offline.md).
 
 ## Quick start
 
@@ -260,7 +263,7 @@ const preset = europeOpen({
   giving way to WorldCover in patches (KB-339).
 - Give each source an `area`, so it is asked only where it has data.
 - A paid provider's key stays out of the code: `secretQuery` adds it to tile requests only, and the profile's `forbids`
-  keeps its tiles out of packages and the persistent cache. The [sources guide](sources.md) connects Google's Map Tiles
+  keeps its tiles out of packages and the persistent cache. The [sources guide](../../docs/guides/sources.md) connects Google's Map Tiles
   API this way.
 
 ## National and regional orthophotos
@@ -350,7 +353,7 @@ local name. Names take the style's own faces: country names its bold font, place
 ### Overlay and Landscape layers
 
 Ask for one style with every overlay a page offers and switch them with the vector layer's runtime style
-(`setVisibility`, see [vector tiles](vector-tiles.md#runtime-changes)): a new style downloads and lays out every tile
+(`setVisibility`, see [vector tiles](../../docs/guides/vector-tiles.md#runtime-changes)): a new style downloads and lays out every tile
 again. These layer ids are stable:
 
 | Part        | Layers                                                                                                |
@@ -400,7 +403,7 @@ npx vibeglobe-data build europe.json --yes --out ./europe-package \
   --source-url europe-vectors=https://btrfs.openfreemap.com/areas/planet/20261020_001001_pt/tiles.pmtiles
 ```
 
-Then write the package's `manifest.json` with `createManifest` of `@vibeglobe/offline` ([offline guide](offline.md)):
+Then write the package's `manifest.json` with `createManifest` of `@vibeglobe/offline` ([offline guide](../../docs/guides/offline.md)):
 one `sources` entry per archive, with its `sourceId` (`europe-satellite`, `europe-terrain`), `file`, levels, and the
 `license` and `attribution` from the dataset's `metadata.json`. A package built to other levels tells the preset with
 `packageLevels`: `europeOpen({ packageLevels: { imagery: 13 } })` reads the satellite imagery to level 13.
@@ -502,7 +505,7 @@ times instead of level 11 sixteen times. The orthophotos still fade in from leve
 ## Hosting the package
 
 Publish the build's `output/` folder and the manifest under a versioned path, such as
-`https://app.example/maps/europe-1.0.0/`, following the [hosting guide](hosting.md) (range requests, CORS, caching,
+`https://app.example/maps/europe-1.0.0/`, following the [hosting guide](../../docs/guides/hosting.md) (range requests, CORS, caching,
 MIME types):
 
 - `manifest.json` and the archives `europe-satellite.pmtiles`, `europe-terrain.pmtiles` (and
@@ -558,8 +561,8 @@ MIME types):
 
 ## See also
 
-- [Sources](sources.md): adapters, provider profiles and keys for `addSources`.
-- [Offline](offline.md): network modes, the package manager and `createManifest`.
-- [Hosting](hosting.md): serving the package.
-- [Vector tiles](vector-tiles.md): styles and runtime changes.
+- [Sources](../../docs/guides/sources.md): adapters, provider profiles and keys for `addSources`.
+- [Offline](../../docs/guides/offline.md): network modes, the package manager and `createManifest`.
+- [Hosting](../../docs/guides/hosting.md): serving the package.
+- [Vector tiles](../../docs/guides/vector-tiles.md): styles and runtime changes.
 - [Data licenses](../data-licenses.md): the pipeline's datasets and their credits.

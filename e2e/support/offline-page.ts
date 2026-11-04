@@ -32,7 +32,6 @@ import {
   type ProviderProfile,
 } from '@vibeglobe/sources';
 import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
-import { openStreetMapHostedImagery, openStreetMapImagery } from '@vibeglobe/providers';
 import { createWorkers } from '@vibeglobe/worker';
 
 /** One imagery source of the harness: fixture tiles of a pattern, or any URL template. */
@@ -52,12 +51,7 @@ interface HarnessSource {
     readonly respectCacheHeaders: boolean;
   };
   readonly cachePolicy?: SourceCachePolicy;
-  /**
-   * A provider adapter instead of the plain XYZ one: the OpenStreetMap public servers or self-hosted OpenStreetMap
-   * tiles (both at `url` or the fixture tiles).
-   */
-  readonly provider?: 'osm-public' | 'osm-hosted';
-  /** A profile the source declares (F326), or the commercial provider's profile of `osm-hosted` (F325). */
+  /** A profile the source declares (F326). */
   readonly profile?: {
     readonly id: string;
     readonly forbids: readonly (keyof LoadingSwitches)[];
@@ -179,16 +173,6 @@ function profileOf(s: HarnessSource): ProviderProfile | undefined {
 async function adapterOf(s: HarnessSource): Promise<ImagerySource> {
   const levels = { minLevel: s.minLevel ?? 0, maxLevel: s.maxLevel ?? 18 };
   const profile = profileOf(s);
-  if (s.provider === 'osm-public')
-    return openStreetMapImagery({ id: s.id, appName: 'VibeGlobe tests', appUrl: location.origin, url: urlOf(s) });
-  if (s.provider === 'osm-hosted')
-    return openStreetMapHostedImagery({
-      id: s.id,
-      url: urlOf(s),
-      ...levels,
-      ...(profile ? { provider: profile } : {}),
-      ...(s.attribution ? { attribution: s.attribution } : {}),
-    });
   const source = xyzImagery({ id: s.id, url: urlOf(s), ...levels });
   // A plain fixture source stays as it is unless the test declares a profile or credits (the offline track's specs
   // rely on its default cache behavior).

@@ -1,26 +1,36 @@
 ---
-title: Services and providers
+title: Services
 ---
 
-# Services and providers
+# Services
 
 `createVibeGlobe` of `vibeglobe` starts a globe in one call with the application's services: a `TileService`
-(required), a terrain (`TerrainSource`) and a `GeocoderService` (optional). The engine knows no map provider:
-anything that implements these interfaces plugs in, whether a commercial service, a private map or tiles of your own.
-`@vibeglobe/providers` holds ready ones for MapTiler, Esri, OpenFreeMap and Photon; it is optional. To assemble the
-engine piece by piece instead, read the [integration guide](integration.md); for the sources a service holds, the
-[sources guide](sources.md).
+(required), a terrain (`TerrainSource`) and a `GeocoderService` (optional). VibeGlobe ships no map and no provider:
+the application brings its own, whether a commercial service, a private map or tiles of its own, through the generic
+sources of `@vibeglobe/sources`. To assemble the engine piece by piece instead, read the
+[integration guide](integration.md); for the sources a service holds, the [sources guide](sources.md).
 
 ## Quick start
 
 ```ts
-import { mapTilerTerrain, mapTilerTiles, photonGeocoder } from '@vibeglobe/providers';
-import { createVibeGlobe } from 'vibeglobe';
+import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
+import { createVibeGlobe, type GeocoderService } from 'vibeglobe';
+
+const geocoder: GeocoderService = {
+  async search(query, { language }) {
+    const response = await fetch(`https://geo.example.com/?q=${encodeURIComponent(query)}&lang=${language}`);
+    const places = (await response.json()) as { name: string; lon: number; lat: number }[];
+    return places.map((p) => ({ label: p.name, longitudeDeg: p.lon, latitudeDeg: p.lat }));
+  },
+};
 
 const { globe, destroy } = await createVibeGlobe(container, {
-  tiles: mapTilerTiles({ key: customerKey }),
-  terrain: mapTilerTerrain({ key: customerKey }),
-  geocoder: photonGeocoder(),
+  tiles: {
+    imagery: [xyzImagery({ id: 'mine', url: 'https://maps.example.com/{z}/{x}/{y}.jpg', maxLevel: 18 })],
+    style: 'https://maps.example.com/styles/labels.json',
+  },
+  terrain: heightmapTerrain({ id: 'dem', url: 'https://maps.example.com/dem/{z}/{x}/{y}.png', encoding: 'terrarium' }),
+  geocoder,
   view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 5 },
   language: 'it',
 });
@@ -28,8 +38,9 @@ globe.on('moveend', () => console.log(globe.camera.zoom));
 window.addEventListener('pagehide', destroy);
 ```
 
-This shows MapTiler's satellite imagery on its terrain, a search box that finds places with Photon, navigation and
-the ready-made controls in Italian. `container` is an element with a size; the globe fills it.
+This shows the application's imagery with its labels over its terrain, a search box that finds places with its
+geocoder, navigation and the ready-made controls in Italian. `container` is an element with a size; the globe fills
+it.
 
 ## The services
 
@@ -47,48 +58,12 @@ the ready-made controls in Italian. `container` is an element with a size; the g
 - `GeocoderService` has one method, `search(query, { signal, language })`, which resolves `GeocoderResult` places,
   empty when none, and stops when `signal` aborts.
 
-## Ready providers
+## Any provider
 
-| Function           | Returns           | Provider                                                            | Key               |
-| ------------------ | ----------------- | ------------------------------------------------------------------- | ----------------- |
-| `mapTilerTiles`    | `TileService`     | MapTiler: `map: 'satellite'` (default) or a map id                  | `key`, required   |
-| `mapTilerTerrain`  | `TerrainSource`   | MapTiler Terrain-RGB, levels 0 to 14                                | `key`, required   |
-| `esriTiles`        | `TileService`     | Esri: `map: 'imagery'` (default), `'streets'`, `'topo'`             | `token`, optional |
-| `openFreeMapTiles` | `TileService`     | OpenFreeMap: `style: 'liberty'` (default), `'bright'`, `'positron'` | none              |
-| `photonGeocoder`   | `GeocoderService` | Photon: komoot's public instance, or `url`                          | none              |
-
-`mapTilerTiles` with `map: 'streets-v2'`, `'outdoor-v2'`, `'topo-v2'` or another MapTiler map id draws that map from
-its vector style. `openStreetMapImagery` and `openStreetMapHostedImagery` of the same package return OpenStreetMap
-sources for a `TileService` of your own.
-
-## Your own services
-
-Any provider plugs in with the generic sources of `@vibeglobe/sources`:
-
-```ts
-import { heightmapTerrain, xyzImagery } from '@vibeglobe/sources';
-import { createVibeGlobe, type GeocoderService } from 'vibeglobe';
-
-const geocoder: GeocoderService = {
-  async search(query, { language }) {
-    const response = await fetch(`https://geo.example.com/?q=${encodeURIComponent(query)}&lang=${language}`);
-    const places = (await response.json()) as { name: string; lon: number; lat: number }[];
-    return places.map((p) => ({ label: p.name, longitudeDeg: p.lon, latitudeDeg: p.lat }));
-  },
-};
-
-await createVibeGlobe(container, {
-  tiles: {
-    imagery: [xyzImagery({ id: 'mine', url: 'https://maps.example.com/{z}/{x}/{y}.jpg', maxLevel: 18 })],
-    style: 'https://maps.example.com/styles/labels.json',
-  },
-  terrain: heightmapTerrain({ id: 'dem', url: 'https://maps.example.com/dem/{z}/{x}/{y}.png', encoding: 'terrarium' }),
-  geocoder,
-});
-```
-
-A source's `attribution` and `profile` carry the provider's credits and rules; the [sources guide](sources.md) lists
-them.
+A provider plugs in with the generic sources: `xyzImagery`, `wmtsImagery` or `pmtilesImagery` for its imagery, a
+MapLibre style for its vector map, `heightmapTerrain` or `quantizedMeshTerrain` for its relief. A transport adds its
+key or token only when a request is made; a source's `attribution` and `profile` carry its credits and rules (the
+[sources guide](sources.md) lists them).
 
 ## Options
 
@@ -107,22 +82,19 @@ The promise resolves with `globe` (the `Globe`), `ui` (the controls, `undefined`
 
 ## Rules and pitfalls
 
-- Map data belongs to its providers: the application holds their keys, pays their plans and keeps to their terms.
-  MapTiler and Esri tiles cannot go in offline packages, and their credits stay visible.
-- komoot's public Photon instance is for light use only; a product with many searches runs its own and passes its
-  `url`.
+- Map data belongs to its providers: the application holds their keys, pays their plans and keeps to their terms,
+  offline use and credits included.
 - The style loads before the promise resolves; a style that fails to load rejects it and stops the globe.
 - Keys in tile URLs are visible to anyone who opens the page: restrict them to your domains in the provider's console.
 - With a strict Content Security Policy, allow `data:` in `connect-src` or pass `baseImageryUrl` from your own origin.
 
 ## Errors
 
-| Error or code                     | When                                               | What to do                          |
-| --------------------------------- | -------------------------------------------------- | ----------------------------------- |
-| `invalid-option`                  | no `tiles`                                         | pass a `TileService`                |
-| `resource-failed`                 | the style or the base image did not load           | check the URL, CORS and the key     |
-| `unsupported-device`              | the device draws neither WebGPU nor WebGL2         | show a fallback                     |
-| `SourceConfigError` `missing-key` | `mapTilerTiles` or `mapTilerTerrain` without a key | pass the application's MapTiler key |
+| Error or code        | When                                       | What to do                      |
+| -------------------- | ------------------------------------------ | ------------------------------- |
+| `invalid-option`     | no `tiles`                                 | pass a `TileService`            |
+| `resource-failed`    | the style or the base image did not load   | check the URL, CORS and the key |
+| `unsupported-device` | the device draws neither WebGPU nor WebGL2 | show a fallback                 |
 
 ## See also
 

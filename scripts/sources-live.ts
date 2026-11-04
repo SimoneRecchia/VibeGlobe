@@ -1,9 +1,14 @@
 // The opt-in live run of the source adapters (F223): `npm run test:live-sources` runs the conformance checks against
 // real public endpoints only where the provider's terms allow automated testing, reports every endpoint it skipped and
-// why, and stops at the first quota error: the OpenStreetMap public servers, at the low volume ADR 0032 allows.
+// why, and stops at the first quota error: the OpenStreetMap public servers through the generic XYZ adapter, at the
+// low volume ADR 0032 allows.
 import { pathToFileURL } from 'node:url';
-import { openStreetMapImagery } from '@vibeglobe/providers';
-import type { DescribedImagerySource } from '@vibeglobe/sources';
+import type { ImagerySource } from '@vibeglobe/core';
+import { fetchTransport, xyzImagery } from '@vibeglobe/sources';
+
+/** The OpenStreetMap Foundation's raster tiles, and how the run identifies itself as their usage policy asks. */
+const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_IDENTITY = 'VibeGlobe live adapter test (https://github.com/SimoneRecchia/VibeGlobe)';
 
 /** What one live run did. */
 export interface LiveReport {
@@ -39,7 +44,7 @@ function guardedFetch(base: typeof fetch, report: LiveReport): typeof fetch {
   };
 }
 
-async function tiles(source: DescribedImagerySource, coords: readonly [number, number, number][]): Promise<void> {
+async function tiles(source: ImagerySource, coords: readonly [number, number, number][]): Promise<void> {
   for (const [level, x, y] of coords) {
     const request = source.request({ root: 0, level, x, y }, { url: '', hostIndex: 0 });
     if (request === 'noData' || request === 'unknown') throw new Error(`${level}/${x}/${y} reported as no data`);
@@ -50,13 +55,13 @@ async function tiles(source: DescribedImagerySource, coords: readonly [number, n
   }
 }
 
-async function openStreetMap(fetchImpl: typeof fetch, report: LiveReport, url?: string): Promise<void> {
-  const source = openStreetMapImagery({
-    appName: 'VibeGlobe live adapter test',
-    appUrl: 'https://github.com/SimoneRecchia/VibeGlobe',
-    fetch: fetchImpl,
-    warn: () => undefined,
-    ...(url ? { url } : {}),
+async function openStreetMap(fetchImpl: typeof fetch, report: LiveReport, url = OSM_TILES): Promise<void> {
+  const source = xyzImagery({
+    id: 'osm-live',
+    url,
+    maxLevel: 19,
+    maxRequestsPerHost: 2,
+    transport: fetchTransport((input, init) => fetchImpl(input, { ...init, headers: { 'User-Agent': OSM_IDENTITY } })),
   });
   await tiles(source, [
     [0, 0, 0],

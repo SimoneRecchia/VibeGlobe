@@ -1,4 +1,4 @@
-# @vibeglobe/renderer
+# vibeglobe/renderer
 
 The renderer plug-in of a VibeGlobe globe: three.js on WebGPU, with an automatic fallback to WebGL2, shaders and GPU
 resource management, recovering from device and context loss. Every application passes `createRenderer()` to
@@ -7,26 +7,26 @@ by applications that import it. Importing the package is SSR-safe: three.js load
 
 ## Install
 
-`@vibeglobe/core`, `@vibeglobe/models` and `three` (pinned to `0.186.1`, with `@types/three`) install with it; there
-are no peer dependencies. Vector tiles also need `@vibeglobe/layers`; 3D Tiles need `@vibeglobe/sources`.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/renderer`. `three` (pinned to `0.186.1`, with
+`@types/three`) installs with it. Vector tiles also need `vibeglobe/layers`; 3D Tiles need `vibeglobe/sources`.
 
 ## Entry points
 
-| Import                             | What                                                                   |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| `@vibeglobe/renderer`              | `createRenderer` and its `RendererOptions`; `gpuLoad`, a test GPU load |
-| `@vibeglobe/renderer/gltf`         | `gltfLoader`, for `createRenderer({ gltf })`                           |
-| `@vibeglobe/renderer/vector-tiles` | `createVectorTileTarget`, for `addVectorTiles`                         |
-| `@vibeglobe/renderer/tiles3d`      | `threeTileMeshes`, for `tiles3d` of `@vibeglobe/sources/tiles3d`       |
-| `@vibeglobe/renderer/starfield`    | `addSpaceBackground`: stars and the Milky Way                          |
-| `@vibeglobe/renderer/gpu-probes`   | `runGpuProbes`: GPU precision and depth diagnostics                    |
+| Import                            | What                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `vibeglobe/renderer`              | `createRenderer` and its `RendererOptions`; `gpuLoad`, a test GPU load |
+| `vibeglobe/renderer/gltf`         | `gltfLoader`, for `createRenderer({ gltf })`                           |
+| `vibeglobe/renderer/vector-tiles` | `createVectorTileTarget`, for `addVectorTiles`                         |
+| `vibeglobe/renderer/tiles3d`      | `threeTileMeshes`, for `tiles3d` of `vibeglobe/sources/tiles3d`        |
+| `vibeglobe/renderer/starfield`    | `addSpaceBackground`: stars and the Milky Way                          |
+| `vibeglobe/renderer/gpu-probes`   | `runGpuProbes`: GPU precision and depth diagnostics                    |
 
 ## Example
 
 ```ts
-import { createGlobe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
-import { gltfLoader } from '@vibeglobe/renderer/gltf';
+import { createGlobe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
+import { gltfLoader } from 'vibeglobe/renderer/gltf';
 
 const globe = createGlobe({
   container,

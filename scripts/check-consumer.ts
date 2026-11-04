@@ -2,9 +2,9 @@
 // exports map (resolving dist/, not sources), and a strict TypeScript consumer type-checks against the declarations.
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { ROOT_DIR, readWorkspace } from './workspace.ts';
+import { ROOT_DIR, enginePackages } from './workspace.ts';
 
-const published = readWorkspace().filter((pkg) => pkg.dir.startsWith('packages/') && !pkg.manifest.private);
+const published = enginePackages();
 for (const pkg of published) {
   const name = pkg.manifest.name as string;
   const resolved = import.meta.resolve(name);

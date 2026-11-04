@@ -2,6 +2,7 @@
 // way a consumer would get them from the registry (F530, F532, F559; ADR 0171).
 import { execFileSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -14,60 +15,127 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { ALLOWED_LICENSES, FONT_LICENSES } from '../licenses.ts';
-import { ROOT_DIR, importSpecifiers, readWorkspace } from '../workspace.ts';
+import { ROOT_DIR, enginePackages, importSpecifiers } from '../workspace.ts';
 
 /** Where the release scripts write tarballs and consumer projects (ignored by git). */
 const RELEASE_DIR = join(ROOT_DIR, '.release');
 const TARBALL_DIR = join(RELEASE_DIR, 'tarballs');
+/** The one published package (ADR 0189); every other engine package goes in it under its folder's name. */
+const ENTRY = 'vibeglobe';
+/** Code whose `@vibeglobe/<name>` imports become the single package's own `vibeglobe/<name>` subpaths. */
+const REWRITTEN = /\.(js|mjs|ts|mts|map)$/;
 
 export interface PackedPackage {
   name: string;
   version: string;
   /** Absolute path of the tarball. */
   tarball: string;
-  /** `@vibeglobe/*` packages it depends on at runtime. */
-  engineDependencies: string[];
 }
 
-/** The workspace packages that are published: every non-private package under `packages/`. */
-function publishedPackages(): { name: string; dir: string; dependencies: Record<string, string> }[] {
-  return readWorkspace()
-    .filter((pkg) => pkg.dir.startsWith('packages/') && !pkg.manifest.private)
-    .map((pkg) => ({ name: pkg.manifest.name as string, dir: pkg.dir, dependencies: pkg.manifest.dependencies ?? {} }));
+type ExportTarget = string | { readonly [condition: string]: ExportTarget };
+
+/** An exports map's targets moved under `folder`, without the workspace's `source` condition. */
+function retarget(target: ExportTarget, folder: string): ExportTarget {
+  if (typeof target === 'string') return folder === '' ? target : `./${folder}/${target.replace(/^\.\//, '')}`;
+  return Object.fromEntries(
+    Object.entries(target)
+      .filter(([condition]) => condition !== 'source')
+      .map(([condition, value]) => [condition, retarget(value, folder)]),
+  );
 }
 
-/** Packs every published package into `outDir` (their `dist/` must be built) and returns the tarballs. */
-export function packAll(outDir: string = TARBALL_DIR): PackedPackage[] {
+/** A workspace package's exports as subpaths of the single package: `.` becomes `./<folder>`. */
+function nestedExports(exports: unknown, folder: string): Record<string, ExportTarget> {
+  const entries = (typeof exports === 'string' ? { '.': exports } : exports) as Record<string, ExportTarget>;
+  const subpath = (key: string): string => (folder === '' ? key : `./${folder}${key === '.' ? '' : key.slice(1)}`);
+  return Object.fromEntries(Object.entries(entries).map(([key, value]) => [subpath(key), retarget(value, folder)]));
+}
+
+/** Copies a file into the single package, its engine imports turned into the package's own subpaths. */
+function stageFile(from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  if (REWRITTEN.test(from)) writeFileSync(to, readFileSync(from, 'utf8').replaceAll('@vibeglobe/', 'vibeglobe/'));
+  else cpSync(from, to);
+}
+
+/** The single package's third-party dependencies: every engine package's, one range each. */
+function thirdPartyDependencies(
+  manifests: readonly { dependencies?: Record<string, string> }[],
+): Record<string, string> {
+  const merged: Record<string, string> = {};
+  for (const manifest of manifests) {
+    for (const [name, range] of Object.entries(manifest.dependencies ?? {})) {
+      if (name.startsWith('@vibeglobe/')) continue;
+      if (merged[name] !== undefined && merged[name] !== range)
+        throw new Error(`${name}: two engine packages ask for ${merged[name]} and ${range}`);
+      merged[name] = range;
+    }
+  }
+  return Object.fromEntries(Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/** Writes the single package into `stage`: the engine packages' published files, the guides and the manifest. */
+function stagePackage(root: string, stage: string): void {
+  const packages = enginePackages(root);
+  const entry = packages.find((pkg) => pkg.manifest.name === ENTRY);
+  if (!entry) throw new Error(`no ${ENTRY} package in packages/`);
+  const args = [
+    'pack',
+    '--dry-run',
+    '--json',
+    '--ignore-scripts',
+    ...packages.flatMap((pkg) => ['-w', String(pkg.manifest.name)]),
+  ];
+  const output = execFileSync('npm', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  const listed = JSON.parse(output) as { name: string; files: { path: string }[] }[];
+  let exports: Record<string, ExportTarget> = {};
+  let bin: Record<string, string> = {};
+  for (const pkg of packages) {
+    const folder = pkg === entry ? '' : pkg.dir.slice('packages/'.length);
+    for (const { path } of listed.find((item) => item.name === pkg.manifest.name)?.files ?? []) {
+      if (path === 'package.json' || (folder !== '' && path === 'LICENSE.md')) continue;
+      stageFile(join(root, pkg.dir, path), join(stage, folder, path));
+    }
+    exports = { ...exports, ...nestedExports(pkg.manifest.exports, folder) };
+    for (const [command, file] of Object.entries(pkg.manifest.bin ?? {}))
+      bin = { ...bin, [command]: retarget(file, folder) as string };
+  }
+  for (const path of ['docs/guides', 'docs/data-licenses.md', 'llms.txt'])
+    cpSync(join(root, path), join(stage, path), { recursive: true });
+  const { name, version, description, license, type, sideEffects, types } = entry.manifest;
+  const dependencies = thirdPartyDependencies(packages.map((pkg) => pkg.manifest));
+  const peers = { peerDependencies: { vue: '^3.5.0' }, peerDependenciesMeta: { vue: { optional: true } } };
+  const manifest = {
+    name,
+    version,
+    description,
+    license,
+    type,
+    sideEffects,
+    exports,
+    types,
+    bin,
+    dependencies,
+    ...peers,
+  };
+  writeFileSync(join(stage, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+/**
+ * Packs VibeGlobe as one npm package into `outDir` (the engine packages' `dist/` must be built): `vibeglobe` at the
+ * root, every other engine package under its folder (`vibeglobe/core`, `vibeglobe/layers/vector-tiles`, …), with the
+ * guides and `llms.txt`, and no import that leaves the package (ADR 0189, F702).
+ */
+export function packAll(outDir: string = TARBALL_DIR, root: string = ROOT_DIR): PackedPackage[] {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
-  const packages = publishedPackages();
-  const args = ['pack', '--json', '--pack-destination', outDir, ...packages.flatMap((pkg) => ['-w', pkg.name])];
-  const output = execFileSync('npm', args, { cwd: ROOT_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  const stage = join(root, '.release/package');
+  rmSync(stage, { recursive: true, force: true });
+  stagePackage(root, stage);
+  const args = ['pack', stage, '--json', '--ignore-scripts', '--pack-destination', outDir];
+  const output = execFileSync('npm', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
   const packed = JSON.parse(output) as { name: string; version: string; filename: string }[];
-  return packed.map((entry) => {
-    const pkg = packages.find((candidate) => candidate.name === entry.name);
-    if (!pkg) throw new Error(`npm packed ${entry.name}, which is not a published package`);
-    return {
-      name: entry.name,
-      version: entry.version,
-      tarball: join(outDir, entry.filename),
-      engineDependencies: Object.keys(pkg.dependencies).filter((dep) => dep.startsWith('@vibeglobe/')),
-    };
-  });
-}
-
-/** The engine packages `names` need at runtime, themselves included, in name order. */
-function engineClosure(packed: readonly PackedPackage[], names: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const visit = (name: string): void => {
-    if (seen.has(name)) return;
-    const pkg = packed.find((candidate) => candidate.name === name);
-    if (!pkg) throw new Error(`${name} is not a packed package`);
-    seen.add(name);
-    pkg.engineDependencies.forEach(visit);
-  };
-  names.forEach(visit);
-  return [...seen].sort();
+  return packed.map((item) => ({ name: item.name, version: item.version, tarball: join(outDir, item.filename) }));
 }
 
 /** Extracts a tarball into a new directory and returns the package root (`<dir>/package`). */
@@ -147,34 +215,21 @@ export function freshDir(prefix: string): string {
 }
 
 /**
- * Installs the engine packages `names` (and the engine packages they need) from their tarballs into `projectDir`,
- * which holds a package.json: third-party dependencies come from the public registry with no credentials.
+ * Installs the packed `vibeglobe` into `projectDir`, which holds a package.json: third-party dependencies come from the
+ * public registry with no credentials.
  */
-export function installTarballs(projectDir: string, packed: readonly PackedPackage[], names: readonly string[]): void {
+export function installTarballs(projectDir: string, packed: readonly PackedPackage[]): void {
   const manifestPath = join(projectDir, 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { dependencies?: Record<string, string> };
-  const tarballs: Record<string, string> = {};
-  for (const name of engineClosure(packed, names)) {
-    tarballs[name] = `file:${packed.find((pkg) => pkg.name === name)?.tarball}`;
-  }
-  // Only the packages the project names are dependencies; overrides let npm satisfy the others from tarballs too.
-  const dependencies = { ...manifest.dependencies };
-  for (const name of names) dependencies[name] = tarballs[name] as string;
-  writeFileSync(manifestPath, JSON.stringify({ ...manifest, dependencies, overrides: tarballs }, null, 2));
+  const dependencies = {
+    ...manifest.dependencies,
+    ...Object.fromEntries(packed.map((pkg) => [pkg.name, `file:${pkg.tarball}`])),
+  };
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, dependencies }, null, 2));
   execFileSync('npm', ['install', '--no-audit', '--no-fund', '--userconfig', join(projectDir, '.npmrc-none')], {
     cwd: projectDir,
     stdio: 'inherit',
   });
-}
-
-/** The `@vibeglobe/*` packages installed in a project's node_modules. */
-export function installedEnginePackages(projectDir: string): string[] {
-  const dir = join(projectDir, 'node_modules/@vibeglobe');
-  return existsSync(dir)
-    ? readdirSync(dir)
-        .map((name) => `@vibeglobe/${name}`)
-        .sort()
-    : [];
 }
 
 /** A non-code file shipped in a package (scripts/release/assets.json, F519). */

@@ -1,0 +1,14 @@
+{
+  "name": "vibeglobe-one-call",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A consumer application that installs only vibeglobe and starts the globe in one call with its own tiles (F702).",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  }
+}

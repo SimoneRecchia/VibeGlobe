@@ -4,15 +4,15 @@ title: Space background
 
 # Space background
 
-`addSpaceBackground` of `@vibeglobe/renderer/starfield` draws stars and the Milky Way behind the globe, with an
-optional halo around it seen from space. It is off unless added, and `@vibeglobe/core` does not depend on it. The
+`addSpaceBackground` of `vibeglobe/renderer/starfield` draws stars and the Milky Way behind the globe, with an
+optional halo around it seen from space. It is off unless added, and `vibeglobe/core` does not depend on it. The
 atmosphere's day and night, which shape the same far view, are `Globe.setAtmosphere` settings, covered below.
 
 ## Quick start
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addSpaceBackground } from '@vibeglobe/renderer/starfield';
+import type { Globe } from 'vibeglobe/core';
+import { addSpaceBackground } from 'vibeglobe/renderer/starfield';
 
 declare const globe: Globe;
 
@@ -49,7 +49,7 @@ background color and a halo in a tone of it. With the atmosphere off (`Globe.set
 give the page behind it the same color.
 
 ```ts
-import type { SpaceBackground } from '@vibeglobe/renderer/starfield';
+import type { SpaceBackground } from 'vibeglobe/renderer/starfield';
 
 declare const space: SpaceBackground;
 space.setOptions({ stars: false, milkyWay: false, sky: '#f4f4f4', glow: 1, glowColor: '#cfd3d4' });
@@ -81,8 +81,8 @@ Its widths are kilometres, so the nearer the camera, the more of the screen the 
 the range:
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addSpaceBackground } from '@vibeglobe/renderer/starfield';
+import type { Globe } from 'vibeglobe/core';
+import { addSpaceBackground } from 'vibeglobe/renderer/starfield';
 
 declare const globe: Globe;
 
@@ -112,7 +112,7 @@ background.
   stays. A view like that needs no `glow`.
 
 ```ts
-import type { Globe, ImagerySource } from '@vibeglobe/core';
+import type { Globe, ImagerySource } from 'vibeglobe/core';
 
 declare const globe: Globe;
 declare const nightLights: ImagerySource;
@@ -127,13 +127,13 @@ limit (a fade in time, so the globe is never left half-dark at a resting zoom), 
 
 ## Hosting its asset
 
-The background has one asset, `bsc5-stars.bin` (54 KB), shipped at `@vibeglobe/renderer/src/starfield/bsc5-stars.bin`.
+The background has one asset, `bsc5-stars.bin` (54 KB), shipped at `vibeglobe/renderer/src/starfield/bsc5-stars.bin`.
 The module refers to it with `new URL(…, import.meta.url)`, so bundlers such as Vite copy it to the application's
 assets. To host it elsewhere on your own origin ([hosting guide](hosting.md)), copy the file and pass its URL:
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addSpaceBackground } from '@vibeglobe/renderer/starfield';
+import type { Globe } from 'vibeglobe/core';
+import { addSpaceBackground } from 'vibeglobe/renderer/starfield';
 
 declare const globe: Globe;
 

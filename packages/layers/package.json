@@ -1,6 +1,7 @@
 {
   "name": "@vibeglobe/layers",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "VibeGlobe layers: data layers: primitives, labels, styling, picking and draping.",
   "license": "MPL-2.0",
   "type": "module",
@@ -46,8 +47,8 @@
   ],
   "dependencies": {
     "@maplibre/maplibre-gl-style-spec": "26.4.4",
-    "@vibeglobe/core": "0.1.0",
-    "@vibeglobe/sources": "0.1.0",
+    "@vibeglobe/core": "0.2.0",
+    "@vibeglobe/sources": "0.2.0",
     "earcut": "3.2.4",
     "pbf": "5.1.2",
     "rbush": "4.0.1",

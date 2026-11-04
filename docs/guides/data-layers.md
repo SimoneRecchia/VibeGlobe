@@ -4,7 +4,7 @@ title: Data layers
 
 # Data layers
 
-`@vibeglobe/layers` draws application data on the globe from GeoJSON: points, markers, labels, lines, polygons,
+`vibeglobe/layers` draws application data on the globe from GeoJSON: points, markers, labels, lines, polygons,
 extrusions and geodesic circles. Layers are styled with MapLibre Style Specification properties and expressions,
 picked and dragged with the pointer, and changed one feature at a time without a rebuild. glTF models are in the
 [models guide](models.md); MapLibre styles over vector tiles are in the [vector tiles guide](vector-tiles.md), and their
@@ -13,9 +13,9 @@ building heights at the end of this guide.
 ## Quick start
 
 ```ts
-import { createGlobeLayers, DataLayer } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 await globe.ready;
 const { stack } = createGlobeLayers(globe);
@@ -53,9 +53,9 @@ A `DataLayer` holds one kind of primitive. Its `data` is a `FeatureCollection`, 
   from north, default 0) give a geodesic ellipse on the WGS84 ellipsoid, true to its ground size at any latitude.
 
 ```ts
-import { createGlobeLayers, DataLayer } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 stack.add(
@@ -127,9 +127,9 @@ Specialised layers build on `DataLayer`: `LabelLayer` (collision and fades), `Cl
 | `{ absoluteAltitudeMeters }` | Metres above the WGS84 ellipsoid; a third coordinate overrides it for its vertex | none                            |
 
 ```ts
-import { createGlobeLayers, DataLayer } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 stack.add(
@@ -155,9 +155,9 @@ is a literal. A property the kind does not read, or a malformed expression, thro
 list every fault.
 
 ```ts
-import { createGlobeLayers, DataLayer, StyleError } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer, StyleError } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 stack.add(
@@ -189,9 +189,9 @@ cluster's properties are `cluster`, `cluster_id`, `point_count` and `point_count
 point keeps its own feature's id and properties. `clusterExtent(clusterId)` gives the bounds of a cluster's points.
 
 ```ts
-import { ClusterLayer, createGlobeLayers } from '@vibeglobe/layers';
+import { ClusterLayer, createGlobeLayers } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 const sensors = stack.add(
@@ -218,7 +218,7 @@ sensors.on('click', async ({ feature }) => {
 `cluster` takes `radiusPx` (default 50, at 512-pixel tiles), `maxZoom` (the last zoom with clusters, default 16),
 `minPoints` (default 2) and `transitionMs` (default 300). `kind: 'marker'` clusters markers instead of points.
 `setData` replaces every point and rebuilds the index. The index is built on the main thread by default;
-`engine: workerClusterEngine(workers)` of `@vibeglobe/layers/cluster-worker`, with the `createWorkers()` given to the
+`engine: workerClusterEngine(workers)` of `vibeglobe/layers/cluster-worker`, with the `createWorkers()` given to the
 globe, builds and queries it in a worker.
 
 ## Labels
@@ -229,9 +229,9 @@ Labels take `text-field`, `text-font` (a font stack; the system's fonts follow i
 out.
 
 ```ts
-import { createGlobeLayers, LabelLayer } from '@vibeglobe/layers';
+import { createGlobeLayers, LabelLayer } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 stack.add(
@@ -270,9 +270,9 @@ above, points on top. `data` is a URL (`{ url }` or a `URL`), a `File` or `Blob`
 `FeatureCollection`; `format` is `geojsonFormat` (default), `kmlFormat` (KML and KMZ) or `gpxFormat`.
 
 ```ts
-import { createGlobeLayers, GeoJsonLayer, kmlFormat } from '@vibeglobe/layers';
+import { createGlobeLayers, GeoJsonLayer, kmlFormat } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><name>Bridge</name>
 <LineString><coordinates>12.46,41.9 12.48,41.91</coordinates></LineString></Placemark></kml>`;
@@ -313,9 +313,9 @@ sets a feature's `selected` state, which styles read; a click does not select by
 `clearSelection`, `selection` and `hovered` complete it.
 
 ```ts
-import { createGlobeLayers, DataLayer } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const map = document.getElementById('map'); // the globe's container
 const { stack, interaction } = createGlobeLayers(globe, map ? { element: map } : {});
@@ -358,9 +358,9 @@ are `paddingPx` (a number, or `{ top, right, bottom, left }`), `movement` (`'fly
 `tiltDeg`. It returns the globe's `CameraMovement`, a promise of the outcome with `cancel()`.
 
 ```ts
-import { createGlobeLayers, DataLayer, fitObjects } from '@vibeglobe/layers';
+import { createGlobeLayers, DataLayer, fitObjects } from 'vibeglobe/layers';
 
-declare const globe: import('@vibeglobe/core').Globe;
+declare const globe: import('vibeglobe/core').Globe;
 
 const { stack } = createGlobeLayers(globe);
 const fleet = stack.add(
@@ -405,7 +405,7 @@ asks for frames with `requestFrame`: the globe draws only when asked. The built-
 
 ## Buildings
 
-`@vibeglobe/layers/vector-tiles` extrudes vector-tile buildings (`buildingHeight`, `extrudeBuilding`). The height of a
+`vibeglobe/layers/vector-tiles` extrudes vector-tile buildings (`buildingHeight`, `extrudeBuilding`). The height of a
 building comes from its tags, in this order:
 
 1. `height` (or OpenMapTiles' `render_height`), in metres; `m`, `ft` and `'` suffixes are read.

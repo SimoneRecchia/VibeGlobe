@@ -4,8 +4,8 @@ title: UI controls and GIS utilities
 
 # UI controls and GIS utilities
 
-The engine runs without any UI. `@vibeglobe/ui` adds ready-made controls over a globe (`createUi`), styled by CSS
-variables and translated; `@vibeglobe/ui/minimap` holds the overview minimap. `@vibeglobe/gis` holds the pure
+The engine runs without any UI. `vibeglobe/ui` adds ready-made controls over a globe (`createUi`), styled by CSS
+variables and translated; `vibeglobe/ui/minimap` holds the overview minimap. `vibeglobe/gis` holds the pure
 functions behind them, usable without the renderer or the UI: coordinate formats and parsing, reference-system
 transforms, geodesic measurement, view state in URLs and grids on the ground. Mouse, touch
 and keyboard navigation is in the [controls guide](controls.md); in Vue, add a control with `<VibeControl>`
@@ -14,8 +14,8 @@ and keyboard navigation is in the [controls guide](controls.md); in Vue, add a c
 ## Quick start
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addDefaultControls, createUi, ZoomControl } from '@vibeglobe/ui';
+import type { Globe } from 'vibeglobe/core';
+import { addDefaultControls, createUi, ZoomControl } from 'vibeglobe/ui';
 
 declare const globe: Globe;
 
@@ -60,7 +60,7 @@ Each control is a class taking an options object with `id` and `position`; `ui.a
 - `addAllControls` adds search and the 2D / 3D / Auto toggle (top left), zoom, compass, tilt, home, geolocation, layers
   and fullscreen (top right), the readout and the scale bar (bottom left) and attribution (bottom right).
 - Both take `geocoder` and `debug`; `addAllControls` also takes `layers` (the layer switcher's options) and `tilt`.
-- `MinimapControl` is imported from `@vibeglobe/ui/minimap`, so an application without it never loads it.
+- `MinimapControl` is imported from `vibeglobe/ui/minimap`, so an application without it never loads it.
 - The search box makes no request without a `geocoder`: the application supplies one implementing `GeocoderService`
   (`search(query, { signal, language })` resolving `GeocoderResult[]`).
 
@@ -72,7 +72,7 @@ optionally `localize()`. `context` gives the globe (its public API), the map con
 extended by subclassing.
 
 ```ts
-import type { ControlContext, UiControl } from '@vibeglobe/ui';
+import type { ControlContext, UiControl } from 'vibeglobe/ui';
 
 class NorthUpButton implements UiControl {
   readonly id = 'north-up';
@@ -145,9 +145,9 @@ toolbar drives directly: `DrawingTool` holds the shapes and the mode, `DrawLayer
 given colors, and `DrawInput` turns pointer, touch and keyboard input on the map container into the tool's commands.
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import * as layersModule from '@vibeglobe/layers';
-import { DrawingTool, DrawInput, DrawLayers } from '@vibeglobe/ui';
+import type { Globe } from 'vibeglobe/core';
+import * as layersModule from 'vibeglobe/layers';
+import { DrawingTool, DrawInput, DrawLayers } from 'vibeglobe/ui';
 
 declare const globe: Globe;
 declare const cursor: HTMLElement; // the keyboard cursor, positioned over the map by DrawInput
@@ -172,9 +172,9 @@ cross itself). `tool.features()` returns the shapes as GeoJSON features.
 ## View state in a URL
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { viewStateFromUrl, viewStateOf, viewStateToUrl } from '@vibeglobe/gis';
-import { applyViewState } from '@vibeglobe/ui';
+import type { Globe } from 'vibeglobe/core';
+import { viewStateFromUrl, viewStateOf, viewStateToUrl } from 'vibeglobe/gis';
+import { applyViewState } from 'vibeglobe/ui';
 
 declare const globe: Globe;
 
@@ -193,7 +193,7 @@ read it as JSON. Readers return undefined for malformed input and clamp or wrap 
 ## GIS utilities
 
 ```ts
-import { formatCoordinate, measureDistance, parseCoordinate, transformCoordinates } from '@vibeglobe/gis';
+import { formatCoordinate, measureDistance, parseCoordinate, transformCoordinates } from 'vibeglobe/gis';
 
 const milan = { longitudeDeg: 9.19, latitudeDeg: 45.4642 };
 const rome = { longitudeDeg: 12.4964, latitudeDeg: 41.9028 };
@@ -225,7 +225,7 @@ larger square has its spacing doubled until it fits. It throws a `RangeError` wh
 of meters.
 
 ```ts
-import { gridLines } from '@vibeglobe/gis';
+import { gridLines } from 'vibeglobe/gis';
 
 const lines = gridLines({ center: { longitudeDeg: 13.0, latitudeDeg: 52.3 }, halfSizeM: 400, spacingM: 10 });
 ```

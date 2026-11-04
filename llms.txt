@@ -7,7 +7,7 @@
 
 Start with the integration guide to put a globe in an application, then read the guide of the task at hand. Every
 `ts` example in the guides type-checks against the packages. The TSDoc of each export (in the `.d.ts` files) holds the
-per-option details. Installed, this file and the guides are in `node_modules/@vibeglobe/core/`.
+per-option details. Installed, this file and the guides are in `node_modules/vibeglobe/`.
 
 ## Start
 

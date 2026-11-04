@@ -1,4 +1,4 @@
-# @vibeglobe/tools
+# vibeglobe/tools
 
 The `vibeglobe-data` command line, also usable as a Node library: the data pipeline that builds tile folders, PMTiles
 and MBTiles packages from open datasets (imagery, terrain, vector tiles, the global base image), and the offline
@@ -8,16 +8,16 @@ browser never loads it.
 
 ## Install
 
-Node.js 22.18 or later. Depends on `@vibeglobe/core` and `pmtiles`; no peer dependencies. Docker runs GDAL for datasets
-with a `convert` step and for `verify`.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/tools`. Node.js 22.18 or later; the command is
+`npx vibeglobe-data`. Docker runs GDAL for datasets with a `convert` step and for `verify`.
 
 ## Entry points
 
-| Import path        | What                                                                                                  |
-| ------------------ | ----------------------------------------------------------------------------------------------------- |
-| `vibeglobe-data`   | The command: `estimate`, `build` and its steps, `verify`, `pack`, `licenses`, `help`                  |
-| `@vibeglobe/tools` | `main`, `loadConfig`, `estimateBuild`, `runBuild`, `formatEstimate`, `PROVIDER_PROFILES`              |
-| `configs/`         | The shipped configurations, named by file: `europe.json`, `world-satellite.json`, `world-low.json`, … |
+| Import path       | What                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `vibeglobe-data`  | The command: `estimate`, `build` and its steps, `verify`, `pack`, `licenses`, `help`                  |
+| `vibeglobe/tools` | `main`, `loadConfig`, `estimateBuild`, `runBuild`, `formatEstimate`, `PROVIDER_PROFILES`              |
+| `configs/`        | The shipped configurations, named by file: `europe.json`, `world-satellite.json`, `world-low.json`, … |
 
 ## Example
 
@@ -28,9 +28,9 @@ npx vibeglobe-data build europe.json --yes --out ./europe-package \
 ```
 
 ```ts
-import { estimateBuild, formatEstimate, loadConfig } from '@vibeglobe/tools';
+import { estimateBuild, formatEstimate, loadConfig } from 'vibeglobe/tools';
 
-const loaded = loadConfig('node_modules/@vibeglobe/tools/configs/europe.json');
+const loaded = loadConfig('node_modules/vibeglobe/tools/configs/europe.json');
 console.log(formatEstimate(estimateBuild(loaded, { sample: false })));
 ```
 

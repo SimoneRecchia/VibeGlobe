@@ -121,16 +121,16 @@ function application(fetchImpl: typeof fetch) {
       toEqual: (wanted: unknown) => expect(value, JSON.stringify(value)).toEqual(wanted),
     }),
     __modules: {
-      '@vibeglobe/core': {
+      'vibeglobe/core': {
         ...core,
         createGlobe: () => ({ imageryLayers: layers, setPolarCapColors: () => undefined }),
       },
-      '@vibeglobe/gis': gis,
-      '@vibeglobe/sources': sources,
-      '@vibeglobe/sources/conformance': conformance,
-      '@vibeglobe/sources/geotiff': geotiff,
-      '@vibeglobe/sources/mbtiles': mbtiles,
-      '@vibeglobe/sources/vector': vector,
+      'vibeglobe/gis': gis,
+      'vibeglobe/sources': sources,
+      'vibeglobe/sources/conformance': conformance,
+      'vibeglobe/sources/geotiff': geotiff,
+      'vibeglobe/sources/mbtiles': mbtiles,
+      'vibeglobe/sources/vector': vector,
     },
   };
 }
@@ -141,7 +141,7 @@ function runnable(code: string): string {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, verbatimModuleSyntax: false },
   }).outputText;
   return js
-    .replace(/import \{([^}]+)\} from '(@vibeglobe\/[\w/-]+)';/g, (_, names: string, from: string) => {
+    .replace(/import \{([^}]+)\} from '(vibeglobe\/[\w/-]+)';/g, (_, names: string, from: string) => {
       const values = names
         .split(',')
         .map((n) => n.trim())

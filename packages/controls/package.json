@@ -1,6 +1,7 @@
 {
   "name": "@vibeglobe/controls",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "private": true,
   "description": "VibeGlobe controls: input handling, gestures and navigation logic.",
   "license": "MPL-2.0",
   "type": "module",
@@ -27,6 +28,6 @@
     "!dist/test-harness.*"
   ],
   "dependencies": {
-    "@vibeglobe/core": "0.1.0"
+    "@vibeglobe/core": "0.2.0"
   }
 }

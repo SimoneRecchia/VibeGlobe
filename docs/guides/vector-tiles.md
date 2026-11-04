@@ -4,17 +4,17 @@ title: Vector tiles
 
 # Vector tiles
 
-`addVectorTiles` of `@vibeglobe/layers/vector-tiles` draws a [MapLibre Style Specification](https://maplibre.org/maplibre-style-spec/)
+`addVectorTiles` of `vibeglobe/layers/vector-tiles` draws a [MapLibre Style Specification](https://maplibre.org/maplibre-style-spec/)
 style from Mapbox Vector Tiles on the globe, through the globe-to-flat morph and on the flat map, draped on terrain.
-`createVectorTileTarget` of `@vibeglobe/renderer/vector-tiles` is its renderer side. The style and its tiles are the
+`createVectorTileTarget` of `vibeglobe/renderer/vector-tiles` is its renderer side. The style and its tiles are the
 application's: VibeGlobe ships no map. For application data from GeoJSON, use [data layers](data-layers.md).
 
 ## Quick start
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { addVectorTiles } from '@vibeglobe/layers/vector-tiles';
-import { createVectorTileTarget } from '@vibeglobe/renderer/vector-tiles';
+import type { Globe } from 'vibeglobe/core';
+import { addVectorTiles } from 'vibeglobe/layers/vector-tiles';
+import { createVectorTileTarget } from 'vibeglobe/renderer/vector-tiles';
 
 declare const globe: Globe;
 
@@ -48,7 +48,7 @@ sprite.
 `setVisibility`, `setLayerZoomRange`, `addLayer` and `removeLayer`. No tile is downloaded again.
 
 ```ts
-import type { VectorTileLayer } from '@vibeglobe/layers/vector-tiles';
+import type { VectorTileLayer } from 'vibeglobe/layers/vector-tiles';
 
 declare const layer: VectorTileLayer;
 
@@ -107,7 +107,7 @@ layers from the top down). Each `PickedVectorFeature` has `layerId`, `source`, `
 `hover`, `hoverend` and `click` events, and the layer sets the `hover` and `selected` feature states.
 
 ```ts
-import type { VectorTileLayer } from '@vibeglobe/layers/vector-tiles';
+import type { VectorTileLayer } from 'vibeglobe/layers/vector-tiles';
 
 declare const layer: VectorTileLayer;
 
@@ -134,7 +134,7 @@ are, and `labelAnchors` still lists it. It fades out over 300 ms on the engine c
 `placedLabels()` and picking leave hidden labels out once they have faded.
 
 ```ts
-import type { VectorTileLayer } from '@vibeglobe/layers/vector-tiles';
+import type { VectorTileLayer } from 'vibeglobe/layers/vector-tiles';
 
 declare const layer: VectorTileLayer;
 declare const marker: HTMLElement;
@@ -149,16 +149,16 @@ if (italy) marker.style.transform = `translate(${italy.screenPoint.xPx}px, ${ita
 
 `VectorTilesOptions`:
 
-| Option            | Type                             | Default            | Effect                                                         |
-| ----------------- | -------------------------------- | ------------------ | -------------------------------------------------------------- |
-| `style`           | URL `string` or style JSON       | required           | The style                                                      |
-| `target`          | `(renderer) => VectorTileTarget` | required           | `createVectorTileTarget` of `@vibeglobe/renderer/vector-tiles` |
-| `element`         | `HTMLElement`                    | none               | Whose pointer events hover and click features                  |
-| `transformUrl`    | `(url) => string`                | none               | Rewrites TileJSON, tile, glyph and sprite URLs                 |
-| `transport`       | `TileTransport`                  | `fetchTransport()` | Tile requests                                                  |
-| `fetch`           | `typeof fetch`                   | the global `fetch` | Style, TileJSON, glyph and sprite documents                    |
-| `localFontFamily` | `string`                         | none               | CSS font family for characters the glyphs lack                 |
-| `fontFamily`      | `string`                         | none               | CSS font family every label draws in, no glyphs fetched        |
+| Option            | Type                             | Default            | Effect                                                        |
+| ----------------- | -------------------------------- | ------------------ | ------------------------------------------------------------- |
+| `style`           | URL `string` or style JSON       | required           | The style                                                     |
+| `target`          | `(renderer) => VectorTileTarget` | required           | `createVectorTileTarget` of `vibeglobe/renderer/vector-tiles` |
+| `element`         | `HTMLElement`                    | none               | Whose pointer events hover and click features                 |
+| `transformUrl`    | `(url) => string`                | none               | Rewrites TileJSON, tile, glyph and sprite URLs                |
+| `transport`       | `TileTransport`                  | `fetchTransport()` | Tile requests                                                 |
+| `fetch`           | `typeof fetch`                   | the global `fetch` | Style, TileJSON, glyph and sprite documents                   |
+| `localFontFamily` | `string`                         | none               | CSS font family for characters the glyphs lack                |
+| `fontFamily`      | `string`                         | none               | CSS font family every label draws in, no glyphs fetched       |
 
 ## Rules and pitfalls
 

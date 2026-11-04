@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Globe, ImagerySource } from '@vibeglobe/core';
-import { xyzImagery } from '@vibeglobe/sources';
-import { VibeGlobe } from '@vibeglobe/vue';
+import type { Globe, ImagerySource } from 'vibeglobe/core';
+import { xyzImagery } from 'vibeglobe/sources';
+import { VibeGlobe } from 'vibeglobe/vue';
 import { onMounted, shallowRef } from 'vue';
 
 const component = shallowRef<{ globe: Globe | undefined }>();

@@ -1,12 +1,13 @@
 // Builds the consumer projects in examples/ outside the repository, from the packed tarballs (or, with --registry, from
 // the public npm registry), serves them under a strict Content Security Policy and checks them in Chromium.
 //
-//   node scripts/release/check-consumers.ts [F503] [F531] [F532]   (all three by default)
+//   node scripts/release/check-consumers.ts [F503] [F531] [F702] [F703]   (all four by default)
 //     F503  the initial bundle of a core-and-renderer app within budget, each optional module fetched only when enabled
 //     F531  worker and WebAssembly load in a Vite and a Nuxt build with no asset configuration, then from a separate
 //           static server; nothing needs 'unsafe-eval'
-//     F532  only the core, the renderer, one imagery source and the basic worker installed; renders and navigates
-//   node scripts/release/check-consumers.ts --registry <version>   F559: the same consumer installed from npm
+//     F702  only `vibeglobe` installed, a globe started in one call with createVibeGlobe; renders and navigates
+//     F703  an app importing only the core, the renderer, one imagery source and the basic worker bundles only those
+//   node scripts/release/check-consumers.ts --registry <version>   F559: the same consumers installed from npm
 //
 // Run `npm run build` first. Third-party dependencies come from the public registry, with no credentials.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,11 +19,11 @@ import { PNG } from 'pngjs';
 import { gpuArgs } from '../browser/gpu-args.ts';
 import { ROOT_DIR } from '../workspace.ts';
 import { serveSite, type Site } from './serve.ts';
-import { freshDir, installTarballs, installedEnginePackages, packAll, type PackedPackage } from './tarballs.ts';
+import { freshDir, installTarballs, packAll, type PackedPackage } from './tarballs.ts';
 
 const BASE_IMAGE = join(ROOT_DIR, 'apps/playground/public/imagery/natural-earth-4096.jpg');
-/** Packages a core-and-renderer application must not pull in (F532). */
-const OPTIONAL_PACKAGES = ['layers', 'ui', 'offline', 'vue', 'web-component'].map((name) => `@vibeglobe/${name}`);
+/** Modules a core-and-renderer application must not bundle (F703). */
+const OPTIONAL_MODULES = ['layers', 'ui', 'offline', 'vue', 'web-component'];
 
 let failures = 0;
 function check(ok: boolean, message: string): void {
@@ -31,11 +32,7 @@ function check(ok: boolean, message: string): void {
 }
 
 /** Copies an example outside the repository, installs it and builds it; returns the project directory. */
-function buildExample(
-  example: string,
-  engine: readonly string[],
-  install: { packed: readonly PackedPackage[] } | { version: string },
-): string {
+function buildExample(example: string, install: { packed: readonly PackedPackage[] } | { version: string }): string {
   const project = freshDir(example);
   cpSync(join(ROOT_DIR, 'examples', example), project, {
     recursive: true,
@@ -43,12 +40,12 @@ function buildExample(
   });
   mkdirSync(join(project, 'public'), { recursive: true });
   cpSync(BASE_IMAGE, join(project, 'public/natural-earth-4096.jpg'));
-  if ('packed' in install) installTarballs(project, install.packed, engine);
+  if ('packed' in install) installTarballs(project, install.packed);
   else {
     // From the public registry like any other dependency: no .npmrc, no token, the default registry.
     const manifestPath = join(project, 'package.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { dependencies?: Record<string, string> };
-    const dependencies = { ...manifest.dependencies, ...Object.fromEntries(engine.map((n) => [n, install.version])) };
+    const dependencies = { ...manifest.dependencies, vibeglobe: install.version };
     writeFileSync(manifestPath, JSON.stringify({ ...manifest, dependencies }, null, 2));
     execFileSync(
       'npm',
@@ -153,7 +150,7 @@ function changedShare(a: PNG, b: PNG): number {
   return changed / (a.width * a.height);
 }
 
-/** F532 (and F559's rendering step): renders the globe with tiled imagery and navigates. */
+/** F531, F702 (and F559's rendering step): renders the globe with tiled imagery and navigates. */
 async function checkRendersAndNavigates(browser: Browser, site: Site, label: string): Promise<void> {
   const { page, errors, fetched } = await open(browser, `${site.url}?backend=webgl2`);
   const first = await waitForImagery(page, 'minimalGlobe');
@@ -225,6 +222,19 @@ async function checkCustomAssetUrls(browser: Browser, project: string, label: st
   await site.close();
   await assetServer.close();
   rmSync(assets, { recursive: true, force: true });
+}
+
+/** F703: the application imports only the core, the renderer, one source and the basic worker, and bundles only those. */
+function checkOnlyImportedModules(project: string, label: string): void {
+  const maps = execFileSync('find', [join(project, 'dist'), '-name', '*.js.map'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((file) => file !== '');
+  const sources = maps.flatMap((map) => (JSON.parse(readFileSync(map, 'utf8')) as { sources: string[] }).sources);
+  const bundled = OPTIONAL_MODULES.filter((name) => sources.some((source) => source.includes(`/vibeglobe/${name}/`)));
+  check(
+    sources.some((source) => source.includes('/vibeglobe/core/')) && bundled.length === 0,
+    `${label}: bundles vibeglobe/core and none of ${OPTIONAL_MODULES.map((name) => `vibeglobe/${name}`).join(', ')}${bundled.length ? `: ${bundled.join(', ')} came in` : ''}`,
+  );
 }
 
 /** F531 step 3: nothing in the build needs 'unsafe-eval': no eval, no Function constructor, no blob or data workers. */
@@ -329,25 +339,17 @@ const registryVersion = registryIndex >= 0 ? args[registryIndex + 1] : undefined
 const entries = new Set(
   args.filter((arg, index) => /^F\d+$/.test(arg) && (registryIndex < 0 || index !== registryIndex + 1)),
 );
-if (entries.size === 0) for (const entry of ['F503', 'F531', 'F532']) entries.add(entry);
+if (entries.size === 0) for (const entry of ['F503', 'F531', 'F702', 'F703']) entries.add(entry);
 if (registryVersion !== undefined) entries.add('F559');
-const MINIMAL_ENGINE = ['@vibeglobe/core', '@vibeglobe/renderer', '@vibeglobe/sources', '@vibeglobe/worker'];
 
 const browser = await launch();
 const packed = registryVersion === undefined ? packAll() : [];
 try {
-  if (entries.has('F531') || entries.has('F532') || entries.has('F559')) {
-    const label = registryVersion === undefined ? 'vite' : `npm ${registryVersion}`;
-    const project = buildExample(
-      'minimal-globe',
-      MINIMAL_ENGINE,
-      registryVersion === undefined ? { packed } : { version: registryVersion },
-    );
-    if (entries.has('F532')) {
-      const installed = installedEnginePackages(project);
-      const optional = installed.filter((name) => OPTIONAL_PACKAGES.includes(name));
-      check(optional.length === 0, `F532: installs ${installed.join(', ')}; none of ${OPTIONAL_PACKAGES.join(', ')}`);
-    }
+  const install = registryVersion === undefined ? { packed } : { version: registryVersion };
+  const label = registryVersion === undefined ? 'vite' : `npm ${registryVersion}`;
+  if (entries.has('F531') || entries.has('F703') || entries.has('F559')) {
+    const project = buildExample('minimal-globe', install);
+    if (entries.has('F703')) checkOnlyImportedModules(project, `F703 ${label}`);
     const site = await serveSite(join(project, 'dist'));
     await checkRendersAndNavigates(browser, site, `${[...entries].join('/')} ${label}`);
     await site.close();
@@ -357,8 +359,15 @@ try {
     }
     removeProject(project);
   }
+  if (entries.has('F702') || entries.has('F559')) {
+    const project = buildExample('one-call', install);
+    const site = await serveSite(join(project, 'dist'));
+    await checkRendersAndNavigates(browser, site, `F702 createVibeGlobe ${label}`);
+    await site.close();
+    removeProject(project);
+  }
   if (entries.has('F531') && registryVersion === undefined) {
-    const project = buildExample('nuxt-globe', ['@vibeglobe/vue', '@vibeglobe/sources'], { packed });
+    const project = buildExample('nuxt-globe', { packed });
     // Nuxt writes its configuration as an inline script: the page needs 'unsafe-inline', never 'unsafe-eval'.
     const site = await serveSite(join(project, '.output/public'), { inlineScripts: true });
     const { page, errors, fetched } = await open(browser, `${site.url}?backend=webgl2`);
@@ -378,10 +387,7 @@ try {
     removeProject(project);
   }
   if (entries.has('F503')) {
-    const engine = ['core', 'renderer', 'sources', 'worker', 'layers', 'ui', 'offline'].map(
-      (name) => `@vibeglobe/${name}`,
-    );
-    const project = buildExample('lazy-modules', engine, { packed });
+    const project = buildExample('lazy-modules', { packed });
     const site = await serveSite(join(project, 'dist'));
     await checkLazyModules(browser, project, site);
     await site.close();

@@ -1,7 +1,7 @@
 // A consumer application that starts with only the core and the renderer (the pinned base imagery) and loads each
 // optional module with a dynamic import when it is enabled (F503).
-import { createGlobe, type Globe } from '@vibeglobe/core';
-import { createRenderer } from '@vibeglobe/renderer';
+import { createGlobe, type Globe } from 'vibeglobe/core';
+import { createRenderer } from 'vibeglobe/renderer';
 
 declare global {
   interface Window {

@@ -2,7 +2,7 @@
 // tarballs into a strict TypeScript consumer outside the repository and type-checks it, failing on any file it reads
 // from outside that project.
 // Usage: node scripts/release/check-tarballs.ts (after npm run build).
-import { cpSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, sep } from 'node:path';
 import { ROOT_DIR } from '../workspace.ts';
@@ -36,18 +36,17 @@ cpSync(join(ROOT_DIR, 'examples/strict-consumer'), project, {
   recursive: true,
   filter: (path) => !path.includes(`${sep}node_modules`),
 });
-installTarballs(
-  project,
-  packed,
-  packed.map((pkg) => pkg.name),
-);
+installTarballs(project, packed);
 const tsc = join(ROOT_DIR, 'node_modules/typescript/bin/tsc');
 const typescriptLib = dirname(join(ROOT_DIR, 'node_modules/typescript/lib/lib.d.ts'));
 try {
   const listed = execFileSync('node', [tsc, '-p', project, '--listFiles'], { encoding: 'utf8' });
+  // TypeScript lists real paths: on macOS the temporary directory /var/… is /private/var/….
+  const inProject = (file: string): boolean =>
+    [project, realpathSync(project)].some((dir) => file.startsWith(dir + sep));
   const outside = listed
     .split('\n')
-    .filter((file) => file !== '' && !file.startsWith(project + sep) && !file.startsWith(typescriptLib + sep));
+    .filter((file) => file !== '' && !inProject(file) && !file.startsWith(typescriptLib + sep));
   for (const file of outside) console.error(`FAIL  the consumer read ${file}, outside the project and its tarballs`);
   failed ||= outside.length > 0;
   if (outside.length === 0) console.log('ok    strict consumer type-checks against the tarballs alone');

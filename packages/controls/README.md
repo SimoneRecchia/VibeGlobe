@@ -1,25 +1,25 @@
-# @vibeglobe/controls
+# vibeglobe/controls
 
 Mouse, trackpad, touch and keyboard navigation for a VibeGlobe globe. `createControls` returns the factory that
 `GlobeOptions.controls` takes, with commands for an application's own buttons (`zoomIn`, `resetNorth`, …), the
 `'free'` and `'north-up'` navigation modes and the tilt policy. An application needs it for a globe the user moves;
-`@vibeglobe/vue` and `@vibeglobe/web-component` create it themselves.
+`vibeglobe/vue` and `vibeglobe/web-component` create it themselves.
 
 ## Install
 
-Needs `@vibeglobe/core` (a dependency).
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/controls`.
 
 ## Entry points
 
-| Import path           | What                                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `@vibeglobe/controls` | `createControls`, `watchClicks`, `DEFAULT_CONTROLS_OPTIONS`, `DEFAULT_TILT_POLICY`, the option types |
+| Import path          | What                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `vibeglobe/controls` | `createControls`, `watchClicks`, `DEFAULT_CONTROLS_OPTIONS`, `DEFAULT_TILT_POLICY`, the option types |
 
 ## Example
 
 ```ts
-import { createControls, watchClicks } from '@vibeglobe/controls';
-import { createGlobe } from '@vibeglobe/core';
+import { createControls, watchClicks } from 'vibeglobe/controls';
+import { createGlobe } from 'vibeglobe/core';
 
 const controls = createControls({ navigationMode: 'north-up', tiltPolicy: true, gestures: { boxZoom: false } });
 const globe = createGlobe({ container, renderer, controls, baseImageryUrl: '/vibeglobe/fallback-base.jpg' });

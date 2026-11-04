@@ -1,6 +1,6 @@
 // Data layers: the layer stack drawn on the running globe.
-import type { Globe } from '@vibeglobe/core';
-import { createGlobeLayers } from '@vibeglobe/layers';
+import type { Globe } from 'vibeglobe/core';
+import { createGlobeLayers } from 'vibeglobe/layers';
 
 export async function enable(globe: Globe): Promise<string> {
   await globe.ready;

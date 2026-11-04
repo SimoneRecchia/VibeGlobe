@@ -1,4 +1,4 @@
-# @vibeglobe/quality
+# vibeglobe/quality
 
 Quality presets and adaptive quality for a VibeGlobe globe. `createQuality` applies a preset (`low`, `medium`, `high`
 or `ultra`), or chooses one from the device's capabilities, and then steps detail and resolution down while frames
@@ -7,19 +7,20 @@ without tuning the globe by hand. In Vue, the `qualityPreset` prop of `VibeGlobe
 
 ## Install
 
-`@vibeglobe/core` installs with it; there are no peer dependencies. It drives a globe only through its public API.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/quality`. It drives a globe only through its
+public API.
 
 ## Entry points
 
-| Import               | What                                                                                         |
-| -------------------- | -------------------------------------------------------------------------------------------- |
-| `@vibeglobe/quality` | `createQuality`, `QUALITY_PRESETS`, `choosePreset`, `FrameTimeGovernor`, `GOVERNOR_DEFAULTS` |
+| Import              | What                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `vibeglobe/quality` | `createQuality`, `QUALITY_PRESETS`, `choosePreset`, `FrameTimeGovernor`, `GOVERNOR_DEFAULTS` |
 
 ## Example
 
 ```ts
-import type { Globe } from '@vibeglobe/core';
-import { createQuality } from '@vibeglobe/quality';
+import type { Globe } from 'vibeglobe/core';
+import { createQuality } from 'vibeglobe/quality';
 
 declare const globe: Globe;
 

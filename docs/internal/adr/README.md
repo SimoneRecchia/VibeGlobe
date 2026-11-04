@@ -77,3 +77,4 @@ Conventions:
 | [0186](0186-provider-services.md)                    | Provider services: tile, terrain and geocoder services; ready providers in their own package                     | Accepted (partly superseded by 0187)                              |
 | [0187](0187-no-maps-in-the-library.md)               | No maps in the library: no provider package, the Europe preset is the playground's own                           | Accepted                                                          |
 | [0188](0188-no-consumer-named.md)                    | No consumer application named in the repository                                                                  | Accepted                                                          |
+| [0189](0189-one-npm-package.md)                      | One npm package: `vibeglobe`, the engine packages inside it under subpaths                                       | Accepted                                                          |

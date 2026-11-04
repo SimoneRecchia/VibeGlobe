@@ -1,11 +1,11 @@
 name: Release
 
 # ADR 0171. A release is started by hand (workflow_dispatch) with the version to release. The dry-run job always runs:
-# it sets the version, generates the changelog entry, builds, checks the tarballs and the consumer projects, creates
-# the version tag in its own checkout and runs `npm publish --dry-run` for every package. Only when `publish` is
-# chosen, on main, does the publish job run: it waits in the `npm-release` environment until the owner approves it
-# (required reviewers), then publishes to the public npm registry under @vibeglobe with the NPM_TOKEN secret of that
-# environment and pushes the release commit and tag. Pull requests that change the release tooling run the dry run.
+# it sets the version, generates the changelog entry, builds, packs and checks the single `vibeglobe` package and the
+# consumer projects, creates the version tag in its own checkout and runs `npm publish --dry-run` (ADR 0189). Only when
+# `publish` is chosen, on main, does the publish job run: it waits in the `npm-release` environment until the owner
+# approves it (required reviewers), then publishes `vibeglobe` to the public npm registry with the NPM_TOKEN secret of
+# that environment and pushes the release commit and tag. Pull requests that change the release tooling run the dry run.
 on:
   workflow_dispatch:
     inputs:
@@ -52,10 +52,10 @@ jobs:
       - run: npm ci
       - name: Release dry run (version, changelog, build, tarballs, tag, npm publish --dry-run)
         run: node scripts/release/release.ts "$VERSION"
-      - name: Consumer projects from the tarballs (F503, F531, F532)
+      - name: Consumer projects from the tarball (F503, F531, F702, F703)
         run: |
           npx tsc -b && npm run build:browser -w @vibeglobe/web-component
-          node scripts/release/check-consumers.ts F503 F531 F532
+          node scripts/release/check-consumers.ts F503 F531 F702 F703
       - name: No reference to the first consumer (F559)
         run: node scripts/release/check-consumer-names.ts
       - uses: actions/upload-artifact@v7

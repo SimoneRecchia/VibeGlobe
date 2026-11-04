@@ -1,27 +1,27 @@
-# @vibeglobe/web-component
+# vibeglobe/web-component
 
 The framework-neutral `<vibe-globe>` custom element: a globe configured by attributes, with the camera attributes
-followed at runtime, the ready-made controls of `@vibeglobe/ui` (`ui="all"`) and `CustomEvent`s. Use it in an
+followed at runtime, the ready-made controls of `vibeglobe/ui` (`ui="all"`) and `CustomEvent`s. Use it in an
 application without Vue, with another framework, or in a plain page. Importing the package registers nothing:
 `defineVibeGlobe()` does, so it is safe under server-side rendering.
 
 ## Install
 
-It brings `@vibeglobe/controls`, `@vibeglobe/core`, `@vibeglobe/renderer`, `@vibeglobe/sources`, `@vibeglobe/ui` and
-`@vibeglobe/worker`; install `@vibeglobe/sources` directly to build sources in your own code.
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/web-component`. Sources built in your own code
+come from `vibeglobe/sources`.
 
 ## Entry points
 
-| Import path                        | What                                                                               |
-| ---------------------------------- | ---------------------------------------------------------------------------------- |
-| `@vibeglobe/web-component`         | `defineVibeGlobe`, the `VibeGlobeElement` and event types                          |
-| `@vibeglobe/web-component/browser` | One ES module with the engine bundled, and its worker, for pages without a bundler |
+| Import path                       | What                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `vibeglobe/web-component`         | `defineVibeGlobe`, the `VibeGlobeElement` and event types                          |
+| `vibeglobe/web-component/browser` | One ES module with the engine bundled, and its worker, for pages without a bundler |
 
 ## Example
 
 ```ts
-import { xyzImagery } from '@vibeglobe/sources';
-import { defineVibeGlobe, type VibeGlobeElement } from '@vibeglobe/web-component';
+import { xyzImagery } from 'vibeglobe/sources';
+import { defineVibeGlobe, type VibeGlobeElement } from 'vibeglobe/web-component';
 
 defineVibeGlobe();
 const element = document.createElement('vibe-globe') as VibeGlobeElement;

@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-11-04: one npm package, `vibeglobe`; no maps, no providers, no consumer named (F701–F707)
+
+The owner's briefs of 2026-11-04, after the services: the library ships no map and no provider
+(`@vibeglobe/providers` removed, the Europe preset the playground's own in `apps/presets`, ADR 0187, F701); the
+repository names no consumer application (the checks keep the names as hashes, ADR 0188); and VibeGlobe is published
+as one npm package (ADR 0189, F702). The engine packages stay in `packages/`, private, each with its tests and budget;
+`scripts/release/tarballs.ts` packs them into `vibeglobe` under subpaths (`vibeglobe/core`, `vibeglobe/layers/vector-tiles`,
+…), their `@vibeglobe/<name>` imports rewritten to the package's own subpaths, with the guides and `llms.txt`. Every
+engine package is at 0.2.0. The release publishes that tarball alone (F704); the consumer checks install it alone,
+`examples/one-call` starts a globe with `createVibeGlobe` (F702), and the minimal consumer's source maps show it bundles
+none of the optional modules (F703, replacing F532). The public documentation imports `vibeglobe/<name>`. F555, F558,
+F568 and F570 are superseded by F705–F707 and F704. Still for the owner: running the Release workflow with `0.2.0`
+and approving its publish job.
+
 ## 2026-11-04: the engine knows no provider; one call starts it with the application's services (F699, F700, KB-343)
 
 The owner's brief: VibeGlobe depends only on interfaces, and anyone starts it on a page with one object of services

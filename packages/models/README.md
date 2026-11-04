@@ -1,28 +1,28 @@
-# @vibeglobe/models
+# vibeglobe/models
 
 glTF 2.0 and GLB parsing and validation for VibeGlobe, Draco and meshopt decoding, node transforms, and a
 renderer-neutral `ModelDescription` (flat typed arrays, materials as numbers, encoded images). It has no DOM and no
 three.js. The engine's worker program uses it to parse the glTF content of 3D Tiles. An application imports it to
 decode meshopt models for three.js's `GLTFLoader` (`meshoptWasmDecoder`), to parse 3D Tiles content without the worker
 program (`createModelTasks`), or to check a glTF file itself (`parseModel`). `ModelLayer` and `ModelSetLayer` of
-`@vibeglobe/layers/models` load models through the renderer's `gltf` loader instead.
+`vibeglobe/layers/models` load models through the renderer's `gltf` loader instead.
 
 ## Install
 
-`@vibeglobe/core` and `draco3d` install with it; there are no peer dependencies. Decoders are files the application
-hosts: meshoptimizer's module ships in `@vibeglobe/worker` as `wasm/meshopt-decoder.wasm`, and `loadDraco3d(wasmUrl)`
+Part of `vibeglobe`: `npm install vibeglobe`, then import from `vibeglobe/models`. Decoders are files the application
+hosts: meshoptimizer's module ships in `vibeglobe/worker` as `wasm/meshopt-decoder.wasm`, and `loadDraco3d(wasmUrl)`
 loads `draco_decoder.wasm` from your URL.
 
 ## Entry points
 
-| Import              | What                                                                                        |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| `@vibeglobe/models` | `parseModel`, `validateGltf`, `createModelLoader`, `createModelTasks`, `meshoptWasmDecoder` |
+| Import             | What                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `vibeglobe/models` | `parseModel`, `validateGltf`, `createModelLoader`, `createModelTasks`, `meshoptWasmDecoder` |
 
 ## Example
 
 ```ts
-import { meshoptWasmDecoder, ModelError, parseModel } from '@vibeglobe/models';
+import { meshoptWasmDecoder, ModelError, parseModel } from 'vibeglobe/models';
 
 declare const file: File;
 

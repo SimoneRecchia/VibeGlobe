@@ -55,6 +55,11 @@ function typeErrors(examples: ReadonlyMap<string, string>): string[] {
   };
   host.fileExists = (name) => files.has(name) || fileExists(name);
   host.readFile = (name) => files.get(name) ?? readFile(name);
+  // `vibeglobe/<part>` is a subpath of the published package; in the workspace it is the `@vibeglobe/<part>` package.
+  host.resolveModuleNameLiterals = (literals, containingFile) =>
+    literals.map((literal) =>
+      ts.resolveModuleName(literal.text.replace(/^vibeglobe\//, '@vibeglobe/'), containingFile, options, host),
+    );
   const program = ts.createProgram([...files.keys()], options, host);
   return ts
     .getPreEmitDiagnostics(program)
@@ -79,7 +84,7 @@ it('every ts example of the guides and the READMEs type-checks against the packa
 });
 
 const REPOSITORY = 'https://github.com/SimoneRecchia/VibeGlobe/blob/main/';
-/** What travels in `@vibeglobe/core` (scripts/release/core-docs.ts): its documents link only among themselves. */
+/** What travels in the `vibeglobe` package (scripts/release/tarballs.ts): its documents link only among themselves. */
 const SHIPPED_WITH_CORE = ['llms.txt', 'docs/data-licenses.md', ...GUIDES];
 
 const linksOf = (path: string): string[] =>

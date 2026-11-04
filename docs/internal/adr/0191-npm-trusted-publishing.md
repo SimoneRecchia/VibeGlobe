@@ -1,6 +1,6 @@
 # 0191. Publishing through npm's trusted publishing, with no token
 
-- Status: Accepted
+- Status: Accepted (partly superseded by [ADR 0192](0192-release-on-github-release.md): the release runs on a GitHub release)
 - Date: 2026-11-04
 - Milestone: M15 (F709; partly supersedes ADR 0190)
 

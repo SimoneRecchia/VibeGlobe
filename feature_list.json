@@ -8479,6 +8479,18 @@
         "Assert the workflow is started by hand, has one job in the `npm-release` environment with `id-token: write` and npm 11.5.1 or later, and names no token or secret",
         "Configure the trusted publisher of `vibeglobe` on npmjs.com, run the workflow for a version and assert `vibeglobe@<version>` is on the public npm registry with its provenance"
       ],
+      "status": "superseded"
+    },
+    {
+      "id": "F710",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "Publishing a GitHub release publishes `vibeglobe`: the Release workflow runs on the published release, takes the version from its tag (`v1.2.3` or `1.2.3`), builds the engine at that tag, packs `vibeglobe` at that version and publishes it to the public npm registry through npm's trusted publishing (the workflow's GitHub OIDC identity, no npm token, provenance attached by npm). It does nothing else.",
+      "steps": [
+        "Unit-test that the release script publishes only for a GitHub release from the release workflow in CI with an OIDC identity, reads the version from the tag with or without a v, and sends pre-releases to the next dist-tag",
+        "Assert the workflow runs on published releases, has one job in the `npm-release` environment with `id-token: write` and npm 11.5.1 or later, passes the release's tag and names no token or secret",
+        "Configure the trusted publisher of `vibeglobe` on npmjs.com, publish a GitHub release tagged with a version and assert `vibeglobe@<version>` is on the public npm registry with its provenance"
+      ],
       "status": "pending"
     }
   ]

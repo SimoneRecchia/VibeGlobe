@@ -13,20 +13,19 @@ matching the version are in `node_modules/@vibeglobe/core/` (`llms.txt`, `docs/g
 ## The smallest globe
 
 ```ts
-import { OpenFreeMapTiles, PhotonGeocoder } from '@vibeglobe/providers';
+import { openFreeMapTiles, photonGeocoder } from '@vibeglobe/providers';
 import { createVibeGlobe } from 'vibeglobe';
 
 const { globe } = await createVibeGlobe(document.getElementById('map') as HTMLElement, {
-  tiles: new OpenFreeMapTiles(),
-  geocoder: new PhotonGeocoder(),
+  tiles: openFreeMapTiles(),
+  geocoder: photonGeocoder(),
   view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 5 },
 });
 ```
 
-The engine knows no map provider: it takes the application's services, a `TileService` (required), a
-`TerrainService` and a `GeocoderService` (optional), and turns off what a missing optional service would serve.
-`@vibeglobe/providers` implements them for MapTiler, Esri, OpenFreeMap and Photon; any other provider plugs in by
-implementing the same interfaces ([services guide](docs/guides/services.md)). The
+The engine knows no map provider: it takes the application's services, a `TileService` (required), a terrain and a
+`GeocoderService` (optional), and turns off what a missing optional service would serve. `@vibeglobe/providers`
+holds ready ones for MapTiler, Esri, OpenFreeMap and Photon; any other provider plugs in through the same interfaces ([services guide](docs/guides/services.md)). The
 [integration guide](docs/guides/integration.md) assembles the engine piece by piece, with Vue, Nuxt and the Web
 Component. For ready map types of Europe and the world from free sources, use the
 [Europe preset](docs/guides/europe-preset.md).

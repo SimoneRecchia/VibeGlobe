@@ -1,34 +1,19 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
- * The services an application plugs into the engine (ADR 0186): the engine knows no provider, only these interfaces.
- * Tiles are required; terrain and place search are optional, and without them the features they serve are off.
+ * The services an application plugs into the engine (ADR 0186): the engine knows no provider. Tiles are required; a
+ * terrain (`TerrainSource`) and place search are optional, and without them their features are off.
  */
 import type { ImageryLayerInput } from '../imagery/imagery-stack.js';
-import type { TerrainSource } from '../terrain/terrain-source.js';
 import type { AbortSignalLike } from './imagery-runtime.js';
 import type { GeoBounds } from './types.js';
 
-/**
- * Where the map's tiles come from (required): any provider, built on the generic sources of `@vibeglobe/sources`
- * (`xyzImagery`, `wmtsImagery`, `pmtilesImagery`, …) or on a source of its own. Read once, when the globe is created.
- */
+/** Where the map's tiles come from (required): raster layers, a vector style, or both, from any provider. */
 export interface TileService {
-  /** The raster layers, bottom first: sources, or layers of sources with their options; empty for a style-only map. */
-  imagery(): readonly ImageryLayerInput[];
-  /**
-   * Optional: a MapLibre style (its URL or JSON) of vector tiles drawn over the imagery: streets, labels, 3D buildings.
-   * Undefined for a map without one.
-   */
-  style?(): string | object | undefined;
-  /** Optional: rewrites every URL the style leads to before it is requested (a key, a mirror). */
-  transformUrl?(url: string): string;
-}
-
-/** The relief of the 3D view (optional): without it the surface is the WGS84 ellipsoid. */
-export interface TerrainService {
-  /** The terrain the surface is displaced to: `heightmapTerrain`, `quantizedMeshTerrain` or a source of its own. */
-  terrain(): TerrainSource;
+  /** The raster layers, bottom first: sources (`xyzImagery`, …) or layers of sources; empty for a style-only map. */
+  readonly imagery: readonly ImageryLayerInput[];
+  /** A MapLibre style, its URL or JSON, drawn over the imagery: streets, labels, 3D buildings. */
+  readonly style?: string | object;
 }
 
 /** A place a geocoder found (F208). */

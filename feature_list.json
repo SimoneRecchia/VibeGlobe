@@ -8324,7 +8324,7 @@
         "Unit-test that `createVibeGlobe` refuses a missing tile service, passes the services' imagery and terrain to the engine, gives the search box the geocoder, draws a tile service's style, and stops everything when the style fails to load",
         "Playwright test: a globe started with fixture tiles alone draws them on a flat surface with a search box for coordinates; with a terrain and a geocoder service it draws terrain and lists the geocoder's places; a style-only tile service draws its vector map"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F697",
@@ -8336,7 +8336,7 @@
         "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
         "Assert that no engine package exports a provider's adapter"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F698",
@@ -8348,6 +8348,29 @@
         "Install the two tarballs in a project outside the repository and start a globe with `createVibeGlobe` and `MapTilerTiles` in Chromium"
       ],
       "status": "failing"
+    },
+    {
+      "id": "F699",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The engine depends only on interfaces and starts on any page in one call: `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })` of `vibeglobe` takes a `TileService` (required: `{ imagery, style? }`, its raster layers and optionally a MapLibre style), a terrain (`TerrainSource`) and a `GeocoderService` (optional) with the engine's options, and sets up the renderer, the workers, navigation and the ready-made controls. Without a tile service it refuses to start; without terrain the surface is flat and without a geocoder the search box takes coordinates only, with no error.",
+      "steps": [
+        "Unit-test that `createVibeGlobe` refuses a missing tile service, passes the tiles and the terrain to the engine, gives the search box the geocoder, draws a tile service's style in the language asked, and stops everything when the style fails to load",
+        "Playwright test: a globe started with fixture tiles alone draws them on a flat surface with a search box for coordinates; with a terrain and a geocoder it draws terrain and lists the geocoder's places; a style-only tile service draws its vector map"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F700",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "No engine package holds a provider: an application connects any provider, a paid or proprietary one included, through the interfaces with the generic adapters and a profile of the provider's terms. The optional `@vibeglobe/providers` holds ready services as functions: `mapTilerTiles` and `mapTilerTerrain` (with the application's key), `esriTiles`, `openFreeMapTiles`, `photonGeocoder`, and the OpenStreetMap sources, each with its credits and the loading features its terms forbid.",
+      "steps": [
+        "Unit-test each provider's requests (URL, key or token, tile size, levels), credits and profile, and Photon's query and results against a stubbed `fetch`",
+        "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
+        "Assert that no engine package exports a provider's adapter"
+      ],
+      "status": "passing"
     }
   ]
 }

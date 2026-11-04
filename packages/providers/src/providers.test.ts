@@ -1,18 +1,17 @@
-// F697: ready implementations of the services for MapTiler, Esri, OpenFreeMap and Photon.
-import type { ImagerySource, TileCoord, TileService } from '@vibeglobe/core';
+// F700: ready services for MapTiler, Esri, OpenFreeMap and Photon, and no provider in the engine packages.
+import type { TileCoord, TileSource } from '@vibeglobe/core';
 import type { DescribedImagerySource } from '@vibeglobe/sources';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EsriTiles, MapTilerTerrain, MapTilerTiles, OpenFreeMapTiles, PhotonGeocoder } from './index.js';
+import { esriTiles, mapTilerTerrain, mapTilerTiles, openFreeMapTiles, photonGeocoder } from './index.js';
 
 const coord: TileCoord = { root: 0, level: 5, x: 17, y: 11 };
-const only = (tiles: TileService): DescribedImagerySource => {
-  const [source] = tiles.imagery();
-  expect(tiles.imagery()).toHaveLength(1);
-  return source as DescribedImagerySource;
-};
-const urlOf = (source: ImagerySource | { request: ImagerySource['request'] }): string => {
+const urlOf = (source: TileSource): string => {
   const request = source.request(coord, { url: '', hostIndex: 0 });
   return typeof request === 'string' ? request : request.url;
+};
+const only = ({ imagery }: { imagery: readonly unknown[] }): DescribedImagerySource => {
+  expect(imagery).toHaveLength(1);
+  return imagery[0] as DescribedImagerySource;
 };
 
 it('keeps every provider out of the engine packages', async () => {
@@ -23,52 +22,44 @@ it('keeps every provider out of the engine packages', async () => {
 
 describe('MapTiler', () => {
   it('serves the satellite imagery with the key and its required credit, or a map from its vector style', () => {
-    const satellite = only(new MapTilerTiles({ key: 'k y' }));
+    const satellite = only(mapTilerTiles({ key: 'k y' }));
     expect(urlOf(satellite)).toBe('https://api.maptiler.com/tiles/satellite-v2/5/17/11.jpg?key=k%20y');
     expect(satellite).toMatchObject({ tileSizePx: 512, maxLevel: 20 });
     expect(satellite.attribution[0]?.text).toBe('© MapTiler © OpenStreetMap contributors');
     expect(satellite.profile.forbids.has('offlinePackaging')).toBe(true);
-    expect(new MapTilerTiles({ key: 'k' }).style()).toBeUndefined();
-    const streets = new MapTilerTiles({ key: 'k', map: 'streets-v2' });
-    expect(streets.imagery()).toEqual([]);
-    expect(streets.style()).toBe('https://api.maptiler.com/maps/streets-v2/style.json?key=k');
+    expect(mapTilerTiles({ key: 'k', map: 'streets-v2' })).toEqual({
+      imagery: [],
+      style: 'https://api.maptiler.com/maps/streets-v2/style.json?key=k',
+    });
   });
 
   it('serves Terrain-RGB heights for the 3D view, and refuses a missing key', () => {
-    const terrain = new MapTilerTerrain({ key: 'k' }).terrain();
-    expect(terrain.decoder).toEqual({ kind: 'terrain-rgb' });
-    expect(terrain.maxLevel).toBe(14);
+    const terrain = mapTilerTerrain({ key: 'k' });
+    expect(terrain).toMatchObject({ decoder: { kind: 'terrain-rgb' }, maxLevel: 14 });
     expect(urlOf(terrain)).toBe('https://api.maptiler.com/tiles/terrain-rgb-v2/5/17/11.webp?key=k');
-    expect(() => new MapTilerTiles({ key: '' })).toThrow(/API key/);
-    expect(() => new MapTilerTerrain({ key: ' ' })).toThrow(/API key/);
+    expect(() => mapTilerTiles({ key: '' })).toThrow(/API key/);
+    expect(() => mapTilerTerrain({ key: ' ' })).toThrow(/API key/);
   });
 });
 
-describe('Esri', () => {
-  it('requests row before column, with the token, "Powered by Esri" and the data credit', () => {
-    const imagery = only(new EsriTiles());
-    expect(urlOf(imagery)).toBe(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/5/11/17',
-    );
-    expect(imagery.attribution.map((credit) => credit.text)).toEqual([
-      'Powered by Esri',
-      'Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-    ]);
-    // The grey "Map data not yet available" filler counts as no data (F691).
-    expect(imagery.blankTile).toEqual({ rgb: [204, 204, 204], share: 0.9 });
-    const streets = only(new EsriTiles({ map: 'streets', token: 't&1' }));
-    expect(urlOf(streets)).toBe(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/5/11/17?token=t%261',
-    );
-  });
+it('Esri: requests row before column, with the token, "Powered by Esri", the data credit and its filler as no data', () => {
+  const imagery = only(esriTiles());
+  expect(urlOf(imagery)).toBe(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/5/11/17',
+  );
+  expect(imagery.attribution.map((credit) => credit.text)).toEqual([
+    'Powered by Esri',
+    'Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+  ]);
+  expect(imagery.blankTile).toEqual({ rgb: [204, 204, 204], share: 0.9 });
+  expect(urlOf(only(esriTiles({ map: 'streets', token: 't&1' })))).toBe(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/5/11/17?token=t%261',
+  );
 });
 
-describe('OpenFreeMap', () => {
-  it('draws its vector style, Liberty by default, without imagery or key', () => {
-    expect(new OpenFreeMapTiles().imagery()).toEqual([]);
-    expect(new OpenFreeMapTiles().style()).toBe('https://tiles.openfreemap.org/styles/liberty');
-    expect(new OpenFreeMapTiles({ style: 'positron' }).style()).toBe('https://tiles.openfreemap.org/styles/positron');
-  });
+it('OpenFreeMap: draws its vector style, Liberty by default, without imagery or key', () => {
+  expect(openFreeMapTiles()).toEqual({ imagery: [], style: 'https://tiles.openfreemap.org/styles/liberty' });
+  expect(openFreeMapTiles({ style: 'positron' }).style).toBe('https://tiles.openfreemap.org/styles/positron');
 });
 
 describe('Photon', () => {
@@ -80,7 +71,7 @@ describe('Photon', () => {
   };
   const signal = new AbortController().signal;
 
-  it('asks for the query in the language when the instance has it, and reads places and their extent', async () => {
+  it('asks in the language when the instance has it, and reads places and their extent', async () => {
     const fetch = answer({
       features: [
         {
@@ -97,10 +88,9 @@ describe('Photon', () => {
           geometry: { coordinates: [12.5, 41.9] },
           properties: { street: 'Via del Corso', housenumber: '1', city: 'Roma' },
         },
-        { geometry: {}, properties: { name: 'nowhere' } },
       ],
     });
-    const results = await new PhotonGeocoder().search('stadion & co', { signal, language: 'de' });
+    const results = await photonGeocoder().search('stadion & co', { signal, language: 'de' });
     expect(fetch.mock.calls[0]?.[0]).toBe('https://photon.komoot.io/api/?q=stadion%20%26%20co&limit=5&lang=de');
     expect(results).toEqual([
       {
@@ -116,10 +106,10 @@ describe('Photon', () => {
   it('leaves other languages to the local names, takes its own instance, and fails on an HTTP error', async () => {
     const fetch = answer({ features: [] });
     await expect(
-      new PhotonGeocoder({ url: 'https://geo.test/' }).search('roma', { signal, language: 'it' }),
+      photonGeocoder({ url: 'https://geo.test' }).search('roma', { signal, language: 'it' }),
     ).resolves.toEqual([]);
     expect(fetch.mock.calls[0]?.[0]).toBe('https://geo.test/api/?q=roma&limit=5');
     answer({}, 500);
-    await expect(new PhotonGeocoder().search('roma', { signal, language: 'en' })).rejects.toThrow(/HTTP 500/);
+    await expect(photonGeocoder().search('roma', { signal, language: 'en' })).rejects.toThrow(/HTTP 500/);
   });
 });

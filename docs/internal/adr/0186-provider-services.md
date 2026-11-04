@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-04
-- Milestone: M7, M15 (F696, F697, F698; partly supersedes ADR 0185)
+- Milestone: M7, M15 (F698, F699, F700; partly supersedes ADR 0185)
 
 ## Context
 
@@ -31,7 +31,8 @@ optional adapters that respect their terms"; ADR 0185 had removed every such ada
    configuration and wires everything else.
 3. **The 3D service** as a service of buildings and terrain together: the buildings of every listed provider come in
    its vector style (MapTiler and OpenFreeMap tiles carry building heights), Esri's are I3S scene layers, which the
-   engine does not read. So the 3D view's own data is the relief: `TerrainService`.
+   engine does not read. So the 3D view's own data is the relief, which the engine already takes as a `TerrainSource`:
+   a `TerrainService` with one method returning it would only wrap it.
 
 For the single package: (a) merge the fourteen workspace packages' sources into one, rewriting every import and
 splitting every per-package rule, budget and coverage file; (b) keep the workspace packages as the units the code is
@@ -41,17 +42,20 @@ depends on the fourteen published packages (one install, but fourteen packages o
 
 ## Decision
 
-Option 2 with `TerrainService`, and packaging (b):
+Option 2, with the terrain as the existing `TerrainSource`, and packaging (b). As short as it can be (owner,
+2026-11-04: "fewer lines, fewer chances of error"):
 
-- `@vibeglobe/core` declares `TileService` (`imagery()`, optional `style()` and `transformUrl()`), `TerrainService`
-  (`terrain()`) and `GeocoderService` (`search()`), types only: no byte in the core's bundle.
+- `@vibeglobe/core` declares `TileService`, plain data (`{ imagery, style? }`), and `GeocoderService` (`search()`);
+  the terrain is a `TerrainSource`. Types only: no byte in the core's bundle.
 - `vibeglobe` exports `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })`: it refuses a missing tile
   service (`invalid-option`), starts the renderer, the bundled workers, navigation and the ready-made controls (search
   box with the geocoder, else coordinates only), the base image (one ocean color unless given) and, for a style,
-  imports the vector tile modules on demand. It resolves once the first frame is drawn and the style attached.
-- `@vibeglobe/providers`, optional, holds `MapTilerTiles`, `MapTilerTerrain`, `EsriTiles`, `OpenFreeMapTiles`,
-  `PhotonGeocoder`, and the OpenStreetMap sources moved out of `@vibeglobe/sources`. Each builds on the public generic
-  adapters only; the engine never imports it.
+  imports the vector tile modules on demand. It resolves once the first frame is drawn and the style attached. Its
+  only options besides the engine's are `ui` (true or false), `controls` (options or false), `language` and
+  `baseImageryUrl`.
+- `@vibeglobe/providers`, optional, holds functions that return those services: `mapTilerTiles`, `mapTilerTerrain`,
+  `esriTiles`, `openFreeMapTiles`, `photonGeocoder`, and the OpenStreetMap sources moved out of `@vibeglobe/sources`.
+  Each builds on the public generic adapters only; the engine never imports it.
 - No engine package holds a provider: `@vibeglobe/sources` keeps the generic adapters and the profile mechanism.
   `@vibeglobe/presets` (the Europe preset of free sources) is not part of the engine package either.
 
@@ -68,10 +72,11 @@ published attribution rules as known and need the owner's confirmation (open que
   stays for applications that choose each part.
 - ADR 0185's "the library ships no adapter of a paid or proprietary provider" now reads: no engine package does; the
   optional `@vibeglobe/providers`, outside the library, does for MapTiler and Esri, by the owner's request. F679 still
-  holds for the library; F697 adds the optional package.
+  holds for the library; F700 adds the optional package.
 - A globe with workers and no imagery or terrain now runs its imagery runtime, so a style-only map shows its credits
   (KB-343) and accepts imagery layers added later; the separate extension pools for that case are gone (core
-  64.99 → 64.61 KB).
+  64.99 → 64.61 KB). Without layers or terrain the runtime only steps its worker pool each frame, and motion keeps no
+  frames coming.
 - The monorepo's root package is `vibeglobe-monorepo`, so that `vibeglobe` names the public package.
 - Verified by `packages/vibeglobe/src/create-vibe-globe.test.ts`, `packages/providers/src/providers.test.ts`,
   `e2e/services.spec.ts` and the services guide's type-checked examples.

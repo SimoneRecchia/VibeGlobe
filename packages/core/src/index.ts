@@ -83,7 +83,7 @@ export type {
   CameraConstraints,
 } from './globe/types.js';
 export { NO_TERRAIN } from './globe/types.js';
-export type { GeocoderResult, GeocoderService, TerrainService, TileService } from './globe/services.js';
+export type { GeocoderResult, GeocoderService, TileService } from './globe/services.js';
 export { BASE_TEXTURE as BASE_TEXTURE_HANDLE, TONE_BELOW } from './imagery/draw-list.js';
 export type { TileDrawBelow } from './imagery/draw-list.js';
 export type { NavigationMode } from './globe/view-control.js';

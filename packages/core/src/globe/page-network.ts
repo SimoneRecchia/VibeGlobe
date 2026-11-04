@@ -9,10 +9,7 @@ import type { RendererBackend } from './types.js';
 /** The page's network pool, shared by every engine instance (ADR 0007: limits per host hold page-wide; F095). */
 let pagePool: { pool: NetworkPool; users: number } | undefined;
 
-/**
- * Takes a share of the page's network pool (also for render extensions on a globe without imagery, track D hook 4) and a
- * lease on the worker pool of `workers`, both on `host`'s clock and timers.
- */
+/** Takes a share of the page's network pool and a lease on the worker pool of `workers`, on `host`'s clock and timers. */
 export function acquirePools(
   workers: WorkerEndpointFactory,
   host: RendererBackend['host'],

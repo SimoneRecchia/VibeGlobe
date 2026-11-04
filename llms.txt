@@ -3,7 +3,7 @@
 > A TypeScript web engine that draws an interactive 3D globe and 2D map (WebGPU with a WebGL2 fallback), with
 > imagery, terrain, vector tiles, glTF models, application data, offline packages and ready-made controls. ESM
 > packages, framework-agnostic, with Vue 3 and Web Component adapters. MPL-2.0. The engine knows no map provider: an
-> application plugs in its own through the `TileService`, `TerrainService` and `GeocoderService` interfaces.
+> application plugs in its own through the `TileService`, `TerrainSource` and `GeocoderService` interfaces.
 
 Start with the integration guide to put a globe in an application, then read the guide of the task at hand. Every
 `ts` example in the guides type-checks against the packages. The TSDoc of each export (in the `.d.ts` files) holds the
@@ -12,7 +12,7 @@ per-option details. Installed, this file and the guides are in `node_modules/@vi
 ## Start
 
 - [Services and providers](docs/guides/services.md): a globe in one call with `createVibeGlobe` and the
-  application's tile, terrain and geocoder services; ready MapTiler, Esri, OpenFreeMap and Photon implementations.
+  application's tile, terrain and geocoder services; ready MapTiler, Esri, OpenFreeMap and Photon services.
 - [Integration](docs/guides/integration.md): install, create a globe in plain TypeScript, Vue, Nuxt (SSR) or a Web
   Component, lazy loading, hosting the engine's assets, Content Security Policy, attribution.
 - [Europe preset](docs/guides/europe-preset.md): ready map types (Satellite, Hybrid, Map, Landscape, Relief) from free

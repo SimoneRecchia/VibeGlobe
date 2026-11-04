@@ -7,32 +7,27 @@ import {
   type GeocoderService,
   type Globe,
   type GlobeOptions,
-  type TerrainService,
   type TileService,
 } from '@vibeglobe/core';
-import { createRenderer, type BackendChoice } from '@vibeglobe/renderer';
-import { addAllControls, addDefaultControls, createUi, type Ui } from '@vibeglobe/ui';
+import { createRenderer } from '@vibeglobe/renderer';
+import { addDefaultControls, createUi, type Ui } from '@vibeglobe/ui';
 import { createWorkers } from '@vibeglobe/worker';
 
-/** Options of {@link createVibeGlobe}: the services, then any engine option (`view`, `quality`, `constraints`, …). */
+/** Options of {@link createVibeGlobe}: the services, then any engine option (`terrain`, `view`, `quality`, …). */
 export interface VibeGlobeOptions extends Omit<
   GlobeOptions,
-  'container' | 'renderer' | 'controls' | 'baseImageryUrl' | 'imagery' | 'terrain' | 'workers'
+  'container' | 'renderer' | 'controls' | 'baseImageryUrl' | 'imagery' | 'workers'
 > {
   /** Where the map's tiles come from: required. */
   readonly tiles: TileService;
-  /** The relief of the 3D view; without it the surface is flat. */
-  readonly terrain?: TerrainService;
   /** Place search; without it the search box accepts coordinates only. */
   readonly geocoder?: GeocoderService;
   /** An equirectangular image of the whole world, shown where no tile is loaded yet (default: one ocean color). */
   readonly baseImageryUrl?: string;
-  /** 'auto' (default: WebGPU, else WebGL2), 'webgpu' or 'webgl2'. */
-  readonly backend?: BackendChoice;
-  /** Mouse, touch and keyboard navigation: true (default), these options, or false for none. */
-  readonly controls?: boolean | ControlsOptions;
-  /** The ready-made controls: 'default' (search, zoom, compass, fullscreen, coordinates), 'all', or false for none. */
-  readonly ui?: 'default' | 'all' | false;
+  /** Mouse, touch and keyboard navigation options, or false for none. */
+  readonly controls?: ControlsOptions | false;
+  /** The ready-made controls (search, zoom, compass, fullscreen, coordinates); false for none. */
+  readonly ui?: boolean;
   /** The language of the controls and of the map's names, such as 'it' (default English). */
   readonly language?: string;
 }
@@ -51,52 +46,45 @@ const OCEAN =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQsY8BAAEyALi+BX15AAAAAElFTkSuQmCC';
 
 /**
- * Starts VibeGlobe in `container` with the application's services (ADR 0186): the tiles, required, and optionally the
- * terrain and a geocoder; the features of a missing optional service are off. Resolves once the first frame is drawn
- * and the tile service's style, if any, is attached; rejects with a `GlobeError` (everything stopped) when the device
- * can draw neither WebGPU nor WebGL2, the tile service is missing, or its style does not load.
+ * Starts VibeGlobe in `container` with the application's services (ADR 0186): the tiles, required, and optionally a
+ * terrain and a geocoder. Resolves once the first frame is drawn and the tile service's style, if any, is attached;
+ * rejects with a `GlobeError` (everything stopped) without tiles, on a device without WebGPU or WebGL2, or when the
+ * style does not load.
  */
 export async function createVibeGlobe(container: HTMLElement, options: VibeGlobeOptions): Promise<VibeGlobe> {
-  const { tiles, terrain, geocoder, backend, controls, ui: uiKind, language, baseImageryUrl, ...engine } = options;
-  if (typeof tiles?.imagery !== 'function')
-    throw new GlobeError('invalid-option', 'createVibeGlobe needs a tile service: { tiles: new MyTiles() }');
-  const navigation = controls === false ? undefined : createControls(controls === true ? undefined : controls);
+  const { tiles, geocoder, controls, ui: withUi = true, language, baseImageryUrl = OCEAN, ...engine } = options;
+  if (!tiles) throw new GlobeError('invalid-option', 'createVibeGlobe needs a tile service: { tiles }');
   const globe = createGlobe({
-    ...(uiKind === 'all' ? { creditsElement: false } : {}),
     ...engine,
     container,
-    renderer: createRenderer({ backend: backend ?? 'auto' }),
-    ...(navigation ? { controls: navigation } : {}),
-    baseImageryUrl: baseImageryUrl ?? OCEAN,
-    imagery: tiles.imagery(),
-    ...(terrain ? { terrain: terrain.terrain() } : {}),
+    renderer: createRenderer(),
+    ...(controls === false ? {} : { controls: createControls(controls) }),
+    baseImageryUrl,
+    imagery: tiles.imagery,
     workers: createWorkers(),
   });
-  const ui = uiKind === false ? undefined : createUi(globe, container, language ? { language } : {});
-  if (ui) (uiKind === 'all' ? addAllControls : addDefaultControls)(ui, geocoder ? { geocoder } : {});
-  const stops: (() => void)[] = [];
+  const ui = withUi ? createUi(globe, container, language ? { language } : {}) : undefined;
+  if (ui) addDefaultControls(ui, geocoder ? { geocoder } : {});
+  let layer: { remove(): void } | undefined;
   const destroy = (): void => {
-    for (const stop of stops) stop();
+    layer?.remove();
     ui?.destroy();
     globe.destroy();
   };
   try {
     await globe.ready;
-    const style = tiles.style?.();
-    if (style !== undefined) {
+    if (tiles.style) {
       const [{ addVectorTiles }, { createVectorTileTarget }] = await Promise.all([
         import('@vibeglobe/layers/vector-tiles'),
         import('@vibeglobe/renderer/vector-tiles'),
       ]);
-      const transformUrl = tiles.transformUrl?.bind(tiles);
-      const layer = await addVectorTiles(globe, {
-        style,
+      const vector = await addVectorTiles(globe, {
+        style: tiles.style,
         target: createVectorTileTarget,
         element: container,
-        ...(transformUrl ? { transformUrl } : {}),
       });
-      if (language) layer.setLanguage(language);
-      stops.push(() => layer.remove());
+      if (language) vector.setLanguage(language);
+      layer = vector;
     }
   } catch (cause) {
     destroy();

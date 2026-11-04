@@ -1,11 +1,10 @@
-// F696: `createVibeGlobe` starts a globe on any page from the application's services: the tiles are required, the
+// F699: `createVibeGlobe` starts a globe on any page from the application's services: the tiles are required, the
 // terrain and the geocoder optional, and a missing optional service only turns its feature off.
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import type * as SourcesModule from '@vibeglobe/sources';
 import type * as VibeGlobeModule from 'vibeglobe';
-import { PNG } from 'pngjs';
-import { openGlobe } from './support/globe.ts';
+import { openGlobe, pageImage } from './support/globe.ts';
 
 declare global {
   interface Window {
@@ -44,9 +43,9 @@ async function start(page: Page, plan: Plan): Promise<void> {
       const raster = sources.xyzImagery({ id: 'world', url: '/fixture-tiles/services/world/mercator/{z}/{x}/{y}.png' });
       const tiles =
         p.tiles === 'raster'
-          ? { imagery: () => [raster] }
+          ? { imagery: [raster] }
           : p.tiles === 'style'
-            ? { imagery: () => [], style: () => '/vector-tiles/styles/streets.json' }
+            ? { imagery: [], style: '/vector-tiles/styles/streets.json' }
             : undefined;
       const terrain = sources.heightmapTerrain({
         id: 'dem',
@@ -64,7 +63,7 @@ async function start(page: Page, plan: Plan): Promise<void> {
         state.started = await createVibeGlobe(container, {
           tiles: tiles as never,
           view: p.view,
-          ...(p.terrain ? { terrain: { terrain: () => terrain } } : {}),
+          ...(p.terrain ? { terrain } : {}),
           ...(p.geocoder ? { geocoder } : {}),
         });
       } catch (error) {
@@ -77,7 +76,7 @@ async function start(page: Page, plan: Plan): Promise<void> {
 
 /** The share of the page's pixels that are not the plain ocean shown where no tile is drawn. */
 async function drawnShare(page: Page): Promise<number> {
-  const png = PNG.sync.read(await page.screenshot());
+  const png = await pageImage(page, 'canvas');
   let drawn = 0;
   for (let i = 0; i < png.data.length; i += 4) {
     const d =
@@ -87,7 +86,7 @@ async function drawnShare(page: Page): Promise<number> {
   return drawn / (png.width * png.height);
 }
 
-/** Waits until the started globe has drawn imagery (or terrain) tiles at `level` or finer and gone idle. */
+/** Waits until the started globe draws a tile with imagery (or terrain). */
 async function settle(page: Page, check: 'imagery' | 'terrain'): Promise<void> {
   await expect
     .poll(
@@ -101,7 +100,7 @@ async function settle(page: Page, check: 'imagery' | 'terrain'): Promise<void> {
     .toBe(true);
 }
 
-test.describe('createVibeGlobe (F696)', () => {
+test.describe('createVibeGlobe (F699)', () => {
   test.setTimeout(60_000);
 
   test('refuses to start without a tile service and leaves nothing on the page', async ({ page }) => {
@@ -123,7 +122,7 @@ test.describe('createVibeGlobe (F696)', () => {
         window.servicesTest?.started?.globe.surfaceTiles().every((t) => t.terrainLevel === null),
       ),
     ).toBe(true);
-    const search = page.locator('.vg-ui input[type="search"], .vg-ui input').first();
+    const search = page.locator('.vg-ui input').first();
     await search.fill('Bolzano');
     await expect(page.locator('.vg-ui')).toContainText(/coordinates/i);
     expect(await drawnShare(page)).toBeGreaterThan(0.2);

@@ -108,7 +108,7 @@ export interface RenderExtensionContext {
   report(error: GlobeError): void;
   /**
    * The page's request pool (per-host limits, coalescing, cancellation, the measured link; F462): an extension
-   * queues its own requests by priority and starts them when `hasFreeSlot` allows. Absent on a globe without imagery.
+   * queues its own requests by priority and starts them when `hasFreeSlot` allows. Absent on a globe without workers.
    */
   readonly network?: NetworkPool;
   /** The engine's worker pool: its tasks (`layout-vector-tile`, `parse-model`, …) run there. Absent likewise. */

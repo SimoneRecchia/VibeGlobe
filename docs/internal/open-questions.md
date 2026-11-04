@@ -4,6 +4,15 @@ Items only the owner can provide or decide. Each lists the stub or default used 
 
 ## Open
 
+- **40. MapTiler's and Esri's terms for `@vibeglobe/providers` (ADR 0186).** This session's network refused
+  `maptiler.com`, `docs.maptiler.com` and `esri.com`, so the profiles follow the providers' published attribution rules
+  as known: the credit always shown ("© MapTiler © OpenStreetMap contributors"; "Powered by Esri" with the data
+  sources) and no offline packaging. The URL formats were checked against MapTiler's dataset page through a search
+  (Terrain-RGB v2: WebP, 512 px, levels 0 to 14) and Esri's long-standing ArcGIS Online tile paths. Options: (a) allow
+  those hosts in the environment's network settings, and the next session reads the terms and amends ADR 0186; (b) the
+  owner reads MapTiler's and Esri's current terms and confirms or corrects the two profiles (caching, the logo on free
+  plans, satellite tile size and deepest level).
+
 - **39. Six more orthophoto services, and Italy's AGEA imagery (ADR 0182, amendment of 2026-10-31 evening).**
   Schleswig-Holstein and Valle d'Aosta publish their orthophotos under open licences that allow commercial use, but
   their layer names or endpoints could not be read: the container's network policy refuses the provider hosts

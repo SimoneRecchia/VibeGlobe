@@ -25,8 +25,6 @@ import type * as PluginModule from '../fixtures/offline-plugin/index.ts';
 import { buildFixturePackage, type FixturePackageSpec } from './offline-fixtures.ts';
 import {
   heightmapTerrain,
-  openStreetMapHostedImagery,
-  openStreetMapImagery,
   pmtilesImagery,
   withProfile,
   xyzImagery,
@@ -34,6 +32,7 @@ import {
   type ProviderProfile,
 } from '@vibeglobe/sources';
 import { mbtilesImagery } from '@vibeglobe/sources/mbtiles';
+import { openStreetMapHostedImagery, openStreetMapImagery } from '@vibeglobe/providers';
 import { createWorkers } from '@vibeglobe/worker';
 
 /** One imagery source of the harness: fixture tiles of a pattern, or any URL template. */

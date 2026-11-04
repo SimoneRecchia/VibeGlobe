@@ -39,6 +39,12 @@ dependencies; `@vibeglobe/web-component` brings `controls`, `core`, `renderer`, 
 | `@vibeglobe/vue`           | the `VibeGlobe` component, composables and child components                     |
 | `@vibeglobe/web-component` | the `<vibe-globe>` custom element                                               |
 
+## One call
+
+`createVibeGlobe` of `vibeglobe` does everything this guide describes for plain TypeScript in one call, with the
+application's tile, terrain and geocoder services: the [services guide](services.md) shows it. The sections below
+assemble the same engine piece by piece, for an application that needs to choose each part.
+
 ## The base image
 
 `baseImageryUrl` is required in every integration: an equirectangular image of the whole world (for example a JPEG

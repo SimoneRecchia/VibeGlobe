@@ -5,7 +5,7 @@ import { CompassControl } from './controls/compass.js';
 import { CoordinateReadoutControl } from './controls/readout.js';
 import { DebugToggleControl } from './controls/debug-toggle.js';
 import { FullscreenControl } from './controls/fullscreen.js';
-import { SearchControl, type Geocoder } from './controls/search.js';
+import { SearchControl, type GeocoderService } from './controls/search.js';
 import { ZoomControl } from './controls/zoom.js';
 import { AttributionControl } from './controls/attribution.js';
 import { GeolocationControl } from './controls/geolocation.js';
@@ -21,7 +21,7 @@ export interface DefaultControlsOptions {
   /** Adds the debug panel toggle (default false: absent unless enabled). */
   readonly debug?: boolean;
   /** The search box's place provider; without one it accepts coordinates only. */
-  readonly geocoder?: Geocoder;
+  readonly geocoder?: GeocoderService;
   /** The layer switcher's overlays, names and data layers. */
   readonly layers?: LayerSwitcherOptions;
   /** Whether the camera may tilt now (F625): the 2D / 3D / Auto toggle disables 3D while it says no. */

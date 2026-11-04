@@ -5,13 +5,13 @@
  * application's geocoder when one is configured; none is bundled and no request is made without one.
  */
 import { formatCoordinate, parseCoordinate, parseCoordinateResult } from '@vibeglobe/gis';
-import type { GeoBounds, Geocoder, GeocoderResult, Globe } from '@vibeglobe/core';
+import type { GeoBounds, GeocoderService, GeocoderResult, Globe } from '@vibeglobe/core';
 import type { ControlContext, ControlPosition, UiControl } from '../ui.js';
 import { controlFrame } from './dom.js';
 import { decimalSeparator } from './locale.js';
 
 /** The engine's geocoder interface (F208), re-exported for the search box's users. */
-export type { Geocoder, GeocoderResult };
+export type { GeocoderService, GeocoderResult };
 
 /** Moves the camera to a chosen place; by default a flight (F195), or a fit of the place's bounds when it has some. */
 export type GoTo = (
@@ -23,7 +23,7 @@ export type GoTo = (
 export interface SearchControlOptions {
   readonly id?: string;
   readonly position?: ControlPosition;
-  readonly geocoder?: Geocoder;
+  readonly geocoder?: GeocoderService;
   /** Delay after the last keystroke before the geocoder is asked, in milliseconds (default 250). */
   readonly debounceMs?: number;
   /** Zoom for typed coordinates and results without one (default 12). */
@@ -52,7 +52,7 @@ let instances = 0;
 export class SearchControl implements UiControl {
   readonly id: string;
   readonly position: ControlPosition;
-  readonly #geocoder: Geocoder | undefined;
+  readonly #geocoder: GeocoderService | undefined;
   readonly #debounceMs: number;
   readonly #zoom: number;
   readonly #goTo: GoTo;

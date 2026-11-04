@@ -112,6 +112,12 @@
     },
     "tools": {
       "bundleGzipKB": 100
+    },
+    "vibeglobe": {
+      "bundleGzipKB": 2
+    },
+    "providers": {
+      "bundleGzipKB": 3
     }
   },
   "streaming": {

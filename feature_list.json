@@ -8314,6 +8314,40 @@
         "Unit-test that the quality settings in effect have no `motionBlur`"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F696",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "The engine depends only on service interfaces, and starts on any page in one call: `createVibeGlobe(container, { tiles, terrain?, geocoder?, … })` of `vibeglobe` takes a `TileService` (required: its imagery layers and optionally a MapLibre style), a `TerrainService` and a `GeocoderService` (optional) with the engine's options, and sets up the renderer, the workers, navigation and the ready-made controls. Without a tile service it refuses to start; without terrain the surface is flat and without a geocoder the search box takes coordinates only, with no error.",
+      "steps": [
+        "Unit-test that `createVibeGlobe` refuses a missing tile service, passes the services' imagery and terrain to the engine, gives the search box the geocoder, draws a tile service's style, and stops everything when the style fails to load",
+        "Playwright test: a globe started with fixture tiles alone draws them on a flat surface with a search box for coordinates; with a terrain and a geocoder service it draws terrain and lists the geocoder's places; a style-only tile service draws its vector map"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F697",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "No engine package holds a provider: an application connects any provider, a paid or proprietary one included, by implementing the service interfaces with the generic adapters and a profile of the provider's terms. The optional `@vibeglobe/providers` holds ready implementations: `MapTilerTiles` and `MapTilerTerrain` (with the application's key), `EsriTiles`, `OpenFreeMapTiles`, `PhotonGeocoder`, and the OpenStreetMap sources, each with its credits and the loading features its terms forbid.",
+      "steps": [
+        "Unit-test each provider's requests (URL, key or token, tile size, levels), credits and profile, and Photon's query and results against a stubbed `fetch`",
+        "Unit-test that the OpenStreetMap sources keep their usage-policy rules from the providers package",
+        "Assert that no engine package exports a provider's adapter"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F698",
+      "milestone": 15,
+      "section": "Packaging and release",
+      "description": "VibeGlobe is published as one npm package, `vibeglobe`, holding the engine, the interfaces and the generic adapters under subpaths (`vibeglobe`, `vibeglobe/renderer`, `vibeglobe/vue`, …) and no provider; the optional `@vibeglobe/providers` is the only other package an application installs.",
+      "steps": [
+        "Pack `vibeglobe` and assert its tarball holds every engine subpath, resolves no `@vibeglobe/*` package from outside it, and holds no provider",
+        "Install the two tarballs in a project outside the repository and start a globe with `createVibeGlobe` and `MapTilerTiles` in Chromium"
+      ],
+      "status": "failing"
     }
   ]
 }

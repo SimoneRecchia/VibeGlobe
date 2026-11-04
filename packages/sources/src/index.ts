@@ -2,7 +2,8 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 /**
  * @packageDocumentation
- * Source adapters for imagery, terrain, vector and 3D data, with provider profiles.
+ * Generic source adapters for imagery, terrain, vector and 3D data (XYZ, WMTS, WMS, PMTiles, MBTiles, …) and the
+ * provider profiles any provider's terms are declared with; no adapter of a particular provider (ADR 0186).
  * @module @vibeglobe/sources
  */
 export { fetchTransport, maxAgeOf, redactUrl, retryAfterMs } from './fetch-transport.js';
@@ -46,15 +47,6 @@ export type { WmsImageryOptions } from './ogc/wms-imagery.js';
 export { parseWmsCapabilities } from './ogc/wms-capabilities.js';
 export type { WmsCapabilities, WmsLayer } from './ogc/wms-capabilities.js';
 export type { CropImage } from './ogc/wms-transport.js';
-export {
-  OSM_ODBL_ATTRIBUTION,
-  OSM_PUBLIC_MAX_CONCURRENT,
-  OSM_PUBLIC_PROFILE,
-  OSM_SELF_HOSTED_PROFILE,
-  openStreetMapHostedImagery,
-  openStreetMapImagery,
-} from './providers/openstreetmap-provider.js';
-export type { OpenStreetMapHostedOptions, OpenStreetMapImageryOptions } from './providers/openstreetmap-provider.js';
 export { composeInBrowser, reprojectedImagery, warpInBrowser } from './reproject/reprojected-imagery.js';
 export type {
   ComposeImage,

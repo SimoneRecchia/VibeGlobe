@@ -1,17 +1,17 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { TileTransport } from '@vibeglobe/core';
-import { fetchTransport } from '../fetch-transport.js';
 import {
   type Attribution,
   combineProfiles,
   type DescribedImagerySource,
+  fetchTransport,
   type ProviderProfile,
   SourceConfigError,
   withProfile,
-} from '../metadata.js';
-import type { XyzImageryOptions } from '../xyz-imagery.js';
-import { xyzImagery } from '../xyz-imagery.js';
+  type XyzImageryOptions,
+  xyzImagery,
+} from '@vibeglobe/sources';
 
 /** At most this many requests in flight to the public servers (ADR 0032). */
 export const OSM_PUBLIC_MAX_CONCURRENT = 2;

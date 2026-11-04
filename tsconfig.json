@@ -92,6 +92,18 @@
       "path": "./packages/web-component/tsconfig.test.json"
     },
     {
+      "path": "./packages/vibeglobe"
+    },
+    {
+      "path": "./packages/vibeglobe/tsconfig.test.json"
+    },
+    {
+      "path": "./packages/providers"
+    },
+    {
+      "path": "./packages/providers/tsconfig.test.json"
+    },
+    {
       "path": "./packages/tools"
     },
     {

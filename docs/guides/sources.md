@@ -496,7 +496,7 @@ whether a key may be used in a browser are between you and the provider.
 ### OpenStreetMap public servers
 
 ```ts
-import { openStreetMapImagery } from '@vibeglobe/sources';
+import { openStreetMapImagery } from '@vibeglobe/providers';
 
 const osm = openStreetMapImagery({ appName: 'My demo', appUrl: 'https://demo.example.com/' });
 ```
@@ -510,7 +510,7 @@ OpenStreetMap extract by the data pipeline (`vibeglobe-data`, [hosting guide](ho
 ### Self-hosted OpenStreetMap tiles
 
 ```ts
-import { openStreetMapHostedImagery } from '@vibeglobe/sources';
+import { openStreetMapHostedImagery } from '@vibeglobe/providers';
 
 const own = openStreetMapHostedImagery({ id: 'osm', url: 'https://tiles.mycompany.example/{z}/{x}/{y}.png' });
 const viaProvider = openStreetMapHostedImagery({

@@ -4,6 +4,7 @@
 import { resolve } from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import type * as CoreModule from '@vibeglobe/core';
+import type * as ProvidersModule from '@vibeglobe/providers';
 import type * as RendererModule from '@vibeglobe/renderer';
 import type * as SourcesModule from '@vibeglobe/sources';
 import type * as MbtilesModule from '@vibeglobe/sources/mbtiles';
@@ -13,8 +14,8 @@ import { BACKGROUND_RGB, emptyPixelsInside, openGlobe } from './globe.ts';
 
 /** What the tests reach on the page (`window.vibeglobeSources`). */
 interface SourcesTestHandle {
-  /** The main entry and the MBTiles entry of `@vibeglobe/sources`. */
-  readonly sources: typeof SourcesModule & typeof MbtilesModule;
+  /** The main entry and the MBTiles entry of `@vibeglobe/sources`, and `@vibeglobe/providers`. */
+  readonly sources: typeof SourcesModule & typeof MbtilesModule & typeof ProvidersModule;
   /** Replaces the mounted globe with one showing `source` over the base image. */
   mount(source: CoreModule.ImagerySource, options?: { readonly hiddenCredits?: readonly string[] }): Promise<void>;
   globe?: CoreModule.Globe;
@@ -37,6 +38,7 @@ const ENTRIES = {
   worker: fsUrl('packages/worker/src/index.ts'),
   sources: fsUrl('packages/sources/src/index.ts'),
   mbtiles: fsUrl('packages/sources/src/mbtiles.ts'),
+  providers: fsUrl('packages/providers/src/index.ts'),
 };
 
 /** Opens the playground at a view, removes its globe and prepares the source globe's modules. */
@@ -51,6 +53,7 @@ export async function openSources(page: Page, query: string): Promise<void> {
       const sources = {
         ...((await import(/* @vite-ignore */ entries.sources)) as typeof SourcesModule),
         ...((await import(/* @vite-ignore */ entries.mbtiles)) as typeof MbtilesModule),
+        ...((await import(/* @vite-ignore */ entries.providers)) as typeof ProvidersModule),
       };
       const playground = window.vibeglobePlayground?.globe;
       if (!playground) throw new Error('no playground globe');

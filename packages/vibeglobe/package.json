@@ -1,0 +1,31 @@
+{
+  "name": "vibeglobe",
+  "version": "0.1.0",
+  "description": "VibeGlobe: a 3D globe and 2D map engine for the web, started in one call with the application's tile, terrain and geocoder services.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "LICENSE.md",
+    "!dist/tsconfig.tsbuildinfo",
+    "!src/**/*.test.ts"
+  ],
+  "dependencies": {
+    "@vibeglobe/controls": "0.1.0",
+    "@vibeglobe/core": "0.1.0",
+    "@vibeglobe/layers": "0.1.0",
+    "@vibeglobe/renderer": "0.1.0",
+    "@vibeglobe/ui": "0.1.0",
+    "@vibeglobe/worker": "0.1.0"
+  }
+}

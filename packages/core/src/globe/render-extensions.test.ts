@@ -128,4 +128,28 @@ describe('render extensions (M13 hook)', () => {
     // The pool's only lease is released: its worker is terminated.
     expect(terminated).toBe(1);
   });
+
+  it("lists an extension's credits on a globe with workers but no imagery or terrain (KB-343)", async () => {
+    const workers: WorkerEndpointFactory = {
+      url: 'test://credit-workers',
+      create: () => ({ post: () => undefined, terminate: () => undefined }),
+      inline: () => Promise.resolve({}),
+    };
+    const { renderer, factory } = fakeRenderer();
+    Object.assign(renderer, { extensions: { context: {}, add: () => () => undefined } });
+    const globe = createGlobe({ container: {}, renderer: factory, baseImageryUrl: 'w', workers });
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.flush();
+    await globe.ready;
+    const changes: string[][] = [];
+    globe.on('credits-change', ({ credits }) => void changes.push(credits.map((credit) => credit.text)));
+    globe.addRenderExtension((context) => {
+      context.setCredits([{ id: 'vector-tiles:openmaptiles', attribution: [{ text: 'OpenFreeMap © OpenMapTiles' }] }]);
+      return { frame: () => undefined, dispose: () => undefined };
+    });
+    expect(globe.credits().map((credit) => credit.text)).toEqual(['OpenFreeMap © OpenMapTiles']);
+    expect(changes.at(-1)).toEqual(['OpenFreeMap © OpenMapTiles']);
+    globe.destroy();
+  });
 });

@@ -4,7 +4,7 @@
  * The showcase's demo data (owner, 2026-10-25): city markers with clustering, a polygon, a line and labels, and a
  * geocoder stub over the same cities, so the search box shows the place-search interface without a service.
  */
-import type { Geocoder, GeocoderResult, Globe } from '@vibeglobe/core';
+import type { GeocoderService, GeocoderResult, Globe } from '@vibeglobe/core';
 import type { Feature, Geometry, Layer } from '@vibeglobe/layers';
 
 /** Adds a layer to the page's stack, for as long as the scene that adds it is shown. */
@@ -31,7 +31,7 @@ const CITIES: readonly (readonly [name: string, longitudeDeg: number, latitudeDe
 ];
 
 /** A geocoder over the demo cities, case-insensitive on any part of the name: the interface without a service. */
-export const demoGeocoder: Geocoder = {
+export const demoGeocoder: GeocoderService = {
   search(query) {
     const q = query.trim().toLowerCase();
     const found: GeocoderResult[] = CITIES.filter(([name]) => q.length > 0 && name.toLowerCase().includes(q)).map(

@@ -1,6 +1,6 @@
 # 0185. No adapter of a paid or proprietary provider; applications connect them through the generic sources
 
-- Status: Accepted
+- Status: Accepted (partly superseded by 0186)
 - Date: 2026-11-01
 - Milestone: M7, M8, M9, M13 (F679; supersedes F256–F262, F321–F323, F340, F470, F549, F572, F573)
 
@@ -41,3 +41,9 @@ Option 2. The library ships no adapter of a paid or proprietary provider:
   describe library code. ADR 0141's Google sessions are no longer library code either.
 - F471's step with Google Photorealistic 3D Tiles "where a key is available" now means an application's own source.
 - The pipeline's requester-pays pricing has no user left (`docs/internal/follow-ups.md`).
+
+## Update 2026-11-04
+
+By the owner's request, ready implementations for MapTiler and Esri (with OpenFreeMap and Photon) ship in the
+optional `@vibeglobe/providers`, outside every engine package ([ADR 0186](0186-provider-services.md)); no engine
+package holds a provider adapter, and Google stays an application's own code.

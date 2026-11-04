@@ -5,7 +5,7 @@ import { CameraTween } from './animation.js';
 import { CompassControl } from './controls/compass.js';
 import { CoordinateReadoutControl } from './controls/readout.js';
 import { DebugToggleControl } from './controls/debug-toggle.js';
-import { SearchControl, type Geocoder } from './controls/search.js';
+import { SearchControl, type GeocoderService } from './controls/search.js';
 import { ViewModeControl } from './controls/view-mode.js';
 import { ZoomControl } from './controls/zoom.js';
 import { addDefaultControls } from './defaults.js';
@@ -238,7 +238,7 @@ describe('controls', () => {
 
   it('the search box goes to typed coordinates and lists geocoder results (F405, F426)', async () => {
     const { ui, container, globe } = setup();
-    const geocoder: Geocoder = {
+    const geocoder: GeocoderService = {
       search: () => Promise.resolve([{ label: 'Rome', longitudeDeg: 12.5, latitudeDeg: 41.9 }]),
     };
     ui.add(new SearchControl({ geocoder, debounceMs: 0 }));

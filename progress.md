@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-11-04: the engine knows no provider; one call starts it with the application's services (F696, F697, KB-343)
+
+The owner's brief: VibeGlobe depends only on interfaces, and anyone instantiates it on a page with one object of
+services and settings. `@vibeglobe/core` declares `TileService` (required: `imagery()`, optional `style()` and
+`transformUrl()`), `TerrainService` (`terrain()`; the 3D view's own data is the relief, the buildings come in the tile
+service's style) and `GeocoderService` (the former `Geocoder`), types only. The new `vibeglobe` package exports
+`createVibeGlobe(container, { tiles, terrain?, geocoder?, … })`: it refuses a missing tile service, wires renderer,
+workers, navigation, the ready-made controls and, for a style, the vector tile modules on demand; a missing optional
+service turns off its feature without error. The optional `@vibeglobe/providers` holds `MapTilerTiles`,
+`MapTilerTerrain`, `EsriTiles`, `OpenFreeMapTiles`, `PhotonGeocoder` and the OpenStreetMap sources, moved out of
+`@vibeglobe/sources` (ADR 0186; ADR 0185 partly superseded). KB-343, found on the way: a globe with workers but no
+imagery or terrain never showed its render extensions' credits, so a style-only map had no attribution; the imagery
+runtime now starts with the workers, and the separate extension pools are gone (core 64.99 → 64.61 KB). Sizes:
+`vibeglobe` 1.52 KB (budget 2), `@vibeglobe/providers` 2.42 KB (budget 3). Tests: `create-vibe-globe.test.ts`,
+`providers.test.ts`, the KB-343 regression, `e2e/services.spec.ts` (4 passing in Chromium), the services guide's
+examples. Still open: F698, VibeGlobe as one npm package (`vibeglobe` with subpaths), and the providers' terms read from
+an unrestricted network (open question 40).
+
 ## 2026-11-03: 'north-up' holds the heading against every input (KB-342)
 
 'North-up' held north up only for drags: a right-drag, a two-finger turn (Safari's trackpad gesture, a touch screen)

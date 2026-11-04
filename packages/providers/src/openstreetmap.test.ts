@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ImagerySource, TileCoord, TransportResult } from '@vibeglobe/core';
-import { failures, runTiledConformance } from '../conformance/index.js';
-import { SourceConfigError } from '../metadata.js';
-import { xyzImagery } from '../xyz-imagery.js';
-import { OSM_PUBLIC_PROFILE, openStreetMapImagery } from './openstreetmap-provider.js';
+import { SourceConfigError, xyzImagery } from '@vibeglobe/sources';
+import { failures, runTiledConformance } from '@vibeglobe/sources/conformance';
+import { OSM_PUBLIC_PROFILE, openStreetMapImagery } from './openstreetmap.js';
 
 const encoder = new TextEncoder();
 

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as core from '@vibeglobe/core';
 import * as gis from '@vibeglobe/gis';
+import * as providers from '@vibeglobe/providers';
 import * as sources from '@vibeglobe/sources';
 import * as conformance from '@vibeglobe/sources/conformance';
 import * as geotiff from '@vibeglobe/sources/geotiff';
@@ -126,6 +127,7 @@ function application(fetchImpl: typeof fetch) {
         createGlobe: () => ({ imageryLayers: layers, setPolarCapColors: () => undefined }),
       },
       '@vibeglobe/gis': gis,
+      '@vibeglobe/providers': providers,
       '@vibeglobe/sources': sources,
       '@vibeglobe/sources/conformance': conformance,
       '@vibeglobe/sources/geotiff': geotiff,

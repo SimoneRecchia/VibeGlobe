@@ -46,7 +46,7 @@ The engine must run smoothly on the weakest PC there is: an old SCADA workstatio
 - Hot paths: performance-critical modules are named `*.hot.ts` and open with a TSDoc header `@hotpath <reason>` and `@benchmark <path>`; they are exempt from the function and module length limits (`npm run check`).
 - `core` has no runtime dependencies and no DOM; nothing may touch `window`, `document` or the GPU at import time (SSR test). Frameworks only in their adapter package; the rendering library only in `renderer`.
 - VibeGlobe is under the Mozilla Public License 2.0 (`LICENSE.md`, ADR 0043); every package.json declares `MPL-2.0` and every source file under `packages/*/src` opens with the MPL notice (`npm run check`). Third-party code: permissive licenses only (MIT, BSD, Apache-2.0, ISC; OFL fonts). Never copy code from other engines: study, then write original code.
-- The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys. The library ships no adapter of a paid or proprietary provider (owner, 2026-11-01): an application connects one (Google, …) from its own code through the generic adapters and a profile of its terms.
+- The project runs no servers: consumers host tiles, packages and engine assets (ADR 0015). Never commit keys. The engine knows no provider (owner, 2026-11-04, ADR 0186): it takes the application's `TileService` (required), `TerrainService` and `GeocoderService` (optional), and no engine package holds a provider's adapter. Ready implementations (MapTiler, Esri, OpenFreeMap, Photon, OpenStreetMap) live only in the optional `@vibeglobe/providers`; any other provider (Google, …) is the application's own code, through the generic adapters and a profile of its terms.
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/internal/adr/README.md` has the conventions). Survey prior art first (`docs/internal/research/`).
 - Owner-only blockers go to `docs/internal/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/internal/follow-ups.md`.
@@ -80,7 +80,7 @@ Owner's rules (2026-10-21, ADR 0022): most waste is extra tests, repeated runs a
 
 ## Layout and gotchas
 
-- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`), the playground in `apps/playground`, a fixture host that loads the engine lazily in `apps/lazy-host`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
+- npm workspaces: libraries in `packages/*` (`@vibeglobe/<name>`, each with its own `CLAUDE.md`; the public entry `createVibeGlobe` is the unscoped `vibeglobe`, the monorepo root `vibeglobe-monorepo`), the playground in `apps/playground`, a fixture host that loads the engine lazily in `apps/lazy-host`, repository scripts in `scripts/`, benchmarks in `benchmarks/`.
 - Workspace packages export a `source` condition: the playground and Vitest run on TypeScript sources without building; bundle-size and tree-shaking checks use `dist/`.
 - Relative imports in libraries use `.js` extensions (NodeNext); tooling scripts import `.ts` and run directly with Node ≥ 22.18.
 - TypeScript is pinned to 6.0.x (typescript-eslint and TypeDoc do not support 7.x yet); eslint-plugin-jsdoc to 63.x (64+ needs Node 22.22.2).

@@ -137,8 +137,9 @@ export class SurfaceFrame {
   }
 
   /**
-   * Starts the options' tiled imagery, if any: from now on tiles refine until their texels are small enough (F081) and
-   * are textured with the layers' tiles.
+   * Starts the tiled imagery of a globe with workers, with the options' layers if any: from now on tiles refine until
+   * their texels are small enough (F081) and are textured with the layers' tiles. Without layers or terrain it still
+   * runs the pools and the credits of render extensions and of layers added later (KB-343).
    */
   startImagery(options: GlobeOptions, renderer: RendererBackend, callbacks: ImageryCallbacks): void {
     const { imagery: inputs = [], terrain, workers } = options;
@@ -148,7 +149,7 @@ export class SurfaceFrame {
       logger.log('error', message);
       callbacks.sourceError?.(new GlobeError('invalid-option', message));
     });
-    if ((entries.length === 0 && !terrain) || !workers) return;
+    if (!workers) return;
     const blockedByCors = new Set<string>();
     const imagery = new ImageryRuntime(
       entries,

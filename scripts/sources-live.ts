@@ -2,7 +2,8 @@
 // real public endpoints only where the provider's terms allow automated testing, reports every endpoint it skipped and
 // why, and stops at the first quota error: the OpenStreetMap public servers, at the low volume ADR 0032 allows.
 import { pathToFileURL } from 'node:url';
-import { openStreetMapImagery, type DescribedImagerySource } from '@vibeglobe/sources';
+import { openStreetMapImagery } from '@vibeglobe/providers';
+import type { DescribedImagerySource } from '@vibeglobe/sources';
 
 /** What one live run did. */
 export interface LiveReport {

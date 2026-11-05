@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-05: a moving camera keeps the detail it has; overzoom shows the finest source (F713, F714, KB-344, KB-345)
+
+The owner's reports from an application's satellite view: zoomed past Esri's last level over Australia the ground
+turned into the world package's level 8 magnified (KB-344), and over the Alps the map blurred while moving although
+its sharp tiles were resident (KB-345). Past every source's last level a chain now magnifies the covering source whose
+last level is finest. A fast camera selects and draws at the still detail, the resident finer imagery included, and
+motion lowers only the levels it requests (F713); adaptive quality brings a lowered level back with a movement only
+when the movement's first frames at the preset are slow (F714, replacing F688). ADR 0195 has the measurements.
+
 ## 2026-11-05: the images of the Earth by day and by night ship with the package (F712)
 
 The owner's brief: the day and night images move from the first application into the library, as defaults it can

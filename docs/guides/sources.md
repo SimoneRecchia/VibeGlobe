@@ -305,7 +305,8 @@ globe at every zoom, so the cap is always a whole disc.
 
 `createGlobe({ imagery })` takes layers bottom first. A layer is a source, or `{ id, sources, opacity, visible, blend }`
 with sources in priority order: each tile comes from the first source that has it, and a source that fails (errors,
-timeouts, offline) leaves its tiles to the next one.
+timeouts, offline) leaves its tiles to the next one. Zoomed in past every source's last level, the source whose last
+level is finest shows, magnified.
 
 ```ts
 import { createGlobe, type WorkerEndpointFactory } from 'vibeglobe/core';

@@ -253,14 +253,18 @@ function writeOverlays(list: DrawList, index: number, overlays: number): void {
 /**
  * Wants a tile of a layer from its source chain (F247, F248): the first source that has the tile at the surface's
  * level (within its levels and coverage, not missing or failing), the deepest resident tile of which is drawn; while
- * that source's tiles load, a resident tile of another source stands in. When no source has it, the first source that
- * covers the area shows its deepest tile magnified. Returns the chosen source's index with the handle and mapping in
- * `mapping`, or -1 when nothing is resident.
+ * that source's tiles load, a resident tile of another source stands in. When no source has it, the covering source
+ * whose last level is finest shows it magnified (KB-344), and while it loads the first source that covers the area
+ * does. Returns the chosen source's index with the handle and mapping in `mapping`, or -1 when nothing is resident.
  */
 function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance: number): number {
   let fallback = -1;
   // The first source with no tile here: its own ancestors may still be finer than another source's (KB-331).
   let missing = -1;
+  // Of the covering sources whose last level the tile is past, the one whose last level is finest, and its floor.
+  let finest = -1;
+  let finestTop = -1;
+  let finestFloor = 0;
   // Levels an earlier source serves are its own: a later source is asked only for finer ones (F247).
   let floor = 0;
   for (let k = 0; k < chain.length; k++) {
@@ -269,11 +273,17 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
     if (!hasTile(layer, tile)) {
       // A source that answered "no tile" here shows its ancestors only where no other source serves finer ones (KB-142,
       // KB-149, KB-331).
-      if (fallback < 0 && mapInto(layer, tile)) {
+      const covers = mapInto(layer, tile);
+      if (covers && fallback < 0) {
         if (!unavailableAtMapping(layer)) fallback = k;
         else if (missing < 0) missing = k;
       }
       const top = topLevel(layer);
+      if (covers && tile.level > top && top > finestTop) {
+        finest = k;
+        finestTop = top;
+        finestFloor = floor;
+      }
       if (tile.level > top && top + 1 > floor) floor = top + 1;
       continue;
     }
@@ -287,6 +297,9 @@ function wantChain(chain: readonly ImageryLayer[], tile: QuadtreeTile, distance:
   const own = chain[missing];
   // Its own ancestors when finer than anything another source serves there (Esri's filler, F691).
   if (own && wantLayer(own, tile, distance, floor) >= 0) return missing;
+  // Zoomed past every source's last level, the finest of them shows magnified, not the first (KB-344).
+  const best = chain[finest];
+  if (best && finest !== fallback && wantLayer(best, tile, distance, finestFloor) >= 0) return finest;
   const covering = chain[fallback];
   return covering && wantLayer(covering, tile, distance, 0) >= 0 ? fallback : -1;
 }
@@ -379,13 +392,23 @@ const COVER_SPAN = 32;
  * source of the chain) are neither requested nor looked up. While nothing finer is resident, the ancestor
  * {@link COVER_LEVELS} up (or the coarsest level), and the coarser ones requested, are requested before every visible
  * tile, coarse first (KB-305). In both classes a request ranks by its levels below the tile's wanted one, not by its
- * own level: where half a view wants deeper levels than the other half, both halves sharpen together (KB-330).
+ * own level: where half a view wants deeper levels than the other half, both halves sharpen together (KB-330). A fast
+ * camera's requests start `loader.motionLevels` below the tile's level, the finer ones drawn only when resident (F713).
  */
 function wantLayer(layer: ImageryLayer, tile: QuadtreeTile, distance: number, floor: number): number {
   const source = layer.source;
   if (!mapInto(layer, tile)) return -1;
-  const wanted = mapped(MAPPING_LEVEL);
   const lowest = source.minLevel > floor ? source.minLevel : floor;
+  // A fast camera requests coarser levels only: the finer ones it draws when already resident (F713).
+  for (let skip = layer.loader.motionLevels; skip > 0 && mapped(MAPPING_LEVEL) > lowest; skip--) {
+    const handle = layer.loader.readyHandle(mapped(MAPPING_LEVEL), mapped(MAPPING_X), mapped(MAPPING_Y));
+    if (handle >= 0) {
+      mapping[MAPPING_HANDLE] = handle;
+      return handle;
+    }
+    mapAncestor(mapping, 0, 1);
+  }
+  const wanted = mapped(MAPPING_LEVEL);
   const cover = wanted - COVER_LEVELS > lowest ? wanted - COVER_LEVELS : lowest;
   // Once a finer tile's bytes are in hand (ARRIVING), coarser ones are only looked up, never requested (F097).
   let arriving = false;

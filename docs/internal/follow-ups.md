@@ -144,3 +144,10 @@ found and fixed: TG-06, KB-313, KB-314). Not changed:
   mipmaps of a frame's uploads share one queue submit, so a WebGPU frame takes 7 to 8 tiles within the 2 ms budget
   instead of 4 to 5 (WebGL2: about 14). What remains is three.js creating bind groups and render passes for every
   mip level of every tile; mipmaps made in the worker (one bitmap per level, copied without passes) would remove it.
+
+## Overzoom and motion (2026-11-05, KB-344, KB-345)
+
+- **A flight's preload skips a destination past every source's last level.** `preloadImagery` wants a plan's tiles
+  only from a source that has them at their level, so a flight ending past the chain's last level (an application's
+  zoom 18 over Esri's 16) loads the finest source's last level only once it arrives; wanting that source's last level
+  there, as the draw now shows it (KB-344), would make such an arrival complete.

@@ -1,6 +1,6 @@
 # 0122. Quality presets, start-up choice and adaptive quality
 
-- Status: Accepted (decided by agent; owner may revisit)
+- Status: Accepted (decided by agent; owner may revisit; amended by 0195)
 - Date: 2026-10-23
 - Milestone: M11
 
@@ -69,3 +69,9 @@ Found in the code review of 2026-10-31. Two cases the governor above could not h
   ratio, so a phone at 3 drew 2.25 pixels per CSS pixel on `medium`, about five times a ratio-1 screen's. Each preset
   now caps the pixels per CSS pixel (`maxPixelRatio`: low 1, medium 1.5, high 2, ultra none), against the device
   pixel ratio at the controller's start; at ratio 1 to 1.5 nothing changes.
+
+## Update 2026-11-05 (a lowered level returns only for slow frames)
+
+A movement from rest no longer brings the lowered level back at once (F688): its first 6 frames are drawn back to back
+at the preset, and the level returns only when they are slow, else it is forgotten
+([ADR 0195](0195-moving-camera-keeps-resident-detail.md), F714, KB-345).

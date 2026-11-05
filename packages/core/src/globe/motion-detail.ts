@@ -22,14 +22,15 @@ const MOTION_FACTOR = 2;
 /** Index of the last frame's factor in {@link MotionDetail.state}, which per-frame code reads directly. */
 export const FACTOR = 3;
 /** Index of the largest texel at rest in {@link MotionDetail.state}. */
-export const BASE_TEXEL = 4;
+const BASE_TEXEL = 4;
 
 /**
- * Motion-aware detail (F287, F288, F301): while the camera moves fast the imagery may be coarser (texels up to four
- * times the still size, two levels), so a fast pan or a flight loads fewer, coarser tiles it can actually show; on a
- * slow link one level coarser again. Once the camera slows the factor returns to 1 and the tiles refine with their
- * cross-fades. The speed is the eye's motion in view ranges (its distance to the target) per second, remembered with a
- * fast decay so a frame without motion does not refine at once. A zoom out is not motion here (KB-309).
+ * Motion-aware detail (F287, F288, F301): while the camera moves fast the imagery it requests may be coarser (texels up
+ * to four times the still size, two levels), so a fast pan or a flight loads fewer, coarser tiles it can actually show;
+ * on a slow link one level coarser again. What is already resident still draws at the still detail (F713). Once the
+ * camera slows the factor returns to 1 and the finer tiles load and fade in. The speed is the eye's motion in view
+ * ranges (its distance to the target) per second, remembered with a fast decay so a frame without motion does not
+ * refine at once. A zoom out is not motion here (KB-309).
  */
 export class MotionDetail {
   private readonly lastEye = new Float64Array(3).fill(Number.NaN);

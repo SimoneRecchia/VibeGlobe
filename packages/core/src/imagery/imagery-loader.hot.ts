@@ -248,6 +248,11 @@ export class ImageryLoader implements NetworkPoolClient {
    * long, milliseconds: tiles a moving view shows for a moment never load (F287). Its ancestors stand in meanwhile.
    */
   settleMs = 0;
+  /**
+   * Levels below a visible tile's own that a fast camera requests it from, 0 at rest (F288, F713): the finer levels are
+   * only looked up, so tiles already on the GPU keep drawing while nothing finer loads.
+   */
+  motionLevels = 0;
   /** Surface levels finer than the source's tiles: 1 for tiles of 512 texels, which serve the next level (F240). */
   levelShift = 0;
 

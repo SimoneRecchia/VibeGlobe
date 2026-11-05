@@ -1,6 +1,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-import { FrameTimeGovernor, type GovernorOptions } from './governor.js';
+import { FrameTimeGovernor, GOVERNOR_DEFAULTS, type GovernorOptions } from './governor.js';
 import {
   adaptiveLadder,
   isPresetName,
@@ -103,6 +103,11 @@ function startPreset(
  * shows in full. The frames keep a slow device's drag, whose frames can come without the input's next move, moving.
  */
 const REST = { ms: 150, frames: 3 };
+/**
+ * Frames a movement from rest draws back to back at the preset before a lowered level returns: the level comes back
+ * only when they are slow, and is forgotten when they are fast (F714).
+ */
+const TRIAL_FRAMES = 6;
 
 class Quality implements QualityController {
   preset: QualityPresetName;
@@ -124,6 +129,9 @@ class Quality implements QualityController {
   private restTimer: ReturnType<typeof setTimeout> | undefined;
   /** The camera rests: the preset shows in full and frames are not judged. */
   private resting = false;
+  /** Frames of a movement's trial drawn so far (-1: none under way), and the time of its first. */
+  private trialFrames = -1;
+  private trialStartMs = 0;
 
   constructor(
     private readonly target: QualityTarget,
@@ -158,14 +166,30 @@ class Quality implements QualityController {
     if (!this.adaptive || this.resting) return;
     const still = ++this.stillFrames >= REST.frames && this.now() - this.movedAtMs >= REST.ms;
     if (still && this.movedAtMs > Number.NEGATIVE_INFINITY) return this.rest();
+    if (this.trialFrames >= 0) return this.trial();
     const decision = this.governor.frame(this.now());
     if (decision) this.apply(decision.level, decision.direction);
+  }
+
+  // A level lowered once came back with every movement, though frames were fast again (KB-345): it returns only when
+  // the movement's first frames, drawn back to back so they measure the drawing and not the input, are slow.
+  private trial(): void {
+    const nowMs = this.now();
+    if (this.trialFrames++ === 0) this.trialStartMs = nowMs;
+    if (this.trialFrames <= TRIAL_FRAMES) return this.target.requestRender();
+    this.trialFrames = -1;
+    const { targetFrameMs, lowerAbove } = { ...GOVERNOR_DEFAULTS, ...this.governorOptions };
+    const slow = (nowMs - this.trialStartMs) / TRIAL_FRAMES > targetFrameMs * lowerAbove;
+    const level = slow ? this.governor.level : 0;
+    this.governor.reset(level, nowMs);
+    this.apply(level, slow ? 'motion' : 'raise');
   }
 
   // A still view is drawn once, so its cost does not matter: it turns sharp the moment the camera stops.
   private rest(): void {
     if (this.resting || !this.adaptive) return;
     this.resting = true;
+    this.trialFrames = -1;
     if (this.governor.level > 0) this.apply(0, 'rest');
   }
 
@@ -183,7 +207,7 @@ class Quality implements QualityController {
     clearTimeout(this.restTimer);
     if (!this.resting) return;
     this.resting = false;
-    if (this.adaptive && this.governor.level > 0) this.apply(this.governor.level, 'motion');
+    if (this.adaptive && this.governor.level > 0) this.trialFrames = 0;
   }
 
   private apply(level: number, reason: QualityChangeReason): void {
@@ -234,8 +258,9 @@ class Quality implements QualityController {
  * measures the interval between drawn frames, lowers one ladder step ({@link adaptiveLadder}) when frames stay slow
  * and raises one step back once they are fast for the governor's stable interval. The lowered level applies while the
  * camera moves: once it rests (the engine idles, or no movement event came for 150 ms while frames go on, as an
- * animation draws them, three frames at least) the preset shows in full, and the next movement brings the level back at once (F688). Create it after
- * `globe.ready`, so the 'auto' preset reads the device's capabilities; an explicit preset overrides detection.
+ * animation draws them, three frames at least) the preset shows in full (F688); the next movement draws its first
+ * frames back to back at the preset, and brings the level back only if they are slow, else forgets it (F714). Create
+ * it after `globe.ready`, so the 'auto' preset reads the device's capabilities; an explicit preset overrides detection.
  */
 export function createQuality(target: QualityTarget, options: QualityOptions = {}): QualityController {
   return new Quality(target, options);

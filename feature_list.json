@@ -8242,7 +8242,7 @@
       "steps": [
         "Unit-test that slow frames during motion lower the level, an idle engine shows the preset in full with the level kept, the first move applies the level again, and frames drawn without camera motion rest after 150 ms without lowering it"
       ],
-      "status": "passing"
+      "status": "superseded"
     },
     {
       "id": "F689",
@@ -8514,6 +8514,28 @@
       "steps": [
         "Unit-test that both images resolve to WebP files next to their module, that `nightLights` cuts its night layer from the shipped image or from the one given, and that `createVibeGlobe` and the Vue component start on the shipped day image with its polar caps without a base image and on the application's own otherwise",
         "Pack the release and confirm the tarball holds both images, each recorded in `scripts/release/assets.json`"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F713",
+      "milestone": 8,
+      "section": "Tiles, level of detail and streaming",
+      "description": "A moving camera keeps the detail already on the GPU: motion-aware detail lowers only the levels a fast camera requests, never what it draws. The surface keeps the still view's tiles while the camera moves, each visible tile draws the finest imagery already resident for it, and the requests start as many levels below the tile's own as the motion allows, so a view that was sharp stays sharp while it pans or zooms.",
+      "steps": [
+        "Unit-test that a fast camera draws a visible tile's finest resident imagery and requests only from the levels its motion allows, and that a globe moving fast keeps the still view's tiles with their own imagery and requests only coarser levels",
+        "Pan fast back and forth over a loaded view in the playground in Chromium and confirm the drawn imagery stays at the still view's levels while moving, with no more requests and no slower frames than before (ADR 0195)"
+      ],
+      "status": "passing"
+    },
+    {
+      "id": "F714",
+      "milestone": 13,
+      "section": "Performance and quality targets",
+      "description": "Adaptive quality lowers detail and resolution only for slow frames: while the camera moves the governor's lowered step applies, once it rests the preset shows in full, and a movement from rest draws its first frames back to back at the preset, then brings the lowered step back if they were slow, or forgets it if they were fast, so a level lowered once by a slow phase does not blur every later movement.",
+      "steps": [
+        "Unit-test that slow frames during motion lower the level, a rest shows the preset, a movement whose first frames at the preset are slow brings the level back, and one whose first frames are fast resets it to the preset, those frames requested back to back",
+        "In the playground with an artificial GPU load, lower the level, remove the load and confirm the next drag draws at the preset's resolution after its first frames; with the load kept, confirm the lowered level returns after them"
       ],
       "status": "passing"
     }

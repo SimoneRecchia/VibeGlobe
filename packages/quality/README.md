@@ -48,7 +48,8 @@ lowers one step after 500 ms above 1.15 × the target, and raises one after 3 s 
 2 s between changes. Steps alternate resolution × 0.85 and screen error × 1.4, down to 0.4 and 8 px; effects stay.
 An object for `adaptive` overrides `GOVERNOR_DEFAULTS`. The lowered step applies while the camera moves: once it rests
 (the engine idles, or the camera has been still for 150 ms while an animation draws) the preset shows in full
-(`reason` `'rest'`), and the camera's first move brings the step back at once (`'motion'`); `level` keeps the step.
+(`reason` `'rest'`); the camera's next move draws its first 6 frames back to back at the preset, then brings the step
+back if they were slow (`'motion'`), or forgets it if they were fast (`'raise'`, `level` 0).
 
 ## Pitfalls
 

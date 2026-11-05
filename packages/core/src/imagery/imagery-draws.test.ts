@@ -165,6 +165,20 @@ describe('drawImagery', () => {
     expect(wanted).toEqual([9]);
   });
 
+  it('draws the finest resident tile while the camera moves fast, and requests only the levels its motion allows (F713)', () => {
+    // Moving two levels coarse (prefetch paused): the resident level 9 still draws, and nothing is requested.
+    const surface = tile(9, 300, 170);
+    const moving = fakeLayer({ 9: 40, 7: 30 });
+    Object.assign(moving.layer.loader, { motionLevels: 2, prefetching: false });
+    expect(draw(moving.layer, surface).textures[0]).toBe(40);
+    expect(moving.wanted).toEqual([]);
+    // With nothing finer resident, it draws and requests from level 7 down, as a selection two levels coarser did.
+    const coarse = fakeLayer({ 7: 30 });
+    Object.assign(coarse.layer.loader, { motionLevels: 2, prefetching: false });
+    expect(draw(coarse.layer, surface).imageryLevels[0]).toBe(7);
+    expect(coarse.wanted).toEqual([7]);
+  });
+
   it('requests no ancestor while the tile itself is arriving from the RAM tier (F097)', () => {
     const { layer, wanted } = fakeLayer({ 9: ARRIVING, 4: 42 });
     const list = draw(layer, tile(9, 300, 170));
@@ -308,6 +322,18 @@ describe('drawImagery', () => {
     const world = fakeLayer({ 8: 60 }, [], 8);
     const list = drawStack([stacked([esri.layer, world.layer])], tile(19, 307200, 174080));
     expect([list.textures[0], list.imageryLevels[0]]).toEqual([90, 17]);
+  });
+
+  it("magnifies past every source's last level the one whose last level is finest, not the first covering the tile (KB-344)", () => {
+    // The world package stops at 8, Esri at 16: zoomed in to 18, Esri's level 16 shows, softer, not the package's 8.
+    const esri = fakeLayer({ 16: 95 }, [], 16);
+    const list = drawStack([stacked([fakeLayer({ 8: 60 }, [], 8).layer, esri.layer])], tile(18, 153600, 87040));
+    expect([list.textures[0], list.imageryLevels[0]]).toEqual([95, 16]);
+    // While its level 16 loads, Esri is asked for none of the package's levels, and the package's level 8 stands in.
+    const loading = fakeLayer({}, [], 16);
+    const meanwhile = drawStack([stacked([fakeLayer({ 8: 60 }, [], 8).layer, loading.layer])], tile(18, 153600, 87040));
+    expect([meanwhile.textures[0], meanwhile.imageryLevels[0]]).toEqual([60, 8]);
+    expect(Math.min(...loading.wanted)).toBeGreaterThan(8);
   });
 
   it("magnifies a lone source's ancestor where its own tile fails, with no other source (KB-149, F242)", () => {

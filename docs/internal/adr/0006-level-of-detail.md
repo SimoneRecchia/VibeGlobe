@@ -1,6 +1,6 @@
 # 0006. Terrain and imagery level of detail
 
-- Status: Accepted (partly superseded by 0013)
+- Status: Accepted (partly superseded by 0013; amended by 0195)
 - Date: 2026-10-20
 - Milestone: M3 (selection, fallback, imagery transitions, poles and antimeridian), M4 (terrain geometry, geomorphing, skirts)
 
@@ -188,3 +188,9 @@ M2's geographic surface quadtree had no polar rule, and zooming in at a pole sel
   now also holds, in its top three bits, how many levels coarser (up to four) the neighbor's mesh is, and the surface
   shader moves each vertex of that edge onto the straight segment between the vertices it shares with the neighbor, a
   vertex every 2^levels of its own. F137, F138 and F139 pass on both backends.
+
+## Update 2026-11-05 (motion lowers only what is requested)
+
+Motion no longer multiplies the imagery threshold of the selection: a fast camera selects and draws at the still
+detail, the finer imagery already on the GPU included, and requests only from the levels its motion allows
+([ADR 0195](0195-moving-camera-keeps-resident-detail.md), F713, KB-345).

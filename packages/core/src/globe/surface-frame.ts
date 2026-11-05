@@ -2,7 +2,7 @@
 // distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import type { LayerGround } from '../layers/layer-target.js';
 import { refuseDisplayOnly } from './display-only.js';
-import { BASE_TEXEL, FACTOR, motionOf } from './motion-detail.js';
+import { FACTOR, motionOf } from './motion-detail.js';
 import { DrawList, drawOnBaseImage, drawWithoutTerrain } from '../imagery/draw-list.js';
 import { DEFAULT_FADE_MS } from '../imagery/fades.js';
 import {
@@ -288,16 +288,16 @@ export class SurfaceFrame {
     const imagery = this.imagery;
     const timed = imagery?.heights !== undefined;
     const selectionStart = timed ? imagery.now() : 0;
-    // Motion-aware detail (F288): a fast camera accepts coarser imagery and loads ahead nothing, nor does a flight (F287).
+    // Motion-aware detail (F288): a fast camera requests coarser imagery and loads ahead nothing, nor does a flight
+    // (F287); it selects and draws the still view's tiles, finer imagery already resident included (F713).
     motionOf(this).flying = imagery?.plan.flying === true;
     motionOf(this).update(camera, this.nowMs, imagery?.network.bandwidth);
     const motion = motionOf(this).state[FACTOR] ?? 1;
-    // Written only when it changes: a new double in the options' field would allocate every frame (F064).
-    const texelErrorPx = (motionOf(this).state[BASE_TEXEL] ?? 1.5) * motion;
-    if (this.selection.maxTexelErrorPx !== texelErrorPx) this.selection.maxTexelErrorPx = texelErrorPx;
     if (imagery)
       for (const layer of imagery.layers) {
         layer.loader.prefetchPaused = motion > 1 || imagery.plan.flying;
+        // The factor's levels: 1, 2, 4 and 8 are 0 to 3.
+        layer.loader.motionLevels = 31 - Math.clz32(motion);
         // A flight requests no visible tile: its plan loads the path and the destination instead (F287, F671).
         layer.loader.settleMs = imagery.plan.flying ? Number.POSITIVE_INFINITY : 0;
       }

@@ -136,6 +136,42 @@ describe('tiled imagery in a globe (M3 increment 3b)', () => {
     globe.destroy();
   });
 
+  it('draws the still view’s resident detail while the camera moves fast, and requests only coarser tiles (KB-345)', async () => {
+    const berlin = { longitudeDeg: 13.4, latitudeDeg: 52.5, zoom: 7 };
+    const urls: string[] = [];
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source(urls)],
+      workers: instantWorkers(),
+      view: berlin,
+    });
+    const run = async (frames: number): Promise<void> => {
+      for (let frame = 0; frame < frames; frame++) {
+        await settle();
+        renderer.timers.advance(16);
+        renderer.flush();
+      }
+    };
+    await run(120);
+    const key = (t: { level: number; x: number; y: number }): string => `${t.level}/${t.x}/${t.y}`;
+    const still = new Set(globe.surfaceTiles().map(key));
+    const finest = Math.max(...globe.surfaceTiles().map((t) => t.level));
+    // A fast pan, about a tenth of a degree per frame once under way.
+    void globe.easeTo({ ...berlin, longitudeDeg: berlin.longitudeDeg + 3 }, { durationMs: 500 });
+    await run(6);
+    const before = urls.length;
+    await run(9);
+    const kept = globe.surfaceTiles().filter((t) => still.has(key(t)));
+    expect(kept.length).toBeGreaterThan(still.size / 4);
+    expect(kept.every((t) => t.imageryLevel === t.level)).toBe(true);
+    const levels = urls.slice(before).map((url) => Number(url.split('/')[2]));
+    expect(Math.max(...levels)).toBeLessThan(finest);
+    globe.destroy();
+  });
+
   it('refuses imagery without a worker pool', () => {
     const { factory } = fakeRenderer();
     expect(() =>

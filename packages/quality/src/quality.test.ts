@@ -131,29 +131,7 @@ describe('createQuality', () => {
   });
 
   it('shows the preset in full once the camera rests, and the lowered level again from its next movement (F688)', () => {
-    const handlers = new Map<string, Set<() => void>>();
-    const state = { clockMs: 0, scales: [] as number[] };
-    const target: QualityTarget = {
-      capabilities: DESKTOP,
-      on: (event, handler) => {
-        const set = handlers.get(event) ?? new Set();
-        handlers.set(event, set);
-        const h = (): void => handler({ frameNumber: 0 });
-        set.add(h);
-        return () => set.delete(h);
-      },
-      setResolutionScale: (scale) => state.scales.push(scale),
-      requestRender: () => undefined,
-    };
-    const emit = (event: string): void => handlers.get(event)?.forEach((h) => h());
-    // Each frame of a drag carries its own movement, as the controls send it; still frames carry none.
-    const frames = (ms: number, count: number, moving: boolean): void => {
-      for (let i = 0; i < count; i++) {
-        state.clockMs += ms;
-        if (moving) emit(i % 2 ? 'moveend' : 'movestart');
-        emit('frame');
-      }
-    };
+    const { target, state, emit, frames } = movingGlobe();
     const quality = createQuality(target, { preset: 'high', now: () => state.clockMs });
     frames(30, 200, true);
     const level = quality.level;
@@ -169,8 +147,11 @@ describe('createQuality', () => {
     expect(state.scales.at(-1)).toBe(lowered);
     frames(30, 100, false);
     expect([state.scales.at(-1), quality.level]).toEqual([1, level]);
-    // The next movement brings the level back at once; an engine idling within 150 ms of it rests once they passed.
+    // The next movement brings the level back once its first frames at the preset are slow (F714); an engine idling
+    // within 150 ms of it rests once they passed.
     emit('movestart');
+    expect(state.scales.at(-1)).toBe(1);
+    frames(30, 7, true);
     expect(state.scales.at(-1)).toBe(lowered);
     vi.useFakeTimers();
     emit('idle');
@@ -180,4 +161,47 @@ describe('createQuality', () => {
     expect(state.scales.at(-1)).toBe(1);
     vi.useRealTimers();
   });
+
+  it("forgets a lowered level when a movement's first frames at the preset are fast, drawn back to back (F714, KB-345)", () => {
+    const { target, state, frames } = movingGlobe();
+    const quality = createQuality(target, { preset: 'high', now: () => state.clockMs });
+    frames(30, 200, true);
+    expect(quality.level).toBeGreaterThan(0);
+    frames(30, 100, false);
+    const renders = state.renders;
+    frames(16, 7, true);
+    expect([state.scales.at(-1), quality.level, quality.settings.resolutionScale]).toEqual([1, 0, 1]);
+    expect(state.renders - renders).toBeGreaterThanOrEqual(6);
+    // Moving on at the preset with fast frames keeps it.
+    frames(16, 300, true);
+    expect([state.scales.at(-1), quality.level]).toEqual([1, 0]);
+  });
 });
+
+/** A globe stand-in that also sends movement and idle events (`emit`); `frames` moves the camera on each when asked. */
+function movingGlobe() {
+  const handlers = new Map<string, Set<() => void>>();
+  const state = { clockMs: 0, scales: [] as number[], renders: 0 };
+  const target: QualityTarget = {
+    capabilities: DESKTOP,
+    on: (event, handler) => {
+      const set = handlers.get(event) ?? new Set();
+      handlers.set(event, set);
+      const h = (): void => handler({ frameNumber: 0 });
+      set.add(h);
+      return () => set.delete(h);
+    },
+    setResolutionScale: (scale) => state.scales.push(scale),
+    requestRender: () => state.renders++,
+  };
+  const emit = (event: string): void => handlers.get(event)?.forEach((h) => h());
+  // Each frame of a drag carries its own movement, as the controls send it; still frames carry none.
+  const frames = (ms: number, count: number, moving: boolean): void => {
+    for (let i = 0; i < count; i++) {
+      state.clockMs += ms;
+      if (moving) emit(i % 2 ? 'moveend' : 'movestart');
+      emit('frame');
+    }
+  };
+  return { target, state, emit, frames };
+}

@@ -2111,3 +2111,19 @@ The 9,096 stars of the Yale Bright Star Catalog, 5th revised edition (Hoffleit a
 License: Public domain AND MIT
 
 The star catalog data is the Yale Bright Star Catalog, 5th revised edition (Hoffleit, D. and Warren, W. H. Jr., 1991), in the public domain. Converted to JSON by Bretton Wade: MIT License, Copyright (c) 2016 Bretton Wade. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## sources/src/earth/day.webp in vibeglobe
+
+The world by day for the default base image: NASA Blue Marble with shaded relief and bathymetry, equirectangular, 4096 × 2048 pixels (ADR 0194); source: NASA Global Imagery Browse Services (GIBS), layer BlueMarble_ShadedRelief_Bathymetry, https://www.earthdata.nasa.gov/gibs
+
+License: Public domain
+
+Imagery: NASA Blue Marble, from NASA's Global Imagery Browse Services (GIBS), part of NASA's ESDIS.
+
+## sources/src/earth/night.webp in vibeglobe
+
+City lights by night for nightLights(): NASA Black Marble 2016, Web Mercator, 2048 × 2048 pixels (ADR 0194); source: NASA Black Marble 2016 (VIIRS), through NASA GIBS, layer VIIRS_Black_Marble, https://earthobservatory.nasa.gov/features/NightLights
+
+License: Public domain
+
+Night lights: NASA Black Marble.

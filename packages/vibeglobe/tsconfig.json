@@ -19,6 +19,7 @@
     { "path": "../renderer" },
     { "path": "../layers" },
     { "path": "../ui" },
-    { "path": "../worker" }
+    { "path": "../worker" },
+    { "path": "../sources" }
   ]
 }

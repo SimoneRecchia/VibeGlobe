@@ -70,12 +70,12 @@ key or token only when a request is made; a source's `attribution` and `profile`
 `createVibeGlobe(container, options)` takes the services and every `GlobeOptions` field the engine does not build
 itself (`view`, `quality`, `constraints`, `atmosphere`, `home`, `memory`, …).
 
-| Option           | Type                       | Default        | Effect                                            |
-| ---------------- | -------------------------- | -------------- | ------------------------------------------------- |
-| `ui`             | `boolean`                  | `true`         | search, zoom, compass, fullscreen and coordinates |
-| `controls`       | `ControlsOptions \| false` | the defaults   | mouse, touch and keyboard navigation              |
-| `language`       | `string`                   | `'en'`         | the controls' language and the map's names        |
-| `baseImageryUrl` | `string`                   | one ocean blue | the world image shown where no tile is loaded yet |
+| Option           | Type                       | Default                   | Effect                                            |
+| ---------------- | -------------------------- | ------------------------- | ------------------------------------------------- |
+| `ui`             | `boolean`                  | `true`                    | search, zoom, compass, fullscreen and coordinates |
+| `controls`       | `ControlsOptions \| false` | the defaults              | mouse, touch and keyboard navigation              |
+| `language`       | `string`                   | `'en'`                    | the controls' language and the map's names        |
+| `baseImageryUrl` | `string`                   | NASA Blue Marble, shipped | the world image shown where no tile is loaded yet |
 
 The promise resolves with `globe` (the `Globe`), `ui` (the controls, `undefined` with `ui: false`; add more with
 `ui.add`) and `destroy()`, which stops the globe and removes its canvas and controls.
@@ -86,7 +86,8 @@ The promise resolves with `globe` (the `Globe`), `ui` (the controls, `undefined`
   offline use and credits included.
 - The style loads before the promise resolves; a style that fails to load rejects it and stops the globe.
 - Keys in tile URLs are visible to anyone who opens the page: restrict them to your domains in the provider's console.
-- With a strict Content Security Policy, allow `data:` in `connect-src` or pass `baseImageryUrl` from your own origin.
+- Without `baseImageryUrl` the globe starts on the NASA Blue Marble shipped in the package (`dayImageUrl()` of
+  `vibeglobe/sources`, 0.85 MB), which your bundler copies to your assets; pass your own image to replace it.
 
 ## Errors
 

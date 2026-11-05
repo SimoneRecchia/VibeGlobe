@@ -24,6 +24,15 @@ The application hosts these outputs itself and shows each attribution wherever t
 | ------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ---------- |
 | Fresher imagery: a mosaic built from raw Copernicus Sentinel-2 data | Copernicus Sentinel data licence (free, full and open) | Contains modified Copernicus Sentinel data {year} (the year of the data) | [https://registry.opendata.aws/sentinel-2-l2a-cogs/](https://registry.opendata.aws/sentinel-2-l2a-cogs/) | 2026-10-21 |
 
+## Images shipped in the package
+
+Two images ship in `vibeglobe/sources` (ADR 0194); an application that shows them shows their attribution.
+
+| Image                                                        | Used by                                 | License       | Attribution (exact)                                                                                | Source                                                                                                           |
+| ------------------------------------------------------------ | --------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| NASA Blue Marble, shaded relief and bathymetry (4096 × 2048) | `dayImageUrl()`, the default base image | Public domain | Imagery: NASA Blue Marble, from NASA's Global Imagery Browse Services (GIBS), part of NASA's ESDIS | [https://www.earthdata.nasa.gov/gibs](https://www.earthdata.nasa.gov/gibs)                                       |
+| NASA Black Marble 2016, VIIRS night lights (2048 × 2048)     | `nightImageUrl()`, `nightLights()`      | Public domain | Night lights: NASA Black Marble                                                                    | [https://earthobservatory.nasa.gov/features/NightLights](https://earthobservatory.nasa.gov/features/NightLights) |
+
 ## Refused sources
 
 The pipeline and the offline package builder (`vibeglobe-data pack`) refuse these before downloading anything:

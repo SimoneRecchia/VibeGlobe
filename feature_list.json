@@ -8505,6 +8505,17 @@
         "Start the CI workflow by hand and confirm it contains the fast, end-to-end, measurement, cross-browser and benchmark jobs"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F712",
+      "milestone": 7,
+      "section": "Map sources: map-agnostic design",
+      "description": "Two public-domain images of the whole Earth ship with the package as defaults an application may replace: NASA Blue Marble with bathymetry by day (`dayImageUrl()`, with its credit and polar caps), the base image of `createVibeGlobe` and of the Vue component when they are given none, and NASA Black Marble city lights by night, `nightLights(image?)`, a `blend: 'night'` imagery layer cut from it or from the application's own image.",
+      "steps": [
+        "Unit-test that both images resolve to WebP files next to their module, that `nightLights` cuts its night layer from the shipped image or from the one given, and that `createVibeGlobe` and the Vue component start on the shipped day image with its polar caps without a base image and on the application's own otherwise",
+        "Pack the release and confirm the tarball holds both images, each recorded in `scripts/release/assets.json`"
+      ],
+      "status": "passing"
     }
   ]
 }

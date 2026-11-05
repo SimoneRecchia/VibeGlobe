@@ -10,6 +10,7 @@ import {
   type TileService,
 } from '@vibeglobe/core';
 import { createRenderer } from '@vibeglobe/renderer';
+import { DAY_IMAGE_POLAR_CAPS, dayImageUrl } from '@vibeglobe/sources';
 import { addDefaultControls, createUi, type Ui } from '@vibeglobe/ui';
 import { createWorkers } from '@vibeglobe/worker';
 
@@ -22,7 +23,10 @@ export interface VibeGlobeOptions extends Omit<
   readonly tiles: TileService;
   /** Place search; without it the search box accepts coordinates only. */
   readonly geocoder?: GeocoderService;
-  /** An equirectangular image of the whole world, shown where no tile is loaded yet (default: one ocean color). */
+  /**
+   * An equirectangular image of the whole world, shown where no tile is loaded yet (default: the NASA Blue Marble
+   * shipped with the package, `dayImageUrl()` of `vibeglobe/sources`, with its polar caps).
+   */
   readonly baseImageryUrl?: string;
   /** Mouse, touch and keyboard navigation options, or false for none. */
   readonly controls?: ControlsOptions | false;
@@ -41,10 +45,6 @@ export interface VibeGlobe {
   destroy(): void;
 }
 
-/** A 1×1 ocean-blue image: the world under the tiles while none is loaded, without an asset to host. */
-const OCEAN =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQsY8BAAEyALi+BX15AAAAAElFTkSuQmCC';
-
 /**
  * Starts VibeGlobe in `container` with the application's services (ADR 0186): the tiles, required, and optionally a
  * terrain and a geocoder. Resolves once the first frame is drawn and the tile service's style, if any, is attached;
@@ -52,14 +52,15 @@ const OCEAN =
  * style does not load.
  */
 export async function createVibeGlobe(container: HTMLElement, options: VibeGlobeOptions): Promise<VibeGlobe> {
-  const { tiles, geocoder, controls, ui: withUi = true, language, baseImageryUrl = OCEAN, ...engine } = options;
+  const { tiles, geocoder, controls, ui: withUi = true, language, baseImageryUrl, ...engine } = options;
   if (!tiles) throw new GlobeError('invalid-option', 'createVibeGlobe needs a tile service: { tiles }');
   const globe = createGlobe({
+    ...(baseImageryUrl ? {} : { polarCapColors: DAY_IMAGE_POLAR_CAPS }),
     ...engine,
     container,
     renderer: createRenderer(),
     ...(controls === false ? {} : { controls: createControls(controls) }),
-    baseImageryUrl,
+    baseImageryUrl: baseImageryUrl ?? dayImageUrl(),
     imagery: tiles.imagery,
     workers: createWorkers(),
   });

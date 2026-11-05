@@ -51,9 +51,11 @@ assemble the same engine piece by piece, for an application that needs to choose
 
 ## The base image
 
-`baseImageryUrl` is required in every integration: an equirectangular image of the whole world (for example a JPEG
-of 4096 × 2048 pixels), which the application serves. The engine drapes it over the globe before any tile arrives and
-wherever no imagery layer has a tile. `globe.ready` waits for it, and rejects with a `GlobeError` (`resource-failed`)
+`baseImageryUrl` is an equirectangular image of the whole world (for example a JPEG of 4096 × 2048 pixels). The engine
+drapes it over the globe before any tile arrives and wherever no imagery layer has a tile. `createGlobe` and the Web
+Component require it; `createVibeGlobe` and the Vue component default to the NASA Blue Marble shipped in the package
+(`dayImageUrl()` of `vibeglobe/sources`, with its polar caps `DAY_IMAGE_POLAR_CAPS`), which bundlers copy to the
+application's assets. `globe.ready` waits for it, and rejects with a `GlobeError` (`resource-failed`)
 when it fails to load. The [hosting guide](hosting.md) shows how to build one from public-domain data.
 
 ## Plain TypeScript
@@ -151,7 +153,7 @@ the controls and, when `imagery` is set, the workers (`createWorkers()` of `vibe
 
 | Prop                                                           | Applied         | Effect                                                                     |
 | -------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------- |
-| `baseImageryUrl`                                               | at start        | Required: the base image                                                   |
+| `baseImageryUrl`                                               | at start        | The base image (default: the shipped NASA Blue Marble)                     |
 | `imagery`                                                      | at start        | Imagery sources, bottom first                                              |
 | `backend`                                                      | at start        | `'auto'` (default), `'webgpu'` or `'webgl2'`                               |
 | `controls`                                                     | at start        | `true` (default), `false`, or the options of `createControls`              |

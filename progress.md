@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-05: the images of the Earth by day and by night ship with the package (F712)
+
+The owner's brief: the day and night images move from the first application into the library, as defaults it can
+replace. `@vibeglobe/sources` ships NASA Blue Marble with bathymetry (`dayImageUrl()`, its credit and polar caps) and
+NASA Black Marble city lights (`nightLights(image?)`, a `blend: 'night'` layer); `createVibeGlobe` and the Vue component
+start on the day image when given none (ADR 0194). The package grows by about 0.96 MB, fetched only when used.
+
 ## 2026-11-04: CI only on pull requests and by hand (F711)
 
 The owner's brief: the checks run on pull requests, and nothing starts on `main`, after a merge or a push. `ci.yml`

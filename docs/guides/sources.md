@@ -214,6 +214,27 @@ const lights = mercatorImage({
 // A layer of its own: globe.imageryLayers.add({ id: 'night-lights', blend: 'night', sources: [lights] }).
 ```
 
+## Images of the Earth shipped with the package
+
+Two public-domain images ship in `vibeglobe/sources`; bundlers copy them to the application's assets, and nothing
+downloads them unless the application uses them.
+
+- `dayImageUrl()`: NASA Blue Marble with bathymetry by day, equirectangular, 4096 × 2048 pixels (0.85 MB), the default
+  base image of `createVibeGlobe` and the Vue component. Pass it with `DAY_IMAGE_POLAR_CAPS` to `createGlobe`, and
+  show `DAY_IMAGE_CREDIT` with the other credits.
+- `nightLights(image?)`: the night side's city lights, a `blend: 'night'` layer (`NIGHT_LIGHTS_ID`) cut from NASA's
+  Black Marble 2016 (`nightImageUrl()`, Web Mercator, 2048 pixels), or from the application's own image of the world.
+
+```ts
+import { createGlobe } from 'vibeglobe/core';
+import { DAY_IMAGE_POLAR_CAPS, dayImageUrl, NIGHT_LIGHTS_ID, nightLights } from 'vibeglobe/sources';
+
+const globe = createGlobe({ container, renderer, baseImageryUrl: dayImageUrl(), polarCapColors: DAY_IMAGE_POLAR_CAPS });
+globe.imageryLayers.add({ ...nightLights(), visible: false }); // or nightLights('/my/night-lights.webp')
+// Shown with the night side: globe.setAtmosphere({ dayNight: 1, timeMs: Date.now() }).
+globe.imageryLayers.set(NIGHT_LIGHTS_ID, { visible: true });
+```
+
 ## Reprojection
 
 The engine draws Web Mercator and geographic pyramids. A service in another reference system, such as UTM zones 32N
@@ -265,7 +286,8 @@ transparent outside the data, so the layers below show there.
 
 Web Mercator sources end at ±85.0511°. Beyond, the globe draws two polar caps: a geographic (`EPSG:4326`) imagery
 source that covers them fills them; otherwise each cap shows one color, `#78a9cd` in the north and `#f2f3f7` in the
-south (the sea and the ice of the default base image).
+south (the sea and the ice of the Natural Earth base image the pipeline builds); the day image shipped in the package
+comes with its own, `DAY_IMAGE_POLAR_CAPS`.
 
 ```ts
 import { createGlobe } from 'vibeglobe/core';

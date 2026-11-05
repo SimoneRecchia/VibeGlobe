@@ -18,6 +18,10 @@ const ENTRIES = {
   sources: fsUrl('packages/sources/src/index.ts'),
 };
 
+/** A 1×1 ocean-blue base image: the shares below count what the tiles draw over it, not the shipped day image. */
+const OCEAN =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQsY8BAAEyALi+BX15AAAAAElFTkSuQmCC';
+
 /** Which services the page plugs in: fixture tiles (raster or the streets style), terrain, a geocoder stub. */
 interface Plan {
   readonly tiles: 'raster' | 'style' | 'none';
@@ -30,7 +34,7 @@ interface Plan {
 async function start(page: Page, plan: Plan): Promise<void> {
   await openGlobe(page);
   await page.evaluate(
-    async ({ entries, plan: p }) => {
+    async ({ entries, plan: p, ocean }) => {
       const { createVibeGlobe } = (await import(/* @vite-ignore */ entries.vibeglobe)) as typeof VibeGlobeModule;
       const sources = (await import(/* @vite-ignore */ entries.sources)) as typeof SourcesModule;
       window.vibeglobePlayground?.globe.destroy();
@@ -62,6 +66,7 @@ async function start(page: Page, plan: Plan): Promise<void> {
       try {
         state.started = await createVibeGlobe(container, {
           tiles: tiles as never,
+          baseImageryUrl: ocean,
           view: p.view,
           ...(p.terrain ? { terrain } : {}),
           ...(p.geocoder ? { geocoder } : {}),
@@ -70,7 +75,7 @@ async function start(page: Page, plan: Plan): Promise<void> {
         state.error = (error as { code?: string }).code ?? String(error);
       }
     },
-    { entries: ENTRIES, plan },
+    { entries: ENTRIES, plan, ocean: OCEAN },
   );
 }
 

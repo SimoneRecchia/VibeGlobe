@@ -3,6 +3,7 @@
 import type { ControlsOptions, NavigationControls } from '@vibeglobe/controls';
 import type { Globe, GlobeOptions, ImagerySource, ViewInit } from '@vibeglobe/core';
 import { createRenderer, type BackendChoice, type RendererOptions } from '@vibeglobe/renderer';
+import { DAY_IMAGE_POLAR_CAPS, dayImageUrl } from '@vibeglobe/sources';
 import { createWorkers } from '@vibeglobe/worker';
 
 /** Engine options the component passes through unchanged (everything it does not build itself). */
@@ -13,7 +14,8 @@ export type GlobeExtraOptions = Omit<
 
 /** What the component needs to start an engine: its props, resolved. */
 export interface GlobeConfig {
-  readonly baseImageryUrl: string;
+  /** The base image; without one, the NASA Blue Marble shipped with the package and its polar caps. */
+  readonly baseImageryUrl?: string | undefined;
   readonly backend: BackendChoice;
   /** Navigation: off (false), the defaults (true) or these options (F625's tilt policy, the navigation mode…). */
   readonly controls: boolean | ControlsOptions;
@@ -37,11 +39,12 @@ export function globeOptions(
   const imagery = config.imagery ?? [];
   const workers = config.workers ?? (imagery.length > 0 ? createWorkers() : undefined);
   return {
+    ...(config.baseImageryUrl ? {} : { polarCapColors: DAY_IMAGE_POLAR_CAPS }),
     ...config.options,
     container,
     renderer: createRenderer({ backend: config.backend, ...(config.gltf ? { gltf: config.gltf } : {}) }),
     ...(controls ? { controls } : {}),
-    baseImageryUrl: config.baseImageryUrl,
+    baseImageryUrl: config.baseImageryUrl ?? dayImageUrl(),
     view: config.view,
     ...(imagery.length > 0 ? { imagery } : {}),
     ...(workers ? { workers } : {}),

@@ -83,7 +83,7 @@ async function guideFetch(): Promise<typeof fetch> {
 
 /** The values the examples take from the application. */
 function application(fetchImpl: typeof fetch) {
-  const layers = { set: () => undefined, move: () => undefined, list: () => [] };
+  const layers = { add: () => undefined, set: () => undefined, move: () => undefined, list: () => [] };
   return {
     container: {},
     renderer: {},

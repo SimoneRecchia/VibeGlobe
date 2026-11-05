@@ -168,8 +168,11 @@ function viewOf(
 export const VibeGlobe = defineComponent({
   name: 'VibeGlobe',
   props: {
-    /** URL of the base image draped on the whole globe before any tile arrives. */
-    baseImageryUrl: { type: String, required: true },
+    /**
+     * URL of the base image draped on the whole globe before any tile arrives. Default: the NASA Blue Marble shipped
+     * with the package (`dayImageUrl()` of `vibeglobe/sources`), with its polar caps. Read when the engine starts.
+     */
+    baseImageryUrl: { type: String, default: undefined },
     /** Imagery sources, bottom first. Read when the engine starts. */
     imagery: { type: Array as PropType<readonly ImagerySource[]>, default: undefined },
     /** 'auto' (WebGPU, falling back to WebGL2), 'webgpu' or 'webgl2'. Read when the engine starts. */

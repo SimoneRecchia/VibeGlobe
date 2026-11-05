@@ -43,6 +43,8 @@ export const ZoomReadout = defineComponent({
 ## Pitfalls
 
 - `VibeGlobe` fills its parent: the parent must have a height.
+- Without `baseImageryUrl` the globe starts on the NASA Blue Marble shipped in the package (`dayImageUrl()` of
+  `vibeglobe/sources`), which the bundler copies to the application's assets.
 - `baseImageryUrl`, `imagery`, `backend`, `controls`, `gltf`, `workers` and `options` are read once, at start; the
   camera props, `viewMode`, `layers`, `networkMode` and `qualityPreset` change the running engine.
 - The composables and child components work inside `VibeGlobe`'s default slot.

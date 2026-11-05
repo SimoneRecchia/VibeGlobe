@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NavigationControls } from '@vibeglobe/controls';
 import { createApp, createSSRApp, effectScope, h, nextTick, shallowRef } from 'vue';
 import { renderToString } from 'vue/server-renderer';
+import { DAY_IMAGE_POLAR_CAPS, dayImageUrl } from '@vibeglobe/sources';
 
 const created: GlobeOptions[] = [];
 const handlers = new Map<string, (payload: unknown) => void>();
@@ -183,6 +184,15 @@ describe('controls options, exposed controls and the glTF loader (F628, F629)', 
     expect(on.controls()?.tiltPolicy).toBeNull();
     expect(renderers[1]).not.toHaveProperty('gltf');
     on.unmount();
+  });
+
+  it('starts on the shipped day image and its polar caps without a base image (F712)', () => {
+    const globe = mountGlobe({ baseImageryUrl: undefined });
+    expect(created[0]).toMatchObject({ baseImageryUrl: dayImageUrl(), polarCapColors: DAY_IMAGE_POLAR_CAPS });
+    globe.unmount();
+    mountGlobe({}).unmount();
+    expect(created[1]?.baseImageryUrl).toBe('/base.jpg');
+    expect(created[1]).not.toHaveProperty('polarCapColors');
   });
 
   it("useTiltAvailable follows the controls' tilt availability, and is true without controls", async () => {

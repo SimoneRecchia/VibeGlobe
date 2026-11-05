@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // F699: one call starts the globe with the application's services; tiles are required, terrain and geocoder optional.
 import type { GlobeOptions, TerrainSource } from '@vibeglobe/core';
+import { DAY_IMAGE_POLAR_CAPS, dayImageUrl } from '@vibeglobe/sources';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const created: GlobeOptions[] = [];
@@ -43,7 +44,7 @@ describe('createVibeGlobe', () => {
     const { ui } = await createVibeGlobe(container(), { tiles: { imagery }, view: { zoom: 3 } });
     expect(created[0]).toMatchObject({ imagery, workers: 'workers', controls: 'controls', view: { zoom: 3 } });
     expect(created[0]).not.toHaveProperty('terrain');
-    expect(created[0]?.baseImageryUrl).toMatch(/^data:image\/png/);
+    expect(created[0]).toMatchObject({ baseImageryUrl: dayImageUrl(), polarCapColors: DAY_IMAGE_POLAR_CAPS });
     expect(spies.controls).toHaveBeenCalledWith(ui, {});
   });
 
@@ -54,6 +55,12 @@ describe('createVibeGlobe', () => {
     expect(created[0]).toMatchObject({ terrain });
     expect(created[0]).not.toHaveProperty('controls');
     expect(spies.controls).toHaveBeenCalledWith(ui, { geocoder });
+  });
+
+  it("starts on the application's own base image with the engine's polar caps (F712)", async () => {
+    await createVibeGlobe(container(), { tiles: { imagery }, baseImageryUrl: '/world.webp' });
+    expect(created[0]?.baseImageryUrl).toBe('/world.webp');
+    expect(created[0]).not.toHaveProperty('polarCapColors');
   });
 
   it('draws the style in the language asked, removed on destroy; a style that fails stops everything', async () => {

@@ -6,7 +6,9 @@ description: Release VibeGlobe: a published GitHub release builds the single `vi
 # Release
 
 ADR 0190: the release only builds and publishes. One package is published, `vibeglobe`, holding every engine package
-under subpaths (ADR 0189). Publishing is the owner's: an agent never publishes, it may pack and run the checks.
+under subpaths (ADR 0189). A release (`latest`) is the owner's: an agent publishes one only with the owner's
+authorization for that version, as a GitHub release they create. A pre-release (`-rc.<n>`, `next`) is the agent's when
+it is worth publishing (ADR 0196, below).
 
 ## Publish (owner)
 
@@ -33,6 +35,24 @@ Every release after that is a GitHub release (ADR 0192):
    job (not CI, not a release, not `release.yml`, or no OIDC identity) and a tag that names no version.
 
 Nothing else happens: no changelog or commit. npm refuses a version that was already published: choose the next.
+
+## Pre-release (agent, ADR 0196)
+
+Worth publishing when changes merged on `main` are waited for by an application (a fix or a feature it needs), not
+after every merge and not to try a change. Then:
+
+1. On `main`, run the package checks below; all pass.
+2. The version: the next free `-rc.<n>` of the coming version (`npm view vibeglobe versions`, GitHub's releases),
+   never a version without `-`.
+3. The notes, in the style of the earlier pre-releases: a first line naming the `next` tag, one bullet per change with
+   its F/KB numbers and pull request, "Everything in v<previous>."
+4. Start the Release workflow by hand on `main` (the GitHub tools' `run_workflow` of `release.yml`, inputs `version`
+   and `notes`). **Publish to npm** refuses a release version or another branch; then **GitHub pre-release** creates
+   the tag `v<version>` and the pre-release page on the published commit.
+5. Check `npm view vibeglobe@<version>` (npm may take a few minutes) and tell the owner, with the page's link.
+
+The `npm-release` environment must allow deployments from `main`; with required reviewers set, the owner approves the
+run first.
 
 ## Before and after (agent or owner)
 

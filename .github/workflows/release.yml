@@ -4,9 +4,19 @@ name: Release
 # `vibeglobe` at the version the tag names (v1.2.3 or 1.2.3) and publishes it to the public npm registry through npm's
 # trusted publishing: GitHub's OIDC identity of this workflow, no token, provenance attached by npm. The `npm-release`
 # environment's required reviewers, when set, approve the job first. Nothing else: no changelog or commit.
+# A pre-release may also be started by hand on `main` (F715, ADR 0196): published the same way, then given its tag and
+# its GitHub pre-release page by a second job. A release (no `-` in its version) is refused that way.
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: A pre-release version, such as 0.3.0-rc.4 (a release is published from a GitHub release)
+        required: true
+      notes:
+        description: The notes of its GitHub pre-release (Markdown)
+        required: true
 
 permissions:
   contents: read
@@ -19,6 +29,7 @@ jobs:
     environment: npm-release
     env:
       TAG: ${{ github.event.release.tag_name }}
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v7
       # No dependency cache in a release build (npm's trusted publishing guide).
@@ -31,4 +42,21 @@ jobs:
       - run: npm install --global npm@11.21.1
       - run: npm ci
       - name: Build, pack and publish vibeglobe
-        run: node scripts/release/release.ts "$TAG"
+        run: node scripts/release/release.ts "${TAG:-v$VERSION}"
+
+  # The tag and the GitHub pre-release page of a run started by hand, once npm has the version: a job of its own, the
+  # only one that may write to the repository, which checks out and runs nothing.
+  prerelease-page:
+    name: GitHub pre-release
+    needs: publish
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      NOTES: ${{ inputs.notes }}
+    steps:
+      - run: gh release create "v$VERSION" --prerelease --target "$GITHUB_SHA" --title "v$VERSION" --notes "$NOTES"

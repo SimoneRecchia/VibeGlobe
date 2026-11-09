@@ -383,6 +383,24 @@ describe('imagery layers added and removed at runtime (track A hook 2)', () => {
     globe.destroy();
   });
 
+  it('pins the base of a layer added at runtime, as of one given at creation (KB-347)', async () => {
+    const { renderer, factory } = fakeRenderer();
+    const globe = createGlobe({
+      container: {},
+      renderer: factory,
+      baseImageryUrl: 'world.jpg',
+      imagery: [source([])],
+      workers: instantWorkers(),
+      view: { longitudeDeg: 12.5, latitudeDeg: 41.9, zoom: 6 },
+    });
+    await settle();
+    renderer.flush();
+    globe.imageryLayers.add({ ...source([]), id: 'added' });
+    // Levels 0–3 of each 256 px source: 85 tiles apiece (F084).
+    expect(globe.imageryStats()?.pinnedTotal).toBe(170);
+    globe.destroy();
+  });
+
   it('reuses the texture handles of removed layers, so a layer added after hundreds of swaps still draws', async () => {
     const { renderer, factory } = fakeRenderer();
     const globe = createGlobe({

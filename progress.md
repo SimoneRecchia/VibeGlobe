@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-09: every layer keeps a pinned base; the tile cache writes in batches (KB-346, KB-347, KB-348)
+
+The owner's report from an application's satellite view: zooming in and out showed squares of the layer beneath, at
+the view's edges and at times in its middle. Two layers of that application had no pinned base at all: a chain led by
+a source that starts deep pinned nothing (KB-346, now the coarsest source of the chain pins), and no layer added with
+`imageryLayers.add` was pinned (KB-347, now pinned as if given at creation). The persistent cache slowed a cold view:
+each downloaded tile was written in a transaction of its own, and every read waited behind them (KB-348); now one write
+transaction runs at a time with up to 16 tiles, and reads under writes take 30–48 ms in Chromium instead of 384 ms.
+
 ## 2026-11-05: a moving camera keeps the detail it has; overzoom shows the finest source (F713, F714, KB-344, KB-345)
 
 The owner's reports from an application's satellite view: zoomed past Esri's last level over Australia the ground

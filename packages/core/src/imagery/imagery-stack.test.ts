@@ -93,6 +93,16 @@ describe('the pinned base (F084, KB-218)', () => {
     const fine = { ...valid, id: 'fine', minLevel: 12, coverage: europe };
     expect(pinnedLevels(stackEntries([{ sources: [fine] }]), 512 * 1024 * 1024)[0]).toBe(-1);
   });
+
+  it('pins the coarsest source of a chain that starts too deep, so its layer keeps a base everywhere (KB-346)', () => {
+    // A regional package from level 9, a world one from 3 and an online source from 3: the world one pins from 3.
+    const europe = [{ westRad: -0.5, southRad: 0.6, eastRad: 0.7, northRad: 1.2 }];
+    const regional = { ...valid, id: 'regional', minLevel: 9, coverage: europe };
+    const world = { ...valid, id: 'world', minLevel: 3 };
+    const online = { ...valid, id: 'online', minLevel: 3 };
+    const levels = pinnedLevels(stackEntries([{ sources: [regional, world, online] }]), 512 * 1024 * 1024);
+    expect(levels).toEqual([-1, 3, -1]);
+  });
 });
 
 describe('fading a layer in with the zoom (F635)', () => {

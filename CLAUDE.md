@@ -50,7 +50,8 @@ The engine must run smoothly on the weakest PC there is: an old SCADA workstatio
 - Research: read only the parts of other engines that answer the current question; keep notes short.
 - Record significant decisions as ADRs (`docs/internal/adr/README.md` has the conventions). Survey prior art first (`docs/internal/research/`).
 - Owner-only blockers go to `docs/internal/open-questions.md` (use a stub and continue); out-of-scope ideas go to `docs/internal/follow-ups.md`.
-- Ask the owner before force pushes, deleting branches or data, publishing packages, changing repository settings.
+- Ask the owner before force pushes, deleting branches or data, publishing a release, changing repository settings.
+- Pre-releases are the agent's (owner, 2026-11-09, ADR 0196): when changes merged on `main` are waited for by an application, and the release skill's package checks pass, start the Release workflow by hand on `main` (`run_workflow` of `release.yml`) with the next free `-rc.<n>` of the coming version and short notes in the style of the earlier pre-releases. Not after every merge, not to try a change. A release (a version without `-`, npm's `latest`) only with the owner's authorization for that version, as a GitHub release they create.
 - Commits, pushes, pull requests and comments go out in the owner's name only (owner, 2026-10-31): git author `Simone Recchia <recchia.sim@gmail.com>`, and no AI attribution anywhere (no `Co-Authored-By` or session trailers, no "Generated with" footers), so GitHub credits the owner's account.
 
 ## Working efficiently

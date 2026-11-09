@@ -18,13 +18,13 @@ describe('release (F710)', () => {
   };
 
   it('publishes only for a GitHub release, from the release workflow in CI, with its OIDC identity', () => {
-    expect(publishRefusal(ci)).toBeUndefined();
-    expect(publishRefusal({ ...ci, CI: undefined, GITHUB_ACTIONS: undefined })).toMatch(/only from CI/);
-    expect(publishRefusal({ ...ci, GITHUB_EVENT_NAME: 'push' })).toMatch(/GitHub release/);
-    expect(publishRefusal({ ...ci, GITHUB_WORKFLOW_REF: 'x/.github/workflows/ci.yml@refs/heads/main' })).toMatch(
-      /release\.yml/,
-    );
-    expect(publishRefusal({ ...ci, ACTIONS_ID_TOKEN_REQUEST_URL: undefined })).toMatch(/id-token: write/);
+    expect(publishRefusal(ci, '1.0.0')).toBeUndefined();
+    expect(publishRefusal({ ...ci, CI: undefined, GITHUB_ACTIONS: undefined }, '1.0.0')).toMatch(/only from CI/);
+    expect(publishRefusal({ ...ci, GITHUB_EVENT_NAME: 'push' }, '1.0.0')).toMatch(/GitHub release/);
+    expect(
+      publishRefusal({ ...ci, GITHUB_WORKFLOW_REF: 'x/.github/workflows/ci.yml@refs/heads/main' }, '1.0.0'),
+    ).toMatch(/release\.yml/);
+    expect(publishRefusal({ ...ci, ACTIONS_ID_TOKEN_REQUEST_URL: undefined }, '1.0.0')).toMatch(/id-token: write/);
   });
 
   it("takes the version from the release's tag, with or without a v", () => {
@@ -44,13 +44,47 @@ describe('release (F710)', () => {
     // no token, the version from the release's tag.
     expect(workflow).toMatch(/^on:\n {2}release:\n {4}types: \[published\]$/m);
     expect(workflow).toMatch(/TAG: \$\{\{ github\.event\.release\.tag_name \}\}/);
-    expect(workflow.slice(workflow.indexOf('\njobs:')).match(/^ {2}[a-z-]+:$/gm)).toEqual(['  publish:']);
+    expect(workflow.slice(workflow.indexOf('\njobs:')).match(/^ {2}[a-z-]+:$/gm)).toEqual([
+      '  publish:',
+      '  prerelease-page:',
+    ]);
     expect(workflow).toMatch(/environment: npm-release/);
     expect(workflow).toMatch(/^ {2}id-token: write$/m);
     expect(workflow).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN|secrets\./);
     const npm = /npm install --global npm@(\d+)\.(\d+)\.(\d+)/.exec(workflow);
     expect(Number(npm?.[1]) * 1000 + Number(npm?.[2])).toBeGreaterThanOrEqual(11005);
     expect(workflow.match(/scripts\/release\/release\.ts/g)).toHaveLength(1);
+  });
+});
+
+describe('pre-releases started by hand (F715)', () => {
+  const manual = {
+    CI: 'true',
+    GITHUB_ACTIONS: 'true',
+    GITHUB_EVENT_NAME: 'workflow_dispatch',
+    GITHUB_REF: 'refs/heads/main',
+    GITHUB_WORKFLOW_REF: 'SimoneRecchia/VibeGlobe/.github/workflows/release.yml@refs/heads/main',
+    ACTIONS_ID_TOKEN_REQUEST_URL: 'https://token.actions.example/',
+  };
+
+  it('publishes a pre-release started by hand on main, and never a release that way', () => {
+    expect(publishRefusal(manual, '1.0.0-rc.2')).toBeUndefined();
+    expect(publishRefusal(manual, '1.0.0')).toMatch(/only a pre-release/);
+    expect(publishRefusal({ ...manual, GITHUB_REF: 'refs/heads/feature' }, '1.0.0-rc.2')).toMatch(/from main/);
+  });
+
+  it('takes the version as an input, and gives the GitHub pre-release page to a job of its own that alone may write', () => {
+    const workflow = readFileSync(join(ROOT_DIR, '.github/workflows/release.yml'), 'utf8');
+    expect(workflow).toMatch(/^ {2}workflow_dispatch:\n {4}inputs:\n {6}version:$/m);
+    expect(workflow).toMatch(/release\.ts "\$\{TAG:-v\$VERSION\}"/);
+    // The publishing job, which installs and runs third-party code, cannot write to the repository.
+    expect(workflow).toMatch(/^permissions:\n {2}contents: read\n {2}id-token: write$/m);
+    const page = workflow.slice(workflow.indexOf('\n  prerelease-page:'));
+    expect(page).toMatch(/needs: publish/);
+    expect(page).toMatch(/if: github\.event_name == 'workflow_dispatch'/);
+    expect(page).toMatch(/permissions:\n {6}contents: write/);
+    expect(page).not.toMatch(/checkout|npm /);
+    expect(page).toMatch(/gh release create "v\$VERSION" --prerelease/);
   });
 });
 

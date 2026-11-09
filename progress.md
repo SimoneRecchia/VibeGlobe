@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-09: pre-releases started by hand (F715)
+
+The owner's brief: the agent publishes pre-releases itself when one is worth it, releases stay the owner's. The Release
+workflow also runs by hand on `main` with a version and notes; `release.ts` publishes such a run only for a pre-release
+version, and a second job, the only one that may write to the repository, creates the tag and the GitHub pre-release
+page (ADR 0196). `v0.3.0-rc.3` (KB-346, KB-347, KB-348) went out as a GitHub release the owner created. F715's last
+step, a run started by hand, is due with the next pre-release worth publishing.
+
 ## 2026-11-09: every layer keeps a pinned base; the tile cache writes in batches (KB-346, KB-347, KB-348)
 
 The owner's report from an application's satellite view: zooming in and out showed squares of the layer beneath, at

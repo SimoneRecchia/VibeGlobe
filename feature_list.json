@@ -8538,6 +8538,18 @@
         "In the playground with an artificial GPU load, lower the level, remove the load and confirm the next drag draws at the preset's resolution after its first frames; with the load kept, confirm the lowered level returns after them"
       ],
       "status": "passing"
+    },
+    {
+      "id": "F715",
+      "milestone": 15,
+      "section": "Documentation and distribution",
+      "description": "A pre-release can be published without the owner: the Release workflow, started by hand on main with a pre-release version and its notes, publishes `vibeglobe` at that version to the `next` dist-tag like a GitHub release does, then a separate job that alone may write to the repository creates its tag and GitHub pre-release page. A release version, or a run from another branch, is refused that way: releases stay GitHub releases the owner creates.",
+      "steps": [
+        "Unit-test that the release script publishes a run started by hand only for a pre-release version from main, and still publishes any version for a GitHub release",
+        "Assert the workflow takes the version and notes as inputs, keeps the publishing job read-only, and gives the tag and pre-release page to a job that needs the publishing job, runs only when started by hand, checks out and installs nothing and alone has `contents: write`",
+        "Start the Release workflow by hand on main with the next pre-release version and assert `vibeglobe@<version>` is on npm under `next`, with its tag and GitHub pre-release page"
+      ],
+      "status": "failing"
     }
   ]
 }

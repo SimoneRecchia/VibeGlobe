@@ -92,6 +92,26 @@ describe('cache stores', () => {
     store.close();
   });
 
+  it('writes up to 16 tiles that arrive together in one transaction, so reads wait for one write, not one per tile (KB-348)', async () => {
+    const store = indexedDbStore({ indexedDB: new IDBFactory() });
+    await store.usage();
+    const original = IDBDatabase.prototype.transaction;
+    let writes = 0;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<IDBDatabase['transaction']>) {
+      if (args[1] === 'readwrite') writes++;
+      return original.apply(this, args);
+    };
+    try {
+      await Promise.all(Array.from({ length: 40 }, (_, i) => store.put(`w/${String(i)}`, tile(100))));
+    } finally {
+      IDBDatabase.prototype.transaction = original;
+    }
+    expect(writes).toBe(3);
+    expect((await store.usage()).bytes).toBe(4000);
+    expect((await store.get('w/39'))?.bytes.byteLength).toBe(100);
+    store.close();
+  });
+
   it('reports a database deleted while open, then works on an empty one (F275)', async () => {
     const factory = new IDBFactory();
     const reasons: string[] = [];

@@ -3,6 +3,7 @@
 import type { StackLayer } from '../imagery/imagery-draws.js';
 import {
   applyChanges,
+  pinnedLevels,
   sourceInfo,
   validStack,
   type ImageryLayerChanges,
@@ -97,8 +98,11 @@ class ImageryLayersController implements ImageryLayers {
       throw new GlobeError('invalid-option', `An imagery layer already has the id "${entry.id}"`);
     const taken = entry.sources.find((source) => imagery.layers.some((layer) => layer.source.id === source.id));
     if (taken) throw new GlobeError('invalid-option', `An imagery source already has the id "${taken.id}"`);
-    const chain = entry.sources.map((source) => {
-      const layer = imagery.newLayer(source, freeIndex(imagery), -1);
+    // Its base is pinned as if it had been given at creation, after the layers already there (KB-347).
+    const stack = [...imagery.stack.map((layer) => layer.entry), entry];
+    const pinned = pinnedLevels(stack, imagery.residency.budgetBytes).slice(-entry.sources.length);
+    const chain = entry.sources.map((source, at) => {
+      const layer = imagery.newLayer(source, freeIndex(imagery), pinned[at] ?? -1);
       imagery.layers.push(layer);
       return layer;
     });

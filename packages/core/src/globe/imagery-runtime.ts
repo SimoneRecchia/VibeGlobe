@@ -115,7 +115,8 @@ export class ImageryRuntime {
   readonly network: NetworkPool;
   /** The engine's share of the page's worker pool (render extensions run their tasks on it too). */
   readonly lease: WorkerPoolLease;
-  private readonly residency: Residency;
+  /** The GPU textures and their budget, shared by every layer (ADR 0007). */
+  readonly residency: Residency;
   private readonly ram: RamTier;
   private frame = 0;
   private readonly fades = new ImageryFades();

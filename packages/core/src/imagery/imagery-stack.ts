@@ -318,14 +318,14 @@ const MAX_PINNED_START = 8;
  */
 export function pinnedLevels(entries: readonly StackEntry[], gpuBudgetBytes: number): number[] {
   const sources = entries.flatMap((entry) => entry.sources);
-  // One source of a chain pins a base, the later ones serving finer levels or standing in (F247): the first that has
-  // level 0, so a chain over a world source from a source that starts deeper pins the world's low levels (KB-218); in
-  // a chain without one, its first source, from its first level (F634).
+  // One source of a chain pins a base, the later ones serving finer levels or standing in (F247): the one that starts
+  // coarsest, the first among equals, from its first level (F634). A chain over a world source from a regional one
+  // that starts deeper so pins the world's low levels (KB-218, KB-346).
   const heads = entries.flatMap((entry) => {
-    const base = Math.max(
-      0,
-      entry.sources.findIndex((source) => !source.minLevel),
-    );
+    let base = 0;
+    entry.sources.forEach((source, index) => {
+      if (source.minLevel < (entry.sources[base]?.minLevel ?? 0)) base = index;
+    });
     return entry.sources.map((_, index) => index === base);
   });
   // A source starting deeper than this pins nothing: its first level has too many tiles to count, let alone pin.

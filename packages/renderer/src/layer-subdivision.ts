@@ -5,9 +5,19 @@ import type { FeatureGeometry } from '@vibeglobe/core';
 /** The longest edge, degrees, drawn as one straight piece: shorter ones stay within a few meters of the surface. */
 export const MAX_STEP_DEG = 1;
 /** On the terrain: pieces of about a kilometer, at most this many across a feature. */
-export const DRAPE_STEP_DEG = 0.01;
+const DRAPE_STEP_DEG = 0.01;
 /** On the terrain, the most pieces across a feature's extent (so large drapes stay affordable). */
-export const MAX_DRAPE_PIECES = 100;
+const MAX_DRAPE_PIECES = 100;
+/** A feature of a few kilometers or less still follows the relief: this many pieces across it (KB-351). */
+const SMALL_DRAPE_PIECES = 8;
+/** No piece is finer than the terrain's own detail, about 30 m. */
+const FINEST_DRAPE_STEP_DEG = 0.0003;
+
+/** The longest straight piece of a line or polygon edge draped on the terrain, degrees, for a feature `extentDeg` across. */
+export function drapeStepDeg(extentDeg: number): number {
+  const large = Math.min(MAX_STEP_DEG, Math.max(DRAPE_STEP_DEG, extentDeg / MAX_DRAPE_PIECES));
+  return Math.min(large, Math.max(FINEST_DRAPE_STEP_DEG, extentDeg / SMALL_DRAPE_PIECES));
+}
 
 /** A position: longitude and latitude in degrees, height in meters. */
 export type Vertex = [number, number, number];

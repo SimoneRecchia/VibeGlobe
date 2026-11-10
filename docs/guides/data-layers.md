@@ -454,6 +454,11 @@ metres.
 - Features need an `id` to be updated, selected or removed by the application; one without gets a generated id.
 - Change features in place (`setFeaturePosition`, `updateFeature`, `setFeatureState`): `setStyle` re-evaluates every
   feature, and a new layer rebuilds its batch.
+- A color or opacity change of one line or flat polygon (`setFeatureColor`, a `feature-state` color) uploads only that
+  feature's colors, so a pulse costs no rebuild; any other change of a line or polygon rebuilds its layer's batch.
+- Features on the terrain follow it without a rebuild: a line or polygon is draped in pieces, eight across a feature
+  of a few kilometers or less and none finer than about 30 m, and takes newer terrain's heights in place; a hidden
+  layer takes them when it shows.
 - An expression that reads both `['zoom']` and a feature property re-evaluates every feature at each zoom change. A
   zoom-only expression is evaluated once per frame for the whole layer, so large layers keep zoom out of per-feature
   expressions.

@@ -13,15 +13,7 @@ import {
   type LayerGround,
   type LayerRenderTarget,
 } from '@vibeglobe/core';
-import {
-  BufferAttribute,
-  BufferGeometry,
-  InterleavedBuffer,
-  InterleavedBufferAttribute,
-  Mesh,
-  type MeshBasicNodeMaterial,
-  type Scene,
-} from 'three/webgpu';
+import { Mesh, type MeshBasicNodeMaterial, type Scene } from 'three/webgpu';
 import { placeTile } from './eye-relative.js';
 import { releaseMesh } from './release-mesh.js';
 import { LAYER_RENDER_ORDER, orderLayerMeshes } from './layer-order.js';
@@ -29,8 +21,18 @@ import { pickAt } from './layer-picking.js';
 import { geometryBytes, LayerModels } from './layer-models.js';
 import { LayerAtlas, type AtlasImage } from './layer-atlas.js';
 import { FieldWaits, LabelSdf } from './label-sdf.js';
-import { FeatureChanges, stableRanges } from './layer-changes.hot.js';
-import { buildLayerArrays, rewriteQuads, rises, type BatchContents, type LayerArrays } from './layer-geometry.js';
+import { FeatureChanges } from './layer-changes.hot.js';
+import { buildLayerArrays, rises, type BatchContents, type LayerArrays } from './layer-geometry.js';
+import { recolor, reground, rewriteQuads } from './layer-rewrites.js';
+import {
+  COLOR,
+  HEIGHT,
+  layerGeometry,
+  QUAD_ATTRIBUTES,
+  uploadOtherHeights,
+  uploadRange,
+  type UpdateRange,
+} from './layer-mesh.js';
 import type { QuadImages } from './layer-geometry.js';
 import { createLayerMaterial, setLayerViewport, type LayerShape } from './layer-material.js';
 import { setSurfaceMorph } from './surface-material.js';
@@ -47,6 +49,8 @@ interface Batch extends BatchContents {
   solid?: boolean;
   visible: boolean;
   dirty: boolean;
+  /** The terrain version its heights were taken at (KB-349). */
+  grounded: number;
   mesh: Mesh | undefined;
   arrays: LayerArrays | undefined;
 }
@@ -55,17 +59,6 @@ interface Batch extends BatchContents {
 function onGround(batch: Batch): boolean {
   return typeof batch.descriptor.placement === 'string';
 }
-
-/** The vertex attributes of a quad batch and their components (`rebuild`). */
-const QUAD_ATTRIBUTES = [
-  ['position', 3],
-  ['tileNormal', 3],
-  ['tilePlane', 4],
-  ['layerHeight', 1],
-  ['layerColor', 4],
-  ['layerCorner', 4],
-  ['layerUv', 4],
-] as const;
 
 function shapeOf(batch: Batch): LayerShape {
   const kind = batch.kind;
@@ -127,6 +120,7 @@ export class LayerBatches implements LayerRenderTarget {
       order: 0,
       visible: true,
       dirty: true,
+      grounded: -1,
       changes: new FeatureChanges(),
       rangePools: QUAD_ATTRIBUTES.map(() => []),
       attributes: new Map(),
@@ -166,7 +160,7 @@ export class LayerBatches implements LayerRenderTarget {
       batch.attributes.set(attribute, values);
     }
     for (let i = first * components; i < (first + count) * components; i++) values[i] = data[i] ?? 0;
-    this.changed(batch, first, first + count);
+    this.changed(batch, first, first + count, attribute === 'color' || attribute === 'opacity');
   }
 
   /** See {@link LayerRenderTarget}. */
@@ -221,13 +215,18 @@ export class LayerBatches implements LayerRenderTarget {
   }
 
   /**
-   * Records a change to features [first, end): a quad batch whose buffers hold them rewrites only those (F376, F377);
-   * anything else is rebuilt on the next frame.
+   * Records a change to features [first, end): a quad batch whose buffers hold them rewrites only those (F376, F377),
+   * and so does a line or flat polygon batch for a change of `color` alone (KB-350); anything else is rebuilt on the
+   * next frame.
    */
-  private changed(batch: Batch, first: number, end: number): void {
+  private changed(batch: Batch, first: number, end: number, color = false): void {
     touchBatch(batch);
-    const inPlace = !batch.dirty && shapeOf(batch) === 'quad' && batch.arrays && end * 4 <= batch.arrays.vertices;
-    if (inPlace) batch.changes.mark(first, end);
+    const shape = shapeOf(batch);
+    const held =
+      shape === 'quad'
+        ? end * 4 <= (batch.arrays?.vertices ?? -1)
+        : color && shape !== 'solid' && end < (batch.arrays?.starts?.length ?? 0);
+    if (!batch.dirty && held) batch.changes.mark(first, end);
     else batch.dirty = true;
   }
 
@@ -302,13 +301,7 @@ export class LayerBatches implements LayerRenderTarget {
   place(view: FrameView): void {
     this.lastView = view;
     this.models.place(view);
-    const version = this.ground?.version() ?? 0;
-    if (version !== this.groundVersion) {
-      // Finer terrain arrived: features on the ground are placed on it again.
-      this.groundVersion = version;
-      for (const batch of this.batchList)
-        if (batch.descriptor.placement !== undefined && onGround(batch)) batch.dirty = true;
-    }
+    this.groundVersion = this.ground?.version() ?? 0;
     if (this.atlas.generation !== this.atlasGeneration) {
       // The atlas started over: every label and marker is drawn into it again.
       this.atlasGeneration = this.atlas.generation;
@@ -320,6 +313,8 @@ export class LayerBatches implements LayerRenderTarget {
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       if (!batch) continue;
+      // Finer terrain arrived: a batch in view takes its heights from it again (KB-349).
+      if (batch.visible && batch.grounded !== this.groundVersion && onGround(batch)) this.reground(batch);
       if (batch.dirty) this.rebuild(batch);
       else if (!batch.changes.empty) this.rewrite(batch);
       const mesh = batch.mesh;
@@ -403,8 +398,24 @@ export class LayerBatches implements LayerRenderTarget {
   }
 
   /**
-   * Rewrites the changed features of a quad batch and uploads only their vertices, one upload per run of consecutive
-   * features (F376–F378); rebuilds the batch when its arrays do not hold them.
+   * Stands a batch on the terrain known now without building it again (KB-349): lines and polygons by their heights
+   * alone, quads rewritten in place; a line or polygon built before any terrain, in pieces too long, is rebuilt.
+   */
+  private reground(batch: Batch): void {
+    batch.grounded = this.groundVersion;
+    const { arrays, mesh } = batch;
+    const ground = this.groundOf(batch);
+    if (batch.dirty || !arrays || !mesh || !ground) return;
+    if (!arrays.starts) return this.changed(batch, 0, batch.count);
+    if (!arrays.sources) return rebuildLater(batch);
+    reground(arrays, arrays.sources, ground);
+    uploadRange(batch.rangePools, mesh.geometry, HEIGHT, 0, arrays.vertices);
+    uploadOtherHeights(mesh.geometry, arrays);
+  }
+
+  /**
+   * Rewrites the changed features of a batch and uploads only their vertices, one upload per run of consecutive
+   * features (F376–F378, KB-350); rebuilds the batch when its arrays do not hold them.
    */
   private rewrite(batch: Batch): void {
     this.rewriting = this.waits.current = batch;
@@ -427,28 +438,27 @@ export class LayerBatches implements LayerRenderTarget {
     const batch = this.rewriting;
     const arrays = batch?.arrays;
     const mesh = batch?.mesh;
-    if (!batch || !arrays || !mesh || !rewriteQuads(batch, arrays, first, end, this.images, this.groundOf(batch)))
-      return false;
-    for (let i = 0; i < QUAD_ATTRIBUTES.length; i++) {
-      const [name, size] = QUAD_ATTRIBUTES[i] ?? ['', 0];
-      const attribute = mesh.geometry.getAttribute(name) as BufferAttribute;
-      // As `addUpdateRange`, with range objects of a pool, into a list three.js empties without dropping its storage.
-      const ranges = stableRanges(attribute);
-      const pool = batch.rangePools[i] ?? [];
-      const range = pool[ranges.length] ?? { start: 0, count: 0 };
-      if (pool[ranges.length] === undefined) pool.push(range);
-      range.start = first * 4 * size;
-      range.count = (end - first) * 4 * size;
-      ranges[ranges.length++] = range;
-      attribute.needsUpdate = true;
+    if (!batch || !arrays || !mesh) return false;
+    let from = first * 4;
+    let to = end * 4;
+    if (arrays.starts) {
+      // A line or polygon: only its colors changed.
+      if (!recolor(batch, arrays, first, end)) return false;
+      from = arrays.starts[first] ?? 0;
+      to = arrays.starts[end] ?? 0;
+      uploadRange(batch.rangePools, mesh.geometry, COLOR, from, to);
+    } else {
+      if (!rewriteQuads(batch, arrays, first, end, this.images, this.groundOf(batch))) return false;
+      for (let i = 0; i < QUAD_ATTRIBUTES.length; i++) uploadRange(batch.rangePools, mesh.geometry, i, from, to);
     }
     this.rangeUploads++;
-    this.uploadedVertices += (end - first) * 4;
+    this.uploadedVertices += to - from;
     return true;
   };
 
   private rebuild(batch: Batch): void {
     batch.dirty = false;
+    batch.grounded = this.groundVersion;
     batch.changes.clear();
     this.rebuilds++;
     this.disposeMesh(batch);
@@ -458,17 +468,7 @@ export class LayerBatches implements LayerRenderTarget {
     this.waits.current = undefined;
     batch.arrays = arrays;
     if (!arrays) return;
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(arrays.positions, 3));
-    geometry.setAttribute('tileNormal', new BufferAttribute(arrays.normals, 3));
-    geometry.setAttribute('tilePlane', new BufferAttribute(arrays.planes, 4));
-    geometry.setAttribute('layerHeight', new BufferAttribute(arrays.heights, 1));
-    geometry.setAttribute('layerColor', new BufferAttribute(arrays.colors, 4));
-    geometry.setAttribute('layerCorner', new BufferAttribute(arrays.corners, 4));
-    if (shapeOf(batch) === 'quad') geometry.setAttribute('layerUv', new BufferAttribute(arrays.uvs, 4));
-    if (arrays.other) setOtherEndpoint(geometry, arrays.other, arrays.vertices);
-    geometry.setIndex(new BufferAttribute(arrays.indices, 1));
-    const mesh = new Mesh(geometry, this.material(batch));
+    const mesh = new Mesh(layerGeometry(arrays, shapeOf(batch) === 'quad'), this.material(batch));
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
     mesh.frustumCulled = false;
@@ -483,31 +483,4 @@ export class LayerBatches implements LayerRenderTarget {
     releaseMesh(this.scene, batch.mesh);
     batch.mesh = undefined;
   }
-}
-
-/**
- * The other endpoint of each line vertex's segment, interleaved in one vertex buffer: WebGPU allows 8 per pipeline, and
- * a line vertex has 10 attributes.
- */
-function setOtherEndpoint(geometry: BufferGeometry, other: NonNullable<LayerArrays['other']>, vertices: number): void {
-  const stride = 11;
-  const data = new Float32Array(vertices * stride);
-  for (let v = 0; v < vertices; v++) {
-    const at = v * stride;
-    for (let i = 0; i < 3; i++) data[at + i] = other.positions[v * 3 + i] ?? 0;
-    for (let i = 0; i < 3; i++) data[at + 3 + i] = other.normals[v * 3 + i] ?? 0;
-    for (let i = 0; i < 4; i++) data[at + 6 + i] = other.planes[v * 4 + i] ?? 0;
-    data[at + 10] = other.heights[v] ?? 0;
-  }
-  const buffer = new InterleavedBuffer(data, stride);
-  geometry.setAttribute('otherPosition', new InterleavedBufferAttribute(buffer, 3, 0));
-  geometry.setAttribute('otherNormal', new InterleavedBufferAttribute(buffer, 3, 3));
-  geometry.setAttribute('otherPlane', new InterleavedBufferAttribute(buffer, 4, 6));
-  geometry.setAttribute('otherHeight', new InterleavedBufferAttribute(buffer, 1, 10));
-}
-
-/** A range of a buffer attribute's components to upload, as three.js keeps them. */
-interface UpdateRange {
-  start: number;
-  count: number;
 }

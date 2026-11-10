@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-11-10: data layers on the ground change in place (KB-349, KB-350, KB-351)
+
+The owner's reports from an application's draped areas, outlines and pulsing rings: flights toward them stuttered, a
+pulse rebuilt its layer twenty times a second, and small areas were cut by the relief. A batch on the ground now keeps
+where each vertex stands and takes only its heights from newer terrain (quads are rewritten in place, hidden batches
+wait until they show); a color or opacity change of a line or flat polygon uploads only that feature's colors; a
+feature of a few kilometers or less is draped in eight pieces across, down to about 30 m. A line's other endpoints
+are built interleaved from the start, which drops four arrays a batch and their copy. Measured: the renderer's main
+entry 38.03 → 38.39 KB (budget 38.5).
+
 ## 2026-11-09: pre-releases started by hand (F715)
 
 The owner's brief: the agent publishes pre-releases itself when one is worth it, releases stay the owner's. The Release

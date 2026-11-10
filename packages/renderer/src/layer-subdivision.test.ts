@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { greatCirclePoints, MAX_STEP_DEG, subdivide, type Triangle, type Vertex } from './layer-subdivision.js';
+import {
+  drapeStepDeg,
+  greatCirclePoints,
+  MAX_STEP_DEG,
+  subdivide,
+  type Triangle,
+  type Vertex,
+} from './layer-subdivision.js';
 
 const DEG = Math.PI / 180;
 const arcDeg = (u: Vertex, v: Vertex): number =>
@@ -56,5 +63,16 @@ describe('layer subdivision', () => {
       for (let k = 0; k < 3; k++)
         expect(arcDeg(piece[k] ?? [0, 0, 0], piece[(k + 1) % 3] ?? [0, 0, 0])).toBeLessThanOrEqual(MAX_STEP_DEG + 1e-9);
     expect(greatCirclePoints([0, 0, 0], [10, 0, 0], MAX_STEP_DEG)).toHaveLength(11);
+  });
+
+  it("drapes a small feature in pieces of its own size, down to the terrain's detail, and a large one as before (KB-351)", () => {
+    // Eight pieces across a feature of a few kilometers or less, none finer than about 30 m.
+    expect(drapeStepDeg(0.005)).toBeCloseTo(0.000625, 9);
+    expect(drapeStepDeg(0.05)).toBeCloseTo(0.00625, 9);
+    expect(drapeStepDeg(0.0005)).toBe(0.0003);
+    // From about 9 km across, pieces of a kilometer, at most a hundred across, never longer than the surface allows.
+    expect(drapeStepDeg(0.5)).toBe(0.01);
+    expect(drapeStepDeg(5)).toBe(0.05);
+    expect(drapeStepDeg(200)).toBe(MAX_STEP_DEG);
   });
 });

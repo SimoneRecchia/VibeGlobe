@@ -13,11 +13,10 @@ import { valueOf, type BatchContents } from './layer-contents.js';
 
 export { rises, valueOf, type BatchContents } from './layer-contents.js';
 import {
-  DRAPE_STEP_DEG,
+  drapeStepDeg,
   extentOf,
   forEachPart,
   greatCirclePoints,
-  MAX_DRAPE_PIECES,
   MAX_STEP_DEG,
   subdivide,
   vertexOf,
@@ -25,7 +24,6 @@ import {
 } from './layer-subdivision.js';
 import { nearestLon, originLonDeg, unwrappedPolygon, worldCopies, wrappedLon } from './layer-antimeridian.js';
 import { LABEL_BUFFER_TEXELS, labelReferencePx, SDF_UNITS_PER_TEXEL } from './label-sdf.js';
-import { writePointQuad } from './layer-points.hot.js';
 
 /** The vertex arrays of a layer mesh, sized for its vertices (ADR 0037). */
 export interface LayerArrays {
@@ -43,17 +41,26 @@ export interface LayerArrays {
    */
   readonly uvs: Float32Array;
   readonly indices: Uint32Array;
-  /** Lines only: the other endpoint of each vertex's segment. */
-  readonly other?: { positions: Float32Array; normals: Float32Array; planes: Float32Array; heights: Float32Array };
+  /** Lines only: the other endpoint of each vertex's segment, 11 values a vertex: position, normal, plane, height. */
+  readonly other?: Float32Array;
+  /** Lines and polygons: the first vertex of each feature, and one past the last, to recolor one in place (KB-350). */
+  readonly starts?: Uint32Array;
+  /**
+   * Lines and polygons on the terrain: each vertex's longitude, latitude and height above the ground, to stand it on
+   * newer terrain without building the batch again (KB-349). A line's other endpoints need none: the four vertices
+   * of a piece are its two ends twice, so vertex `v` has its other end at vertex `v ^ 2`.
+   */
+  readonly sources?: Float64Array;
 }
 
 /** The vertex values of a hidden quad: transparent, collapsed, without an image. */
 const HIDDEN_COLOR = [0, 0, 0, 0];
 const HIDDEN_CORNER = [0, 0, 2, 2];
-const HIDDEN_UV = [-1, -1, 0, 0];
+/** The atlas coordinates of a quad without an image. */
+export const HIDDEN_UV = [-1, -1, 0, 0];
 
 /** A feature's straight RGBA with its opacity and visibility applied to alpha. */
-function colorOf(batch: BatchContents, feature: number, attribute: BatchAttribute = 'color'): number[] {
+export function colorOf(batch: BatchContents, feature: number, attribute: BatchAttribute = 'color'): number[] {
   const alpha = valueOf(batch, 'opacity', feature) * valueOf(batch, 'visible', feature);
   return [0, 1, 2, 3].map((c) => {
     const value = valueOf(batch, attribute, feature, c);
@@ -73,7 +80,9 @@ class Builder {
   corners: number[] = [];
   uvs: number[] = [];
   indices: number[] = [];
-  other = { positions: [] as number[], normals: [] as number[], planes: [] as number[], heights: [] as number[] };
+  starts: number[] = [];
+  sources: number[] = [];
+  other: number[] = [];
   private readonly one = { positions: new Float32Array(3), normals: new Float32Array(3), planes: new Float32Array(4) };
 
   /** Longitudes on the flat map (F368): nearest the origin (quads), the previous one (lines), or as given (rings). */
@@ -106,7 +115,18 @@ class Builder {
 
   /** The longest straight piece of a line or polygon edge, degrees: finer on the terrain, so drapes follow it. */
   stepDeg(extentDeg: number): number {
-    return this.ground ? Math.min(MAX_STEP_DEG, Math.max(DRAPE_STEP_DEG, extentDeg / MAX_DRAPE_PIECES)) : MAX_STEP_DEG;
+    return this.ground ? drapeStepDeg(extentDeg) : MAX_STEP_DEG;
+  }
+
+  /**
+   * A height above the terrain under a position; a line's or polygon's vertex keeps the position, to take the height
+   * again from newer terrain (KB-349).
+   */
+  private standing(lonDeg: number, latDeg: number, heightMeters: number): number {
+    if (!this.ground) return heightMeters;
+    const lon = wrappedLon(lonDeg);
+    if (this.starts.length > 0) this.sources.push(lon, latDeg, heightMeters);
+    return heightMeters + this.ground.heightAt(lon, latDeg);
   }
 
   get count(): number {
@@ -124,28 +144,22 @@ class Builder {
     uv: number[] = HIDDEN_UV,
   ): void {
     const lon = this.place(lonDeg);
-    this.attributesOf(lon, latDeg, this);
-    this.heights.push(heightMeters + (this.ground?.heightAt(wrappedLon(lon), latDeg) ?? 0));
+    const { positions, normals, planes } = this.one;
+    writeLayerVertex(this.one, 0, lon, latDeg, this.origin);
+    this.positions.push(...positions);
+    this.normals.push(...normals);
+    this.planes.push(...planes);
+    this.heights.push(this.standing(lon, latDeg, heightMeters));
     this.colors.push(...color);
     this.corners.push(...corner);
     this.uvs.push(...uv);
     if (to) {
       // A segment's other end: on the branch next to this one.
       const toLon = nearestLon(to[0] ?? 0, lon);
-      this.attributesOf(toLon, to[1] ?? 0, this.other);
-      this.other.heights.push((to[2] ?? 0) + (this.ground?.heightAt(wrappedLon(toLon), to[1] ?? 0) ?? 0));
+      writeLayerVertex(this.one, 0, toLon, to[1] ?? 0, this.origin);
+      const height = (to[2] ?? 0) + (this.ground?.heightAt(wrappedLon(toLon), to[1] ?? 0) ?? 0);
+      this.other.push(...positions, ...normals, ...planes, height);
     }
-  }
-
-  private attributesOf(
-    lonDeg: number,
-    latDeg: number,
-    into: { positions: number[]; normals: number[]; planes: number[] },
-  ): void {
-    writeLayerVertex(this.one, 0, lonDeg, latDeg, this.origin);
-    into.positions.push(...this.one.positions);
-    into.normals.push(...this.one.normals);
-    into.planes.push(...this.one.planes);
   }
 
   arrays(line: boolean): LayerArrays {
@@ -160,16 +174,9 @@ class Builder {
       corners: Float32Array.from(this.corners),
       uvs: Float32Array.from(this.uvs),
       indices: Uint32Array.from(this.indices),
-      ...(line
-        ? {
-            other: {
-              positions: Float32Array.from(this.other.positions),
-              normals: Float32Array.from(this.other.normals),
-              planes: Float32Array.from(this.other.planes),
-              heights: Float32Array.from(this.other.heights),
-            },
-          }
-        : {}),
+      ...(line ? { other: Float32Array.from(this.other) } : {}),
+      ...(this.starts.length > 0 ? { starts: Uint32Array.from([...this.starts, this.count]) } : {}),
+      ...(this.sources.length > 0 ? { sources: Float64Array.from(this.sources) } : {}),
     };
   }
 }
@@ -264,7 +271,7 @@ interface QuadVertices {
 }
 
 /** A quad feature's vertices; a hidden one collapses to its anchor, transparent, keeping its place in the buffers. */
-function quadVertices(batch: BatchContents, feature: number, images: QuadImages | undefined): QuadVertices {
+export function quadVertices(batch: BatchContents, feature: number, images: QuadImages | undefined): QuadVertices {
   const lon = valueOf(batch, 'position', feature, 0);
   const lat = valueOf(batch, 'position', feature, 1);
   const height = valueOf(batch, 'position', feature, 2);
@@ -314,7 +321,7 @@ const QUAD_CORNERS = [
 
 /**
  * Points, markers and labels: a screen-sized quad around each feature's position, four vertices per feature in feature
- * order (hidden ones collapsed), so a change to one feature rewrites only its vertices ({@link rewriteQuads}).
+ * order (hidden ones collapsed), so a change to one feature rewrites only its vertices (`rewriteQuads`).
  */
 function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages | undefined): void {
   builder.startFeature('origin');
@@ -333,43 +340,10 @@ function buildQuads(batch: BatchContents, builder: Builder, images: QuadImages |
   }
 }
 
-/**
- * Rewrites the vertices of features [first, end) of a quad batch in place (F376, F377); returns false when its arrays do
- * not hold them (the batch must be rebuilt).
- */
-export function rewriteQuads(
-  batch: BatchContents,
-  arrays: LayerArrays,
-  first: number,
-  end: number,
-  images: QuadImages | undefined,
-  ground: LayerGround | undefined,
-): boolean {
-  if (end * 4 > arrays.vertices) return false;
-  if (batch.kind === 'point') {
-    // Points have no image: the allocation-free path of live feeds (F378).
-    for (let feature = first; feature < end; feature++) writePointQuad(batch, arrays, feature, ground);
-    return true;
-  }
-  for (let feature = first; feature < end; feature++) {
-    const q = quadVertices(batch, feature, images);
-    const height = q.height + (ground?.heightAt(q.lon, q.lat) ?? 0);
-    const lon = nearestLon(q.lon, originLonDeg(arrays.origin));
-    for (let c = 0; c < 4; c++) {
-      const v = feature * 4 + c;
-      writeLayerVertex(arrays, v, lon, q.lat, arrays.origin);
-      arrays.heights[v] = height;
-      arrays.colors.set(q.color, v * 4);
-      arrays.corners.set(q.corners[c] ?? [], v * 4);
-      arrays.uvs.set(q.uvs[c] ?? HIDDEN_UV, v * 4);
-    }
-  }
-  return true;
-}
-
 /** Lines: a quad per segment, its vertices offset across the projected segment by half the width. */
 function buildLines(batch: BatchContents, builder: Builder): void {
   for (let feature = 0; feature < batch.count; feature++) {
+    builder.starts.push(builder.count);
     const geometry = batch.geometry.get(feature);
     if (!geometry || valueOf(batch, 'visible', feature) <= 0) continue;
     const step = builder.stepDeg(extentOf(geometry));
@@ -398,6 +372,7 @@ function buildLines(batch: BatchContents, builder: Builder): void {
 /** Polygons: triangulated with their holes; with a height, extruded as walls and a roof (`fill-extrusion`). */
 function buildPolygons(batch: BatchContents, builder: Builder): void {
   for (let feature = 0; feature < batch.count; feature++) {
+    builder.starts.push(builder.count);
     const geometry = batch.geometry.get(feature);
     if (!geometry || valueOf(batch, 'visible', feature) <= 0) continue;
     const step = builder.stepDeg(extentOf(geometry));

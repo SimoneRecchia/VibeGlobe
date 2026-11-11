@@ -244,6 +244,46 @@ describe('ImageryLoader', () => {
     expect(transport.started).toEqual([url(6, 1, 1)]);
   });
 
+  it('asks nothing below a tile its source does not have, when the source says nothing is deeper (KB-352)', () => {
+    const { timers, transport, loader } = setUp(32, { source: { emptyBelowMissing: true } });
+    const wantAll = (): void => {
+      loader.beginFrame();
+      // The view wants a deep tile and, as the engine does, its ancestors before it.
+      loader.want(5, 4, 4, 1);
+      loader.want(6, 8, 8, 2);
+      loader.want(7, 16, 16, 3);
+      loader.want(8, 32, 32, 4);
+      loader.endFrame();
+    };
+    wantAll();
+    // Only the coarsest is asked: the deeper ones wait for its answer instead of leaving with it.
+    expect(transport.started).toEqual([url(5, 4, 4)]);
+    transport.answer(url(5, 4, 4), { kind: 'status', status: 404, retryAfterMs: undefined });
+    for (let frame = 0; frame < 5; frame++) {
+      timers.advance(1000);
+      wantAll();
+    }
+    expect(transport.started).toEqual([url(5, 4, 4)]);
+    expect(loader.noData(8, 32, 32)).toBe(true);
+    // A sibling branch is untouched, and a reload of the missing tiles asks again.
+    loader.beginFrame();
+    loader.want(6, 20, 20, 1);
+    loader.endFrame();
+    expect(transport.started).toEqual([url(5, 4, 4), url(6, 20, 20)]);
+    loader.reload(true);
+    wantAll();
+    expect(transport.started).toEqual([url(5, 4, 4), url(6, 20, 20), url(5, 4, 4)]);
+  });
+
+  it('asks every level at once below a missing tile of an ordinary source (KB-352)', () => {
+    const { transport, loader } = setUp();
+    loader.beginFrame();
+    loader.want(5, 4, 4, 1);
+    loader.want(6, 8, 8, 2);
+    loader.endFrame();
+    expect(transport.started).toEqual([url(5, 4, 4), url(6, 8, 8)]);
+  });
+
   it('takes an empty success (a 204 or a 200 without a body) for no data, not a corrupt tile', () => {
     const { timers, transport, loader, errors, tasks } = setUp();
     loader.beginFrame();

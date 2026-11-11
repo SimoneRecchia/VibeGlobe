@@ -40,6 +40,8 @@ Without `terrain` the surface is the WGS84 ellipsoid. Where the source has no da
   (`−10000 + (R × 65536 + G × 256 + B) / 10` m) PNG tiles, 256 or 512 px, Web Mercator or geographic (`tiling`), XYZ or
   TMS (`{-y}`), levels 0 to 15 by default. `coverage` (rectangles in radians) or `area` (polygons in degrees, tiles
   wholly inside) limits the requests.
+  `emptyBelowMissing: true` is for a pyramid deeper only where its data is finer: after one 404 the tiles below that
+  one are not requested.
 - **Quantized-mesh** (`quantizedMeshTerrain({ id, url })`, `url` naming `layer.json`): gzip-compressed or not. The
   oct-encoded normals, water mask and metadata extensions are requested only when `layer.json` declares them. Tiles
   outside the declared availability, including availability declared in parent tiles' metadata, are never requested.

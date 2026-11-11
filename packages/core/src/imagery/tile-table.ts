@@ -43,6 +43,8 @@ export interface TileRecord {
   settled: boolean;
   /** The source last answered that it cannot tell yet whether the tile exists (F128). */
   availabilityUnknown: boolean;
+  /** The server answered that it has no such tile, or an ancestor's did for a source `emptyBelowMissing` (KB-352). */
+  missing: boolean;
   /** Rounds of attempts the tile was given again when its source answered after it failed (ADR 0046, at most 3). */
   rounds: number;
   /**
@@ -121,6 +123,7 @@ export class TileTable {
       pinned: level <= this.pinnedLevel && (this.isPinned?.(level, x, y) ?? true),
       settled: false,
       availabilityUnknown: false,
+      missing: false,
       rounds: 0,
       roundSuccesses: 0,
       freshUntilMs: Infinity,

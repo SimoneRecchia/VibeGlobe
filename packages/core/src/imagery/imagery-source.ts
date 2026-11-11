@@ -18,6 +18,12 @@ export interface TileSource {
   readonly maxLevel: number;
   /** The areas with data: tiles outside every rectangle are never requested (F094). */
   readonly coverage?: readonly TileRectangleRad[];
+  /**
+   * A tile the server does not have (404, 410, 204, an empty body) has nothing deeper either, as in a pyramid cut from
+   * data of uneven detail: the tiles below it are never requested, and a tile waits for the answer of an ancestor
+   * still on its way (KB-352). Off by default: a sparse pyramid may hold tiles below a missing one.
+   */
+  readonly emptyBelowMissing?: boolean;
   /** Fetches tile bytes; `fetchTransport()` from `@vibeglobe/sources` in browsers. */
   readonly transport: TileTransport;
   /** Requests in flight to each of the source's hosts (default 6, or 16 when `multiplexed`; F089). */

@@ -534,7 +534,11 @@ export class ImageryLoader implements NetworkPoolClient {
    */
   reload(missingOnly = false): void {
     if (missingOnly) {
-      for (const record of this.table.bySlot) if (record.state === NO_DATA) record.state = UNLOADED;
+      for (const record of this.table.bySlot)
+        if (record.state === NO_DATA) {
+          record.state = UNLOADED;
+          record.missing = false;
+        }
       this.options.requestFrame();
       return;
     }
@@ -549,6 +553,7 @@ export class ImageryLoader implements NetworkPoolClient {
       record.retries = 0;
       record.rounds = 0;
       record.availabilityUnknown = false;
+      record.missing = false;
       record.settled = false;
     }
     this.active.length = 0;
@@ -666,6 +671,23 @@ export class ImageryLoader implements NetworkPoolClient {
   }
 
   /**
+   * For a source whose missing tiles have nothing deeper: 1 when an ancestor is missing, so the tile is too, -1 while
+   * an ancestor's answer is awaited, 0 otherwise (KB-352).
+   */
+  private above(coord: TileCoord): number {
+    let x = coord.x;
+    let y = coord.y;
+    for (let level = coord.level - 1; level >= this.options.source.minLevel; level--) {
+      x = Math.floor(x / 2);
+      y = Math.floor(y / 2);
+      const record = this.table.find(level, x, y);
+      if (record?.missing) return 1;
+      if (record?.state === QUEUED || record?.state === LOADING) return -1;
+    }
+    return 0;
+  }
+
+  /**
    * Starts the best queued request: 1 when started, 0 when it must wait (no free slot, or the pinned base is still
    * loading and the tile is not part of it), -1 when the tile had no data or its availability is not known yet.
    */
@@ -679,10 +701,20 @@ export class ImageryLoader implements NetworkPoolClient {
       const slot = this.heap.peek();
       const record = slot >= 0 ? this.table.bySlot[slot] : undefined;
       if (!record || (!record.pinned && !this.pinnedComplete)) break;
-      const request = this.options.source.request(record.coord, { url: '', hostIndex: 0 }, this.pixelRatio);
+      const above = this.options.source.emptyBelowMissing === true ? this.above(record.coord) : 0;
+      if (above < 0) {
+        // An ancestor's answer is on its way: asked again when wanted again, once it is known whether anything is here.
+        this.heap.pop();
+        record.state = UNLOADED;
+        result = -1;
+        break;
+      }
+      const request =
+        above > 0 ? 'noData' : this.options.source.request(record.coord, { url: '', hostIndex: 0 }, this.pixelRatio);
       if (request === 'noData') {
         this.heap.pop();
         record.state = NO_DATA;
+        record.missing = above > 0;
         record.availabilityUnknown = false;
         this.settlePinned(record);
         result = -1;
@@ -777,6 +809,7 @@ export class ImageryLoader implements NetworkPoolClient {
       record.state = UNLOADED;
     } else if (decision.failureClass === FAILURE_NO_DATA) {
       record.state = NO_DATA;
+      record.missing = true;
     } else if (decision.retry) {
       if (decision.failureClass === FAILURE_TRANSIENT) this.failedTransiently();
       record.state = FAILED;

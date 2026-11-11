@@ -47,6 +47,11 @@ export interface HeightmapTerrainOptions {
   maxRequestsPerHost?: number;
   multiplexed?: boolean;
   timeoutsMs?: TimeoutsMs;
+  /**
+   * The server has nothing below a tile it does not have (a pyramid deeper only where its data is finer): after one
+   * 404 the tiles below are not requested. Off by default.
+   */
+  emptyBelowMissing?: boolean;
   /** Credits shown while the terrain is in view (F254); none by default. */
   attribution?: readonly Attribution[];
   /** The provider's rules; everything enabled by default. */
@@ -78,6 +83,7 @@ export function heightmapTerrain(options: HeightmapTerrainOptions): TerrainSourc
     ...(options.maxRequestsPerHost === undefined ? {} : { maxRequestsPerHost: options.maxRequestsPerHost }),
     ...(options.multiplexed === undefined ? {} : { multiplexed: options.multiplexed }),
     ...(options.timeoutsMs === undefined ? {} : { timeoutsMs: options.timeoutsMs }),
+    ...(options.emptyBelowMissing ? { emptyBelowMissing: true } : {}),
     request(coord: TileCoord, out: TileRequest): TileRequest | 'noData' {
       if (coord.level < minLevel || coord.level > maxLevel) return 'noData';
       if (options.coverage && !inCoverage(options.coverage, tiling.tileExtent(coord, extent))) return 'noData';

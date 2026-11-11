@@ -195,7 +195,8 @@ export class GlyphSource {
         const index = parseSpriteIndex(await (await this.fetchImpl(new URL(sheet.json, base).href)).json(), sheet.id);
         const image = await createImageBitmap(await (await this.fetchImpl(new URL(sheet.png, base).href)).blob());
         const canvas = new OffscreenCanvas(image.width, image.height);
-        const ctx = canvas.getContext('2d');
+        // One read per icon of the sheet: kept in memory, not on the GPU, where each read would be a slow copy back.
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (ctx === null) continue;
         ctx.drawImage(image, 0, 0);
         for (const [name, icon] of index) {
